@@ -1,0 +1,97 @@
+Source: httrack
+Section: web
+Priority: optional
+Maintainer: Xavier Roche <roche@httrack.com>
+Standards-Version: 3.9.3
+Build-Depends: debhelper (>> 5.0.0), zlib1g-dev
+Homepage: http://www.httrack.com
+
+Package: httrack
+Architecture: any
+Section: web
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Suggests: webhttrack, httrack-doc
+Description: Copy websites to your computer (Offline browser)
+ HTTrack is an offline browser utility, allowing you to download a World
+ Wide website from the Internet to a local directory, building recursively
+ all directories, getting html, images, and other files from the server to
+ your computer.
+ .
+ HTTrack arranges the original site's relative link-structure. Simply
+ open a page of the "mirrored" website in your browser, and you can
+ browse the site from link to link, as if you were viewing it online.
+ HTTrack can also update an existing mirrored site, and resume
+ interrupted downloads. HTTrack is fully configurable, and has an
+ integrated help system. 
+
+Package: webhttrack
+Architecture: any
+Section: web
+Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
+Suggests: httrack, httrack-doc
+Replaces: webhttrack-common (<< 3.43.9-2)
+Enhances: httrack
+Description: Copy websites to your computer, httrack with a Web interface
+ WebHTTrack is an offline browser utility, allowing you to download a World
+ Wide website from the Internet to a local directory, building recursively
+ all directories, getting html, images, and other files from the server to
+ your computer, using a step-by-step web interface.
+ .
+ WebHTTrack arranges the original site's relative link-structure. Simply
+ open a page of the "mirrored" website in your browser, and you can
+ browse the site from link to link, as if you were viewing it online.
+ HTTrack can also update an existing mirrored site, and resume
+ interrupted downloads. WebHTTrack is fully configurable, and has an
+ integrated help system.
+ .
+  Snapshots: http://www.httrack.com/page/21/
+
+Package: webhttrack-common
+Architecture: all
+Section: web
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: webhttrack common files
+ This package is the common files of webhttrack, website copier and
+ mirroring utility
+
+Package: libhttrack2
+Architecture: any
+Section: libs
+Replaces: libhttrack1
+Conflicts: libhttrack1
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Recommends: libssl1.0.0
+Description: Httrack website copier library
+ This package is the library part of httrack, website copier and mirroring
+ utility
+
+Package: libhttrack-dev
+Architecture: any
+Section: libdevel
+Depends: ${misc:Depends}, ${shlibs:Depends}, zlib1g-dev
+Recommends: libssl1.0.0
+Description: Httrack website copier includes and development files
+ This package adds supplemental files for using the httrack website copier
+ library
+
+Package: httrack-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends}
+Description: Httrack website copier additional documentation
+ This package adds supplemental documentation for httrack and webhttrack
+ as a browsable html documentation
+
+Package: proxytrack
+Architecture: any
+Section: web
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Suggests: squid, httrack
+Description: Build HTTP Caches using archived websites copied by HTTrack
+ ProxyTrack is a simple proxy server aimed to deliver content archived by
+ HTTrack sessions. It can aggregate multiple download caches, for direct
+ use (through any browser) or as an upstream cache slave server.
+ This proxy can handle HTTP/1.1 proxy connections, and is able to reply to
+ ICPv2 requests for an efficient integration within other cache servers,
+ such as Squid. It can also handle transparent HTTP requests to allow
+ cached live connections inside an offline network.

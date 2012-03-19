@@ -1,0 +1,1144 @@
+httrack (3.45.2-1) unstable; urgency=low
+
+  * Updated to 3.45.2 (3.45-2)
+    Lintian fixes
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 18 Mar 2012 22:01:13 +0100
+
+httrack (3.45.1-1) unstable; urgency=low
+
+  * Updated to 3.45.1 (3.45-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 17 Mar 2012 10:35:16 +0100
+
+httrack (3.44.5-1) unstable; urgency=low
+
+  * Updated to 3.44.5 (3.44-5)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 11 Feb 2012 12:58:06 +0100
+
+httrack (3.44.4-1) unstable; urgency=low
+
+  * Updated to 3.44.4 (3.44-4)
+    closes:#657878
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 Jan 2012 15:55:51 +0100
+
+httrack (3.44.3-1) unstable; urgency=low
+
+  * Updated to 3.44.3 (3.44-3)
+    closes:#657334
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 25 Jan 2012 21:19:09 +0100
+
+httrack (3.44.2-1) unstable; urgency=low
+
+  * Hardened build flags through dpkg-buildflags (Moritz Muehlenhoff <jmm@debian.org>)
+    Updated to 3.44.2 (3.44-2)
+    closes:#657334
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 25 Jan 2012 19:35:28 +0100
+
+httrack (3.44.1-4) unstable; urgency=low
+
+  * Fixed hardcoded "Recommends: libssl0.9.8" (now libssl1.0.0)
+    closes:#636080
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 08 Apr 2011 19:04:50 +0200
+
+httrack (3.44.1-3) unstable; urgency=low
+
+  * Fixed *.la/*.a files in libhttrack-dev (examples, this time)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 08 Apr 2011 19:04:50 +0200
+
+httrack (3.44.1-2) unstable; urgency=low
+
+  * Fixed *.la/*.a files in libhttrack-dev
+    Fixed double entry in menu on Ubuntu (Ubuntu BUG #554256)
+    closes:#621541
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 07 Apr 2011 21:51:22 +0200
+
+httrack (3.44.1-1) unstable; urgency=medium
+
+  * Fixed content of files replaced with error pages randomly during a update
+    closes:#614966
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 27 Feb 2011 21:49:25 +0100
+
+httrack (3.43.12-1) unstable; urgency=medium
+
+  * Fixed buffer overflow while repairing httrack cache if a damaged cache is
+    found from a previous mirror
+    closes:#607704
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 21 Dec 2010 11:29:14 +0100
+
+httrack (3.43.11-1) unstable; urgency=low
+
+  * Updated to 3.43.11 (3.43-11)
+    Fixed icecat/iceweasel issues
+    closes:#605140
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 27 Nov 2010 23:06:42 +0100
+
+httrack (3.43.9-2) unstable; urgency=low
+
+  * Moved desktop files from webhttrack-common to webhttrack to fix lintian
+    warnings
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 10 Jan 2010 15:28:49 +0100
+
+httrack (3.43.9-1) unstable; urgency=low
+
+  * Updated to 3.43.9 (3.43-9)
+    closes:#563691
+    Also merged various lintian fixes and updated i386 build chain for piuparts
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 04 Jan 2010 19:08:48 +0100
+
+httrack (3.43.8-1) unstable; urgency=low
+
+  * Updated to 3.43.8 (3.43-8)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 01 Jan 2010 11:41:34 +0100
+
+httrack (3.43.7-1) unstable; urgency=low
+
+  * Updated to 3.43.7 (3.43-7)
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 23 Jul 2009 19:09:10 +0200
+
+httrack (3.43.6-1) unstable; urgency=low
+
+  * Updated to 3.43.6 (3.43-6)
+    closes:#530031
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 18 Jul 2009 17:49:47 +0200
+
+httrack (3.43.5-1) unstable; urgency=low
+
+  * Updated to 3.43.5 (3.43-5)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 20 May 2009 19:09:11 +0200
+
+httrack (3.43.4-1) unstable; urgency=low
+
+  * Updated to 3.43.4 (3.43-4)
+    closes:#516615
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 19 Mar 2009 18:42:38 +0100
+
+httrack (3.43.3-1) unstable; urgency=low
+
+  * Updated to 3.43.3 (3.43-3)
+    closes:#516450
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 21 Feb 2009 16:31:16 +0100
+
+httrack (3.43.2-1) unstable; urgency=low
+
+  * Updated to 3.43.2 (3.43-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 07 Dec 2008 11:12:22 +0100
+
+httrack (3.43.1-2) unstable; urgency=low
+
+  * Fixed bogus homepage in control file
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 30 Nov 2008 10:11:53 +0100
+
+httrack (3.43.1-1) unstable; urgency=low
+
+  * Updated to 3.43.1 (3.43)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 28 Sep 2008 18:43:12 +0200
+
+httrack (3.42.96-1) unstable; urgency=low
+
+  * Updated to 3.42.96 (3.43-rc-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 21 Sep 2008 11:54:37 +0200
+
+httrack (3.42.95-1) unstable; urgency=low
+
+  * Updated to 3.42.95 (3.43-rc-1)
+  * Various fixes in desktop/txt/build files (Debarshi Ray)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 13 Sep 2008 15:38:47 +0200
+
+httrack (3.42.93-1) unstable; urgency=low
+
+  * Updated to 3.42.93 (3.43-beta-4)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 07 Sep 2008 18:45:10 +0200
+
+httrack (3.42.92-1) unstable; urgency=low
+
+  * Updated to 3.42.92 (3.43-beta-3)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 31 Aug 2008 15:21:58 +0200
+
+httrack (3.42.91-1) unstable; urgency=low
+
+  * Updated to 3.42.91 (3.43-beta-2)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 22 Aug 2008 19:51:06 +0200
+
+httrack (3.42.90-1) unstable; urgency=low
+
+  * Updated to 3.42.90 (3.43-beta-1)
+  * Splitted webhttrack into webhttrack + webhttrack-common
+    (arch-dep-package-has-big-usr-share)
+  * Renamed libhttrack1 to libhttrack2 (package-name-doesnt-match-sonames)
+  * Fixed other minor lintian issues (debian-rules-sets-DH_COMPAT,
+    desktop-file-in-wrong-dir, debian-changelog-line-too-long ..)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 19 Aug 2008 22:25:52 +0200
+
+httrack (3.42.3-1) unstable; urgency=high
+
+  * Updated to 3.42.3-1 (3.42-3) ; (Joan CALVET) fixed security issue regarding
+    commandline parsing of URLs
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 28 Jul 2008 22:52:53 +0200
+
+httrack (3.42.2-1) unstable; urgency=low
+
+  * Updated to 3.42.2-1 (3.42-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 16 Mar 2008 22:25:09 +0100
+
+httrack (3.42.1-1) unstable; urgency=low
+
+  * Updated to 3.42.1-1 (3.42)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 16 Nov 2007 13:34:01 +0100
+
+httrack (3.41.23-1) unstable; urgency=medium
+
+  * Updated to 3.41.23-1 (3.41-3) ; (Dann Frazier) fixed gzopen64() implicitly
+    converted to pointer (closes:#431487)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 03 Jul 2007 21:05:49 +0200
+
+httrack (3.41.22-1) unstable; urgency=low
+
+  * Updated to 3.41.22 (3.41-3) ; fixed configure.in
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 16 Jun 2007 17:27:26 +0200
+
+httrack (3.41.20-1) unstable; urgency=low
+
+  * Updated to 3.41.20 (3.41) (closes:#366763, #406807)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  3 Feb 2007 14:32:12 +0100
+
+httrack (3.41.19-1) unstable; urgency=low
+
+  * Updated to 3.41.19 (3.41-rc-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 14 Jan 2007 14:46:19 +0100
+
+httrack (3.41.18-1) unstable; urgency=low
+
+  * Updated to 3.41.18 (3.41-beta-13)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 12 Nov 2006 18:58:12 +0100
+
+httrack (3.41.17-1) unstable; urgency=low
+
+  * Updated to 3.41.17 (3.41-beta-12)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 Oct 2006 11:40:23 +0200
+
+httrack (3.41.16-1) unstable; urgency=low
+
+  * Updated to 3.41.16 (3.41-beta-11)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 Oct 2006 10:39:13 +0200
+
+httrack (3.41.15-1) unstable; urgency=low
+
+  * Updated to 3.41.15 (3.41-beta-10)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  3 Sep 2006 10:24:04 +0200
+
+httrack (3.41.14-1) unstable; urgency=low
+
+  * Updated to 3.41.14 (3.41-beta-9)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 19 Aug 2006 17:52:06 +0200
+
+httrack (3.41.13-1) unstable; urgency=low
+
+  * Updated to 3.41.13 (3.41-beta-8)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 15 Aug 2006 11:53:17 +0200
+
+httrack (3.41.12-1) unstable; urgency=low
+
+  * Updated to 3.41.12 (3.41-beta-7)
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 14 Aug 2006 10:50:10 +0200
+
+httrack (3.41.11-1) unstable; urgency=low
+
+  * Updated to 3.41.11 (3.41-beta-6)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  6 Aug 2006 14:40:36 +0200
+
+httrack (3.41.10-1) unstable; urgency=low
+
+  * Updated to 3.41.10 (3.41-beta-5)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 30 Jul 2006 18:20:14 +0200
+
+httrack (3.41.9-1) unstable; urgency=low
+
+  * Updated to 3.41.9 (3.41-beta-4)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 29 Jul 2006 09:42:32 +0200
+
+httrack (3.41.8-1) unstable; urgency=low
+
+  * Updated to 3.41.8 (3.41-beta-3)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 23 Jul 2006 10:28:16 +0200
+
+httrack (3.41.7-1) unstable; urgency=low
+
+  * Updated to 3.41.7 (3.41-beta-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 25 Jun 2006 17:42:17 +0200
+
+httrack (3.41.6-1) unstable; urgency=low
+
+  * Updated to 3.41.6 (3.41-beta-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 10 Jun 2006 11:53:23 +0200
+
+httrack (3.41.5-1) unstable; urgency=low
+
+  * Updated to 3.41.5 (3.41-alpha-5)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  3 Jun 2006 21:58:11 +0200
+
+httrack (3.41.4-1) unstable; urgency=low
+
+  * Updated to 3.41.4 (3.41-alpha-4)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 21 May 2006 19:25:58 +0200
+
+httrack (3.41-1) unstable; urgency=low
+
+  * Updated to 3.41.0 (3.41-alpha)
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  1 May 2006 10:29:16 +0200
+
+httrack (3.40.4-4) unstable; urgency=low
+
+  * Fixed dpkg problems while removing old webhttrack due to a conflicting
+    non-empty directory caused by files moved from webhttrack to httrack-doc
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  5 Aug 2006 14:25:04 +0200
+
+httrack (3.40.4-3.1) unstable; urgency=medium
+
+  * Non-Maintainer upload
+  * Move arch-dependent libtest stuff from /usr/share to /usr/lib
+    (closes: #392419)
+
+ -- Bas Zoetekouw <bas@debian.org>  Wed, 18 Oct 2006 22:36:28 +0200
+
+httrack (3.40.4-3) unstable; urgency=medium
+
+  * Fixed conflicting httrack-doc/webhttrack packages again
+    (closes:#381396)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  5 Aug 2006 13:34:11 +0200
+
+httrack (3.40.4-2) unstable; urgency=low
+
+  * Fixed broken httrack-doc package when installing with webhttrack
+    (closes:#381396)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  5 Aug 2006 11:47:53 +0200
+
+httrack (3.40.4-1) unstable; urgency=medium
+
+  * Fixed SSL version, fixed "Packages must not require the existance of any
+    files in /usr/share/doc in order to function" (closes:#362836)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 16 Apr 2006 11:10:08 +0200
+
+httrack (3.40.3-1) unstable; urgency=low
+
+  * Updated to 3.40.3 (3.40-2), fixed dependencies (closes:#355473)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  9 Apr 2006 13:33:42 +0200
+
+httrack (3.40.2-1) unstable; urgency=low
+
+  * Updated to 3.40.2 (3.40), fixed headers problems (closes:#349553)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 24 Jan 2006 22:19:56 +0100
+
+httrack (3.40.1-1) unstable; urgency=low
+
+  * Updated to 3.40.1 (3.40)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 21 Jan 2006 13:44:42 +0100
+
+httrack (3.39.54-1) unstable; urgency=low
+
+  * Updated to 3.39.54 (3.40-beta-4)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 17 Dec 2005 15:28:25 +0100
+
+httrack (3.39.53-1) unstable; urgency=low
+
+  * Updated to 3.39.53 (3.40-beta-3)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 19 Nov 2005 14:50:40 +0100
+
+httrack (3.39.52-1) unstable; urgency=low
+
+  * Updated to 3.39.52 (3.40-beta-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 22 Oct 2005 17:14:02 +0200
+
+httrack (3.39.51-1) unstable; urgency=low
+
+  * Updated to 3.39.51 (3.40-beta-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 24 Sep 2005 10:16:22 +0200
+
+httrack (3.39.13-1) unstable; urgency=low
+
+  * Updated to 3.39.13 (3.40-alpha-13)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 18 Sep 2005 22:30:12 +0200
+
+httrack (3.39.12-1) unstable; urgency=low
+
+  * Updated to 3.39.12 (3.40-alpha-12)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 10 Sep 2005 14:11:07 +0200
+
+httrack (3.39.11-1) unstable; urgency=low
+
+  * Updated to 3.39.11 (3.40-alpha-11)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  4 Sep 2005 16:54:16 +0200
+
+httrack (3.39.10-1) unstable; urgency=low
+
+  * Updated to 3.39.10 (3.40-alpha-10)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  3 Sep 2005 12:52:26 +0200
+
+httrack (3.39.8-1) unstable; urgency=low
+
+  * Updated to 3.39.8 (3.40-alpha-8), added src/proxytrack
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 28 Aug 2005 20:26:38 +0200
+
+httrack (3.39.7-1) unstable; urgency=low
+
+  * Updated to 3.39.7 (3.40-alpha-7)
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 22 Aug 2005 14:20:41 +0200
+
+httrack (3.39.6-1) unstable; urgency=low
+
+  * Updated to 3.39.6 (3.40-alpha-6)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 14 Aug 2005 11:12:55 +0200
+
+httrack (3.39.5-1) unstable; urgency=low
+
+  * Updated to 3.39.5 (3.40-alpha-5) 
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 29 Jul 2005 20:57:44 +0200
+
+httrack (3.39.4-1) unstable; urgency=low
+
+  * Updated to 3.39.4 (3.40-alpha-4)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  5 Jun 2005 18:24:16 +0200
+
+httrack (3.39.3-1) unstable; urgency=low
+
+  * Updated to 3.39.3 (3.40-alpha-3)
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 30 May 2005 20:59:59 +0200
+
+httrack (3.39.2-1) unstable; urgency=low
+
+  * Updated to 3.39.2 (3.40-alpha-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 May 2005 22:11:03 +0200
+
+httrack (3.39.1-1) unstable; urgency=low
+
+  * Updated to 3.39.1 (3.40-alpha-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 May 2005 15:12:09 +0200
+
+httrack (3.33.24-1) unstable; urgency=low
+
+  * Updated to 3.33.24 (3.34-alpha-9)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 May 2005 11:25:30 +0200
+
+httrack (3.33.23-1) unstable; urgency=low
+
+  * Updated to 3.33.23 (3.34-alpha-8)
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 16 May 2005 13:31:05 +0200
+
+httrack (3.33.22-1) unstable; urgency=low
+
+  * Updated to 3.33.22 (3.34-alpha-7)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 May 2005 14:23:11 +0200
+
+httrack (3.33.21-1) unstable; urgency=low
+
+  * Updated to 3.33.21 (3.34-alpha-6)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 May 2005 10:00:56 +0200
+
+httrack (3.33.20-1) unstable; urgency=low
+
+  * Updated to 3.33.20 (3.34-alpha-5)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 11 May 2005 21:08:58 +0200
+
+httrack (3.33.19-1) unstable; urgency=low
+
+  * Updated to 3.33.19 (3.34-alpha-4)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 10 May 2005 20:05:51 +0200
+
+httrack (3.33.18-1) unstable; urgency=low
+
+  * Updated to 3.33.18 (3.34-alpha-3)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  8 May 2005 18:18:49 +0200
+
+httrack (3.33.17-1) unstable; urgency=low
+
+  * Updated to 3.33.17 (3.34-alpha-2)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  8 May 2005 13:53:33 +0200
+
+httrack (3.33.16-1) unstable; urgency=low
+
+  * Updated to 3.33.16 (3.34-alpha-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 23 Apr 2005 14:07:38 +0200
+
+httrack (3.33.15-1) unstable; urgency=low
+
+  * Updated to 3.33.15 (3.33 final)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  5 Feb 2005 09:32:29 +0100
+
+httrack (3.33.14-1) unstable; urgency=low
+
+  * Updated to 3.33.14
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 22 Jan 2005 16:01:53 +0100
+
+httrack (3.33.13-1) unstable; urgency=low
+
+  * Updated to 3.33.13
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  8 Jan 2005 13:29:13 +0100
+
+httrack (3.33.11-1) unstable; urgency=low
+
+  * Updated to 3.33.11
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 23 Dec 2004 08:39:45 +0100
+
+httrack (3.33.10-1) unstable; urgency=low
+
+  * Updated to 3.33.10
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 20 Dec 2004 20:05:00 +0100
+
+httrack (3.33.09-1) unstable; urgency=low
+
+  * Updated to 3.33.09
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 18 Dec 2004 19:32:07 +0100
+
+httrack (3.33.08-1) unstable; urgency=low
+
+  * Updated to 3.33.08
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 12 Dec 2004 17:04:55 +0100
+
+httrack (3.33.07-1) unstable; urgency=low
+
+  * Updated to 3.33.07
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  4 Dec 2004 16:48:15 +0100
+
+httrack (3.33.06-1) unstable; urgency=low
+
+  * Updated to 3.33.06
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 27 Nov 2004 13:10:28 +0100
+
+httrack (3.33.05-1) unstable; urgency=low
+
+  * Updated to 3.33.05
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 15 Nov 2004 20:56:07 +0100
+
+httrack (3.33.04-1) unstable; urgency=low
+
+  * Updated to 3.33.04
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 12 Nov 2004 17:01:26 +0100
+
+httrack (3.33.03-1) unstable; urgency=low
+
+  * Updated to 3.33.03
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 10 Oct 2004 11:11:29 +0200
+
+httrack (3.33.02-1) unstable; urgency=low
+
+  * Updated to 3.33.02
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 28 Aug 2004 12:36:18 +0200
+
+httrack (3.33.01-1) unstable; urgency=low
+
+  * Updated to 3.33.01
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 15 Jul 2004 10:04:28 +0200
+
+httrack (3.32.03-1) unstable; urgency=medium
+
+  * Fixed broken webhttrack script on (Linu|Uni)x
+
+ -- root <root@httrack.com>  Thu, 20 May 2004 11:46:16 +0200
+
+httrack (3.32.02-1) unstable; urgency=medium
+
+  * Fixed broken engine on 64-bit archs (crash in hashtables)
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  8 May 2004 11:53:12 +0200
+
+httrack (3.32.01-1) unstable; urgency=low
+
+  * Fixed broken ARM compiling (no source update)
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 29 Apr 2004 09:17:49 +0200
+
+httrack (3.32.00-1) unstable; urgency=low
+
+  * Updated to 3.32.00 (hotfixes)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 10 Apr 2004 16:03:10 +0200
+
+httrack (3.31.94-1) unstable; urgency=low
+
+  * Updated to 3.31.94-1, fixed libtest/* compilation problems
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 10 Apr 2004 11:53:13 +0200
+
+httrack (3.31.93-1) unstable; urgency=low
+
+  * Updated to 3.31.93-1, fixed src/minizip/* DOS files
+
+ -- Xavier Roche <xavier@debian.org>  Wed,  7 Apr 2004 21:24:31 +0200
+
+httrack (3.31.92-1) unstable; urgency=low
+
+  * Updated to 3.31.92-1, added .so plugin examples
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  4 Apr 2004 09:59:26 +0200
+
+httrack (3.31.91-1) unstable; urgency=low
+
+  * Updated to 3.31.91-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  3 Apr 2004 18:05:56 +0200
+
+httrack (3.31.90-1) unstable; urgency=low
+
+  * Updated to final 3.31.90-1
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 28 Mar 2004 18:41:47 +0200
+
+httrack (3.31.1-1) unstable; urgency=low
+
+  * Removed vcproj file
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 14 Mar 2004 01:07:29 +0100
+
+httrack (3.31.0-2) unstable; urgency=low
+
+  * Fixed Build-Depends missing zlib1g/zlib1g-dev
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 13 Mar 2004 22:38:53 +0100
+
+httrack (3.31.0-1) unstable; urgency=low
+
+  * Updated to final 3.31.0-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 13 Mar 2004 08:30:16 +0100
+
+httrack (3.30.102-1) unstable; urgency=low
+
+  * Updated to 3.30.102-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 21 Feb 2004 10:14:45 +0100
+
+httrack (3.30.101-1) unstable; urgency=low
+
+  * Updated to 3.30.101-1
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 Feb 2004 11:13:43 +0100
+
+httrack (3.30.100-1) unstable; urgency=low
+
+  * Updated to 3.30.100-1
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  8 Feb 2004 09:06:05 +0100
+
+httrack (3.30.99-1) unstable; urgency=low
+
+  * Updated to 3.30.99-1
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  1 Feb 2004 10:49:40 +0100
+
+httrack (3.30.98-1) unstable; urgency=low
+
+  * Updated to 3.30.98-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 24 Jan 2004 19:28:42 +0100
+
+httrack (3.30.97-1) unstable; urgency=low
+
+  * Updated to 3.30.97-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 24 Jan 2004 08:50:23 +0100
+
+httrack (3.30.96-1) unstable; urgency=low
+
+  * Updated to 3.30.96-1
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 19 Jan 2004 21:33:22 +0100
+
+httrack (3.30.95-1) unstable; urgency=low
+
+  * Updated to 3.30.95-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 17 Jan 2004 17:15:38 +0100
+
+httrack (3.30.94-1) unstable; urgency=low
+
+  * Updated to 3.30.94-1
+
+ -- Xavier Roche <xavier@debian.org>  Thu,  8 Jan 2004 16:46:27 +0100
+
+httrack (3.30.93-1) unstable; urgency=low
+
+  * Updated to 3.30.93-1
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 30 Dec 2003 15:29:16 +0100
+
+httrack (3.30.92-1) unstable; urgency=low
+
+  * Updated to 3.30.92-1
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 27 Dec 2003 15:54:31 +0100
+
+httrack (3.30.91-1) unstable; urgency=low
+
+  * Updated to 3.30.91-1 (testing release)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 22 Nov 2003 12:09:30 +0100
+
+httrack (3.30.01-1) unstable; urgency=low
+
+  * Updated to 3.30.01 (final 3.30 release)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 11 Oct 2003 09:03:04 +0200
+
+httrack (3.29.39-1) unstable; urgency=low
+
+  * Updated to 3.29.39
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  4 Oct 2003 14:57:18 +0200
+
+httrack (3.29.38-1) unstable; urgency=low
+
+  * Updated to 3.29.38
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 21 Sep 2003 10:09:29 +0200
+
+httrack (3.29.37-1) unstable; urgency=low
+
+  * Updated to 3.29.37
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 13 Sep 2003 18:04:12 +0200
+
+httrack (3.29.36-1) unstable; urgency=low
+
+  * Updated to 3.29.36
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  7 Sep 2003 11:39:46 +0200
+
+httrack (3.29.35-1) unstable; urgency=low
+
+  * Fixed missing space in control file, updated to 3.29.35
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 30 Aug 2003 10:43:49 +0200
+
+httrack (3.29.34-1) unstable; urgency=low
+
+  * Updated to 3.29.34
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 24 Aug 2003 14:44:46 +0200
+
+httrack (3.29.33-1) unstable; urgency=low
+
+  * Updated to 3.29.33
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  9 Aug 2003 17:21:09 +0200
+
+httrack (3.29.32-1) unstable; urgency=low
+
+  * Updated to 3.29.32
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  2 Aug 2003 16:34:42 +0200
+
+httrack (3.29.31-1) unstable; urgency=low
+
+  * Updated to 3.29.31
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 26 Jul 2003 11:13:16 +0200
+
+httrack (3.29.30-1) unstable; urgency=low
+
+  * Updated to 3.29.30
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 20 Jul 2003 16:49:30 +0200
+
+httrack (3.29.29-1) unstable; urgency=low
+
+  * Updated to 3.29.29
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 14 Jul 2003 15:25:43 +0200
+
+httrack (3.29.28-1) unstable; urgency=low
+
+  * Updated to 3.29.28
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  7 Jul 2003 23:00:07 +0200
+
+httrack (3.29.27-1) unstable; urgency=low
+
+  * Updated libtool things, updated to 3.29.27
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  6 Jul 2003 18:18:13 +0200
+
+httrack (3.29.26-1) unstable; urgency=low
+
+  * Updated to 3.29.26
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 Jun 2003 09:52:24 +0200
+
+httrack (3.29.25-1) unstable; urgency=low
+
+  * Updated to 3.29.25
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 22 Jun 2003 17:48:04 +0200
+
+httrack (3.29.24-1) unstable; urgency=low
+
+  * Updated to 3.29.24
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 Jun 2003 12:01:33 +0200
+
+httrack (3.29.23-1) unstable; urgency=low
+
+  * Updated to 3.29.23
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  9 Jun 2003 13:04:47 +0200
+
+httrack (3.29.22-2) unstable; urgency=low
+
+  * Fixed control file (description) and desktop entry
+
+ -- Xavier Roche <xavier@debian.org>  Tue,  3 Jun 2003 16:05:21 +0200
+
+httrack (3.29.22-1) unstable; urgency=low
+
+  * Fixed parser problems, updated to 3.29.22
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  2 Jun 2003 18:59:17 +0200
+
+httrack (3.29.21-1) unstable; urgency=low
+
+  * Fixed bogus desktop entry, updated to 3.29.21
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  2 Jun 2003 09:03:11 +0200
+
+httrack (3.29.20-2) unstable; urgency=low
+
+  * Fixed link problems, added menu entry for browse
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  1 Jun 2003 18:10:03 +0200
+
+httrack (3.29.20-1) unstable; urgency=low
+
+  * Updated to 3.29.20 (RC-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  1 Jun 2003 17:30:47 +0200
+
+httrack (3.29.19-1) unstable; urgency=low
+
+  * Updated to 3.29.19
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  1 Jun 2003 10:04:04 +0200
+
+httrack (3.29.18-1) unstable; urgency=low
+
+  * Changed desktop entry location. Updated to 3.29.18
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 31 May 2003 14:41:49 +0200
+
+httrack (3.29.17-1) unstable; urgency=low
+
+  * Updated to 3.29.17
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 25 May 2003 22:02:49 +0200
+
+httrack (3.29.16-1) unstable; urgency=low
+
+  * Updated to 3.29.16
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 23 May 2003 15:39:46 +0200
+
+httrack (3.29.15-1) unstable; urgency=low
+
+  * Updated to 3.29.15, fixed webhttrack script problems
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 18 May 2003 19:33:23 +0200
+
+httrack (3.29.14-1) unstable; urgency=low
+
+  * Updated to 3.29.14
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 11 May 2003 15:08:45 +0200
+
+httrack (3.29.13-1) unstable; urgency=low
+
+  * Changed library version number, updated to 3.29.13
+
+ -- Xavier Roche <xavier@debian.org>  Thu,  1 May 2003 16:58:42 +0200
+
+httrack (3.29.12-1) unstable; urgency=low
+
+  * Updated to 3.29.12
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 27 Apr 2003 15:12:48 +0200
+
+httrack (3.29.11-1) unstable; urgency=low
+
+  * Updated to 3.29.11
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 21 Apr 2003 23:26:50 +0200
+
+httrack (3.29.10-1) unstable; urgency=low
+
+  * Updated to 3.29.10
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 18 Apr 2003 11:25:40 +0200
+
+httrack (3.29.09-1) unstable; urgency=low
+
+  * Updated to 3.29.09
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 17 Apr 2003 23:24:44 +0200
+
+httrack (3.29.08-1) unstable; urgency=low
+
+  * Updated to 3.29.08
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 13 Apr 2003 19:29:37 +0200
+
+httrack (3.29.07-1) unstable; urgency=low
+
+  * Updated to 3.29.07, splitted swf module
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  7 Apr 2003 11:58:35 +0200
+
+httrack (3.29.06-2) unstable; urgency=low
+
+  * Changed swf module location
+
+ -- Xavier Roche <xavier@debian.org>  Mon,  7 Apr 2003 09:01:51 +0200
+
+httrack (3.29.06-1) unstable; urgency=low
+
+  * Updated to 3.29.06
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 30 Mar 2003 11:25:44 +0200
+
+httrack (3.29.05-2) unstable; urgency=low
+
+  * Fixed control, fixed webhttrack script
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 29 Mar 2003 11:28:06 +0100
+
+httrack (3.29.05-1) unstable; urgency=low
+
+  * Updated to 3.29.05
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 23 Mar 2003 16:33:01 +0100
+
+httrack (3.29.04-1) unstable; urgency=low
+
+  * Updated to 3.29.04
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 22 Mar 2003 16:20:18 +0100
+
+httrack (3.29.03-1) unstable; urgency=low
+
+  * Updated to 3.29.03
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 20 Mar 2003 21:29:45 +0100
+
+httrack (3.29.02-2) unstable; urgency=low
+
+  * Fixed htsserver in /usr/lib/httrack
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 20 Mar 2003 20:19:01 +0100
+
+httrack (3.29.02-1) unstable; urgency=low
+
+  * Updated to 3.29.02, fixed misplaced xpm
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 20 Mar 2003 17:38:30 +0100
+
+httrack (3.29.01-1) unstable; urgency=low
+
+  * Updated to 3.29.01
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  9 Mar 2003 16:32:58 +0100
+
+httrack (3.23.20-1) unstable; urgency=low
+
+  * Updated to 3.23.20, modified control (directories), added doc-base
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  8 Mar 2003 10:41:05 +0100
+
+httrack (3.23.11-1) unstable; urgency=low
+
+  * Updated to 3.23.11
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 22 Feb 2003 15:53:11 +0100
+
+httrack (3.23.10-1) unstable; urgency=low
+
+  * Updated to 3.23.10
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 29 Jan 2003 19:00:10 +0100
+
+httrack (3.23.9-1) unstable; urgency=low
+
+  * Updated to 3.23.9
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 23 Jan 2003 20:22:08 +0100
+
+httrack (3.23.8-1) unstable; urgency=low
+
+  * Updated to 3.23.8
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 17 Jan 2003 18:04:06 +0100
+
+httrack (3.23.7-1) unstable; urgency=low
+
+  * Updated to 3.23.7, removed gcc-3.2 changes
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 12 Jan 2003 20:16:31 +0100
+
+httrack (3.23.6-2) unstable; urgency=low
+
+  * Modified dh_installchangelogs
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 Dec 2002 20:41:37 +0100
+
+httrack (3.23.6-1) unstable; urgency=low
+
+  * Updated to 3.23.6
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 29 Dec 2002 19:45:22 +0100
+
+httrack (3.23.4-1) unstable; urgency=low
+
+  * Modified debian/rules for mips and mipsel (less optims)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 18 Dec 2002 19:19:00 +0100
+
+httrack (3.23.3-2) unstable; urgency=low
+
+  * Modified debian/rules for mips and mipsel (gcc-3.2)
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 17 Dec 2002 22:56:33 +0100
+
+httrack (3.23.3-1) unstable; urgency=low
+
+  * httpmirror() more splitted for mips compiling problems
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 13 Dec 2002 21:21:52 +0100
+
+httrack (3.23.2-1) unstable; urgency=low
+
+  * htscore.c splitted and now modular for mips compiling problems
+
+ -- Xavier Roche <xavier@debian.org>  Sat,  7 Dec 2002 12:08:15 +0100
+
+httrack (3.22.3-5) unstable; urgency=low
+
+  * Again modified debian/rules for s390, mips and mipsel (backend
+    optimization)
+
+ -- Xavier Roche <xavier@debian.org>  Wed,  4 Dec 2002 21:25:11 +0100
+
+httrack (3.22.3-4) unstable; urgency=low
+
+  * Modified debian/rules for s390, mips and mipsel
+
+ -- Xavier Roche <xavier@debian.org>  Wed,  4 Dec 2002 07:48:18 +0100
+
+httrack (3.22.3-3) unstable; urgency=low
+
+  * Changed debian/rules for s390, mips and mipsel
+
+ -- Xavier Roche <xavier@debian.org>  Tue,  3 Dec 2002 22:00:10 +0100
+
+httrack (3.22.3-2) unstable; urgency=low
+
+  * Changed copyright file for openSSL
+
+ -- Xavier Roche <xavier@debian.org>  Sun,  1 Dec 2002 18:35:52 +0100
+
+httrack (3.22-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 27 Sep 2002 16:42:25 +0200
+
