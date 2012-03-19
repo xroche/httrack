@@ -1,4 +1,4 @@
-Informations on this project:
+﻿Informations on this project:
 
 This project has been developed by:
 Xavier Roche (xroche at httrack.com)
@@ -13,6 +13,11 @@ Leto Kauler (molotov at tasmail.com)
   http://kauler.com/
 Christian Marillat (marillat.christian at wanadoo.fr)
   for autoconf compliance and .deb package
+Fred Cohen (fc at all.net)
+  for HTTrack user's guide
+  http://all.net/
+
+And the help of the following third party developers:
 Nicolas Benoit (nbenoit at tuxfamily.org), SDP Multimedia and Major MMS
   for the mms plugin core routines (MMSRIP)
   http://nbenoit.tuxfamily.org/
@@ -22,9 +27,9 @@ Jean-loup Gailly from gzip.org
 Eric A. Young (eay at cryptsoft.com)
   for SSL cryptographic material (OpenSSL)
   http://www.openssl.org/
-Fred Cohen (fc at all.net)
-  for HTTrack user's guide
-  http://all.net/
+Jordan Russell
+  for the Windows setup tool (Inno Setup)
+  http://www.jrsoftware.org/isinfo.php
 
 Translations written by:
 David Lawrie (dalawrie at lineone.net)

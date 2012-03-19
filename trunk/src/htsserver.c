@@ -302,7 +302,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     };
     initStrElt initStr[] = {
       { "user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" },
-      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2006], %s -->" },
+      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2008], %s -->" },
       { "url2", "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/*" },
       { NULL, NULL }
     };
@@ -332,8 +332,6 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     char line[8192];
     char line2[1024];
     T_SOC soc_c;
-    struct sockaddr dummyaddr;
-    int dummylen = sizeof(struct sockaddr);
     LLint length = 0;
     char* error_redirect = NULL;
 
@@ -349,7 +347,6 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     StringCat(tmpbuff, "");
     StringCat(tmpbuff2, "");
     StringCat(fspath, "");
-    memset(&dummyaddr, 0, sizeof(dummyaddr));
 
     /* UnLock */
     webhttrack_release();
@@ -360,7 +357,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
 #endif
 
     /* Accept */
-    while ( (soc_c = (T_SOC) accept(soc, &dummyaddr, &dummylen)) == INVALID_SOCKET);
+    while ( (soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET);
 
     /* Lock */
     webhttrack_lock();
