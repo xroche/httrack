@@ -140,9 +140,33 @@ int hts_extract_meta(const char* path) {
   }
   return 0;
 }
-    
-#else
-    
-#error HTS_USEZLIB not defined
-    
+
+const char* hts_get_zerror(int err) {
+  switch(err) {
+    case UNZ_OK:
+      return "no error";
+      break;
+    case UNZ_END_OF_LIST_OF_FILE:
+      return "end of list of file";
+      break;
+    case UNZ_ERRNO:
+      return (const char*) strerror(errno);
+      break;
+    case UNZ_PARAMERROR:
+      return "parameter error";
+      break;
+    case UNZ_BADZIPFILE:
+      return "bad zip file";
+      break;
+    case UNZ_INTERNALERROR:
+      return "internal error";
+      break;
+    case UNZ_CRCERROR:
+      return "crc error";
+      break;
+    default:
+      return "unknown error";
+      break;
+  }
+}
 #endif

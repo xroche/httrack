@@ -1,7 +1,7 @@
 AC_INIT(src/httrack.c)
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(httrack, 3.41.20)
-VERSION_INFO="2:41:0"
+AM_INIT_AUTOMAKE(httrack, 3.42.3)
+VERSION_INFO="2:42:0"
 AM_MAINTAINER_MODE
 
 AC_PREREQ(2.50)
@@ -33,8 +33,7 @@ AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 
 ### Check LLint format
-if test x"$ac_cv_sizeof_long" = x"8"
-then
+if test x"$ac_cv_sizeof_long" = x"8"; then
 AC_MSG_CHECKING(long printf format)
 AC_TRY_RUN([#include <stdio.h>
 main() { long int c = -1, d = -1; char* f = "%ld"; sscanf("1234", f, &c, &d); 
@@ -55,14 +54,13 @@ main() { long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d);
 	AC_DEFINE(LLINT_TYPE,long int,[LLint type])
 ],
 [
-	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(no)
 	AC_MSG_RESULT(assuming not on target machine)
 	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
 	AC_DEFINE(LLINT_TYPE,int,[LLint type])
 ])
 ])
-elif test x"$ac_cv_sizeof_long_long" = x"8"
-then
+elif test x"$ac_cv_sizeof_long_long" = x"8"; then
 AC_MSG_CHECKING(long long printf format)
 AC_TRY_RUN([#include <stdio.h>
 main() { long long int c = -1, d = -1; char* f = "%lld"; sscanf("1234", f, &c, &d); 
@@ -93,7 +91,7 @@ main() { long long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d)
 	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
 ],
 [
-	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(no)
 	AC_MSG_RESULT(assuming not on target machine)
 	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
 	AC_DEFINE(LLINT_TYPE,int,[LLint type])
@@ -121,7 +119,7 @@ AC_DEFINE(HTS_INET6, 1,[Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 
 AC_SUBST(V6_FLAG)
 
 ### Check for LFS
-AC_CHECK_LIB(c, fopen64, [LFS_FLAG="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE"
+AC_CHECK_LIB(c, fopen64, [LFS_FLAG="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE"
 AC_DEFINE(HTS_LFS, 1,[Check for large files support])], AC_MSG_RESULT([not found]))
 AC_SUBST(LFS_FLAG)
 

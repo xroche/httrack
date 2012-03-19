@@ -522,6 +522,7 @@ const char* hts_mime[][2] = {
   { "video/x-ms-asf", "asf" },
   { "video/x-ms-asf", "asr" },
   { "video/x-ms-asf", "asx" },
+  { "video/x-ms-wmv", "wmv" },
   { "x-world/x-vrml", "flr" },
   { "x-world/x-vrml", "vrml" },
   { "x-world/x-vrml", "wrz" },
@@ -3852,8 +3853,6 @@ HTSEXT_API void escape_for_html_print_full(char* s, char* d) {
   }
   *d = '\0';
 }
-
-
 
 // concat, concatène deux chaines et renvoi le résultat
 // permet d'alléger grandement le code

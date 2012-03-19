@@ -262,8 +262,14 @@ void htspe_init(void) {
 #ifdef _WIN32
       handle = LoadLibraryA((char*)"ssleay32");
 #else
-      /* We are compatible with 0.9.6/7/8 and potentially above */
-      handle = dlopen("libssl.so.0.9.8", RTLD_LAZY);
+      /* We are compatible with 0.9.6/7/8/8b and potentially above */
+      handle = dlopen("libssl.so.0.9.8g", RTLD_LAZY);  /* added 8g release too (Debarshi Ray) */
+      if (handle == NULL) {
+		handle = dlopen("libssl.so.0.9.8b", RTLD_LAZY);
+	  }
+      if (handle == NULL) {
+		handle = dlopen("libssl.so.0.9.8", RTLD_LAZY);
+	  }
       if (handle == NULL) {
         handle = dlopen("libssl.so.0.9.7", RTLD_LAZY);
       }
@@ -271,12 +277,12 @@ void htspe_init(void) {
         handle = dlopen("libssl.so.0.9.6", RTLD_LAZY);
       }
       if (handle == NULL) {
-        /* Try harder */
-        handle = dlopen("libssl.so", RTLD_LAZY);
+        /* Try harder with .0 if any */
+        handle = dlopen("libssl.so.0", RTLD_LAZY);
       }
       if (handle == NULL) {
-        /* Try harder */
-        handle = dlopen("libssl.so.0", RTLD_LAZY);
+        /* Try harder with devel link */
+        handle = dlopen("libssl.so", RTLD_LAZY);
       }
 #endif
       ssl_handle = handle;

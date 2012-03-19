@@ -395,7 +395,9 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
               mime_from_file[0] = 0;
               get_httptype(opt, mime_from_file, fil, 1);
               if (!strnotempty(mime_from_file) || strcasecmp(mime_type, mime_from_file) != 0) {    /* different mime for this type */
-                ext_chg = 1;
+                if (!may_unknown(opt, mime_type)) {
+                  ext_chg = 1;
+                }
               } else {
                 ext_chg = 0;
               }

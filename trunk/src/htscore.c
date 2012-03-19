@@ -167,7 +167,7 @@ RUN_CALLBACK0(opt, end); \
     cache.zipInput = NULL; \
   } \
   if (cache.olddat) { fclose(cache.olddat); cache.olddat=NULL; } \
-  if (cache.lst) { fclose(cache.lst); cache.lst=NULL; } \
+  if (cache.lst) { fclose(cache.lst); cache.lst=opt->state.strc.lst=NULL; } \
   if (cache.txt) { fclose(cache.txt); cache.txt=NULL; } \
   if (opt->log) fflush(opt->log); \
   if (opt->log) fflush(opt->log);\
@@ -1901,7 +1901,7 @@ jump_if_done:
 
   // purger!
   if (cache.lst) {
-    fclose(cache.lst); cache.lst=NULL;
+    fclose(cache.lst); cache.lst=opt->state.strc.lst=NULL;
     if (opt->delete_old) {
       FILE *old_lst,*new_lst;
       //

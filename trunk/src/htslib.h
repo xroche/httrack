@@ -77,10 +77,18 @@ typedef struct t_dnscache t_dnscache;
 #define READ_INTERNAL_ERROR (-4)
 
 /* concat */
-HTS_STATIC char* getHtsOptBuff_(httrackp *opt) {
+
+#if ( defined(_WIN32) && defined(_MSC_VER) && ( _MSC_VER >= 1300 ) && (_MSC_VER <= 1310 ) )
+/* NOTE: VC2003 inlining bug in optim mode not respecting function call sequence point */
+#define MSVC2003INLINEBUG __declspec(noinline)
+#else
+#define MSVC2003INLINEBUG
+#endif
+MSVC2003INLINEBUG static char* getHtsOptBuff_(httrackp *opt) {
 	opt->state.concat.index = ( opt->state.concat.index + 1 ) % 16;
 	return opt->state.concat.buff[opt->state.concat.index];
 }
+#undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT) ( getHtsOptBuff_(OPT) )
 
 // structure pour paramètres supplémentaires lors de la requête
