@@ -37,7 +37,12 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 /* specific definitions */
-#include "htsbase.h"
+
+/* Bypass internal definition protection */
+#define HTS_INTERNAL_BYTECODE
+  #include "htsbase.h"
+#undef HTS_INTERNAL_BYTECODE
+
 #include "htsnet.h"
 #include "htslib.h"
 #include <stdio.h>
@@ -64,7 +69,12 @@ Please visit our Website: http://www.httrack.com
 #include "httrack-library.h"
 
 /* Language files */
-#include "htsinthash.h"
+
+/* Bypass internal definition protection */
+#define HTS_INTERNAL_BYTECODE
+  #include "htsinthash.h"
+#undef HTS_INTERNAL_BYTECODE
+
 int NewLangStrSz=1024;
 inthash NewLangStr=NULL;
 int NewLangStrKeysSz=1024;
@@ -72,7 +82,6 @@ inthash NewLangStrKeys=NULL;
 int NewLangListSz=1024;
 inthash NewLangList=NULL;
 /* Language files */
-
 
 #include "htsserver.h"
 
@@ -102,6 +111,15 @@ static int is_html(char* file) {
 static void sig_brpipe( int code ) {
   /* ignore */
 }
+
+static int check_readinput_t(T_SOC soc, int timeout);
+static int recv_bl(T_SOC soc, void* buffer, size_t len, int timeout);
+static int linputsoc(T_SOC soc, char* s, int max);
+static int check_readinput(htsblk* r);
+static int linputsoc_t(T_SOC soc, char* s, int max, int timeout);
+
+
+static int linput(FILE* fp,char* s,int max);
 
 
 // URL Link catcher
@@ -209,23 +227,8 @@ T_SOC smallserver_init(int* port,char* adr) {
 
 // 2 - Wait for URL
 
-static int recv_bl(T_SOC soc, void* buffer, size_t len, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    int n = 1;
-    size_t size = len;
-    size_t offs = 0;
-    while(n > 0 && size > 0) {
-      n = recv(soc, ((char*)buffer) + offs, (int) size, 0);
-      if (n > 0) {
-        offs += n;
-        size -= n;
-      }
-    }
-    return (int)offs;
-  }
-  return -1;
-}
 
+// check if data is available
 
 // smallserver
 // returns 0 if error
@@ -241,20 +244,6 @@ typedef struct {
   char* value;
 } initStrElt;
 
-int smallserver_setkey(char* key, char* value) {
-  return inthash_write(NewLangList, key, (unsigned long int)strdup(value));
-}
-int smallserver_setkeyint(char* key, LLint value) {
-  char tmp[256];
-  sprintf(tmp, LLintP, value);
-  return inthash_write(NewLangList, key, (unsigned long int)strdup(tmp));
-}
-int smallserver_setkeyarr(char* key, int id, char* key2, char* value) {
-  char tmp[256];
-  sprintf(tmp, "%s%d%s", key, id, key2);
-  return inthash_write(NewLangList, tmp, (unsigned long int)strdup(value));
-}
-
 #define SET_ERROR(err) do { \
   inthash_write(NewLangList, "error", (unsigned long int)strdup(err)); \
   error_redirect = "/server/error.html"; \
@@ -269,6 +258,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
   String tmpbuff = STRING_EMPTY;
+  String tmpbuff2 = STRING_EMPTY;
   String fspath = STRING_EMPTY;
 
   /* Load strings */
@@ -283,7 +273,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
   {
     char pth[1024];
     char* initOn[] = { "parseall", "Cache", "ka", 
-      "cookies", "parsejava", "testall", "updhack", "index", NULL };
+      "cookies", "parsejava", "testall", "updhack", "urlhack", "index", NULL };
     initIntElt initInt[] = {
       { "filter", 4 },
       { "travel", 2 },
@@ -303,7 +293,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     };
     initStrElt initStr[] = {
       { "user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" },
-      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2002], %s -->" },
+      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2005], %s -->" },
       { "url2", "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/*" },
       { NULL, NULL }
     };
@@ -340,14 +330,16 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
 
     line[0] = '\0';
     buffer[0] = '\0';
-    StringClear(&headers);
-    StringClear(&output);
-    StringClear(&tmpbuff);
-    StringClear(&fspath);
-    StringStrcat(&headers, "");
-    StringStrcat(&output, "");
-    StringStrcat(&tmpbuff, "");
-    StringStrcat(&fspath, "");
+    StringClear(headers);
+    StringClear(output);
+    StringClear(tmpbuff);
+    StringClear(tmpbuff2);
+    StringClear(fspath);
+    StringStrcat(headers, "");
+    StringStrcat(output, "");
+    StringStrcat(tmpbuff, "");
+    StringStrcat(tmpbuff2, "");
+    StringStrcat(fspath, "");
     memset(&dummyaddr, 0, sizeof(dummyaddr));
 
     /* UnLock */
@@ -473,8 +465,10 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
         unsigned long int adr = 0;
         if (inthash_readptr(NewLangList, "lang", (long int *)&adr)) {
           int n = 0;
-          if (sscanf((char*)adr, "%d", &n) == 1 && n - 1 != LANG_T(path, -1)) {
+          if (sscanf((char*)adr, "%d", &n) == 1 && n > 0 && n - 1 != LANG_T(path, -1)) {
             LANG_T(path, n - 1);
+            /* make a backup, because the GUI will override it */
+            inthash_write(NewLangList, "lang_", (unsigned long int)strdup((char*)adr));
           }
         }
 
@@ -487,24 +481,48 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
           inthash_write(NewLangList, "loadprojname", (unsigned long int)NULL);
           doLoad=1;
         }
-
+        else if (inthash_readptr(NewLangList, "loadprojcateg", (long int *)&adr)) {
+          char* pname = (char*) adr;
+          if (*pname) {
+            inthash_write(NewLangList, "projcateg", (unsigned long int)strdup(pname));
+          }
+          inthash_write(NewLangList, "loadprojcateg", (unsigned long int)NULL);
+        }
+        
+        /* intial configuration */
+        {
+          if (!inthash_read(NewLangList, "conf_file_loaded", NULL)) {
+            inthash_write(NewLangList, "conf_file_loaded", (unsigned long int)strdup("true"));
+            doLoad = 2;
+          }
+        }
+        
         /* path : <path>/<project> */
         if (!commandRunning) {
           unsigned long int adrw = 0, adrpath = 0, adrprojname = 0;
           if (inthash_readptr(NewLangList, "path", (long int *)&adrpath)
             && inthash_readptr(NewLangList, "projname", (long int *)&adrprojname)) {
-            StringClear(&fspath);
-            StringStrcat(&fspath, (char*)adrpath);
-            StringStrcat(&fspath, "/");
-            StringStrcat(&fspath, (char*)adrprojname);
+            StringClear(fspath);
+            StringStrcat(fspath, (char*)adrpath);
+            StringStrcat(fspath, "/");
+            StringStrcat(fspath, (char*)adrprojname);
           }
         }
         
         /* Load existing project settings */
         if (doLoad) {
           FILE* fp;
-          StringStrcat(&fspath, "/hts-cache/winprofile.ini");
-          fp = fopen(StringBuff(&fspath), "rb");
+          if (doLoad == 1) {
+            StringStrcat(fspath, "/hts-cache/winprofile.ini");
+          } else if (doLoad == 2) {
+            StringStrcpy(fspath, gethomedir());
+#ifdef _WIN32
+            StringStrcat(fspath, "/httrack.ini");
+#else
+            StringStrcat(fspath, "/.httrack.ini");
+#endif
+          }
+          fp = fopen(StringBuff(fspath), "rb");
           if (fp) {
             /* Read file */
             while(!feof(fp)) {
@@ -579,15 +597,39 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
               if (inthash_readptr(NewLangList, "command_do", (long int *)&adrcd)) {
                 unsigned long int adrw = 0, adrpath = 0, adrprojname = 0;
                 if (inthash_readptr(NewLangList, "winprofile", (long int *)&adrw)) {
-                  StringClear(&tmpbuff);
-                  StringStrcat(&tmpbuff, StringBuff(&fspath));
-                  StringStrcat(&tmpbuff, "/hts-cache/");
+
+                  /* User general profile */
+                  unsigned long int adruserprofile = 0;
+                  if (inthash_readptr(NewLangList, "userprofile", (long int *)&adruserprofile)
+                    && adruserprofile != 0) {
+                    int count = (int) strlen((char*)adruserprofile);
+                    if (count > 0) {
+                      FILE* fp;
+                      StringClear(tmpbuff);
+                      StringStrcpy(tmpbuff, gethomedir());
+#ifdef _WIN32
+                      StringStrcat(tmpbuff, "/httrack.ini");
+#else
+                      StringStrcat(tmpbuff, "/.httrack.ini");
+#endif
+                      fp = fopen(StringBuff(tmpbuff), "wb");
+                      if (fp != NULL) {
+                        (void)((int)fwrite((void*)adruserprofile, 1, count, fp));
+                        fclose(fp);
+                      }
+                    }
+                  }
+                  
+                  /* Profile */
+                  StringClear(tmpbuff);
+                  StringStrcat(tmpbuff, StringBuff(fspath));
+                  StringStrcat(tmpbuff, "/hts-cache/");
                   
                   /* Create minimal directory structure */
-                  if (!structcheck(StringBuff(&tmpbuff))) {
+                  if (!structcheck(StringBuff(tmpbuff))) {
                     FILE* fp;
-                    StringStrcat(&tmpbuff, "winprofile.ini");
-                    fp = fopen(StringBuff(&tmpbuff), "wb");
+                    StringStrcat(tmpbuff, "winprofile.ini");
+                    fp = fopen(StringBuff(tmpbuff), "wb");
                     if (fp != NULL) {
                       int count = (int) strlen((char*)adrw);
                       if ((int)fwrite((void*)adrw, 1, count, fp) == count) {
@@ -596,10 +638,10 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                       even a bit annoying (duplicate/ghost options)
                       The behaviour is exactly the same as in WinHTTrack
                         */
-                        StringClear(&tmpbuff);
-                        StringStrcat(&tmpbuff, StringBuff(&fspath));
-                        StringStrcat(&tmpbuff, "/hts-cache/doit.log");
-                        remove(StringBuff(&tmpbuff));
+                        StringClear(tmpbuff);
+                        StringStrcat(tmpbuff, StringBuff(fspath));
+                        StringStrcat(tmpbuff, "/hts-cache/doit.log");
+                        remove(StringBuff(tmpbuff));
                         
                         /*
                         RUN THE SERVER
@@ -612,18 +654,18 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                         }
                       } else {
                         char tmp[1024];
-                        sprintf(tmp, "Unable to write %d bytes in the the init file %s", count, StringBuff(&fspath));
+                        sprintf(tmp, "Unable to write %d bytes in the the init file %s", count, StringBuff(fspath));
                         SET_ERROR(tmp);
                       }
                       fclose(fp);
                     } else {
                       char tmp[1024];
-                      sprintf(tmp, "Unable to create the init file %s", StringBuff(&fspath));
+                      sprintf(tmp, "Unable to create the init file %s", StringBuff(fspath));
                       SET_ERROR(tmp);
                     }
                   } else {
                     char tmp[1024];
-                    sprintf(tmp, "Unable to create the directory structure in %s", StringBuff(&fspath));
+                    sprintf(tmp, "Unable to create the directory structure in %s", StringBuff(fspath));
                     SET_ERROR(tmp);
                   }
                   
@@ -732,22 +774,22 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                   newfile = newadr;
                 }
               }
-              StringMemcat(&headers, redir, strlen(redir));
+              StringMemcat(headers, redir, strlen(redir));
               {
                 char tmp[256];
                 if (strlen(file) < sizeof(tmp) - 32) {
                   sprintf(tmp, "Location: %s\r\n", newfile);
-                  StringMemcat(&headers, tmp, strlen(tmp));
+                  StringMemcat(headers, tmp, strlen(tmp));
                 }
               }
               inthash_write(NewLangList, "redirect", (unsigned long int)NULL);
             }
             else if (is_html(file)) {
               int outputmode = 0;
-              StringMemcat(&headers, ok, sizeof(ok) - 1);
+              StringMemcat(headers, ok, sizeof(ok) - 1);
               while(!feof(fp)) {
                 char* str = line;
-                int prevlen = StringLength(&output);
+                int prevlen = StringLength(output);
                 int nocr = 0;
                 if (!linput(fp, line, sizeof(line) - 2)) {
                   *str = '\0';
@@ -828,7 +870,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                         }
                       } else if (strcmp(name, "if-project-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist(fconcat(StringBuff(&fspath), pos2))) {
+                          if (!fexist(fconcat(StringBuff(fspath), pos2))) {
                             outputmode = -1;
                           }
                         }
@@ -854,35 +896,17 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                         unsigned long int adr = 0;
                         if (inthash_readptr(NewLangList, "path", (long int *)&adr)) {
                           char* rpath = (char*) adr;
-                          find_handle h;
+                          //find_handle h;
                           if (rpath[0]) {
                             if (rpath[strlen(rpath)-1]=='/') {
                               rpath[strlen(rpath)-1]='\0';      /* note: patching stored (inhash) value */
                             }
                           }
-                          h = hts_findfirst(rpath);
-                          if (h) {
-                            struct topindex_chain * chain=NULL;
-                            struct topindex_chain * startchain=NULL;
-                            StringClear(&tmpbuff);
-                            do {
-                              if (hts_findisdir(h)) {
-                                char iname[HTS_URLMAXSIZE*2];
-                                strcpybuff(iname,rpath);
-                                strcatbuff(iname,"/");
-                                strcatbuff(iname,hts_findgetname(h));
-                                strcatbuff(iname,"/hts-cache/winprofile.ini");
-                                if (fexist(iname)) {
-                                  if (StringLength(&tmpbuff) > 0) {
-                                    StringStrcat(&tmpbuff, "\r\n");
-                                  }
-                                  StringStrcat(&tmpbuff, hts_findgetname(h));
-                                }
-                                
-                              }
-                            } while(hts_findnext(h));
-                            hts_findclose(h);
-                            inthash_write(NewLangList, "winprofile", (unsigned long int)StringAcquire(&tmpbuff));
+                          {
+                            char* profiles = hts_getcategories(rpath, 0);
+                            char* categ = hts_getcategories(rpath,1 );
+                            inthash_write(NewLangList, "winprofile", (unsigned long int)profiles);
+                            inthash_write(NewLangList, "wincateg", (unsigned long int)categ);
                           }
                         }  
                       } else if (strcmp(name, "copy") == 0) {
@@ -1020,27 +1044,27 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                               char c;
                               if (sscanf(a+1, "%x", &n) == 1) {
                                 c = (char)n;
-                                StringMemcat(&output, &c, 1);
+                                StringMemcat(output, &c, 1);
                               }
                               a += 2;
                             } else if (outputmode && a[0] == '<') {
-                              StringStrcat(&output, "&lt;");
+                              StringStrcat(output, "&lt;");
                             } else if (outputmode && a[0] == '>') {
-                              StringStrcat(&output, "&gt;");
+                              StringStrcat(output, "&gt;");
                             } else if (outputmode && a[0] == '&') {
-                              StringStrcat(&output, "&amp;");
+                              StringStrcat(output, "&amp;");
                             } else if (outputmode == 3 && a[0] == ' ') {
-                              StringStrcat(&output, "%20");
+                              StringStrcat(output, "%20");
                             } else if (outputmode >= 2 && ((unsigned char)a[0]) < 32) {
                               char tmp[32];
                               sprintf(tmp, "%%%02x", (unsigned char)a[0]);
-                              StringStrcat(&output, tmp);
+                              StringStrcat(output, tmp);
                             } else if (outputmode == 2 && a[0] == '%') {
-                              StringStrcat(&output, "%%");
+                              StringStrcat(output, "%%");
                             } else if (outputmode == 3 && a[0] == '%') {
-                              StringStrcat(&output, "%25");
+                              StringStrcat(output, "%25");
                             } else {
-                              StringMemcat(&output, a, 1);
+                              StringMemcat(output, a, 1);
                             }
                             a++;
                           }
@@ -1048,108 +1072,108 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
                         break;
                       case 3:
                         if (*langstr) {
-                          StringStrcat(&output, "checked");
+                          StringStrcat(output, "checked");
                         }
                         break;
                       default: 
                         if (*langstr) {
                           int id=1;
                           char* fstr = langstr;
-                          StringClear(&tmpbuff);
+                          StringClear(tmpbuff);
                           if (format == 2) {
-                            StringStrcat(&output, "<option value=1>");
+                            StringStrcat(output, "<option value=1>");
                           } else if (format == -2) {
-                            StringStrcat(&output, "<option value=\"");
+                            StringStrcat(output, "<option value=\"");
                           }
                           while(*fstr) {
                             switch(*fstr) {
                             case 13: break;
                             case 10:
                               if (format == 1) {
-                                StringStrcat(&output, StringBuff(&tmpbuff));
-                                StringStrcat(&output, "<br>\r\n");
+                                StringStrcat(output, StringBuff(tmpbuff));
+                                StringStrcat(output, "<br>\r\n");
                               } else if (format == -2) {
-                                StringStrcat(&output, StringBuff(&tmpbuff));
-                                StringStrcat(&output, "\">");
-                                StringStrcat(&output, StringBuff(&tmpbuff));
-                                StringStrcat(&output, "</option>\r\n");
-                                StringStrcat(&output, "<option value=\"");
+                                StringStrcat(output, StringBuff(tmpbuff));
+                                StringStrcat(output, "\">");
+                                StringStrcat(output, StringBuff(tmpbuff));
+                                StringStrcat(output, "</option>\r\n");
+                                StringStrcat(output, "<option value=\"");
                               } else {
                                 char tmp[32];
                                 sprintf(tmp, "%d", ++id);
-                                StringStrcat(&output, StringBuff(&tmpbuff));
-                                StringStrcat(&output, "</option>\r\n");
-                                StringStrcat(&output, "<option value=");
-                                StringStrcat(&output, tmp);
+                                StringStrcat(output, StringBuff(tmpbuff));
+                                StringStrcat(output, "</option>\r\n");
+                                StringStrcat(output, "<option value=");
+                                StringStrcat(output, tmp);
                                 if (listDefault == id) {
-                                  StringStrcat(&output, " selected");
+                                  StringStrcat(output, " selected");
                                 }
-                                StringStrcat(&output, ">");
+                                StringStrcat(output, ">");
                               }
-                              StringClear(&tmpbuff);
+                              StringClear(tmpbuff);
                               break;
                             case '<':
-                              StringStrcat(&tmpbuff, "&lt;");
+                              StringStrcat(tmpbuff, "&lt;");
                               break;
                             case '>':
-                              StringStrcat(&tmpbuff, "&gt;");
+                              StringStrcat(tmpbuff, "&gt;");
                               break;
                             case '&':
-                              StringStrcat(&tmpbuff, "&amp;");
+                              StringStrcat(tmpbuff, "&amp;");
                               break;
                             default:
-                              StringMemcat(&tmpbuff, fstr, 1);
+                              StringMemcat(tmpbuff, fstr, 1);
                               break;
                             }
                             fstr++;
                           }
                           if (format == 2) {
-                            StringStrcat(&output, StringBuff(&tmpbuff));
-                            StringStrcat(&output, "</option>");
+                            StringStrcat(output, StringBuff(tmpbuff));
+                            StringStrcat(output, "</option>");
                           } else if (format == -2) {
-                            StringStrcat(&output, StringBuff(&tmpbuff));
-                            StringStrcat(&output, "\">");
-                            StringStrcat(&output, StringBuff(&tmpbuff));
-                            StringStrcat(&output, "</option>");
+                            StringStrcat(output, StringBuff(tmpbuff));
+                            StringStrcat(output, "\">");
+                            StringStrcat(output, StringBuff(tmpbuff));
+                            StringStrcat(output, "</option>");
                           } else {
-                            StringStrcat(&output, StringBuff(&tmpbuff));
+                            StringStrcat(output, StringBuff(tmpbuff));
                           }
-                          StringClear(&tmpbuff);
+                          StringClear(tmpbuff);
                         }
                       }
                     }
                     str = pos;
                   } else {
                     if (outputmode != -1) {
-                      StringMemcat(&output, str, 1);
+                      StringMemcat(output, str, 1);
                     }
                   }
                   str++;
                 }
-                if (!nocr && prevlen != StringLength(&output)) {
-                  StringStrcat(&output, "\r\n");
+                if (!nocr && prevlen != StringLength(output)) {
+                  StringStrcat(output, "\r\n");
                 }
               }
 #ifdef _DEBUG
               {
-                int len = (int)strlen((char*)StringBuff(&output));
-                assert(len == (int)StringLength(&output));
+                int len = (int)strlen((char*)StringBuff(output));
+                assert(len == (int)StringLength(output));
               }
 #endif
             } else if (is_text(file)) {
-              StringMemcat(&headers, ok_text, sizeof(ok_text) - 1);
+              StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
               while(!feof(fp)) {
                 int n = fread(line, 1, sizeof(line) - 2, fp);
                 if (n > 0) {
-                  StringMemcat(&output, line, n);
+                  StringMemcat(output, line, n);
                 }
               }
             } else {
-              StringMemcat(&headers, ok_img, sizeof(ok_img) - 1);
+              StringMemcat(headers, ok_img, sizeof(ok_img) - 1);
               while(!feof(fp)) {
                 int n = fread(line, 1, sizeof(line) - 2, fp);
                 if (n > 0) {
-                  StringMemcat(&output, line, n);
+                  StringMemcat(output, line, n);
                 }
               }
             }
@@ -1160,8 +1184,8 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
               "Content-type: text/html\r\n";
             char error[] = 
               "Page not found.\r\n";
-            StringStrcat(&headers, error_hdr);
-            StringStrcat(&output, error);
+            StringStrcat(headers, error_hdr);
+            StringStrcat(output, error);
             //assert(file == NULL);
           }
         }
@@ -1172,20 +1196,20 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
           "Content-type: text/html\r\n";
         char error[] = 
           "Server error.\r\n";
-        StringStrcat(&headers, error_hdr);
-        StringStrcat(&output, error);
+        StringStrcat(headers, error_hdr);
+        StringStrcat(output, error);
 #endif
       }
       {
         char tmp[256];
-        sprintf(tmp, "Content-length: %d\r\n", (int) StringLength(&output));
-        StringStrcat(&headers, tmp);
+        sprintf(tmp, "Content-length: %d\r\n", (int) StringLength(output));
+        StringStrcat(headers, tmp);
       }
-      StringStrcat(&headers, "\r\n");
+      StringStrcat(headers, "\r\n");
       if (
-          (send(soc_c, StringBuff(&headers), StringLength(&headers), 0) != StringLength(&headers))
+          (send(soc_c, StringBuff(headers), StringLength(headers), 0) != StringLength(headers))
           ||
-          ( (meth == 1) && (send(soc_c, StringBuff(&output), StringLength(&output), 0) != StringLength(&output)) )
+          ( (meth == 1) && (send(soc_c, StringBuff(output), StringLength(output), 0) != StringLength(output)) )
         ) {
 #ifdef _DEBUG
         //assert(FALSE);
@@ -1224,10 +1248,11 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
 #endif
   }
 
-  StringFree(&headers);
-  StringFree(&output);
-  StringFree(&tmpbuff);
-  StringFree(&fspath);
+  StringFree(headers);
+  StringFree(output);
+  StringFree(tmpbuff);
+  StringFree(tmpbuff2);
+  StringFree(fspath);
 
   if (buffer)
     free(buffer);
@@ -1270,7 +1295,21 @@ int htslang_uninit() {
   return 1;
 }
 
-int htslang_load(char* limit_to, char* path) {
+int smallserver_setkey(char* key, char* value) {
+  return inthash_write(NewLangList, key, (unsigned long int)strdup(value));
+}
+int smallserver_setkeyint(char* key, LLint value) {
+  char tmp[256];
+  sprintf(tmp, LLintP, value);
+  return inthash_write(NewLangList, key, (unsigned long int)strdup(tmp));
+}
+int smallserver_setkeyarr(char* key, int id, char* key2, char* value) {
+  char tmp[256];
+  sprintf(tmp, "%s%d%s", key, id, key2);
+  return inthash_write(NewLangList, tmp, (unsigned long int)strdup(value));
+}
+
+static int htslang_load(char* limit_to, char* path) {
   char* hashname;
   //
   int selected_lang=LANG_T(path, -1);
@@ -1433,7 +1472,7 @@ int htslang_load(char* limit_to, char* path) {
 }
 
 /* NOTE : also contains the "webhttrack" hack */
-void conv_printf(char* from,char* to) {
+static void conv_printf(char* from,char* to) {
   int i=0,j=0,len;
   len=strlen(from);
   while(i<len) {
@@ -1475,13 +1514,13 @@ void conv_printf(char* from,char* to) {
   }
 }
 
-void LANG_DELETE() {
+static void LANG_DELETE() {
   inthash_delete(&NewLangStr);
   inthash_delete(&NewLangStrKeys);
 }
 
 // sélection de la langue
-void LANG_INIT(char* path) {
+static void LANG_INIT(char* path) {
   //CWinApp* pApp = AfxGetApp();
   //if (pApp) {
     int test = 0; /* pApp->GetProfileInt("Language","IntId",0); */
@@ -1489,7 +1528,7 @@ void LANG_INIT(char* path) {
   //}
 }
 
-int LANG_T(char* path, int l) {
+static int LANG_T(char* path, int l) {
   if (l>=0) {
     QLANG_T(l);
     htslang_load(NULL, path);
@@ -1497,7 +1536,7 @@ int LANG_T(char* path, int l) {
   return QLANG_T(-1);  // 0=default (english)
 }
 
-int LANG_SEARCH(char* path, char* iso) {
+static int LANG_SEARCH(char* path, char* iso) {
   char lang_str[1024];
   int i = 0;
   int curr_lng=LANG_T(path, -1);
@@ -1516,7 +1555,7 @@ int LANG_SEARCH(char* path, char* iso) {
   return found;
 }
 
-int LANG_LIST(char* path, char* buffer) {
+static int LANG_LIST(char* path, char* buffer) {
   char lang_str[1024];
   int i = 0;
   int curr_lng=LANG_T(path, -1);
@@ -1537,7 +1576,7 @@ int LANG_LIST(char* path, char* buffer) {
   return i;
 }
 
-int QLANG_T(int l) {
+static int QLANG_T(int l) {
   static int lng=0;
   if (l>=0) {
     lng=l;
@@ -1545,7 +1584,7 @@ int QLANG_T(int l) {
   return lng;  // 0=default (english)
 }
 
-char* LANGSEL(char* name) {
+static char* LANGSEL(char* name) {
   unsigned long int adr = 0;
   if (NewLangStr)
   if (!inthash_read(NewLangStr,name,(long int *)&adr))
@@ -1556,7 +1595,7 @@ char* LANGSEL(char* name) {
   return "";
 }
 
-char* LANGINTKEY(char* name) {
+static char* LANGINTKEY(char* name) {
   unsigned long int adr=0;
   if (NewLangStrKeys)
   if (!inthash_read(NewLangStrKeys,name,(long int *)&adr))
@@ -1567,123 +1606,48 @@ char* LANGINTKEY(char* name) {
   return "";
 }
 
-char* gethomedir(void) {
-  char* home = getenv( "HOME" );
-  if (home)
-    return home;
-  else
-    return ".";
-}
 
-int linput_cpp(FILE* fp,char* s,int max) {
-  int rlen=0;
-  s[0]='\0';
-  do {
-    int ret;
-    if (rlen>0)
-    if (s[rlen-1]=='\\')
-      s[--rlen]='\0';      // couper \ final
-    // lire ligne
-    ret=linput_trim(fp,s+rlen,max-rlen);
-    if (ret>0)
-      rlen+=ret;
-  } while((s[max(rlen-1,0)]=='\\') && (rlen<max));
-  return rlen;
-}
 
-// copy of concat
-typedef struct {
-  char buff[16][HTS_URLMAXSIZE*2*2];
-  int rol;
-} concat_strc;
-char* concat(const char* a,const char* b) {
-  static concat_strc* strc = NULL;
-  if (strc == NULL) {
-    strc = (concat_strc*) calloc(16, sizeof(concat_strc));
-  }
-  strc->rol=((strc->rol+1)%16);    // roving pointer
-  strcpybuff(strc->buff[strc->rol],a);
-  if (b) strcatbuff(strc->buff[strc->rol],b);
-  return strc->buff[strc->rol];
-}
-#ifdef _WIN32
-char* __fconv(char* a) {
-  int i;
-  for(i=0;i<(int) strlen(a);i++)
-    if (a[i]=='/')  // convertir
-      a[i]='\\';
-  return a;
-}
-char* fconcat(char* a,char* b) {
-  return __fconv(concat(a,b));
-}
-char* fconv(char* a) {
-  return __fconv(concat(a,""));
-}
-#endif
 
 /* *** Various functions *** */
 
 
-int fexist(char* s) {
-  struct stat st;
-  memset(&st, 0, sizeof(st));
-  if (stat(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
+
+static int check_readinput_t(T_SOC soc, int timeout) {
+  if (soc != INVALID_SOCKET) {
+    fd_set fds;           // poll structures
+    struct timeval tv;          // structure for select
+    FD_ZERO(&fds);
+    FD_SET(soc,&fds);           
+    tv.tv_sec=timeout;
+    tv.tv_usec=0;
+    select(soc + 1,&fds,NULL,NULL,&tv);
+    if (FD_ISSET(soc,&fds))
       return 1;
-    }
-  }
-  return 0;
-} 
-
-int linput(FILE* fp,char* s,int max) {
-  int c;
-  int j=0;
-  do {
-    c=fgetc(fp);
-    if (c!=EOF) {
-      switch(c) {
-        case 13: break;  // sauter CR
-        case 10: c=-1; break;
-        case 0: case 9: case 12: break;  // sauter ces caractères
-        default: s[j++]=(char) c; break;
-      }
-    }
-  }  while((c!=-1) && (c!=EOF) && (j<(max-1)));
-  s[j]='\0';
-  return j;
+    else
+      return 0;
+  } else
+    return 0;
 }
 
-int linput_trim(FILE* fp,char* s,int max) {
-  int rlen=0;
-  char* ls=(char*) malloct(max+2);
-  s[0]='\0';
-  if (ls) {
-    char* a;
-    // lire ligne
-    rlen=linput(fp,ls,max);
-    if (rlen) {
-      // sauter espaces et tabs en fin
-      while( (rlen>0) && is_realspace(ls[max(rlen-1,0)]) )
-        ls[--rlen]='\0';
-      // sauter espaces en début
-      a=ls;
-      while((rlen>0) && ((*a==' ') || (*a=='\t'))) {
-        a++;
-        rlen--;
-      }
-      if (rlen>0) {
-        memcpy(s,a,rlen);      // can copy \0 chars
-        s[rlen]='\0';
+static int recv_bl(T_SOC soc, void* buffer, size_t len, int timeout) {
+  if (check_readinput_t(soc, timeout)) {
+    int n = 1;
+    size_t size = len;
+    size_t offs = 0;
+    while(n > 0 && size > 0) {
+      n = recv(soc, ((char*)buffer) + offs, (int) size, 0);
+      if (n > 0) {
+        offs += n;
+        size -= n;
       }
     }
-    //
-    freet(ls);
+    return (int)offs;
   }
-  return rlen;
+  return -1;
 }
 
-int linputsoc(T_SOC soc, char* s, int max) {
+static int linputsoc(T_SOC soc, char* s, int max) {
   int c;
   int j=0;
   do {
@@ -1706,15 +1670,8 @@ int linputsoc(T_SOC soc, char* s, int max) {
   return j;
 }
 
-int linputsoc_t(T_SOC soc, char* s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
-  }
-  return -1;
-}
-
 // check if data is available
-int check_readinput(htsblk* r) {
+static int check_readinput(htsblk* r) {
   if (r->soc != INVALID_SOCKET) {
     fd_set fds;           // poll structures
     struct timeval tv;          // structure for select
@@ -1731,84 +1688,21 @@ int check_readinput(htsblk* r) {
     return 0;
 }
 
-// check if data is available
-int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;           // poll structures
-    struct timeval tv;          // structure for select
-    FD_ZERO(&fds);
-    FD_SET(soc,&fds);           
-    tv.tv_sec=timeout;
-    tv.tv_usec=0;
-    select(soc + 1,&fds,NULL,NULL,&tv);
-    if (FD_ISSET(soc,&fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
+static int linputsoc_t(T_SOC soc, char* s, int max, int timeout) {
+  if (check_readinput_t(soc, timeout)) {
+    return linputsoc(soc, s, max);
+  }
+  return -1;
 }
 
-int strfield(const char* f,const char* s) {
+/*int strfield(const char* f,const char* s) {
   int r=0;
   while (streql(*f,*s) && ((*f)!=0) && ((*s)!=0)) { f++; s++; r++; }
   if (*s==0)
     return r;
   else
     return 0;
-}
-
-int ehexh(char c) {
-  if ((c>='0') && (c<='9')) return c-'0';
-  if ((c>='a') && (c<='f')) c-=('a'-'A');
-  if ((c>='A') && (c<='F')) return (c-'A'+10);
-  return 0;
-}
-
-int ehex(char* s) {
-  return 16*ehexh(*s)+ehexh(*(s+1));
-}
-
-void unescapehttp(char* s, String* tempo) {
-  int i;
-  for (i=0;i<(int) strlen(s);i++) {
-    if (s[i]=='%' && s[i+1]=='%') {
-      i++;
-      StringAddchar(tempo, '%');
-    } else if (s[i]=='%') {
-      char hc;
-      i++;
-      hc = (char) ehex(s+i);
-      StringAddchar(tempo, (char) hc);
-      i++;    // sauter 2 caractères finalement
-    }
-    else if (s[i]=='+') {
-      StringAddchar(tempo, ' ');
-    }
-    else
-      StringAddchar(tempo, s[i]);
-  }
-}
+}*/
 
 /* same, except + */
-void unescapeini(char* s, String* tempo) {
-  int i;
-  char lastc=0;
-  for (i=0;i<(int) strlen(s);i++) {
-    if (s[i]=='%' && s[i+1]=='%') {
-      i++;
-      StringAddchar(tempo, lastc = '%');
-    } else if (s[i]=='%') {
-      char hc;
-      i++;
-      hc = (char) ehex(s+i);
-      if (!is_retorsep(hc) || !is_retorsep(lastc)) {
-        StringAddchar(tempo, lastc = (char) hc);
-      }
-      i++;    // sauter 2 caractères finalement
-    }
-    else
-      StringAddchar(tempo, lastc = s[i]);
-  }
-}
 

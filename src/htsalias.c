@@ -35,12 +35,13 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htsbase.h"
 #include "htsalias.h"
 #include "htsglobal.h"
+
 void linput(FILE* fp,char* s,int max);
 void hts_lowcase(char* s);
 
@@ -108,6 +109,7 @@ const char* hts_optalias[][4] = {
   {"host-control","-H","param",""},
   {"extended-parsing","-%P","param",""},
   {"near","-n","single",""},
+  {"disable-security-limits","-%!","single",""},
   {"test","-t","single",""},
   {"list","-%L","param1",""},
   {"urllist","-%S","param1",""},
@@ -115,7 +117,7 @@ const char* hts_optalias[][4] = {
   {"structure","-N","param",""}, {"user-structure","-N","param1",""},
   {"long-names","-L","param",""},
   {"keep-links","-K","param",""},
-  {"mime-html","-%M","param",""}, {"mht","-%M","param",""},
+  {"mime-html","-%M","single",""}, {"mht","-%M","single",""},
   {"replace-external","-x","single",""},
   {"disable-passwords","-%x","single",""},{"disable-password","-%x","single",""},
   {"include-query-string","-%q","single",""},
@@ -135,6 +137,8 @@ const char* hts_optalias[][4] = {
   {"updatehack","-%s","single",""}, {"sizehack","-%s","single",""},
   {"urlhack","-%u","single",""},
   {"user-agent","-F","param1","user-agent identity"},
+  {"referer","-%R","param1","default referer URL"},
+  {"from","-%E","param1","from email address"},
   {"footer","-%F","param1",""},
   {"cache","-C","param","number of retries for non-fatal errors"},
   {"store-all-in-cache","-k","single",""},
@@ -150,7 +154,7 @@ const char* hts_optalias[][4] = {
   {"priority","-p","param",""},
   {"debug-headers","-%H","single",""},
   {"userdef-cmd","-V","param1",""},
-  {"callback","-%W","param1",""}, {"wrapper","-%W","param1",""},
+  {"callback","-%W","param1","plug an external callback"}, {"wrapper","-%W","param1","plug an external callback"},
   {"structure","-N","param1","user-defined structure"},
   {"usercommand","-V","param1","user-defined command"},
   {"display","-%v","single","show files transfered and other funny realtime information"},
@@ -185,7 +189,10 @@ const char* hts_optalias[][4] = {
   {"fast-engine","-#X","single","Enable fast routines"},
   {"debug-overflows","-#X0","single","Attempt to detect buffer overflows"},
   {"debug-cache","-#C","param1","List files in the cache"},
-  
+  {"extract-cache","-#C","single","Extract meta-data"},
+  {"debug-parsing","-#d","single","debug: test parser"},
+  {"repair-cache","-#R","single","repair the damaged cache ZIP file"}, {"repair","-#R","single",""},
+
   /* STANDARD ALIASES */
   {"spider","-p0C0I0t","single",""},
   {"testsite","-p0C0I0t","single",""},
@@ -226,6 +233,7 @@ const char* hts_optalias[][4] = {
   {"updatehttrack","--updatehttrack","single","update HTTrack Website Copier"},
   {"clean","--clean","single","clean up log files and cache"},
   {"tide","--clean","single","clean up log files and cache"},
+  {"autotest","-#T","single",""},
   /* */
 
   {"","","",""}
@@ -342,7 +350,7 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
     return need_param;
   }
 
-  /* Check -P <path> */
+  /* Check -O <path> */
   {
     int pos;
     if ((pos=optreal_find(argv[n_arg]))>=0) {
@@ -514,17 +522,19 @@ int optinclude_file(const char* name,
 /* Get home directory, '.' if failed */
 /* example: /home/smith */
 char* hts_gethome(void) {
+#ifndef _WIN32_WCE
   char* home = getenv( "HOME" );
   if (home)
     return home;
   else
+#endif
     return ".";
 }
 
 /* Convert ~/foo into /home/smith/foo */
 void expand_home(char* str) {
   if (str[0] == '~') {
-    char tempo[HTS_URLMAXSIZE*2];
+    char BIGSTK tempo[HTS_URLMAXSIZE*2];
     strcpybuff(tempo,hts_gethome());
     strcatbuff(tempo,str+1);
     strcpybuff(str,tempo);

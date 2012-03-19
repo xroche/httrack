@@ -69,6 +69,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LFS_FLAG = @LFS_FLAG@
+LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
@@ -135,7 +136,8 @@ target_alias = @target_alias@
 
 templatesdir = $(datadir)/httrack/templates
 templates_DATA = index-body.html index-header.html topindex-footer.html \
-	index-footer.html topindex-body.html topindex-header.html
+	index-footer.html topindex-body.html topindex-header.html \
+	topindex-bodycat.html
 
 
 EXTRA_DIST = $(templates_DATA)

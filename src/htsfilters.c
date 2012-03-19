@@ -35,6 +35,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 
 // *.gif                  match all gif files 
 // *[file]/*[file].exe    match all exe files with one folder structure
@@ -49,9 +52,6 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 #include "htslib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 /* END specific definitions */
 

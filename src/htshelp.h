@@ -43,11 +43,14 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 void infomsg(char* msg);
 void help(char* app,int more);
 void make_empty_index(char* str);
 void help_wizard(httrackp* opt);
 int help_query(char* list,int def);
 void help_catchurl(char* dest_path);
+#endif
 
 #endif

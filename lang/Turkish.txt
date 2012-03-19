@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Arman (Armish) Aksoy <armish@linux-sevenler.de>\r\n
 LANGUAGE_CHARSET
 ISO-8859-9
+LANGUAGE_WINDOWSID
+Turkish
 OK
 Tamam
 Cancel
@@ -180,6 +182,8 @@ Pause - Toggle [Mirror]/[Pause download] to resume operation
 Duraklat - Ýþleme devam etmek için [Yansý]/[Ýndirmeyi duraklat]'a geçin
 Finishing pending transfers - Select [Cancel] to stop now!
 Bekleyen transferler sonlandýrýlýyor - Durdurmak için [Ýptal]'i seçin!
+scanning
+
 Waiting for scheduled time..
 Planlanan zaman bekleniyor..
 Connecting to provider
@@ -225,7 +229,7 @@ Kayý dosyalarý konumu
 Path
 Konum
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
--Baðlantý Listeleme Modu -\n\nYansýlanacak sayfalarýn adreslerini URL kutusuna giriniz  
+-Baðlantý Listeleme Modu -\n\nYansýlanacak sayfalarýn adreslerini URL kutusuna giriniz
 New project / Import?
 Yeni Proje / Aktarýlsýn mý?
 Choose criterion
@@ -389,7 +393,7 @@ Dosya zaman aþýmý
 Cancel all links from host if timeout occurs
 Eðer zaman aþýmý yaþanýrsa sunucudaki tüm baðlantýlarý iptal et
 Minimum admissible transfer rate
-Kabul edilebilen minimum ransfer hýzý 
+Kabul edilebilen minimum ransfer hýzý
 Cancel all links from host if too slow
 Eðer sunucu çok yavaþsa tüm baðlantýlarý iptal et
 Maximum number of retries on non-fatal errors
@@ -450,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Eski HTTP/1.0 isteklerini kullan (sistem gücünü kýsýtlar!)
 Attempt to limit retransfers through several tricks (file size test..)
 Tekrarlanan transferleri birkaç hile ile kýsýtlandýrmaya çalýþ (dosya boyutu testi...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Alýnmayan baðlantýlarý giriþ/parola istemeden yaz
 Write internal links without query string
@@ -552,6 +558,8 @@ Tolerant requests (for servers)
 Tölerans istekleri (sunucular için)
 Update hack (limit re-transfers)
 Güncelleme ince ayarý (tekrar eden transferleri sýnýrla)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Eski HTTP/1.0 isteklerine zorla (no 1.1)
 Max connections / seconds
@@ -768,6 +776,8 @@ Select existing project to update
 Güncellenecek projeyi seçin
 Click here to select path
 Konumu seçmek için týklayýn
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Proje Sihirbazý...
 New project name:
@@ -778,6 +788,8 @@ Project name:
 Proje adý:
 Base path:
 Ana konum:
+Project category:
+
 C:\\My Web Sites
 C:\\Benim Web Sitem
 Type a new project name, \r\nor select existing project to update/resume

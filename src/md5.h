@@ -1,16 +1,29 @@
 #ifndef MD5_H
 #define MD5_H
 
-#ifdef __alpha
-typedef unsigned int uint32;
+#ifdef _WIN32
+#ifndef SIZEOF_LONG
+#define SIZEOF_LONG 4
+#endif
 #else
+#include "config.h"
+#endif
+
+#if SIZEOF_LONG==8
+typedef unsigned int uint32;
+#elif SIZEOF_LONG==4
 typedef unsigned long uint32;
+#else
+#error undefined: SIZEOF_LONG
 #endif
 
 struct MD5Context {
+  unsigned char in[64];
   uint32 buf[4];
   uint32 bits[2];
-  unsigned char in[64];
+#ifdef _WIN32_WCE
+  uint32 pad[2];
+#endif
   int doByteReverse;
 };
 

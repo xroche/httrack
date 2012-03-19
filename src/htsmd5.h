@@ -42,9 +42,12 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSMD5_DEFH
 #define HTSMD5_DEFH 
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int domd5mem(unsigned char * buf, int len, 
                     unsigned char * digest, int asAscii);
 unsigned long int md5sum32(char* buff);
+#endif
 
 #endif
 

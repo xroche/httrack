@@ -40,7 +40,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-#ifndef HTTRACK_DEFLIB
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 HTSEXT_API int htswrap_init(void);
 HTSEXT_API int htswrap_add(char* name,void* fct);
 HTSEXT_API int htswrap_free(void);

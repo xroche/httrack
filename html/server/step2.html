@@ -1,4 +1,4 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
 
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
@@ -171,6 +171,7 @@ ${do:set:cache:1}
 
 ${/* Convert winprofile.ini into internal variables */}
 ${do:copy:CurrentUrl:urls}
+${do:copy:Category:projcateg}
 ${do:copy:CurrentAction:todo}
 ${do:copy:CurrentURLList:filelist}
 ${do:copy:Proxy:proxy}
@@ -200,6 +201,7 @@ ${do:copy:ParseJava:parsejava}
 ${do:copy:HTTP10:http10}
 ${do:copy:TolerantRequests:toler}
 ${do:copy:UpdateHack:updhack}
+${do:copy:URLHack:urlhack}
 ${do:copy:StoreAllInCache:cache2}
 ${do:copy:LogType:logtype}
 ${do:copy:UseHTTPProxyForFTP:ftpprox}
@@ -278,6 +280,23 @@ ${do:loadhash}
 		<input name="projname" value="${projname}"
 			onMouseOver="info('${LANG_S1}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
+
+<br>
+
+<table border="0">
+<tr><td>
+
+		${LANG_S13}
+		<select name="loadprojcateg" onChange="form.redirect.value='step2.html'; form.submit()">
+		<option value="">&nbsp;</option>
+		${liststr:wincateg}
+		</select>
+</td><td>
+		<input name="projcateg" value="${projcateg}"
+			onMouseOver="info('${LANG_S5}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+
+</td></tr></table>
 
 <br>
 		${LANG_S12}

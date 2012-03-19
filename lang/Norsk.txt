@@ -7,7 +7,9 @@ no
 LANGUAGE_AUTHOR
 Tobias "Spug" Langhoff (Dark Spug at hazardlabs.com )\r\n[ spug_enigma@hotmail.com ] \r\n
 LANGUAGE_CHARSET
-
+ISO-8859-1
+LANGUAGE_WINDOWSID
+Norwegian (Nynorsk)
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Bruk gamle HTTP/1.0-forespørsler (begrenser effektiviteten!)
 Attempt to limit retransfers through several tricks (file size test..)
 Prøv å begrense gjentakelser av samme overføring ved å bruke spesielle 'triks' (f.eks å teste filstørrelsen)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Skriv eksterne linker uten brukernavn/passord
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Aksepter forespørsler (for servere)
 Update hack (limit re-transfers)
 Oppdater hack (begrens gjen-overføringer)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Gjennomtving gamle HTTP/1.0-forespørsler (ikke 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Velg eksisterende prosjekt som skal oppdateres
 Click here to select path
 Klikk her for å velge bane
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack prosjektguide...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Prosjektnavn:
 Base path:
 Lagringsbane:
+Project category:
+
 C:\\My Web Sites
 C:\\Mine websider
 Type a new project name, \r\nor select existing project to update/resume

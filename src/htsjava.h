@@ -57,6 +57,8 @@ typedef struct {
 } RESP_STRUCT;
 
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int hts_detect_java(htsmoduleStruct* str);
 int hts_parse_java(htsmoduleStruct* str);
 RESP_STRUCT affecte(int i1,int i2,RESP_STRUCT *i3,RESP_STRUCT *i4,int i5);
@@ -65,6 +67,6 @@ RESP_STRUCT readtable(htsmoduleStruct* str,FILE *fp,RESP_STRUCT,int*);
 unsigned short int readshort(FILE *fp);
 int tris(char*);
 char * printname(char [1024]);
-
+#endif
 
 #endif

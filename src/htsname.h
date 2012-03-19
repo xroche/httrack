@@ -42,9 +42,12 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int url_savename(char* adr_complete,char* fil_complete,char* save,char* former_adr,char* former_fil,char* referer_adr,char* referer_fil,httrackp* opt,lien_url** liens,int lien_tot,lien_back* back,int back_max,cache_back* cache,hash_struct* hash,int ptr,int numero_passe);
 void standard_name(char* b,char* dot_pos,char* nom_pos,char* fil_complete,int short_ver);
 void url_savename_addstr(char* d,char* s);
 char* url_md5(char* fil_complete);
+#endif
 
 #endif

@@ -45,7 +45,9 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #if HTS_WIN
  // pour read
+#ifndef  _WIN32_WCE
  #include <io.h>
+#endif
  // pour FindFirstFile
  #include <winbase.h>
 #else
@@ -71,12 +73,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DO_NOT_REDEFINE_in_addr_t
  typedef unsigned long in_addr_t;
 #endif
-#undef min
-#undef max
-#undef Sleep
-#define min(a,b) ((a)>(b)?(b):(a))
-#define max(a,b) ((a)>(b)?(a):(b))
-#define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
 
 /*
@@ -87,7 +83,7 @@ Please visit our Website: http://www.httrack.com
 /* Ipv4 structures */
 typedef struct in_addr INaddr;
 /* This should handle all cases */
-typedef struct {
+typedef struct SOCaddr {
   union {
     struct sockaddr_in in;
     struct sockaddr sa;
@@ -155,7 +151,7 @@ strcpy(namebuf, dot); \
 /* Ipv4 structures */
 typedef struct in6_addr INaddr;
 /* This should handle all cases */
-typedef struct {
+typedef struct SOCaddr {
   union {
     struct sockaddr_in6 in6;
     struct sockaddr_in in;
@@ -236,7 +232,7 @@ getnameinfo((struct sockaddr *)&(ss), sslen, \
 #endif
 
 /* Buffer structure to copy various hostent structures */
-typedef struct {
+typedef struct t_fullhostent {
   t_hostent hp;
   char* list[2];
   char addr[HTS_MAXADDRLEN];    /* various struct sockaddr structures */

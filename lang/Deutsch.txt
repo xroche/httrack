@@ -5,9 +5,11 @@ Deutsch
 LANGUAGE_ISO
 de
 LANGUAGE_AUTHOR
-Rainer Klueting (rainer at klueting.de) \r\nBastian Gorke (bastiang at yahoo.com) \r\nRudi Ferrari (Wyando at netcologne.de) \r\nMarcus Gaza (MarcusGaza at t-online.de) \r\n
+Rainer Klueting (rk-htt at centermail.net) \r\nBastian Gorke (bastiang at yahoo.com) \r\nRudi Ferrari (Wyando at netcologne.de) \r\nMarcus Gaza (MarcusGaza at t-online.de) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+German (Standard)
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Alten Standard HTTP/1.0 benutzen (begrenzt das Arbeitstempo!)
 Attempt to limit retransfers through several tricks (file size test..)
 Versuche, mit verschiedenen Tricks die Zahl der Re-Transfers zu begrenzen (Prüfung der Dateigröße...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Externe Verknüpfungen ohne Benutzername/Passwort eintragen
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Tolerante Anfragen (für Server)
 Update hack (limit re-transfers)
 Aktualisierungstrick (Re-Transfers begrenzen)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Alte HTTP/1.0-Anfragen erzwingen (nicht 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Vorhandenes Projekt zum Aktualisieren auswählen
 Click here to select path
 Hier klicken, um einen Pfad auszuwählen
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Projektassistent
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Projektname:
 Base path:
 Basisverzeichnis:
+Project category:
+
 C:\\My Web Sites
 C:\\Meine Webseiten
 Type a new project name, \r\nor select existing project to update/resume

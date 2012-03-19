@@ -35,14 +35,14 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htswizard.h"
 #include "htsdefines.h"
 
 /* specific definitions */
 #include "htsbase.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 /* END specific definitions */
 
@@ -91,6 +91,7 @@ retour:
 int hts_acceptlink(httrackp* opt,
                    int ptr,int lien_tot,lien_url** liens,
                    char* adr,char* fil,
+                   char* tag, char* attribute,
                    int* set_prio_to,
                    int* just_test_it) {
   
@@ -166,8 +167,8 @@ int hts_acceptlink(httrackp* opt,
     {  // tester interdiction de descendre
       // MODIFIE : en cas de remontée puis de redescente, il se pouvait qu'on ne puisse pas atteindre certains fichiers
       // problème: si un fichier est virtuellement accessible via une page mais dont le lien est sur une autre *uniquement*..
-      char tempo[HTS_URLMAXSIZE*2];
-      char tempo2[HTS_URLMAXSIZE*2];
+      char BIGSTK tempo[HTS_URLMAXSIZE*2];
+      char BIGSTK tempo2[HTS_URLMAXSIZE*2];
       tempo[0] = tempo2[0] = '\0';
       
       // note (up/down): on calcule à partir du lien primaire, ET du lien précédent.
@@ -190,15 +191,17 @@ int hts_acceptlink(httrackp* opt,
           
           // (test même niveau (NOUVEAU à cause de certains problèmes de filtres non intégrés))
           // NEW
-          if (tempo[0] != '\0' && tempo[1] != '\0') {
-            if ( (!strchr(tempo+1,'/')) || (!strchr(tempo2+1,'/')) ) {
-              if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
-                forbidden_url=0;
-                if ((opt->debug>1) && (opt->log!=NULL)) {
-                  fspc(opt->log,"debug"); fprintf(opt->log,"same level link authorized: %s%s"LF,adr,fil);
-                  test_flush;
-                }
-              }
+          if ( 
+            (tempo[0]  != '\0' && tempo[1]  != '\0' && strchr(tempo+1,'/') == 0)
+            ||
+            (tempo2[0] != '\0' && tempo2[1] != '\0' && strchr(tempo2+1,'/') == 0) 
+            ) {
+            if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
+              forbidden_url=0;
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"same level link authorized: %s%s"LF,adr,fil);
+                test_flush;
+             }
             }
           }
           
@@ -289,8 +292,8 @@ int hts_acceptlink(httrackp* opt,
     }  // tester interdiction de descendre?
     
     {  // tester interdiction de monter
-      char tempo[HTS_URLMAXSIZE*2];
-      char tempo2[HTS_URLMAXSIZE*2];
+      char BIGSTK tempo[HTS_URLMAXSIZE*2];
+      char BIGSTK tempo2[HTS_URLMAXSIZE*2];
       if (lienrelatif(tempo,fil,liens[liens[ptr]->premier]->fil)==0) {
         if (lienrelatif(tempo2,fil,liens[ptr]->fil)==0) {
         } else {
@@ -414,8 +417,8 @@ int hts_acceptlink(httrackp* opt,
     int question=1;         // poser une question                            
     int force_mirror=0;     // pour mirror links
     int filters_answer=0;   // décision prise par les filtres
-    char l[HTS_URLMAXSIZE*2];
-    char lfull[HTS_URLMAXSIZE*2];
+    char BIGSTK l[HTS_URLMAXSIZE*2];
+    char BIGSTK lfull[HTS_URLMAXSIZE*2];
     
     if (forbidden_url!=-1) question=0;  // pas de question, résolu
     
@@ -618,7 +621,7 @@ int hts_acceptlink(httrackp* opt,
         HTS_REQUEST_END;
 #if HTS_ANALYSTE
           {
-            char tempo[HTS_URLMAXSIZE*2];
+            char BIGSTK tempo[HTS_URLMAXSIZE*2];
             tempo[0]='\0';
             strcatbuff(tempo,adr);
             strcatbuff(tempo,"/");
@@ -851,8 +854,8 @@ int hts_testlinksize(httrackp* opt,
                      LLint size) {
   int jok=0;
   if (size>=0) {
-    char l[HTS_URLMAXSIZE*2];
-    char lfull[HTS_URLMAXSIZE*2];
+    char BIGSTK l[HTS_URLMAXSIZE*2];
+    char BIGSTK lfull[HTS_URLMAXSIZE*2];
     if (size>=0) {
       LLint sz=size;
       int size_flag=0;

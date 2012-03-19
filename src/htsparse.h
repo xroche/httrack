@@ -37,7 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 
-typedef struct {
+typedef struct htsmoduleStructExtended {
   /* Main object */
   htsblk* r_;
 
@@ -84,6 +84,9 @@ typedef struct {
 } htsmoduleStructExtended;
 
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 /*
   Main parser, attempt to scan links inside the html/css/js file
   Parameters: The public module structure, and the private module variables
@@ -105,4 +108,4 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 */
 int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 
-
+#endif

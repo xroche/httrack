@@ -41,15 +41,23 @@ Please visit our Website: http://www.httrack.com
 #if HTS_WIN
 
 #if HTS_INET6==0
- #include <winsock.h>
+ #include <winsock2.h>
 #else
+
+#ifndef _WIN32_WCE
 #undef HTS_USESCOPEID
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <tpipv6.h>
+#else
+ #include <winsock2.h>
+ #include <socket.h>
 #endif
- typedef SOCKET T_SOC;
+
+#endif
+
+typedef SOCKET T_SOC;
  typedef struct hostent FAR t_hostent;
 
 #else
@@ -67,15 +75,15 @@ Please visit our Website: http://www.httrack.com
 */
 #ifndef HTS_OPENSSL_H_INCLUDED
 #define HTS_OPENSSL_H_INCLUDED
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /*
 #include <openssl/ssl.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 */
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 
 /* OpenSSL definitions */
 #define SSL_shutdown hts_ptrfunc_SSL_shutdown
@@ -96,6 +104,9 @@ extern "C" {
 #define ERR_error_string hts_ptrfunc_ERR_error_string
 #define SSL_load_error_strings hts_ptrfunc_SSL_load_error_strings
 #define SSL_CTX_ctrl hts_ptrfunc_SSL_CTX_ctrl
+
+#endif
+
 /* */
 typedef void SSL_CTX;
 typedef void* SSL;
@@ -118,6 +129,10 @@ typedef SSL_CTX * (*t_SSL_CTX_new)(SSL_METHOD *method);
 typedef char * (*t_ERR_error_string)(unsigned long e, char *buf);
 typedef void (*t_SSL_load_error_strings)(void);
 typedef long (*t_SSL_CTX_ctrl)(SSL_CTX *ctx, int cmd, long larg, char *parg);
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 extern int SSL_is_available;
 extern t_SSL_shutdown SSL_shutdown;
 extern t_SSL_free SSL_free;
@@ -137,6 +152,9 @@ extern t_SSL_CTX_new SSL_CTX_new;
 extern t_ERR_error_string ERR_error_string;
 extern t_SSL_load_error_strings SSL_load_error_strings;
 extern t_SSL_CTX_ctrl SSL_CTX_ctrl;
+
+#endif
+
 /*
 From /usr/include/openssl/ssl.h
 */
@@ -154,9 +172,6 @@ From /usr/include/openssl/ssl.h
         SSL_CTX_ctrl(ctx,SSL_CTRL_OPTIONS,op,NULL)
 
 //#include <openssl/bio.h>
-#ifdef __cplusplus
- };
-#endif
 /* OpenSSL structure */
 extern SSL_CTX *openssl_ctx;
 

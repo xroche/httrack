@@ -1,4 +1,4 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
 
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
@@ -80,7 +80,7 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 <script language="javascript">
 <!--
 var freeze=0;
-setTimeout(do_refresh, 500);
+setTimeout(do_refresh, 1000);
 function do_load() {
 	window.status=' ';
 	enable_timer();
@@ -118,7 +118,7 @@ function do_refresh() {
 	if (!freeze) {
 		document.location.reload();
 	} else {
-		setTimeout(do_refresh, 500);
+		setTimeout(do_refresh, 1000);
 	}
 }
 function no_refresh() {

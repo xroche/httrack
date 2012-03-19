@@ -44,15 +44,24 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 // Includes & définitions
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
 #ifdef _WIN32
+#ifndef  _WIN32_WCE
 #include <conio.h>
+#endif
+#ifndef  _WIN32_WCE
 #include <signal.h>
 #include <direct.h>
+#else
+#ifndef HTS_CECOMPAT
+#include "signal.h"
+#endif
+#endif
 #else
 #include <signal.h>
 #ifdef HAVE_UNISTD_H
@@ -68,7 +77,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsopt.h"
 
 // structure d'un lien
-typedef struct {
+typedef struct lien_url {
   char firstblock;      // flag 1=premier malloc 
   char link_import;     // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
   int depth;            // profondeur autorisée lien ; >0 forte 0=faible
@@ -93,7 +102,7 @@ typedef struct {
 } lien_url;
 
 // chargement de fichiers en 'arrière plan'
-typedef struct {
+typedef struct lien_back {
 #if DEBUG_CHECKINT
   char magic;
 #endif
@@ -137,8 +146,10 @@ typedef struct {
 #endif
 } lien_back;
 
+typedef struct cache_back_zip_entry cache_back_zip_entry;
+
 // cache
-typedef struct {
+typedef struct cache_back {
   int version;        // 0 ou 1
   /* */
   int type;
@@ -150,15 +161,23 @@ typedef struct {
   char lastmodified[256];
   // HASH
   void* hashtable;
+  // HASH for tests (naming subsystem)
+  void* cached_tests;
   // fichiers log optionnels
   FILE* log;
   FILE* errlog;
   // variables
   int ptr_ant;      // pointeur pour anticiper
   int ptr_last;     // pointeur pour anticiper
+  //
+  void* zipInput;
+  void* zipOutput;
+  cache_back_zip_entry* zipEntries;
+  int zipEntriesOffs;
+  int zipEntriesCapa;
 } cache_back;
 
-typedef struct {
+typedef struct hash_struct {
   lien_url** liens;                     // pointeur sur liens
   int max_lien;                         // indice le plus grand rencontré
   int hash[3][HTS_HASH_SIZE];           // tables pour sav/adr-fil/former_adr-former_fil
@@ -169,10 +188,23 @@ typedef struct {
 #define hash_write(A,B)
 #endif
 
-typedef struct {
+typedef struct filecreate_params {
   FILE* lst;
   char path[HTS_URLMAXSIZE*2];
 } filecreate_params;
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
+static int cache_writable(cache_back* cache) {
+  return (cache != NULL && ( cache->dat != NULL || cache->zipOutput != NULL ) );
+}
+
+static int cache_readable(cache_back* cache) {
+  return (cache != NULL && ( cache->olddat != NULL || cache->zipInput != NULL ) );
+}
+
+#endif
 
 // Fonctions
 
@@ -240,6 +272,7 @@ typedef void  (* t_hts_htmlcheck_uninit)(void);
 typedef int   (* t_hts_htmlcheck_start)(httrackp* opt);
 typedef int   (* t_hts_htmlcheck_end)(void);
 typedef int   (* t_hts_htmlcheck_chopt)(httrackp* opt);
+typedef int   (* t_hts_htmlcheck_process)(char** html,int* len,char* url_adresse,char* url_fichier);
 typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url_fichier);
 typedef char* (* t_hts_htmlcheck_query)(char* question);
 typedef char* (* t_hts_htmlcheck_query2)(char* question);
@@ -249,6 +282,7 @@ typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
 typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
 typedef void  (* t_hts_htmlcheck_filesave)(char* file);
 typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
+typedef int   (* t_hts_htmlcheck_linkdetected2)(char* link, char* tag_start);
 typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
 typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
 typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
@@ -264,6 +298,8 @@ extern t_hts_htmlcheck_uninit     hts_htmlcheck_uninit;
 extern t_hts_htmlcheck_start      hts_htmlcheck_start;
 extern t_hts_htmlcheck_end        hts_htmlcheck_end;
 extern t_hts_htmlcheck_chopt      hts_htmlcheck_chopt;
+extern t_hts_htmlcheck_process    hts_htmlcheck_preprocess;
+extern t_hts_htmlcheck_process    hts_htmlcheck_postprocess;
 extern t_hts_htmlcheck            hts_htmlcheck;
 extern t_hts_htmlcheck_query      hts_htmlcheck_query;
 extern t_hts_htmlcheck_query2     hts_htmlcheck_query2;
@@ -273,11 +309,16 @@ extern t_hts_htmlcheck_check      hts_htmlcheck_check;
 extern t_hts_htmlcheck_pause      hts_htmlcheck_pause;
 extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
 extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
+extern t_hts_htmlcheck_linkdetected2 hts_htmlcheck_linkdetected2;
 extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
 extern t_hts_htmlcheck_savename   hts_htmlcheck_savename;
 extern t_hts_htmlcheck_sendhead   hts_htmlcheck_sendhead;
 extern t_hts_htmlcheck_receivehead hts_htmlcheck_receivehead;
 */
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 //
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_is_parsing(int flag);
@@ -306,8 +347,6 @@ extern int _hts_setpause;
 extern char** _hts_addurl;
 extern int _hts_cancel;
 #endif
-
-
 
 //
 
@@ -342,6 +381,8 @@ int liens_record(char* adr,char* fil,char* save,char* former_adr,char* former_fi
 
 
 // backing, routines externes
+int back_pluggable_sockets(lien_back* back, int back_max, httrackp* opt);
+int back_pluggable_sockets_strict(lien_back* back, int back_max, httrackp* opt);
 int back_fill(lien_back* back,int back_max,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
 int backlinks_done(lien_url** liens,int lien_tot,int ptr);
 int back_fillmax(lien_back* back,int back_max,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
@@ -392,6 +433,8 @@ int htsAddLink(htsmoduleStruct* str, char* link);
 void voidf(void);
 
 #define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
+
+#endif
 
 #endif
 

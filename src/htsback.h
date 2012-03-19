@@ -42,6 +42,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsbasenet.h"
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 // backing
 #define BACK_ADD_TEST "(dummy)"
 #define BACK_ADD_TEST2 "(dummy2)"
@@ -53,16 +56,16 @@ int  back_nsoc(lien_back* back,int back_max);
 int  back_nsoc_overall(lien_back* back,int back_max);
 int  back_add(lien_back* back,int back_max,httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* referer_adr,char* referer_fil,int test,int* pass2_ptr);
 int  back_stack_available(lien_back* back,int back_max);
-int  back_search(httrackp* opt, lien_back* back, int back_max);
+int  back_search(httrackp* opt, cache_back* cache, lien_back* back, int back_max);
 void back_clean(httrackp* opt,cache_back* cache,lien_back* back,int back_max);
 void back_wait(lien_back* back,int back_max,httrackp* opt,cache_back* cache,TStamp stat_timestart);
-int  back_letlive(httrackp* opt, lien_back* back, int p);
+int  back_letlive(httrackp* opt, cache_back* cache, lien_back* back, int p);
 int  back_searchlive(httrackp* opt, lien_back* back, int back_max, char* search_addr);
 void back_connxfr(htsblk* src, htsblk* dst);
-int  back_delete(httrackp* opt,lien_back* back,int p);
-int  back_maydelete(httrackp* opt, lien_back* back, int p);
-void back_maydeletehttp(httrackp* opt, lien_back* back, int back_max, int p);
-int  back_trylive(httrackp* opt,lien_back* back, int back_max, int p);
+int  back_delete(httrackp* opt,cache_back* cache,lien_back* back,int p);
+int  back_maydelete(httrackp* opt, cache_back* cache, lien_back* back, int p);
+void back_maydeletehttp(httrackp* opt, cache_back* cache, lien_back* back, int back_max, int p);
+int  back_trylive(httrackp* opt,cache_back* cache,lien_back* back, int back_max, int p);
 int  back_finalize(httrackp* opt,cache_back* cache,lien_back* back,int p);
 void back_info(lien_back* back,int i,int j,FILE* fp);
 void back_infostr(lien_back* back,int i,int j,char* s);
@@ -77,8 +80,10 @@ int back_checkmirror(httrackp* opt);
 
 #if HTS_XGETHOST
 #if USE_BEGINTHREAD
-PTHREAD_TYPE Hostlookup(void* iadr_p);
+PTHREAD_TYPE PTHREAD_TYPE_FNC Hostlookup(void* iadr_p);
 #endif
+#endif
+
 #endif
 
 #endif

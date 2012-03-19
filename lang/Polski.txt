@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Lukasz Jokiel (Opole University of Technology, Lukasz.Jokiel at po.opole.pl) \r\n
 LANGUAGE_CHARSET
 ISO-8859-2
+LANGUAGE_WINDOWSID
+Polish
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 U¿yj trybu zgodnoœci z starszym standardem HTTP/1.0 (ogranicza moc silnika programu)
 Attempt to limit retransfers through several tricks (file size test..)
 Próba ograniczenia powtórnych transferów dziêki kilku trikom (test wielko¶ci pliku)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Spróbuj ogranicznyc ilosc lacz poprzez  pomijanie podobnych URL'i (www.foo.com==foo.com, http=https ..)
 Write external links without login/password
 Zapisuj zewnêtrzne ³acza bez login/has³o
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Toleruj¹ce ¿¹dania (dla serwerów)
 Update hack (limit re-transfers)
 Dostrajanie uaktualnienia (limitowanie retransferów)
+URL hacks (join similar URLs)
+Triki URL
 Force old HTTP/1.0 requests (no 1.1)
 U¿yj ¿¹dañ HTTP/1.0 (BEZ HTTP/1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Tutaj wybierz istniej¹cy projekt przeznaczony do aktualizacji
 Click here to select path
 Kliknij tutaj aby wybraæ œcie¿kê
+Select or create a new category name, to sort your mirrors in categories
+Wybierz lub stwórz nowa kategorie, tak aby posortowac lustra w kategorie
 HTTrack Project Wizard...
 Kreator projektu HTTrack
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Nazwa projektu:
 Base path:
 Œcie¿ka bazowa
+Project category:
+Projekt - kategoria:
 C:\\My Web Sites
 C:\\Moje Strony Web
 Type a new project name, \r\nor select existing project to update/resume

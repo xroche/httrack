@@ -47,10 +47,11 @@ typedef struct robots_wizard {
 } robots_wizard;
 
 
-// robots
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int checkrobots(robots_wizard* robots,char* adr,char* fil);
 void checkrobots_free(robots_wizard* robots);
 int checkrobots_set(robots_wizard* robots,char* adr,char* data);
-
+#endif
 
 #endif

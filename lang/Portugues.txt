@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Rui Fernandes (CANTIC, ruiefe at mail.malhatlantica.pt) \r\nPedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago at mail.iupi.pt) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Portuguese (Portugal)
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 A utilização de chamadas antigas HTTP/1.0 limita as capacidades do motor de captura!
 Attempt to limit retransfers through several tricks (file size test..)
 Tentativa de limitar a retransferência através de vários métodos (teste do tamanho do ficheiro...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Guardar hiperligações externas sem login/palavra-chave
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Chamadas tolerantes (para servidores)
 Update hack (limit re-transfers)
 Actualização forçada (limita retransferências)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Chamadas antigas HTTP/1.0 (não 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Selecione um projecto existente para actualização
 Click here to select path
 Clique aqui para seleccionar o caminho
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Assistente de projectos do WinHTTrack
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Nome do projecto:
 Base path:
 Caminho base:
+Project category:
+
 C:\\My Web Sites
 C:\\Os meus Sites
 Type a new project name, \r\nor select existing project to update/resume

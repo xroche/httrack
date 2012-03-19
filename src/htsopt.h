@@ -44,7 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 
 // structure proxy
-typedef struct {
+typedef struct t_proxy {
   int active;
   char name[1024];
   int port;
@@ -52,14 +52,24 @@ typedef struct {
 } t_proxy; 
 
 /* Structure utile pour copier en bloc les paramètres */
-typedef struct {
+typedef struct htsfilters {
   char***  filters;
   int*     filptr;
   //int*    filter_max;
 } htsfilters;
 
+/* User callbacks chain */
+typedef int (*htscallbacksfncptr)(void);
+typedef struct htscallbacks htscallbacks;
+struct htscallbacks {
+  char callbackName[128];
+  void* moduleHandle;
+  htscallbacksfncptr exitFnc;
+  htscallbacks * next;
+};
+
 /* Structure état du miroir */
-typedef struct {
+typedef struct htsoptstate {
   int stop;
   int exit_xh;
   int back_add_stats;
@@ -67,11 +77,13 @@ typedef struct {
   int mimehtml_created;
   char mimemid[256];
   FILE* mimefp;
+  /* */
+  htscallbacks callbacks;
 } htsoptstate;
 
 
 // paramètres httrack (options)
-typedef struct {
+typedef struct httrackp {
   int wizard;       // wizard aucun/grand/petit
   int flush;        // fflush sur les fichiers log
   int travel;       // type de déplacements (same domain etc)
@@ -96,7 +108,7 @@ typedef struct {
   int rateout;          // nombre d'octets minium pour le transfert
   int maxtime;          // temps max en secondes
   int maxrate;          // taux de transfert max
-  int maxconn;          // nombre max de connexions/s
+  float maxconn;        // nombre max de connexions/s
   int waittime;         // démarrage programmé
   int cache;            // génération d'un cache
   //int aff_progress;     // barre de progression
@@ -108,6 +120,8 @@ typedef struct {
   int mimehtml;         // MIME-html
   int user_agent_send;  // user agent (ex: httrack/1.0 [sun])
   char user_agent[128];
+  char referer[256];    // referer 
+  char from[256];       // from
   char path_log[1024];  // chemin pour cache et log
   char path_html[1024]; // chemin pour miroir
   char path_bin[1024];  // chemin pour templates
@@ -135,6 +149,7 @@ typedef struct {
   int urlhack;          // force "url normalization" to avoid loops
   int tolerant;         // accepter content-length incorrect
   int parseall;         // essayer de tout parser (tags inconnus contenant des liens, par exemple)
+  int parsedebug;       // débugger parser (debug!)
   int norecatch;        // ne pas reprendre les fichiers effacés localement par l'utilisateur
   int verbosedisplay;   // animation textuelle
   char footer[256];     // ligne d'infos
@@ -156,6 +171,7 @@ typedef struct {
   //
   int quiet;            // poser des questions autres que wizard?
   int keyboard;         // vérifier stdin
+  int bypass_limits;    // bypass built-in limits
   //
   int is_update;        // c'est une update (afficher "File updated...")
   int dir_topindex;     // reconstruire top index par la suite
@@ -164,7 +180,7 @@ typedef struct {
 } httrackp;
 
 // stats for httrack
-typedef struct {
+typedef struct hts_stat_struct {
   LLint HTS_TOTAL_RECV;      // flux entrant reçu
   LLint stat_bytes;          // octets écrits sur disque
   // int HTS_TOTAL_RECV_STATE;  // status: 0 tout va bien 1: ralentir un peu 2: ralentir 3: beaucoup
@@ -193,6 +209,9 @@ typedef struct {
   LLint nb;                  // données transférées actuellement (estimation)
   //
   LLint rate;
+  //
+  TStamp last_connect;      // last connect() call
+  TStamp last_request;      // last request issued
 } hts_stat_struct;
 
 

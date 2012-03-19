@@ -35,20 +35,19 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef _WIN32
-#if HTS_DLOPEN
-#include <dlfcn.h>
-#endif
-#endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
 #include "htsmodules.h"
 #include "htsopt.h"
 extern int fspc(FILE* fp,char* type);
+
+#ifndef _WIN32
+#if HTS_DLOPEN
+#include <dlfcn.h>
+#endif
+#endif
 
 /* >>> Put all modules definitions here */
 #include "htszlib.h"
@@ -71,9 +70,11 @@ t_hts_detect_swf hts_detect_swf = NULL;
 t_hts_parse_swf hts_parse_swf = NULL;
 
 int gz_is_available = 0;
+#if 0
 t_gzopen gzopen = NULL;
 t_gzread gzread = NULL;
 t_gzclose gzclose = NULL;
+#endif
 
 int SSL_is_available = 0;
 t_SSL_shutdown SSL_shutdown = NULL;
@@ -108,6 +109,7 @@ void abortLog__fnc(char* msg, char* file, int line) {
   FILE* fp = fopen("CRASH.TXT", "wb");
   if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb");
   if (!fp) fp = fopen("C:\\CRASH.TXT", "wb");
+  if (!fp) fp = fopen("CRASH.TXT", "wb");
   if (fp) {
     fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n", file, line);
     fprintf(fp, "Reason:\r\n%s\r\n", msg);
@@ -144,17 +146,60 @@ int hts_parse_externals(htsmoduleStruct* str) {
   return -1;
 }
 
-/* NOTE: handled NOT closed */
-void* getFunctionPtr(char* file_, char* fncname) {
-  char file[1024];
+static void addCallback(htscallbacks* chain, void* moduleHandle, htscallbacksfncptr exitFnc) {
+  while(chain->next != NULL) {
+    chain = chain->next;
+  }
+  chain->next = calloct(1, sizeof(htscallbacks));
+  assertf(chain->next != NULL);
+  chain = chain->next;
+  memset(chain, 0, sizeof(*chain));
+  chain->exitFnc = exitFnc;
+  chain->moduleHandle = moduleHandle;
+}
+
+void clearCallbacks(htscallbacks* chain_);
+void clearCallbacks(htscallbacks* chain_) {
+  htscallbacks* chain;
+  chain = chain_;
+  while(chain != NULL) {
+    if (chain->exitFnc != NULL) {
+      (void) chain->exitFnc();      /* result ignored */
+      chain->exitFnc = NULL;
+    }
+    chain = chain->next;
+  }
+  chain = chain_;
+  while(chain != NULL) {
+    if (chain->moduleHandle != NULL) {
+#ifdef _WIN32
+      FreeLibrary(chain->moduleHandle);
+#else
+      dlclose(chain->moduleHandle);
+#endif
+    }
+    chain = chain->next;
+  }
+  chain = chain_->next;     // Don't free the block #0
+  while(chain != NULL) {
+    htscallbacks* nextchain = chain->next;
+    freet(chain);
+    chain = nextchain;
+  }
+  chain_->next = NULL;    // Empty
+}
+
+void* getFunctionPtr(httrackp* opt, char* file_, char* fncname);
+void* getFunctionPtr(httrackp* opt, char* file_, char* fncname) {
+  char BIGSTK file[1024];
   void* handle;
   void* userfunction = NULL;
   strcpybuff(file, file_);
 #ifdef _WIN32
-  handle = LoadLibrary(file);
+  handle = LoadLibraryA((char*)file);
   if (handle == NULL) {
     strcatbuff(file, ".dll");
-    handle = LoadLibrary(file);
+    handle = LoadLibraryA((char*)file);
   }
 #else
   handle = dlopen(file, RTLD_LAZY);
@@ -164,13 +209,61 @@ void* getFunctionPtr(char* file_, char* fncname) {
   }
 #endif
   if (handle) {
-    userfunction = (void*) DynamicGet(handle, fncname);
+    /* Thanks to Lars Clausen for the "wrapper-init" patch */
+    /* If given arguments, call "<wrappername>_init" */
+    char BIGSTK tmpName[1024];
+    char *comma;
+    if ((comma = strchr(fncname, ',')) != NULL) {   /* empty arg */
+      *comma++ = '\0';
+    }
+    
+    /* speficic plug init */
+    {
+      t_htsWrapperPlugInit initfunction;
+      sprintf(tmpName, "%s_init", fncname);
+      initfunction = (t_htsWrapperPlugInit)DynamicGet(handle, (char*)tmpName);
+      if (initfunction  != NULL) {
+        int result = (int) initfunction(comma);
+        if (!result) {
+          if (userfunction == NULL) {
+#ifdef _WIN32
+            FreeLibrary(handle);
+#else
+            dlclose(handle);
+#endif
+          }
+          return NULL;
+        }       
+      }
+    }
+    /* wrapper_init() */
+    {
+      t_htsWrapperInit initfunction = (t_htsWrapperInit)DynamicGet(handle, (char*)"wrapper_init");
+      if (initfunction != NULL) {
+        if (! initfunction(fncname, comma)) {
+          if (userfunction == NULL) {
+#ifdef _WIN32
+            FreeLibrary(handle);
+#else
+            dlclose(handle);
+#endif
+          }
+          return NULL;
+        }
+      }
+    }
+    /* the function itself */
+    userfunction = (void*) DynamicGet(handle, (char*)fncname);
     if (userfunction == NULL) {
 #ifdef _WIN32
       FreeLibrary(handle);
 #else
       dlclose(handle);
 #endif
+    } else {
+      /* optional exit wrapper */
+      t_htsWrapperExit exitFnc = (t_htsWrapperExit) DynamicGet(handle, (char*)"wrapper_exit");
+      addCallback(&opt->state.callbacks, handle, exitFnc);      // exitFnc can be null
     }
   }
   return userfunction;
@@ -183,7 +276,10 @@ void htspe_init() {
     
     /* >>> Put all module initializations here */
     
+
     /* Zlib */
+    gz_is_available = 1;
+    /*
 #if HTS_DLOPEN
     {
       void* handle;
@@ -202,13 +298,14 @@ void htspe_init() {
       }
     }
 #endif
+    */
 
     /* OpenSSL */
 #if HTS_DLOPEN
     {
       void* handle;
 #ifdef _WIN32
-      handle = LoadLibrary("ssleay32");
+      handle = LoadLibraryA((char*)"ssleay32");
 #else
       /* We are compatible with 0.9.6/7 and potentially above */
       handle = dlopen("libssl.so.0.9.7", RTLD_LAZY);
@@ -221,27 +318,27 @@ void htspe_init() {
       }
 #endif
       if (handle) {
-        SSL_shutdown = (t_SSL_shutdown) DynamicGet(handle, "SSL_shutdown");
-        SSL_free = (t_SSL_free) DynamicGet(handle, "SSL_free");
-        SSL_new = (t_SSL_new) DynamicGet(handle, "SSL_new");
-        SSL_clear = (t_SSL_clear) DynamicGet(handle, "SSL_clear");
-        SSL_set_fd = (t_SSL_set_fd) DynamicGet(handle, "SSL_set_fd");
-        SSL_set_connect_state = (t_SSL_set_connect_state) DynamicGet(handle, "SSL_set_connect_state");
-        SSL_connect = (t_SSL_connect) DynamicGet(handle, "SSL_connect");
-        SSL_get_error = (t_SSL_get_error) DynamicGet(handle, "SSL_get_error");
-        SSL_write = (t_SSL_write) DynamicGet(handle, "SSL_write");
-        SSL_read = (t_SSL_read) DynamicGet(handle, "SSL_read");
-        SSL_library_init = (t_SSL_library_init) DynamicGet(handle, "SSL_library_init");
-        ERR_load_SSL_strings = (t_ERR_load_SSL_strings) DynamicGet(handle, "ERR_load_SSL_strings");
-        SSLv23_client_method = (t_SSLv23_client_method) DynamicGet(handle, "SSLv23_client_method");
-        SSL_CTX_new  = (t_SSL_CTX_new) DynamicGet(handle, "SSL_CTX_new");
-        SSL_load_error_strings = (t_SSL_load_error_strings) DynamicGet(handle, "SSL_load_error_strings");
-        SSL_CTX_ctrl = (t_SSL_CTX_ctrl) DynamicGet(handle, "SSL_CTX_ctrl");
+        SSL_shutdown = (t_SSL_shutdown) DynamicGet(handle, (char*)"SSL_shutdown");
+        SSL_free = (t_SSL_free) DynamicGet(handle, (char*)"SSL_free");
+        SSL_new = (t_SSL_new) DynamicGet(handle, (char*)"SSL_new");
+        SSL_clear = (t_SSL_clear) DynamicGet(handle, (char*)"SSL_clear");
+        SSL_set_fd = (t_SSL_set_fd) DynamicGet(handle, (char*)"SSL_set_fd");
+        SSL_set_connect_state = (t_SSL_set_connect_state) DynamicGet(handle, (char*)"SSL_set_connect_state");
+        SSL_connect = (t_SSL_connect) DynamicGet(handle, (char*)"SSL_connect");
+        SSL_get_error = (t_SSL_get_error) DynamicGet(handle, (char*)"SSL_get_error");
+        SSL_write = (t_SSL_write) DynamicGet(handle, (char*)"SSL_write");
+        SSL_read = (t_SSL_read) DynamicGet(handle, (char*)"SSL_read");
+        SSL_library_init = (t_SSL_library_init) DynamicGet(handle, (char*)"SSL_library_init");
+        ERR_load_SSL_strings = (t_ERR_load_SSL_strings) DynamicGet(handle, (char*)"ERR_load_SSL_strings");
+        SSLv23_client_method = (t_SSLv23_client_method) DynamicGet(handle, (char*)"SSLv23_client_method");
+        SSL_CTX_new  = (t_SSL_CTX_new) DynamicGet(handle, (char*)"SSL_CTX_new");
+        SSL_load_error_strings = (t_SSL_load_error_strings) DynamicGet(handle, (char*)"SSL_load_error_strings");
+        SSL_CTX_ctrl = (t_SSL_CTX_ctrl) DynamicGet(handle, (char*)"SSL_CTX_ctrl");
 #ifdef _WIN32
-        handle = LoadLibrary("libeay32");
+        handle = LoadLibraryA((char*)"libeay32");
 #endif
-        ERR_load_crypto_strings = (t_ERR_load_crypto_strings) DynamicGet(handle, "ERR_load_crypto_strings");
-        ERR_error_string = (t_ERR_error_string) DynamicGet(handle, "ERR_error_string");
+        ERR_load_crypto_strings = (t_ERR_load_crypto_strings) DynamicGet(handle, (char*)"ERR_load_crypto_strings");
+        ERR_error_string = (t_ERR_error_string) DynamicGet(handle, (char*)"ERR_error_string");
 
         if (SSL_shutdown && SSL_free && SSL_CTX_ctrl && SSL_new && SSL_clear && 
           SSL_set_fd && SSL_set_connect_state && SSL_connect && SSL_get_error && SSL_write 
@@ -262,7 +359,7 @@ void htspe_init() {
 #if HTS_DLOPEN
     {
 #ifdef _WIN32
-      void* handle = LoadLibrary("htsswf");
+      void* handle = LoadLibraryA((char*)"htsswf");
 #else
       void* handle = dlopen("libhtsswf.so.1", RTLD_LAZY);
 #endif
@@ -300,6 +397,7 @@ static void htspe_log(htsmoduleStruct* str, char* msg) {
   }
 }
 
+HTSEXT_API const char* hts_is_available(void);
 HTSEXT_API const char* hts_is_available(void) {
   return WHAT_is_available;
 }

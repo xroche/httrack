@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Александар Савиќ (aleks@macedonia.eu.org) \r \n
 LANGUAGE_CHARSET
 ISO-8859-5
+LANGUAGE_WINDOWSID
+FYRO Macedonian
 OK
 Добро
 Cancel
@@ -173,13 +175,13 @@ Parsing HTML file..
 Purging files..
 Пречистување на датотеките...
 Loading cache in progress..
-
+Вчитување на кешот во тек..
 Parsing HTML file (testing links)..
 Анализирање на HTML датотеките (тестирање на линковите)..
 Pause - Toggle [Mirror]/[Pause download] to resume operation
 Пауза - Изберете [Mirror]/[Паузирање на симнувањето] за продолжување на операцијата
 Finishing pending transfers - Select [Cancel] to stop now!
-
+Завршување на трансфери кои чекаат - Изберете [Откажи] за стопирање!
 scanning
 скенира
 Waiting for scheduled time..
@@ -225,7 +227,7 @@ Do you really want to quit WinHTTrack Website Copier?
 Log files Path
 Path за log датотеките
 Path
-Path
+Патека
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
 - Начин за листање на линковите -n\nКористете го URL полето за внесување на адреси или страници кои содржат линкови за копијата.
 New project / Import?
@@ -247,11 +249,11 @@ Define proxy settings
 Use standard HTTP proxy as FTP proxy
 Користете стандарден HTTP proxy како FTP proxy
 Path
-Path
+Патека
 Select Path
 Изберете Path
 Path
-Path
+Патека
 Select Path
 Изберете Path
 Quit WinHTTrack Website Copier
@@ -373,7 +375,7 @@ Create error logging and report files
 Generate DOS 8-3 filenames ONLY
 Генерирајте САМО DOS 8-3 имиња на датотеки
 Generate ISO9660 filenames ONLY for CDROM medias
-
+Генерирај ISO9660 имиња на датотеки САМО за CDROM уреди
 Do not create HTML error pages
 Не креирајте HTML страници со грешки
 Select file types to be saved to disk
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Користете стари HTML/1.0 молби (ограничена е можноста на програмата)
 Attempt to limit retransfers through several tricks (file size test..)
 Обиди се да се ограничат повторните трансфери преку некои трикови (тест на големината на датотеката...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Запиши ги надворешните линкови без login/password
 Write internal links without query string
@@ -479,7 +483,7 @@ Log датотеки
 DOS names (8+3)
 DOS имиња (8+3)*/
 ISO9660 names (CDROM)
-
+ISO 9660 имиња (CDROM)
 No error pages
 Без страници со грешки
 Primary Scan Rule
@@ -493,7 +497,7 @@ These options should be modified only exceptionally
 Activate Debugging Mode (winhttrack.log)
 Активирај го начин на debug (winhttrack.log)
 Rewrite links: internal / external
-
+Повторно напиши линкови: внатрешни / надворешни
 Flow control
 Flow контрола
 Limits
@@ -517,7 +521,7 @@ Use proxy for ftp transfers
 TimeOut(s)
 Тајм аут(и)
 Persistent connections (Keep-Alive)
-
+Постојани поврзувања (Keep-Alive)
 Reduce connection time and type lookup time using persistent connections
 
 Retries
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Толеранти молби (за сервери)
 Update hack (limit re-transfers)
 Update hack (ограничи ги повторните трансфери)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Искористи ги старите HTTP/1.0 молби (не 1.1)
 Max connections / seconds
@@ -585,9 +591,9 @@ Spider
 Log, Index, Cache
 Log, индекс, кеш
 Proxy
-Proxy
+Прокси
 MIME Types
-
+MIME типови
 Do you really want to quit WinHTTrack Website Copier?
 Дали навистина сакате да го исклучите WinHTTrack Website Copier?
 Do not connect to a provider (already connected)
@@ -615,7 +621,7 @@ Please adjust connection parameters if necessary,\nthen press FINISH to launch t
 Save settings only, do not launch download now.
 Зачувај ги само сетинзите, не почнувај со симнување сега.
 On hold
-On hold
+На чекање
 Transfer scheduled for: (hh/mm/ss)
 Трансферот е закажан за: (hh\mm\ss)
 Start
@@ -635,7 +641,7 @@ About WinHTTrack Website Copier
 Please visit our Web page
 Ве молиме посетете ја нашата Веб страница
 Wizard query
-Wizard query
+Волшебник прашалник
 Your answer:
 Вашиот одговор:
 Link detected..
@@ -657,7 +663,7 @@ Mirror domain
 Ignore all
 Игнорирај се
 Wizard query
-Wizard query
+Волшебник прашалник
 NO
 НЕ
 File
@@ -665,7 +671,7 @@ File
 Options
 Опции
 Log
-Log
+Лог
 Window
 Прозорец
 Help
@@ -701,7 +707,7 @@ Preferences
 Mirror
 Копија на сајтот
 Log
-Log
+Лог
 Window
 Прозорец
 Help
@@ -751,7 +757,7 @@ Proxy порта:
 Authentication (only if needed)
 Идентификација (само ако е потребна)
 Login
-Login
+Логин
 Password
 Лозинка
 Enter proxy address here
@@ -770,8 +776,10 @@ Select existing project to update
 Одберете постоечки проект за update
 Click here to select path
 Кликни овде за избирање на path
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
-HTTrack Project Wizard...
+HTTrack проект волшебник...
 New project name:
 Име на новиот проект:
 Existing project name:
@@ -780,6 +788,8 @@ Project name:
 Име на проектот:
 Base path:
 Основен path:
+Project category:
+
 C:\\My Web Sites
 C:\\Мои Веб Сајтови
 Type a new project name, \r\nor select existing project to update/resume
@@ -793,7 +803,7 @@ URL:
 Authentication (only if needed)
 Идентификација (само ако е потребна)
 Login
-Login
+Логин
 Password
 Лозинка
 Forms or complex links:
@@ -875,7 +885,7 @@ File names with extension:\nFile names containing:\nThis file name:\nFolder name
 Show all\nHide debug\nHide infos\nHide debug and infos
 Покажи ги сите\nСокриј debug\nСокриј ги информациите\nСокриј debug и информации
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Структура на сајтот (стандардно)\nHtml во web/,       слики/др. датотеки во web/слики/\nHtml во web/html,   слики/друго во web/слики\nHtml во web/,       слики/друго во web/\nHtml во web/,       слики/друго во web/xxx, каде xxx е наставката на датотеката\nHtml во web/html,   слики/друго во web/xxx\nСтруктура на сајтот, без www.domain.xxx/\nHtml во site_name/, слики/др. датотеки во site_name/слики/\nHtml во site_name/html, слики/друго во site_name/слики\nHtml во site_name/, слики/друго во site_name/\nHtml во site_name/, слики/друго во site_name/xxx\nHtml во site_name/html, слики/друго во site_name/xxx\nСите датотеки во web/, со произволни имиња (gadget !)\nСите датотеки во site_name/, со произволни имиња (gadget !)\nСтруктура дефинирана од корисникот..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Само скенирај\nСмести ги HTML датотеките\nСмести ги не-HTML датотеките\nСмести ги сите датотеки (default)жнСмести ги првин HTML датотеките
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -891,30 +901,30 @@ normal\nextended\ndebug
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
 Симни веб сајтови\nСимни веб сајтови + прашања\nЗеми посебни датотеки\nСимни ги сите сајтови во страници (повеќекратна копија)\nТестирај ги линковите во страниците (bookmark тест)\n*Продолжи го прекинатото симнување\n*Направи update na постоечкото симнувањеEnglish
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
-
+Релативен URI / Апсолутен URL (стандарден)\nАпсолутен URL / Апсолутен URL\nАпсолутен URI / Апсолутен URL\nОригинален URL / Оригинален URL
 Open Source offline browser
-
+Open Source offline пребарувач
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-
+Копирач на веб сајтови/Offline пребарувач. Копирајте веб сајтови на вашиот компјутер. Бесплатно.
 httrack, winhttrack, webhttrack, offline browser
-
+httrack, winhttrack, webhttrack, offline пребарувач
 URL list (.txt)
-
+URL листа (.txt)
 Previous
-
+Претходен
 Next
-
+Следен
 URLs
-
+URLs
 Warning
-
+Предупредување
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-
+Вашиот пребарувач не поддржува javascript. За подобри резултати, користете пребарувач со javascript.
 Thank you
-
+Благодариме
 You can now close this window
-
+Можете да го затворите овој прозорец
 Server terminated
-
+Серверот е прекинат
 A fatal error has occured during this mirror
-
+Настана фатална грешка при овој mirror

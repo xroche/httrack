@@ -35,15 +35,15 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htsinthash.h"
 
 /* specific definitions */
 #include "htsbase.h"
 #include "htsglobal.h"
 #include "htsmd5.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 /* END specific definitions */
 
 /* Specific macros */
@@ -68,11 +68,12 @@ int inthash_write(inthash hashtable,char* name,long int value) {
     if (strcmp(h->name,name)==0) {
       /* Delete element */
       if (hashtable->flag_valueismalloc) {
-        if (h->value.intg) {
+        void* ptr = (void*)h->value.intg;
+        if (ptr != NULL) {
           if (hashtable->free_handler)
-            hashtable->free_handler((void*)h->value.intg);
+            hashtable->free_handler(ptr);
           else
-            freet((void*)h->value.intg);
+            freet(ptr);
         }
       }
       /* Insert */
@@ -151,7 +152,8 @@ int inthash_read(inthash hashtable,char* name,long int* value) {
   inthash_chain* h=hashtable->hash[pos];
   while (h) {
     if (strcmp(h->name,name)==0) {
-      *value=h->value.intg;
+      if (value != NULL)
+        *value=h->value.intg;
       return 1;
     }
     h=h->next;
@@ -180,12 +182,13 @@ void inthash_delchain(inthash_chain* hash,t_inthash_freehandler free_handler) {
     inthash_delchain(hash->next,free_handler);
     if (free_handler) {     // pos is a malloc() block, delete it!
       if (hash->value.intg) {
+        void* ptr = (void*)hash->value.intg;
         if (free_handler)
-          free_handler((void*)hash->value.intg);
+          free_handler(ptr);
         else
-          freet((void*)hash->value.intg);
+          freet(ptr);
+        hash->value.intg=0;
       }
-      hash->value.intg=0;
     }
     freet(hash);
   }

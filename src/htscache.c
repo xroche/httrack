@@ -35,15 +35,19 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htscache.h"
 
 /* specific definitions */
 #include "htsbase.h"
 #include "htsbasenet.h"
 #include "htsmd5.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <time.h>
+
+#include "htszlib.h"
+
 
 #include "htsnostatic.h"
 /* END specific definitions */
@@ -116,10 +120,15 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* 
   // ---stockage en cache---
   // stocker dans le cache?
   if (opt->cache) {
-    if (cache->dat!=NULL) {
+    if (cache_writable(cache)) {
       // c'est le seul endroit ou l'on ajoute des elements dans le cache (fichier entier ou header)
       // on stocke tout fichier "ok", mais également les réponses 404,301,302...
-      if ((r->statuscode==200)         /* stocker réponse standard, plus */
+      if (
+#if 1
+        r->statuscode > 0
+#else
+        /* We don't store 5XX errors, because it might be a server problem */
+        (r->statuscode==200)        /* stocker réponse standard, plus */
         || (r->statuscode==204)     /* no content */
         || (r->statuscode==301)     /* moved perm */
         || (r->statuscode==302)     /* moved temp */
@@ -129,13 +138,33 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* 
         || (r->statuscode==403)     /* unauthorized */
         || (r->statuscode==404)     /* not found */
         || (r->statuscode==410)     /* gone */
+#endif
         )
       {        /* ne pas stocker si la page générée est une erreur */
         if (!r->is_file) {
           // stocker fichiers (et robots.txt)
-          if ( (strnotempty(url_save)) || (strcmp(url_fil,"/robots.txt")==0)) {
+          if ( url_save == NULL || (strnotempty(url_save)) || (strcmp(url_fil,"/robots.txt")==0)) {
             // ajouter le fichier au cache
-            cache_add(*r,url_adr,url_fil,url_save,cache->ndx,cache->dat,opt->all_in_cache);
+            cache_add(cache,*r,url_adr,url_fil,url_save,opt->all_in_cache);
+            //
+            // store a reference NOT to redo the same test zillions of times!
+            // (problem reported by Lars Clausen)
+            // we just store statuscode + location (if any)
+            if (url_save == NULL && r->statuscode / 100 >= 3) {
+              // cached "fast" header doesn't uet exists
+              if (inthash_read((inthash)cache->cached_tests, concat(url_adr, url_fil), NULL) == 0) {
+                char BIGSTK tempo[HTS_URLMAXSIZE*2];
+                sprintf(tempo, "%d", (int)r->statuscode);
+                if (r->location != NULL && r->location[0] != '\0') {
+                  strcatbuff(tempo, "\n");
+                  strcatbuff(tempo, r->location);
+                }
+                if ((opt->debug>0) && (opt->log!=NULL)) {
+                  fspc(opt->log,"debug"); fprintf(opt->log, "Cached fast-header response: %s%s is %d"LF, url_adr, url_fil, (int)r->statuscode);
+                }
+                inthash_add((inthash)cache->cached_tests, concat(url_adr, url_fil), (long int)strdupt(tempo));
+              }
+            }
           }
         }
       }
@@ -145,13 +174,222 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* 
 }
 
 
+
+#if 01
+
+/* test only - to be removed */
+
+#define ZIP_FIELD_STRING(headers, headersSize, field, value) do { \
+  if ( (value != NULL) && (value)[0] != '\0') { \
+    sprintf(headers + headersSize, "%s: %s\r\n", field, (value != NULL) ? (value) : ""); \
+    (headersSize) += (int) strlen(headers + headersSize); \
+  } \
+} while(0)
+#define ZIP_FIELD_INT(headers, headersSize, field, value) do { \
+  if ( (value != 0) ) { \
+    sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
+    (headersSize) += (int) strlen(headers + headersSize); \
+  } \
+} while(0)
+#define ZIP_FIELD_INT_FORCE(headers, headersSize, field, value) do { \
+  sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
+  (headersSize) += (int) strlen(headers + headersSize); \
+} while(0)
+
+struct cache_back_zip_entry {
+  unsigned long int hdrPos;
+  unsigned long int size;
+  int compressionMethod;
+};
+
+#define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    strcpybuff(refvalue, value); \
+    line[0] = '\0'; \
+  } \
+} while(0)
+#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    int intval = 0; \
+    sscanf(value, "%d", &intval); \
+    (refvalue) = intval; \
+    line[0] = '\0'; \
+  } \
+} while(0)
+
+
 /* Ajout d'un fichier en cache */
-void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_ndx,FILE* cache_dat,int all_in_cache) {
+void cache_add(cache_back* cache,htsblk r,char* url_adr,char* url_fil,char* url_save,int all_in_cache) {
+  char BIGSTK filemame[HTS_URLMAXSIZE*4];
+  int dataincache=0;    // put data in cache ?
+  char BIGSTK headers[8192];
+  int headersSize = 0;
+  int entryBodySize = 0;
+  int entryFilenameSize = 0;
+  zip_fileinfo fi;
+
+  // robots.txt hack
+  if (url_save == NULL) {
+    dataincache=0;		// testing links
+  }
+  else {
+    if ( (strnotempty(url_save)==0) ) {
+      if (strcmp(url_fil,"/robots.txt")==0)        // robots.txt
+        dataincache=1;
+      else
+        return;   // error (except robots.txt)
+    }
+
+    /* Data in cache ? */
+    if (is_hypertext_mime(r.contenttype, url_fil))
+      dataincache=1;
+    else if (all_in_cache)
+      dataincache=1;
+  }
+
+  if (r.size < 0)   // error
+    return;
+
+  // data in cache
+  if (dataincache) {
+    assertf(((int) r.size) == r.size);
+    entryBodySize = (int) r.size;
+  }
+
+  /* Fields */
+  headers[0] = '\0';
+  headersSize = 0;
+  /* */
+  {
+    char* message;
+    if (strlen(r.msg) < 32) {
+      message = r.msg;
+    } else {
+      message = "(See X-StatusMessage)";
+    }
+    /* 64 characters MAX for first line */
+    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', r.statuscode, r.msg);
+  }
+  headersSize += (int) strlen(headers + headersSize);
+  /* Second line MUST ALWAYS be X-In-Cache */
+  ZIP_FIELD_INT_FORCE(headers, headersSize, "X-In-Cache", dataincache);
+  ZIP_FIELD_INT(headers, headersSize, "X-StatusCode", r.statuscode);
+  ZIP_FIELD_STRING(headers, headersSize, "X-StatusMessage", r.msg);
+  ZIP_FIELD_INT(headers, headersSize, "X-Size", r.size);           // size
+  ZIP_FIELD_STRING(headers, headersSize, "Content-Type", r.contenttype);      // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, "X-Charset", r.charset);          // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, "Last-Modified", r.lastmodified);     // last-modified
+  ZIP_FIELD_STRING(headers, headersSize, "Etag", r.etag);             // Etag
+  ZIP_FIELD_STRING(headers, headersSize, "Location", r.location);         // 'location' pour moved
+  ZIP_FIELD_STRING(headers, headersSize, "Content-Disposition", r.cdispo);           // Content-disposition
+  ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);            // Original address
+  ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);            // Original URI filename
+  ZIP_FIELD_STRING(headers, headersSize, "X-Save", url_save);           // Original save filename
+  
+  entryFilenameSize = (int) ( strlen(url_adr) + strlen(url_fil));
+  
+  /* Filename */
+  if (!link_has_authority(url_adr)) {
+    strcpybuff(filemame, "http://");
+  } else {
+    strcpybuff(filemame, "");
+  }
+  strcatbuff(filemame, url_adr);
+  strcatbuff(filemame, url_fil);
+
+  /* Time */
+  memset(&fi, 0, sizeof(fi));
+  if (r.lastmodified[0] != '\0') {
+    struct tm* tm_s=convert_time_rfc822(r.lastmodified);
+    if (tm_s) {
+      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
+      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
+      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
+      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
+      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
+      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
+    }
+  }
+  
+  /* Open file - NOTE: headers in "comment" */
+  if (zipOpenNewFileInZip((zipFile) cache->zipOutput,
+    filemame,
+    &fi,
+    /* 
+    Store headers in realtime in the local file directory as extra field
+    In case of crash, we'll be able to recover the whole ZIP file by rescanning it
+    */
+    headers,
+    (uInt) strlen(headers),
+    NULL,
+    0,
+    NULL, /* comment */
+    Z_DEFLATED,
+    Z_DEFAULT_COMPRESSION) != Z_OK)
+  {
+    int zip_disk_write_failed = 0;
+    assertf(zip_disk_write_failed);
+  }
+  
+  /* Write data in cache */
+  if (dataincache) {
+    if (r.is_write == 0) {
+      if (r.size > 0 && r.adr != NULL) {
+        if (zipWriteInFileInZip((zipFile) cache->zipOutput, r.adr, (int) r.size) != Z_OK) {
+          int zip_disk_write_failed = 0;
+          assertf(zip_disk_write_failed);
+        }
+      }
+    } else {
+      FILE* fp;
+      // On recopie le fichier..
+      LLint file_size=fsize(fconv(url_save));
+      if (file_size>=0) {
+        fp=fopen(fconv(url_save),"rb");
+        if (fp!=NULL) {
+          char BIGSTK buff[32768];
+          INTsys nl;
+          do {
+            nl=fread(buff,1,32768,fp);
+            if (nl>0) { 
+              if (zipWriteInFileInZip((zipFile) cache->zipOutput, buff, (int) nl) != Z_OK) {
+                int zip_disk_write_failed = 0;
+                assertf(zip_disk_write_failed);
+              }
+            }
+          } while(nl>0);
+          fclose(fp);
+        } else {
+          /* Err FIXME - lost file */
+        }
+      } /* Empty files are OK */
+    }
+  }
+  
+  /* Close */
+  if (zipCloseFileInZip((zipFile) cache->zipOutput) != Z_OK) {
+    int zip_disk_write_failed = 0;
+    assertf(zip_disk_write_failed);
+  }
+
+  /* Flush */
+  if (zipFlush((zipFile) cache->zipOutput) != 0) {
+    int zip_disk_write_failed = 0;
+    assertf(zip_disk_write_failed);
+  }
+}
+
+#else
+
+/* Ajout d'un fichier en cache */
+void cache_add(cache_back* cache,htsblk r,char* url_adr,char* url_fil,char* url_save,int all_in_cache) {
   int pos;
   char s[256];
-  char buff[HTS_URLMAXSIZE*4];
+  char BIGSTK buff[HTS_URLMAXSIZE*4];
   int ok=1;
   int dataincache=0;    // donnée en cache?
+  FILE* cache_ndx = cache->ndx;
+  FILE* cache_dat = cache->dat;
   /*char digest[32+2];*/
   /*digest[0]='\0';*/
 
@@ -159,6 +397,8 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
   if ( (strnotempty(url_save)==0) ) {
     if (strcmp(url_fil,"/robots.txt")==0)        // robots.txt
       dataincache=1;
+    else if (strcmp(url_fil,"/test")==0)        // testing links
+      dataincache=0;
     else
       return;   // erreur (sauf robots.txt)
   }
@@ -167,7 +407,7 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
     return;          // refusé..
 
   // Mettre les *donées* en cache ?
-  if (is_hypertext_mime(r.contenttype))    // html, mise en cache des données et 
+  if (is_hypertext_mime(r.contenttype, url_fil))    // html, mise en cache des données et 
     dataincache=1;                               // pas uniquement de l'en tête
   else if (all_in_cache)
     dataincache=1;                               // forcer tout en cache
@@ -209,6 +449,7 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
   && cache_wstr(cache_dat,url_adr) != -1            // Original address
   && cache_wstr(cache_dat,url_fil) != -1            // Original URI filename
   && cache_wstr(cache_dat,url_save) != -1           // Original save filename
+  && cache_wstr(cache_dat,r.headers) != -1          // Full HTTP Headers
   && cache_wstr(cache_dat,"HTS") != -1              // end of header
   ) {
     ok=1;       /* ok */
@@ -238,7 +479,7 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
           if (cache_wLLint(cache_dat,file_size)!=-1) {
             fp=fopen(fconv(url_save),"rb");
             if (fp!=NULL) {
-              char buff[32768];
+              char BIGSTK buff[32768];
               INTsys nl;
               do {
                 nl=fread(buff,1,32768,fp);
@@ -275,6 +516,8 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
   fflush(cache_dat); fflush(cache_ndx);
 }
 
+#endif
+
 
 htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location) {
   return cache_readex(opt,cache,adr,fil,save,location,NULL,0);
@@ -284,19 +527,274 @@ htsblk cache_read_ro(httrackp* opt,cache_back* cache,char* adr,char* fil,char* s
   return cache_readex(opt,cache,adr,fil,save,location,NULL,1);
 }
 
+static htsblk cache_readex_old(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
+                               char* return_save, int readonly);
+
+static htsblk cache_readex_new(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
+                               char* return_save, int readonly);
+
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
 htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
                     char* return_save, int readonly) {
+  if (cache->zipInput != NULL) {
+    return cache_readex_new(opt, cache, adr, fil, save, location, return_save, readonly);
+  } else {
+    return cache_readex_old(opt, cache, adr, fil, save, location, return_save, readonly);
+  }
+}
+
+// lecture d'un fichier dans le cache
+// si save==null alors test unqiquement
+static htsblk cache_readex_new(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
+                               char* return_save, int readonly) {
+  char BIGSTK location_default[HTS_URLMAXSIZE*2];
+  char BIGSTK buff[HTS_URLMAXSIZE*2];
+  char BIGSTK previous_save[HTS_URLMAXSIZE*2];
+  long int hash_pos;
+  int hash_pos_return;
+  htsblk r;
+  memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
+
+  if (location) {
+    r.location = location;
+  } else {
+    r.location = location_default;
+  }
+  strcpybuff(r.location, ""); 
+  strcpybuff(buff, adr);
+  strcatbuff(buff,fil);
+  hash_pos_return = inthash_read((inthash)cache->hashtable, buff, (long int*)&hash_pos);
+  /* avoid errors on data entries */
+  if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
+#if HTS_FAST_CACHE
+    hash_pos_return = 0;
+#else
+    a = NULL;
+#endif
+  }
+
+  if (hash_pos_return) {
+    uLong posInZip;
+    if (hash_pos > 0) {
+      posInZip = (uLong) hash_pos;
+    } else {
+      posInZip = (uLong) -hash_pos;
+    }
+    if (unzSetOffset((unzFile) cache->zipInput, posInZip) == Z_OK) {
+      /* Read header (Max 8KiB) */
+      if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
+        char BIGSTK headerBuff[8192 + 2];
+        int readSizeHeader;
+        int totalHeader = 0;
+        int dataincache = 0;
+        
+        /* For BIG comments */
+        headerBuff[0] 
+          = headerBuff[sizeof(headerBuff) - 1] 
+          = headerBuff[sizeof(headerBuff) - 2] 
+          = headerBuff[sizeof(headerBuff) - 3] = '\0';
+
+        if ( (readSizeHeader = unzGetLocalExtrafield((unzFile) cache->zipInput, headerBuff, sizeof(headerBuff) - 2)) > 0) 
+        /*if (unzGetCurrentFileInfo((unzFile) cache->zipInput, NULL,
+          NULL, 0, NULL, 0, headerBuff, sizeof(headerBuff) - 2) == Z_OK ) */
+        {
+          int offset = 0;
+          char BIGSTK line[HTS_URLMAXSIZE + 2];
+          int lineEof = 0;
+          /*readSizeHeader = (int) strlen(headerBuff);*/
+          headerBuff[readSizeHeader] = '\0';
+          do {
+            char* value;
+            line[0] = '\0';
+            offset += binput(headerBuff + offset, line, sizeof(line) - 2);
+            if (line[0] == '\0') {
+              lineEof = 1;
+            }
+            value = strchr(line, ':');
+            if (value != NULL) {
+              *value++ = '\0';
+              if (*value == ' ' || *value == '\t') value++;
+              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
+              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg);              // msg
+              ZIP_READFIELD_INT(line, value, "X-Size", r.size);           // size
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype);      // contenttype
+              ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset);          // contenttype
+              ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified);     // last-modified
+              ZIP_READFIELD_STRING(line, value, "Etag", r.etag);             // Etag
+              ZIP_READFIELD_STRING(line, value, "Location", r.location);         // 'location' pour moved
+              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo);           // Content-disposition
+              ZIP_READFIELD_STRING(line, value, "X-Addr", previous_save);            // Original address
+              ZIP_READFIELD_STRING(line, value, "X-Fil", previous_save);            // Original URI filename
+              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save);           // Original save filename
+            }
+          } while(offset < readSizeHeader && !lineEof);
+          totalHeader = offset;
+
+          /* Complete fields */
+          r.totalsize=r.size;
+          r.adr=NULL;
+          r.out=NULL;
+          r.fp=NULL;
+          
+          if (save != NULL) {     /* ne pas lire uniquement header */
+            int ok = 0;
+                       
+#if HTS_DIRECTDISK
+            // Court-circuit:
+            // Peut-on stocker le fichier directement sur disque?
+            if (ok) {
+              if (r.msg[0] == '\0') {
+                strcpybuff(r.msg,"Cache Read Error : Unexpected error");
+              }
+            }
+            else if (!readonly && r.statuscode==200 && !is_hypertext_mime(r.contenttype, fil) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
+              
+              r.is_write=1;    // écrire
+              if (fexist(fconv(save))) {  // un fichier existe déja
+                //if (fsize(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
+                ok=1;    // plus rien à faire
+                filenote(save,NULL);        // noter comme connu
+              }
+              
+              if (!dataincache && !ok) { // Pas de donnée en cache et fichier introuvable : erreur!
+                if (opt->norecatch) {
+                  filecreateempty(save);
+                  //
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"File deleted by user not recaught");
+                  ok=1;     // ne pas récupérer (et pas d'erreur)
+                } else {
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"Previous cache file not found");
+                  ok=1;    // ne pas récupérer
+                }
+              }
+              
+              if (!ok) {  
+                r.out=filecreate(save);
+#if HDEBUG
+                printf("direct-disk: %s\n",save);
+#endif
+                if (r.out!=NULL) {
+                  char BIGSTK buff[32768+4];
+                  LLint size = r.size;
+                  if (size > 0) {
+                    INTsys nl;
+                    do {
+                      nl = unzReadCurrentFile((unzFile) cache->zipInput, buff, (int)minimum(size, 32768));
+                      if (nl>0) {
+                        size-=nl; 
+                        if ((INTsys)fwrite(buff,1,(INTsys)nl,r.out)!=nl) {  // erreur
+                          r.statuscode=-1;
+                          strcpybuff(r.msg,"Cache Read Error : Read To Disk");
+                        }
+                      }
+                    } while((nl>0) && (size>0) && (r.statuscode!=-1));
+                  }
+                  
+                  fclose(r.out);
+                  r.out=NULL;
+#if HTS_WIN==0
+                  chmod(save,HTS_ACCESS_FILE);      
+#endif          
+                  //xxusercommand(opt,0,NULL,fconv(save), adr, fil);
+                } else {
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"Cache Write Error : Unable to Create File");
+                  //printf("%s\n",save);
+                }
+              }
+              
+            } else
+#endif
+            { // lire en mémoire
+              
+              if (!dataincache) {
+                if (strnotempty(save)) { // Pas de donnée en cache, bizarre car html!!!
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"Previous cache file not found (2)");
+                } else {                 /* Read in memory from cache */
+                  if (strnotempty(return_save) && fexist(return_save)) {
+                    FILE* fp = fopen(fconv(return_save), "rb");
+                    if (fp != NULL) {
+                      r.adr=(char*) malloct((INTsys)r.size + 4);
+                      if (adr != NULL) {
+                        if (r.size > 0 && fread(r.adr, 1, (INTsys) r.size, fp) != r.size) {
+                          r.statuscode=-1;
+                          strcpybuff(r.msg,"Read error in cache disk data");
+                        }
+                      } else {
+                        r.statuscode=-1;
+                        strcpybuff(r.msg,"Read error (memory exhausted) from cache");
+                      }
+                      fclose(fp);
+                    }
+                  } else {
+                    r.statuscode=-1;
+                    strcpybuff(r.msg,"Cache file not found on disk");
+                  }
+                }
+              } else {
+                // lire fichier (d'un coup)
+                r.adr=(char*) malloct((INTsys)r.size+4);
+                if (r.adr!=NULL) {
+                  if (unzReadCurrentFile((unzFile) cache->zipInput, r.adr, (INTsys)r.size) != r.size) {  // erreur
+                    freet(r.adr);
+                    r.adr=NULL;
+                    r.statuscode=-1;
+                    strcpybuff(r.msg,"Cache Read Error : Read Data");
+                  } else
+                    *(r.adr+r.size)='\0';
+                  //printf(">%s status %d\n",back[p].r.contenttype,back[p].r.statuscode);
+                } else {  // erreur
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"Cache Memory Error");
+                }
+              }
+            }
+          }    // si save==null, ne rien charger (juste en tête)
+
+
+        } else {
+          r.statuscode=-1;
+          strcpybuff(r.msg,"Cache Read Error : Read Header Data");
+        }
+        unzCloseCurrentFile((unzFile) cache->zipInput);
+      } else {
+        r.statuscode=-1;
+        strcpybuff(r.msg,"Cache Read Error : Open File");
+      }
+
+    } else {
+      r.statuscode=-1;
+      strcpybuff(r.msg,"Cache Read Error : Bad Offset");
+    }
+  } else {
+    r.statuscode=-1;
+    strcpybuff(r.msg,"File Cache Entry Not Found");
+  }
+  if (!location) {   /* don't export internal buffer */
+    r.location = NULL;
+  }
+  return r;
+}
+
+
+// lecture d'un fichier dans le cache
+// si save==null alors test unqiquement
+static htsblk cache_readex_old(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
+                               char* return_save, int readonly) {
 #if HTS_FAST_CACHE
   long int hash_pos;
   int hash_pos_return;
 #else
   char* a;
 #endif
-  char buff[HTS_URLMAXSIZE*2];
-  char location_default[HTS_URLMAXSIZE*2];
-  char previous_save[HTS_URLMAXSIZE*2];
+  char BIGSTK buff[HTS_URLMAXSIZE*2];
+  char BIGSTK location_default[HTS_URLMAXSIZE*2];
+  char BIGSTK previous_save[HTS_URLMAXSIZE*2];
   htsblk r;
   int ok=0;
   int header_only=0;
@@ -388,6 +886,9 @@ htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* sa
             strcpybuff(return_save, previous_save);
           }
         }
+        if (cache->version >= 5) {
+          r.headers = cache_rstr_addr(cache->olddat);
+        }
         //
         cache_rstr(cache->olddat,check);
         if (strcmp(check,"HTS")==0) {           /* intégrité OK */
@@ -425,7 +926,7 @@ htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* sa
 #if HTS_DIRECTDISK
             // Court-circuit:
             // Peut-on stocker le fichier directement sur disque?
-            if (!readonly && r.statuscode==200 && !is_hypertext_mime(r.contenttype) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
+            if (!readonly && r.statuscode==200 && !is_hypertext_mime(r.contenttype, fil) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
               int ok=0;
               
               r.is_write=1;    // écrire
@@ -457,7 +958,7 @@ htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* sa
                 printf("direct-disk: %s\n",save);
 #endif
                 if (r.out!=NULL) {
-                  char buff[32768+4];
+                  char BIGSTK buff[32768+4];
                   LLint size = r.size;
                   if (size > 0) {
                     INTsys nl;
@@ -572,7 +1073,7 @@ htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* sa
 /* 0 if failed */
 int cache_writedata(FILE* cache_ndx,FILE* cache_dat,char* str1,char* str2,char* outbuff,int len) {
   if (cache_dat) {
-    char buff[HTS_URLMAXSIZE*4];
+    char BIGSTK buff[HTS_URLMAXSIZE*4];
     char s[256];
     int pos;
     fflush(cache_dat); fflush(cache_ndx);
@@ -599,7 +1100,7 @@ int cache_writedata(FILE* cache_ndx,FILE* cache_dat,char* str1,char* str2,char* 
 int cache_readdata(cache_back* cache,char* str1,char* str2,char** inbuff,int* inlen) {
 #if HTS_FAST_CACHE
   if (cache->hashtable) {
-    char buff[HTS_URLMAXSIZE*4];
+    char BIGSTK buff[HTS_URLMAXSIZE*4];
     long int pos;
     strcpybuff(buff,str1); strcatbuff(buff,str2);
     if (inthash_read((inthash)cache->hashtable,buff,(long int*)&pos)) {
@@ -651,7 +1152,29 @@ void cache_init(cache_back* cache,httrackp* opt) {
 #else
       mkdir(fconcat(opt->path_log,"hts-cache"),HTS_PROTECT_FOLDER);
 #endif
-      if ((fexist(fconcat(opt->path_log,"hts-cache/new.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+      if ((fexist(fconcat(opt->path_log,"hts-cache/new.zip")))) {  // il existe déja un cache précédent.. renommer
+        /* Previous cache from the previous cache version */
+#if 0
+        /* No.. reuse with old httrack releases! */
+        if (fexist(fconcat(opt->path_log,"hts-cache/old.dat")))
+          remove(fconcat(opt->path_log,"hts-cache/old.dat"));
+        if (fexist(fconcat(opt->path_log,"hts-cache/old.ndx")))
+          remove(fconcat(opt->path_log,"hts-cache/old.ndx"));
+#endif
+        /* Previous cache version */
+        if ((fexist(fconcat(opt->path_log,"hts-cache/new.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+          rename(fconcat(opt->path_log,"hts-cache/new.dat"),fconcat(opt->path_log,"hts-cache/old.dat"));
+          rename(fconcat(opt->path_log,"hts-cache/new.ndx"),fconcat(opt->path_log,"hts-cache/old.ndx"));
+        }
+
+        /* Remove OLD cache */
+        if (fexist(fconcat(opt->path_log,"hts-cache/old.zip")))
+          remove(fconcat(opt->path_log,"hts-cache/old.zip"));
+        
+        /* Rename */
+        rename(fconcat(opt->path_log,"hts-cache/new.zip"),fconcat(opt->path_log,"hts-cache/old.zip"));
+      }
+      else if ((fexist(fconcat(opt->path_log,"hts-cache/new.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
 #if DEBUGCA
         printf("work with former cache\n");
 #endif
@@ -675,6 +1198,136 @@ void cache_init(cache_back* cache,httrackp* opt) {
     
     // charger index cache précédent
     if (
+      (
+      !cache->ro &&
+      fsize(fconcat(opt->path_log,"hts-cache/old.zip")) > 0 
+      )
+      ||
+      (
+      cache->ro &&
+      fsize(fconcat(opt->path_log,"hts-cache/new.zip")) > 0
+      )
+      ) 
+    {
+      if (!cache->ro) {
+        cache->zipInput = unzOpen(fconcat(opt->path_log,"hts-cache/old.zip"));
+      } else {
+        cache->zipInput = unzOpen(fconcat(opt->path_log,"hts-cache/new.zip"));
+      }
+      
+      // Corrupted ZIP file ? Try to repair!
+      if (cache->zipInput == NULL && !cache->ro) {
+          char* name;
+          uLong repaired = 0;
+          uLong repairedBytes = 0;
+          if (!cache->ro) {
+            name = fconcat(opt->path_log,"hts-cache/old.zip");
+          } else {
+            name = fconcat(opt->path_log,"hts-cache/new.zip");
+          }
+          if (opt->log) {
+            fspc(opt->log,"warning"); fprintf(opt->log,"Cache: damaged cache, trying to repair"LF);
+            fflush(opt->log);
+          }
+          if (unzRepair(name, 
+            fconcat(opt->path_log,"hts-cache/repair.zip"),
+            fconcat(opt->path_log,"hts-cache/repair.tmp"),
+            &repaired, &repairedBytes
+            ) == Z_OK) {
+            unlink(name);
+            rename(fconcat(opt->path_log,"hts-cache/repair.zip"), name);
+            cache->zipInput = unzOpen(name);
+            if (opt->log) {
+              fspc(opt->log,"warning"); fprintf(opt->log,"Cache: %d bytes successfully recovered in %d entries"LF, 
+                (int) repairedBytes, (int) repaired);
+              fflush(opt->log);
+            }
+          } else {
+            if (opt->log) {
+              fspc(opt->log,"warning"); fprintf(opt->log,"Cache: could not repair the cache"LF);
+              fflush(opt->log);
+            }
+          }
+      }
+      
+      // Opened ?
+      if (cache->zipInput!=NULL) {
+        
+        /* Ready directory entries */
+        if (unzGoToFirstFile((unzFile) cache->zipInput) == Z_OK) {
+          char comment[128];
+          char BIGSTK filename[HTS_URLMAXSIZE * 4];
+          int entries = 0;
+          memset(comment, 0, sizeof(comment));       // for truncated reads
+          do  {
+            int readSizeHeader = 0;
+            filename[0] = '\0';
+            comment[0] = '\0';
+            if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
+              if (
+                (readSizeHeader = unzGetLocalExtrafield((unzFile) cache->zipInput, comment, sizeof(comment) - 2)) > 0
+                &&
+                unzGetCurrentFileInfo((unzFile) cache->zipInput, NULL, filename, sizeof(filename) - 2, NULL, 0, NULL, 0) == Z_OK
+                ) 
+              {
+                long int pos = (long int) unzGetOffset((unzFile) cache->zipInput);
+                assertf(readSizeHeader < sizeof(comment));
+                comment[readSizeHeader] = '\0';
+                entries++;
+                if (pos > 0) {
+                  int dataincache = 0;    // data in cache ?
+                  char* filenameIndex = filename;
+                  if (strfield(filenameIndex, "http://")) {
+                    filenameIndex += 7;
+                  }
+                  if (comment[0] != '\0') {
+                    int maxLine = 2;
+                    char* a = comment;
+                    while(*a && maxLine-- > 0) {      // parse only few first lines
+                      char BIGSTK line[1024];
+                      line[0] = '\0';
+                      a+=binput(a, line, sizeof(line) - 2);
+                      if (strfield(line, "X-In-Cache:")) {
+                        if (strfield2(line, "X-In-Cache: 1")) {
+                          dataincache = 1;
+                        } else {
+                          dataincache = 0;
+                        }
+                        break;
+                      }
+                    }
+                  }
+                  if (dataincache)
+                    inthash_add((inthash)cache->hashtable, filenameIndex, pos);
+                  else
+                    inthash_add((inthash)cache->hashtable, filenameIndex, -pos);
+                } else {
+                  if (opt->log!=NULL) {
+                    fspc(opt->log,"warning"); fprintf(opt->log,"Corrupted cache meta entry #%d"LF, (int)entries);
+                  }
+                }
+              } else {
+                if (opt->log!=NULL) {
+                  fspc(opt->log,"warning"); fprintf(opt->log,"Corrupted cache entry #%d"LF, (int)entries);
+                }
+              }
+              unzCloseCurrentFile((unzFile) cache->zipInput);
+            } else {
+              if (opt->log!=NULL) {
+                fspc(opt->log,"warning"); fprintf(opt->log,"Corrupted cache entry #%d"LF, (int)entries);
+              }
+            }
+          } while( unzGoToNextFile((unzFile) cache->zipInput) == Z_OK );
+          if ((opt->debug>0) && (opt->log!=NULL)) {
+            fspc(opt->log,"debug"); fprintf(opt->log,"Cache index loaded: %d entries loaded"LF, (int)entries);
+          }
+          opt->is_update=1;        // signaler comme update
+          
+        }    
+        
+      }
+      
+    } else if (
       (
       !cache->ro &&
       fsize(fconcat(opt->path_log,"hts-cache/old.dat")) >=0 && fsize(fconcat(opt->path_log,"hts-cache/old.ndx")) >0
@@ -724,7 +1377,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
           if (strncmp(firstline,"CACHE-",6)==0) {       // Nouvelle version du cache
             if (strncmp(firstline,"CACHE-1.",8)==0) {      // Version 1.1x
               cache->version=(int)(firstline[8]-'0');           // cache 1.x
-              if (cache->version <= 4) {
+              if (cache->version <= 5) {
                 a+=cache_brstr(a,firstline);
                 strcpybuff(cache->lastmodified,firstline);
               } else {
@@ -762,7 +1415,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
           /* Create hash table for the cache (MUCH FASTER!) */
 #if HTS_FAST_CACHE
           if (cache->use) {
-            char line[HTS_URLMAXSIZE*2];
+            char BIGSTK line[HTS_URLMAXSIZE*2];
             char linepos[256];
             int  pos;
             while ( (a!=NULL) && (a < (cache->use+buffl) ) ) {
@@ -793,60 +1446,96 @@ void cache_init(cache_back* cache,httrackp* opt) {
       if (!cache->ro) {
         // ouvrir caches actuels
         structcheck(fconcat(opt->path_log, "hts-cache/"));
-        cache->dat=fopen(fconcat(opt->path_log,"hts-cache/new.dat"),"wb");        
-        cache->ndx=fopen(fconcat(opt->path_log,"hts-cache/new.ndx"),"wb");        
-        // les deux doivent être ouvrables
-        if ((cache->dat==NULL) && (cache->ndx!=NULL)) {
-          fclose(cache->ndx);
-          cache->ndx=NULL;
-        }
-        if ((cache->dat!=NULL) && (cache->ndx==NULL)) {
-          fclose(cache->dat);
-          cache->dat=NULL;
-        }
         
-        if (cache->ndx!=NULL) {
-          char s[256];
-          
-          cache_wstr(cache->dat,"CACHE-1.4");
-          fflush(cache->dat);
-          cache_wstr(cache->ndx,"CACHE-1.4");
-          fflush(cache->ndx);
-          //
-          time_gmt_rfc822(s);   // date et heure actuelle GMT pour If-Modified-Since..
-          cache_wstr(cache->ndx,s);        
-          fflush(cache->ndx);    // un petit fflush au cas où
-          
-          // supprimer old.lst
-          if (fexist(fconcat(opt->path_log,"hts-cache/old.lst")))
-            remove(fconcat(opt->path_log,"hts-cache/old.lst"));
-          // renommer
-          if (fexist(fconcat(opt->path_log,"hts-cache/new.lst")))
-            rename(fconcat(opt->path_log,"hts-cache/new.lst"),fconcat(opt->path_log,"hts-cache/old.lst"));
-          // ouvrir
-          cache->lst=fopen(fconcat(opt->path_log,"hts-cache/new.lst"),"wb");
-          {
-            filecreate_params tmp;
-            strcpybuff(tmp.path,opt->path_html);    // chemin
-            tmp.lst=cache->lst;                 // fichier lst
-            filenote("",&tmp);        // initialiser filecreate
+        if (1) {
+          /* Create ZIP file cache */
+          cache->zipOutput = (void*) zipOpen(fconcat(opt->path_log,"hts-cache/new.zip"), 0);
+
+          if (cache->zipOutput != NULL) {
+            // supprimer old.lst
+            if (fexist(fconcat(opt->path_log,"hts-cache/old.lst")))
+              remove(fconcat(opt->path_log,"hts-cache/old.lst"));
+            // renommer
+            if (fexist(fconcat(opt->path_log,"hts-cache/new.lst")))
+              rename(fconcat(opt->path_log,"hts-cache/new.lst"),fconcat(opt->path_log,"hts-cache/old.lst"));
+            // ouvrir
+            cache->lst=fopen(fconcat(opt->path_log,"hts-cache/new.lst"),"wb");
+            {
+              filecreate_params tmp;
+              strcpybuff(tmp.path,opt->path_html);    // chemin
+              tmp.lst=cache->lst;                 // fichier lst
+              filenote("",&tmp);        // initialiser filecreate
+            }
+            
+            // supprimer old.txt
+            if (fexist(fconcat(opt->path_log,"hts-cache/old.txt")))
+              remove(fconcat(opt->path_log,"hts-cache/old.txt"));
+            // renommer
+            if (fexist(fconcat(opt->path_log,"hts-cache/new.txt")))
+              rename(fconcat(opt->path_log,"hts-cache/new.txt"),fconcat(opt->path_log,"hts-cache/old.txt"));
+            // ouvrir
+            cache->txt=fopen(fconcat(opt->path_log,"hts-cache/new.txt"),"wb");
+            if (cache->txt) {
+              fprintf(cache->txt,"date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
+              fprintf(cache->txt,"statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"LF);
+            }
+          }
+        } else {
+          cache->dat=fopen(fconcat(opt->path_log,"hts-cache/new.dat"),"wb");        
+          cache->ndx=fopen(fconcat(opt->path_log,"hts-cache/new.ndx"),"wb");        
+          // les deux doivent être ouvrables
+          if ((cache->dat==NULL) && (cache->ndx!=NULL)) {
+            fclose(cache->ndx);
+            cache->ndx=NULL;
+          }
+          if ((cache->dat!=NULL) && (cache->ndx==NULL)) {
+            fclose(cache->dat);
+            cache->dat=NULL;
           }
           
-          // supprimer old.txt
-          if (fexist(fconcat(opt->path_log,"hts-cache/old.txt")))
-            remove(fconcat(opt->path_log,"hts-cache/old.txt"));
-          // renommer
-          if (fexist(fconcat(opt->path_log,"hts-cache/new.txt")))
-            rename(fconcat(opt->path_log,"hts-cache/new.txt"),fconcat(opt->path_log,"hts-cache/old.txt"));
-          // ouvrir
-          cache->txt=fopen(fconcat(opt->path_log,"hts-cache/new.txt"),"wb");
-          if (cache->txt) {
-            fprintf(cache->txt,"date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
-            fprintf(cache->txt,"statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"LF);
+          if (cache->ndx!=NULL) {
+            char s[256];
+            
+            cache_wstr(cache->dat,"CACHE-1.5");
+            fflush(cache->dat);
+            cache_wstr(cache->ndx,"CACHE-1.5");
+            fflush(cache->ndx);
+            //
+            time_gmt_rfc822(s);   // date et heure actuelle GMT pour If-Modified-Since..
+            cache_wstr(cache->ndx,s);        
+            fflush(cache->ndx);    // un petit fflush au cas où
+            
+            // supprimer old.lst
+            if (fexist(fconcat(opt->path_log,"hts-cache/old.lst")))
+              remove(fconcat(opt->path_log,"hts-cache/old.lst"));
+            // renommer
+            if (fexist(fconcat(opt->path_log,"hts-cache/new.lst")))
+              rename(fconcat(opt->path_log,"hts-cache/new.lst"),fconcat(opt->path_log,"hts-cache/old.lst"));
+            // ouvrir
+            cache->lst=fopen(fconcat(opt->path_log,"hts-cache/new.lst"),"wb");
+            {
+              filecreate_params tmp;
+              strcpybuff(tmp.path,opt->path_html);    // chemin
+              tmp.lst=cache->lst;                 // fichier lst
+              filenote("",&tmp);        // initialiser filecreate
+            }
+            
+            // supprimer old.txt
+            if (fexist(fconcat(opt->path_log,"hts-cache/old.txt")))
+              remove(fconcat(opt->path_log,"hts-cache/old.txt"));
+            // renommer
+            if (fexist(fconcat(opt->path_log,"hts-cache/new.txt")))
+              rename(fconcat(opt->path_log,"hts-cache/new.txt"),fconcat(opt->path_log,"hts-cache/old.txt"));
+            // ouvrir
+            cache->txt=fopen(fconcat(opt->path_log,"hts-cache/new.txt"),"wb");
+            if (cache->txt) {
+              fprintf(cache->txt,"date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
+              fprintf(cache->txt,"statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"LF);
+            }
+            
+            // test
+            // cache_writedata(cache->ndx,cache->dat,"//[TEST]//","test1","TEST PIPO",9);
           }
-          
-          // test
-          // cache_writedata(cache->ndx,cache->dat,"//[TEST]//","test1","TEST PIPO",9);
         }
         
       } else {
@@ -906,12 +1595,11 @@ char* readfile_or(char* fil,char* defaultdata) {
 int cache_wstr(FILE* fp,char* s) {
   INTsys i;
   char buff[256+4];
-  i=strlen(s);
+  i = s != NULL ? strlen(s) : 0;
   sprintf(buff,INTsysP "\n",i);
   if (fwrite(buff,1,(INTsys)strlen(buff),fp) != strlen(buff))
     return -1;
-  if (i>0)
-  if ((INTsys)fwrite(s,1,i,fp) != i)
+  if (i > 0 && (INTsys)fwrite(s,1,i,fp) != i)
     return -1;
   return 0;
 }
@@ -922,9 +1610,33 @@ void cache_rstr(FILE* fp,char* s) {
   sscanf(buff,INTsysP,&i);
   if (i < 0 || i > 32768)    /* error, something nasty happened */
     i=0;
-  if (i>0)
-    fread(s,1,i,fp);
+  if (i>0) {
+    if ((int) fread(s,1,i,fp) != i) {
+      int fread_cache_failed = 0;
+      assertf(fread_cache_failed);
+    }
+  }
   *(s+i)='\0';
+}
+char* cache_rstr_addr(FILE* fp) {
+  INTsys i;
+  char* addr = NULL;
+  char buff[256+4];
+  linput(fp,buff,256);
+  sscanf(buff,INTsysP,&i);
+  if (i < 0 || i > 32768)    /* error, something nasty happened */
+    i=0;
+  if (i > 0) {
+    addr = malloct(i + 1);
+    if (addr != NULL) {
+      if ((int) fread(addr,1,i,fp) != i) {
+        int fread_cache_failed = 0;
+        assertf(fread_cache_failed);
+      }
+      *(addr+i)='\0';
+    }
+  }
+  return addr;
 }
 int cache_brstr(char* adr,char* s) {
   int i;

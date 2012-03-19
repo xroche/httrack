@@ -1,86 +1,90 @@
 Informations on this project:
 
 This project has been developed by:
-Xavier Roche (xroche@httrack.com)
+Xavier Roche (xroche at httrack.com)
   for the main engine and Windows interface
   and maintainer for v2.0 and v3.0
-Yann Philippot (yphilippot@lemel.fr)
+Yann Philippot (yphilippot at lemel.fr)
   for the java binary .class parser
-David Lawrie (dalawrie@lineone.net)
-Robert Lagadec (rlagadec@yahoo.fr)
+David Lawrie (dalawrie at lineone.net)
+Robert Lagadec (rlagadec at yahoo.fr)
   for checking both English & French translations
 Juan Pablo Barrio Lera (University of León)
   for Spanish translations
-Rainer Klueting (rainer@klueting.de)
-Bastian Gorke (bastiang@yahoo.com)
-Rudi Ferrari (Wyando@netcologne.de)
-Marcus Gaza (MarcusGaza@t-online.de)
+Rainer Klueting (rk-htt at centermail.net)
+Bastian Gorke (bastiang at yahoo.com)
+Rudi Ferrari (Wyando at netcologne.de)
+Marcus Gaza (MarcusGaza at t-online.de)
   for German translations
-Rudi Ferrari (Wyando@netcologne.de)
+Rudi Ferrari (Wyando at netcologne.de)
   for Dutch translations
-Lukasz Jokiel (Opole University of Technology, Lukasz.Jokiel@po.opole.pl)
+Lukasz Jokiel (Opole University of Technology, Lukasz.Jokiel at po.opole.pl)
   for Polish translations
-Rui Fernandes (CANTIC, ruiefe@mail.malhatlantica.pt)
-Pedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago@mail.iupi.pt)
+Rui Fernandes (CANTIC, ruiefe at mail.malhatlantica.pt)
+Pedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago at mail.iupi.pt)
   for Portuguese translations
-Andrei Iliev (iliev@vitaplus.ru)
+Andrei Iliev (iliev at vitaplus.ru)
   for Russian translations
-Witold Krakowski (wtkrak@netscape.net )
+Witold Krakowski (wtkrak at netscape.net )
   for Italian translations
-Jozsef Tamas Herczeg (hdodi@freemail.hu)
+Jozsef Tamas Herczeg (hdodi at freemail.hu)
   for Hungarian translation
-Paulo Neto (company@layout.com.br)
+Paulo Neto (company at layout.com.br)
   for Brazilian translation
-Brook Qin (brookqwr@sina.com) 
+Brook Qin (brookqwr at sina.com) 
    for simplified Chinese translation
-David Hing Cheong Hung (DAVEHUNG@mtr.com.hk)
-Addy Lin (addy1975@pchome.com.tw)
+David Hing Cheong Hung (DAVEHUNG at mtr.com.hk)
+Addy Lin (addy1975 at pchome.com.tw)
    for traditional Chinese translation
-Jesper Bramm (bramm@get2net.dk)
+Jesper Bramm (bramm at get2net.dk)
    for Danish translation
 Tõnu Virma
    for Estonian translation
-Staffan Ström (staffan@fam-strom.org)
+Staffan Ström (staffan at fam-strom.org)
    for Swedish translation
-Arman (Armish) Aksoy (armish@linux-sevenler.de)
-Mehmet Akif Köeoðlu (mak@ttnet.net.tr)
+Arman (Armish) Aksoy (armish at linux-sevenler.de)
+Mehmet Akif Köeoðlu (mak at ttnet.net.tr)
   for Turkish translation
-Aleksandar Savic (aleks@macedonia.eu.org)
+Aleksandar Savic (aleks at macedonia.eu.org)
   for Macedonian translation
 Takayoshi Nakasikiryo
   for Japanese translation
-Martin Sereday (sereday@slovanet.sk)
+Martin Sereday (sereday at slovanet.sk)
   for Slovak translation
-Antonín Matìjèík (matejcik@volny.cz)
+Antonín Matìjèík (matejcik at volny.cz)
   for Czech translation
 Andrij Shevchuk (http://programy.com.ua)
   for Ukrainian translation
-Tobias "Spug" Langhoff (spug_enigma@hotmail.com)
+Tobias "Spug" Langhoff (spug_enigma at hotmail.com)
   for Norwegian translation
-Jadran Rudeciur (jrudec@email.si)
+Jadran Rudeciur (jrudec at email.si)
   for Slovenian translation
-Alin Gheorghe Miron (miron.alin@personal.ro)
+Alin Gheorghe Miron (miron.alin at personal.ro)
   for Romanian translation
-Michael Papadakis (mikepap@freemail.gr)
+Michael Papadakis (mikepap at freemail.gr)
   for Greek translation
+Ilia Lindov (ilia at infomat-bg.com)
+  for Bulgarian translation
 
 Thanks to:
-Leto Kauler (molotov@tasmail.com)
+Leto Kauler (molotov at tasmail.com)
   for the site/logos design
 
 Special Thanks to:
 Patrick Ducrot & Daniel Carré (ENSI of Caen)
   for their initial support
-Fred Cohen (fc@all.net)
+Fred Cohen (fc at all.net)
   for HTTrack user's guide
 
 Greetings to:
-Christian Marillat (marillat.christian@wanadoo.fr)
+Christian Marillat (marillat.christian at wanadoo.fr)
   for autoconf compliance and .deb package
 Jean-loup Gailly from gzip.org
   for the help provided with Zlib
-Eric A. Young (eay@cryptsoft.com)
+Eric A. Young (eay at cryptsoft.com)
   for SSL cryptographic material (OpenSSL)
+La sonothèque du Terrier
+  for the sound fx :)
 
 Russ Freeman from gipsymedia
   for hints on DLL dynamic load

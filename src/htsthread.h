@@ -43,14 +43,23 @@ Please visit our Website: http://www.httrack.com
 #endif
 #if HTS_WIN
 #include "windows.h"
+#ifdef _WIN32_WCE
+#ifndef HTS_CECOMPAT
+#include "cethread.h"
+#endif
+#endif
 #endif
 
 #if USE_BEGINTHREAD
 #if HTS_WIN
 
 #define PTHREAD_RETURN
-#define PTHREAD_TYPE void __cdecl
+#define PTHREAD_TYPE void
+#define PTHREAD_TYPE_FNC __cdecl
 #define PTHREAD_LOCK_TYPE HANDLE
+#define PTHREAD_HANDLE HANDLE
+#define PTHREAD_WAIT_THREAD(A) do { WaitForSingleObject(A, INFINITE); CloseHandle(A); } while(0)
+
 
 /* Useless - see '__declspec( thread )' */
 /*
@@ -65,12 +74,15 @@ Please visit our Website: http://www.httrack.com
 
 #define PTHREAD_RETURN NULL
 #define PTHREAD_TYPE void*
+#define PTHREAD_TYPE_FNC
 #define PTHREAD_LOCK_TYPE pthread_mutex_t
 #define PTHREAD_KEY_TYPE pthread_key_t
 #define PTHREAD_KEY_CREATE(ptrkey, uninit)      pthread_key_create(ptrkey, uninit)
 #define PTHREAD_KEY_DELETE(key)                 pthread_key_delete(key)
 #define PTHREAD_KEY_SET(key, val, ptrtype)      pthread_setspecific(key, (void*)val)
 #define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)pthread_getspecific(key); } while(0)
+#define PTHREAD_HANDLE pthread_t
+#define PTHREAD_WAIT_THREAD(A) do { pthread_join(A, NULL); CloseHandle(A); } while(0)
 
 #endif
 
@@ -82,13 +94,24 @@ Please visit our Website: http://www.httrack.com
 #define PTHREAD_KEY_DELETE(key)                 do { key=(void*)NULL; } while(0)
 #define PTHREAD_KEY_SET(key, val, ptrtype)      do { key=(void*)(val); } while(0)
 #define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)(key); } while(0)
+#define PTHREAD_HANDLE void
 
 #endif
 
+/* Library internal definictions */
+HTSEXT_API int hts_newthread( PTHREAD_TYPE ( PTHREAD_TYPE_FNC *start_address )( void * ), unsigned stack_size, void *arglist );
+HTSEXT_API void htsthread_wait(void );
+HTSEXT_API void htsthread_wait_n(int n_wait);
+
+#ifdef HTS_INTERNAL_BYTECODE
 HTSEXT_API int htsSetLock(PTHREAD_LOCK_TYPE * hMutex,int lock);
+HTSEXT_API void htsthread_init(void );
+HTSEXT_API void htsthread_uninit(void );
 
 #if USE_PTHREAD
-unsigned long _beginthread( void* ( *start_address )( void * ), unsigned stack_size, void *arglist );
+// unsigned long _beginthread( void* ( *start_address )( void * ), unsigned stack_size, void *arglist );
+
+#endif
 #endif
 
 #endif

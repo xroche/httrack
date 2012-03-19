@@ -41,8 +41,17 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+#include "httrack-library.h"
+
 #include "htsglobal.h"
+#include "htsbase.h"
+#include "htsopt.h"
 #include "httrack.h"
+
+/* Static definitions */
+static int fexist(char* s);
+static int linput(FILE* fp,char* s,int max);
+
 
 // htswrap_add
 #include "htswrap.h"
@@ -64,9 +73,6 @@ Please visit our Website: http://www.httrack.com
 #include <unistd.h>
 #endif
 #include <ctype.h>
-#ifdef _WIN32
-//#include "Winsock.h"
-#endif
 /* END specific definitions */
 
 // ISO VT100/220 definitions
@@ -105,10 +111,10 @@ Please visit our Website: http://www.httrack.com
 #define VT_CLRSCR       "\33[2J"
 //
 #define csi(X)          printf(s_csi( X ));
-void vt_clear(void) {
+static void vt_clear(void) {
   printf("%s%s%s",VT_RESET,VT_CLRSCR,VT_GOTOXY("1","0"));
 }
-void vt_home(void) {
+static void vt_home(void) {
   printf("%s%s",VT_RESET,VT_GOTOXY("1","0"));
 }
 //
@@ -146,7 +152,13 @@ Log: "engine: end"
   hts_htmlcheck_chopt        = (t_hts_htmlcheck_chopt)          htswrap_read("change-options");
 Log: "engine: change-options"
 
-  hts_htmlcheck              = (t_hts_htmlcheck)                htswrap_read("check-html");
+  hts_htmlcheck_preprocess   = (t_hts_htmlcheck_process)        htswrap_read("preprocess-html");
+Log: "preprocess-html: <url>"
+
+  hts_htmlcheck_postprocess   = (t_hts_htmlcheck_process)        htswrap_read("postprocess-html");
+Log: "postprocess-html: <url>"
+
+hts_htmlcheck              = (t_hts_htmlcheck)                htswrap_read("check-html");
 Log: "check-html: <url>"
 
   hts_htmlcheck_query        = (t_hts_htmlcheck_query)          htswrap_read("query");
@@ -161,6 +173,7 @@ Log: "pause: <lockfile>"
 
   hts_htmlcheck_filesave     = (t_hts_htmlcheck_filesave)       htswrap_read("save-file");
   hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
+  hts_htmlcheck_linkdetected2 = (t_hts_htmlcheck_linkdetected2)   htswrap_read("link-detected2");
 Log: none
 
   hts_htmlcheck_xfrstatus    = (t_hts_htmlcheck_xfrstatus)      htswrap_read("transfer-status");
@@ -179,6 +192,8 @@ Log:
   htswrap_add("start",htsshow_start);
   htswrap_add("change-options",htsshow_chopt);
   htswrap_add("end",htsshow_end);
+  htswrap_add("preprocess-html",htsshow_preprocesshtml);
+  htswrap_add("postprocess-html",htsshow_preprocesshtml);
   htswrap_add("check-html",htsshow_checkhtml);
   htswrap_add("loop",htsshow_loop);
   htswrap_add("query",htsshow_query);
@@ -188,8 +203,11 @@ Log:
   htswrap_add("pause",htsshow_pause);
   htswrap_add("save-file",htsshow_filesave);
   htswrap_add("link-detected",htsshow_linkdetected);
+  htswrap_add("link-detected2",htsshow_linkdetected2);
   htswrap_add("transfer-status",htsshow_xfrstatus);
   htswrap_add("save-name",htsshow_savename);
+  htswrap_add("send-header", htsshow_sendheader);
+  htswrap_add("receive-header", htsshow_receiveheader);
 
   ret = hts_main(argc,argv);
   if (ret) {
@@ -202,7 +220,7 @@ Log:
 /* CALLBACK FUNCTIONS */
 
 /* Initialize the Winsock */
-void __cdecl htsshow_init(void) {
+static void __cdecl htsshow_init(void) {
 #ifdef _WIN32
   {
     WORD   wVersionRequested;   // requested version WinSock API
@@ -222,12 +240,12 @@ void __cdecl htsshow_init(void) {
 #endif
 
 }
-void __cdecl htsshow_uninit(void) {
+static void __cdecl htsshow_uninit(void) {
 #ifdef _WIN32
   WSACleanup();
 #endif
 }
-int __cdecl htsshow_start(httrackp* opt) {
+static int __cdecl htsshow_start(httrackp* opt) {
   use_show=0;
   if (opt->verbosedisplay==2) {
     use_show=1;
@@ -235,16 +253,19 @@ int __cdecl htsshow_start(httrackp* opt) {
   }
   return 1; 
 }
-int __cdecl htsshow_chopt(httrackp* opt) {
+static int __cdecl htsshow_chopt(httrackp* opt) {
   return htsshow_start(opt);
 }
-int  __cdecl htsshow_end(void) { 
+static int  __cdecl htsshow_end(void) { 
   return 1; 
 }
-int __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier) {
+static int __cdecl htsshow_preprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier) {
   return 1;
 }
-int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appelé à chaque boucle de HTTrack
+static int __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier) {
+  return 1;
+}
+static int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appelé à chaque boucle de HTTrack
   static TStamp prev_mytime=0; /* ok */
   static t_InpInfo SInfo; /* ok */
   //
@@ -436,7 +457,7 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
               }
               
               if (ok) {
-                char s[HTS_URLMAXSIZE*2];
+                char BIGSTK s[HTS_URLMAXSIZE*2];
                 //
                 StatsBuffer[index].back=i;        // index pour + d'infos
                 //
@@ -508,6 +529,15 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
           case 2:
             printf("purging files");
             break;
+          case 3:
+            printf("loading cache");
+            break;
+          case 4:
+            printf("waiting (scheduler)");
+            break;
+          case 5:
+            printf("waiting (throttle)");
+            break;
           }
         }
         printf("%s\n",VT_CLREOL);
@@ -539,19 +569,19 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
 
   return 1;
 }
-char* __cdecl htsshow_query(char* question) {
+static char* __cdecl htsshow_query(char* question) {
   static char s[12]=""; /* ok */
   printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n",question);
   io_flush; linput(stdin,s,4);
   return s;
 }
-char* __cdecl htsshow_query2(char* question) {
+static char* __cdecl htsshow_query2(char* question) {
   static char s[12]=""; /* ok */
   printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n",question);
   io_flush; linput(stdin,s,4);
   return s;
 }
-char* __cdecl htsshow_query3(char* question) {
+static char* __cdecl htsshow_query3(char* question) {
   static char line[256]; /* ok */
   do {
     io_flush; linput(stdin,line,206);
@@ -559,31 +589,39 @@ char* __cdecl htsshow_query3(char* question) {
   printf("ok..\n");
   return line;
 }
-int __cdecl htsshow_check(char* adr,char* fil,int status) {
+static int __cdecl htsshow_check(char* adr,char* fil,int status) {
   return -1;
 }
-void __cdecl htsshow_pause(char* lockfile) {
+static void __cdecl htsshow_pause(char* lockfile) {
   while (fexist(lockfile)) {
     Sleep(1000);
   }
 }
-void __cdecl htsshow_filesave(char* file) {
+static void __cdecl htsshow_filesave(char* file) {
 }
-int __cdecl htsshow_linkdetected(char* link) {
+static int __cdecl htsshow_linkdetected(char* link) {
   return 1;
 }
-int __cdecl htsshow_xfrstatus(lien_back* back) {
+static int __cdecl htsshow_linkdetected2(char* link, char* start_tag) {
   return 1;
 }
-int __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save) {
+static int __cdecl htsshow_xfrstatus(lien_back* back) {
   return 1;
 }
-
+static int __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save) {
+  return 1;
+}
+static int __cdecl htsshow_sendheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing) {
+  return 1;
+}
+static int __cdecl htsshow_receiveheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming) {
+  return 1;
+}
 
 /* *** Various functions *** */
 
 
-int fexist(char* s) {
+static int fexist(char* s) {
   struct stat st;
   memset(&st, 0, sizeof(st));
   if (stat(s, &st) == 0) {
@@ -594,7 +632,7 @@ int fexist(char* s) {
   return 0;
 } 
 
-int linput(FILE* fp,char* s,int max) {
+static int linput(FILE* fp,char* s,int max) {
   int c;
   int j=0;
   do {

@@ -35,15 +35,14 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
 
 #include "htsbauth.h"
 
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "htsnostatic.h"
 
@@ -171,17 +170,17 @@ char* cookie_nextfield(char* a) {
 // lire également (Windows seulement) les *@*.txt (cookies IE copiés)
 // !=0 : erreur
 int cookie_load(t_cookie* cookie,char* fpath,char* name) {
-  cookie->data[0]='\0';
+ //  cookie->data[0]='\0';
 
   // Fusionner d'abord les éventuels cookies IE
 #if HTS_WIN
   {
-    WIN32_FIND_DATA find;
+    WIN32_FIND_DATAA find;
     HANDLE h;
     char  pth[MAX_PATH + 32];
     strcpybuff(pth,fpath);
     strcatbuff(pth,"*@*.txt");
-    h = FindFirstFile(pth,&find);
+    h = FindFirstFileA((char*)pth,&find);
     if (h != INVALID_HANDLE_VALUE) {
       do {
         if (!(find.dwFileAttributes  & FILE_ATTRIBUTE_DIRECTORY ))
@@ -191,19 +190,33 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
               char cook_name[256];
               char cook_value[1000];
               char domainpathpath[512];
+              char dummy[512];
               //
               char domain[256];           // domaine cookie (.netscape.com)
               char path[256];             // chemin (/)
               int cookie_merged=0;
-              linput(fp,cook_name,250);
-              if (!feof(fp)) {
-                linput(fp,cook_value,250);
-                if ( (!feof(fp)) && (strnotempty(cook_value)) )  {
-                  linput(fp,domainpathpath,500);
-                  if (strnotempty(domainpathpath)) {
-                    if (ident_url_absolute(domainpathpath,domain,path)>=0) {
-                      cookie_add(cookie,cook_name,cook_value,domain,path);
-                      cookie_merged=1;
+              //
+              // Read all cookies
+              while( ! feof(fp) ) {
+                cook_name[0] = cook_value[0] = domainpathpath[0] 
+                  = dummy[0] = domain[0] = path[0] = '\0';
+                linput(fp,cook_name,250);
+                if ( ! feof(fp) ) {
+                  linput(fp,cook_value,250);
+                  if ( ! feof(fp) )  {
+                    int i;
+                    linput(fp,domainpathpath,500);
+                    /* Read 6 other useless values */
+                    for(i = 0 ; ! feof(fp) && i < 6 ; i++) {
+                      linput(fp,dummy,500);
+                    }
+                    if (strnotempty(cook_name) 
+                      && strnotempty(cook_value) 
+                      && strnotempty(domainpathpath)) {
+                      if (ident_url_absolute(domainpathpath,domain,path)>=0) {
+                        cookie_add(cookie,cook_name,cook_value,domain,path);
+                        cookie_merged=1;
+                      }
                     }
                   }
                 }
@@ -213,7 +226,7 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
                 remove(fconcat(fpath,find.cFileName));
             }  // if fp
           }
-      } while(FindNextFile(h,&find));
+      } while(FindNextFileA(h,&find));
       FindClose(h);
     }
   }
@@ -223,7 +236,7 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
   {
     FILE* fp = fopen(fconcat(fpath,name),"rb");
     if (fp) {
-      char line[8192];
+      char BIGSTK line[8192];
       while( (!feof(fp)) && (((int) strlen(cookie->data)) < cookie->max_len)) {
         rawlinput(fp,line,8100);
         if (strnotempty(line)) {
@@ -232,7 +245,7 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
               char domain[256];           // domaine cookie (.netscape.com)
               char path[256];             // chemin (/)
               char cook_name[256];        // nom cookie (MYCOOK)
-              char cook_value[8192];      // valeur (ID=toto,S=1234)
+              char BIGSTK cook_value[8192];      // valeur (ID=toto,S=1234)
               strcpybuff(domain,cookie_get(line,0));       // host
               strcpybuff(path,cookie_get(line,2));         // path
               strcpybuff(cook_name,cookie_get(line,5));    // name
@@ -256,7 +269,7 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
 // !=0 : erreur
 int cookie_save(t_cookie* cookie,char* name) {
   if (strnotempty(cookie->data)) {
-    char line[8192];
+    char BIGSTK line[8192];
     FILE* fp = fopen(fconv(name),"wb");
     if (fp) {
       char* a=cookie->data;

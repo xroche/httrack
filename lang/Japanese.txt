@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 TAPKAL\r\n
 LANGUAGE_CHARSET
 shift-jis
+LANGUAGE_WINDOWSID
+Japanese
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 以前の HTTP/1.0 リクエストを使用する (作業スピードの制限!)
 Attempt to limit retransfers through several tricks (file size test..)
 いくつかのトリック（ファイルサイズテストなど）による再転送制限を行ってみる
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 ログイン名/パスワードなしに外部リンクを書き出す
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 サーバの許容リクエスト数
 Update hack (limit re-transfers)
 更新のトリック (再転送制限)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 以前の HTTP/1.0 リクエストを強要する (1.1ではなく)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 更新する既存のプロジェクトを選択
 Click here to select path
 ここをクリックしてパスの選択
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack プロジェクトウィザード
 New project name:
@@ -780,6 +788,8 @@ Project name:
 プロジェクト名
 Base path:
 基準パス
+Project category:
+
 C:\\My Web Sites
 C:\\My Web Sites
 Type a new project name, \r\nor select existing project to update/resume

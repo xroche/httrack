@@ -43,7 +43,7 @@ Please visit our Website: http://www.httrack.com
 #define NStatsBuffer     14
 #define MAX_LEN_INPROGRESS 40
 
-typedef struct {
+typedef struct t_StatsBuffer {
   char name[1024];
   char file[1024];
   char state[256];
@@ -59,7 +59,7 @@ typedef struct {
   int actived;    // pour disabled
 } t_StatsBuffer;
 
-typedef struct {
+typedef struct t_InpInfo {
   int ask_refresh;
   int refresh;
   LLint stat_bytes;
@@ -85,6 +85,7 @@ void  __cdecl htsshow_uninit(void);
 int   __cdecl htsshow_start(httrackp* opt);
 int   __cdecl htsshow_chopt(httrackp* opt);
 int   __cdecl htsshow_end(void);
+int   __cdecl htsshow_preprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier);
 int   __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier);
 int   __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats);
 char* __cdecl htsshow_query(char* question);
@@ -94,17 +95,14 @@ int   __cdecl htsshow_check(char* adr,char* fil,int status);
 void  __cdecl htsshow_pause(char* lockfile);
 void  __cdecl htsshow_filesave(char* file);
 int   __cdecl htsshow_linkdetected(char* link);
+int   __cdecl htsshow_linkdetected2(char* link, char* start_tag);
 int   __cdecl htsshow_xfrstatus(lien_back* back);
 int   __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-
+int   __cdecl htsshow_sendheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
+int   __cdecl htsshow_receiveheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
   
 int main(int argc, char **argv);
 void webhttrack_main(char* cmd);
 void webhttrack_lock(int lock);
-
-#ifndef _WIN32
-#define fconv(a) (a)
-#define fconcat(a,b) concat(a,b)
-#endif
 
 #endif

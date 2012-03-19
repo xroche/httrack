@@ -35,9 +35,10 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
 
-#include <stdio.h>
-#include <stdlib.h>
+
 #include "htsindex.h"
 #include "htsglobal.h"
 #include "htslib.h"
@@ -124,11 +125,13 @@ int hts_primindex_words=0;
 */
 void index_init(const char* indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
+#ifndef _WIN32_WCE
   /* remove(concat(indexpath,"index.txt")); */
   hts_index_init=1;
   hts_primindex_size=0;
   hts_primindex_words=0;
   fp_tmpproject=tmpfile();
+#endif
 #endif
 }
 
@@ -298,7 +301,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
           unsigned long int e=0;
           if (inthash_read(WordIndexHash,line,&e)) {
             //if (e) {
-            char savelst[HTS_URLMAXSIZE*2];
+            char BIGSTK savelst[HTS_URLMAXSIZE*2];
             e++;          /* 0 means "once" */
             
             if (strncmp((const char*)fslash((char*)indexpath),filename,strlen(indexpath))==0)  // couper

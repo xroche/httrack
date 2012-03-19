@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "HTTrack version 3.30-RC-19+swf (compiled Oct  4 2003)" "httrack website copier"
+.TH httrack 1 "May 2005" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -62,7 +62,7 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B -NN, --structure[=N] 
 ] [ 
-.B -%M, --mime-html[=N] 
+.B -%M, --mime-html 
 ] [ 
 .B -LN, --long-names[=N] 
 ] [ 
@@ -103,6 +103,10 @@ httrack \- offline browser : copy websites to a local directory
 .B -@iN, --protocol[=N] 
 ] [ 
 .B -F, --user-agent 
+] [ 
+.B -%R, --referer 
+] [ 
+.B -%E, --from 
 ] [ 
 .B -%F, --footer 
 ] [ 
@@ -156,6 +160,8 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B -%H, --debug-headers 
 ] [ 
+.B -%!, --disable-security-limits 
+] [ 
 .B -V, --userdef-cmd 
 ] [ 
 .B -%U, --user 
@@ -173,7 +179,7 @@ allows you to download a World Wide Web site from the Internet to a local direct
 .B httrack www.someweb.com/bob/
  mirror site www.someweb.com/bob/ and only this site
 .TP
-.B httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg
+.B httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg -mime:application/*
  mirror the two sites together (with shared links) and accept any .jpg files on .com sites
 .TP
 .B httrack www.someweb.com/bob/bobby.html +* -r6
@@ -268,8 +274,10 @@ test all URLs (even forbidden ones) (--test)
 structure type (0 *original structure, 1+: see below) (--structure[=N])
 .IP -or
 user defined structure (-N "%h%p/%n%q.%t")
+.IP -%N
+delayed type check, don t make any link test but wait for files download to start instead (experimental) (%N0 don t use, %N1 use for unknown extensions, * %N2 always use)
 .IP -%M
-generate a RFC MIME-encapsulated full-archive (.mht) (--mime-html[=N])
+generate a RFC MIME-encapsulated full-archive (.mht) (--mime-html)
 .IP -LN
 long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible) (--long-names[=N])
 .IP -KN
@@ -295,7 +303,7 @@ check document type if unknown (cgi,asp..) (u0 don t check, * u1 check but /, u2
 .IP -j
 *parse Java Classes (j0 don t parse) (--parse-java[=N])
 .IP -sN
-follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always) (--robots[=N])
+follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always (even strict rules)) (--robots[=N])
 .IP -%h
 force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (--http-10)
 .IP -%k
@@ -308,12 +316,18 @@ update hacks: various hacks to limit re-transfers when updating (identical size,
 url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..) (--urlhack)
 .IP -%A
 assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip) (--assume <param>)
+.IP -can
+also be used to force a specific file type: --assume foo.cgi=text/html
 .IP -@iN
 internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (--protocol[=N])
 
 .SS Browser ID:
 .IP -F
-user-agent field (-F "user-agent name") (--user-agent <param>)
+user-agent field sent in HTTP headers (-F "user-agent name") (--user-agent <param>)
+.IP -%R
+default referer field sent in HTTP headers (--referer <param>)
+.IP -%E
+from email address sent in HTTP headers (--from <param>)
 .IP -%F
 footer string in Html code (-%F "Mirrored [from host %s [file %s [at %s]]]" (--footer <param>)
 .IP -%l
@@ -327,7 +341,7 @@ store all files in cache (not useful if files on disk) (--store-all-in-cache)
 .IP -%n
 do not re-download locally erased files (--do-not-recatch)
 .IP -%v
-display on screen filenames downloaded (in realtime) - * %v1 short version (--display)
+display on screen filenames downloaded (in realtime) - * %v1 short version - %v2 full animation (--display)
 .IP -Q
 no log - quiet mode (--do-not-log)
 .IP -q
@@ -386,8 +400,18 @@ debug HTTP headers in logfile (--debug-headers)
 *use optimized engine (limited memory boundary checks) (--fast-engine)
 .IP -#0
 filter test (-#0  *.gif   www.bar.com/foo.gif ) (--debug-testfilters <param>)
+.IP -#1
+simplify test (-#1 ./foo/bar/../foobar)
+.IP -#2
+type test (-#2 /foo/bar.php)
 .IP -#C
 cache list (-#C  *.com/spider*.gif  (--debug-cache <param>)
+.IP -#R
+cache repair (damaged cache) (--debug-oldftp)
+.IP -#d
+debug parser (--debug-parsing)
+.IP -#E
+extract new.zip cache meta-data in meta.zip
 .IP -#f
 always flush log files (--advanced-flushlogs)
 .IP -#FN
@@ -413,13 +437,21 @@ generate transfer rate statictics every minutes (--debug-ratestats)
 .IP -#!
 execute a shell command (-#! "echo hello") (--exec <param>)
 
+.SS Dangerous options: (do NOT use unless you exactly know what you are doing)
+.IP -%!
+bypass built-in security limits aimed to avoid bandwith abuses (bandwidth, simultaneous connections) (--disable-security-limits)
+.IP -IMPORTANT
+NOTE: DANGEROUS OPTION, ONLY SUITABLE FOR EXPERTS
+.IP -USE
+IT WITH EXTREME CARE
+
 .SS Command-line specific options:
 .IP -V
 execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd <param>)
 .IP -%U
 run the engine with another id when called as root (-%U smith) (--user <param>)
 .IP -%W
-use an external library function as a wrapper (-%W link-detected=foo.so:myfunction) (--callback <param>)
+use an external library function as a wrapper (-%W link-detected=foo.so:myfunction[,myparameters]) (--callback <param>)
 
 .SS Details: Option N
 .IP -N0
@@ -470,6 +502,7 @@ Identical to N99 exept that there is no "web" directory
    %h  Host name (ex: www.someweb.com)
    %M  URL MD5 (128 bits, 32 ascii bytes)
    %Q  query string MD5 (128 bits, 32 ascii bytes)
+   %r  protocol name (ex: http)
    %q  small query string MD5 (16 bits, 4 ascii bytes)
       %s?  Short name version (ex: %sN)
    %[param]  param variable in query string
@@ -535,6 +568,12 @@ foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)
 .SS  start  : int   (* myfunction)(httrackp* opt);
 .SS  end  : int   (* myfunction)(void);
 .SS  change-options  : int   (* myfunction)(httrackp* opt);
+.SS  preprocess-html  : int   (* myfunction)(char** html,int* len,char* url
+adresse,char* url
+fichier);
+.SS  postprocess-html  : int   (* myfunction)(char** html,int* len,char* url
+adresse,char* url
+fichier);
 .SS  check-html  : int   (* myfunction)(char* html,int len,char* url
 adresse,char* url
 fichier);
@@ -554,6 +593,8 @@ struct* stats);
 .SS  pause  : void  (* myfunction)(char* lockfile);
 .SS  save-file  : void  (* myfunction)(char* file);
 .SS  link-detected  : int   (* myfunction)(char* link);
+.SS  link-detected2  : int   (* myfunction)(char* link, char* start
+tag);
 .SS  transfer-status  : int   (* myfunction)(lien
 back* back);
 .SS  save-name  : int   (* myfunction)(char* adr
@@ -561,6 +602,8 @@ complete,char* fil
 complete,char* referer
 adr,char* referer
 fil,char* save);
+.SS And <wrappername>
+init() functions if defined, called upon plug
 .SH FILES
 .I /etc/httrack.conf
 .RS

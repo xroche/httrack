@@ -35,6 +35,9 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 /* Version: Oct/2000 */
 /* Fixed: problems with class structure (10/2000) */
 
@@ -45,10 +48,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 
 #include "htsjava.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "htsnostatic.h"
 
@@ -186,7 +185,7 @@ int hts_parse_java(htsmoduleStruct* str)
           if((tab[i].index1!=SClass) && (tab[i].index1!=Class) && (tab[tab[i].index1].name[0]!='[')) {
             
             if(!strstr(tab[tab[i].index1].name,"java/")) {
-              char tempo[1024];
+              char BIGSTK tempo[1024];
               tempo[0]='\0';
               
               sprintf(tempo,"%s.class",tab[tab[i].index1].name);
@@ -289,7 +288,7 @@ RESP_STRUCT readtable(htsmoduleStruct* str,
       strcpybuff(trans.name,"HTS_UNICODE");
     
     {
-      char buffer[1024]; 
+      char BIGSTK buffer[1024]; 
       char *p;
       
       p=&buffer[0];

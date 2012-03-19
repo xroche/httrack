@@ -41,8 +41,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath);
 void index_init(const char* indexpath);
 void index_finish(const char* indexpath,int mode);
+#endif
 
 #endif

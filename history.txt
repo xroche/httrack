@@ -4,6 +4,83 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.33-2
++ Fixed: Added network bandwidth limiters by default to prevent excessive bandwidth usage using the commandline version
++ Fixed: Bogus redirects with same location in https
++ Fixed: Bogus file naming with URL hack
++ Fixed: Extremly slow redirections and empty files
++ Fixed: Bogus names with directories ending with a "."
++ New: Number of connection per second can now be.. decimal, to delay even more
++ New: Enforce stronger ISO9660 compliance
++ Shell: "URL Hack" in interface
++ Shell: "Save settings" now rebuild categories
++ Shell: "Shutdown PC after mirror" option
++ Shell: Sound at the begining/end or the mirror (configurable through system sound properties)
++ Shell: Fixed drag & drop, .url import
++ Shell: Fixed "wizard" mode (crash)
++ Fixed: Crash at the end due to unterminated pending threads
++ Fixed: \ is not anymore transformed into / after the query (?) delimiter
++ New: Two new callbacks for pre/post-processing html data
++ New: link-detected2 callback (additional tag name parameter)
++ Fixed: Broken ISO9660
++ Fixed: Crash on file:// links
++ Fixed: Unescaped ampersands (&) in URLs
++ Fixed: Transfer hangs introduced in 3.33-beta-2
++ Fixed: Display bug "Waiting for scheduled time.."
++ Fixed: Bug "Waiting for scheduled time.." (NOT a display bug, actually)
++ Fixed: CaSe SenSiTiViTy bugs with mutliple links reffering to the same URL but using different case styles
++ Fixed: Failed to build from sources (FTBFS) on amd64 archs because of cast problems (Andreas Jochens)
++ Fixed: & were converted into &nbsp; (Leto Kauler)
++ Shell: Fixed crash with long URL lists (Libor Striz)
++ Fixed: connection/seconds limiter replugged
++ Fixed: "no files updated" display bug
++ Fixed: bogus links encoded with UTF (Lukasz Wozniak)
++ New: --assume can be used to force a specific script type (Brian Schröder)
+
+3.32
++ Fixed: css and js files were not parsed!
++ Fixed: again broken file:// (infinite loops with local crawls)
++ Fixed: Bandwidth limiter more gentle with low transfer rate
++ Fixed: external wrappers were not called during updates/continue
++ New: additional callback examples
++ Fixed: overflow in unzip.c fixed
++ New: tests are now cached for better performances!
++ New: %r (protocol) option for user-defined structure
++ Fixed: Broken engine on 64-bit archs
+
+3.31
++ New: Experimental categories implemented
++ New: New cache format (ZIP file)
++ New: .m3u files now crawled
++ New: .aam files now crawled
++ Fixed: Broken ftp
++ Fixed: Broken file://
++ Fixed: Broken cookies management and loading
++ Fixed: HTTrackInterface.c:251 crash
++ Fixed: "N connections" means "N connections" even in scan phase
++ Fixed: javascript:location bug
++ Fixed: libtool versioning problem fixed
++ Fixed: More javascript bugs with \' and \"
++ Fixed: .HTM files not renamed into .html anymore
++ Fixed: OSX fixes in the Makefile script
++ New: Default "referer" and "from" fields
++ New: Full HTTP headers are now stored in cache
++ Fixed: ftp transfer not logged/properly finalized
++ Fixed: Missing symbolic link in webhttrack install
++ Fixed: path and language not saved in webhttrack
++ Shell: Avoid invalid project names
++ Fixed: Javascript bug with src=
++ Fixed: Keep-alive consistency problems on Linux/Unix with bogus servers (SIGPIPE)
++ Fixed: Parsing bug inside javascript (bogus parsing with empty quotes in function: foo(''))
++ Fixed: static compiling on Linux/Unix
++ Fixed: bloated .h headers (internal function definitions)
++ Fixed: Bogus query strings with embedded ../ and/or ./
++ New: Added "change-options" call in the crawl begining
++ New: Query arguments now sorted for normalized URL checks (when "url hack" option is activated)
++ Fixed: Previous dependency to zlib.dll to zlib1.dll
++ Fixed: Broken static files were not correctly updated with the new cache format
++ Shell: Launch button in Internet Explorer
++ Fixed: Crash when dealing with multiple '?' in query string with 3.31-alpha
 
 3.30
 + New: Webhttrack, a linux/unix/bsd Web GUI for httrack
