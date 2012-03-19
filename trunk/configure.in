@@ -1,7 +1,7 @@
 AC_INIT(src/httrack.c)
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(httrack, 3.40.4)
-VERSION_INFO="1:40:0"
+AM_INIT_AUTOMAKE(httrack, 3.41.20)
+VERSION_INFO="2:41:0"
 AM_MAINTAINER_MODE
 
 AC_PREREQ(2.50)
@@ -21,12 +21,12 @@ AC_SUBST(DEFAULT_CFLAGS)
 AC_SUBST(VERSION_INFO)
 
 ### Check for platform
-case $host in
-AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
-*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
-*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
-*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
-esac
+#case $host in
+#AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
+#*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
+#*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
+#*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
+#esac
 
 ### Check size of long and long long.
 AC_CHECK_SIZEOF(long)
@@ -175,8 +175,8 @@ AC_OUTPUT([ Makefile
 src/Makefile
 man/Makefile
 m4/Makefile
-libtest/Makefile
 templates/Makefile
 lang/Makefile
 html/Makefile
+libtest/Makefile
 ])

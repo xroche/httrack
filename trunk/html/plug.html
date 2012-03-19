@@ -108,83 +108,213 @@ We'll see there some examples.
 
 <br><br>
 
-The <tt>httrack</tt> commandline tool allows (since the 3.30 release) to plug external functions to various callbacks defined in httrack.<br>
-See also: the <tt>httrack-library.h</tt> prototype file, and the <tt>callbacks-example.c</tt> given in the httrack archive.<br>
+The <tt>httrack</tt> commandline tool allows (since the 3.30 release) to plug external functions to various callbacks defined in httrack.
+The 3.41 release introduces a cleaned up verion of callbacks, with two major changes:
+<ul>
+<li>Cleaned up function prototypes, with two arguments always passed (the caller carg structure, and the httrackp* object), convenient to pass an user-defined pointer (see <tt>CALLBACKARG_USERDEF(carg)</tt>)</li>
+<li>The httrackp* option structure can be directly accessed to plug callbacks (no need to give the callback name and function name in the commandline!)</li>
+<li>The callback plug is made through the CHAIN_FUNCTION() helper, allowing to chain multiple callbacks of the same type (the callbacks MUST preserve the chain by calling ancestors)</li>
+</ul>
 
 <br>
-Example:
+References: 
+<ul>
+<li>the <tt>httrack-library.h</tt> prototype file
+<br />
+Note: the <i>Initialization</i>, <i>Main functions</i>, <i>Options handling</i> and <i>Wrapper functions</i> sections are generally the only ones to be considered.
+</li>
+<li>the <tt>htsdefines.h</tt> prototype file, which describes callback function prototypes</li>
+<li>the <tt>htsopt.h</tt> prototype file, which describes the full httrackp* structure</li>
+<li>the <tt>callbacks-example*.c</tt> files given in the httrack archive</li>
+<li>the <tt>htsjava.c</tt> source file (the java class plugin ; overrides 'detect' and 'parse')</li>
+<li>the example given at the end of this document</li>
+</ul>
+
+<br />
+Below the list of functions to be defined in the module (plugin).<br />
+<br />
+
+<table width="100%">
+<tr><td><b><i>module function name</i></b></td><td><b>function description</b></td><td><b>function signature</b></td></tr>
+<tr><td background="img/fade.gif"><i>hts_plug</i></td><td background="img/fade.gif">
+The module entry point. The opt structure can be used to plug callbacks, using the CHAIN_FUNCTION() macro helper. The argv optional argument is the one passed in the commandline as --wrapper parameter.<br>return value: 1 upon success, 0 upon error (the mirror will then be aborted)<br />
+
+<br />
+Wrappers can be plugged inside hts_plug() using:<br />
 <tt>
-httrack --wrapper check-html=callback:process_file ..
+CHAIN_FUNCTION(opt, &lt;callback name&gt;, &lt;our callback function name&gt;, &lt;our callback function optional custom pointer argument&gt;);
 </tt>
-<br>
-With the callback.so (or callback.dll) module defined as below:
+<br />
 
+<br />
+Example:
+<br />
+<tt>
+CHAIN_FUNCTION(opt, check_html, process, userdef);
+</tt>
+<br />
+
+</td><td background="img/fade.gif"><tt>extern int hts_plug(httrackp *opt, const char* argv);</tt></td></tr>
+
+<!-- -->
+
+<tr><td background="img/fade.gif"><i>hts_unplug</i></td><td background="img/fade.gif">
+The module exit point. To free allocated resources without using global variables, use the uninit callback (see below)</td><td background="img/fade.gif"><tt>extern int hts_unplug(httrackp *opt);</tt></td></tr>
+
+</table>
+
+
+<br />
+Note that all callbacks (except init and uninit) take as first two argument:
+<ul>
+<li>the t_hts_callbackarg structure<br />
+this structure holds the callback chain (parent callbacks defined before the current callback) pointers, and the user-defined pointer ; see <tt>CALLBACKARG_USERDEF(carg)</tt>)
+</li>
+<li>the httrackp structure<br />
+this structure, holding all current httrack options and mirror state, can be read or mofidied
+</li>
+</ul>
+
+<br />
+Below the list of callbacks, and associated external wrappers.
+
+<table width="100%">
+<tr><td><b><i>callback name</i></b></td><td><b>callback description</b></td><td><b>callback function signature</b></td></tr>
+
+<tr><td background="img/fade.gif"><i>init</i></td><td background="img/fade.gif">Note: the use the "start" callback is advised. Called during initialization.<br>return value: none</td><td background="img/fade.gif"><tt>void  mycallback(t_hts_callbackarg *carg);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>uninit</i></td><td background="img/fade.gif">Note: the use os the "end" callback is advised.<br />Called during un-initialization<br>return value: none</td><td background="img/fade.gif"><tt>void  mycallback(t_hts_callbackarg *carg);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>start</i></td><td background="img/fade.gif">Called when the mirror starts. The <tt>opt</tt> structure passed lists all options defined for this mirror. You may modify the <tt>opt</tt> structure to fit your needs.<br>return value: 1 upon success, 0 upon error (the mirror will then be aborted)</td><td background="img/fade.gif"><tt>int mycallback(t_hts_callbackarg *carg, httrackp* opt);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>end</i></td><td background="img/fade.gif">Called when the mirror ends<br>return value: 1 upon success, 0 upon error (the mirror will then be considered aborted)</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>chopt</i></td><td background="img/fade.gif">Called when options are to be changed. The <tt>opt</tt> structure passed lists all options, updated to take account of recent changes<br>return value: 1 upon success, 0 upon error (the mirror will then be aborted)</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>preprocess</i></td><td background="img/fade.gif">Called when a document (which is an html document) is to be parsed (original, not yet modified document). The <tt>html</tt> address points to the document data address (char**), and the <tt>length</tt> address points to the lenth of this document. Both pointer values (address and size) can be modified to change the document. It is up to the callback function to reallocate the given pointer (using the hts_realloc()/hts_free() library functions), which will be free()'ed by the engine. Hence, return of static buffers is strictly forbidden, and the use of hts_strdup() in such cases is advised. The <tt>url_address</tt> and <tt>url_file</tt> are the address and URI of the file being processed<br>return value: 1 if the new pointers can be applied (default value)</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char** html, int* len, const char* url_address, const char* url_file);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>postprocess</i></td><td background="img/fade.gif">Called when a document (which is an html document) is parsed and transformed (links rewritten). The <tt>html</tt> address points to the document data address (char**), and the <tt>length</tt> address points to the lenth of this document. Both pointer values (address and size) can be modified to change the document. It is up to the callback function to reallocate the given pointer (using the hts_realloc()/hts_free() library functions), which will be free()'ed by the engine. Hence, return of static buffers is strictly forbidden, and the use of hts_strdup() in such cases is advised. The <tt>url_address</tt> and <tt>url_file</tt> are the address and URI of the file being processed<br>return value: 1 if the new pointers can be applied (default value)</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char** html, int* len, const char* url_address, const char* url_file);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>check_html</i></td><td background="img/fade.gif">Called when a document (which may not be an html document) is to be parsed. The <tt>html</tt> address points to the document data, of lenth <tt>len</tt>. The <tt>url_address</tt> and <tt>url_file</tt> are the address and URI of the file being processed<br>return value: 1 if the parsing can be processed, 0 if the file must be skipped without being parsed</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char* html, int len, const char* url_address, const char* url_file);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>query</i></td><td background="img/fade.gif">Called when the wizard needs to ask a question. The <tt>question</tt> string contains the question for the (human) user<br>return value: the string answer ("" for default reply)</td><td background="img/fade.gif"><tt>const char* mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* question);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>query2</i></td><td background="img/fade.gif">Called when the wizard needs to ask a question</td><td background="img/fade.gif"><tt>const char* mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* question);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>query3</i></td><td background="img/fade.gif">Called when the wizard needs to ask a question</td><td background="img/fade.gif"><tt>const char* mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* question);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>loop</i></td><td background="img/fade.gif">Called periodically (informational, to display statistics)<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, lien_back* back, int back_max, int back_index, int lien_tot, int lien_ntot, int stat_time, hts_stat_struct* stats);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>check_link</i></td><td background="img/fade.gif">Called when a link has to be tested. The <tt>adr</tt> and <tt>fil</tt> are the address and URI of the link being tested. The passed <tt>status</tt> value has the following meaning: 0 if the link is to be accepted by default, 1 if the link is to be refused by default, and -1 if no decision has yet been taken by the engine<br>return value: same meaning as the passed <tt>status</tt> value ; you may generally return -1 to let the engine take the decision by itself</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* adr, const char* fil, int status);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>check_mime</i></td><td background="img/fade.gif">Called when a link download has begun, and needs to be tested against its MIME type. The <tt>adr</tt> and <tt>fil</tt> are the address and URI of the link being tested, and the <tt>mime</tt> string contains the link type being processed. The passed <tt>status</tt> value has the following meaning: 0 if the link is to be accepted by default, 1 if the link is to be refused by default, and -1 if no decision has yet been taken by the engine<br>return value: same meaning as the passed <tt>status</tt> value ; you may generally return -1 to let the engine take the decision by itself</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* adr, const char* fil, const char* mime, int status);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>pause</i></td><td background="img/fade.gif">Called when the engine must pause. When the <tt>lockfile</tt> passed is deleted, the function can return<br>return value: none</td><td background="img/fade.gif"><tt>void  mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* lockfile);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>filesave</i></td><td background="img/fade.gif">Called when a file is to be saved on disk<br>return value: none</td><td background="img/fade.gif"><tt>void  mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* file);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>filesave2</i></td><td background="img/fade.gif">Called when a file is to be saved or checked on disk<br>The hostname, filename and local filename are given. Two additional flags tells if the local file is new (is_new), if the local file is to be modified (is_modified), and if the file was not updated remotely (not_updated).<br>(!is_new && !is_modified): the file is up-to-date, and will not be modified<br>(is_new && is_modified): a new file will be written (or an updated file is being written)<br>(!is_new && is_modified): a file is being updated (append)<br>(is_new && !is_modified): an empty file will be written ("do not recatch locally erased files")<br>not_updated: the file was not re-downloaded because it was up-to-date (no data transfered again)<br><br>return value: none</td><td background="img/fade.gif"><tt>void  mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* hostname, const char* filename, const char* localfile, int is_new, int is_modified, int not_updated);</tt></td></tr>
+
+<tr><td background="img/fade.gif"><i>linkdetected</i></td><td background="img/fade.gif">Called when a link has been detected<br>return value: 1 if the link can be analyzed, 0 if the link must not even be considered</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char* link);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>linkdetected2</i></td><td background="img/fade.gif">Called when a link has been detected<br>return value: 1 if the link can be analyzed, 0 if the link must not even be considered</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char* link, const const char* tag_start);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>xfrstatus</i></td><td background="img/fade.gif">Called when a file has been processed (downloaded, updated, or error)<br>return value: must return 1</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, lien_back* back);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>savename</i></td><td background="img/fade.gif">Called when a local filename has to be processed. The <tt>adr_complete</tt> and <tt>fil_complete</tt> are the address and URI of the file being saved ; the <tt>referer_adr</tt> and <tt>referer_fil</tt> are the address and URI of the referer link. The <tt>save</tt> string contains the local filename being used. You may modifiy the <tt>save</tt> string to fit your needs, up to 1024 bytes (note: filename collisions, if any, will be handled by the engine by renaming the file into file-2.ext, file-3.ext ..).<br>return value: must return 1</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>sendhead</i></td><td background="img/fade.gif">Called when HTTP headers are to be sent to the remote server. The <tt>buff</tt> buffer contains text headers, <tt>adr</tt> and <tt>fil</tt> the URL, and <tt>referer_adr</tt> and <tt>referer_fil</tt> the referer URL. The <tt>outgoing</tt> structure contains all information related to the current slot.<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* outgoing);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>receivehead</i></td><td background="img/fade.gif">Called when HTTP headers are recevived from the remote server. The <tt>buff</tt> buffer contains text headers, <tt>adr</tt> and <tt>fil</tt> the URL, and <tt>referer_adr</tt> and <tt>referer_fil</tt> the referer URL. The <tt>incoming</tt> structure contains all information related to the current slot.<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* incoming);</tt></td></tr>
+
+<tr><td background="img/fade.gif"><i>detect</i></td><td background="img/fade.gif">Called when an unknown document is to be parsed. The <tt>str</tt> structure contains all information related to the document.<br>return value: 1 if the type is known and can be parsed, 0 if the document type is unknown</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, htsmoduleStruct* str);</tt></td></tr>
+<tr><td background="img/fade.gif"><i>parse</i></td><td background="img/fade.gif">The <tt>str</tt> structure contains all information related to the document.<br>return value: 1 if the document was successfully parsed, 0 if an error occured</td><td background="img/fade.gif"><tt>int   mycallback(t_hts_callbackarg *carg, httrackp* opt, htsmoduleStruct* str);</tt></td></tr>
+
+
+</table>
+
+<br><br>
+Note: the optional libhttrack-plugin module (libhttrack-plugin.dll or libhttrack-plugin.so), if found in the library environment, is loaded automatically, and its <tt>hts_plug()</tt> function being called.<br />
+
+
+<br />
+An example is generally more efficient than anything else, so let's write our first module, aimed to stupidely print all parsed html files:
+<table width="100%" border="2">
+<tr><td>
 <pre>
-int process_file(char* html, int len, char* url_adresse, char* url_fichier) {
-  printf("now parsing %s%s..\n", url_adresse, url_fichier);
-  strcpy(currentURLBeingParsed, url_adresse);
-  strcat(currentURLBeingParsed, url_fichier);
+/* system includes */
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+/* standard httrack module includes */
+#include "httrack-library.h"
+#include "htsopt.h"
+#include "htsdefines.h"
+
+/* local function called as "check_html" callback */
+static int process_file(t_hts_callbackarg /*the carg structure, holding various information*/*carg, /*the option settings*/httrackp *opt, 
+                        /*other parameters are callback-specific*/
+                        char* html, int len, const char* url_address, const char* url_file) {
+  void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
+
+  /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
+  if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt,
+                                                html, len, url_address, url_file)) {
+        return 0;  /* abort */
+      }
+  }
+
+  printf("file %s%s content: %s\n", url_address, url_file, html);
+  return 1;  /* success */
+}
+
+/* local function called as "end" callback */
+static int end_of_mirror(t_hts_callbackarg /*the carg structure, holding various information*/*carg, /*the option settings*/httrackp *opt) {
+  void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
+
+  /* processing */
+  fprintf(stderr, "That's all, folks!\n");
+
+  /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
+  if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
+    /* status is ok on our side, return other callabck's status */
+    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+  }
+
+  return 1;  /* success */
+}
+
+/*
+module entry point
+the function name and prototype MUST match this prototype
+*/
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+  /* optional argument passed in the commandline we won't be using here */
+  const char *arg = strchr(argv, ',');
+  if (arg != NULL)
+    arg++;
+
+  /* plug callback functions */
+  CHAIN_FUNCTION(opt, check_html, process_file, /*optional user-defined arg*/NULL);
+  CHAIN_FUNCTION(opt, end, end_of_mirror, /*optional user-defined arg*/NULL);
+
+  return 1;  /* success */
+}
+
+/*
+module exit point
+the function name and prototype MUST match this prototype
+*/
+EXTERNAL_FUNCTION int hts_unplug(httrackp *opt) {
+  fprintf(stder, "Module unplugged");
+
   return 1;  /* success */
 }
 </pre>
+</td></tr></table>
 
-Below the list of callbacks, and associated external wrappers:<br>
-
-<table width="100%">
-<tr><td><b>"<i>callback name</i>"</b></td><td><b>callback description</b></td><td><b>callback function signature</b></td></tr>
-
-<tr><td background="img/fade.gif">"<i>init</i>"</td><td background="img/fade.gif"><font color="red">Note: deprecated, should not be used anymore (unsafe callback) - see "start" callback or wrapper_init() module function below this table.</font>Called during initialization ; use of htswrap_add (see <tt>httrack-library.h</tt>) is permitted inside this function to setup other callbacks.<br>return value: none</td><td background="img/fade.gif"><tt>void  (* myfunction)(void);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>free</i>"</td><td background="img/fade.gif"><font color="red">Note: deprecated, should not be used anymore (unsafe callback) - see "end" callback or wrapper_exit() module function below this table.</font><br />Called during un-initialization<br>return value: none</td><td background="img/fade.gif"><tt>void  (* myfunction)(void);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>start</i>"</td><td background="img/fade.gif">Called when the mirror starts. The <tt>opt</tt> structure passed lists all options defined for this mirror. You may modify the <tt>opt</tt> structure to fit your needs.  Besides, use of htswrap_add (see <tt>httrack-library.h</tt>) is permitted inside this function to setup other callbacks.<br>return value: 1 upon success, 0 upon error (the mirror will then be aborted)</td><td background="img/fade.gif"><tt>int   (* myfunction)(httrackp* opt);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>end</i>"</td><td background="img/fade.gif">Called when the mirror ends<br>return value: 1 upon success, 0 upon error (the mirror will then be considered aborted)</td><td background="img/fade.gif"><tt>int   (* myfunction)(void);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>change-options</i>"</td><td background="img/fade.gif">Called when options are to be changed. The <tt>opt</tt> structure passed lists all options, updated to take account of recent changes<br>return value: 1 upon success, 0 upon error (the mirror will then be aborted)</td><td background="img/fade.gif"><tt>int   (* myfunction)(httrackp* opt);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>check-html</i>"</td><td background="img/fade.gif">Called when a document (which may not be an html document) is to be parsed. The <tt>html</tt> address points to the document data, of lenth <tt>len</tt>. The <tt>url_adresse</tt> and <tt>url_fichier</tt> are the address and URI of the file being processed<br>return value: 1 if the parsing can be processed, 0 if the file must be skipped without being parsed</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* html,int len,char* url_adresse,char* url_fichier);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>preprocess-html</i>"</td><td background="img/fade.gif">Called when a document (which is an html document) is to be parsed (original, not yet modified document). The <tt>html</tt> address points to the document data address (char**), and the <tt>length</tt> address points to the lenth of this document. Both pointer values (address and size) can be modified to change the document. It is up to the callback function to reallocate the given pointer (using standard C library realloc()/free() functions), which will be free()'ed by the engine. Hence, return of static buffers is strictly forbidden, and the use of strdup() in such cases is advised. The <tt>url_adresse</tt> and <tt>url_fichier</tt> are the address and URI of the file being processed<br>return value: 1 if the new pointers can be applied (default value)</td><td background="img/fade.gif"><tt>int   (* myfunction)(char** html,int* len,char* url_adresse,char* url_fichier);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>postprocess-html</i>"</td><td background="img/fade.gif">Called when a document (which is an html document) is parsed and transformed (links rewritten). The <tt>html</tt> address points to the document data address (char**), and the <tt>length</tt> address points to the lenth of this document. Both pointer values (address and size) can be modified to change the document. It is up to the callback function to reallocate the given pointer (using standard C library realloc()/free() functions), which will be free()'ed by the engine. Hence, return of static buffers is strictly forbidden, and the use of strdup() in such cases is advised. The <tt>url_adresse</tt> and <tt>url_fichier</tt> are the address and URI of the file being processed<br>return value: 1 if the new pointers can be applied (default value)</td><td background="img/fade.gif"><tt>int   (* myfunction)(char** html,int* len,char* url_adresse,char* url_fichier);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>query</i>"</td><td background="img/fade.gif">Called when the wizard needs to ask a question. The <tt>question</tt> string contains the question for the (human) user<br>return value: the string answer ("" for default reply)</td><td background="img/fade.gif"><tt>char* (* myfunction)(char* question);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>query2</i>"</td><td background="img/fade.gif">Called when the wizard needs to ask a question</td><td background="img/fade.gif"><tt>char* (* myfunction)(char* question);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>query3</i>"</td><td background="img/fade.gif">Called when the wizard needs to ask a question</td><td background="img/fade.gif"><tt>char* (* myfunction)(char* question);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>loop</i>"</td><td background="img/fade.gif">Called periodically (informational, to display statistics)<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   (* myfunction)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>check-link</i>"</td><td background="img/fade.gif">Called when a link has to be tested. The <tt>adr</tt> and <tt>fil</tt> are the address and URI of the link being tested. The passed <tt>status</tt> value has the following meaning: 0 if the link is to be accepted by default, 1 if the link is to be refused by default, and -1 if no decision has yet been taken by the engine<br>return value: same meaning as the passed <tt>status</tt> value ; you may generally return -1 to let the engine take the decision by itself</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* adr,char* fil,int status);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>check-mime</i>"</td><td background="img/fade.gif">Called when a link download has begun, and needs to be tested against its MIME type. The <tt>adr</tt> and <tt>fil</tt> are the address and URI of the link being tested, and the <tt>mime</tt> string contains the link type being processed. The passed <tt>status</tt> value has the following meaning: 0 if the link is to be accepted by default, 1 if the link is to be refused by default, and -1 if no decision has yet been taken by the engine<br>return value: same meaning as the passed <tt>status</tt> value ; you may generally return -1 to let the engine take the decision by itself</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* adr,char* fil,char* mime,int status);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>pause</i>"</td><td background="img/fade.gif">Called when the engine must pause. When the <tt>lockfile</tt> passed is deleted, the function can return<br>return value: none</td><td background="img/fade.gif"><tt>void  (* myfunction)(char* lockfile);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>save-file</i>"</td><td background="img/fade.gif">Called when a file is to be saved on disk<br>return value: none</td><td background="img/fade.gif"><tt>void  (* myfunction)(char* file);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>save-file2</i>"</td><td background="img/fade.gif">Called when a file is to be saved or checked on disk<br>The hostname, filename and local filename are given. Two additional flags tells if the file is new (is_new) and is the file is to be modified (is_modified).<br>(!is_new && !is_modified): the file is up-to-date, and will not be modified<br>(is_new && is_modified): a new file will be written (or an updated file is being written)<br>(!is_new && is_modified): a file is being updated (append)<br>(is_new && !is_modified): an empty file will be written ("do not recatch locally erased files")<br>return value: none</td><td background="img/fade.gif"><tt>void  (* myfunction)(char* hostname,char* filename,char* localfile,int is_new,int is_modified);</tt></td></tr>
-
-typedef void  (* t_hts_htmlcheck_filesave2)();
-
-
-<tr><td background="img/fade.gif">"<i>link-detected</i>"</td><td background="img/fade.gif">Called when a link has been detected<br>return value: 1 if the link can be analyzed, 0 if the link must not even be considered</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* link);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>transfer-status</i>"</td><td background="img/fade.gif">Called when a file has been processed (downloaded, updated, or error)<br>return value: must return 1</td><td background="img/fade.gif"><tt>int   (* myfunction)(lien_back* back);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>save-name</i>"</td><td background="img/fade.gif">Called when a local filename has to be processed. The <tt>adr_complete</tt> and <tt>fil_complete</tt> are the address and URI of the file being saved ; the <tt>referer_adr</tt> and <tt>referer_fil</tt> are the address and URI of the referer link. The <tt>save</tt> string contains the local filename being used. You may modifiy the <tt>save</tt> string to fit your needs, up to 1024 bytes (note: filename collisions, if any, will be handled by the engine by renaming the file into file-2.ext, file-3.ext ..).<br>return value: must return 1</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>send-header</i>"</td><td background="img/fade.gif">Called when HTTP headers are to be sent to the remote server. The <tt>buff</tt> buffer contains text headers, <tt>adr</tt> and <tt>fil</tt> the URL, and <tt>referer_adr</tt> and <tt>referer_fil</tt> the referer URL. The <tt>outgoing</tt> structure contains all information related to the current slot.<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);</tt></td></tr>
-<tr><td background="img/fade.gif">"<i>receive-header</i>"</td><td background="img/fade.gif">Called when HTTP headers are recevived from the remote server. The <tt>buff</tt> buffer contains text headers, <tt>adr</tt> and <tt>fil</tt> the URL, and <tt>referer_adr</tt> and <tt>referer_fil</tt> the referer URL. The <tt>incoming</tt> structure contains all information related to the current slot.<br>return value: 1 if the mirror can continue, 0 if the mirror must be aborted</td><td background="img/fade.gif"><tt>int   (* myfunction)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);</tt></td></tr>
-
-</table>
-
-<br><br>
-Below additional function names that can be defined inside the module (DLL/.so):<br>
-
-<table width="100%" ID="Table1">
-<tr><td><b>"<i>module function name</i>"</b></td><td><b>function description</b></td></tr>
-
-<tr><td background="img/fade.gif"><i>int <b>function-name</b>_init(char *args);</i></td><td background="img/fade.gif">Called when a function named <b>function-name</b> is extracted from the current module (same as wrapper_init). The optional <tt>args</tt> provides additional commandline parameters. Returns 1 upon success, 0 if the function should not be extracted.</td></tr>
-<tr><td background="img/fade.gif"><i>int wrapper_init(char *fname, char *args);</i></td><td background="img/fade.gif">Called when a function named <tt>fname</tt> is extracted from the current module. The optional <tt>args</tt> provides additional commandline parameters. Besides, use of htswrap_add (see <tt>httrack-library.h</tt>) is permitted inside this function to setup other callbacks. Returns 1 upon success, 0 if the function should not be extracted.</td></tr>
-<tr><td background="img/fade.gif"><i>int wrapper_exit(void);</i></td><td background="img/fade.gif">Called when the module is unloaded. The function should return 1 (but the result is ignored).</td></tr>
-
-</table>
-
-<br><br>
-Below additional function names that can be defined inside the optional libhttrack-plugin module (libhttrack-plugin.dll or libhttrack-plugin.so) searched inside common library path:<br>
-
-<table width="100%" ID="Table2">
-<tr><td><b>"<i>module function name</i>"</b></td><td><b>function description</b></td></tr>
-
-<tr><td background="img/fade.gif"><i>void plugin_init(void);</i></td><td background="img/fade.gif">Called if the module (named libhttrack-plugin.(so|dll)) is found in the library path. Use of htswrap_add (see <tt>httrack-library.h</tt>) is permitted inside this function to setup other callbacks.</td></tr>
-
-</table>
-
-<br><br>
+<br />
+Compile this file ; for example:
+<br />
+<tt>
+gcc -O -g3 -shared -o mylibrary.so myexample.c
+</tt>
+<br />
+and plug the module using the commandline ; for example:
+<br />
+<tt>
+httrack --wrapper mylibrary http://www.example.com
+</tt>
+<br />
+or, if some parameters are desired:
+<br />
+<tt>
+httrack --wrapper mylibrary,myparameter-string http://www.example.com
+</tt>
+<br />
+(the "myparameter-string" string will be available in the 'arg' parameter passed to the hts_plug entry point)
+<br />
 
 
 <br><br>
@@ -202,7 +332,7 @@ Below additional function names that can be defined inside the optional libhttra
 
 <table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
 	<tr>
-	<td id="footer"><small>&copy; 2003 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
 	</tr>
 </table>
 

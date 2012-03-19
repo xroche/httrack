@@ -40,11 +40,16 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSHASH_DEFH
 #define HTSHASH_DEFH 
 
-#include "htscore.h"
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-// tables de hashage
+
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_hash_struct
+#define HTS_DEF_FWSTRUCT_hash_struct
+typedef struct hash_struct hash_struct;
+#endif
+
+// tables de hachage
 int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized);
 void hash_write(hash_struct* hash,int lpos,int normalized);
 int* hash_calc_chaine(hash_struct* hash,int type,int pos);

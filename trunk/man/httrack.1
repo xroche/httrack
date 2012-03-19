@@ -1,12 +1,14 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "HTTrack version 3.40-2 (compiled Apr  9 2006)" "httrack website copier"
+.TH httrack 1 "Jan 2007" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
 .B httrack [ url ]... [ -filter ]... [ +filter ]... [ 
 .B-O, --path 
+] [ 
+.B -%O, --chroot 
 ] [ 
 .B -w, --mirror 
 ] [ 
@@ -105,6 +107,8 @@ httrack \- offline browser : copy websites to a local directory
 .B -%A, --assume 
 ] [ 
 .B -@iN, --protocol[=N] 
+] [ 
+.B -%w, --disable-module 
 ] [ 
 .B -F, --user-agent 
 ] [ 
@@ -208,6 +212,9 @@ mirror[,path
 cache
 and
 logfiles]) (--path <param>)
+.IP -%O
+chroot path to, must be r00t (-%O root
+path) (--chroot <param>)
 
 .SS Action options:
 .IP -w
@@ -309,7 +316,7 @@ accept cookies in cookies.txt (0=do not accept,* 1=accept) (--cookies[=N])
 .IP -u
 check document type if unknown (cgi,asp..) (u0 don t check, * u1 check but /, u2 check always) (--check-type[=N])
 .IP -j
-*parse Java Classes (j0 don t parse) (--parse-java[=N])
+*parse Java Classes (j0 don t parse, bitmask: |1 parse default, |2 don t parse .class |4 don t parse .js |8 don t be aggressive) (--parse-java[=N])
 .IP -sN
 follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always (even strict rules)) (--robots[=N])
 .IP -%h
@@ -328,6 +335,8 @@ assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=t
 also be used to force a specific file type: --assume foo.cgi=text/html
 .IP -@iN
 internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (--protocol[=N])
+.IP -%w
+disable a specific external mime module (-%w htsswf -%w htsjava) (--disable-module <param>)
 
 .SS Browser ID:
 .IP -F
@@ -415,7 +424,7 @@ type test (-#2 /foo/bar.php)
 .IP -#C
 cache list (-#C  *.com/spider*.gif  (--debug-cache <param>)
 .IP -#R
-cache repair (damaged cache) (--debug-oldftp)
+cache repair (damaged cache) (--repair-cache)
 .IP -#d
 debug parser (--debug-parsing)
 .IP -#E
@@ -435,7 +444,7 @@ display ugly progress information (--advanced-progressinfo)
 .IP -#P
 catch URL (--catch-url)
 .IP -#R
-old FTP routines (debug) (--debug-oldftp)
+old FTP routines (debug) (--repair-cache)
 .IP -#T
 generate transfer ops. log every minutes (--debug-xfrstats)
 .IP -#u
@@ -459,7 +468,7 @@ execute system command after each files ($0 is the filename: -V "rm \$0") (--use
 .IP -%U
 run the engine with another id when called as root (-%U smith) (--user <param>)
 .IP -%W
-use an external library function as a wrapper (-%W link-detected=foo.so:myfunction[,myparameters]) (--callback <param>)
+use an external library function as a wrapper (-%W myfoo.so[,myparameters]) (--callback <param>)
 
 .SS Details: Option N
 .IP -N0
@@ -571,50 +580,7 @@ foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)
              force http/1.0 requests (-%h)
 
 .SS Details: Option %W: External callbacks prototypes
-.SS  init  : void  (* myfunction)(void);
-.SS  free  : void  (* myfunction)(void);
-.SS  start  : int   (* myfunction)(httrackp* opt);
-.SS  end  : int   (* myfunction)(void);
-.SS  change-options  : int   (* myfunction)(httrackp* opt);
-.SS  preprocess-html  : int   (* myfunction)(char** html,int* len,char* url
-adresse,char* url
-fichier);
-.SS  postprocess-html  : int   (* myfunction)(char** html,int* len,char* url
-adresse,char* url
-fichier);
-.SS  check-html  : int   (* myfunction)(char* html,int len,char* url
-adresse,char* url
-fichier);
-.SS  query  : char* (* myfunction)(char* question);
-.SS  query2  : char* (* myfunction)(char* question);
-.SS  query3  : char* (* myfunction)(char* question);
-.SS  loop  : int   (* myfunction)(lien
-back* back,int back
-max,int back
-index,int lien
-tot,int lien
-ntot,int stat
-time,hts
-stat
-struct* stats);
-.SS  check-link  : int   (* myfunction)(char* adr,char* fil,int status);
-.SS  pause  : void  (* myfunction)(char* lockfile);
-.SS  save-file  : void  (* myfunction)(char* file);
-.SS  save-file2  : void  (* myfunction)(char* hostname,char* filename,char* localfile,int is
-new,int is
-modified);
-.SS  link-detected  : int   (* myfunction)(char* link);
-.SS  link-detected2  : int   (* myfunction)(char* link, char* start
-tag);
-.SS  transfer-status  : int   (* myfunction)(lien
-back* back);
-.SS  save-name  : int   (* myfunction)(char* adr
-complete,char* fil
-complete,char* referer
-adr,char* referer
-fil,char* save);
-.SS And <wrappername>
-init() functions if defined, called upon plug
+.SS see htsdefines.h
 .SH FILES
 .I /etc/httrack.conf
 .RS

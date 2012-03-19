@@ -43,6 +43,7 @@ extern "C" {
 #endif
 
 #include "htsglobal.h"
+#include "htsstrings.h"
 
 #include <string.h>
 #include <time.h>
@@ -50,7 +51,7 @@ extern "C" {
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_TYPES_H
+#if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
 #include <sys/types.h>
 #endif
 #ifdef HAVE_SYS_STAT_H
@@ -60,15 +61,24 @@ extern "C" {
 #include <dlfcn.h>
 #endif
 
-#ifndef _WIN32
 #include <errno.h>
-#endif
 
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #include <fcntl.h>
 #endif
 #include <assert.h>
+
+/* GCC extension */
+#ifndef HTS_UNUSED
+#ifdef __GNUC__
+#define HTS_UNUSED __attribute__ ((unused))
+#define HTS_STATIC static __attribute__ ((unused))
+#else
+#define HTS_UNUSED
+#define HTS_STATIC static
+#endif
+#endif
 
 #undef min
 #undef max
@@ -149,6 +159,35 @@ extern HTSEXT_API t_abortLog abortLog__;
   } \
 } while(0)
 
+/* logging */
+typedef enum {
+	LOG_DEBUG,
+	LOG_INFO,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_PANIC
+} HTS_LogType;
+#define HTS_LOG(OPT,TYPE) do { \
+  int last_errno = errno; \
+	switch(TYPE) { \
+	case LOG_DEBUG: \
+		fspc(OPT,(OPT)->log, "debug"); \
+		break; \
+	case LOG_INFO: \
+		fspc(OPT,(OPT)->log, "info"); \
+		break; \
+	case LOG_WARNING: \
+		fspc(OPT,(OPT)->log, "warning"); \
+		break; \
+	case LOG_ERROR: \
+		fspc(OPT,(OPT)->log, "error"); \
+		break; \
+	case LOG_PANIC: \
+		fspc(OPT,(OPT)->log, "panic"); \
+		break; \
+	} \
+  errno = last_errno; \
+} while(0)
 
 /* regular malloc's() */
 #ifndef HTS_TRACE_MALLOC
@@ -194,6 +233,7 @@ extern HTSEXT_API int htsMemoryFastXfr;
 /*
 */
 
+#define stringdup()
 
 #ifdef STRDEBUG
 

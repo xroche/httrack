@@ -55,12 +55,13 @@ Please visit our Website: http://www.httrack.com
   Return value: size of the new file, or -1 if an error occured
 */
 int hts_zunpack(char* filename,char* newfile) {
+	char catbuff[CATBUFF_SIZE];
   if (gz_is_available && filename && newfile) {
     if (filename[0] && newfile[0]) {
       gzFile gz = gzopen (filename, "rb");
       if (gz) {
-        FILE* fpout=fopen(fconv(newfile),"wb");
-        INTsys size=0;
+        FILE* fpout=fopen(fconv(catbuff, newfile),"wb");
+        int size=0;
         if (fpout) {
           int nr;
           do {
@@ -68,7 +69,7 @@ int hts_zunpack(char* filename,char* newfile) {
             nr=gzread (gz, buff, 1024);
             if (nr>0) {
               size+=nr;
-              if ((INTsys)fwrite(buff,1,nr,fpout) != nr)
+              if (fwrite(buff,1,nr,fpout) != nr)
                 nr=size=-1;
             }
           } while(nr>0);
@@ -76,23 +77,23 @@ int hts_zunpack(char* filename,char* newfile) {
         } else
           size=-1;
         gzclose(gz);
-        return size;
+        return (int) size;
       }
     }
   }
   return -1;
 }
 
-int hts_extract_meta(char* path) {
-  unzFile zFile = unzOpen(fconcat(path,"hts-cache/new.zip"));
-  zipFile zFileOut = zipOpen(fconcat(path,"hts-cache/meta.zip"), 0);
+int hts_extract_meta(const char* path) {
+	char catbuff[CATBUFF_SIZE];
+  unzFile zFile = unzOpen(fconcat(catbuff,path,"hts-cache/new.zip"));
+  zipFile zFileOut = zipOpen(fconcat(catbuff,path,"hts-cache/meta.zip"), 0);
   if (zFile != NULL && zFileOut != NULL) {
     if (unzGoToFirstFile(zFile) == Z_OK) {
       zip_fileinfo fi;
       unz_file_info ufi;
       char BIGSTK filename[HTS_URLMAXSIZE * 4];
       char BIGSTK comment[8192];
-      int entries = 0;
       memset(comment, 0, sizeof(comment));       // for truncated reads
       memset(&fi, 0, sizeof(fi));
       memset(&ufi, 0, sizeof(ufi));

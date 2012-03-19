@@ -35,47 +35,65 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-
+// inthash -- simple hash table, using a key (char[]) and a value (uintptr_t)
 
 #ifndef HTSINTHASH_DEFH
 #define HTSINTHASH_DEFH 
 
-// inthash -- simple hash table, using a key (char[]) and a value (ulong int)
+/* Includes */
+#ifdef _WIN32
+#include <stddef.h>
+#elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
+  || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
+#include <inttypes.h>
+#else
+#include <stdint.h>
+#endif
 
 // value
 typedef union inthash_value {
-  unsigned long int intg;        /* integer value */
+  uintptr_t intg;                /* integer value */
   void* ptr;                     /* ptr value */
 } inthash_value;
 
 #define INTHASH_VALUE_NULL { 0 }
 
 // simple hash table for other routines
-typedef struct inthash_chain {
+#ifndef HTS_DEF_FWSTRUCT_inthash_chain
+#define HTS_DEF_FWSTRUCT_inthash_chain
+typedef struct inthash_chain inthash_chain;
+#endif
+struct inthash_chain {
   char* name;                    /* key (name) */
   inthash_value value;           /* value */
   struct inthash_chain* next;    /* next element */
-} inthash_chain;
+};
 
-// structure behind inthash
 typedef void (* t_inthash_freehandler)(void* value);
-typedef struct struct_inthash {
+
+/* inthash structure */
+#ifndef HTS_DEF_FWSTRUCT_struct_inthash
+#define HTS_DEF_FWSTRUCT_struct_inthash
+typedef struct struct_inthash struct_inthash, *inthash;
+#endif
+struct struct_inthash {
   inthash_chain** hash;
   unsigned int nitems;
   t_inthash_freehandler free_handler;
   unsigned int hash_size;
   unsigned short flag_valueismalloc;
-} struct_inthash;
-
-// main inthash type
-typedef struct_inthash* inthash;
+};
 
 // enumeration
-typedef struct struct_inthash_enum {
+#ifndef HTS_DEF_FWSTRUCT_struct_inthash_enum
+#define HTS_DEF_FWSTRUCT_struct_inthash_enum
+typedef struct struct_inthash_enum struct_inthash_enum;
+#endif
+struct struct_inthash_enum {
   inthash table;
   int index;
   inthash_chain* item;
-} struct_inthash_enum;
+};
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -91,8 +109,8 @@ void    inthash_value_is_malloc(inthash hashtable,int flag);              /* Is 
 void    inthash_value_set_free_handler(inthash hashtable,                 /* value free() handler (default one is 'free') */
                                        t_inthash_freehandler free_handler);
 /* */
-int     inthash_read(inthash hashtable,const char* name,long int* intvalue);    /* Read entry from the hash table */
-int     inthash_readptr(inthash hashtable,const char* name,long int* intvalue); /* Same function, but returns 0 upon null ptr */
+int     inthash_read(inthash hashtable,const char* name,intptr_t* intvalue);    /* Read entry from the hash table */
+int     inthash_readptr(inthash hashtable,const char* name,intptr_t* intvalue); /* Same function, but returns 0 upon null ptr */
 int     inthash_exists(inthash hashtable, const char* name);                    /* Is the key existing ? */
 /* */
 int     inthash_read_value(inthash hashtable,const char* name,inthash_value* value);
@@ -103,9 +121,9 @@ int     inthash_read_pvoid(inthash hashtable,const char* name, void** value);
 int     inthash_write_pvoid(inthash hashtable,const char* name, void* value);
 void    inthash_add_pvoid(inthash hashtable, const char* name, void* value);
 /* */
-void    inthash_add(inthash hashtable,const char* name,long int value);    /* Add entry in the hash table */
+void    inthash_add(inthash hashtable,const char* name,intptr_t value);    /* Add entry in the hash table */
 void*   inthash_addblk(inthash hashtable,const char* name,int blksize);    /* Add entry in the hash table and set value to a new memory block */
-int     inthash_write(inthash hashtable,const char* name,long int value);  /* Overwrite/add entry in the hash table */
+int     inthash_write(inthash hashtable,const char* name,intptr_t value);  /* Overwrite/add entry in the hash table */
 int     inthash_inc(inthash hashtable,const char* name);                   /* Increment entry in the hash table */
 int     inthash_remove(inthash hashtable,const char* name);                /* Remove an entry from the hashtable */
 /* */

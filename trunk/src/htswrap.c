@@ -41,33 +41,21 @@ Please visit our Website: http://www.httrack.com
 #include "htswrap.h"
 #include "htshash.h"
 #include "htsinthash.h"
+#include "htslib.h"
 
-// typedef long (__stdcall * XSHBFF_WndProc_type)(HWND ,UINT ,WPARAM ,LPARAM);
-
-inthash wrappers=NULL;
-
-HTSEXT_API int htswrap_init(void) {
-  if (!wrappers)
-    wrappers=inthash_new(42);
-  return inthash_created(wrappers);
-}
-
-HTSEXT_API int htswrap_free(void) {
-  inthash_delete(&wrappers);
+HTSEXT_API int htswrap_init(void) {		// LEGACY
   return 1;
 }
 
-HTSEXT_API int htswrap_add(char* name,void* fct) {
-  if (!wrappers)
-    htswrap_init();
-  inthash_write(wrappers,name,(unsigned long int)fct);
+HTSEXT_API int htswrap_free(void) {		// LEGACY
   return 1;
 }
 
-HTSEXT_API unsigned long int htswrap_read(char* name) {
-  unsigned long int fct=0;
-  if (!wrappers)
-    htswrap_init();
-  inthash_read(wrappers,name,(void*)&fct);
-  return fct;
+HTSEXT_API int htswrap_add(httrackp *opt, const char* name,void* fct) {
+	return hts_set_callback((t_hts_htmlcheck_callbacks*)opt->callbacks_fun, name, fct);
 }
+
+HTSEXT_API uintptr_t htswrap_read(httrackp *opt, const char* name) {
+	return (uintptr_t) hts_get_callback((t_hts_htmlcheck_callbacks*)opt->callbacks_fun, name);
+}
+

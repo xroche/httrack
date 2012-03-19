@@ -94,7 +94,7 @@ void inthash_add_pvoid(inthash hashtable, const char* name, void* pvalue) {
 }
 
 // Check for duplicate entry (==1 : added)
-int inthash_write(inthash hashtable,const char* name,long int intvalue) {
+int inthash_write(inthash hashtable,const char* name,intptr_t intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
   value.intg = intvalue;
   return inthash_write_value(hashtable, name, value);
@@ -129,7 +129,7 @@ int inthash_write_value(inthash hashtable,const char* name,inthash_value value) 
 // Increment pos value, create one if necessary (=0)
 // (==1 : created)
 int inthash_inc(inthash hashtable,const char* name) {
-  long int value=0;
+  intptr_t value=0;
   int r=0;
   if (inthash_read(hashtable,name,&value)) {
     value++;
@@ -144,7 +144,7 @@ int inthash_inc(inthash hashtable,const char* name) {
 
 
 // Does not check for duplicate entry
-void inthash_add(inthash hashtable, const char* name, long int intvalue) {
+void inthash_add(inthash hashtable, const char* name, intptr_t intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
   memset(&value, 0, sizeof(value));
   value.intg = intvalue;
@@ -195,7 +195,7 @@ void* inthash_addblk(inthash hashtable,const char* name,int blksize) {
   return NULL;
 }
 
-int inthash_read(inthash hashtable,const char* name,long int* intvalue) {
+int inthash_read(inthash hashtable,const char* name,intptr_t* intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
   int ret = inthash_read_value(hashtable, name, (intvalue != NULL) ? &value : NULL);
   if (intvalue != NULL)
@@ -255,7 +255,7 @@ int inthash_remove(inthash hashtable,const char* name) {
   return 0;
 }
 
-int inthash_readptr(inthash hashtable,const char* name,long int* value) {
+int inthash_readptr(inthash hashtable,const char* name,intptr_t* value) {
   int ret;
   *value = 0;
   ret = inthash_read(hashtable, name, value);

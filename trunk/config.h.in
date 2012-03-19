@@ -54,9 +54,6 @@
 /* Check for large files support */
 #undef HTS_LFS
 
-/* Default value used */
-#undef HTS_PLATFORM
-
 /* Check for libsocket */
 #undef LIBSOCKET
 

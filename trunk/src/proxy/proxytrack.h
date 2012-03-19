@@ -29,13 +29,26 @@ Please visit our Website: http://www.httrack.com
 #define WEBHTTRACK_PROXYTRACK
 
 /* Version */
-#define PROXYTRACK_VERSION "0.4"
+#define PROXYTRACK_VERSION "0.5"
 
 /* Store manager */
 #include "../minizip/mztools.h"
 #include "store.h"
 
 #include <sys/stat.h>
+#ifndef HTS_DO_NOT_USE_FTIME
+#ifdef _WIN32
+#include <sys/utime.h>
+#else
+#include <utime.h>
+#endif
+#include <sys/timeb.h>
+#else
+#include <utime.h>
+#endif
+#ifndef _WIN32
+#include <pthread.h>
+#endif
 
 /* generic */
 
@@ -233,23 +246,6 @@ static int linput_trim(FILE* fp,char* s,int max) {
   return rlen;
 }
 
-// copy of concat
-#define HTS_URLMAXSIZE 1024
-typedef struct concat_strc {
-  char buff[16][HTS_URLMAXSIZE*2*2];
-  int rol;
-} concat_strc;
-static char* concat(const char* a,const char* b) {
-  static concat_strc* strc = NULL;
-  if (strc == NULL) {
-    strc = (concat_strc*) calloc(16, sizeof(concat_strc));
-  }
-  strc->rol=((strc->rol+1)%16);    // roving pointer
-  strcpy(strc->buff[strc->rol],a);
-  if (b) strcat(strc->buff[strc->rol],b);
-  return strc->buff[strc->rol];
-}
-
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
 #endif
@@ -264,25 +260,135 @@ static int fexist(char* s) {
   return 0;
 } 
 
-#ifndef _WIN32
-#define fconv(a) (a)
-#define fconcat(a,b) concat(a,b)
-#endif
-
-#ifdef _WIN32
-static char* __fconv(char* a) {
+/* convertir une chaine en temps */
+static void set_lowcase(char* s) {
   int i;
-  for(i=0;i<(int) strlen(a);i++)
-    if (a[i]=='/')  // convertir
-      a[i]='\\';
-  return a;
+  for(i=0;i<(int) strlen(s);i++)
+    if ((s[i]>='A') && (s[i]<='Z'))
+      s[i]+=('a'-'A');
 }
-static char* fconcat(char* a,char* b) {
-  return __fconv(concat(a,b));
+static struct tm* convert_time_rfc822(struct tm *result,const char* s) {
+  char months[]="jan feb mar apr may jun jul aug sep oct nov dec";
+  char str[256];
+	char* a;
+  /* */
+  int result_mm=-1;
+  int result_dd=-1;
+  int result_n1=-1;
+  int result_n2=-1;
+  int result_n3=-1;
+  int result_n4=-1;
+  /* */
+
+  if ((int) strlen(s) > 200)
+    return NULL;
+  strcpy(str,s);
+  set_lowcase(str);
+  /* éliminer :,- */
+  while( (a=strchr(str,'-')) ) *a=' ';
+  while( (a=strchr(str,':')) ) *a=' ';
+  while( (a=strchr(str,',')) ) *a=' ';
+  /* tokeniser */
+  a=str;
+  while(*a) {
+    char *first, *last;
+    char tok[256];
+    /* découper mot */
+    while(*a==' ') a++;   /* sauter espaces */
+    first=a;
+    while((*a) && (*a!=' ')) a++;
+    last=a;
+    tok[0]='\0';
+    if (first!=last) {
+      char* pos;
+      strncat(tok,first,(int) (last - first));
+      /* analyser */
+      if ( (pos=strstr(months,tok)) ) {               /* month always in letters */
+        result_mm=((int) (pos - months))/4;
+      } else {
+        int number;
+        if (sscanf(tok,"%d",&number) == 1) {      /* number token */
+          if (result_dd<0)                        /* day always first number */
+            result_dd=number;
+          else if (result_n1<0)
+            result_n1=number;
+          else if (result_n2<0)
+            result_n2=number;
+          else if (result_n3<0)
+            result_n3=number;
+          else if (result_n4<0)
+            result_n4=number;
+        }   /* sinon, bruit de fond(+1GMT for exampel) */
+      }
+    }
+  }
+  if ((result_n1>=0) && (result_mm>=0) && (result_dd>=0) && (result_n2>=0) && (result_n3>=0) && (result_n4>=0)) {
+    if (result_n4>=1000) {               /* Sun Nov  6 08:49:37 1994 */
+      result->tm_year=result_n4-1900;
+      result->tm_hour=result_n1;
+      result->tm_min=result_n2;
+      result->tm_sec=max(result_n3,0);
+    } else {                            /* Sun, 06 Nov 1994 08:49:37 GMT or Sunday, 06-Nov-94 08:49:37 GMT */
+      result->tm_hour=result_n2;
+      result->tm_min=result_n3;
+      result->tm_sec=max(result_n4,0);
+      if (result_n1<=50)                /* 00 means 2000 */
+        result->tm_year=result_n1+100;
+      else if (result_n1<1000)          /* 99 means 1999 */
+        result->tm_year=result_n1;
+      else                              /* 2000 */
+        result->tm_year=result_n1-1900;
+    }
+    result->tm_isdst=0;        /* assume GMT */
+    result->tm_yday=-1;        /* don't know */
+    result->tm_wday=-1;        /* don't know */
+    result->tm_mon=result_mm;
+    result->tm_mday=result_dd;
+    return result;
+  }
+  return NULL;
 }
-static char* fconv(char* a) {
-  return __fconv(concat(a,""));
-}
+static struct tm PT_GetTime(time_t t) {
+	struct tm tmbuf;
+#ifdef _WIN32
+	struct tm * tm = gmtime(&t);
+#else
+	struct tm * tm = gmtime_r(&t, &tmbuf);
 #endif
+	if (tm != NULL)
+		return *tm;
+	else {
+		memset(&tmbuf, 0, sizeof(tmbuf));
+		return tmbuf;
+	}
+}
+static int set_filetime(const char* file, struct tm* tm_time) {
+  struct utimbuf tim;
+#ifndef HTS_DO_NOT_USE_FTIME
+  struct timeb B;
+  memset(&B, 0, sizeof(B));
+  B.timezone=0;
+  ftime( &B );
+  tim.actime = tim.modtime = mktime(tm_time) - B.timezone*60; 
+#else
+  // bogus time (GMT/local)..
+  tim.actime=tim.modtime=mktime(tm_time); 
+#endif
+  return utime(file, &tim);
+}
+static int set_filetime_time_t(const char* file, time_t t) {
+	if (t != (time_t) 0 && t != (time_t) -1) {
+		struct tm tm = PT_GetTime(t);
+		return set_filetime(file, &tm);
+	}
+	return -1;
+}
+static int set_filetime_rfc822(const char* file, const char* date) {
+	struct tm buffer;
+  struct tm* tm_s = convert_time_rfc822(&buffer,date);
+  if (tm_s) {
+    return set_filetime(file,tm_s);
+  } else return -1;
+}
 
 #endif

@@ -119,12 +119,9 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include <string.h>
 #include <time.h>
 #include <fcntl.h>
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #include <arpa/inet.h>
-#endif
-#ifndef _WIN32
-#include <signal.h>
 #endif
 /* END specific definitions */
 
@@ -136,12 +133,6 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 
 /* définitions globales */
 #include "htsglobal.h"
-
-/* htslib */
-/*#include "htslib.h"*/
-
-/* HTTrack Website Copier Library */
-#include "httrack-library.h"
 
 /* htsweb */
 #include "htsinthash.h"
@@ -228,27 +219,6 @@ static int linputsoc_t(T_SOC soc, char* s, int max, int timeout) {
   return -1;
 }
 
-static void unescapeini(char* s, String* tempo) {
-  int i;
-  char lastc=0;
-  for (i=0;i<(int) strlen(s);i++) {
-    if (s[i]=='%' && s[i+1]=='%') {
-      i++;
-      StringAddchar(*tempo, lastc = '%');
-    } else if (s[i]=='%') {
-      char hc;
-      i++;
-      hc = (char) ehex(s+i);
-      if (!is_retorsep(hc) || !is_retorsep(lastc)) {
-        StringAddchar(*tempo, lastc = (char) hc);
-      }
-      i++;    // sauter 2 caractères finalement
-    }
-    else
-      StringAddchar(*tempo, lastc = s[i]);
-  }
-}
-
 static int gethost(const char* hostname, SOCaddr *server, size_t server_size) {
   if (hostname != NULL && *hostname != '\0') {
 #if HTS_INET6==0
@@ -257,8 +227,8 @@ static int gethost(const char* hostname, SOCaddr *server, size_t server_size) {
 		*/
 		t_hostent* hp=gethostbyname(hostname);
 		if (hp!=NULL) {
-			if ( (hp->h_length) && ( ((unsigned int) hp->h_length) <= buffer->addr_maxlen) ) {
-				SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0], hp->h_length);
+			if (hp->h_length) {
+				SOCaddr_copyaddr(*server, server_size, hp->h_addr_list[0], hp->h_length);
 				return 1;
 			}
 		}
@@ -325,7 +295,7 @@ static T_SOC smallserver_init(const char* adr, int port, int family) {
 	SOCaddr_initany(server, server_size); 
   if (gethost(adr, &server, server_size)) {    // host name
 		T_SOC soc = INVALID_SOCKET;
-    if ( (soc = socket(SOCaddr_sinfamily(server), family, 0)) != INVALID_SOCKET) {
+    if ( (soc = (T_SOC) socket(SOCaddr_sinfamily(server), family, 0)) != INVALID_SOCKET) {
       SOCaddr_initport(server, port);
       if ( bind(soc,(struct sockaddr*) &server, (int)server_size) == 0 ) {
         if (family != SOCK_STREAM 
@@ -379,7 +349,8 @@ int proxytrack_main(char* proxyAddr, int proxyPort,
     fflush(stderr);
     //
     if (!proxytrack_start(index, soc, socICP)) {
-      fprintf(stderr, "Unable to create the server: %s\n", strerror(errno));
+      int last_errno = errno;
+      fprintf(stderr, "Unable to create the server: %s\n", strerror(last_errno));
 #ifdef _WIN32
       closesocket(soc);
 #else
@@ -391,7 +362,8 @@ int proxytrack_main(char* proxyAddr, int proxyPort,
       returncode = 0;
     }
   } else {
-		fprintf(stderr, "Unable to initialize a temporary server : %s\n", strerror(errno));
+    int last_errno = errno;
+		fprintf(stderr, "Unable to initialize a temporary server : %s\n", strerror(last_errno));
     returncode = 1;
   }
   printf("EXITED\n");
@@ -452,7 +424,7 @@ static const char* GetHttpMessage(int statuscode) {
 #ifndef NO_WEBDAV
 static void proxytrack_add_DAV_Item(String *item, String *buff,
 																		const char* filename,
-																		unsigned long int size,
+																		size_t size,
 																		time_t timestamp,
 																		const char* mime,
 																		int isDir,
@@ -485,7 +457,7 @@ static void proxytrack_add_DAV_Item(String *item, String *buff,
 		}
 
 		StringRoom(*item, 1024);
-		sprintf(StringBuff(*item),
+		sprintf(StringBuffRW(*item),
 			"<response xmlns=\"DAV:\">\r\n"
 			"<href>/webdav%s%s</href>\r\n"
 			"<propstat>\r\n"
@@ -644,17 +616,17 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes, const char 
 		StringClear(buff);
 
 		/* Canonize URL */
-		StringStrcpy(url, file + ((file[0] == '/') ? 1 : 0));
+		StringCopy(url, file + ((file[0] == '/') ? 1 : 0));
 		if (StringLength(url) > 0) {
 			if (StringBuff(url)[StringLength(url) - 1] == '/') {
-				StringBuff(url)[StringLength(url) - 1] = '\0';
+				StringBuffRW(url)[StringLength(url) - 1] = '\0';
 				StringLength(url)--;
 			}
 		}
 
 		/* Form response */
 		StringRoom(response, 1024);
-		sprintf(StringBuff(response),
+		sprintf(StringBuffRW(response),
 			"<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
 			"<multistatus xmlns=\"DAV:\">\r\n");
 		StringLength(response) = (int) strlen(StringBuff(response));
@@ -683,22 +655,22 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes, const char 
 						/* Item URL */
 						StringRoom(itemUrl, thisUrlLen + prefixLen + sizeof("/webdav/") + 1);
 						StringClear(itemUrl);
-						sprintf(StringBuff(itemUrl), "/%s/%s", prefix, thisUrl);
+						sprintf(StringBuffRW(itemUrl), "/%s/%s", prefix, thisUrl);
 						if (!thisIsDir)
 							StringLength(itemUrl) = (int) strlen(StringBuff(itemUrl));
 						else
 							StringLength(itemUrl) = (int) strlen(StringBuff(itemUrl)) - 1;
-						StringBuff(itemUrl)[StringLength(itemUrl)] = '\0';
+						StringBuffRW(itemUrl)[StringLength(itemUrl)] = '\0';
 
 						if (thisIsDir == isDir) {
-							unsigned long size = 0;
+							size_t size = 0;
 							time_t timestamp = (time_t) 0;
 							PT_Element file = NULL;
 
 							/* Item stats */
 							if (!isDir) {
 								file = PT_ReadIndex(indexes, StringBuff(itemUrl) + 1, FETCH_HEADERS);
-								if (file != NULL && file->statuscode == 200 ) {
+								if (file != NULL && file->statuscode == HTTP_OK ) {
 									size = file->size;
 									if (file->lastmodified) {
 										timestamp = get_time_rfc822(file->lastmodified);
@@ -735,7 +707,7 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes, const char 
 		}		/* Depth > 0 */
 
 		/* End of responses */
-		StringStrcat(response,
+		StringCat(response,
 			"</multistatus>\r\n"
 			);
 
@@ -767,7 +739,7 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes, const char * 
 		int i, isDir;
 		String html = STRING_EMPTY;
 		StringClear(html);
-		StringStrcat(html, 
+		StringCat(html, 
 			"<html>"
 			PROXYTRACK_COMMENT_HEADER
 			DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
@@ -787,28 +759,28 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes, const char * 
 				int thisIsDir = (thisUrl[thisUrlLen - 1] == '/') ? 1 : 0;
 				if (thisIsDir == isDir) {
 					if (isDir)
-						StringStrcat(html, "<tt>[DIR] ");
+						StringCat(html, "<tt>[DIR] ");
 					else
-						StringStrcat(html, "<tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
-					StringStrcat(html, "<a href=\"");
+						StringCat(html, "<tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+					StringCat(html, "<a href=\"");
 					if (isDir) {
-						StringStrcat(html, "http://proxytrack/");
+						StringCat(html, "http://proxytrack/");
 					}
-					StringStrcat(html, url);
-					StringStrcat(html, list[i]);
-					StringStrcat(html, "\">");
-					StringStrcat(html, list[i]);
-					StringStrcat(html, "</a></tt><br />");
+					StringCat(html, url);
+					StringCat(html, list[i]);
+					StringCat(html, "\">");
+					StringCat(html, list[i]);
+					StringCat(html, "</a></tt><br />");
 				}
 			}
 		}
-		StringStrcat(html, 
+		StringCat(html, 
 			"</body>"
 			"</html>");
 		PT_Enumerate_Delete(&list);
 		elt->size = StringLength(html);
 		elt->adr = StringAcquire(&html);
-		elt->statuscode = 200;
+		elt->statuscode = HTTP_OK;
 		strcpy(elt->charset, "iso-8859-1");
 		strcpy(elt->contenttype, "text/html");
 		strcpy(elt->msg, "OK");
@@ -843,10 +815,10 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #endif
 
 	StringRoom(localhost, 256);
-	if (gethostname(StringBuff(localhost), StringCapacity(localhost) - 1) == 0) {
+	if (gethostname(StringBuffRW(localhost), (int) StringCapacity(localhost) - 1) == 0) {
 		StringLength(localhost) = (int) strlen(StringBuff(localhost));
 	} else {
-		StringStrcpy(localhost, "localhost");
+		StringCopy(localhost, "localhost");
 	}
 
 #ifdef _DEBUG
@@ -855,7 +827,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
 	if (buffer == NULL || line == NULL || line1 == NULL) {
 		CRITICAL("proxytrack_process_HTTP:memory exhausted");
-#if HTS_WIN
+#ifdef _WIN32
 		closesocket(soc_c);
 #else
 		close(soc_c);
@@ -918,7 +890,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 					char* chost = line + p;
 					if (*chost == ' ')
 						chost++;
-					StringStrcpy(host, chost);
+					StringCopy(host, chost);
 				}
 #ifndef NO_WEBDAV
 				else if ((p = strfield(line, "Depth: "))) {
@@ -935,8 +907,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 			if (length > 0) {
 				if (length < 32768) {
 					StringRoom(davRequest, length + 1);
-					if (recv(soc_c, StringBuff(davRequest), length, 0) == length) {
-						StringBuff(davRequest)[length] = 0;
+					if (recv(soc_c, StringBuffRW(davRequest), length, 0) == length) {
+						StringBuffRW(davRequest)[length] = 0;
 					} else {
 						msgCode = 500;
 						msgError = "Posted Data Read Error";
@@ -970,9 +942,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 			else if (strcasecmp(command, "options") == 0) {
 				const char * options = "GET, HEAD, OPTIONS, POST, PROPFIND, TRACE"
 					", MKCOL, DELETE, PUT";			/* Not supported */
-				msgCode = 200;
+				msgCode = HTTP_OK;
 				StringRoom(headers, 8192);
-				sprintf(StringBuff(headers), 
+				sprintf(StringBuffRW(headers), 
 					"HTTP/1.1 %d %s\r\n"
 					"DAV: 1, 2\r\n"
 					"MS-Author-Via: DAV\r\n"
@@ -1020,11 +992,10 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
 			/* Post-process request */
 			if (link_has_authority(surl)) {
-				const unsigned int prefixLen = sizeof("http://proxytrack/") - 1;
-				if (strncasecmp(surl, "http://proxytrack/", prefixLen) == 0) {
+				if (strncasecmp(surl, "http://proxytrack/", sizeof("http://proxytrack/") - 1) == 0) {
 					directHit = 1; /* Another direct hit hack */
 				}
-				StringStrcpy(url, surl);
+				StringCopy(url, surl);
 			} else {
 				if (StringLength(host) > 0) {
 					/* Direct hit */
@@ -1046,15 +1017,23 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 						}
 						/* Direct hit */
 						directHit = 1;
-						StringStrcpy(url, "");
+						StringCopy(url, "");
 						if (!link_has_authority(toHit))
-							StringStrcat(url, "http://");
-						StringStrcat(url, toHit);
+							StringCat(url, "http://");
+						StringCat(url, toHit);
+					} else if (strncasecmp(surl, "/proxytrack/", sizeof("/proxytrack/") - 1) == 0) {
+						const char * toHit = surl + sizeof("/proxytrack/") - 1;
+						/* Direct hit */
+						directHit = 1;
+						StringCopy(url, "");
+						if (!link_has_authority(toHit))
+							StringCat(url, "http://");
+						StringCat(url, toHit);
 					} else {
 						/* Transparent proxy */
-						StringStrcpy(url, "http://");
-						StringStrcat(url, StringBuff(host));
-						StringStrcat(url, surl);
+						StringCopy(url, "http://");
+						StringCat(url, StringBuff(host));
+						StringCat(url, surl);
 					}
 				} else {
 					msgCode = 500;
@@ -1073,7 +1052,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 					if ((element = proxytrack_process_DAV_Request(indexes, StringBuff(url), davDepth)) != NULL) {
 						msgCode = element->statuscode;
 						StringRoom(davHeaders, 1024);
-						sprintf(StringBuff(davHeaders), 
+						sprintf(StringBuffRW(davHeaders), 
 							"DAV: 1, 2\r\n"
 							"MS-Author-Via: DAV\r\n"
 							"Cache-Control: private\r\n");
@@ -1100,7 +1079,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 				if (element != NULL) {
 					msgCode = element->statuscode;
 					StringRoom(headers, 8192);
-					sprintf(StringBuff(headers), 
+					sprintf(StringBuffRW(headers), 
 						"HTTP/1.1 %d %s\r\n"
 #ifndef NO_WEBDAV
 						"%s"
@@ -1138,12 +1117,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 				} else {
 					/* No query string, no ending / : check the the <url>/ page */
 					if (StringLength(url) > 0 && StringBuff(url)[StringLength(url) - 1] != '/' && strchr(StringBuff(url), '?') == NULL) {
-						StringStrcpy(urlRedirect, StringBuff(url));
-						StringStrcat(urlRedirect, "/");
+						StringCopy(urlRedirect, StringBuff(url));
+						StringCat(urlRedirect, "/");
 						if (PT_LookupIndex(indexes, StringBuff(urlRedirect))) {
 							msgCode = 301;  /* Moved Permanently */
 							StringRoom(headers, 8192);
-							sprintf(StringBuff(headers),
+							sprintf(StringBuffRW(headers),
 								"HTTP/1.1 %d %s\r\n"
 								"Content-Type: text/html\r\n"
 								"Location: %s\r\n",
@@ -1155,7 +1134,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 							StringLength(headers) = (int) strlen(StringBuff(headers));
 							/* */
 							StringRoom(output, 1024 + sizeof(PROXYTRACK_COMMENT_HEADER) + sizeof(DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES));
-							sprintf(StringBuff(output), 
+							sprintf(StringBuffRW(output), 
 								"<html>"
 								PROXYTRACK_COMMENT_HEADER
 								DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
@@ -1195,14 +1174,14 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 				msgError = GetHttpMessage(msgCode);
 			}
 			StringRoom(headers, 256);
-			sprintf(StringBuff(headers), 
+			sprintf(StringBuffRW(headers), 
 				"HTTP/1.1 %d %s\r\n"
 				"Content-type: text/html\r\n",
 				msgCode,
 				msgError);
 			StringLength(headers) = (int) strlen(StringBuff(headers));
 			StringRoom(output, 1024 + sizeof(PROXYTRACK_COMMENT_HEADER) + sizeof(DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES));
-			sprintf(StringBuff(output), 
+			sprintf(StringBuffRW(output), 
 				"<html>"
 				PROXYTRACK_COMMENT_HEADER
 				DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
@@ -1225,7 +1204,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 		}
 		{
 			char tmp[20 + 1]; /* 2^64 = 18446744073709551616 */
-			unsigned int dataSize = 0;
+			size_t dataSize = 0;
 			if (!headRequest) {
 				dataSize = StringLength(output);
 				if (dataSize == 0 && element != NULL) {
@@ -1233,30 +1212,30 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 				}
 			}
 			sprintf(tmp, "%d", (int) dataSize);
-			StringStrcat(headers, "Content-length: ");
-			StringStrcat(headers, tmp);
-			StringStrcat(headers, "\r\n");
+			StringCat(headers, "Content-length: ");
+			StringCat(headers, tmp);
+			StringCat(headers, "\r\n");
 		}
 		if (keepAlive) {
-			StringStrcat(headers, 
+			StringCat(headers, 
 				"Connection: Keep-Alive\r\n"
 				"Proxy-Connection: Keep-Alive\r\n");
 		} else {
-			StringStrcat(headers, 
+			StringCat(headers, 
 				"Connection: Close\r\n"
 				"Proxy-Connection: Close\r\n");
 		}
 		if (msgCode != 500)
-			StringStrcat(headers, "X-Cache: HIT from ");
+			StringCat(headers, "X-Cache: HIT from ");
 		else
-			StringStrcat(headers, "X-Cache: MISS from ");
-		StringStrcat(headers, StringBuff(localhost));
-		StringStrcat(headers, "\r\n");
+			StringCat(headers, "X-Cache: MISS from ");
+		StringCat(headers, StringBuff(localhost));
+		StringCat(headers, "\r\n");
 
 		/* Logging */
 		{
 			const char * contentType = "text/html";
-			unsigned long int size = StringLength(output) ? StringLength(output) : ( element ? element->size : 0 );
+			size_t size = StringLength(output) ? StringLength(output) : ( element ? element->size : 0 );
 			/* */
 			String ip = STRING_EMPTY;
 			SOCaddr serverClient;
@@ -1265,7 +1244,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 			if (getsockname(soc_c, (struct sockaddr*) &serverClient, &lenServerClient) == 0) {
 				ip = getip(&serverClient, lenServerClient);
 			} else {
-				StringStrcpy(ip, "unknown");
+				StringCopy(ip, "unknown");
 			}
 			if (element != NULL && element->contenttype[0] != '\0') {
 				contentType = element->contenttype;
@@ -1275,11 +1254,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 		}
 
 		/* Send reply */
-		StringStrcat(headers, "Server: ProxyTrack " PROXYTRACK_VERSION " (HTTrack " HTTRACK_VERSIONID ")\r\n");
-		StringStrcat(headers, "\r\n");			/* Headers separator */
-		if (send(soc_c, StringBuff(headers), StringLength(headers), 0) != StringLength(headers)
-			|| ( !headRequest && StringLength(output) > 0 && send(soc_c, StringBuff(output), StringLength(output), 0) != StringLength(output))
-			|| ( !headRequest && StringLength(output) == 0 && element != NULL && element->adr != NULL && send(soc_c, element->adr, element->size, 0) != element->size)
+		StringCat(headers, "Server: ProxyTrack " PROXYTRACK_VERSION " (HTTrack " HTTRACK_VERSIONID ")\r\n");
+		StringCat(headers, "\r\n");			/* Headers separator */
+		if (send(soc_c, StringBuff(headers), (int)StringLength(headers), 0) != StringLength(headers)
+			|| ( !headRequest && StringLength(output) > 0 && send(soc_c, StringBuff(output), (int)StringLength(output), 0) != StringLength(output))
+			|| ( !headRequest && StringLength(output) == 0 && element != NULL && element->adr != NULL && send(soc_c, element->adr, (int)element->size, 0) != element->size)
 			)
 		{
 			keepAlive = 0;		/* Error, abort connection */
@@ -1298,7 +1277,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 		}
 	} while(keepAlive);
 
-#if HTS_WIN
+#ifdef _WIN32
 	closesocket(soc_c);
 #else
 	close(soc_c);
@@ -1314,19 +1293,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 		free(buffer);
 }
 
-#ifdef _WIN32
-#define PTHREAD_RETURN
-#define PTHREAD_TYPE void
-#define PTHREAD_TYPE_FNC __cdecl
-#else
-#define PTHREAD_RETURN NULL
-#define PTHREAD_TYPE void*
-#define PTHREAD_TYPE_FNC
-#endif
-
 /* Generic threaded function start */
-static int startThread(PTHREAD_TYPE (PTHREAD_TYPE_FNC * funct)(void* ),
-											 void* param) 
+static int startThread(void (*funct)(void*), void* param) 
 {
 	if (param != NULL) {
 #ifdef _WIN32
@@ -1361,14 +1329,14 @@ typedef struct proxytrack_process_th_p {
 } proxytrack_process_th_p;
 
 /* Generic socket/index function stub */
-static PTHREAD_TYPE PTHREAD_TYPE_FNC proxytrack_process_th(void* param_) {
+static void proxytrack_process_th(void* param_) {
 	proxytrack_process_th_p *param = (proxytrack_process_th_p *) param_;
 	T_SOC soc_c = param->soc_c;
 	PT_Indexes indexes = param->indexes;
 	void (*process)(PT_Indexes indexes, T_SOC soc_c) = param->process;
 	free(param);
 	process(indexes, soc_c);
-	return PTHREAD_RETURN ;
+	return ;
 }
 
 /* Process generic socket/index operation */
@@ -1400,7 +1368,7 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
 		struct sockaddr clientAddr;
 		int clientAddrLen = sizeof(struct sockaddr);
 		memset(&clientAddr, 0, sizeof(clientAddr));
-		if ( (soc_c = accept(soc, &clientAddr, &clientAddrLen)) != INVALID_SOCKET) {
+		if ( (soc_c = (T_SOC) accept(soc, &clientAddr, &clientAddrLen)) != INVALID_SOCKET) {
 			if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
 				CRITICAL("proxytrack_start_HTTP::Can not fork a thread");
 			}
@@ -1587,7 +1555,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 				if (lenServerClient > 0) {
 					ip = getip(&serverClient, lenServerClient);
 				} else {
-					StringStrcpy(ip, "unknown");
+					StringCopy(ip, "unknown");
 				}
 				LOG("ICP %s %s/%s %s" _ StringBuff(ip) _ LogRequest _ LogReply _ (UrlRequest ? UrlRequest : "-") );
 				StringFree(ip);

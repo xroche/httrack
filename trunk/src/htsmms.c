@@ -47,9 +47,7 @@ Please visit our Website: http://www.httrack.com
 
 #if HTS_USEMMS
 
-#include "htsbase.h"
-#include "htsnet.h"
-#include "htsthread.h"
+#include "htscore.h"
 
 #include "htsmms.h"
 #include "mmsrip/mms.h"
@@ -57,10 +55,10 @@ Please visit our Website: http://www.httrack.com
 #define FTP_STATUS_READY 1001
 
 static int run_launch_mms(MMSDownloadStruct* back);
-static PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_mms( void* pP ) {
+static void back_launch_mms( void* pP ) {
 	MMSDownloadStruct *pStruct = (MMSDownloadStruct*)pP;
   if (pStruct == NULL)
-    return PTHREAD_RETURN;
+    return ;
 
 	/* Initialize */ 
 	hts_init();
@@ -79,7 +77,7 @@ static PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_mms( void* pP ) {
 
 	/* Uninitialize */
   hts_uninit();
-  return PTHREAD_RETURN;
+  return ;
 }
 
 /* download cancelled */
@@ -96,7 +94,7 @@ static int stop_mms(lien_back* back) {
 void launch_mms(const MMSDownloadStruct* pStruct) {
 	MMSDownloadStruct *pCopy = calloc(sizeof(MMSDownloadStruct), 1);
 	memcpy(pCopy, pStruct, sizeof(*pCopy));
-  (void) hts_newthread(back_launch_mms, 0, (void*) pCopy);
+  hts_newthread(back_launch_mms, (void*) pCopy);
 }
 
 /* Code mainly written by Nicolas BENOIT */
@@ -105,6 +103,8 @@ static int run_launch_mms(MMSDownloadStruct* pStruct) {
 	httrackp* opt = pStruct->pOpt;
 	/* */
 	char url[HTS_URLMAXSIZE*2];
+	char catbuff[CATBUFF_SIZE];
+	char catbuff2[CATBUFF_SIZE];
   MMS *mms;
   FILE *f;
   ssize_t len_written;
@@ -112,25 +112,25 @@ static int run_launch_mms(MMSDownloadStruct* pStruct) {
 	int delay = opt->mms_maxtime;
 	time_t end = time(NULL) + delay;
 	short checkPending = 0;
-	INTsys existingSize = fsize(back->url_sav);
+	ssize_t existingSize = fsize(back->url_sav);
 
 	// effacer
 	strcpybuff(back->r.msg,"");
-	back->status=1000;
-	back->r.statuscode=200;
+	back->status=STATUS_FTP_TRANSFER;
+	back->r.statuscode=HTTP_OK;
 	back->r.size=0;
 
 	/* Create file */
 	if (existingSize > 0) {
 		/* back->r.out = fileappend(back->url_sav);
 		*/
-		(void) unlink(fconcat(back->url_sav, ".old"));
-		if (rename(fconcat(back->url_sav, ""), fconcat(back->url_sav, ".old")) == 0) {
+		(void) unlink(fconcat(catbuff,back->url_sav, ".old"));
+		if (rename(fconcat(catbuff,back->url_sav, ""), fconcat(catbuff2,back->url_sav, ".old")) == 0) {
 			checkPending = 1;
 		}
-		back->r.out = filecreate(back->url_sav);
+		back->r.out = filecreate(&pStruct->pOpt->state.strc, back->url_sav);
 	} else {
-		back->r.out = filecreate(back->url_sav);
+		back->r.out = filecreate(&pStruct->pOpt->state.strc, back->url_sav);
 	}
 	if ((f = back->r.out) != NULL) {
 		// create mms resource
@@ -151,18 +151,18 @@ static int run_launch_mms(MMSDownloadStruct* pStruct) {
 							{
 								fclose(back->r.out);
 								f = back->r.out = NULL;
-								if (unlink(fconcat(back->url_sav, "")) == 0 
-									&& rename(fconcat(back->url_sav, ".old"), fconcat(back->url_sav, "")) == 0) 
+								if (unlink(fconcat(catbuff, back->url_sav, "")) == 0 
+									&& rename(fconcat(catbuff, back->url_sav, ".old"), fconcat(catbuff2, back->url_sav, "")) == 0) 
 								{
 									back->r.notmodified = 1;
-									back->r.statuscode = 200;
+									back->r.statuscode = HTTP_OK;
 									strcpybuff(back->r.msg, "Not modified");
 								} else {
-									back->r.statuscode = 500;
+									back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 									strcpybuff(back->r.msg, "Unable to rename previous file (not updated)");
 								}
 							} else {
-								(void) unlink(fconcat(back->url_sav, ".old"));
+								(void) unlink(fconcat(catbuff, back->url_sav, ".old"));
 							}
 						}
 
@@ -180,8 +180,7 @@ static int run_launch_mms(MMSDownloadStruct* pStruct) {
 								if ( len_written == 0 ) {
 									break;
 								} else if ( len_written == -1 ) {
-									back->r.statuscode = -1;
-									back->r.statuscode = 500;
+									back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 									strcpybuff(back->r.msg, "Unable to write stream data");
 									break;
 								}
@@ -194,50 +193,38 @@ static int run_launch_mms(MMSDownloadStruct* pStruct) {
 
 								if ( delay != 0 && end <= time(NULL) ) {
 									delay = -1;
-									back->r.statuscode = 200;
+									back->r.statuscode = HTTP_OK;
 									strcpybuff(back->r.msg, "Download interrupted");
 									break;
 								}
 							}		// while
 
-							back->r.statuscode = 0;			/* Finished */
+							back->r.statuscode = HTTP_OK;			/* Finished */
 						} else if (f != NULL) {
-							back->r.statuscode = -1;
-							back->r.statuscode = 500;
+							back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 							strcpybuff(back->r.msg, "Can not begin ripping");
 						}
 					} else {
-						back->r.statuscode = -1;
-						back->r.statuscode = 500;
+						back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 						strcpybuff(back->r.msg, "Can not write stream header");
 					}
 				} else {
-					back->r.statuscode = -1;
-					back->r.statuscode = 500;
+					back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 					strcpybuff(back->r.msg, "Can not handshake");
 				}
 				mms_disconnect ( mms );
 			} else {
-				back->r.statuscode = -1;
-				back->r.statuscode = 500;
+				back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 				strcpybuff(back->r.msg, "Can not connect");
 			}
 			mms_destroy ( mms );
 		} else {
-			back->r.statuscode = -1;
-			back->r.statuscode = 500;
+			back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 			strcpybuff(back->r.msg, "Can not create mms resource");
 		}
 	} else {
-		back->r.statuscode = -1;
-		back->r.statuscode = 500;
+		back->r.statuscode = HTTP_INTERNAL_SERVER_ERROR;
 		strcpybuff(back->r.msg, "Unable to open local output file");
-	}
-
-	// End
-	if (back->r.statuscode != -1) {
-		back->r.statuscode=200;
-		strcpybuff(back->r.msg, "OK");
 	}
 	return 0;
 }

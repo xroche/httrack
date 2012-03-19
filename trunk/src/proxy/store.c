@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 Please visit our Website: http://www.httrack.com
 */
 
+/* Parts (inside ARC format routines) by Lars Clausen (lc@statsbiblioteket.dk) */
+
 /* ------------------------------------------------------------ */
 /* File: Cache manager for ProxyTrack                           */
 /* Author: Xavier Roche                                         */
@@ -28,6 +30,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Locking */
 #ifdef _WIN32
@@ -40,8 +43,10 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_INTERNAL_BYTECODE
 #include "htsinthash.h"
+#include "htsmd5.h"
 #undef HTS_INTERNAL_BYTECODE
 #include "../minizip/mztools.h"
+#include "../minizip/zip.h"
 
 #include "htscore.h"
 #include "htsback.h"
@@ -58,6 +63,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index, const char* url, int flags
 static int PT_LookupCache__Old_u(PT_Index index, const char* url);
 static PT_Element PT_ReadCache__Old_u(PT_Index index, const char* url, int flags);
 
+static int PT_LookupCache__Arc_u(PT_Index index, const char* url);
+static PT_Element PT_ReadCache__Arc_u(PT_Index index, const char* url, int flags);
 
 /* Locking */
 
@@ -100,10 +107,12 @@ void MutexFree(PT_Mutex *pMutex) {
 
 typedef struct _PT_Index__New _PT_Index__New;
 typedef struct _PT_Index__Old _PT_Index__Old;
+typedef struct _PT_Index__Arc _PT_Index__Arc;
 typedef struct _PT_Index_Functions _PT_Index_Functions;
 
 typedef struct _PT_Index__New *PT_Index__New;
 typedef struct _PT_Index__Old *PT_Index__Old;
+typedef struct _PT_Index__Arc *PT_Index__Arc;
 typedef struct _PT_Index_Functions *PT_Index_Functions;
 
 enum {
@@ -111,29 +120,42 @@ enum {
 	PT_CACHE_MIN = 0,
 	PT_CACHE__NEW = PT_CACHE_MIN,
 	PT_CACHE__OLD,
-	PT_CACHE_MAX = PT_CACHE__OLD
+	PT_CACHE__ARC,
+	PT_CACHE_MAX = PT_CACHE__ARC
 };
 
 static int PT_LoadCache__New(PT_Index index, const char *filename);
 static void PT_Index_Delete__New(PT_Index *pindex);
 static PT_Element PT_ReadCache__New(PT_Index index, const char* url, int flags);
 static int PT_LookupCache__New(PT_Index index, const char* url);
+static int PT_SaveCache__New(PT_Indexes indexes, const char *filename);
 /**/
 static int PT_LoadCache__Old(PT_Index index, const char *filename);
 static void PT_Index_Delete__Old(PT_Index *pindex);
 static PT_Element PT_ReadCache__Old(PT_Index index, const char* url, int flags);
 static int PT_LookupCache__Old(PT_Index index, const char* url);
+/**/
+static int PT_LoadCache__Arc(PT_Index index, const char *filename);
+static void PT_Index_Delete__Arc(PT_Index *pindex);
+static PT_Element PT_ReadCache__Arc(PT_Index index, const char* url, int flags);
+static int PT_LookupCache__Arc(PT_Index index, const char* url);
+static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename);
 
 struct _PT_Index_Functions {
+	/* Mandatory services */
 	int (*PT_LoadCache)(PT_Index index, const char *filename);
 	void (*PT_Index_Delete)(PT_Index *pindex);
 	PT_Element (*PT_ReadCache)(PT_Index index, const char* url, int flags);
 	int (*PT_LookupCache)(PT_Index index, const char* url);
+
+	/* Optional services */
+	int (*PT_SaveCache)(PT_Indexes indexes, const char *filename);
 };
 
 static _PT_Index_Functions _IndexFuncts[] = {
-  { PT_LoadCache__New, PT_Index_Delete__New, PT_ReadCache__New, PT_LookupCache__New },
-  { PT_LoadCache__Old, PT_Index_Delete__Old, PT_ReadCache__Old, PT_LookupCache__Old },
+  { PT_LoadCache__New, PT_Index_Delete__New, PT_ReadCache__New, PT_LookupCache__New, PT_SaveCache__New },
+  { PT_LoadCache__Old, PT_Index_Delete__Old, PT_ReadCache__Old, PT_LookupCache__Old, NULL },
+  { PT_LoadCache__Arc, PT_Index_Delete__Arc, PT_ReadCache__Arc, PT_LookupCache__Arc, PT_SaveCache__Arc },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -164,11 +186,22 @@ struct _PT_Index__Old {
 	int safeCache;
 };
 
+struct _PT_Index__Arc {
+	PT_INDEX_COMMON_STRUCTURE;
+	FILE *file;
+	PT_Mutex fileLock;
+	int version;
+	char lastmodified[1024];
+	char line[2048];
+	char filenameIndexBuff[2048];
+};
+
 struct _PT_Index {
 	int type;
 	union {
 		_PT_Index__New formatNew;
 		_PT_Index__Old formatOld;
+		_PT_Index__Arc formatArc;
 		struct {
 			PT_INDEX_COMMON_STRUCTURE;
 		} common;
@@ -194,7 +227,7 @@ struct _PT_Cache {
 	int count;
 };
 
-PT_Indexes PT_New() {
+PT_Indexes PT_New(void) {
 	PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
 	index->cil = inthash_new(127);
 	index->index_size = 0;
@@ -301,6 +334,16 @@ static void PT_Index_Delete__Old(PT_Index *pindex) {
 	}
 }
 
+static void PT_Index_Delete__Arc(PT_Index *pindex) {
+	if (pindex != NULL && (*pindex) != NULL) {
+		PT_Index__Arc index = &(*pindex)->slots.formatArc;
+		if (index->file != NULL) {
+			fclose(index->file);
+		}
+		MutexFree(&index->fileLock);
+	}
+}
+
 int PT_AddIndex(PT_Indexes indexes, const char *path) {
 	PT_Index index = PT_LoadCache(path);
 	if (index != NULL) {
@@ -319,7 +362,7 @@ PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes) {
 		int i;
 		String html = STRING_EMPTY;
 		StringClear(html);
-		StringStrcat(html, 
+		StringCat(html, 
 			"<html>"
 			PROXYTRACK_COMMENT_HEADER
 			DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
@@ -330,26 +373,26 @@ PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes) {
 			"<h3>Available sites in this cache:</h3><br />"
 			"<br />"
 			);
-		StringStrcat(html, "<ul>\r\n");
+		StringCat(html, "<ul>\r\n");
 		for(i = 0 ; i < indexes->index_size ; i++) {
 			if (indexes->index[i] != NULL
 				&& indexes->index[i]->slots.common.startUrl[0] != '\0')
 			{
 				const char * url = indexes->index[i]->slots.common.startUrl;
-				StringStrcat(html, "<li>\r\n");
-				StringStrcat(html, "<a href=\"");
-				StringStrcat(html, url);
-				StringStrcat(html, "\">");
-				StringStrcat(html, url);
-				StringStrcat(html, "</a>\r\n");
-				StringStrcat(html, "</li>\r\n");
+				StringCat(html, "<li>\r\n");
+				StringCat(html, "<a href=\"");
+				StringCat(html, url);
+				StringCat(html, "\">");
+				StringCat(html, url);
+				StringCat(html, "</a>\r\n");
+				StringCat(html, "</li>\r\n");
 			}
 		}
-		StringStrcat(html, "</ul>\r\n");
-		StringStrcat(html, "</body></html>\r\n");
+		StringCat(html, "</ul>\r\n");
+		StringCat(html, "</body></html>\r\n");
 		elt->size = StringLength(html);
 		elt->adr = StringAcquire(&html);
-		elt->statuscode = 200;
+		elt->statuscode = HTTP_OK;
 		strcpy(elt->charset, "iso-8859-1");
 		strcpy(elt->contenttype, "text/html");
 		strcpy(elt->msg, "OK");
@@ -404,9 +447,9 @@ char ** PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 								char* ptr = NULL;
 								ptr += StringLength(list);
 								if (len > 0)
-									StringStrcat(list, StringBuff(subitem));
+									StringCat(list, StringBuff(subitem));
 								if (isFolder)
-									StringStrcat(list, "/");
+									StringCat(list, "/");
 								StringMemcat(list, "\0", 1);		/* NULL terminated strings */
 								StringMemcat(listindexes, &ptr, sizeof(ptr));
 								listCount++;
@@ -434,7 +477,7 @@ char ** PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 			StringMemcat(listindexes, StringBuff(list), StringLength(list));
 			/* ---- no reallocation beyond this point (fixed addresses) ---- */
 			/* start of all strings (pointer) */
-			startStrings = (startStrings - nullPointer) + StringBuff(listindexes);
+			startStrings = (startStrings - nullPointer) + StringBuffRW(listindexes);
 			/* transform indexes into references */
 			for(i = 0 ; i < listCount ; i++) {
 				char *ptr = NULL;
@@ -442,7 +485,7 @@ char ** PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 				memcpy(&ptr, &StringBuff(listindexes)[i*sizeof(char*)], sizeof(char*));
 				ndx = (unsigned int) (ptr - nullPointer);
 				ptr = startStrings + ndx;
-				memcpy(&StringBuff(listindexes)[i*sizeof(char*)], &ptr, sizeof(char*));
+				memcpy(&StringBuffRW(listindexes)[i*sizeof(char*)], &ptr, sizeof(char*));
 			}
 			blk = StringAcquire(&listindexes);
 			StringFree(list);
@@ -460,16 +503,22 @@ void PT_Enumerate_Delete(char ***plist) {
 	}
 }
 
-PT_Index PT_LoadCache(const char *filename) {
-	int type = PT_CACHE_UNDEFINED;
+static int PT_GetType(const char *filename) {
 	char * dot = strrchr(filename, '.');
 	if (dot != NULL) {
 		if (strcasecmp(dot, ".zip") == 0) {
-			type = PT_CACHE__NEW;
+			return PT_CACHE__NEW;
 		} else if (strcasecmp(dot, ".ndx") == 0 || strcasecmp(dot, ".dat") == 0) {
-			type = PT_CACHE__OLD;
+			return PT_CACHE__OLD;
+		} else if (strcasecmp(dot, ".arc") == 0) {
+			return PT_CACHE__ARC;
 		}
 	}
+	return PT_CACHE_UNDEFINED;
+}
+
+PT_Index PT_LoadCache(const char *filename) {
+	int type = PT_GetType(filename);
 	if (type != PT_CACHE_UNDEFINED) {
 		PT_Index index = calloc(sizeof(_PT_Index), 1);
 		if (index != NULL) {
@@ -524,6 +573,44 @@ int PT_LookupCache(PT_Index index, const char* url) {
 	return 0;
 }
 
+int PT_SaveCache(PT_Indexes indexes, const char *filename) {
+	int type = PT_GetType(filename);
+	if (type != PT_CACHE_UNDEFINED) {
+		if (_IndexFuncts[type].PT_SaveCache != NULL) {
+			int ret = _IndexFuncts[type].PT_SaveCache(indexes, filename);
+			if (ret == 0) {
+				(void) set_filetime_time_t(filename, PT_GetTimeIndex(indexes));
+				return 0;
+			}
+		}
+	}
+	return -1;
+}
+
+int PT_EnumCache(PT_Indexes indexes, int (*callback)(void *, const char *url, PT_Element), void *arg) {
+	if (indexes != NULL && indexes->cil != NULL) {
+		struct_inthash_enum en = inthash_enum_new(indexes->cil);
+		inthash_chain* chain;
+		while((chain = inthash_enum_next(&en))) {
+			const long int index_id = (long int)chain->value.intg;
+			const char *const url = chain->name;
+			if (index_id >= 0 && index_id <= indexes->index_size) {
+				PT_Element item =  PT_ReadCache(indexes->index[index_id], url, FETCH_HEADERS | FETCH_BODY);
+				if (item != NULL) {
+					int ret = callback(arg, url, item);
+					PT_Element_Delete(&item);
+					if (ret != 0)
+						return ret;
+				}
+			} else {
+				CRITICAL("PT_ReadCache:Corrupted central index locator");
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
 time_t PT_Index_Timestamp(PT_Index index) {
 	return index->slots.common.timestamp;
 }
@@ -569,8 +656,8 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex)
 			while((chain = inthash_enum_next(&en)) != NULL) {
 				const char * url = chain->name;
 				if (url != NULL && url[0] != '\0') {
-					long int previous_index_id = 0;
-					if (inthash_read(indexes->cil, url, (long int*)&previous_index_id)) {
+					intptr_t previous_index_id = 0;
+					if (inthash_read(indexes->cil, url, &previous_index_id)) {
 						if (previous_index_id >= 0 && previous_index_id < indexes->index_size) {
 							if (indexes->index[previous_index_id]->slots.common.timestamp > index->slots.common.timestamp)			// existing entry is newer
 								break;
@@ -616,14 +703,14 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char* url, int flags)
 {
 	if (indexes != NULL) 
 	{
-		long int index_id;
+		intptr_t index_id;
 		if (strncmp(url, "http://", 7) == 0)
 			url += 7;
 		if (inthash_read(indexes->cil, url, &index_id)) {
 			if (index_id >= 0 && index_id <= indexes->index_size) {
 				PT_Element item =  PT_ReadCache(indexes->index[index_id], url, flags);
 				if (item != NULL) {
-					item->indexId = index_id;
+					item->indexId = (int) index_id;
 					return item;
 				}
 			} else {
@@ -637,7 +724,7 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char* url, int flags)
 int PT_LookupIndex(PT_Indexes indexes, const char* url) {
 	if (indexes != NULL) 
 	{
-		long int index_id;
+		intptr_t index_id;
 		if (strncmp(url, "http://", 7) == 0)
 			url += 7;
 		if (inthash_read(indexes->cil, url, &index_id)) {
@@ -651,6 +738,22 @@ int PT_LookupIndex(PT_Indexes indexes, const char* url) {
 	return 0;
 }
 
+time_t PT_GetTimeIndex(PT_Indexes indexes) {
+	if (indexes != NULL && indexes->index_size > 0) 
+	{
+		int i;
+		time_t maxt = indexes->index[0]->slots.common.timestamp;
+		for(i = 1 ; i < indexes->index_size ; i++) {
+			const time_t currt = indexes->index[i]->slots.common.timestamp;
+			if (currt > maxt) {
+				maxt = currt;
+			}
+		}
+		return maxt;
+	}
+	return (time_t) -1;
+}
+
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId) {
 	if (indexes != NULL && indexId >= 0 && indexId < indexes->index_size) 
 	{
@@ -659,7 +762,7 @@ PT_Index PT_GetIndex(PT_Indexes indexes, int indexId) {
 	return NULL;
 }
 
-PT_Element PT_ElementNew() {
+PT_Element PT_ElementNew(void) {
 	PT_Element r = NULL;
 	if ((r = calloc(sizeof(_PT_Element), 1)) == NULL)
 		return NULL;
@@ -690,6 +793,22 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char* url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
+#define ZIP_FIELD_STRING(headers, headersSize, field, value) do { \
+  if ( (value != NULL) && (value)[0] != '\0') { \
+    sprintf(headers + headersSize, "%s: %s\r\n", field, (value != NULL) ? (value) : ""); \
+    (headersSize) += (int) strlen(headers + headersSize); \
+  } \
+} while(0)
+#define ZIP_FIELD_INT(headers, headersSize, field, value) do { \
+  if ( (value != 0) ) { \
+    sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
+    (headersSize) += (int) strlen(headers + headersSize); \
+  } \
+} while(0)
+#define ZIP_FIELD_INT_FORCE(headers, headersSize, field, value) do { \
+  sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
+  (headersSize) += (int) strlen(headers + headersSize); \
+} while(0)
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     strcpy(refvalue, value); \
@@ -821,7 +940,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
   char location_default[HTS_URLMAXSIZE*2];
   char previous_save[HTS_URLMAXSIZE*2];
   char previous_save_[HTS_URLMAXSIZE*2];
-  long int hash_pos;
+	char catbuff[CATBUFF_SIZE];
+  intptr_t hash_pos;
   int hash_pos_return;
 	PT_Element r = NULL;
 	if (index == NULL || index->hash == NULL || index->zFile == NULL || url == NULL || *url == 0)
@@ -835,7 +955,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 	strcpy(r->location, ""); 
 	if (strncmp(url, "http://", 7) == 0)
 		url += 7;
-  hash_pos_return = inthash_read(index->hash, url, (long int*)&hash_pos);
+  hash_pos_return = inthash_read(index->hash, url, &hash_pos);
 
   if (hash_pos_return) {
     uLong posInZip;
@@ -888,6 +1008,16 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
               //ZIP_READFIELD_STRING(line, value, "X-Addr", ..);            // Original address
               //ZIP_READFIELD_STRING(line, value, "X-Fil", ..);            // Original URI filename
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);           // Original save filename
+							if (line[0] != '\0') {
+								int len = r->headers ? ((int) strlen(r->headers)) : 0;
+								int nlen = (int) ( strlen(line) + 2 + strlen(value) + sizeof("\r\n") + 1 );
+								r->headers = realloc(r->headers, len + nlen);
+								r->headers[len] = '\0';
+								strcat(r->headers, line);
+								strcat(r->headers, ": ");
+								strcat(r->headers, value);
+								strcat(r->headers, "\r\n");
+							}
             }
           } while(offset < readSizeHeader && !lineEof);
           totalHeader = offset;
@@ -955,13 +1085,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 								/* Read in memory from cache */
 								if (flags & FETCH_BODY) {
 									if (strnotempty(previous_save)) {
-										FILE* fp = fopen(fconv(previous_save), "rb");
+										FILE* fp = fopen(fconv(catbuff,previous_save), "rb");
 										if (fp != NULL) {
 											r->adr = (char*) malloc(r->size + 4);
 											if (r->adr != NULL) {
 												if (r->size > 0 && fread(r->adr, 1,  r->size, fp) != r->size) {
+                          int last_errno = errno;
 													r->statuscode=STATUSCODE_INVALID;
-													sprintf(r->msg,"Read error in cache disk data: %s", strerror(errno));
+													sprintf(r->msg,"Read error in cache disk data: %s", strerror(last_errno));
 												}
 											} else {
 												r->statuscode=STATUSCODE_INVALID;
@@ -970,7 +1101,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 											fclose(fp);
 										} else {
 											r->statuscode=STATUSCODE_INVALID;
-											sprintf(r->msg, "Read error (can't open '%s') from cache", fconv(previous_save));
+											sprintf(r->msg, "Read error (can't open '%s') from cache", fconv(catbuff,previous_save));
 										}
 									} else {
 										r->statuscode=STATUSCODE_INVALID;
@@ -982,7 +1113,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 								if (flags & FETCH_BODY) {
 									r->adr=(char*) malloc(r->size+1);
 									if (r->adr!=NULL) {
-										if (unzReadCurrentFile(index->zFile, r->adr, r->size) != r->size) {  // erreur
+										if (unzReadCurrentFile(index->zFile, r->adr, (unsigned int) r->size) != r->size) {  // erreur
 											free(r->adr);
 											r->adr=NULL;
 											r->statuscode=STATUSCODE_INVALID;
@@ -1023,6 +1154,121 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 	}
   return r;
 }
+
+static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element) {
+	zipFile zFileOut = (zipFile) arg;
+	char headers[8192];
+  int headersSize;
+  zip_fileinfo fi;
+	int zErr;
+	const char *url_adr = "";
+	const char *url_fil = "";
+
+  headers[0] = '\0';
+  headersSize = 0;
+
+  /* Fields */
+  headers[0] = '\0';
+  headersSize = 0;
+  /* */
+  {
+    char* message;
+    if (strlen(element->msg) < 32) {
+      message = element->msg;
+    } else {
+      message = "(See X-StatusMessage)";
+    }
+    /* 64 characters MAX for first line */
+		sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', element->statuscode, element->msg);
+  }
+  headersSize += (int) strlen(headers + headersSize);
+
+  /* Second line MUST ALWAYS be X-In-Cache */
+  ZIP_FIELD_INT_FORCE(headers, headersSize, "X-In-Cache", 1);
+  ZIP_FIELD_INT(headers, headersSize, "X-StatusCode", element->statuscode);
+  ZIP_FIELD_STRING(headers, headersSize, "X-StatusMessage", element->msg);
+  ZIP_FIELD_INT(headers, headersSize, "X-Size", element->size);           // size
+  ZIP_FIELD_STRING(headers, headersSize, "Content-Type", element->contenttype);      // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, "X-Charset", element->charset);          // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, "Last-Modified", element->lastmodified);     // last-modified
+  ZIP_FIELD_STRING(headers, headersSize, "Etag", element->etag);             // Etag
+  ZIP_FIELD_STRING(headers, headersSize, "Location", element->location);         // 'location' pour moved
+  ZIP_FIELD_STRING(headers, headersSize, "Content-Disposition", element->cdispo);           // Content-disposition
+  ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);            // Original address
+  ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);            // Original URI filename
+  ZIP_FIELD_STRING(headers, headersSize, "X-Save", "");           // Original save filename
+  
+  /* Time */
+  memset(&fi, 0, sizeof(fi));
+  if (element->lastmodified[0] != '\0') {
+		struct tm buffer;
+    struct tm* tm_s = convert_time_rfc822(&buffer, element->lastmodified);
+    if (tm_s) {
+      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
+      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
+      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
+      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
+      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
+      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
+    }
+  }
+
+  /* Open file - NOTE: headers in "comment" */
+  if ((zErr = zipOpenNewFileInZip(zFileOut,
+    url,
+    &fi,
+    /* 
+    Store headers in realtime in the local file directory as extra field
+    In case of crash, we'll be able to recover the whole ZIP file by rescanning it
+    */
+    headers,
+    (uInt) strlen(headers),
+    NULL,
+    0,
+    NULL, /* comment */
+    Z_DEFLATED,
+    Z_DEFAULT_COMPRESSION)) != Z_OK)
+  {
+    int zip_zipOpenNewFileInZip_failed = 0;
+    assertf(zip_zipOpenNewFileInZip_failed);
+  }
+  
+	/* Write data in cache */
+	if (element->size > 0 && element->adr != NULL) {
+		if ((zErr = zipWriteInFileInZip(zFileOut, element->adr, (int) element->size)) != Z_OK) {
+			int zip_zipWriteInFileInZip_failed = 0;
+			assertf(zip_zipWriteInFileInZip_failed);
+		}
+	}
+
+	/* Close */
+	if ((zErr = zipCloseFileInZip(zFileOut)) != Z_OK) {
+		int zip_zipCloseFileInZip_failed = 0;
+    assertf(zip_zipCloseFileInZip_failed);
+  }
+
+  /* Flush */
+  if ((zErr = zipFlush(zFileOut)) != 0) {
+    int zip_zipFlush_failed = 0;
+    assertf(zip_zipFlush_failed);
+  }
+
+	return 0;
+}
+
+static int PT_SaveCache__New(PT_Indexes indexes, const char *filename) {
+	zipFile zFileOut = zipOpen(filename, 0);
+	if (zFileOut != NULL) {
+		int ret = PT_EnumCache(indexes, PT_SaveCache__New_Fun, (void *) zFileOut);
+    zipClose(zFileOut, "Created by HTTrack Website Copier/ProxyTrack "PROXYTRACK_VERSION);
+		zFileOut = NULL;
+		if (ret != 0)
+			(void) unlink(filename);
+		return ret;
+	}
+	return -1;
+}
+
 
 
 /* ------------------------------------------------------------ */
@@ -1167,7 +1413,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 					/* */
 				} else {              // Vieille version du cache
 					/* */
-					// fspc(opt->log,"warning"); fprintf(opt->log,"Cache: importing old cache format"LF);
+					// HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: importing old cache format"LF);
 					cache->version=0;        // cache 1.0
 					strcpy(cache->lastmodified,firstline); 
 				}
@@ -1257,7 +1503,7 @@ static PT_Element PT_ReadCache__Old(PT_Index index, const char* url, int flags) 
 
 static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char* url, int flags) {
 	PT_Index__Old cache = (PT_Index__Old) &index_->slots.formatOld;
-  long int hash_pos;
+  intptr_t hash_pos;
   int hash_pos_return;
   char location_default[HTS_URLMAXSIZE*2];
   char previous_save[HTS_URLMAXSIZE*2];
@@ -1276,7 +1522,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char* url, int flag
 	strcpy(r->location, ""); 
 	if (strncmp(url, "http://", 7) == 0)
 		url += 7;
-  hash_pos_return=inthash_read(cache->hash, url, (long int*)&hash_pos);
+  hash_pos_return=inthash_read(cache->hash, url, &hash_pos);
 
   if (hash_pos_return) {
     int pos = (int) hash_pos;     /* simply */
@@ -1325,10 +1571,12 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char* url, int flag
       } else {
         char check[256];
         unsigned long size_read;
+        unsigned long int size_;
         check[0]='\0';
         //
         cache_rint(cache->dat,&r->statuscode);
-        cache_rLLint(cache->dat,&r->size);
+        cache_rLLint(cache->dat,&size_);
+        r->size = (size_t) size_;
         cache_rstr(cache->dat,r->msg);
         cache_rstr(cache->dat,r->contenttype);
         if (cache->version >= 3)
@@ -1503,3 +1751,497 @@ static int PT_LookupCache__Old_u(PT_Index index_, const char* url) {
 	return 0;
 }
 
+
+/* ------------------------------------------------------------ */
+/* Internet Archive Arc 1.0 (arc) format                        */
+/* Xavier Roche (roche@httrack.com)                             */
+/* Lars Clausen (lc@statsbiblioteket.dk)                        */
+/* ------------------------------------------------------------ */
+
+#define ARC_SP ' '
+
+static const char* getArcField(const char *line, int pos) {
+	int i;
+	for(i = 0 ; line[i] != '\0' && pos > 0 ; i++) {
+		if (line[i] == ARC_SP)
+			pos--;
+	}
+	if (pos == 0)
+		return &line[i];
+	return NULL;
+}
+
+static char* copyArcField(const char *line, int npos, char *dest, int destMax) {
+	const char *pos;
+	if ((pos = getArcField(line, npos)) != NULL) {
+		int i;
+		for(i = 0 ; pos[i] != '\0' && pos[i] != ARC_SP && ( --destMax ) > 0; i++) {
+			dest[i] = pos[i];
+		}
+		dest[i] = 0;
+		return dest;
+	}
+	dest[0] = 0;
+	return NULL;
+}
+
+static int getArcLength(const char *line) {
+	const char *pos;
+	if ((pos = getArcField(line, 9)) != NULL 
+		|| (pos = getArcField(line, 4)) != NULL 
+		|| (pos = getArcField(line, 2)) != NULL
+		) {
+		int length;
+		if (sscanf(pos, "%d", &length) == 1) {
+			return length;
+		}
+	}
+	return -1;
+}
+
+static int skipArcNl(FILE* file) {
+	if (fgetc(file) == 0x0a) {
+		return 0;
+	}
+	return -1;
+}
+
+static int skipArcData(FILE* file, const char *line) {
+	int jump = getArcLength(line);
+	if (jump != -1) {
+		if (fseek(file, jump, SEEK_CUR) == 0 /* && skipArcNl(file) == 0 */) {
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static int getDigit(const char digit) {
+	return (int) ( digit - '0' );
+}
+
+static int getDigit2(const char * const pos) {
+	return getDigit(pos[0])*10 + getDigit(pos[1]);
+}
+
+static int getDigit4(const char * const pos) {
+	return getDigit(pos[0])*1000 + getDigit(pos[1])*100 + getDigit(pos[2])*10 + getDigit(pos[3]);
+}
+
+static time_t getGMT(struct tm *tm) {		/* hey, time_t is local! */
+	time_t t = mktime(tm);
+	if (t != (time_t) -1 && t != (time_t) 0) {
+    /* BSD does not have static "timezone" declared */
+#if (defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
+    time_t now = time(NULL); 
+    time_t timezone = - localtime(&now)->tm_gmtoff;
+#endif
+		return (time_t) (t - timezone);
+	}
+	return (time_t) -1;
+}
+
+static time_t getArcTimestamp(const char * const line) {
+	const char *pos;
+	if ((pos = getArcField(line, 2)) != NULL) {
+		int i;
+		/* date == YYYYMMDDhhmmss (Greenwich Mean Time) */
+		/* example: 20050405154029  */
+		for(i = 0 ; pos[i] >= '0' && pos[i] <= '9' ; i++);
+		if (i == 14) {
+			struct tm tm;
+			memset(&tm, 0, sizeof(tm));
+			tm.tm_year = getDigit4(pos + 0) - 1900;	/* current year minus 1900 */
+			tm.tm_mon =  getDigit2(pos + 4) - 1;		/* 0 – 11 */
+			tm.tm_mday = getDigit2(pos + 6);				/* 1 – 31 */
+			tm.tm_hour = getDigit2(pos + 8);				/* 0 – 23 */
+			tm.tm_min =  getDigit2(pos + 10);				/* 0 – 59 */
+			tm.tm_sec =  getDigit2(pos + 12);				/* 0 – 59 */
+			tm.tm_isdst = 0;
+			return getGMT(&tm);
+		}
+	}
+	return (time_t) -1;
+}
+
+static int readArcURLRecord(PT_Index__Arc index) {
+	index->line[0] = '\0';
+	if (linput(index->file, index->line, sizeof(index->line) - 1)) {
+		return 0;
+	}
+	return -1;
+}
+
+#define str_begins(str, sstr) ( strncmp(str, sstr, sizeof(sstr) - 1) == 0 )
+static int PT_CompatibleScheme(const char *url) {
+	return (str_begins(url, "http:") 
+		|| str_begins(url, "https:") 
+		|| str_begins(url, "ftp:") 
+		|| str_begins(url, "file:"));
+}
+
+int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
+	if (index_ != NULL && filename != NULL) {
+		PT_Index__Arc index = &index_->slots.formatArc;
+		index->timestamp = file_timestamp(filename);
+		MutexInit(&index->fileLock);
+		index->file = fopen(filename, "rb");
+
+		// Opened ?
+		if (index->file != NULL) {
+			inthash hashtable = index->hash;
+			if (readArcURLRecord(index) == 0) {
+				int entries = 0;
+				/* Read first line */
+				if (strncmp(index->line, "filedesc://", sizeof("filedesc://") - 1) != 0) {
+					fprintf(stderr, "Unexpected bad signature #%s"LF, index->line);
+					fclose(index->file);
+					index->file = NULL;
+					return 0;
+				}
+				/* Timestamp */
+				index->timestamp = getArcTimestamp(index->line);
+				/* Skip first entry */
+				if (skipArcData(index->file, index->line) != 0 || skipArcNl(index->file) != 0) {
+					fprintf(stderr, "Unexpected bad data offset size first entry"LF);
+					fclose(index->file);
+					index->file = NULL;
+					return 0;
+				}
+				/* Read all meta-entries (not data) */
+				while(!feof(index->file)) {
+					unsigned long int fpos = ftell(index->file);
+					if (skipArcNl(index->file) == 0 && readArcURLRecord(index) == 0) {
+						int length = getArcLength(index->line);
+						if (length >= 0) {
+							const char * filenameIndex = copyArcField(index->line, 0, 
+								index->filenameIndexBuff, sizeof(index->filenameIndexBuff) - 1);  /* can not be NULL */
+							if (strncmp(filenameIndex, "http://", 7) == 0) {
+								filenameIndex += 7;
+							}
+							if (*filenameIndex != 0) {
+								if (skipArcData(index->file, index->line) != 0) {
+									fprintf(stderr, "Corrupted cache data entry #%d (truncated file?), aborting read"LF, (int)entries);
+								}
+								/*fprintf(stdout, "adding %s [%d]\n", filenameIndex, (int)fpos);*/
+								if (PT_CompatibleScheme(index->filenameIndexBuff)) {
+									inthash_add(hashtable, filenameIndex, fpos);		/* position of meta-data */
+									entries++;
+								}
+							} else {
+								fprintf(stderr, "Corrupted cache meta entry #%d"LF, (int)entries);
+							}
+						} else {
+							fprintf(stderr, "Corrupted cache meta entry #%d, aborting read"LF, (int)entries);
+							break ;
+						}
+					} else {
+						break ;
+					}
+				}
+
+				/* OK */
+				return 1;
+			} else {
+				fprintf(stderr, "Bad file (empty ?)"LF);
+			}
+		} else {
+			fprintf(stderr, "Unable to open file"LF);
+			index = NULL;
+		}
+	} else {
+		fprintf(stderr, "Bad arguments"LF);
+	}
+	return 0;
+}
+
+#define HTTP_READFIELD_STRING(line, value, refline, refvalue) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    strcpy(refvalue, value); \
+    line[0] = '\0'; \
+	} \
+} while(0)
+#define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    int intval = 0; \
+    sscanf(value, "%d", &intval); \
+    (refvalue) = intval; \
+    line[0] = '\0'; \
+	} \
+} while(0)
+
+static PT_Element PT_ReadCache__Arc(PT_Index index, const char* url, int flags) {
+	PT_Element retCode;
+	MutexLock(&index->slots.formatArc.fileLock);
+	{
+		retCode = PT_ReadCache__Arc_u(index, url, flags);
+	}
+	MutexUnlock(&index->slots.formatArc.fileLock);
+	return retCode;
+}
+
+static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char* url, int flags)
+{
+	PT_Index__Arc index = (PT_Index__Arc) &index_->slots.formatArc;
+	char location_default[HTS_URLMAXSIZE*2];
+  intptr_t hash_pos;
+  int hash_pos_return;
+	PT_Element r = NULL;
+	if (index == NULL || index->hash == NULL || url == NULL || *url == 0)
+		return NULL;
+	if ((r = PT_ElementNew()) == NULL)
+		return NULL;
+	location_default[0] = '\0';
+  memset(r, 0, sizeof(_PT_Element));
+  r->location = location_default;
+	strcpy(r->location, ""); 
+	if (strncmp(url, "http://", 7) == 0)
+		url += 7;
+  hash_pos_return = inthash_read(index->hash, url, &hash_pos);
+
+	if (hash_pos_return) {
+		if (fseek(index->file, (long)hash_pos, SEEK_SET) == 0) {
+			if (skipArcNl(index->file) == 0 && readArcURLRecord(index) == 0) {
+				long int fposMeta = ftell(index->file);
+				int dataLength = getArcLength(index->line);
+				const char *pos;
+
+				/* Read HTTP headers */
+				/* HTTP/1.1 404 Not Found */
+				if (linput(index->file, index->line, sizeof(index->line) - 1)) {
+					if ((pos = getArcField(index->line, 1)) != NULL) {
+						if (sscanf(pos, "%d", &r->statuscode) != 1) {
+							r->statuscode = STATUSCODE_INVALID;
+						}
+					}
+					if ((pos = getArcField(index->line, 2)) != NULL) {
+						r->msg[0] = '\0';
+						strncat(r->msg, pos, sizeof(pos) - 1);
+					}
+					while (linput(index->file, index->line, sizeof(index->line) - 1) && index->line[0] != '\0') {
+						char* const line = index->line;
+						char* value = strchr(line, ':');
+						if (value != NULL) {
+							*value = '\0';
+							for( value++ ; *value == ' ' || *value == '\t' ; value++);
+							HTTP_READFIELD_INT(line, value, "Content-Length", r->size);           // size
+							HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);      // contenttype
+							HTTP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);     // last-modified
+							HTTP_READFIELD_STRING(line, value, "Etag", r->etag);             // Etag
+							HTTP_READFIELD_STRING(line, value, "Location", r->location);         // 'location' pour moved
+							HTTP_READFIELD_STRING(line, value, "Content-Disposition", r->cdispo);           // Content-disposition
+							if (line[0] != '\0') {
+								int len = r->headers ? ((int) strlen(r->headers)) : 0;
+								int nlen = (int) ( strlen(line) + 2 + strlen(value) + sizeof("\r\n") + 1 );
+								r->headers = realloc(r->headers, len + nlen);
+								r->headers[len] = '\0';
+								strcat(r->headers, line);
+								strcat(r->headers, ": ");
+								strcat(r->headers, value);
+								strcat(r->headers, "\r\n");
+							}
+						}
+					}
+
+					/* FIXME charset */
+					if (r->contenttype[0] != '\0') {
+						char *pos = strchr(r->contenttype, ';');
+						if (pos != NULL) {
+							/*char *chs = strchr(pos, "charset=");*/
+							/*HTTP_READFIELD_STRING(line, value, "X-Charset", r->charset);*/
+							*pos = 0;
+							if ((pos = strchr(r->contenttype, ' ')) != NULL) {
+								*pos = 0;
+							}
+						}
+					}
+
+					/* Read data */
+					if (r->statuscode != STATUSCODE_INVALID) {			/* Can continue */
+						if (flags & FETCH_BODY) {
+							long int fposCurrent = ftell(index->file);
+							long int metaSize = fposCurrent - fposMeta;
+							long int fetchSize = (long int) r->size;
+							if (fetchSize <= 0) {
+								fetchSize = dataLength - metaSize;
+							} else if (fetchSize > dataLength - metaSize) {
+								r->statuscode=STATUSCODE_INVALID;
+								strcpy(r->msg, "Cache Read Error : Truncated Data");
+							}
+							r->size = 0;
+							if (r->statuscode != STATUSCODE_INVALID) {
+								r->adr = (char*) malloc(fetchSize);
+								if (r->adr != NULL) {
+									if (fetchSize > 0 && ( r->size = (int) fread(r->adr, 1,  fetchSize, index->file) ) != fetchSize) {
+                    int last_errno = errno;
+										r->statuscode=STATUSCODE_INVALID;
+										sprintf(r->msg,"Read error in cache disk data: %s", strerror(last_errno));
+									}
+								} else {
+									r->statuscode=STATUSCODE_INVALID;
+									strcpy(r->msg,"Read error (memory exhausted) from cache");
+								}
+							}
+						}
+					}
+
+				} else {
+					r->statuscode=STATUSCODE_INVALID;
+					strcpy(r->msg, "Cache Read Error : Read Header Error");
+				}
+
+			} else {
+				r->statuscode=STATUSCODE_INVALID;
+				strcpy(r->msg, "Cache Read Error : Read Header Error");
+			}
+		} else {
+			r->statuscode=STATUSCODE_INVALID;
+			strcpy(r->msg, "Cache Read Error : Seek Error");
+		}
+
+	} else {
+		r->statuscode=STATUSCODE_INVALID;
+    strcpy(r->msg,"File Cache Entry Not Found");
+  }
+	if (r->location[0] != '\0') {
+		r->location = strdup(r->location);
+	} else {
+		r->location = NULL;
+	}
+  return r;
+}
+
+static int PT_LookupCache__Arc(PT_Index index, const char* url) {
+	int retCode;
+	MutexLock(&index->slots.formatArc.fileLock);
+	{
+		retCode = PT_LookupCache__Arc_u(index, url);
+	}
+	MutexUnlock(&index->slots.formatArc.fileLock);
+	return retCode;
+}
+
+static int PT_LookupCache__Arc_u(PT_Index index_, const char* url) {
+	if (index_ != NULL) {
+		PT_Index__New cache = (PT_Index__New) &index_->slots.formatNew;
+		if (cache == NULL || cache->hash == NULL || url == NULL || *url == 0)
+			return 0;
+		if (strncmp(url, "http://", 7) == 0)
+			url += 7;
+		if (inthash_read(cache->hash, url, NULL))
+			return 1;
+	}
+	return 0;
+}
+
+typedef struct PT_SaveCache__Arc_t {
+	PT_Indexes indexes;
+	FILE *fp;
+	time_t t;
+	char filename[64];
+	struct tm buff;
+	char headers[8192];
+  char md5[32 + 2];
+} PT_SaveCache__Arc_t;
+
+static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element) {
+	PT_SaveCache__Arc_t *st = (PT_SaveCache__Arc_t*) arg;
+	FILE * const fp = st->fp;
+	struct tm* tm = convert_time_rfc822(&st->buff, element->lastmodified);
+	int size_headers;
+
+	sprintf(st->headers, 
+		"HTTP/1.0 %d %s" "\r\n"
+		"X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
+		"Content-type: %s%s%s%s" "\r\n"
+		"Last-modified: %s" "\r\n"
+		"Content-length: %d" "\r\n"
+		,
+		element->statuscode, element->msg,
+		/**/
+		element->contenttype, 
+		(element->charset[0] ? "; charset=\"" : ""), 
+		(element->charset[0] ? element->charset : ""), 
+		(element->charset[0] ? "\"" : ""),
+		/**/
+		element->lastmodified,
+		(int) element->size
+		);
+	if (element->location != NULL && element->location[0] != '\0') {
+		sprintf(st->headers + strlen(st->headers), "Location: %s" "\r\n", element->location);
+	}
+	if (element->headers != NULL) {
+		if ( strlen(element->headers) < sizeof(st->headers) - strlen(element->headers) - 1 ) {
+			strcat(st->headers, element->headers);
+		}
+	}
+	strcat(st->headers, "\r\n");
+	size_headers = (int) strlen(st->headers);
+
+	/* doc == <nl><URL-record><nl><network_doc> */
+
+  /* Format: URL IP date mime result checksum location offset filename length */
+	if (element->adr != NULL) {
+		domd5mem(element->adr, element->size, st->md5, 1);
+	} else {
+		strcpy(st->md5, "-");
+	}
+  fprintf(fp, 
+		/* nl */
+		"\n"
+	  /* URL-record */
+		"%s%s %s %04d%02d%02d%02d%02d%02d %s %d %s %s %ld %s %ld"
+		/* nl */
+		"\n",
+		/* args */
+	  ( link_has_authority(url) ? "" : "http://" ), url,
+		"0.0.0.0",
+		tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+	  element->contenttype,
+	  element->statuscode,
+		st->md5, ( element->location ? element->location : "-" ),
+	  (long int)ftell(fp), st->filename,
+	  (long int)( size_headers + element->size ));
+	/* network_doc */
+	if (fwrite(st->headers, 1, size_headers, fp) != size_headers
+			|| ( element->size > 0 && fwrite(element->adr, 1, element->size, fp) != element->size )
+		) {
+		return 1;			/* Error */
+	}
+
+	return 0;
+}
+
+static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename) {
+	FILE *fp = fopen(filename, "wb");
+	if (fp != NULL) {
+		PT_SaveCache__Arc_t st;
+		int ret;
+		time_t t = PT_GetTimeIndex(indexes);
+		struct tm tm = PT_GetTime(t);
+
+		/* version-2-block ==
+		filedesc://<path><sp><ip_address><sp><date><sp>text/plain<sp>200<sp>-<sp>-<sp>0<sp><filename><sp><length><nl>
+		2<sp><reserved><sp><origin-code><nl>
+		URL<sp>IP-address<sp>Archive-date<sp>Content-type<sp>Result-code<sp>Checksum<sp>Location<sp> Offset<sp>Filename<sp>Archive-length<nl>
+		<nl> */
+		const char* prefix = 
+			"2 0 HTTrack Website Copier" "\n"
+			"URL IP-address Archive-Date Content-Type Result-code Checksum Location Offset Filename Archive-length" "\n" "\n";
+		sprintf(st.filename, "httrack_%d.arc", (int) t);
+		fprintf(fp, "filedesc://%s 0.0.0.0 %04d%02d%02d%02d%02d%02d text/plain 200 - - 0 %s %d" "\n"
+			"%s",
+			st.filename, 
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+			st.filename, (int)strlen(prefix), prefix);
+		st.fp = fp;
+		st.indexes = indexes;
+		st.t = t;
+		ret = PT_EnumCache(indexes, PT_SaveCache__Arc_Fun, (void *)&st);
+		fclose(fp);
+		if (ret != 0)
+			(void) unlink(filename);
+		return ret;
+	}
+	return -1;
+}

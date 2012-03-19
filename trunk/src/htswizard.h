@@ -38,11 +38,21 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSWIZARD_DEFH
 #define HTSWIZARD_DEFH 
 
-#include "htscore.h"
-
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+#include "htsglobal.h"
+
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+
 int hts_acceptlink(httrackp* opt,
                    int ptr,int lien_tot,lien_url** liens,
                    char* adr,char* fil,

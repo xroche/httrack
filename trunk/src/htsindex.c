@@ -144,6 +144,7 @@ void index_init(const char* indexpath) {
 */
 int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
+	char catbuff[CATBUFF_SIZE];
   int intag=0,inscript=0,incomment=0;
   char keyword[KEYW_LEN+32];
   int i=0;
@@ -165,8 +166,8 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 
   // Init ?
   if (hts_index_init) {
-    remove(concat(indexpath,"index.txt"));
-    remove(concat(indexpath,"sindex.html"));
+    remove(concat(catbuff,indexpath,"index.txt"));
+    remove(concat(catbuff,indexpath,"sindex.html"));
     hts_index_init=0;
   }
 
@@ -236,7 +237,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
       if ( (!inscript) && (!incomment) && (!intag) ) {
         char cchar=html_data[i];
         int pos;
-        int len=strlen(keyword);
+        int len = (int) strlen(keyword);
         
         // Replace (ignore case, and so on..)
         if ((pos=strcpos(KEYW_TRANSCODE_FROM,cchar))>=0)
@@ -261,7 +262,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
           /* Strip ending . and so */
           {
             int ok=0;
-            while((len=strlen(keyword)) && (!ok)) {
+            while((len = (int) strlen(keyword)) && (!ok)) {
               if (strchr(KEYW_STRIP_END,keyword[len-1])) {      /* strip it */
                 keyword[len-1]='\0';
               } else
@@ -302,13 +303,13 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
         char line[KEYW_LEN + 32];
         linput(tmpfp,line,KEYW_LEN + 2);
         if (strnotempty(line)) {
-          unsigned long int e=0;
+          intptr_t e=0;
           if (inthash_read(WordIndexHash,line,&e)) {
             //if (e) {
             char BIGSTK savelst[HTS_URLMAXSIZE*2];
             e++;          /* 0 means "once" */
             
-            if (strncmp((const char*)fslash((char*)indexpath),filename,strlen(indexpath))==0)  // couper
+            if (strncmp((const char*)fslash(catbuff,(char*)indexpath),filename,strlen(indexpath))==0)  // couper
               strcpybuff(savelst,filename+strlen(indexpath));
             else
               strcpybuff(savelst,filename);
@@ -339,11 +340,10 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 */
 void index_finish(const char* indexpath,int mode) {
 #if HTS_MAKE_KEYWORD_INDEX
+	char catbuff[CATBUFF_SIZE];
   char** tab;
   char* blk;
-  INTsys size;
-  
-  size=fpsize(fp_tmpproject);
+  off_t size = fpsize(fp_tmpproject);
   if (size>0) {
     //FILE* fp=fopen(concat(indexpath,"index.txt"),"rb");
     if (fp_tmpproject) {
@@ -373,9 +373,9 @@ void index_finish(const char* indexpath,int mode) {
 
             // Write new file
             if (mode == 1)      // TEXT
-              fp=fopen(concat(indexpath,"index.txt"),"wb");
+              fp=fopen(concat(catbuff,indexpath,"index.txt"),"wb");
             else                // HTML
-              fp=fopen(concat(indexpath,"sindex.html"),"wb");
+              fp=fopen(concat(catbuff,indexpath,"sindex.html"),"wb");
             if (fp) {
               char current_word[KEYW_LEN + 32];
               char word[KEYW_LEN + 32];

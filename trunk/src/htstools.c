@@ -38,22 +38,91 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#include "htstools.h"
-
-/* specific definitions */
-#include "htsbase.h"
-#include <ctype.h>
 /* String */
+#include <ctype.h>
+#include "htscore.h"
+#include "htstools.h"
 #include "htsstrings.h"
-/* END specific definitions */
+#ifdef _WIN32
+#include "windows.h"
+#else
+#include <dirent.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#include <sys/stat.h>
+#endif
 
+// Portable directory find functions
+#ifndef HTS_DEF_FWSTRUCT_find_handle_struct
+#define HTS_DEF_FWSTRUCT_find_handle_struct
+typedef struct find_handle_struct find_handle_struct;
+#endif
+#ifdef _WIN32
+struct find_handle_struct {
+  WIN32_FIND_DATAA hdata;
+  HANDLE handle;
+};
+#else
+struct find_handle_struct {
+  DIR * hdir;
+  struct dirent* dirp;
+  struct stat filestat;
+  char path[2048];
+};
+#endif
+#ifndef HTS_DEF_FWSTRUCT_topindex_chain
+#define HTS_DEF_FWSTRUCT_topindex_chain
+typedef struct topindex_chain topindex_chain;
+#endif
+struct topindex_chain {
+  int level;                          /* sort level */
+  char* category;                     /* category */
+  char name[2048];                    /* path */
+  struct topindex_chain* next;        /* next element */
+};
+
+
+/* Tools */
+
+static int ehexh(char c) {
+  if ((c>='0') && (c<='9')) return c-'0';
+  if ((c>='a') && (c<='f')) c-=('a'-'A');
+  if ((c>='A') && (c<='F')) return (c-'A'+10);
+  return 0;
+}
+
+static int ehex(char* s) {
+  return 16*ehexh(*s)+ehexh(*(s+1));
+}
+
+static void unescapehttp(char* s, String* tempo) {
+  int i;
+  for (i=0;i<(int) strlen(s);i++) {
+    if (s[i]=='%' && s[i+1]=='%') {
+      i++;
+      StringAddchar(*tempo, '%');
+    } else if (s[i]=='%') {
+      char hc;
+      i++;
+      hc = (char) ehex(s+i);
+      StringAddchar(*tempo, (char) hc);
+      i++;    // sauter 2 caractères finalement
+    }
+    else if (s[i]=='+') {
+      StringAddchar(*tempo, ' ');
+    }
+    else
+      StringAddchar(*tempo, s[i]);
+  }
+}
 
 // forme à partir d'un lien et du contexte (origin_fil et origin_adr d'où il est tiré) adr et fil
 // [adr et fil sont des buffers de 1ko]
 // 0 : ok
 // -1 : erreur
 // -2 : protocole non supporté (ftp)
-int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,char* fil) {
+int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin_fil,char* adr,char* fil) {
   int ok=0;
   int scheme=0;
 
@@ -64,7 +133,7 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
 
   // Scheme?
   {
-    char* a=lien;
+    const char* a=lien;
     while (isalpha((unsigned char)*a))
       a++;
     if (*a == ':')
@@ -118,8 +187,6 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
     )) {
     ok=-1;      // unknown scheme
   } else {    // c'est un lien relatif
-    char* a;
-    
     // On forme l'URL complète à partie de l'url actuelle
     // et du chemin actuel si besoin est.
     
@@ -158,7 +225,7 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
           if (a) *a='\0';
           strcatbuff(fil,lien);
         } else {
-          a=strchr(origin_fil,'?');
+          const char *a=strchr(origin_fil,'?');
           if (a == NULL) a=origin_fil+strlen(origin_fil);
           while((*a!='/') && ( a > origin_fil) ) a--;
           if (*a=='/') {    // ok on a un '/'
@@ -210,7 +277,7 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
 
 // créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
 // un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
-int lienrelatif(char* s,char* link,char* curr_fil) {
+int lienrelatif(char* s,const char* link,const char* curr_fil) {
   char BIGSTK _curr[HTS_URLMAXSIZE*2];
   char BIGSTK newcurr_fil[HTS_URLMAXSIZE*2],newlink[HTS_URLMAXSIZE*2];
   char* curr;
@@ -222,13 +289,16 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
   //
 
   // patch: éliminer les ? (paramètres) sinon bug
-  if ( (a=strchr(curr_fil,'?')) ) {
-    strncatbuff(newcurr_fil,curr_fil,(int) (a - curr_fil));
-    curr_fil = newcurr_fil;
-  }
-  if ( (a=strchr(link,'?')) ) {
-    strncatbuff(newlink,link,(int) (a - link));
-    link = newlink;
+  {
+    const char* a;
+    if ( (a=strchr(curr_fil,'?')) ) {
+      strncatbuff(newcurr_fil,curr_fil,(int) (a - curr_fil));
+      curr_fil = newcurr_fil;
+    }
+    if ( (a=strchr(link,'?')) ) {
+      strncatbuff(newlink,link,(int) (a - link));
+      link = newlink;
+    }
   }
 
   // recopier uniquement le chemin courant
@@ -244,7 +314,7 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
   
   // sauter ce qui est commun aux 2 chemins
   {
-    char *l,*c;
+    const char *l,*c;
     if (*link=='/') link++;  // sauter slash
     if (*curr=='/') curr++;
     l=link;
@@ -279,8 +349,8 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
 }
 
 /* Is the link absolute (http://www..) or relative (/bar/foo.html) ? */
-int link_has_authority(char* lien) {
-  char* a=lien;
+int link_has_authority(const char* lien) {
+  const char* a=lien;
   if (isalpha((unsigned char)*a)) {
     // Skip scheme?
     while (isalpha((unsigned char)*a))
@@ -295,10 +365,10 @@ int link_has_authority(char* lien) {
   return 0;
 }
 
-int link_has_authorization(char* lien) {
-  char* adr = jump_protocol(lien);
-  char* firstslash = strchr(adr, '/');
-  char* detect = strchr(adr, '@');
+int link_has_authorization(const char* lien) {
+  const char* adr = jump_protocol(lien);
+  const char* firstslash = strchr(adr, '/');
+  const char* detect = strchr(adr, '@');
   if (firstslash) {
     if (detect) {
       return (detect < firstslash);
@@ -332,7 +402,8 @@ void long_to_83(int mode,char* n83,char* save) {
 
 // conversion nom de fichier/dossier isolé vers 8-3 ou ISO9660
 void longfile_to_83(int mode,char* n83,char* save) {
-  int i=0,j=0,max=0;
+  int j=0,max=0;
+  int i = 0;
   char nom[256];
   char ext[256];
   nom[0]=ext[0]='\0';
@@ -391,7 +462,7 @@ void longfile_to_83(int mode,char* n83,char* save) {
   }  // recopier nom
   nom[i]='\0';
   if (save[j]) {  // il reste au moins un point
-    i=strlen(save)-1;
+    i = (int) strlen(save)-1;
     while((i>0) && (save[i]!='.') && (save[i]!='/')) i--;    // rechercher dernier .
     if (save[i]=='.') {  // point!
       int j=0;
@@ -410,33 +481,32 @@ void longfile_to_83(int mode,char* n83,char* save) {
 }
 
 // écrire backblue.gif
-int verif_backblue(httrackp* opt,char* base) {
-  int* done;
+int verif_backblue(httrackp* opt, const char* base) {
+  int* done = &opt->state.verif_backblue_done;
   int ret=0;
-  NOSTATIC_RESERVE(done, int, 1);
   //
   if (!base) {   // init
     *done=0;
     return 0;
   }
   if ( (!*done)
-    || (fsize(fconcat(base,"backblue.gif")) != HTS_DATA_BACK_GIF_LEN)) {
-    FILE* fp = filecreate(fconcat(base,"backblue.gif"));
+    || (fsize(fconcat(OPT_GET_BUFF(opt), base,"backblue.gif")) != HTS_DATA_BACK_GIF_LEN)) {
+    FILE* fp = filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), base,"backblue.gif"));
     *done=1;
     if (fp) {
       if (fwrite(HTS_DATA_BACK_GIF,HTS_DATA_BACK_GIF_LEN,1,fp) != HTS_DATA_BACK_GIF_LEN)
         ret=1;
       fclose(fp);
-      usercommand(opt,0,NULL,fconcat(base,"backblue.gif"),"","");
+      usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), base,"backblue.gif"),"","");
     } else
       ret=1;
     //
-    fp = filecreate(fconcat(base,"fade.gif"));
+    fp = filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), base,"fade.gif"));
     if (fp) {
       if (fwrite(HTS_DATA_FADE_GIF,HTS_DATA_FADE_GIF_LEN,1,fp) != HTS_DATA_FADE_GIF_LEN)
         ret=1;
       fclose(fp);
-      usercommand(opt,0,NULL,fconcat(base,"fade.gif"),"","");
+      usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), base,"fade.gif"),"","");
     } else
       ret=1;
   } 
@@ -444,9 +514,8 @@ int verif_backblue(httrackp* opt,char* base) {
 }
 
 // flag
-int verif_external(int nb,int test) {
-  int* status;
-  NOSTATIC_RESERVE(status, int, 2);
+int verif_external(httrackp* opt,int nb,int test) {
+  int* status = &opt->state.verif_external_status;
   if (!test)
     status[nb]=0;   // reset
   else if (!status[nb]) {
@@ -580,10 +649,10 @@ HTS_INLINE int check_tag(char* from,const char* tag) {
 }
 
 // teste si un fichier dépasse le quota
-int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
+int istoobig(httrackp *opt,LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
   int ok=1;
   if (size>0) {
-    if (is_hypertext_mime(type, "")) {
+    if (is_hypertext_mime(opt,type, "")) {
       if (maxhtml>0) {
         if (size>maxhtml)
           ok=0;
@@ -612,19 +681,20 @@ static int sortTopIndexFnc(const void * a_, const void * b_) {
   return cmp;
 }
 
-HTSEXT_API char* hts_getcategory(char* filename);
+HTSEXT_API char* hts_getcategory(const char* filename);
 
-HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
+HTSEXT_API int hts_buildtopindex(httrackp* opt,const char* path,const char* binpath) {
   FILE* fpo;
   int retval=0;
   char BIGSTK rpath[1024*2];
   char *toptemplate_header=NULL,*toptemplate_body=NULL,*toptemplate_footer=NULL,*toptemplate_bodycat=NULL;
-  
+ 	char catbuff[CATBUFF_SIZE];
+
   // et templates html
-  toptemplate_header=readfile_or(fconcat(binpath,"templates/topindex-header.html"),HTS_INDEX_HEADER);
-  toptemplate_body=readfile_or(fconcat(binpath,"templates/topindex-body.html"),HTS_INDEX_BODY);
-  toptemplate_bodycat=readfile_or(fconcat(binpath,"templates/topindex-bodycat.html"),HTS_INDEX_BODYCAT);
-  toptemplate_footer=readfile_or(fconcat(binpath,"templates/topindex-footer.html"),HTS_INDEX_FOOTER);
+  toptemplate_header=readfile_or(fconcat(catbuff, binpath,"templates/topindex-header.html"),HTS_INDEX_HEADER);
+  toptemplate_body=readfile_or(fconcat(catbuff, binpath,"templates/topindex-body.html"),HTS_INDEX_BODY);
+  toptemplate_bodycat=readfile_or(fconcat(catbuff, binpath,"templates/topindex-bodycat.html"),HTS_INDEX_BODYCAT);
+  toptemplate_footer=readfile_or(fconcat(catbuff, binpath,"templates/topindex-footer.html"),HTS_INDEX_FOOTER);
   
   if (toptemplate_header && toptemplate_body && toptemplate_footer && toptemplate_bodycat) {
     
@@ -634,11 +704,10 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
         rpath[strlen(rpath)-1]='\0';
     }
     
-    fpo=fopen(fconcat(rpath,"/index.html"),"wb");
+    fpo=fopen(fconcat(catbuff, rpath,"/index.html"),"wb");
     if (fpo) {
-      String iname = STRING_EMPTY;
       find_handle h;
-      verif_backblue(opt,concat(rpath,"/"));    // générer gif
+      verif_backblue(opt,concat(catbuff, rpath,"/"));    // générer gif
       // Header
       fprintf(fpo,toptemplate_header,
         "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"
@@ -653,20 +722,20 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
         int chainSize = 0;
         do {
           if (hts_findisdir(h)) {
-            StringStrcpy(iname,rpath);
-            StringStrcat(iname,"/");
-            StringStrcat(iname,hts_findgetname(h));
-            StringStrcat(iname,"/index.html");
+            StringCopy(iname,rpath);
+            StringCat(iname,"/");
+            StringCat(iname,hts_findgetname(h));
+            StringCat(iname,"/index.html");
             if (fexist(StringBuff(iname))) {
               int level = 0;
               char* category = NULL;
               struct topindex_chain * oldchain=chain;
               
               /* Check for an existing category */
-              StringStrcpy(iname,rpath);
-              StringStrcat(iname,"/");
-              StringStrcat(iname,hts_findgetname(h));
-              StringStrcat(iname,"/hts-cache/winprofile.ini");
+              StringCopy(iname,rpath);
+              StringCat(iname,"/");
+              StringCat(iname,hts_findgetname(h));
+              StringCat(iname,"/hts-cache/winprofile.ini");
               if (fexist(StringBuff(iname))) {
                 category = hts_getcategory(StringBuff(iname));
                 if (category != NULL) {
@@ -774,7 +843,7 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
   return retval;
 }
 
-HTSEXT_API char* hts_getcategory(char* filename) {
+HTSEXT_API char* hts_getcategory(const char* filename) {
   String categ = STRING_EMPTY;
   if (fexist(filename)) {
     FILE* fp = fopen(filename, "rb");
@@ -793,7 +862,7 @@ HTSEXT_API char* hts_getcategory(char* filename) {
       fclose(fp);
     }
   }
-  return StringBuff(categ);
+  return StringBuffRW(categ);
 }
 
 HTSEXT_API char* hts_getcategories(char* path, int type) {
@@ -809,21 +878,19 @@ HTSEXT_API char* hts_getcategories(char* path, int type) {
   }
   h = hts_findfirst(rpath);
   if (h) {
-    struct topindex_chain * chain=NULL;
-    struct topindex_chain * startchain=NULL;
     String iname = STRING_EMPTY;
     if (type == 1) {
       hashCateg = inthash_new(127);
-      StringStrcat(categ, "Test category 1");
-      StringStrcat(categ, "\r\nTest category 2");
+      StringCat(categ, "Test category 1");
+      StringCat(categ, "\r\nTest category 2");
     }
     do {
       if (hts_findisdir(h)) {
         char BIGSTK line2[1024];
-        StringStrcpy(iname,rpath);
-        StringStrcat(iname,"/");
-        StringStrcat(iname,hts_findgetname(h));
-        StringStrcat(iname,"/hts-cache/winprofile.ini");
+        StringCopy(iname,rpath);
+        StringCat(iname,"/");
+        StringCat(iname,hts_findgetname(h));
+        StringCat(iname,"/hts-cache/winprofile.ini");
         if (fexist(StringBuff(iname))) {
           if (type == 1) {
             FILE* fp = fopen(StringBuff(iname), "rb");
@@ -837,7 +904,7 @@ HTSEXT_API char* hts_getcategories(char* path, int type) {
                       if (!inthash_read(hashCateg, line2+9, NULL)) {
                         inthash_write(hashCateg, line2+9, 0);
                         if (StringLength(categ) > 0) {
-                          StringStrcat(categ, "\r\n");
+                          StringCat(categ, "\r\n");
                         }
                         unescapehttp(line2+9, &categ);
                       }
@@ -851,9 +918,9 @@ HTSEXT_API char* hts_getcategories(char* path, int type) {
             }
           } else {
             if (StringLength(profiles) > 0) {
-              StringStrcat(profiles, "\r\n");
+              StringCat(profiles, "\r\n");
             }
-            StringStrcat(profiles, hts_findgetname(h));
+            StringCat(profiles, hts_findgetname(h));
           }
         }
         
@@ -867,9 +934,9 @@ HTSEXT_API char* hts_getcategories(char* path, int type) {
     hashCateg = NULL;
   }
   if (type == 1)
-    return StringBuff(categ);
+    return StringBuffRW(categ);
   else
-    return StringBuff(profiles);
+    return StringBuffRW(profiles);
 }
 
 
@@ -895,7 +962,7 @@ HTSEXT_API find_handle hts_findfirst(char* path) {
       find_handle_struct* find = (find_handle_struct*) calloc(1,sizeof(find_handle_struct));
       if (find) {
         memset(find, 0, sizeof(find_handle_struct));
-#if HTS_WIN
+#ifdef _WIN32
         {
           char BIGSTK rpath[1024*2];
           strcpybuff(rpath,path);
@@ -931,14 +998,15 @@ HTSEXT_API find_handle hts_findfirst(char* path) {
 
 HTSEXT_API int hts_findnext(find_handle find) {
   if (find) {
-#if HTS_WIN
+#ifdef _WIN32
     if ( (FindNextFileA(find->handle,&find->hdata)))
       return 1;
 #else
+		char catbuff[CATBUFF_SIZE];
     memset(&(find->filestat), 0, sizeof(find->filestat));
     if ((find->dirp=readdir(find->hdir)))
       if (find->dirp->d_name)
-        if (!stat(concat(find->path,find->dirp->d_name),&find->filestat))
+        if (!stat(concat(catbuff, find->path,find->dirp->d_name),&find->filestat))
           return 1;
 #endif
   }
@@ -947,7 +1015,7 @@ HTSEXT_API int hts_findnext(find_handle find) {
 
 HTSEXT_API int hts_findclose(find_handle find) {
   if (find) {
-#if HTS_WIN
+#ifdef _WIN32
     if (find->handle) {
       FindClose(find->handle);
       find->handle=NULL;
@@ -965,7 +1033,7 @@ HTSEXT_API int hts_findclose(find_handle find) {
 
 HTSEXT_API char* hts_findgetname(find_handle find) {
   if (find) {
-#if HTS_WIN
+#ifdef _WIN32
     return find->hdata.cFileName;
 #else
     if (find->dirp)
@@ -977,7 +1045,7 @@ HTSEXT_API char* hts_findgetname(find_handle find) {
 
 HTSEXT_API int hts_findgetsize(find_handle find) {
   if (find) {
-#if HTS_WIN
+#ifdef _WIN32
     return find->hdata.nFileSizeLow;
 #else
     return find->filestat.st_size;
@@ -989,7 +1057,7 @@ HTSEXT_API int hts_findgetsize(find_handle find) {
 HTSEXT_API int hts_findisdir(find_handle find) {
   if (find) {
     if (!hts_findissystem(find)) {
-#if HTS_WIN
+#ifdef _WIN32
       if (find->hdata.dwFileAttributes  & FILE_ATTRIBUTE_DIRECTORY)
         return 1;
 #else
@@ -1003,7 +1071,7 @@ HTSEXT_API int hts_findisdir(find_handle find) {
 HTSEXT_API int hts_findisfile(find_handle find) {
   if (find) {
     if (!hts_findissystem(find)) {
-#if HTS_WIN
+#ifdef _WIN32
       if (!(find->hdata.dwFileAttributes  & FILE_ATTRIBUTE_DIRECTORY))
         return 1;
 #else
@@ -1016,7 +1084,7 @@ HTSEXT_API int hts_findisfile(find_handle find) {
 }
 HTSEXT_API int hts_findissystem(find_handle find) {
   if (find) {
-#if HTS_WIN
+#ifdef _WIN32
     if (find->hdata.dwFileAttributes  & (FILE_ATTRIBUTE_SYSTEM|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_TEMPORARY))
       return 1;
     else if ( (!strcmp(find->hdata.cFileName,"..")) || (!strcmp(find->hdata.cFileName,".")) )

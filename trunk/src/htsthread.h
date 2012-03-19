@@ -38,10 +38,10 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFTHREAD
 
 #include "htsglobal.h"
-#if USE_PTHREAD
-#include <pthread.h>    /* _beginthread, _endthread */
+#ifndef _WIN32
+#include <pthread.h>
 #endif
-#if HTS_WIN
+#ifdef _WIN32
 #include "windows.h"
 #ifdef _WIN32_WCE
 #ifndef HTS_CECOMPAT
@@ -49,68 +49,44 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 #endif
-
-#if USE_BEGINTHREAD
-#if HTS_WIN
-
-#define PTHREAD_RETURN
-#define PTHREAD_TYPE void
-#define PTHREAD_TYPE_FNC __cdecl
-#define PTHREAD_LOCK_TYPE HANDLE
-#define PTHREAD_HANDLE HANDLE
-
-
-/* Useless - see '__declspec( thread )' */
-/*
-#define PTHREAD_KEY_TYPE void*
-#define PTHREAD_KEY_CREATE(ptrkey, uninit)      do { *(ptrkey)=(void*)NULL; } while(0)
-#define PTHREAD_KEY_DELETE(key)                 do { key=(void*)NULL; } while(0)
-#define PTHREAD_KEY_SET(key, val, ptrtype)      do { key=(void*)(val); } while(0)
-#define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)(key); } while(0)
-*/
-
-#else
-
-#define PTHREAD_RETURN NULL
-#define PTHREAD_TYPE void*
-#define PTHREAD_TYPE_FNC
-#define PTHREAD_LOCK_TYPE pthread_mutex_t
-#define PTHREAD_KEY_TYPE pthread_key_t
-#define PTHREAD_KEY_CREATE(ptrkey, uninit)      pthread_key_create(ptrkey, uninit)
-#define PTHREAD_KEY_DELETE(key)                 pthread_key_delete(key)
-#define PTHREAD_KEY_SET(key, val, ptrtype)      pthread_setspecific(key, (void*)val)
-#define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)pthread_getspecific(key); } while(0)
-#define PTHREAD_HANDLE pthread_t
-
+#ifndef USE_BEGINTHREAD
+#error needs USE_BEGINTHREAD
 #endif
 
-#else
-
-#define PTHREAD_LOCK_TYPE void*
-#define PTHREAD_KEY_TYPE void*
-#define PTHREAD_KEY_CREATE(ptrkey, uninit)      do { *(ptrkey)=(void*)NULL; } while(0)
-#define PTHREAD_KEY_DELETE(key)                 do { key=(void*)NULL; } while(0)
-#define PTHREAD_KEY_SET(key, val, ptrtype)      do { key=(void*)(val); } while(0)
-#define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)(key); } while(0)
-#define PTHREAD_HANDLE void
-
+/* Forward definition */
+#ifndef HTS_DEF_FWSTRUCT_htsmutex_s
+#define HTS_DEF_FWSTRUCT_htsmutex_s
+typedef struct htsmutex_s htsmutex_s, *htsmutex;
 #endif
+#define HTSMUTEX_INIT NULL
+
+#ifdef _WIN32
+struct htsmutex_s {
+  HANDLE handle;
+};
+#else  /* #ifdef _WIN32 */
+struct htsmutex_s {
+  pthread_mutex_t handle;
+};
+#endif  /* #ifdef _WIN32 */
 
 /* Library internal definictions */
-HTSEXT_API int hts_newthread( PTHREAD_TYPE ( PTHREAD_TYPE_FNC *start_address )( void * ), unsigned stack_size, void *arglist );
+HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg);
+#ifndef HTTRACK_DEFLIB
 HTSEXT_API void htsthread_wait(void );
+#endif
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
+/* Locking functions */
+HTSEXT_API void hts_mutexinit(htsmutex* mutex);
+HTSEXT_API void hts_mutexfree(htsmutex* mutex);
+HTSEXT_API void hts_mutexlock(htsmutex* mutex);
+HTSEXT_API void hts_mutexrelease(htsmutex* mutex);
+
 #ifdef HTS_INTERNAL_BYTECODE
-HTSEXT_API int htsSetLock(PTHREAD_LOCK_TYPE * hMutex,int lock);
-HTSEXT_API void htsthread_init(void );
-HTSEXT_API void htsthread_uninit(void );
-
-#if USE_PTHREAD
-// unsigned long _beginthread( void* ( *start_address )( void * ), unsigned stack_size, void *arglist );
-
-#endif
+/* Thread initialization */
+HTSEXT_API void htsthread_init(void);
+HTSEXT_API void htsthread_uninit(void);
 #endif
 
 #endif
-

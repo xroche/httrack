@@ -35,23 +35,37 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 /* Version: Oct/2000 */
 /* Fixed: problems with class structure (10/2000) */
 
 // htsjava.c - Parseur de classes java
 
-#include "stdio.h"
-#include "htsglobal.h"
-#include "htscore.h"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
+#include <sys/types.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
+/* Standard httrack module includes */
+#include "httrack-library.h"
+#include "htsopt.h"
+#include "htsdefines.h"
+
+/* Module structures */
+#include "htsmodules.h"
+
+/* We link to libhttrack, we can use its functions */
+#include "httrack-library.h"
+
+/* This file */
 #include "htsjava.h"
-
-#include "htsnostatic.h"
-
-//#include <math.h>
 
 static int reverse_endian(void) {
 	int endian = 1;
@@ -62,6 +76,11 @@ static int reverse_endian(void) {
 #define hts_swap16(A) ( (((A) & 0xFF)<<8) | (((A) & 0xFF00)>>8) )
 #define hts_swap32(A) ( (( (hts_swap16(A)) & 0xFFFF)<<16) | (( (hts_swap16(A>>16)) & 0xFFFF)) )
 
+/* Static definitions */
+static RESP_STRUCT readtable(htsmoduleStruct* str,FILE *fp,RESP_STRUCT,int*);
+static unsigned short int readshort(FILE *fp);
+static int tris(httrackp *opt,char*);
+static char * printname(char [1024],char [1024]);
 
 // ** HTS_xx sinon pas pris par VC++
 #define HTS_CLASS  7
@@ -79,148 +98,217 @@ static int reverse_endian(void) {
 
 #define JAVADEBUG 0
 
-int hts_detect_java(htsmoduleStruct* str) {
-  char* savename = str->filename;
+static const char *libName = "htsjava";
+
+#ifdef _WIN32
+#define strcasecmp(a,b) stricmp(a,b)
+#define strncasecmp(a,b,n) strnicmp(a,b,n)
+#endif
+
+static int detect_mime(htsmoduleStruct* str) {
+  const char* savename = str->filename;
   if (savename) {
     int len = (int) strlen(savename);
-    if (len > 6 && strfield(savename + len - 6,".class")) {
+    if (len > 6 && strcasecmp(savename + len - 6,".class") == 0) {
       return 1;
     }
   }
   return 0;
 }
 
-int hts_parse_java(htsmoduleStruct* str)
+static int hts_detect_java(t_hts_callbackarg *carg, httrackp *opt,
+                           htsmoduleStruct* str) 
 {
-  FILE *fpout;
-  JAVA_HEADER header;
-  RESP_STRUCT *tab;
-  char* file = str->filename;
-  
-  str->relativeToHtmlLink = 1;
-
-#if JAVADEBUG
-  printf("fopen\n");
-#endif
-  if ((fpout = fopen(fconv(file), "r+b")) == NULL)
-  {
-    //fprintf(stderr, "Cannot open input file.\n");
-    sprintf(str->err_msg,"Unable to open file %s",file);
-    return 0;   // une erreur..
-  }
-    
-#if JAVADEBUG
-  printf("fread\n");
-#endif
-  //if (fread(&header,1,sizeof(JAVA_HEADER),fpout) != sizeof(JAVA_HEADER)) {   // pas complet..
-  if (fread(&header,1,10,fpout) != 10) {   // pas complet..
-    fclose(fpout);
-    sprintf(str->err_msg,"File header too small (file len = "LLintP")",(LLint)fsize(file));
-    return 0;
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, detect) != NULL) {
+    if (CALLBACKARG_PREV_FUN(carg, detect)(CALLBACKARG_PREV_CARG(carg), opt, str)) {
+      return 1;  /* Found before us, let them have the priority */
+    }
   }
 
-#if JAVADEBUG
-  printf("header\n");
-#endif
-  // tester en tête
-  if (reverse_endian()) {
-    header.magic = hts_swap32(header.magic);
-    header.count = hts_swap16(header.count); 
-  }
-  if(header.magic!=0xCAFEBABE) {
-    sprintf(str->err_msg,"non java file");
-    if (fpout) { fclose(fpout); fpout=NULL; }
-    return 0;
+  /* Check MIME */
+  if (detect_mime(str)) {
+    str->wrapper_name = libName;  /* Our ID */
+    return 1; /* Known format, we take it */
   }
 
-  tab =(RESP_STRUCT*)calloct(header.count,sizeof(RESP_STRUCT));
-  if (!tab) {
-    sprintf(str->err_msg,"Unable to alloc %d bytes",(int)sizeof(RESP_STRUCT));
-    if (fpout) { fclose(fpout); fpout=NULL; }
-    return 0;    // erreur..
-  }
+  return 0;   /* Unknown format */
+}
+
+static off_t fsize(const char* s) {
+  FILE* fp;
+  fp=fopen(s,"rb");
+  if (fp!=NULL) {
+    off_t i;
+    fseek(fp,0,SEEK_END);
+    i = ftell(fp);
+    fclose(fp);
+    return i;
+  } else 
+    return -1;
+}
+
+static int hts_parse_java(t_hts_callbackarg *carg, httrackp *opt,
+                          htsmoduleStruct* str)
+{
+  /* The wrapper_name memebr has changed: not for us anymore */
+  if (str->wrapper_name == NULL || strcmp(str->wrapper_name, libName) != 0) {
+    /* Call parent functions if multiple callbacks are chained. */
+    if (CALLBACKARG_PREV_FUN(carg, parse) != NULL) {
+      return CALLBACKARG_PREV_FUN(carg, parse)(CALLBACKARG_PREV_CARG(carg), opt, str);
+    }
+    strcpy(str->err_msg, "unexpected error: bad wrapper_name and no previous wrapper");
+    return 0;     /* Unexpected error */
+  } else {
+    if (detect_mime(str)) {
+
+      /* (Legacy code) */
+      char catbuff[CATBUFF_SIZE];
+      FILE *fpout;
+      JAVA_HEADER header;
+      RESP_STRUCT *tab;
+      const char* file = str->filename;
+
+      str->relativeToHtmlLink = 1;
 
 #if JAVADEBUG
-  printf("calchead\n");
+      printf("fopen\n");
 #endif
-  {
-    int i;
-    
-    for (i = 1; i < header.count; i++) {
-      int err=0;  // ++    
-      tab[i]=readtable(str,fpout,tab[i],&err);
-      if (!err) {
-        if ((tab[i].type == HTS_LONG) ||(tab[i].type == HTS_DOUBLE)) i++;  //2 element si double ou float
-      } else {    // ++ une erreur est survenue!
-        if (strnotempty(str->err_msg)==0)
-          strcpybuff(str->err_msg,"Internal readtable error");
-        freet(tab);
+      if ((fpout = fopen(fconv(catbuff, file), "r+b")) == NULL)
+      {
+        //fprintf(stderr, "Cannot open input file.\n");
+        sprintf(str->err_msg,"Unable to open file %s",file);
+        return 0;   // une erreur..
+      }
+
+#if JAVADEBUG
+      printf("fread\n");
+#endif
+      //if (fread(&header,1,sizeof(JAVA_HEADER),fpout) != sizeof(JAVA_HEADER)) {   // pas complet..
+      if (fread(&header,1,10,fpout) != 10) {   // pas complet..
+        fclose(fpout);
+        sprintf(str->err_msg,"File header too small (file len = "LLintP")",(LLint)fsize(file));
+        return 0;
+      }
+
+#if JAVADEBUG
+      printf("header\n");
+#endif
+      // tester en tête
+      if (reverse_endian()) {
+        header.magic = hts_swap32(header.magic);
+        header.count = hts_swap16(header.count); 
+      }
+      if(header.magic!=0xCAFEBABE) {
+        sprintf(str->err_msg,"non java file");
         if (fpout) { fclose(fpout); fpout=NULL; }
         return 0;
       }
-    }
-    
-  }
 
-  
+      tab =(RESP_STRUCT*)calloc(header.count,sizeof(RESP_STRUCT));
+      if (!tab) {
+        sprintf(str->err_msg,"Unable to alloc %d bytes",(int)sizeof(RESP_STRUCT));
+        if (fpout) { fclose(fpout); fpout=NULL; }
+        return 0;    // erreur..
+      }
+
 #if JAVADEBUG
-  printf("addfiles\n");
+      printf("calchead\n");
 #endif
-  {
-    unsigned int acess;
-    unsigned int Class;
-    unsigned int SClass;
-    int i;
-    acess = readshort(fpout);
-    Class = readshort(fpout);
-    SClass = readshort(fpout);
-    
-    for (i = 1; i <header.count; i++) {
-      
-      if (tab[i].type == HTS_CLASS) {
-        
-        if ((tab[i].index1<header.count) && (tab[i].index1>=0)) {
-          
-          
-          if((tab[i].index1!=SClass) && (tab[i].index1!=Class) && (tab[tab[i].index1].name[0]!='[')) {
-            
-            if(!strstr(tab[tab[i].index1].name,"java/")) {
-              char BIGSTK tempo[1024];
-              tempo[0]='\0';
-              
-              sprintf(tempo,"%s.class",tab[tab[i].index1].name);
-#if JAVADEBUG
-              printf("add %s\n",tempo);
-#endif
-              if (tab[tab[i].index1].file_position >= 0)
-                str->addLink(str,tempo);  /* tab[tab[i].index1].file_position */
-            }
-            
+      {
+        int i;
+
+        for (i = 1; i < header.count; i++) {
+          int err=0;  // ++    
+          tab[i]=readtable(str,fpout,tab[i],&err);
+          if (!err) {
+            if ((tab[i].type == HTS_LONG) ||(tab[i].type == HTS_DOUBLE)) i++;  //2 element si double ou float
+          } else {    // ++ une erreur est survenue!
+            if (strnotempty(str->err_msg)==0)
+              strcpy(str->err_msg,"Internal readtable error");
+            free(tab);
+            if (fpout) { fclose(fpout); fpout=NULL; }
+            return 0;
           }
-        } else { 
-          i=header.count;  // exit 
+        }
+
+      }
+
+
+#if JAVADEBUG
+      printf("addfiles\n");
+#endif
+      {
+        unsigned int acess;
+        unsigned int Class;
+        unsigned int SClass;
+        int i;
+        acess = readshort(fpout);
+        Class = readshort(fpout);
+        SClass = readshort(fpout);
+
+        for (i = 1; i <header.count; i++) {
+
+          if (tab[i].type == HTS_CLASS) {
+
+            if ((tab[i].index1<header.count) && (tab[i].index1>=0)) {
+
+
+              if((tab[i].index1!=SClass) && (tab[i].index1!=Class) && (tab[tab[i].index1].name[0]!='[')) {
+
+                if(!strstr(tab[tab[i].index1].name,"java/")) {
+                  char BIGSTK tempo[1024];
+                  tempo[0]='\0';
+
+                  sprintf(tempo,"%s.class",tab[tab[i].index1].name);
+#if JAVADEBUG
+                  printf("add %s\n",tempo);
+#endif
+                  if (tab[tab[i].index1].file_position >= 0)
+                    str->addLink(str,tempo);  /* tab[tab[i].index1].file_position */
+                }
+
+              }
+            } else { 
+              i=header.count;  // exit 
+            }
+          }
+
         }
       }
-      
+
+
+#if JAVADEBUG
+      printf("end\n");
+#endif
+      free(tab);
+      if (fpout) { fclose(fpout); fpout=NULL; }
+      return 1;
+
+    } else {
+      strcpy(str->err_msg, "bad MIME type");
     }
   }
-  
- 
-#if JAVADEBUG
-  printf("end\n");
-#endif
-  freet(tab);
-  if (fpout) { fclose(fpout); fpout=NULL; }
-  return 1;
+  return 0;   /* Error */
 }
 
+/*
+module entry point 
+*/
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+  /* Plug callback functions */
+  CHAIN_FUNCTION(opt, detect, hts_detect_java, NULL);
+  CHAIN_FUNCTION(opt, parse, hts_parse_java, NULL);
 
-
+  return 1;  /* success */
+}
 
 // error: !=0 si erreur fatale
-RESP_STRUCT readtable(htsmoduleStruct* str, 
-                      FILE *fp, RESP_STRUCT trans, int* error)
+static  RESP_STRUCT readtable(htsmoduleStruct* str, 
+                              FILE *fp, RESP_STRUCT trans, int* error)
 {
+	char rname[1024];
   unsigned short int length;
   int j;
   *error = 0;  // pas d'erreur
@@ -228,54 +316,54 @@ RESP_STRUCT readtable(htsmoduleStruct* str,
   trans.type = (int)(unsigned char)fgetc(fp);
   switch (trans.type) {
   case HTS_CLASS:
-    strcpybuff(trans.name,"Class");
+    strcpy(trans.name,"Class");
     trans.index1 = readshort(fp);
     break;
     
   case HTS_FIELDREF:
-    strcpybuff(trans.name,"Field Reference");
+    strcpy(trans.name,"Field Reference");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_METHODREF:
-    strcpybuff(trans.name,"Method Reference");
+    strcpy(trans.name,"Method Reference");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_INTERFACE:
-    strcpybuff(trans.name,"Interface Method Reference");
+    strcpy(trans.name,"Interface Method Reference");
     trans.index1 =readshort(fp);
     readshort(fp);
     break;
   case HTS_NAMEANDTYPE:
-    strcpybuff(trans.name,"Name and Type");
+    strcpy(trans.name,"Name and Type");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_STRING:                // CONSTANT_String
-    strcpybuff(trans.name,"String");
+    strcpy(trans.name,"String");
     trans.index1 = readshort(fp);
     break;
     
   case HTS_INTEGER:
-    strcpybuff(trans.name,"Integer");
+    strcpy(trans.name,"Integer");
     for(j=0;j<4;j++) fgetc(fp);
     break;
     
   case HTS_FLOAT:
-    strcpybuff(trans.name,"Float");
+    strcpy(trans.name,"Float");
     for(j=0;j<4;j++) fgetc(fp);
     break;
     
   case HTS_LONG:
-    strcpybuff(trans.name,"Long");
+    strcpy(trans.name,"Long");
     for(j=0;j<8;j++) fgetc(fp);
     break;
   case HTS_DOUBLE:
-    strcpybuff(trans.name,"Double");
+    strcpy(trans.name,"Double");
     for(j=0;j<8;j++) fgetc(fp);
     break;
     
@@ -283,9 +371,9 @@ RESP_STRUCT readtable(htsmoduleStruct* str,
   case HTS_UNICODE:
     
     if (trans.type == HTS_ASCIZ)
-      strcpybuff(trans.name,"HTS_ASCIZ");
+      strcpy(trans.name,"HTS_ASCIZ");
     else
-      strcpybuff(trans.name,"HTS_UNICODE");
+      strcpy(trans.name,"HTS_UNICODE");
     
     {
       char BIGSTK buffer[1024]; 
@@ -309,10 +397,10 @@ RESP_STRUCT readtable(htsmoduleStruct* str,
         //      if(tris(buffer)==1) printf("%s\n ",buffer);
         //      if(tris(buffer)==2)  printf("%s\n ",printname(buffer));
         //#endif
-        if(tris(buffer)==1)  str->addLink(str, buffer);       /* trans.file_position */
-        else if(tris(buffer)==2)  str->addLink(str, printname(buffer));
+				if(tris(str->opt,buffer)==1)  str->addLink(str, buffer);       /* trans.file_position */
+        else if(tris(str->opt,buffer)==2)  str->addLink(str, printname(rname,buffer));
 
-        strcpybuff(trans.name,buffer);
+        strcpy(trans.name,buffer);
       } else {    // gros pb
         while ( (length > 0) && (!feof(fp))) {
           fgetc(fp);
@@ -340,7 +428,7 @@ RESP_STRUCT readtable(htsmoduleStruct* str,
 }
 
 
-unsigned short int readshort(FILE *fp)
+static unsigned short int readshort(FILE *fp)
 {
   unsigned short int valint;
   fread(&valint,sizeof(valint),1,fp);
@@ -352,8 +440,9 @@ unsigned short int readshort(FILE *fp)
   
 }
 
-int tris(char * buffer)
+static int tris(httrackp *opt,char * buffer)
 {
+	char catbuff[CATBUFF_SIZE];
   //
   // Java
   if((buffer[0]=='[') && buffer[1]=='L' && (!strstr(buffer,"java/")) ) 
@@ -365,25 +454,21 @@ int tris(char * buffer)
   {
     char type[256];
     type[0]='\0';
-    get_httptype(type,buffer,0);
+    get_httptype(opt,type,buffer,0);
     if (strnotempty(type))     // type reconnu!
       return 1;
     // ajout RX 05/2001
-    else if (is_dyntype(get_ext(buffer)))   // asp,cgi...
+    else if (is_dyntype(get_ext(catbuff, buffer)))   // asp,cgi...
       return 1;
   }
   return 0;
 }
 
-
-char * printname(char  name[1024])
+static char * printname(char rname[1024], char name[1024])
 {
-  char* rname;
-  //char *rname;
   char *p;
   char *p1;
   int j;
-  NOSTATIC_RESERVE(rname, char, 1024);
   rname[0]='\0';
   //
  
@@ -396,7 +481,7 @@ char * printname(char  name[1024])
   for (j = 0; j < (int) strlen(name); j++,p++) {
     if (*p == '/') *p1='.'; 
     if (*p==';'){*p1='\0';
-    strcatbuff(rname,".class");
+    strcat(rname,".class");
     return (rname);}
     else *p1=*p;
     p1++;

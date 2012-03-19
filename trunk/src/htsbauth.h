@@ -40,19 +40,27 @@ Please visit our Website: http://www.httrack.com
 #define HTSBAUTH_DEFH 
 
 // robots wizard
-typedef struct bauth_chain {
+#ifndef HTS_DEF_FWSTRUCT_bauth_chain
+#define HTS_DEF_FWSTRUCT_bauth_chain
+typedef struct bauth_chain bauth_chain;
+#endif
+struct bauth_chain {
   char prefix[1024];          /* www.foo.com/secure/ */
   char auth[1024];            /* base-64 encoded user:pass */
   struct bauth_chain* next;   /* next element */
-} bauth_chain;
+};
 
 
 // buffer pour les cookies et authentification
-typedef struct t_cookie {
+#ifndef HTS_DEF_FWSTRUCT_t_cookie
+#define HTS_DEF_FWSTRUCT_t_cookie
+typedef struct t_cookie t_cookie;
+#endif
+struct t_cookie {
   int max_len;
   char data[32768];
   bauth_chain auth;
-} t_cookie;
+};
 
 
 /* Library internal definictions */
@@ -61,18 +69,18 @@ typedef struct t_cookie {
 // cookies
 int cookie_add(t_cookie* cookie,char* cook_name,char* cook_value,char* domain,char* path);
 int cookie_del(t_cookie* cookie,char* cook_name,char* domain,char* path);
-int cookie_load(t_cookie* cookie,char* path,char* name);
+int cookie_load(t_cookie* cookie, const char* path, const char* name);
 int cookie_save(t_cookie* cookie,char* name);
 void cookie_insert(char* s,char* ins);
 void cookie_delete(char* s,int pos);
-char* cookie_get(char* cookie_base,int param);
+char* cookie_get(char *buffer, char* cookie_base,int param);
 char* cookie_find(char* s,char* cook_name,char* domain,char* path);
 char* cookie_nextfield(char* a);
 
 // basic auth
 int bauth_add(t_cookie* cookie,char* adr,char* fil,char* auth);
 char* bauth_check(t_cookie* cookie,char* adr,char* fil);
-char* bauth_prefix(char* adr,char* fil);
+char* bauth_prefix(char *buffer, char* adr,char* fil);
 
 #endif
 

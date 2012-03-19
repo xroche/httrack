@@ -40,17 +40,22 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSHELP_DEFH
 #define HTSHELP_DEFH 
 
-#include "htsglobal.h"
-#include "htscore.h"
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+
 void infomsg(char* msg);
 void help(char* app,int more);
 void make_empty_index(char* str);
 void help_wizard(httrackp* opt);
 int help_query(char* list,int def);
-void help_catchurl(char* dest_path);
+void help_catchurl(const char* dest_path);
+
 #endif
 
 #endif

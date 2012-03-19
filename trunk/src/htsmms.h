@@ -42,21 +42,26 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSMMS_DEFH
 #define HTSMMS_DEFH 
 
-#include "htsglobal.h"
-
 #if HTS_USEMMS
 
-#include "htsbase.h"
-#include "htsbasenet.h"
-#include "htsthread.h"
+/* Forware definitions */
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
 
-// lien_back
-#include "htscore.h"
-
-typedef struct MMSDownloadStruct {
+#ifndef HTS_DEF_FWSTRUCT_MMSDownloadStruct
+#define HTS_DEF_FWSTRUCT_MMSDownloadStruct
+typedef struct MMSDownloadStruct MMSDownloadStruct;
+#endif
+struct MMSDownloadStruct {
 	lien_back *pBack;
 	httrackp *pOpt;
-} MMSDownloadStruct;
+};
 
 void launch_mms(const MMSDownloadStruct* pStruct);
 #endif

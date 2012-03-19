@@ -42,12 +42,13 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#include "htsmd5.h"
-#include "md5.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "htsmd5.h"
+#include "md5.h"
 
-int domd5mem(const unsigned char * buf, int len, 
+int domd5mem(const unsigned char * buf, size_t len, 
                     unsigned char * digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
@@ -56,7 +57,7 @@ int domd5mem(const unsigned char * buf, int len,
   MD5_CTX ctx;
 
   MD5Init(&ctx, * ( (char*) &endian));
-  MD5Update(&ctx, buf, len);
+  MD5Update(&ctx, buf, (unsigned int) len);
   MD5Final(bindigest, &ctx);
 #else
   /* Broken md5.. temporary hack */
@@ -87,7 +88,6 @@ int domd5mem(const unsigned char * buf, int len,
 
 unsigned long int md5sum32(const char* buff) {
   unsigned char md5digest[16];
-  unsigned char* md5digest_ = md5digest;
-  domd5mem(buff,strlen(buff),md5digest,0);
+  domd5mem(buff,(int)strlen(buff),md5digest,0);
   return *( (long int*)(char*)md5digest );
 }

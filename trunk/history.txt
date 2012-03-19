@@ -4,6 +4,16 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.41-beta
++ New: changed API/ABI to thread-safe ones (libhttrack1 2), big cleanup in all .h definitions
++ Fixed: Major memory usage bug when downloading large sites
++ Fixed: do not rename files if the original MIME type was compatible
++ Fixed: several source fixes for freeBSD (especially time problems)
++ New: option %w to disable specific modules (java, flash..)
++ Fixed: 'no space left in stack for back_add' error
++ Fixed: fixed redirected images with "html" type
++ Fixed: 'Crash adding error, unexpected error found.. [4268]' error
+
 3.40-2
 + Fixed: bogus '.del' filenames with ISO-9660 option
 + Fixed: now merges the header charset even with an empty footer string

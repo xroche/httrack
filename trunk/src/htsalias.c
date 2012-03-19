@@ -66,7 +66,7 @@ void hts_lowcase(char* s);
   } \
   argv[0]=(buff+ptr); \
   strcpybuff(argv[0],token); \
-  ptr += (strlen(argv[0])+1); \
+  ptr += (int) (strlen(argv[0])+1); \
   argc++
 // END OF COPY OF cmdl_ins in htsmain.c
 
@@ -172,6 +172,7 @@ const char* hts_optalias[][4] = {
   {"display","-%v","single","show files transfered and other funny realtime information"},
   {"dos83","-L0","single",""},
   {"iso9660","-L2","single",""},
+  {"disable-module","-%w","param1",""},
   /* */
 
   /* DEPRECATED */
@@ -193,7 +194,7 @@ const char* hts_optalias[][4] = {
   {"advanced-maxlinks","-#L","single",""},
   {"advanced-progressinfo","-#p","single","deprecated"},
   {"catch-url","-#P","single","catch complex URL through proxy"},
-  {"debug-oldftp","-#R","single",""},
+  /*{"debug-oldftp","-#R","single",""},*/
   {"debug-xfrstats","-#T","single",""},
   {"advanced-wait","-#u","single",""},
   {"debug-ratestats","-#Z","single",""},
@@ -544,11 +545,11 @@ char* hts_gethome(void) {
 }
 
 /* Convert ~/foo into /home/smith/foo */
-void expand_home(char* str) {
-  if (str[0] == '~') {
+void expand_home(String *str) {
+  if (StringSub(*str, 1) == '~') {
     char BIGSTK tempo[HTS_URLMAXSIZE*2];
-    strcpybuff(tempo,hts_gethome());
-    strcatbuff(tempo,str+1);
-    strcpybuff(str,tempo);
+    strcpybuff(tempo, hts_gethome());
+    strcatbuff(tempo, StringBuff(*str) + 1);
+    StringCopy(*str, tempo);
   }
 }

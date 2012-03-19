@@ -3,32 +3,33 @@
     Example of <wrappername>_init and <wrappername>_exit call (httrack >> 3.31)
     .c file
 
+    How to build: (callback.so or callback.dll)
+      With GNU-GCC:
+        gcc -O -g3 -Wall -D_REENTRANT -shared -o mycallback.so callbacks-example.c -lhttrack1
+      With MS-Visual C++:
+        cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.dll" callbacks-example.c libhttrack1.lib
+
+      Note: the httrack library linker option is only necessary when using libhttrack's functions inside the callback
+
     How to use:
-    - compile this file as a module (callback.so or callback.dll)
-      example:
-      (with gcc)
-      gcc -O -g3 -Wall -D_REENTRANT -DINET6 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -shared -o callback.so callbacks-example-contentfilter.c
-      or (with visual c++)
-      cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"callback.dll" callbacks-example-contentfilter.c
-    - use the --wrapper option in httrack:
-      httrack --wrapper save-name=callback:process,string[,string..]
+      httrack --wrapper mycallback,stringtofind,stringtofind.. ..
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* "External" */
-#ifdef _WIN32
-#define EXTERNAL_FUNCTION __declspec(dllexport)
-#else
-#define EXTERNAL_FUNCTION 
-#endif
+/* Standard httrack module includes */
+#include "httrack-library.h"
+#include "htsopt.h"
+#include "htsdefines.h"
 
-/* Function definitions */
-EXTERNAL_FUNCTION int process(char* html, int len, char* address, char* filename);
-EXTERNAL_FUNCTION int wrapper_init(char* module, char* initString);
-EXTERNAL_FUNCTION int wrapper_exit(void);
+/* Local function definitions */
+static int process(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* address, const char* filename);
+static int end(t_hts_callbackarg *carg, httrackp *opt);
+
+/* external functions */
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
 
 /* TOLOWER */
 #define TOLOWER_(a) (a >= 'A' && a <= 'Z') ? (a + ('a' - 'A')) : a
@@ -38,24 +39,74 @@ EXTERNAL_FUNCTION int wrapper_exit(void);
   This sample just crawls pages that contains certain keywords, and skips the other ones
 */
 
-static char stringfilter[8192];
-static char* stringfilters[128];
-static int initialized = 0;
+typedef struct t_my_userdef {
+  char stringfilter[8192];
+  char* stringfilters[128];
+} t_my_userdef;
 
-/*
-"check-html" callback
-from htsdefines.h:
-typedef int   (* t_hts_htmlcheck)(char* html,int len,char* address,char* filename);
+/* 
+module entry point 
 */
-EXTERNAL_FUNCTION int process(char* html, int len, char* address, char* filename) {
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+  const char *arg = strchr(argv, ',');
+  if (arg != NULL)
+    arg++;
+
+  /* Check args */
+  if (arg == NULL || *arg == '\0') {
+    fprintf(stderr, "** callback error: arguments expected or bad arguments\n");
+    fprintf(stderr, "usage: httrack --wrapper callback,stringtofind,stringtofind..\n");
+    fprintf(stderr, "example: httrack --wrapper callback,apple,orange,lemon\n");
+    return 0;
+  } else {
+    t_my_userdef *userdef = (t_my_userdef*) malloc(sizeof(t_my_userdef));    /* userdef */
+    char * const stringfilter = userdef->stringfilter;
+    char** const stringfilters = userdef->stringfilters;
+    /* */
+    char* a = stringfilter;
+    int i = 0;
+    fprintf(stderr, "** info: wrapper_init(%s) called!\n", arg);
+    fprintf(stderr, "** callback example: crawling pages only if specific keywords are found\n");
+
+    /* stringfilters = split(arg, ','); */
+    strcpy(stringfilter, arg);
+    while(a != NULL) {
+      stringfilters[i] = a;
+      a = strchr(a, ',');
+      if (a != NULL) {
+        *a = '\0';
+        a ++;
+      }
+      fprintf(stderr, "** callback info: will crawl pages with '%s' in them\n", stringfilters[i]);
+      i++;
+    }
+    stringfilters[i++] = NULL;
+
+    /* Plug callback functions */
+    CHAIN_FUNCTION(opt, check_html, process, userdef);
+    CHAIN_FUNCTION(opt, end, end, userdef);
+  }
+
+  return 1;  /* success */
+}
+
+static int process(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* address, const char* filename) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+  char * const stringfilter = userdef->stringfilter;
+  char** const stringfilters = userdef->stringfilters;
+  /* */
   int i = 0;
   int getIt = 0;
   char* pos;
-  if (!initialized) {
-    fprintf(stderr, "** ERROR! process_init() was not called by httrack - you are probably using an old version (<3.31)\n");
-    fprintf(stderr, "** bailing out..\n");
-    exit(1);
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt, html, len, address, filename)) {
+      return 0;  /* Abort */
+    }
   }
+
+  /* Process */
   if (strcmp(address, "primary") == 0 && strcmp(filename, "/primary") == 0)      /* primary page (list of links) */
     return 1;
   while(stringfilters[i] != NULL && ! getIt) {
@@ -82,39 +133,18 @@ EXTERNAL_FUNCTION int process(char* html, int len, char* address, char* filename
   }
 }
 
-/* <wrappername>_init() will be called, if exists, upon startup */
-EXTERNAL_FUNCTION int wrapper_init(char* module, char* initString) {
-  char* a = stringfilter;
-  int i = 0;
-  fprintf(stderr, "** info: wrapper_init(%s, %s) called!\n", module, initString);
-  fprintf(stderr, "** callback example: crawling pages only if specific keywords are found\n");
-  if (initString == NULL || *initString == '\0') {
-    fprintf(stderr, "** callback error: arguments expected or bad arguments\n");
-    fprintf(stderr, "usage: httrack --wrapper save-name=callback:process,stringtofind,stringtofind..\n");
-    fprintf(stderr, "example: httrack --wrapper save-name=callback:process,apple,orange,lemon\n");
-    return 0;
-  }
-
-  /* stringfilters = split(initString, ','); */
-  strcpy(stringfilter, initString);
-  while(a != NULL) {
-    stringfilters[i] = a;
-    a = strchr(a, ',');
-    if (a != NULL) {
-      *a = '\0';
-      a ++;
-    }
-    fprintf(stderr, "** callback info: will crawl pages with '%s' in them\n", stringfilters[i]);
-    i++;
-  }
-  stringfilters[i++] = NULL;
-  initialized = 1;      /* we're ok */
-  return 1;  /* success */
-}
-
-/* <wrappername>_exit() will be called, if exists, upon exit */
-EXTERNAL_FUNCTION int wrapper_exit(void) {
+static int end(t_hts_callbackarg *carg, httrackp *opt) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
   fprintf(stderr, "** info: wrapper_exit() called!\n");
-  initialized = 0;
-  return 1;   /* success (result ignored anyway in xx_exit) */
+  if (userdef != NULL) {
+    free(userdef);
+    userdef = NULL;
+  }
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
+    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+  }
+
+  return 1;  /* success */
 }

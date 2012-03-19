@@ -38,35 +38,35 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSJAVA_DEFH
 #define HTSJAVA_DEFH 
 
-#include <stdio.h>
-#include "htsmodules.h"
-
-typedef struct  {
+#ifndef HTS_DEF_FWSTRUCT_JAVA_HEADER
+#define HTS_DEF_FWSTRUCT_JAVA_HEADER
+typedef struct JAVA_HEADER JAVA_HEADER;
+#endif
+struct JAVA_HEADER {
   unsigned long  int magic;
   unsigned short int minor;
   unsigned short int major;
   unsigned short int count;
-} JAVA_HEADER;
+};
 
-typedef struct {
+#ifndef HTS_DEF_FWSTRUCT_RESP_STRUCT
+#define HTS_DEF_FWSTRUCT_RESP_STRUCT
+typedef struct RESP_STRUCT RESP_STRUCT;
+#endif
+struct RESP_STRUCT {
   int file_position;
   //
   unsigned int index1;
   unsigned int type;
   char name[1024];
-} RESP_STRUCT;
+};
 
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int hts_detect_java(htsmoduleStruct* str);
-int hts_parse_java(htsmoduleStruct* str);
-RESP_STRUCT affecte(int i1,int i2,RESP_STRUCT *i3,RESP_STRUCT *i4,int i5);
-//unsigned int swap(long int nomber,int digit);
-RESP_STRUCT readtable(htsmoduleStruct* str,FILE *fp,RESP_STRUCT,int*);
-unsigned short int readshort(FILE *fp);
-int tris(char*);
-char * printname(char [1024]);
+
+EXTERNAL_FUNCTION int hts_plug_java(httrackp *opt, const char* argv);
+
 #endif
 
 #endif

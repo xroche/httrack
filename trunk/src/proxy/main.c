@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
 {
   int i;
   int ret = 0;
-	int proxyPort, icpPort;
+	int proxyPort = 0, icpPort = 0;
 	char proxyAddr[256 + 1], icpAddr[256 + 1];
 	PT_Indexes index;
 
@@ -98,10 +98,21 @@ int main(int argc, char* argv[])
 	printf("*** This version is a development release ***\n");
 	printf("\n");
 	if (argc < 3
-		|| !scanHostPort(argv[1], proxyAddr, &proxyPort)
-		|| !scanHostPort(argv[2], icpAddr, &icpPort)) 
+		|| (
+			strcmp(argv[1], "--convert") != 0
+			&&
+			(
+				!scanHostPort(argv[1], proxyAddr, &proxyPort)
+				|| !scanHostPort(argv[2], icpAddr, &icpPort)
+			)
+			)
+		) 
 	{
-		fprintf(stderr, "usage: %s <proxy-addr:proxy-port> <ICP-addr:ICP-port> [ ( <new.zip path> | <new.ndx path> | --list <file-list> ) ..]\n", argv[0]);
+		fprintf(stderr, "proxy mode:\n");
+		fprintf(stderr, "usage: %s <proxy-addr:proxy-port> <ICP-addr:ICP-port> [ ( <new.zip path> | <new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n", argv[0]);
+		fprintf(stderr, "\texample:%s proxy:8080 localhost:3130 /home/archives/www-archive-01.zip /home/old-archives/www-archive-02.ndx\n", argv[0]);
+		fprintf(stderr, "convert mode:\n");
+		fprintf(stderr, "usage: %s --convert <archive-output-path> [ ( <new.zip path> | <new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n", argv[0]);
 		fprintf(stderr, "\texample:%s proxy:8080 localhost:3130 /home/archives/www-archive-01.zip /home/old-archives/www-archive-02.ndx\n", argv[0]);
     return 1;
   }
@@ -150,7 +161,15 @@ int main(int argc, char* argv[])
 #endif
 
   /* Go */
-  ret = proxytrack_main(proxyAddr, proxyPort, icpAddr, icpPort, index);
+	if (strcmp(argv[1], "--convert") != 0) {
+		ret = proxytrack_main(proxyAddr, proxyPort, icpAddr, icpPort, index);
+	} else {
+		if ((ret = PT_SaveCache(index, argv[2])) == 0) {
+			fprintf(stderr, "processed: '%s'\n", argv[2]);
+		} else {
+			fprintf(stderr, "error: could not save '%s'\n", argv[2]);
+		}
+	}
 
 	/* Wipe */
 	PT_Delete(index);

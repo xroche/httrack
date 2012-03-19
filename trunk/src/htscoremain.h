@@ -45,20 +45,18 @@ Please visit our Website: http://www.httrack.com
   "php2 php3 php4 php cgi asp jsp pl cfm nsf=text/html"
 
 #include "htsglobal.h"
+#include "htsopt.h"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 // Main, récupère les paramètres et appelle le robot
-#if HTS_ANALYSTE
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_main(int argc, char **argv);
-#endif
-#else
-int main(int argc, char **argv);
+HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
 #endif
 
 int cmdl_opt(char* s);
-int check_path(char* s,char* defaultname);
+int check_path(String* s,char* defaultname);
 
 #endif
 

@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
@@ -38,78 +37,189 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEFINES_DEFH
 #define HTS_DEFINES_DEFH
 
-typedef void  (* t_hts_htmlcheck_init)(void);
-typedef void  (* t_hts_htmlcheck_uninit)(void);
-typedef int   (* t_hts_htmlcheck_start)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck_end)(void);
-typedef int   (* t_hts_htmlcheck_chopt)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck_process)(char** html,int* len,char* url_adresse,char* url_fichier);
-typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url_fichier);
-typedef char* (* t_hts_htmlcheck_query)(char* question);
-typedef char* (* t_hts_htmlcheck_query2)(char* question);
-typedef char* (* t_hts_htmlcheck_query3)(char* question);
-typedef int   (* t_hts_htmlcheck_loop)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
-typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
-typedef int   (* t_hts_htmlcheck_check_mime)(char* adr,char* fil,char* mime,int status);
-typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
-typedef void  (* t_hts_htmlcheck_filesave)(char* file);
-typedef void  (* t_hts_htmlcheck_filesave2)(char* hostname,char* filename,char* localfile,int is_new,int is_modified,int not_updated);
-typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
-typedef int   (* t_hts_htmlcheck_linkdetected2)(char* link, char* tag_start);
-typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
-typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
-typedef int   (* t_hts_htmlcheck_receivehead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
-
-/* Library internal definictions */
-#ifdef HTS_INTERNAL_BYTECODE
-// demande d'interaction avec le shell
-#if HTS_ANALYSTE
-extern char HTbuff[2048];
-extern t_hts_htmlcheck_init       hts_htmlcheck_init;
-extern t_hts_htmlcheck_uninit     hts_htmlcheck_uninit;
-extern t_hts_htmlcheck_start      hts_htmlcheck_start;
-extern t_hts_htmlcheck_end        hts_htmlcheck_end;
-extern t_hts_htmlcheck_chopt      hts_htmlcheck_chopt;
-extern t_hts_htmlcheck_process    hts_htmlcheck_preprocess;
-extern t_hts_htmlcheck_process    hts_htmlcheck_postprocess;
-extern t_hts_htmlcheck            hts_htmlcheck;
-extern t_hts_htmlcheck_query      hts_htmlcheck_query;
-extern t_hts_htmlcheck_query2     hts_htmlcheck_query2;
-extern t_hts_htmlcheck_query3     hts_htmlcheck_query3;
-extern t_hts_htmlcheck_loop       hts_htmlcheck_loop;
-extern t_hts_htmlcheck_check      hts_htmlcheck_check;
-extern t_hts_htmlcheck_check_mime hts_htmlcheck_check_mime;
-extern t_hts_htmlcheck_pause      hts_htmlcheck_pause;
-extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
-extern t_hts_htmlcheck_filesave2  hts_htmlcheck_filesave2;
-extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
-extern t_hts_htmlcheck_linkdetected2 hts_htmlcheck_linkdetected2;
-extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
-extern t_hts_htmlcheck_savename   hts_htmlcheck_savename;
-extern t_hts_htmlcheck_sendhead   hts_htmlcheck_sendhead;
-extern t_hts_htmlcheck_receivehead hts_htmlcheck_receivehead;
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_htsblk
+#define HTS_DEF_FWSTRUCT_htsblk
+typedef struct htsblk htsblk;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_hts_stat_struct
+#define HTS_DEF_FWSTRUCT_hts_stat_struct
+typedef struct hts_stat_struct hts_stat_struct;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_htsmoduleStruct
+#define HTS_DEF_FWSTRUCT_htsmoduleStruct
+typedef struct htsmoduleStruct htsmoduleStruct;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_t_hts_callbackarg
+#define HTS_DEF_FWSTRUCT_t_hts_callbackarg
+typedef struct t_hts_callbackarg t_hts_callbackarg;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_t_hts_callbackarg
+#define HTS_DEF_FWSTRUCT_t_hts_callbackarg
+typedef struct t_hts_callbackarg t_hts_callbackarg;
 #endif
 
-#if HTS_ANALYSTE
-#define HT_PRINT(A) strcatbuff(HTbuff,A);
-#define HT_REQUEST_START HTbuff[0]='\0';
-#define HT_REQUEST_END 
-#define HTT_REQUEST_START HTbuff[0]='\0';
-#define HTT_REQUEST_END 
-#define HTS_REQUEST_START HTbuff[0]='\0';
-#define HTS_REQUEST_END 
-#define HTS_PANIC_PRINTF(S) strcpybuff(_hts_errmsg,S);
+/* External callbacks */
+#ifndef EXTERNAL_FUNCTION
+#ifdef _WIN32
+#define EXTERNAL_FUNCTION __declspec(dllexport)
 #else
-#define HT_PRINT(A) printf("%s",A);
-#define HT_REQUEST_START /*printf("§\n");*/
-#define HT_REQUEST_END   /*printf("§\n");*/
-#define HTT_REQUEST_START /*if (httrack.shell) printf("§\n");*/
-#define HTT_REQUEST_END   /*if (httrack.shell) printf("§\n");*/
-#define HTS_REQUEST_START if (opt->shell) { HT_REQUEST_START }
-#define HTS_REQUEST_END   if (opt->shell) { HT_REQUEST_END }
-#define HTS_PANIC_PRINTF(S) printf("%s\n",S);
+#define EXTERNAL_FUNCTION 
 #endif
+#endif
+
+/* --wrapper plug function prototype */
+
+typedef int (*t_hts_plug)(httrackp *opt, const char* argv);
+typedef int (*t_hts_unplug)(httrackp *opt);
+
+/* htsopt function callbacks definitions */
+
+typedef void  (* t_hts_htmlcheck_init)(t_hts_callbackarg *carg);
+typedef void  (* t_hts_htmlcheck_uninit)(t_hts_callbackarg *carg);
+typedef int   (* t_hts_htmlcheck_start)(t_hts_callbackarg *carg, httrackp* opt);
+typedef int   (* t_hts_htmlcheck_end)(t_hts_callbackarg *carg, httrackp *opt);
+typedef int   (* t_hts_htmlcheck_chopt)(t_hts_callbackarg *carg, httrackp* opt);
+typedef int   (* t_hts_htmlcheck_process)(t_hts_callbackarg *carg, httrackp *opt, 
+                                          char** html, int* len, const char* url_adresse, const char* url_fichier);
+typedef t_hts_htmlcheck_process t_hts_htmlcheck_preprocess;
+typedef t_hts_htmlcheck_process t_hts_htmlcheck_postprocess;
+typedef int   (* t_hts_htmlcheck_check_html)(t_hts_callbackarg *carg, httrackp *opt, 
+                                             char* html, int len, const char* url_adresse, const char* url_fichier);
+typedef const char* (* t_hts_htmlcheck_query)(t_hts_callbackarg *carg, httrackp *opt, 
+                                              const char* question);
+typedef const char* (* t_hts_htmlcheck_query2)(t_hts_callbackarg *carg, httrackp *opt, 
+                                               const char* question);
+typedef const char* (* t_hts_htmlcheck_query3)(t_hts_callbackarg *carg, httrackp *opt, 
+                                               const char* question);
+typedef int   (* t_hts_htmlcheck_loop)(t_hts_callbackarg *carg, httrackp *opt, 
+                                       lien_back* back, int back_max, int back_index, 
+                                       int lien_tot, int lien_ntot, 
+                                       int stat_time, hts_stat_struct* stats);
+typedef int   (* t_hts_htmlcheck_check_link)(t_hts_callbackarg *carg, httrackp *opt, 
+                                             const char* adr, const char* fil, int status);
+typedef int   (* t_hts_htmlcheck_check_mime)(t_hts_callbackarg *carg, httrackp *opt, 
+                                             const char* adr, const char* fil, const char* mime, int status);
+typedef void  (* t_hts_htmlcheck_pause)(t_hts_callbackarg *carg, httrackp *opt, 
+                                        const char* lockfile);
+typedef void  (* t_hts_htmlcheck_filesave)(t_hts_callbackarg *carg, httrackp *opt, 
+                                           const char* file);
+typedef void  (* t_hts_htmlcheck_filesave2)(t_hts_callbackarg *carg, httrackp *opt, 
+                                            const char* hostname, const char* filename, const char* localfile, 
+                                            int is_new, int is_modified, int not_updated);
+typedef int   (* t_hts_htmlcheck_linkdetected)(t_hts_callbackarg *carg, httrackp *opt, 
+                                               char* link);
+typedef int   (* t_hts_htmlcheck_linkdetected2)(t_hts_callbackarg *carg, httrackp *opt, 
+                                                char* link, const char* tag_start);
+typedef int   (* t_hts_htmlcheck_xfrstatus)(t_hts_callbackarg *carg, httrackp *opt, 
+                                            lien_back* back);
+typedef int   (* t_hts_htmlcheck_savename)(t_hts_callbackarg *carg, httrackp *opt, 
+                                           const char* adr_complete, const char* fil_complete, 
+                                           const char* referer_adr, const char* referer_fil, char* save);
+typedef int   (* t_hts_htmlcheck_sendhead)(t_hts_callbackarg *carg, httrackp *opt, 
+                                           char* buff, const char* adr, const char* fil, 
+                                           const char* referer_adr, const char* referer_fil, 
+                                           htsblk* outgoing);
+typedef int   (* t_hts_htmlcheck_receivehead)(t_hts_callbackarg *carg, httrackp *opt, 
+                                              char* buff, const char* adr, const char* fil, 
+                                              const char* referer_adr, const char* referer_fil, 
+                                              htsblk* incoming);
+
+/* External additional parsing module(s) */
+typedef int (*t_hts_htmlcheck_detect)(t_hts_callbackarg *carg, httrackp *opt, htsmoduleStruct* str);
+typedef int (*t_hts_htmlcheck_parse)(t_hts_callbackarg *carg, httrackp *opt, htsmoduleStruct* str);
+
+/* Callbacks */
+#ifndef HTS_DEF_FWSTRUCT_t_hts_htmlcheck_callbacks
+#define HTS_DEF_FWSTRUCT_t_hts_htmlcheck_callbacks
+typedef struct t_hts_htmlcheck_callbacks t_hts_htmlcheck_callbacks;
+#endif
+
+/* Callabck array */
+#define DEFCALLBACK(NAME)         \
+  struct NAME {                   \
+    t_hts_htmlcheck_ ##NAME fun;  \
+    t_hts_callbackarg *carg;      \
+  } NAME
+
+/* Callback items */
+typedef void* t_hts_htmlcheck_t_hts_htmlcheck_callbacks_item;
+typedef DEFCALLBACK(t_hts_htmlcheck_callbacks_item);
+
+/* Linked list, which should be used for the 'arg' user-defined argument */
+struct t_hts_callbackarg {
+  /* User-defined agument for the called function */
+  void *userdef;
+
+  /* Previous function, if any (fun != NULL) */
+  struct prev {
+    void *fun;
+    t_hts_callbackarg *carg;
+  } prev;
+};
+
+/* Callback structure */
+struct t_hts_htmlcheck_callbacks {
+  /* v3.41 */
+	DEFCALLBACK(init);
+	DEFCALLBACK(uninit);
+	DEFCALLBACK(start);
+	DEFCALLBACK(end);
+	DEFCALLBACK(chopt);
+	DEFCALLBACK(preprocess);
+	DEFCALLBACK(postprocess);
+	DEFCALLBACK(check_html);
+	DEFCALLBACK(query);
+	DEFCALLBACK(query2);
+	DEFCALLBACK(query3);
+	DEFCALLBACK(loop);
+	DEFCALLBACK(check_link);
+	DEFCALLBACK(check_mime);
+	DEFCALLBACK(pause);
+	DEFCALLBACK(filesave);
+	DEFCALLBACK(filesave2);
+	DEFCALLBACK(linkdetected);
+	DEFCALLBACK(linkdetected2);
+	DEFCALLBACK(xfrstatus);
+	DEFCALLBACK(savename);
+	DEFCALLBACK(sendhead);
+	DEFCALLBACK(receivehead);
+  DEFCALLBACK(detect);
+  DEFCALLBACK(parse);
+  /* >3.41 */
+};
+
+/* Library internal definitions */
+#ifdef HTS_INTERNAL_BYTECODE
+
+#ifndef HTS_DEF_FWSTRUCT_t_hts_callback_ref
+#define HTS_DEF_FWSTRUCT_t_hts_callback_ref
+typedef struct t_hts_callback_ref t_hts_callback_ref;
+#endif
+struct t_hts_callback_ref {
+	const char *name;
+	size_t offset;
+};
+
+extern const t_hts_htmlcheck_callbacks default_callbacks;
+extern const t_hts_callback_ref default_callbacks_ref[];
+
+#define HT_PRINT(A) strcatbuff(opt->state.HTbuff,A);
+#define HT_REQUEST_START opt->state.HTbuff[0]='\0';
+#define HT_REQUEST_END 
+#define HTT_REQUEST_START opt->state.HTbuff[0]='\0';
+#define HTT_REQUEST_END 
+#define HTS_REQUEST_START opt->state.HTbuff[0]='\0';
+#define HTS_REQUEST_END 
+#define HTS_PANIC_PRINTF(S) strcpybuff(opt->state._hts_errmsg,S);
 
 #endif
 
