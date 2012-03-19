@@ -1856,7 +1856,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
     int count=256;
     int tot_nl=0;
     int lf_detected=0;
-    int at_begining=1;
+    int at_beginning=1;
     do {
       nl = READ_INTERNAL_ERROR;
       count--;
@@ -1874,7 +1874,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
             // or
             // lf detected AND first character read
             if (*(r->adr+r->size) == 10) {
-              if (lf_detected || (at_begining) || (bufl<0))
+              if (lf_detected || (at_beginning) || (bufl<0))
                 count=-1;
               lf_detected=1;
             }
@@ -1888,7 +1888,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
                 lf_detected=0;
               }
               (r->size)++;
-              at_begining=0;
+              at_beginning=0;
             }
             *(r->adr+r->size)='\0';    // terminer par octet nul
           }
@@ -4026,7 +4026,7 @@ int get_userhttptype(httrackp *opt, char *s, const char *fil) {
 
       /* Check --assume foooo/foo/bar.cgi=text/html, then foo/bar.cgi=text/html, then bar.cgi=text/html */
       /* also: --assume baz,bar,foooo/foo/bar.cgi=text/html */
-      /* start from path begining */
+      /* start from path beginning */
       do {
         const char* next;
         const char* mimedefs = StringBuff(opt->mimedefs);    /* loop through mime definitions : \nfoo=bar\nzoo=baz\n.. */
@@ -4297,7 +4297,7 @@ void fprintfio(FILE* fp,char* buff,char* prefix) {
     break;
     default:
       if (nl)
-        fprintf(fp,prefix);
+         fprintf(fp,"%s", prefix);
       nl=0;
       fputc(*buff,fp);
     }

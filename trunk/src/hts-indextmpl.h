@@ -166,7 +166,6 @@ regen:
   "		</TH>"LF
 
 /* %s = INFO */
-/* %s = META REFRESH IF ANY */
 #define HTS_INDEX_FOOTER \
   "<!-- Note: Template file not found, using internal one -->"LF\
   "	</TABLE>"LF\
@@ -178,7 +177,6 @@ regen:
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
-  "	%s"LF\
   ""LF\
   "<!-- ==================== Start epilogue ==================== -->"LF\
   "		</td>"LF\

@@ -4,6 +4,27 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.45-1
+* Fixed: interrupting an update/continue mirror session should not delete anymore previously downloaded content (William Roeder, Alain Desilets and many others)
+* Fixed: --continue/--update bug leading to download again already cached data in some cases (especially redirect/error pages)
+
+3.44-5
+* Fixed: crash when using -d with non-fully-qualified hostname (Alain Desilets)
+* Fixed: typo in logs (Pascal Boulerie)
+
+3.44-4
+* Fixed: random crash when interrupting the mirror (spotted by -fstack-protector) in htscoremain.c
+
+3.44-3
++ Fixed: Linux build
+
+3.44-2
++ Fixed: malformed format htslib.c (Moritz Muehlenhoff)
++ Fixed: default footer print format
++ New: clever "^C" handling
++ New: added --do-not-generate-errors option
++ New: increased maximum cookie name
+
 3.44-1
 + Fixed: Randomly corrupted files during updates due to "engine: warning: entry cleaned up, but no trace on heap"/"Unexpected 412/416 error" errors (Petr Gajdusek ; closes:#614966)
 
@@ -142,7 +163,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Shell: "URL Hack" in interface
 + Shell: "Save settings" now rebuild categories
 + Shell: "Shutdown PC after mirror" option
-+ Shell: Sound at the begining/end or the mirror (configurable through system sound properties)
++ Shell: Sound at the beginning/end or the mirror (configurable through system sound properties)
 + Shell: Fixed drag & drop, .url import
 + Shell: Fixed "wizard" mode (crash)
 + Fixed: Crash at the end due to unterminated pending threads
@@ -202,7 +223,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: static compiling on Linux/Unix
 + Fixed: bloated .h headers (internal function definitions)
 + Fixed: Bogus query strings with embedded ../ and/or ./
-+ New: Added "change-options" call in the crawl begining
++ New: Added "change-options" call in the crawl beginning
 + New: Query arguments now sorted for normalized URL checks (when "url hack" option is activated)
 + Fixed: Previous dependency to zlib.dll to zlib1.dll
 + Fixed: Broken static files were not correctly updated with the new cache format

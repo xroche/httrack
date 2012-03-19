@@ -393,15 +393,20 @@ static int hts_acceptlink_(httrackp* opt,
     switch((opt->travel & 255)) {
     case 0: 
       if (!opt->wizard)    // mode non wizard
-        forbidden_url=1; break;    // interdicton de sortir au dela de l'adresse
+        forbidden_url=1;
+      break;    // interdicton de sortir au dela de l'adresse
     case 1: {              // sortie sur le même dom.xxx
       size_t i = strlen(adr)-1;
       size_t j = strlen(urladr)-1;
-      while( (i>0) && (adr[i]!='.')) i--;
-      while( (j>0) && (urladr[j]!='.')) j--;
-      i--; j--;
-      while( (i>0) && (adr[i]!='.')) i--;
-      while( (j>0) && (urladr[j]!='.')) j--;
+      if ((i>0) && (j>0)) {
+        while( (i>0) && (adr[i]!='.')) i--;
+        while( (j>0) && (urladr[j]!='.')) j--;
+        if ((i>0) && (j>0)) {
+          i--; j--;
+          while( (i>0) && (adr[i]!='.')) i--;
+          while( (j>0) && (urladr[j]!='.')) j--;
+        }
+      }
       if ((i>0) && (j>0)) {
         if (!strfield2(adr+i,urladr+j)) {   // !=
           if (!opt->wizard) {   // mode non wizard
@@ -425,7 +430,7 @@ static int hts_acceptlink_(httrackp* opt,
         
       } else
         forbidden_url=1;
-            } 
+      } 
       break;  
     case 2: {                      // sortie sur le même .xxx
       size_t i = strlen(adr)-1;
@@ -452,7 +457,7 @@ static int hts_acceptlink_(httrackp* opt,
           }
         }
       } else forbidden_url=1;     
-            } 
+    } 
       break;
     case 7:                 // everywhere!!
       if (opt->wizard) {   // mode wizard

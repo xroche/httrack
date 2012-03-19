@@ -784,7 +784,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                   if (strnotempty(r->charset)) {
                     HT_ADD("<!-- Added by HTTrack --><meta http-equiv=\"content-type\" content=\"text/html;charset=");
                     HT_ADD(r->charset);
-                    HT_ADD("\"><!-- /Added by HTTrack -->");
+                    HT_ADD("\" /><!-- /Added by HTTrack -->");
                     HT_ADD(eol);
                   }
                 }
@@ -1663,7 +1663,9 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 						char *tag_attr_start = adr;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            if ((nofollow) || (opt->state.stop))
+            if ((nofollow) 
+              || (opt->state.stop && /* force follow not to lose previous cache data */ !opt->is_update)
+              )
               p_nocatch=1;
 
             // écrire codebase avant, flusher avant code

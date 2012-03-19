@@ -87,11 +87,11 @@ Please visit our Website: http://www.httrack.com
                                "uuu" \
                                "y" \
                              )
-// These (accepted) characters will be ignored at begining of a keyword
+// These (accepted) characters will be ignored at beginning of a keyword
 #define KEYW_IGNORE_BEG       "-_."
 // These (accepted) characters will be stripped if at the end of a keyword
 #define KEYW_STRIP_END       "-_."
-// Words begining with these (accepted) characters will be ignored
+// Words beginning with these (accepted) characters will be ignored
 #define KEYW_NOT_BEG         "0123456789"
 // Treat these characters as space characters - MUST NOT BE EMPTY!!!
 #define KEYW_SPACE           " ',;:!?\"\x0d\x0a\x09\x0b\x0c"
@@ -244,7 +244,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
           cchar=KEYW_TRANSCODE_TO[pos];
         
         if (strchr(KEYW_ACCEPT,cchar)) {
-          /* Ignore some characters at begining */
+          /* Ignore some characters at beginning */
           if ((len>0) || (!strchr(KEYW_IGNORE_BEG,cchar))) {
             keyword[len++]=cchar;
             keyword[len]='\0';

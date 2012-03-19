@@ -1635,7 +1635,7 @@ int httpmirror(char* url1, httrackp* opt) {
                   } 
                 }
                 if (opt->log!=NULL) {
-                  HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Note: due to %s remote robots.txt rules, links begining with these path will be forbidden: %s (see in the options to disable this)"LF,urladr,infobuff);
+                  HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)"LF,urladr,infobuff);
                   test_flush;
                 }
               }
@@ -2397,7 +2397,7 @@ HTSEXT_API int structcheck(const char* path) {
     return 0;   /* OK */
   }
 
-  /* Start from the begining */
+  /* Start from the beginning */
   i = 0;
 
   /* Skip irrelevant part (the root slash, or the drive path) */

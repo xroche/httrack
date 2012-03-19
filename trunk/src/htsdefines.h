@@ -124,6 +124,7 @@ typedef int   (* t_hts_htmlcheck_xfrstatus)(t_hts_callbackarg *carg, httrackp *o
 typedef int   (* t_hts_htmlcheck_savename)(t_hts_callbackarg *carg, httrackp *opt, 
                                            const char* adr_complete, const char* fil_complete, 
                                            const char* referer_adr, const char* referer_fil, char* save);
+typedef t_hts_htmlcheck_savename t_hts_htmlcheck_extsavename;
 typedef int   (* t_hts_htmlcheck_sendhead)(t_hts_callbackarg *carg, httrackp *opt, 
                                            char* buff, const char* adr, const char* fil, 
                                            const char* referer_adr, const char* referer_fil, 
@@ -195,6 +196,7 @@ struct t_hts_htmlcheck_callbacks {
   DEFCALLBACK(detect);
   DEFCALLBACK(parse);
   /* >3.41 */
+	DEFCALLBACK(extsavename);
 };
 
 /* Library internal definitions */

@@ -2020,7 +2020,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         }
       }
 
-      sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"));
+      strcpy(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-in_progress.lock"));
       //sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
       /*do {
         if (!n)
@@ -2225,7 +2225,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       // erase ref files if not interrupted
       DIR *dir;
       struct dirent *entry;
-      for(dir = opendir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME)) 
+      for(dir = opendir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME))
         ; dir != NULL && ( entry = readdir(dir) ) != NULL 
         ; )
       {
