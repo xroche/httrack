@@ -69,6 +69,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LFS_FLAG = @LFS_FLAG@
+LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
@@ -134,25 +135,201 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 
 exemplesdir = $(datadir)/httrack/libtest
-exemples_DATA = *.c *.h *.txt *.dsp *.dsw
-
+exemples_DATA = example.* *.c *.h *.txt
 EXTRA_DIST = $(exemples_DATA)
+
+INCLUDES = \
+	@DEFAULT_CFLAGS@ \
+	@THREADS_CFLAGS@ \
+	@V6_FLAG@ \
+	@LFS_FLAG@ \
+	-DPREFIX=\""$(prefix)"\" \
+	-DSYSCONFDIR=\""$(sysconfdir)"\" \
+	-DDATADIR=\""$(datadir)"\" \
+	-DLIBDIR=\""$(libdir)"\"
+
+
+AM_CPPFLAGS = -I../src
+AM_LDFLAGS = -L../src
+
+# Examples
+libbaselinks_la_SOURCES = callbacks-example-baselinks.c
+libbaselinks_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libbaselinks_la_LDFLAGS = -version-info 1:0:0
+libcontentfilter_la_SOURCES = callbacks-example-contentfilter.c
+libcontentfilter_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libcontentfilter_la_LDFLAGS = -version-info 1:0:0
+libdisplayheader_la_SOURCES = callbacks-example-displayheader.c
+libdisplayheader_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libdisplayheader_la_LDFLAGS = -version-info 1:0:0
+libfilename_la_SOURCES = callbacks-example-filename.c
+libfilename_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libfilename_la_LDFLAGS = -version-info 1:0:0
+libfilename2_la_SOURCES = callbacks-example-filename2.c
+libfilename2_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libfilename2_la_LDFLAGS = -version-info 1:0:0
+libfilenameiisbug_la_SOURCES = callbacks-example-filenameiisbug.c
+libfilenameiisbug_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libfilenameiisbug_la_LDFLAGS = -version-info 1:0:0
+liblistlinks_la_SOURCES = callbacks-example-listlinks.c
+liblistlinks_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+liblistlinks_la_LDFLAGS = -version-info 1:0:0
+pkglib_LTLIBRARIES = libbaselinks.la libcontentfilter.la libdisplayheader.la libfilename.la libfilename2.la libfilenameiisbug.la liblistlinks.la
 subdir = libtest
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-DIST_SOURCES =
+LTLIBRARIES = $(pkglib_LTLIBRARIES)
+
+libbaselinks_la_DEPENDENCIES =
+am_libbaselinks_la_OBJECTS = callbacks-example-baselinks.lo
+libbaselinks_la_OBJECTS = $(am_libbaselinks_la_OBJECTS)
+libcontentfilter_la_DEPENDENCIES =
+am_libcontentfilter_la_OBJECTS = callbacks-example-contentfilter.lo
+libcontentfilter_la_OBJECTS = $(am_libcontentfilter_la_OBJECTS)
+libdisplayheader_la_DEPENDENCIES =
+am_libdisplayheader_la_OBJECTS = callbacks-example-displayheader.lo
+libdisplayheader_la_OBJECTS = $(am_libdisplayheader_la_OBJECTS)
+libfilename_la_DEPENDENCIES =
+am_libfilename_la_OBJECTS = callbacks-example-filename.lo
+libfilename_la_OBJECTS = $(am_libfilename_la_OBJECTS)
+libfilename2_la_DEPENDENCIES =
+am_libfilename2_la_OBJECTS = callbacks-example-filename2.lo
+libfilename2_la_OBJECTS = $(am_libfilename2_la_OBJECTS)
+libfilenameiisbug_la_DEPENDENCIES =
+am_libfilenameiisbug_la_OBJECTS = callbacks-example-filenameiisbug.lo
+libfilenameiisbug_la_OBJECTS = $(am_libfilenameiisbug_la_OBJECTS)
+liblistlinks_la_DEPENDENCIES =
+am_liblistlinks_la_OBJECTS = callbacks-example-listlinks.lo
+liblistlinks_la_OBJECTS = $(am_liblistlinks_la_OBJECTS)
+
+DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+am__depfiles_maybe = depfiles
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/callbacks-example-baselinks.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-contentfilter.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-displayheader.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filename.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filename2.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filenameiisbug.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-listlinks.Plo
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
+	$(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
+LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+DIST_SOURCES = $(libbaselinks_la_SOURCES) $(libcontentfilter_la_SOURCES) \
+	$(libdisplayheader_la_SOURCES) $(libfilename_la_SOURCES) \
+	$(libfilename2_la_SOURCES) $(libfilenameiisbug_la_SOURCES) \
+	$(liblistlinks_la_SOURCES)
 DATA = $(exemples_DATA)
 
 DIST_COMMON = Makefile.am Makefile.in
+SOURCES = $(libbaselinks_la_SOURCES) $(libcontentfilter_la_SOURCES) $(libdisplayheader_la_SOURCES) $(libfilename_la_SOURCES) $(libfilename2_la_SOURCES) $(libfilenameiisbug_la_SOURCES) $(liblistlinks_la_SOURCES)
+
 all: all-am
 
 .SUFFIXES:
+.SUFFIXES: .c .lo .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am  $(top_srcdir)/configure.in $(ACLOCAL_M4)
 	cd $(top_srcdir) && \
 	  $(AUTOMAKE) --gnu  libtest/Makefile
 Makefile: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)
+pkglibLTLIBRARIES_INSTALL = $(INSTALL)
+install-pkglibLTLIBRARIES: $(pkglib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(pkglibdir)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    f="`echo $$p | sed -e 's|^.*/||'`"; \
+	    echo " $(LIBTOOL) --mode=install $(pkglibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) $$p $(DESTDIR)$(pkglibdir)/$$f"; \
+	    $(LIBTOOL) --mode=install $(pkglibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) $$p $(DESTDIR)$(pkglibdir)/$$f; \
+	  else :; fi; \
+	done
+
+uninstall-pkglibLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	    p="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " $(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(pkglibdir)/$$p"; \
+	  $(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(pkglibdir)/$$p; \
+	done
+
+clean-pkglibLTLIBRARIES:
+	-test -z "$(pkglib_LTLIBRARIES)" || rm -f $(pkglib_LTLIBRARIES)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" = "$$p" && dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+libbaselinks.la: $(libbaselinks_la_OBJECTS) $(libbaselinks_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libbaselinks_la_LDFLAGS) $(libbaselinks_la_OBJECTS) $(libbaselinks_la_LIBADD) $(LIBS)
+libcontentfilter.la: $(libcontentfilter_la_OBJECTS) $(libcontentfilter_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libcontentfilter_la_LDFLAGS) $(libcontentfilter_la_OBJECTS) $(libcontentfilter_la_LIBADD) $(LIBS)
+libdisplayheader.la: $(libdisplayheader_la_OBJECTS) $(libdisplayheader_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libdisplayheader_la_LDFLAGS) $(libdisplayheader_la_OBJECTS) $(libdisplayheader_la_LIBADD) $(LIBS)
+libfilename.la: $(libfilename_la_OBJECTS) $(libfilename_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libfilename_la_LDFLAGS) $(libfilename_la_OBJECTS) $(libfilename_la_LIBADD) $(LIBS)
+libfilename2.la: $(libfilename2_la_OBJECTS) $(libfilename2_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libfilename2_la_LDFLAGS) $(libfilename2_la_OBJECTS) $(libfilename2_la_LIBADD) $(LIBS)
+libfilenameiisbug.la: $(libfilenameiisbug_la_OBJECTS) $(libfilenameiisbug_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libfilenameiisbug_la_LDFLAGS) $(libfilenameiisbug_la_OBJECTS) $(libfilenameiisbug_la_LIBADD) $(LIBS)
+liblistlinks.la: $(liblistlinks_la_OBJECTS) $(liblistlinks_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(liblistlinks_la_LDFLAGS) $(liblistlinks_la_OBJECTS) $(liblistlinks_la_LIBADD) $(LIBS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT) core *.core
+
+distclean-compile:
+	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-baselinks.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-contentfilter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-displayheader.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filename.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filename2.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filenameiisbug.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-listlinks.Plo@am__quote@
+
+distclean-depend:
+	-rm -rf ./$(DEPDIR)
+
+.c.o:
+@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o $@ `test -f '$<' || echo '$(srcdir)/'`$<; \
+@am__fastdepCC_TRUE@	then mv "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c `test -f '$<' || echo '$(srcdir)/'`$<
+
+.c.obj:
+@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o $@ `if test -f '$<'; then $(CYGPATH_W) '$<'; else $(CYGPATH_W) '$(srcdir)/$<'`; \
+@am__fastdepCC_TRUE@	then mv "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c `if test -f '$<'; then $(CYGPATH_W) '$<'; else $(CYGPATH_W) '$(srcdir)/$<'`
+
+.c.lo:
+@am__fastdepCC_TRUE@	if $(LTCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o $@ `test -f '$<' || echo '$(srcdir)/'`$<; \
+@am__fastdepCC_TRUE@	then mv "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Plo"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/$*.Plo' tmpdepfile='$(DEPDIR)/$*.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ `test -f '$<' || echo '$(srcdir)/'`$<
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -181,12 +358,60 @@ uninstall-exemplesDATA:
 	  echo " rm -f $(DESTDIR)$(exemplesdir)/$$f"; \
 	  rm -f $(DESTDIR)$(exemplesdir)/$$f; \
 	done
+
+ETAGS = etags
+ETAGSFLAGS =
+
+CTAGS = ctags
+CTAGSFLAGS =
+
 tags: TAGS
-TAGS:
+
+ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
+	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	mkid -fID $$unique
+
+TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+		$(TAGS_FILES) $(LISP)
+	tags=; \
+	here=`pwd`; \
+	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	test -z "$(ETAGS_ARGS)$$tags$$unique" \
+	  || $(ETAGS) $(ETAGSFLAGS) $(AM_ETAGSFLAGS) $(ETAGS_ARGS) \
+	     $$tags $$unique
 
 ctags: CTAGS
-CTAGS:
+CTAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+		$(TAGS_FILES) $(LISP)
+	tags=; \
+	here=`pwd`; \
+	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	test -z "$(CTAGS_ARGS)$$tags$$unique" \
+	  || $(CTAGS) $(CTAGSFLAGS) $(AM_CTAGSFLAGS) $(CTAGS_ARGS) \
+	     $$tags $$unique
 
+GTAGS:
+	here=`$(am__cd) $(top_builddir) && pwd` \
+	  && cd $(top_srcdir) \
+	  && gtags -i $(GTAGS_ARGS) $$here
+
+distclean-tags:
+	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 
 top_distdir = ..
@@ -219,10 +444,10 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(DATA)
+all-am: Makefile $(LTLIBRARIES) $(DATA)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(exemplesdir)
+	$(mkinstalldirs) $(DESTDIR)$(pkglibdir) $(DESTDIR)$(exemplesdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -250,11 +475,13 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libtool clean-pkglibLTLIBRARIES \
+	mostlyclean-am
 
 distclean: distclean-am
 
-distclean-am: clean-am distclean-generic distclean-libtool
+distclean-am: clean-am distclean-compile distclean-depend \
+	distclean-generic distclean-libtool distclean-tags
 
 dvi: dvi-am
 
@@ -266,7 +493,7 @@ info-am:
 
 install-data-am: install-exemplesDATA
 
-install-exec-am:
+install-exec-am: install-pkglibLTLIBRARIES
 
 install-info: install-info-am
 
@@ -280,7 +507,8 @@ maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-generic mostlyclean-libtool
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
 pdf: pdf-am
 
@@ -290,17 +518,22 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-exemplesDATA uninstall-info-am
+uninstall-am: uninstall-exemplesDATA uninstall-info-am \
+	uninstall-pkglibLTLIBRARIES
 
-.PHONY: all all-am check check-am clean clean-generic clean-libtool \
-	distclean distclean-generic distclean-libtool distdir dvi \
-	dvi-am info info-am install install-am install-data \
-	install-data-am install-exec install-exec-am \
-	install-exemplesDATA install-info install-info-am install-man \
+.PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
+	clean-libtool clean-pkglibLTLIBRARIES ctags distclean \
+	distclean-compile distclean-depend distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am info \
+	info-am install install-am install-data install-data-am \
+	install-exec install-exec-am install-exemplesDATA install-info \
+	install-info-am install-man install-pkglibLTLIBRARIES \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	uninstall uninstall-am uninstall-exemplesDATA uninstall-info-am
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool pdf \
+	pdf-am ps ps-am tags uninstall uninstall-am \
+	uninstall-exemplesDATA uninstall-info-am \
+	uninstall-pkglibLTLIBRARIES
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

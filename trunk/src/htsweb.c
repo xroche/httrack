@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr, "usage: %s <path-to-html-root-dir> [key value [key value]..]\n", argv[0]);
-    fprintf(stderr, "example: %s /usr/share/httrack\n", argv[0]);
+    fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
     return 1;
   }
 
@@ -200,6 +200,7 @@ int main(int argc, char* argv[])
   /* launch */
   ret = help_server(argv[1]);
 
+  htsthread_wait();
   hts_uninit();
 
 #ifdef _WIN32
@@ -210,7 +211,7 @@ int main(int argc, char* argv[])
 }
 
 static int webhttrack_runmain(int argc, char** argv);
-static PTHREAD_TYPE back_launch_cmd( void* pP ) {
+static PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_cmd( void* pP ) {
   char* cmd = (char*) pP;
   char** argv = (char**) malloct(1024 * sizeof(char*));
   int argc = 0;
@@ -267,8 +268,11 @@ static PTHREAD_TYPE back_launch_cmd( void* pP ) {
 
 void webhttrack_main(char* cmd) {
   commandRunning = 1;
-  _beginthread(back_launch_cmd, 0, (void*) strdup(cmd));
+  (void)hts_newthread(back_launch_cmd, 0, (void*) strdup(cmd));
 }
+
+/* Internal locking */
+HTSEXT_API int htsSetLock(PTHREAD_LOCK_TYPE * hMutex,int lock);
 
 void webhttrack_lock(int lock) {
   htsSetLock(&refreshMutex, lock);
@@ -281,6 +285,7 @@ static int webhttrack_runmain(int argc, char** argv) {
   htswrap_add("start",htsshow_start);
   htswrap_add("change-options",htsshow_chopt);
   htswrap_add("end",htsshow_end);
+  htswrap_add("preprocess-html",htsshow_preprocesshtml);
   htswrap_add("check-html",htsshow_checkhtml);
   htswrap_add("loop",htsshow_loop);
   htswrap_add("query",htsshow_query);
@@ -290,8 +295,10 @@ static int webhttrack_runmain(int argc, char** argv) {
   htswrap_add("pause",htsshow_pause);
   htswrap_add("save-file",htsshow_filesave);
   htswrap_add("link-detected",htsshow_linkdetected);
+  htswrap_add("link-detected2",htsshow_linkdetected2);
   htswrap_add("transfer-status",htsshow_xfrstatus);
   htswrap_add("save-name",htsshow_savename);
+  htsthread_wait_n(1);
   hts_uninit();
   return hts_main(argc,argv);
  
@@ -357,6 +364,9 @@ int __cdecl htsshow_chopt(httrackp* opt) {
 }
 int  __cdecl htsshow_end(void) { 
   return 1; 
+}
+int __cdecl htsshow_preprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier) {
+  return 1;
 }
 int __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier) {
   return 1;
@@ -589,6 +599,15 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
           case 2:
             sprintf(tmp, "purging files");
             break;
+          case 3:
+            sprintf(tmp, "loading cache");
+            break;
+          case 4:
+            sprintf(tmp, "waiting (scheduler)");
+            break;
+          case 5:
+            sprintf(tmp, "waiting (throttle)");
+            break;
           }
           smallserver_setkey("info.currentjob", tmp);
         }
@@ -643,10 +662,19 @@ void __cdecl htsshow_filesave(char* file) {
 int __cdecl htsshow_linkdetected(char* link) {
   return 1;
 }
+int __cdecl htsshow_linkdetected2(char* link, char* start_tag) {
+  return 1;
+}
 int __cdecl htsshow_xfrstatus(lien_back* back) {
   return 1;
 }
 int __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save) {
+  return 1;
+}
+int __cdecl htsshow_sendheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing) {
+  return 1;
+}
+int __cdecl htsshow_receiveheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming) {
   return 1;
 }
 

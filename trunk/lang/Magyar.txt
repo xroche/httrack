@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Jozsef Tamas Herczeg (hdodi at freemail.hu) \r\n
 LANGUAGE_CHARSET
 ISO-8859-2
+LANGUAGE_WINDOWSID
+Hungarian
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Régi HTTP/1.0 kérések használata (korlátozza a motor energiáját!)
 Attempt to limit retransfers through several tricks (file size test..)
 Ismételt átvitel korlátozása különféle trükkökkel (fájlméret teszt...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Külsõ hivatkozások felhasználónév/jelszó nélküli írása
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Türelmes kérések (kiszolgálók részére)
 Update hack (limit re-transfers)
 Ismételt átvitelek korlátozása
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Régi HTTP/1.0 (1.1 nem) kérések alkalmazása
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Jelöljön ki egy létezõ, frissítendõ projektet
 Click here to select path
 Nyomja meg az útvonal kijelöléséhez
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Projekt Varázsló...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Projekt neve:
 Base path:
 Útvonal:
+Project category:
+
 C:\\My Web Sites
 C:\\Letoltott weblapok
 Type a new project name, \r\nor select existing project to update/resume

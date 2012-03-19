@@ -69,6 +69,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LFS_FLAG = @LFS_FLAG@
+LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
@@ -133,7 +134,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 
-SUBDIRS = src man libtest templates lang html
+SUBDIRS = src man m4 libtest templates lang html
 
 EXTRA_DIST = gpl.txt gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def

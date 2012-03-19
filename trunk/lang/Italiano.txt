@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Witold Krakowski (wkrakowski at libero.it)\r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Italian (Standard)
 OK
 Ok
 Cancel
@@ -173,7 +175,7 @@ Analisi file html..
 Purging files..
 Pulizia file
 Loading cache in progress..
-
+Caricamento della cache in corso...
 Parsing HTML file (testing links)..
 Analisi file HTML (test dei collegamenti)
 Pause - Toggle [Mirror]/[Pause download] to resume operation
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Usa richieste HTTP/1.0, limita le capacità del motore!
 Attempt to limit retransfers through several tricks (file size test..)
 Tentativo di limitare il numero di ripetizioni dei trasferimenti, usando alcuni truchi (test della dimensione del file..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Salva link esterni senza login e password
 Write internal links without query string
@@ -517,9 +521,9 @@ Usa proxy per trasferimenti ftp
 TimeOut(s)
 TimeOut
 Persistent connections (Keep-Alive)
-
+Connessioni persistenti (Keep-alive)
 Reduce connection time and type lookup time using persistent connections
-
+Riduci tempo di connessione e il tempo di verifica del tipo usando la connessione persistente
 Retries
 Tentativi
 Size limit
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Richieste toleranti (per i server)
 Update hack (limit re-transfers)
 Aggiorna hack (limita i ritrasferimenti)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Forza richieste HTTP/1.0 (non 1.1)
 Max connections / seconds
@@ -587,7 +593,7 @@ Log, Indice, Cache
 Proxy
 Proxy
 MIME Types
-
+Tipi MIME
 Do you really want to quit WinHTTrack Website Copier?
 Vuoi veramente uscire da WinHTTrack?
 Do not connect to a provider (already connected)
@@ -770,6 +776,8 @@ Select existing project to update
 Seleziona da qui un progetto esistente da aggiornare
 Click here to select path
 Clicca qui per selezionare il percorso
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Wizard per progetto HTTrack
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Il nome del progetto:
 Base path:
 Il percorso base:
+Project category:
+
 C:\\My Web Sites
 C:\\Mie pagine Web
 Type a new project name, \r\nor select existing project to update/resume
@@ -893,28 +903,28 @@ Scarica il sito(i) web\nScarica il sito(i) (con richieste)\nScarica file separat
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
 URL Relativo / URL Assoluto (default)\nURL Assoluto / URL Assoluto\nURL Assoluto 7 URL Assoluto\nURL Originale / URL Originale
 Open Source offline browser
-
+Browser offline open source
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-
+Browser offline/programma per copiare i siti. Copia le pagine remote sul tuo computer. Free
 httrack, winhttrack, webhttrack, offline browser
-
+httrack, winhttrack, webhttrack, offline browser
 URL list (.txt)
-
+lista degli URL (.txt)
 Previous
-
+Precedente
 Next
-
+Successivo
 URLs
-
+URLs
 Warning
-
+Attenzione
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-
+Il tuo browser non supporta javascript. Per un risultato migliiore usa un browser con supporto javascript
 Thank you
-
+Grazie
 You can now close this window
-
+Puoi chiudere questa finestra adesso
 Server terminated
-
+Server disconnesso
 A fatal error has occured during this mirror
-
+Si è verificato un errore fatale durante la copia

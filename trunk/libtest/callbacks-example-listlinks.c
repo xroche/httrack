@@ -26,6 +26,12 @@
 #define EXTERNAL_FUNCTION 
 #endif
 
+/* Function definitions */
+EXTERNAL_FUNCTION int process_file(char* html, int len, char* url_adresse, char* url_fichier);
+EXTERNAL_FUNCTION int check_detectedlink(char* link);
+EXTERNAL_FUNCTION int check_loop(void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats);
+EXTERNAL_FUNCTION int check_void(void);
+
 /*
   This sample just lists all links in documents with the parent link:
   <parent> -> <link>

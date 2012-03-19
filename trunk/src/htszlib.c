@@ -35,13 +35,12 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
 
 /* specific definitions */
-#include <stdio.h>
-#include <stdlib.h>
 #include "htsbase.h"
 #include "htscore.h"
-
 #include "htszlib.h"
 
 #if HTS_USEZLIB
@@ -65,7 +64,7 @@ int hts_zunpack(char* filename,char* newfile) {
         if (fpout) {
           int nr;
           do {
-            char buff[1024];
+            char BIGSTK buff[1024];
             nr=gzread (gz, buff, 1024);
             if (nr>0) {
               size+=nr;
@@ -84,4 +83,65 @@ int hts_zunpack(char* filename,char* newfile) {
   return -1;
 }
 
+int hts_extract_meta(char* path) {
+  unzFile zFile = unzOpen(fconcat(path,"hts-cache/new.zip"));
+  zipFile zFileOut = zipOpen(fconcat(path,"hts-cache/meta.zip"), 0);
+  if (zFile != NULL && zFileOut != NULL) {
+    if (unzGoToFirstFile(zFile) == Z_OK) {
+      zip_fileinfo fi;
+      unz_file_info ufi;
+      char BIGSTK filename[HTS_URLMAXSIZE * 4];
+      char BIGSTK comment[8192];
+      int entries = 0;
+      memset(comment, 0, sizeof(comment));       // for truncated reads
+      memset(&fi, 0, sizeof(fi));
+      memset(&ufi, 0, sizeof(ufi));
+      do  {
+        int readSizeHeader;
+        filename[0] = '\0';
+        comment[0] = '\0';
+        
+        if (unzOpenCurrentFile(zFile) == Z_OK) {
+          if (
+            (readSizeHeader = unzGetLocalExtrafield(zFile, comment, sizeof(comment) - 2)) > 0
+            &&
+            unzGetCurrentFileInfo(zFile, &ufi, filename, sizeof(filename) - 2, NULL, 0, NULL, 0) == Z_OK
+            ) 
+          {
+            comment[readSizeHeader] = '\0';
+            fi.dosDate = ufi.dosDate;
+            fi.internal_fa = ufi.internal_fa;
+            fi.external_fa = ufi.external_fa;
+            if (zipOpenNewFileInZip(zFileOut,
+              filename,
+              &fi,
+              NULL,
+              0,
+              NULL,
+              0,
+              NULL, /* comment */
+              Z_DEFLATED,
+              Z_DEFAULT_COMPRESSION) == Z_OK)
+            {
+              if (zipWriteInFileInZip(zFileOut, comment, (int) strlen(comment)) != Z_OK) {
+              }
+              if (zipCloseFileInZip(zFileOut) != Z_OK) {
+              }
+            }
+          }
+          unzCloseCurrentFile(zFile);
+        }
+      } while( unzGoToNextFile(zFile) == Z_OK );
+    }
+    zipClose(zFileOut, "Meta-data extracted by HTTrack/"HTTRACK_VERSION);
+    unzClose(zFile);
+    return 1;
+  }
+  return 0;
+}
+    
+#else
+    
+#error HTS_USEZLIB not defined
+    
 #endif

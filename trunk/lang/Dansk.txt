@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Jesper Bramm (bramm@get2net.dk) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Danish
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Brug gamle HTTP/1.0 -type forespørglser (begrænser effektiviteten !)
 Attempt to limit retransfers through several tricks (file size test..)
 Forsøg at begrænse gen-overførsler gennem brug af 'tricks' (f.eks. test af fil-størrelser...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Skriv ekstrene links uden brug af login/password
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Acceptér forespørgsler (for servere)
 Update hack (limit re-transfers)
 Opdatér hack (Begræns gen-overførsler)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Gennemtving HTTP / 1.0-type forespørgsler (gælder ikke ver. 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Vælg et projektnavn at opdatere
 Click here to select path
 Klik her for at vælge en stil
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Projektassistent
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Projektnavn:
 Base path:
 Vælg en fast sti til dine projekter:
+Project category:
+
 C:\\My Web Sites
 C:\\Mine web-steder
 Type a new project name, \r\nor select existing project to update/resume

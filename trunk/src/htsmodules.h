@@ -98,14 +98,22 @@ struct htsmoduleStruct {
 
 };
 
+/* Used to wrap module initialization */
+/* return 1 if init was ok */
+typedef int (*t_htsWrapperInit)(char *fn, char *args);
+typedef int (*t_htsWrapperExit)(void);
+typedef int (*t_htsWrapperPlugInit)(char *args);
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 extern void htspe_init(void);
 extern int hts_parse_externals(htsmoduleStruct* str);
-extern void* getFunctionPtr(char* file, char* fncname);
 
 extern int gz_is_available;
 extern int swf_is_available;
 extern int SSL_is_available;
 extern int V6_is_available;
 extern char WHAT_is_available[64];
+#endif
 
 #endif

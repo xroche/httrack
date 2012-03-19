@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Xavier Roche (roche at httrack.com)\r\nRobert Lagadec (rlagadec at yahoo.fr) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+English (United States)
 OK
 OK
 Cancel
@@ -184,6 +186,8 @@ scanning
 scanning
 Waiting for scheduled time..
 Waiting for scheduled time..
+Transferring data..
+Transferring data..
 Connecting to provider
 Connecting to provider
 [%d seconds] to go before start of operation
@@ -452,6 +456,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Use old HTTP/1.0 requests (limits engine power!)
 Attempt to limit retransfers through several tricks (file size test..)
 Attempt to limit retransfers through several tricks (file size test..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
 Write external links without login/password
 Write external links without login/password
 Write internal links without query string
@@ -554,6 +560,8 @@ Tolerant requests (for servers)
 Tolerant requests (for servers)
 Update hack (limit re-transfers)
 Update hack (limit re-transfers)
+URL hacks (join similar URLs)
+URL hacks (join similar URLs)
 Force old HTTP/1.0 requests (no 1.1)
 Force old HTTP/1.0 requests (no 1.1)
 Max connections / seconds
@@ -770,6 +778,8 @@ Select existing project to update
 Select existing project to update
 Click here to select path
 Click here to select path
+Select or create a new category name, to sort your mirrors in categories
+Select or create a new category name, to sort your mirrors in categories
 HTTrack Project Wizard...
 HTTrack Project Wizard...
 New project name:
@@ -780,6 +790,8 @@ Project name:
 Project name:
 Base path:
 Base path:
+Project category:
+Project category:
 C:\\My Web Sites
 C:\\My Web Sites
 Type a new project name, \r\nor select existing project to update/resume

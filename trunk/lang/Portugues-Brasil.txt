@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Paulo Neto (company at layout.com.br) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Portuguese (Brazil)
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Utilizar chamadas antigas HTTP/1.0 limita a capacidade de captura!
 Attempt to limit retransfers through several tricks (file size test..)
 Tentativa de limitar a retransferência através de várias maneiras (teste do tamanho do arquivo..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Gravar links externos sem login/senha
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Requisição de tolerância (para servidores)
 Update hack (limit re-transfers)
 Corte de atualização (limite da retransferência)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Forçar requisição HTTP/1.0 anterior (não 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Selecionar um projeto existente para atualizar
 Click here to select path
 Clique aqui para selecionar o caminho
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Assistente de projetos HTTrack...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Nome do projeto:
 Base path:
 Caminho base:
+Project category:
+
 C:\\My Web Sites
 C:\\Meus Sites
 Type a new project name, \r\nor select existing project to update/resume

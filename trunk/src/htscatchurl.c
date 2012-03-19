@@ -34,6 +34,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 // Fichier intercepteur d'URL .c
 
 /* specific definitions */
@@ -41,11 +44,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#ifndef  _WIN32_WCE
 #include <fcntl.h>
+#endif
 #if HTS_WIN
 #else
 #include <arpa/inet.h>
@@ -194,8 +195,8 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
       socinput(soc,line,1000);
       if (strnotempty(line)) {
         if (sscanf(line,"%s %s %s",method,url,protocol) == 3) {
-          char url_adr[HTS_URLMAXSIZE*2];
-          char url_fil[HTS_URLMAXSIZE*2];
+          char BIGSTK url_adr[HTS_URLMAXSIZE*2];
+          char BIGSTK url_fil[HTS_URLMAXSIZE*2];
           // méthode en majuscule
           int i,r=0;
           url_adr[0]=url_fil[0]='\0';
@@ -207,7 +208,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
           // adresse du lien
           if (ident_url_absolute(url,url_adr,url_fil)>=0) {
             // Traitement des en-têtes
-            char loc[HTS_URLMAXSIZE*2];
+            char BIGSTK loc[HTS_URLMAXSIZE*2];
             htsblk blkretour;
             memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location=loc;    // si non nul, contiendra l'adresse véritable en cas de moved xx

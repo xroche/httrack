@@ -40,19 +40,44 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version
-#define HTTRACK_VERSION      "3.30"
-#define HTTRACK_VERSIONID    "3.30.01"
+#define HTTRACK_VERSION      "3.33-2"
+#define HTTRACK_VERSIONID    "3.33.16"
 #define HTTRACK_AFF_VERSION  "3.x"
 //#define HTTRACK_AFF_WARNING  "This is a BETA release of WinHTTrack Website Copier ("HTTRACK_VERSION")\nPlease report any crashes, bugs or problems"
 
-
+#ifndef HTS_NOINCLUDES
+#ifndef _WIN32_WCE
+#include <stdio.h>
+#include <stdlib.h>
+#else
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef HTS_CECOMPAT
+#include "cecompat.h"
+#else
+#include "celib.h"
+#endif
+#endif
+#endif
 
 // Définition plate-forme
 #include "htssystem.h"
 #include "htsconfig.h"
 
+// WIN32 types
+#ifdef _WIN32
+#ifndef SIZEOF_LONG
+#define SIZEOF_LONG 4
+#define SIZEOF_LONG_LONG 8
+#endif
+#endif
+
+
 // config.h
 #ifdef _WIN32
+
+// WIN32
+#ifndef _WIN32_WCE
 
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
@@ -65,6 +90,35 @@ Please visit our Website: http://www.httrack.com
 #endif
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
+#endif
+
+#else
+
+// Win32CE
+//#pragma runtime_checks( "s", restore )
+#define HTS_SPARE_MEMORY 1
+#define HTS_ALIGN 8
+#define BIGSTK static
+#undef DLLIB   // LoadLibrary(libssl) crashes
+#define NOSTRDEBUG 1
+#undef HTS_MAKE_KEYWORD_INDEX
+#ifdef HTS_CECOMPAT
+#define HTS_DO_NOT_USE_FTIME 1
+#undef HAVE_SYS_STAT_H
+#undef HAVE_SYS_TYPES_H
+#else
+#undef HTS_DO_NOT_USE_FTIME
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#endif
+
+#define HTS_DLOPEN 0
+#undef HTS_INET6
+#ifndef S_ISREG
+#define S_ISREG(m) ((m) & _S_IFREG)
+
+#endif
+
 #endif
 
 #else
@@ -110,7 +164,6 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-
 // Socket windows ou socket unix
 #ifdef _WIN32
 #undef HTS_PLATFORM
@@ -124,6 +177,15 @@ Please visit our Website: http://www.httrack.com
 #undef HTS_PLATFORM
 #define HTS_PLATFORM 3
 #endif
+#endif
+
+// don't spare memory usage by default
+#ifndef HTS_SPARE_MEMORY
+#define HTS_SPARE_MEMORY 0
+#endif
+
+#ifndef BIGSTK 
+#define BIGSTK
 #endif
 
 // compatibilité DOS
@@ -208,14 +270,24 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
+#if HTS_SPARE_MEMORY==0
 /* Gestion des tables de hashage */
 #define HTS_HASH_SIZE 20147
 /* Taille max d'une URL */
 #define HTS_URLMAXSIZE 1024
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
+#else
+/* Gestion des tables de hashage */
+#define HTS_HASH_SIZE 1023
+/* Taille max d'une URL */
+#define HTS_URLMAXSIZE 256
+/* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
+#define HTS_CDLMAXSIZE 1024
+#endif
+
 /* Copyright (C) Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2003]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2005]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"
@@ -357,7 +429,11 @@ typedef int INTsys;
 #define LOCAL_SOCKET_ID -500000
 
 // taille de chaque buffer (10 sockets 650 ko)
-#define TAILLE_BUFFER 65535
+#if HTS_SPARE_MEMORY==0
+#define TAILLE_BUFFER 65536
+#else
+#define TAILLE_BUFFER 8192
+#endif
 
 #if HTS_WIN
 #else
@@ -390,11 +466,11 @@ typedef int INTsys;
 //#define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
 typedef unsigned long int t_htsboundary;
-typedef struct _mlink {
+typedef struct mlink {
   char* adr;
   int len;
   int id;
-  struct _mlink* next;
+  struct mlink* next;
 } mlink;
 static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
@@ -448,6 +524,23 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 
 // htsmain
 #define DEBUG_STEPS 0
+
+
+// Débuggage de contrôle
+#if HTS_DEBUG_CLOSESOCK
+#define _HTS_WIDE 1
+#endif
+#if HTS_WIDE_DEBUG
+#define _HTS_WIDE 1
+#endif
+#if _HTS_WIDE
+extern FILE* DEBUG_fp;
+#define DEBUG_W(A)  { if (DEBUG_fp==NULL) DEBUG_fp=fopen("bug.out","wb"); fprintf(DEBUG_fp,":>"A); fflush(DEBUG_fp); }
+#undef _
+#define _ ,
+#endif
+
+
 
 #endif
 

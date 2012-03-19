@@ -40,12 +40,18 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int hts_acceptlink(httrackp* opt,
                    int ptr,int lien_tot,lien_url** liens,
                    char* adr,char* fil,
+                   char* tag, char* attribute,
                    int* set_prio_to_0,
                    int* just_test_it);
 int hts_testlinksize(httrackp* opt,
                      char* adr,char* fil,
                      LLint size);
+#endif
+
 #endif

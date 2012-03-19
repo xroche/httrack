@@ -35,13 +35,16 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htsnostatic.h"
 
 #include "htsbase.h"
 #include "htshash.h"
 #include "htsinthash.h"
 
-typedef struct {
+typedef struct hts_varhash {
   /*
   inthash values;
   */

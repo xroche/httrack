@@ -39,6 +39,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSALIAS_DEFH
 #define HTSALIAS_DEFH
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 extern const char* hts_optalias[][4];
 int optalias_check(int argc,const char * const * argv,int n_arg,
                    int* return_argc,char** return_argv,
@@ -54,5 +56,6 @@ const char* opttype_value(int p);
 const char* opthelp_value(int p);
 char* hts_gethome(void);
 void expand_home(char* str);
+#endif
 
 #endif

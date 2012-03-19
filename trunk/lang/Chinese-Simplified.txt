@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Brook Qin (brookqwr at sina.com) \r\n
 LANGUAGE_CHARSET
 gb2312
+LANGUAGE_WINDOWSID
+Chinese (PRC)
 OK
 确定
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 使用旧的 HTTP/1.0 请求 (将限制镜像能力!)
 Attempt to limit retransfers through several tricks (file size test..)
 试以若干手段限制再传送 (如通过文件大小测试)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 保存链接时不泻露登陆名/口令
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 允许对服务器的非精确请求
 Update hack (limit re-transfers)
 更新时采取其他手段防止重复下载
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 强制使用旧的HTTP/1.0请求 (不采用1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 请选择一个已有的工程以更新
 Click here to select path
 点击此处以选择路径
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack 工程向导...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 工程名:
 Base path:
 总保存路径:
+Project category:
+
 C:\\My Web Sites
 C:\\My Websites
 Type a new project name, \r\nor select existing project to update/resume

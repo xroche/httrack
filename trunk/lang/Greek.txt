@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Michael Papadakis (mikepap at freemail dot gr)\r\n
 LANGUAGE_CHARSET
 ISO-8859-7
+LANGUAGE_WINDOWSID
+Greek
 OK
 Εντάξει
 Cancel
@@ -61,7 +63,7 @@ Add
 Scan Rules
 Κανόνες Αναζήτησης
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Χρήση μπαλαντέρ για τον αποκλεισμό ή την περίληψη URLs ή links.\nΜπορείτε να βάλετε αρκετές φράσεις ανίχνευσης στην ίδια γραμμή.\nΧρησιμοποιήστε κενά για διαχωρισμό.\n\nΠχ: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Χρήση μπαλαντέρ για τον αποκλεισμό ή την αποδοχή URLs ή links.\nΜπορείτε να βάλετε αρκετές φράσεις ανίχνευσης στην ίδια γραμμή.\nΧρησιμοποιήστε κενά για διαχωρισμό.\n\nΠχ: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
 Links που αποκλείονται
 Include link(s)
@@ -101,7 +103,7 @@ All links will match
 Add exclusion filter
 Πρόσθεση φίλτρου απόρριψης
 Add inclusion filter
-Πρόσθεση φίλτρου συνυπολογισμού
+Πρόσθεση φίλτρου αποδοχής
 Existing filters
 Υπάρχοντα φίλτρα
 Cancel changes
@@ -111,19 +113,19 @@ Save current preferences as default values
 Click to confirm
 Κλικ για επιβεβαίωση
 No log files in %s!
-Δεν υπάρχουν αρχεία γεγονότων στο %s!
+Δεν υπάρχει αρχείο γεγονότων στο %s!
 No 'index.html' file in %s!
 Δεν υπάρχει αρχείο 'index.html' στο %s!
 Click to quit WinHTTrack Website Copier
 Κλικ για να εγκαταλείψετε το WinHTTrack Website Copier
 View log files
-Αρχεία γεγονότων
+Αρχείο γεγονότων
 Browse HTML start page
 ’νοιγμα της αρχικής σελίδας
 End of mirror
 Τέλος αντιγραφής
 View log files
-Αρχεία γεγονότων
+Αρχείο γεγονότων
 Browse Mirrored Website
 Αντιγραμμένος τόπος
 New project...
@@ -163,7 +165,7 @@ connect
 search
 αναζήτηση
 ready
-σε ετοιμότητα
+αναμονή
 error
 λάθος
 Receiving files..
@@ -184,6 +186,8 @@ scanning
 σάρωση
 Waiting for scheduled time..
 Αναμονή προγραμματισμένης ώρας...
+Transferring data..
+Μεταφορά δεδομένων...
 Connecting to provider
 Επιχειρείται σύνδεση
 [%d seconds] to go before start of operation
@@ -199,13 +203,13 @@ A problem occured during the mirroring operation\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
 \nΔείτε το αρχείο γεγονότων αν είναι απαραίτητο.\n\nΚλικ στο ΤΕΛΟΣ για να εγκαταλείψετε το WinHTTrack Website Copier.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-Η διαδικασία αντιγραφής τέλειωσε.\nΚλικ στο Έξοδος για να εγκαταλείψετε το WinHTTrack.\nΔείτε το(α) αρχείο(α) γεγονότων αν είναι απαραίτητο, έτσι ώστε να επιβεβαιώσετε ότι όλα είναι εντάξει.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
+Η διαδικασία αντιγραφής τέλειωσε.\nΚλικ στο Έξοδος για να εγκαταλείψετε το WinHTTrack.\nΔείτε το αρχείο γεγονότων αν είναι απαραίτητο, έτσι ώστε να επιβεβαιώσετε ότι όλα είναι εντάξει.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * Η ΑΝΤΙΓΡΑΦΗ ΕΓΚΑΤΑΛΕΙΦΘΗΚΕ! * *\r\nΗ παρούσα προσωρινή cache είναι απαραίτητη για κάθε λειτουργία ανανέωσης και περιλαμβάνει μόνο δεδομένα που κατέβηκαν κατά τη διάρκεια της τωρινής εγκαταλελειμένης περιόδου.\r\nΗ προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες. Αν δεν θέλετε να χάσετε αυτές τις πληροφορίες, πρέπει να να τις ανακτήσετε και να διαγράψετε την παρούσα cache.\r\n[Σημείωση: Αυτό μπορεί να γίνει εύκολα σβήνοντας τα αρχεία hts-cache/new.*]\r\n\r\nΝομίζετε πως η προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες και θέλετε να την ανακτήσετε;
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * ΣΦΑΛΜΑ ΑΝΤΙΓΡΑΦΗΣ * *\r\nΤο WinHTTrack ανακάλυψε πως το παρών αντίγραφο είναι άδειο. Αν ήταν μια ανανέωση, το προηγούμενο αντίγραφο ανακτήθηκε.\r\nΛόγος: Οι πρώτη(ες) σελίδα(ες) είτε δεν βρέθηκαν ή υπήρξε πρόβλημα κατά την σύνδεση.\r\n=> Επιβεβαιώστε ότι η τοποθεσία υπάρχει ακόμα και/ή ελέγξτε τις ρυθμίσεις του proxy σας! <=
+* * ΣΦΑΛΜΑ ΑΝΤΙΓΡΑΦΗΣ * *\r\nΤο WinHTTrack ανακάλυψε πως το παρόν αντίγραφο είναι άδειο. Αν ήταν μια ανανέωση, το προηγούμενο αντίγραφο ανακτήθηκε.\r\nΛόγος: Οι πρώτη(ες) σελίδα(ες) είτε δεν βρέθηκαν ή υπήρξε πρόβλημα κατά την σύνδεση.\r\n=> Επιβεβαιώστε ότι η τοποθεσία υπάρχει ακόμα και/ή ελέγξτε τις ρυθμίσεις του proxy σας! <=
 \n\nTip: Click [View log file] to see warning or error messages
-\n\nΣυμβουλή: Κλικ στο [Προβολή αρχείων γεγονότων] για να δείτε μηνύματα προειδοποιήσεων ή λαθών
+\n\nΣυμβουλή: Κλικ στο [Προβολή αρχείο γεγονότων] για να δείτε μηνύματα προειδοποιήσεων ή λαθών
 Error deleting a hts-cache/new.* file, please do it manually
 Σφάλμα κατά το σβήσιμο ενός hts-cache/new.* αρχείου, παρακαλώ κάντε το μόνοι σας
 Do you really want to quit WinHTTrack Website Copier?
@@ -223,7 +227,7 @@ Do you really want to quit WinHTTrack Website Copier?
 - Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
 - Κατάσταση συνέχισης (Η διαδικασία διακόπηκε) -\n\nΕπιβεβαιώστε διεύθυνση(εις) στη θέση URL, ελέγξτε τις παραμέτρους αν είναι απαραίτητο και μετά κλικ στο 'Επόμενο'.
 Log files Path
-Διαδρομή αρχείων γεγονότων
+Διαδρομή αρχείου γεγονότων
 Path
 Διαδρομή
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
@@ -245,7 +249,7 @@ Port του proxy
 Define proxy settings
 Ορισμός ρυθμίσεων proxy
 Use standard HTTP proxy as FTP proxy
-Χρήση κανονικού HTTP proxy σαν FTP proxy
+Χρήση κανονικού HTTP proxy, σαν FTP proxy
 Path
 Διαδρομή
 Select Path
@@ -269,9 +273,9 @@ Click to add a URL
 Load URL(s) from text file
 Φόρτωμα URL(s) από αρχείο κειμένου
 WinHTTrack preferences (*.opt)|*.opt||
-WinHTTrack προτιμήσεις (*.opt)|*.opt||
+Προτιμήσεις WinHTTrack (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
-Αρχείο κειμένου λίστας διευθύνσεων  (*.txt)|*.txt||
+Λίστα διευθύνσεων  (*.txt)|*.txt||
 File not found!
 Το αρχείο δεν βρέθηκε!
 Do you really want to change the project name/path?
@@ -311,7 +315,7 @@ Web Addresses: (URL)
 Stop WinHTTrack?
 Σταμάτημα του WinHTTrack;
 No log files in %s!
-Δεν υπάρχουν αρχεία γεγονότων στο %s!
+Δεν υπάρχει αρχείο γεγονότων στο %s!
 Pause Download?
 Παύση κατεβάσματος;
 Stop the mirroring operation
@@ -319,9 +323,9 @@ Stop the mirroring operation
 Minimize to System Tray
 Ελαχιστοποίηση στην μπάρα συστήματος
 Click to skip a link or stop parsing
-Κλικ για πήδημα ενός link ή σταμάτημα παρσίματος
+Κλικ για παράκαμψη ενός link ή σταμάτημα παρσίματος
 Click to skip a link
-Κλικ για πήδημα ενός link
+Κλικ για παράκαμψη ενός link
 Bytes saved
 Σωσμένα bytes
 Links scanned
@@ -331,11 +335,11 @@ Time:
 Connections:
 Συνδέσεις:
 Running:
-Σε εκτέλεση:
+Μεταφορές
 Hide
 Απόκρυψη
 Transfer rate
-Ρυθμός μεταφοράς
+Ταχύτητα
 SKIP
 ΠΑΡΑΛΕΙΨΗ
 Information
@@ -347,7 +351,7 @@ Files updated:
 Errors:
 Λάθη:
 In progress:
-Σε εξέλιξη:
+Ενέργειες:
 Follow external links
 Ακολούθηση εξωτερικών links
 Test all links in pages
@@ -369,7 +373,7 @@ Create a Start Page
 Create a word database of all html pages
 Δημιουργία λίστας λέξεων από όλες τις σελίδες html
 Create error logging and report files
-Δημιουργία αρχεία καταγραφής λαθών και αναφοράς
+Δημιουργία αρχείου καταγραφής λαθών και αναφοράς
 Generate DOS 8-3 filenames ONLY
 Δημιουργία ΜΟΝΟ ονομάτων αρχείων DOS 8-3
 Generate ISO9660 filenames ONLY for CDROM medias
@@ -431,11 +435,11 @@ Links to non-localised external pages will produce error pages
 Do not erase obsolete files after update
 Τα παλιά αρχεία να μην σβήνονται μετά από ενημέρωση
 Accept cookies?
-Αποδοχή των cookies;
+Αποδοχή των cookies
 Check document type when unknown?
-Έλεγχος τύπου εγγράφου όταν είναι άγνωστο;
+Έλεγχος τύπου εγγράφου όταν είναι άγνωστο
 Parse java applets to retrieve included files that must be downloaded?
-Πάρσιμο εφαρμογών java για να ανακτηθούν τα συμπεριλαμβανόμενα αρχεία που πρέπει να κατέβουν;
+Πάρσιμο εφαρμογών java για να ανακτηθούν τα συμπεριλαμβανόμενα αρχεία που πρέπει να κατέβουν
 Store all files in cache instead of HTML only
 Αποθήκευση όλων των αρχείων στην cache αντί για HTML μόνο
 Log file type (if generated)
@@ -451,7 +455,9 @@ Use non-standard requests to get round some server bugs
 Use old HTTP/1.0 requests (limits engine power!)
 Χρήση παλιών HTTP/1.0 αιτήσεων (περιορίζει την ισχύ της μηχανής!)
 Attempt to limit retransfers through several tricks (file size test..)
-Προσπάθεια να περιοριστούν τα ξανακατεβάσματα μέσω διαφόρων τρικ (έλεγχος μεγέθους αρχείου...)
+Προσπάθεια να περιοριστούν οι ανανεώσεις μέσω διαφόρων τρικ (έλεγχος μεγέθους αρχείου...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Προσπάθεια περιορισμού του αριθμού των links θεωρώντας ίδια αυτά που μοιάζουν αρκετά (www.foo.com==foo.com, http=https ..)
 Write external links without login/password
 Γράψιμο εξωτερικών links χωρίς το όνομα χρήστη/συνθηματικό
 Write internal links without query string
@@ -475,11 +481,11 @@ Make an index
 Make a word database
 Δημιουργία βάσης-δεδομένων λέξεων
 Log files
-Αρχεία γεγονότων
+Αρχείο γεγονότων
 DOS names (8+3)
 Ονόματα DOS (8+3)
 ISO9660 names (CDROM)
-Ονόματα  ISO9660 (CDROM)
+Ονόματα ISO9660 (CDROM)
 No error pages
 Χωρίς σελίδες σφαλμάτων
 Primary Scan Rule
@@ -517,7 +523,7 @@ Use proxy for ftp transfers
 TimeOut(s)
 Χρονικό περιθώριο
 Persistent connections (Keep-Alive)
-Συνεχείς συνδέσεις (Διατήρηση)
+Συνεχείς συνδέσεις (διατήρηση)
 Reduce connection time and type lookup time using persistent connections
 Μείωση χρόνου σύνδεσης και τύπου αναζήτησης τοποθεσιών, κάνοντας χρήση συνεχών συνδέσεων
 Retries
@@ -539,7 +545,7 @@ Max transfer rate
 Follow robots.txt
 Ακολούθησε το robots.txt
 No external pages
-Όχι εξωτερικές σελίδες
+Χωρίς εξωτερικές σελίδες
 Do not purge old files
 Τα παλιά αρχεία να μην σβήνονται
 Accept cookies
@@ -553,7 +559,9 @@ Store ALL files in cache
 Tolerant requests (for servers)
 Ανεκτικότητα στις αιτήσεις (για εξυπηρετητή)
 Update hack (limit re-transfers)
-Τρικ ανανέωσης (περιορισμός ξανακατεβάσματος)
+Τρικ ανανέωσης (περιορισμός ανανεώσεων)
+URL hacks (join similar URLs)
+Τρικ για τα URLs (θεωρούνται ίδια τα παρόμοια)
 Force old HTTP/1.0 requests (no 1.1)
 Εξαναγκασμός παλιών HTTP/1.0 αιτήσεων (όχι 1.1)
 Max connections / seconds
@@ -611,11 +619,11 @@ Select a connection provider
 Start
 Έναρξη
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-Παρακαλώ ρυθμίστε τις παραμέτρους της σύνδεσης αν είναι απαραίτητο,\nμετά πατήστε ΤΕΛΟΣ για να ξεκινήσει η διαδικασία αντιγραφής.
+Παρακαλώ ρυθμίστε τις παραμέτρους της σύνδεσης αν είναι απαραίτητο και μετά πατήστε ΤΕΛΟΣ για να ξεκινήσει η διαδικασία αντιγραφής.
 Save settings only, do not launch download now.
-Μόνο αποθήκευση των ρυθμίσεων, όχι έναρξη μεταφοράς τώρα.
+Αποθήκευση των ρυθμίσεων, χωρίς έναρξη μεταφοράς.
 On hold
-Σε αναμονή
+Αναμονή
 Transfer scheduled for: (hh/mm/ss)
 Η μεταφορά προγραμματίστηκε για: (hh/mm/ss)
 Start
@@ -639,7 +647,7 @@ Wizard query
 Your answer:
 Η απάντησή σας:
 Link detected..
-Ανακαλύφτηκε link.
+Ανακαλύφθηκε link.
 Choose a rule
 Επιλέξτε κανόνα
 Ignore this link
@@ -770,6 +778,8 @@ Select existing project to update
 Επιλογή εργασίας για ανανέωση
 Click here to select path
 Κλικ εδώ για επιλογή διαδρομής
+Select or create a new category name, to sort your mirrors in categories
+Επιλέξτε ή δημιουργήστε ένα νέο όνομα κατηγορία, για να κατατάξετε τα αντίγραφά σας σε κατηγορίες
 HTTrack Project Wizard...
 Βοηθός δημιουργίας εργασίας HTTrack...
 New project name:
@@ -780,6 +790,8 @@ Project name:
 Όνομα εργασίας:
 Base path:
 Αρχική διαδρομή:
+Project category:
+Κατηγορία εργασίας:
 C:\\My Web Sites
 C:\\Οι Τοποθεσίες μου
 Type a new project name, \r\nor select existing project to update/resume
@@ -833,15 +845,15 @@ Please drag only folders, not files
 Please drag folders only
 Σας παρακαλώ να τραβάτε μόνο φακέλους
 Select user-defined structure?
-Επιλογή δομής ορισμένης από τον χρήστη;
+Επιλογή δομής ορισμένης από τον χρήστη
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
 Παρακαλώ επιβεβαιώστε πως η ορισμένη φράση από τον χρήστη είναι σωστή,\nαλλιώς τα ονόματα αρχείων θα είναι λανθασμένα!
 Do you really want to use a user-defined structure?
 Θέλετε πράγματι να χρησιμοποιήσετε μία δομή ορισμένη από τον χρήστη;
 Too manu URLs, cannot handle so many links!!
-Πάρα πολλά URLs, δεν είναι δυνατή η διαχείριση τόσων πολλών links!!
+Πάρα πολλά URLs, δεν είναι δυνατή η διαχείριση τόσων πολλών links!
 Not enough memory, fatal internal error..
-Δεν υπάρχει αρκετή μνήμη, καταστροφικό εσωτερικό σφάλμα...
+Δεν υπάρχει αρκετή μνήμη, εσωτερικό καταστροφικό σφάλμα...
 Unknown operation!
 ’γνωστη λειτουργία!
 Add this URL?\r\n
@@ -849,7 +861,7 @@ Add this URL?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
 Προειδοποίηση: Το κυρίως process ακόμα δεν ανταποκρίνεται, δεν γίνεται να προστεθούν URL(s)...
 Type/MIME associations
-Τύπος/MIME συνδέσεις
+Τύπος/MIME διασυνδέσεις
 File types:
 Τύποι αρχείων:
 MIME identity:
@@ -871,7 +883,7 @@ More information:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
 Καλώς ήρθατε στο WinHTTrack Website Copier!\n\nΠαρακαλώ κάντε κλικ στο κουμπί Επόμενο για να\n\n- ξεκινήσετε μία νέα εργασία\n- ή να συνεχίσετε μία προηγούμενη εργασία
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-Ονόματα αρχείων με κατάληξη:\nΟνόματα αρχείων που περιλαμβάνουν:\nΑυτό το όνομα αρχείου:\nΟνόματα φακέλων που περιλαμβάνουν:\nΑυτό το όνομα φακέλου:\nLinks σε αυτό το domain:\nLinks σε domains που περιλαμβάνουν:\nLinks από αυτήν την τοποθεσία:\nLinks που περιλαμβάνουν:\nΑυτό το link:\nΟΛΑ ΤΑ LINKS
+Αρχεία με κατάληξη:\nΑρχεία που περιλαμβάνουν:\nΌνομα αρχείου:\nΦάκελοι που περιλαμβάνουν:\nΌνομα φακέλου:\nLinks σε αυτό το domain:\nLinks σε domains που περιλαμβάνουν:\nLinks από αυτήν την τοποθεσία:\nLinks που περιλαμβάνουν:\nΑυτό το link:\nΟΛΑ ΤΑ LINKS
 Show all\nHide debug\nHide infos\nHide debug and infos
 Προβολή όλων\nΑπόκρυψη αποσφαλμάτωσης\nΑπόκρυψη πληροφοριών\nΑπόκρυψη αποσφαλμ. και πληροφ.
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
@@ -887,13 +899,13 @@ Never\nIf unknown (except /)\nIf unknown
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
 χωρίς κανόνες robots.txt\nrobots.txt εκτός βοηθού\nχρήση κανόνων robots.txt
 normal\nextended\ndebug
-κανονικό\nεκτεταμένο\nαποσφαλμάτωση
+κανονικό\nεκτεταμένο\nαποσφαλμάτωσης
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-Κατέβασμα τοποθεσίας(ών)\nΚατέβασμα τοποθεσίας(ών) + ερωτήσεις\nΚατέβασμα ξεχωριστών αρχείων\nΚατέβασμα όλων των τόπων στις σελίδες (πολλαπλά αντίγραφα)\nΈλεγχος links στις σελίδες (έλεγχος σημειώσεων)\n* Συνέχιση μισοτελειωμένου κατεβάσματος\n* Ανανέωση υπάρχουσας τοποθεσίας
+Κατέβασμα τοποθεσίας(ών)\nΚατέβασμα τοποθεσίας(ών) + ερωτήσεις\nΚατέβασμα ξεχωριστών αρχείων\nΚατέβασμα όλων των τόπων στις σελίδες (πολλαπλά αντίγραφα)\nΈλεγχος links στις σελίδες (έλεγχος αγαπημένων)\n* Συνέχιση μισοτελειωμένου κατεβάσματος\n* Ανανέωση υπάρχουσας τοποθεσίας
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
 Σχετικό URI / Απόλυτο URL (προεπιλογή)\nΑπόλυτο URL / Απόλυτο URL\nΑπόλυτο URI / Απόλυτο URL\nΠρωτότυπο URL / Πρωτότυπο URL
 Open Source offline browser
-’νοιγμα πηγής offline browser
+Εξερευνητής ανοιχτού κώδικα χωρίς ανάγκη σύνδεσης
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
 Website Copier/Offline Browser. Αντιγράψτε απομακρυσμένες τοποθεσίες στον υπολογιστή σας. Ελεύθερα-Δωρεάν.
 httrack, winhttrack, webhttrack, offline browser
@@ -909,7 +921,7 @@ URLs
 Warning
 Προειδοποίηση
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-Ο browser σας δεν (φαίνεται να) υποστηρίζει javascript. Για καλύτερα αποτελέσματα, παρακαλώ χρησιμοποιήστε έναν javascript-ενεργό browser.
+Ο εξερευνητής σας δεν (φαίνεται να) υποστηρίζει javascript. Για καλύτερα αποτελέσματα, παρακαλώ χρησιμοποιήστε έναν javascript-ενεργό εξερευνητή.
 Thank you
 Σας ευχαριστώ
 You can now close this window

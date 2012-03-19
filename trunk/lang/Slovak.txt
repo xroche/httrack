@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Dr. Martin Sereday (sereday at stonline.sk)\r\n
 LANGUAGE_CHARSET
 ISO-8859-2
+LANGUAGE_WINDOWSID
+Slovak
 OK
 Áno
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Poui staré HTTP/1.0 pouadavky (obmdzuje pracovné tempo!)
 Attempt to limit retransfers through several tricks (file size test..)
 Pokúsi sa rôznymi trikmi obmedzi opakované transféry (test ve¾kosti súborov).
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Zada vonkajšie linky bez uívate¾ského mena/hesla
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Prípustné poiadavky (pre servery)
 Update hack (limit re-transfers)
 Trik pre aktualizáciu (obmedzenie opakovanıch prenosov)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Poui staré pravidlá HTTP/1.0 (nie 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Vybra existujúci projekt, ktorı má by aktualizovanı
 Click here to select path
 Kliknú sem a vybra cestu
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Project Wizard...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Názov porjektu:
 Base path:
 Základná cesta:
+Project category:
+
 C:\\My Web Sites
 C:\\My Web Sites
 Type a new project name, \r\nor select existing project to update/resume

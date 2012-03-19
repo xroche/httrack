@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Staffan Ström (staffan at fam-strom.org) \r\n
 LANGUAGE_CHARSET
 ISO-8859-2
+LANGUAGE_WINDOWSID
+Swedish
 OK
 OK
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Använder gamla HTTP/1.0 förfrågningar (begränsar effektiviteten!)
 Attempt to limit retransfers through several tricks (file size test..)
 Försöker att begränsa omsändningar genom att använda flera 'trick' (file size test..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Skriver externa länkar utan att använda login/lösenord
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Acceptera förfrågningar (från server)
 Update hack (limit re-transfers)
 Uppdatera avbrott (begränsa omsändningar)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Forcera gamla HTTP/1.0 förfrågningar (inte 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Välj ett existerande projektnamn att uppdatera
 Click here to select path
 Klicka här för att välja sökväg
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack Projektassistent
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Projektnamn:
 Base path:
 Välj en fast sökväg till dina projekt:
+Project category:
+
 C:\\My Web Sites
 C:\\Mina webbsidor
 Type a new project name, \r\nor select existing project to update/resume

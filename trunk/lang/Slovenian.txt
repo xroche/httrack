@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Jadran Rudec,iur.\r\njrudec@email.si \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Slovenian
 OK
 Vredu
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Uporabi starejše HTTP/1.0 zahteve (omejuje moè naprav!)
 Attempt to limit retransfers through several tricks (file size test..)
 Opozori na omejitve ponovnega prenosa z naigi (preverjanje dolžine datotek..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 apiši zunanje povezave brez prijave/gesla
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Toleriraj zahteve (za strežnike)
 Update hack (limit re-transfers)
 Nadgradi pokašljevanje (omejitev ponovnih prenosov)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Vsili starejše HTTP/1.0 zahteve (ne 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Izberite obstojeèi projekt za nadgradnjo
 Click here to select path
 Tukaj kliknite za izbor poti
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Èarovnik HTTrack projektov...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Naziv projekta:
 Base path:
 Osnovna pot:
+Project category:
+
 C:\\My Web Sites
 C:\\Moje spletne strani
 Type a new project name, \r\nor select existing project to update/resume

@@ -35,6 +35,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htscoremain.h"
 
 #include "htsglobal.h"
@@ -43,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsalias.h"
 #include "htswrap.h"
 #include "htsmodules.h"
+#include "htszlib.h"
 
 #include <ctype.h>
 #if HTS_WIN
@@ -100,7 +104,7 @@ extern int IPV6_resolver;
   } \
 } while(0)
 
-static void set_wrappers(void) {
+void set_wrappers(void) {
 #if HTS_ANALYSTE
   // custom wrappers
   hts_htmlcheck_init         = (t_hts_htmlcheck_init)           htswrap_read("init");
@@ -108,6 +112,8 @@ static void set_wrappers(void) {
   hts_htmlcheck_start        = (t_hts_htmlcheck_start)          htswrap_read("start");
   hts_htmlcheck_end          = (t_hts_htmlcheck_end)            htswrap_read("end");
   hts_htmlcheck_chopt        = (t_hts_htmlcheck_chopt)          htswrap_read("change-options");
+  hts_htmlcheck_preprocess   = (t_hts_htmlcheck_process)        htswrap_read("preprocess-html");
+  hts_htmlcheck_postprocess  = (t_hts_htmlcheck_process)        htswrap_read("postprocess-html");
   hts_htmlcheck              = (t_hts_htmlcheck)                htswrap_read("check-html");
   hts_htmlcheck_query        = (t_hts_htmlcheck_query)          htswrap_read("query");
   hts_htmlcheck_query2       = (t_hts_htmlcheck_query2)         htswrap_read("query2");
@@ -117,6 +123,7 @@ static void set_wrappers(void) {
   hts_htmlcheck_pause        = (t_hts_htmlcheck_pause)          htswrap_read("pause");
   hts_htmlcheck_filesave     = (t_hts_htmlcheck_filesave)       htswrap_read("save-file");
   hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
+  hts_htmlcheck_linkdetected2 = (t_hts_htmlcheck_linkdetected2) htswrap_read("link-detected2");
   hts_htmlcheck_xfrstatus    = (t_hts_htmlcheck_xfrstatus)      htswrap_read("transfer-status");
   hts_htmlcheck_savename     = (t_hts_htmlcheck_savename)       htswrap_read("save-name");
   hts_htmlcheck_sendhead     = (t_hts_htmlcheck_sendhead)       htswrap_read("send-header");
@@ -130,13 +137,9 @@ HTSEXT_API int hts_main(int argc, char **argv) {
 #else
 int main(int argc, char **argv) {
 #endif
-  char* x_argv[999];      // Patch pour argv et argc: en cas de récupération de ligne de commande
+  char** x_argv=NULL;     // Patch pour argv et argc: en cas de récupération de ligne de commande
   char* x_argvblk=NULL;   // (reprise ou update)
   int   x_ptr=0;          // offset
-  /*
-  char* x_argv2[999];     // Patch pour config
-  char* x_argvblk2=NULL;
-  */
   //
   int argv_url=-1;           // ==0 : utiliser cache et doit.log
   char* argv_firsturl=NULL;  // utilisé pour nommage par défaut
@@ -144,13 +147,13 @@ int main(int argc, char **argv) {
   int   url_sz = 65535;
   //char url[65536];         // URLS séparées par un espace
   // the parametres
-  httrackp httrack;
+  httrackp BIGSTK httrack;
   int httrack_logmode=3;   // ONE log file
-  int recuperer=0;       // récupérer un plantage (n'arrive jamais, à supprimer)
+  int recuperer=0;         // récupérer un plantage (n'arrive jamais, à supprimer)
 #if HTS_WIN
 #if HTS_ANALYSTE!=2
   WORD   wVersionRequested; /* requested version WinSock API */ 
-  WSADATA wsadata;        /* Windows Sockets API data */
+  WSADATA BIGSTK wsadata;   /* Windows Sockets API data */
 #endif
 #else
 #ifndef HTS_DO_NOT_USE_UID
@@ -197,6 +200,8 @@ int main(int argc, char **argv) {
   strcpybuff(httrack.proxy.bindhost, "");  // bind default host
   httrack.user_agent_send=1; // envoyer un user-agent
   strcpybuff(httrack.user_agent,"Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
+  strcpybuff(httrack.referer, "");
+  strcpybuff(httrack.from, "");
   httrack.savename_83=0;     // noms longs par défaut
   httrack.savename_type=0;   // avec structure originale
   httrack.mimehtml=0;        // pas MIME-html
@@ -218,6 +223,7 @@ int main(int argc, char **argv) {
   httrack.nocompression=0;   // pas de compression
   httrack.tolerant=0;        // ne pas accepter content-length incorrect
   httrack.parseall=1;        // tout parser (tags inconnus, par exemple)
+  httrack.parsedebug=0;      // pas de mode débuggage
   httrack.norecatch=0;       // ne pas reprendre les fichiers effacés par l'utilisateur
   httrack.verbosedisplay=0;  // pas d'animation texte
   httrack.sizehack=0;        // size hack
@@ -238,19 +244,25 @@ int main(int argc, char **argv) {
   strcpybuff(httrack.path_log,"");
   strcpybuff(httrack.path_bin,"");
   //
+#if HTS_SPARE_MEMORY==0
   httrack.maxlink=100000;    // 100,000 liens max par défaut (400Kb)
   httrack.maxfilter=200;     // 200 filtres max par défaut
+#else
+  httrack.maxlink=10000;     // 10,000 liens max par défaut (40Kb)
+  httrack.maxfilter=50;      // 50 filtres max par défaut
+#endif
   httrack.maxcache=1048576*32;  // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //httrack.maxcache_anticipate=256;  // maximum de liens à anticiper
   httrack.maxtime=-1;        // temps max en secondes
-  httrack.maxrate=-1;        // pas de taux maxi
-  httrack.maxconn=10;        // nombre connexions/s
+  httrack.maxrate=25000;     // default max rate
+  httrack.maxconn=5.0;       // nombre connexions/s
   httrack.waittime=-1;       // wait until.. hh*3600+mm*60+ss
   //
   httrack.exec=argv[0];
   httrack.is_update=0;      // not an update (yet)
   httrack.dir_topindex=0;   // do not built top index (yet)
   //
+  httrack.bypass_limits=0;  // enforce limits by default
   httrack.state.stop=0;     // stopper
   httrack.state.exit_xh=0;  // abort
   //
@@ -337,6 +349,15 @@ int main(int argc, char **argv) {
   strcpybuff(httrack.path_bin, HTS_HTTRACKDIR);
 #endif
 
+  /* libhttrack-plugin DLL preload (libhttrack-plugin.so or libhttrack-plugin.dll) */
+  {
+    void* userfunction = getFunctionPtr(&httrack, "libhttrack-plugin", "plugin_init");
+    if (userfunction != NULL) {
+      t_hts_htmlcheck_init initFnc = (t_hts_htmlcheck_init) userfunction;
+      initFnc();
+      set_wrappers();		/* Re-read wrappers internal static functions */
+    }
+  }
 
   /* filter CR, LF, TAB.. */
   {
@@ -373,13 +394,16 @@ int main(int argc, char **argv) {
     }
     x_argvblk[0]='\0';
     x_ptr=0;
+
+    /* Create argv */
+    x_argv = (char**) malloct(sizeof(char*) * ( argc + 1024 ));
   }
 
   /* Create new argc/argv, replace alias, count URLs, treat -h, -q, -i */
   {
-    char _tmp_argv[2][HTS_CDLMAXSIZE];
+    char BIGSTK _tmp_argv[2][HTS_CDLMAXSIZE];
+    char BIGSTK tmp_error[HTS_CDLMAXSIZE];
     char* tmp_argv[2];
-    char tmp_error[HTS_CDLMAXSIZE];
     int tmp_argc;
     int x_argc=0;
     int na;
@@ -461,53 +485,6 @@ int main(int argc, char **argv) {
     argc=x_argc;
   }
 
-
-
-
-  // Ici on ajoute les arguments de config
-/*
-  if (fexist("config")) {    // configuration        
-    x_argvblk2=(char*) calloct(32768,1);
-
-    if (x_argvblk2!=NULL) {
-      FILE* fp;
-      int x_argc2;
-          
-      //strcpybuff(x_argvblk2,"httrack ");
-      fp=fopen("config","rb");
-      if (fp) {
-        linput(fp,x_argvblk2+strlen(x_argvblk2),32000);
-        fclose(fp); fp=NULL;
-    
-        // calculer arguments selon derniers arguments
-        x_argv2[0]=argv[0];
-        x_argc2=1;
-        {
-          char* p=x_argvblk2;
-          do {
-            x_argv2[x_argc2++]=p;
-            p=strchr(p,' ');
-            if (p) {
-              *p=0;    // octet nul (tableau)
-              p++;
-            }            
-          } while(p!=NULL);
-        }
-        // recopier arguments actuels (pointeurs uniquement)
-        {
-         int na;
-          for(na=1;na<argc;na++) {
-            x_argv2[x_argc2++]=argv[na];
-          }
-        }
-        argc=x_argc2;      // nouvel argc
-        argv=x_argv2;      // nouvel argv
-      }
-    }
-  }
-*/
-
-
   // Option O and includerc
   { 
     int loops=0;
@@ -518,10 +495,10 @@ int main(int argc, char **argv) {
       for(na=1;na<argc;na++) {
         
         if (argv[na][0]=='"') {
-          char tempo[HTS_CDLMAXSIZE];
+          char BIGSTK tempo[HTS_CDLMAXSIZE];
           strcpybuff(tempo,argv[na]+1);
           if (tempo[strlen(tempo)-1]!='"') {
-            char s[HTS_CDLMAXSIZE];
+            char BIGSTK s[HTS_CDLMAXSIZE];
             sprintf(s,"Missing quote in %s",argv[na]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
@@ -626,7 +603,7 @@ int main(int argc, char **argv) {
     if (fp) {
       int insert_after=1;     /* insérer après nom au début */
       //
-      char buff[8192];
+      char BIGSTK buff[8192];
       char *p,*lastp;
       linput(fp,buff,8000);
       fclose(fp); fp=NULL;
@@ -646,21 +623,8 @@ int main(int argc, char **argv) {
         /* Insert parameters BUT so that they can be in the same order */
         if (lastp) {
           if (strnotempty(lastp)) {
-            //char* argv0;
-            //int len;
             insert_after_argc=argc-insert_after;
-            //argv0 = (argv+insert_after)[0];
             cmdl_ins(lastp,insert_after_argc,(argv+insert_after),x_argvblk,x_ptr);
-            /*
-            DONE IN 'next_token'
-            len = strlen(argv0);
-            if (len >= 2 && argv0[0]=='\"' && argv0[len-1]=='\"') {   // "foo"
-              char tempo[1024];
-              tempo[0] = '\0';
-              strncatbuff(tempo, argv0+1, len-2);
-              strcpybuff(argv0, tempo);
-            }
-            */
             argc=insert_after_argc+insert_after;
             insert_after++;
           }
@@ -675,7 +639,11 @@ int main(int argc, char **argv) {
 #if DEBUG_STEPS
   printf("Checking cache\n");
 #endif
-  if ( (!fexist(fconcat(httrack.path_log,"hts-cache/new.dat"))) || (!fexist(fconcat(httrack.path_log,"hts-cache/new.ndx"))) ) {
+  if (!fexist(fconcat(httrack.path_log,"hts-cache/new.zip"))) {
+    if ( fexist(fconcat(httrack.path_log,"hts-cache/old.zip")) ) {
+      rename(fconcat(httrack.path_log,"hts-cache/old.zip"),fconcat(httrack.path_log,"hts-cache/new.zip"));
+    }
+  } else if ( (!fexist(fconcat(httrack.path_log,"hts-cache/new.dat"))) || (!fexist(fconcat(httrack.path_log,"hts-cache/new.ndx"))) ) {
     if ( (fexist(fconcat(httrack.path_log,"hts-cache/old.dat"))) && (fexist(fconcat(httrack.path_log,"hts-cache/old.ndx"))) ) {
       remove(fconcat(httrack.path_log,"hts-cache/new.dat"));
       remove(fconcat(httrack.path_log,"hts-cache/new.ndx"));
@@ -723,6 +691,11 @@ int main(int argc, char **argv) {
               remove(fconcat(httrack.path_log,"hts-err.txt"));
             if (fexist(fconcat(httrack.path_html,"index.html")))
               remove(fconcat(httrack.path_html,"index.html"));
+            /* */
+            if (fexist(fconcat(httrack.path_log,"hts-cache/new.zip")))
+              remove(fconcat(httrack.path_log,"hts-cache/new.zip"));
+            if (fexist(fconcat(httrack.path_log,"hts-cache/old.zip")))
+              remove(fconcat(httrack.path_log,"hts-cache/old.zip"));
             if (fexist(fconcat(httrack.path_log,"hts-cache/new.dat")))
               remove(fconcat(httrack.path_log,"hts-cache/new.dat"));
             if (fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")))
@@ -894,7 +867,11 @@ int main(int argc, char **argv) {
 #endif
   if (argv_url==0) {
     // Présence d'un cache, que faire?..
-    if ((fexist(fconcat(httrack.path_log,"hts-cache/new.dat"))) && (fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+    if (
+      ( fexist(fconcat(httrack.path_log,"hts-cache/new.zip")) )
+      ||
+      ( fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")) )
+      ) {  // il existe déja un cache précédent.. renommer
       if (fexist(fconcat(httrack.path_log,"hts-cache/doit.log"))) {    // un cache est présent
         if (x_argvblk!=NULL) {
           int m;        
@@ -967,7 +944,11 @@ int main(int argc, char **argv) {
       
       httrack.cache=1;    // cache prioritaire
       if (httrack.quiet==0) {
-        if ((fexist(fconcat(httrack.path_log,"hts-cache/new.dat"))) && (fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+        if (
+          ( fexist(fconcat(httrack.path_log,"hts-cache/new.zip")) )
+          ||
+          ( fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")) )
+          ) {
           HT_REQUEST_START;
           HT_PRINT("There is a lock-file in the directory ");
           HT_PRINT(httrack.path_log);
@@ -985,7 +966,11 @@ int main(int argc, char **argv) {
       //char s[32];
       httrack.cache=2;  // cache vient après test de validité
       if (httrack.quiet==0) {
-        if ((fexist(fconcat(httrack.path_log,"hts-cache/new.dat"))) && (fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+        if (
+          ( fexist(fconcat(httrack.path_log,"hts-cache/new.zip")) )
+          ||
+          ( fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/new.ndx")) )
+          ) {
           HT_REQUEST_START;
           HT_PRINT("There is an index.html and a hts-cache folder in the directory ");
           HT_PRINT(httrack.path_log);
@@ -1027,7 +1012,7 @@ int main(int argc, char **argv) {
     for(na=1;na<argc;na++) {
 
       if (argv[na][0]=='"') {
-        char tempo[HTS_CDLMAXSIZE];
+        char BIGSTK tempo[HTS_CDLMAXSIZE];
         strcpybuff(tempo,argv[na]+1);
         if (tempo[strlen(tempo)-1]!='"') {
           char s[HTS_CDLMAXSIZE];
@@ -1189,13 +1174,13 @@ int main(int argc, char **argv) {
             {
               sscanf(com+1,"%d",&httrack.savename_83); 
               switch(httrack.savename_83) {
-              case 0:
+              case 0:    // 8-3 (ISO9660 L1)
                 httrack.savename_83=1;
                 break;
               case 1:
                 httrack.savename_83=0;
                 break;
-              default:
+              default:    // 2 == ISO9660 (ISO9660 L2)
                 httrack.savename_83=2;
                 break;
               }
@@ -1234,7 +1219,7 @@ int main(int argc, char **argv) {
             case 'q': httrack.includequery=1; if (*(com+1)=='0') { httrack.includequery=0; com++; } break;   // No passwords in html files
             case 'I': httrack.kindex=1; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.kindex); while(isdigit((unsigned char)*(com+1))) com++; }
               break;    // Keyword Index
-            case 'c': sscanf(com+1,"%d",&httrack.maxconn); while(isdigit((unsigned char)*(com+1))) com++; break;
+            case 'c': sscanf(com+1,"%f",&httrack.maxconn); while(isdigit((unsigned char)*(com+1)) || *(com+1) == '.') com++; break;
             case 'e': sscanf(com+1,"%d",&httrack.extdepth); while(isdigit((unsigned char)*(com+1))) com++; break;
             case 'B': httrack.tolerant=1; if (*(com+1)=='0') { httrack.tolerant=0; com++; } break;   // HTTP/1.0 notamment
             case 'h': httrack.http10=1; if (*(com+1)=='0') { httrack.http10=0; com++; } break;   // HTTP/1.0
@@ -1246,6 +1231,7 @@ int main(int argc, char **argv) {
             case 'u': httrack.urlhack=1; if (*(com+1)=='0') { httrack.urlhack=0; com++; } break;   // url hack
             case 'v': httrack.verbosedisplay=2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.verbosedisplay); while(isdigit((unsigned char)*(com+1))) com++; } break;
             case 'i': httrack.dir_topindex = 1; if (*(com+1)=='0') { httrack.dir_topindex=0; com++; } break;
+            case '!': httrack.bypass_limits = 1; if (*(com+1)=='0') { httrack.bypass_limits=0; com++; } break;
 
             // preserve: no footer, original links
             case 'p':
@@ -1433,7 +1419,7 @@ int main(int argc, char **argv) {
                 na++;
                 if (pos != NULL && (pos - a) > 0 && (pos - a + 2) < sizeof(callbackname)) {
                   char* posf = strchr(pos + 1, ':');
-                  char filename[1024];
+                  char BIGSTK filename[1024];
                   callbackname[0] = '\0';
                   strncatbuff(callbackname, a, pos - a);
                   pos++;
@@ -1442,38 +1428,38 @@ int main(int argc, char **argv) {
                     filename[0] = '\0';
                     strncatbuff(filename, pos, posf - pos);
                     posf++;
-                    userfunction = getFunctionPtr(filename, posf);
+                    userfunction = getFunctionPtr(&httrack, filename, posf);
                     if (userfunction != NULL) {
                       if ((void*)htswrap_read(callbackname) != NULL) {
                         if (htswrap_add(callbackname, userfunction)) {
-                          if (!httrack.quiet) {
-                            set_wrappers();
-                            if ((void*)htswrap_read(callbackname) == userfunction) {
-                              printf("successfully plugged [%s -> %s:%s]\n", callbackname, posf, filename);
-                            } else {
-                              char tmp[1024 * 2];
-                              sprintf(tmp, "option %%W : unable to (re)plug the function %s from the file %s for the callback %s", posf, filename, callbackname);
-                              HTS_PANIC_PRINTF(tmp);
-                              htsmain_free();
-                              return -1;
+                          set_wrappers();		/* Re-read wrappers internal static functions */
+                          if ((void*)htswrap_read(callbackname) == userfunction) {
+                            if (!httrack.quiet) {
+                              fprintf(stderr, "successfully plugged [%s -> %s:%s]\n", callbackname, posf, filename);
                             }
+                          } else {
+                            char BIGSTK tmp[1024 * 2];
+                            sprintf(tmp, "option %%W : unable to (re)plug the function %s from the file %s for the callback %s", posf, filename, callbackname);
+                            HTS_PANIC_PRINTF(tmp);
+                            htsmain_free();
+                            return -1;
                           }
                         } else {
-                          char tmp[1024 * 2];
+                          char BIGSTK tmp[1024 * 2];
                           sprintf(tmp, "option %%W : unable to plug the function %s from the file %s for the callback %s", posf, filename, callbackname);
                           HTS_PANIC_PRINTF(tmp);
                           htsmain_free();
                           return -1;
                         }
                       } else {
-                        char tmp[1024 * 2];
+                        char BIGSTK tmp[1024 * 2];
                         sprintf(tmp, "option %%W : unknown or undefined callback %s", callbackname);
                         HTS_PANIC_PRINTF(tmp);
                         htsmain_free();
                         return -1;
                       }
                     } else {
-                      char tmp[1024 * 2];
+                      char BIGSTK tmp[1024 * 2];
                       sprintf(tmp, "option %%W : unable to load the function %s in the file %s for the callback %s", posf, filename, callbackname);
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
@@ -1494,6 +1480,39 @@ int main(int argc, char **argv) {
               }
               break;
               
+            case 'R':    // Referer
+              if ((na+1>=argc) || (argv[na+1][0]=='-')) {
+                HTS_PANIC_PRINTF("Option %R needs to be followed by a blank space, and a referer URL");
+                printf("Example: -%%R \"http://www.example.com/\"\n");
+                htsmain_free();
+                return -1;
+              } else{
+                na++;
+                if (strlen(argv[na])>=254) {
+                  HTS_PANIC_PRINTF("Referer URL too long");
+                  htsmain_free();
+                  return -1;
+                }
+                strcpybuff(httrack.referer, argv[na]);
+              }
+              break;
+            case 'E':    // From Email address
+              if ((na+1>=argc) || (argv[na+1][0]=='-')) {
+                HTS_PANIC_PRINTF("Option %E needs to be followed by a blank space, and an email");
+                printf("Example: -%%E \"postmaster@example.com\"\n");
+                htsmain_free();
+                return -1;
+              } else{
+                na++;
+                if (strlen(argv[na])>=254) {
+                  HTS_PANIC_PRINTF("From email too long");
+                  htsmain_free();
+                  return -1;
+                }
+                strcpybuff(httrack.from, argv[na]);
+              }
+              break;
+
             default: {
               char s[HTS_CDLMAXSIZE];
               sprintf(s,"invalid option %%%c\n",*com);
@@ -1587,9 +1606,9 @@ int main(int argc, char **argv) {
                 cache.hashtable=(void*)cache_hashtable;      /* copy backcache hash */
                 cache.ro = 1;          /* read only */
                 if (cache.hashtable) {
-                  char adr[HTS_URLMAXSIZE*2];
-                  char fil[HTS_URLMAXSIZE*2];
-                  char url[HTS_URLMAXSIZE*2];
+                  char BIGSTK adr[HTS_URLMAXSIZE*2];
+                  char BIGSTK fil[HTS_URLMAXSIZE*2];
+                  char BIGSTK url[HTS_URLMAXSIZE*2];
                   char linepos[256];
                   int  pos;
                   char* cacheNdx = readfile(fconcat(httrack.path_log,"hts-cache/new.ndx"));
@@ -1620,7 +1639,7 @@ int main(int argc, char **argv) {
                           ||
                           (strjoker(url, filter, NULL, NULL) != NULL)
                           ) {
-                          r = cache_read(&httrack, &cache, adr, fil, "", NULL);    // lire entrée cache + data
+                          r = cache_read_ro(&httrack, &cache, adr, fil, "", NULL);    // lire entrée cache + data
                           if (r.statuscode != -1) {    // No errors
                             found++;
                             if (!hasFilter) {
@@ -1629,7 +1648,7 @@ int main(int argc, char **argv) {
                                 adr, fil);
                             } else {
                               char msg[256], cdate[256];
-                              char sav[HTS_URLMAXSIZE*2];
+                              char BIGSTK sav[HTS_URLMAXSIZE*2];
                               infostatuscode(msg, r.statuscode);
                               time_gmt_rfc822(cdate);
 
@@ -1713,12 +1732,48 @@ int main(int argc, char **argv) {
                 return 0;
               }
               break;
+            case 'E':     // extract cache
+              if (!hts_extract_meta(httrack.path_log)) {
+                fprintf(stderr, "* error extracting meta-data\n");
+                return 1;
+              }
+              fprintf(stderr, "* successfully extracted meta-data\n");
+              return 0;
+              break;
             case 'X': 
 #ifndef STRDEBUG
               fprintf(stderr, "warning: no string debugging support built, option has no effect\n");
 #endif
               htsMemoryFastXfr=1; 
               if (*(com+1)=='0') { htsMemoryFastXfr=0; com++; } 
+              break;
+            case 'R':
+              {
+                char* name;
+                uLong repaired = 0;
+                uLong repairedBytes = 0;
+                if (fexist(fconcat(httrack.path_log,"hts-cache/new.zip"))) {
+                  name = fconcat(httrack.path_log,"hts-cache/new.zip");
+                } else if (fexist(fconcat(httrack.path_log,"hts-cache/old.zip"))) {
+                  name = fconcat(httrack.path_log,"hts-cache/old.zip");
+                } else {
+                  fprintf(stderr, "* error: no cache found in %s\n", fconcat(httrack.path_log,"hts-cache/new.zip"));
+                  return 1;
+                }
+                fprintf(stderr, "Cache: trying to repair %s\n", name);
+                if (unzRepair(name, 
+                  fconcat(httrack.path_log,"hts-cache/repair.zip"),
+                  fconcat(httrack.path_log,"hts-cache/repair.tmp"),
+                  &repaired, &repairedBytes
+                  ) == Z_OK) {
+                  unlink(name);
+                  rename(fconcat(httrack.path_log,"hts-cache/repair.zip"), name);
+                  fprintf(stderr,"Cache: %d bytes successfully recovered in %d entries\n", (int) repairedBytes, (int) repaired);
+                } else {
+                  fprintf(stderr, "Cache: could not repair the cache\n");
+                }
+              }
+              return 0;
               break;
             case '~': /* internal lib test */
               {
@@ -1742,11 +1797,12 @@ int main(int argc, char **argv) {
             case 'T': httrack.maketrack=1; break;
             case 'u': sscanf(com+1,"%d",&httrack.waittime); while(isdigit((unsigned char)*(com+1))) com++; break;
 
-            case 'R':    // ohh ftp, catch->ftpget
+            /*case 'R':    // ohh ftp, catch->ftpget
               HTS_PANIC_PRINTF("Unexpected internal error with -#R command");
               htsmain_free();
               return -1;        
               break;
+              */
             case 'P': {     // catchurl
               help_catchurl(httrack.path_log);
               htsmain_free();
@@ -1769,6 +1825,19 @@ int main(int argc, char **argv) {
                 return 0;
               }
               break;
+            case '1':   /* test #1 : fil_simplifie */
+              if (na+1>=argc) {
+                HTS_PANIC_PRINTF("Option #1 needs to be followed by an URL");
+                printf("Example: '-#0' ./foo/bar/../foobar\n");
+                htsmain_free();
+                return -1;
+              } else {
+                fil_simplifie(argv[na+1]);
+                printf("simplified=%s\n", argv[na+1]);
+                htsmain_free();
+                return 0;
+              }
+              break;
             case '!':
               if (na+1>=argc) {
                 HTS_PANIC_PRINTF("Option #! needs to be followed by a commandline");
@@ -1778,6 +1847,15 @@ int main(int argc, char **argv) {
               } else {
                 system(argv[na+1]);
               }
+              break;
+            case 'd':
+              httrack.parsedebug = 1;
+              break;
+
+            /* autotest */
+            case 't':     /* not yet implemented */
+              fprintf(stderr, "** AUTOCHECK OK\n");
+              exit(0);
               break;
 
             default: printf("Internal option %c not recognized\n",*com); break;
@@ -1866,7 +1944,7 @@ int main(int argc, char **argv) {
         }  // while
         
       }  else {  // URL/filters
-        char tempo[1024];       
+        char BIGSTK tempo[1024];       
         if (strnotempty(url)) strcatbuff(url," ");  // espace de séparation
         strcpybuff(tempo,unescape_http_unharm(argv[na],1));
         escape_spc_url(tempo);
@@ -1895,7 +1973,7 @@ int main(int argc, char **argv) {
     //if (userdef) {
     if (!userid) {
       //if (strcmp(userdef->pw_name,"root")==0) {
-      char rpath[1024];
+      char BIGSTK rpath[1024];
       //printf("html=%s log=%s\n",httrack.path_html,httrack.path_log);    // xxc
       if ((httrack.path_html[0]) && (httrack.path_log[0])) {
         char *a=httrack.path_html,*b=httrack.path_log,*c=NULL,*d=NULL;
@@ -1913,7 +1991,7 @@ int main(int argc, char **argv) {
           strncatbuff(rpath,httrack.path_html,(int) (c - httrack.path_html));
         }
         {
-          char tmp[1024];
+          char BIGSTK tmp[1024];
           strcpybuff(tmp,c); strcpybuff(httrack.path_html,tmp);
           strcpybuff(tmp,d); strcpybuff(httrack.path_log,tmp);
         }
@@ -1971,7 +2049,19 @@ int main(int argc, char **argv) {
   // cad la version contenant le plus de fichiers  
   if (httrack.cache) {
     if (fexist(fconcat(httrack.path_log,"hts-in_progress.lock"))) {   // problemes..
-      if (fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/new.ndx"))) { 
+      if ( fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) ) { 
+        if ( fexist(fconcat(httrack.path_log,"hts-cache/old.zip")) ) {
+          if (fsize(fconcat(httrack.path_log,"hts-cache/new.zip"))<32768) {
+            if (fsize(fconcat(httrack.path_log,"hts-cache/old.zip"))>65536) {
+              if (fsize(fconcat(httrack.path_log,"hts-cache/old.zip")) > fsize(fconcat(httrack.path_log,"hts-cache/new.zip"))) {
+                remove(fconcat(httrack.path_log,"hts-cache/new.zip"));
+                rename(fconcat(httrack.path_log,"hts-cache/old.zip"), fconcat(httrack.path_log,"hts-cache/new.zip"));
+              }
+            }
+          }
+        }
+      }
+      else if (fexist(fconcat(httrack.path_log,"hts-cache/new.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/new.ndx"))) { 
         if (fexist(fconcat(httrack.path_log,"hts-cache/old.dat")) && fexist(fconcat(httrack.path_log,"hts-cache/old.ndx"))) {
           // switcher si new<32Ko et old>65Ko (tailles arbitraires) ?
           // ce cas est peut être une erreur ou un crash d'un miroir ancien, prendre
@@ -2058,7 +2148,7 @@ int main(int argc, char **argv) {
           fprintf(fp,"and is used for updating this website."LF);
           fprintf(fp,"(The HTML website structure is stored here to allow fast updates)"LF""LF);
           fprintf(fp,"DO NOT delete this folder unless you do not want to update the mirror in the future!!"LF);
-          fprintf(fp,"(you can safely delete old.dat, old.ndx and old.lst files, however)"LF);
+          fprintf(fp,"(you can safely delete old.zip and old.lst files, however)"LF);
           fprintf(fp,""LF);
           fprintf(fp,HTS_LOG_SECURITY_WARNING);
           fclose(fp);
@@ -2177,18 +2267,47 @@ int main(int argc, char **argv) {
     
     io_flush;
 
+    /* Enforce limits to avoid bandwith abuse. The bypass_limits should only be used by administrators and experts. */
+    if (!httrack.bypass_limits) {
+      if (httrack.maxsoc <= 0 || httrack.maxsoc > 4) {
+        httrack.maxsoc = 4;
+        if (httrack.log != NULL) {
+          fspc(httrack.log,"warning"); fprintf(httrack.log,"* security warning: maximum number of simultaneous connections limited to %d to avoid server overload"LF, (int)httrack.maxsoc);
+        }
+      }
+      if (httrack.maxrate <= 0 || httrack.maxrate > 100000) {
+        httrack.maxrate = 100000;
+        if (httrack.log != NULL) {
+          fspc(httrack.log,"warning"); fprintf(httrack.log,"* security warning: maximum bandwidth limited to %d to avoid server overload"LF, (int)httrack.maxrate);
+        }
+      }
+      if (httrack.maxconn <= 0 || httrack.maxconn > 5.0) {
+        httrack.maxconn = 5.0;
+        if (httrack.log != NULL) {
+          fspc(httrack.log,"warning"); fprintf(httrack.log,"* security warning: maximum number of connections per second limited to %f to avoid server overload"LF, (float)httrack.maxconn);
+        }
+      }
+    } else {
+      if (httrack.log != NULL) {
+        fspc(httrack.log,"warning"); fprintf(httrack.log,"* security warning: !!! BYPASSING SECURITY LIMITS - MONITOR THIS SESSION WITH EXTREME CARE !!!"LF);
+      }
+    }
+
   /* Info for wrappers */
   if ( (httrack.debug>0) && (httrack.log!=NULL) ) {
     fspc(httrack.log,"info"); fprintf(httrack.log,"engine: init"LF);
   }
 #if HTS_ANALYSTE
   hts_htmlcheck_init();
+  set_wrappers();   // init() is allowed to set other wrappers
 #endif
 
   // détourner SIGHUP etc.
 #if HTS_WIN
+#ifndef  _WIN32_WCE
   signal( SIGINT  , sig_ask    );   // ^C
   signal( SIGTERM , sig_finish );   // kill <process>
+#endif
 #else
   signal( SIGHUP  , sig_back   );   // close window
   signal( SIGTSTP , sig_back   );   // ^Z
@@ -2226,7 +2345,7 @@ deprecated - see SIGCHLD
     //
     // Build top index
     if (httrack.dir_topindex) {
-      char rpath[1024*2];
+      char BIGSTK rpath[1024*2];
       char* a;
       strcpybuff(rpath,httrack.path_html);
       if (rpath[0]) {
@@ -2249,33 +2368,35 @@ deprecated - see SIGCHLD
       }
     }
 
-  /* Info for wrappers */
-  if ( (httrack.debug>0) && (httrack.log!=NULL) ) {
-    fspc(httrack.log,"info"); fprintf(httrack.log,"engine: free"LF);
-  }
+    /* Info for wrappers */
+    if ( (httrack.debug>0) && (httrack.log!=NULL) ) {
+      fspc(httrack.log,"info"); fprintf(httrack.log,"engine: free"LF);
+    }
 #if HTS_ANALYSTE
-  hts_htmlcheck_uninit();
+    hts_htmlcheck_uninit();
 #endif
-    
+
     if (httrack_logmode!=1) {
       if (httrack.errlog == httrack.log) httrack.errlog=NULL;
       if (httrack.log) { fclose(httrack.log); httrack.log=NULL; }
       if (httrack.errlog) { fclose(httrack.errlog); httrack.errlog=NULL; }
     }  
-    
+
     // Débuggage des en têtes
     if (_DEBUG_HEAD) {
       if (ioinfo) {
         fclose(ioinfo);
       }
     }
-    
+
     // supprimer lock
     remove(n_lock);
   }
-  
+
   if (x_argvblk)
     freet(x_argvblk);
+  if (x_argv)
+    freet(x_argv);
  
 #if HTS_WIN
 #if HTS_ANALYSTE!=2
@@ -2315,7 +2436,7 @@ int check_path(char* s,char* defaultname) {
   if (strnotempty(s)) {
     if (s[(i=strlen(s))-1]=='#') {
       if (strnotempty((defaultname?defaultname:""))) {
-        char tempo[HTS_URLMAXSIZE*2];
+        char BIGSTK tempo[HTS_URLMAXSIZE*2];
         char* a=strchr(defaultname,'#');      // we never know..
         if (a) *a='\0';
         tempo[0]='\0';
@@ -2339,7 +2460,7 @@ int check_path(char* s,char* defaultname) {
 // détermine si l'argument est une option
 int cmdl_opt(char* s) {
   if (s[0]=='-') {  // c'est peut être une option
-    if (strchr(s,'.')!=NULL)
+    if (strchr(s,'.')!=NULL && strchr(s,'%')==NULL)
       return 0;    // sans doute un -www.truc.fr (note: -www n'est pas compris)
     else if (strchr(s,'/')!=NULL)
       return 0;    // idem, -*cgi-bin/

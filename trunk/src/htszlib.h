@@ -39,32 +39,20 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEFZLIB
 #define HTS_DEFZLIB
 
-#if HTS_USEZLIB
+/* ZLib */
+#include "zlib.h"
+//#include "zutil.h"
 
-int hts_zunpack(char* filename,char* newfile);
+/* MiniZip */
+#include "minizip/zip.h"
+#include "minizip/unzip.h"
+#include "minizip/mztools.h"
 
-#define gzopen hts_ptrfunc_gzopen
-#define gzread hts_ptrfunc_gzread
-#define gzclose hts_ptrfunc_gzclose
-
-#ifdef _WIN32
-#define ZEXPORT WINAPI
-#else
-#define ZEXPORT 
-#endif
-
-typedef void* voidp;
-typedef voidp gzFile;
-typedef gzFile (ZEXPORT *t_gzopen)(const char *path, const char *mode);
-typedef int (ZEXPORT *t_gzread)(gzFile file, voidp buf, unsigned len);
-typedef int (ZEXPORT *t_gzclose)(gzFile file);
-
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 extern int gz_is_available;
-extern t_gzopen gzopen;
-extern t_gzread gzread;
-extern t_gzclose gzclose;
-
-#endif 
-
+extern int hts_zunpack(char* filename,char* newfile);
+extern int hts_extract_meta(char* path);
 #endif
 
+#endif

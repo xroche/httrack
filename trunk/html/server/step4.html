@@ -1,4 +1,4 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
 
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
@@ -164,6 +164,8 @@ ${do:end-if}
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="projpath" value="${path}/${projname}/">
 
+<input type="hidden" name="command_arg_profile" value="path,lang">
+
 <table border="0" width="100%">
 <tr><td>
 
@@ -201,6 +203,7 @@ ${do:end-if}
 	${test:build:-N0:-N0:-N1:-N2:-N3:-N4:-N5:-N100:-N101:-N102:-N103:-N104:-N105:-N99:-N199:}
 \
 	${ztest:dos::--long-names=0:--long-names=2}
+	${test:robots:--robots=0:--robots=0:--robots=1:--robots=2}
 	${test:errpage:--generate-errors:--generate-errors=0}
 	${test:external:--replace-external}
 	${test:hidepwd:--disable-passwords}
@@ -241,6 +244,7 @@ ${do:end-if}
 	${test:cookies:--cookies=0:}
 	${test:parsejava:--parse-java=0:}
 	${test:updhack:--updatehack}
+	${test:urlhack:--urlhack=0:--urlhack}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
@@ -257,6 +261,7 @@ ${do:end-if}
 ${do:output-mode:inifile}
 <textarea name="winprofile" cols="50" rows="4" style="visibility:hidden">
 CurrentUrl=${urls}
+Category=${projcateg}
 CurrentAction=${todo}
 CurrentURLList=${filelist}
 Proxy=${proxy}
@@ -286,6 +291,7 @@ ParseJava=${ztest:parsejava:0:1}
 HTTP10=${ztest:http10:0:1}
 TolerantRequests=${ztest:toler:0:1}
 UpdateHack=${ztest:updhack:0:1}
+URLHack=${ztest:urlhack:0:1}
 StoreAllInCache=${ztest:cache2:0:1}
 LogType=${logtype}
 UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
@@ -332,6 +338,16 @@ MIMEDefsMime7=${mime7}
 MIMEDefsMime8=${mime8}
 </textarea>
 ${do:output-mode:}
+<!-- winprofile.ini -->
+
+<!-- httrack.ini -->
+${do:output-mode:inifile}
+<textarea name="userprofile" cols="50" rows="4" style="visibility:hidden">
+path=${path}
+lang=${lang_}
+</textarea>
+${do:output-mode:}
+<!-- httrack.ini -->
 
 </td></tr><tr><td>
 		<table width="100%" border="0"><tr><td align="left">

@@ -35,6 +35,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htshelp.h"
 
 /* specific definitions */
@@ -43,9 +46,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscatchurl.h"
 #include "htslib.h"
 #include "htsalias.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #if HTS_WIN
 #else
 #ifdef HAVE_UNISTD_H
@@ -334,20 +334,20 @@ int help_query(char* list,int def) {
 
 // Capture d'URL
 void help_catchurl(char* dest_path) {
-  char adr_prox[HTS_URLMAXSIZE*2];
+  char BIGSTK adr_prox[HTS_URLMAXSIZE*2];
   int port_prox;
   T_SOC soc=catch_url_init_std(&port_prox,adr_prox);
   if (soc!=INVALID_SOCKET) {
-    char url[HTS_URLMAXSIZE*2];
+    char BIGSTK url[HTS_URLMAXSIZE*2];
     char method[32];
-    char data[32768];
+    char BIGSTK data[32768];
     url[0]=method[0]=data[0]='\0';
     //
     printf("Okay, temporary proxy installed.\nSet your browser's preferences to:\n\n");
     printf("\tProxy's address: \t%s\n\tProxy's port: \t%d\n",adr_prox,port_prox);
     //
     if (catch_url(soc,url,method,data)) {
-      char dest[HTS_URLMAXSIZE*2];
+      char BIGSTK dest[HTS_URLMAXSIZE*2];
       int i=0;
       do {
         sprintf(dest,"%s%s%d",dest_path,"hts-post",i);
@@ -362,7 +362,7 @@ void help_catchurl(char* dest_path) {
       }
       // former URL!
       {
-        char finalurl[HTS_URLMAXSIZE*2];
+        char BIGSTK finalurl[HTS_URLMAXSIZE*2];
         escape_check_url(dest);
         sprintf(finalurl,"%s"POSTTOK"file:%s",url,dest);
         printf("\nThe URL is: \"%s\"\n",finalurl);
@@ -471,7 +471,7 @@ void help(char* app,int more) {
   infomsg("  bN accept cookies in cookies.txt (0=do not accept,* 1=accept)");
   infomsg("  u  check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)");
   infomsg("  j *parse Java Classes (j0 don't parse)");
-  infomsg("  sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always)");
+  infomsg("  sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always (even strict rules))");
   infomsg(" %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies)");
   infomsg(" %k  use keep-alive if possible, greately reducing latency for small files and test requests (%k0 don't use)");
   infomsg(" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
@@ -479,10 +479,13 @@ void help(char* app,int more) {
   infomsg(" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
   infomsg(" %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip)");
   infomsg("     shortcut: '--assume standard' is equivalent to -%A "HTS_ASSUME_STANDARD);
+  infomsg("     can also be used to force a specific file type: --assume foo.cgi=text/html");
   infomsg(" @iN internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only)");
   infomsg("");
   infomsg("Browser ID:");
-  infomsg("  F  user-agent field (-F \"user-agent name\")");
+  infomsg("  F  user-agent field sent in HTTP headers (-F \"user-agent name\")");
+  infomsg(" %R  default referer field sent in HTTP headers");
+  infomsg(" %E  from email address sent in HTTP headers");
   infomsg(" %F  footer string in Html code (-%F \"Mirrored [from host %s [file %s [at %s]]]\"");
   infomsg(" %l  preffered language (-%l \"fr, en, jp, *\"");
   infomsg("");
@@ -490,7 +493,7 @@ void help(char* app,int more) {
   infomsg("  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
   infomsg(" %n  do not re-download locally erased files");
-  infomsg(" %v  display on screen filenames downloaded (in realtime) - * %v1 short version");
+  infomsg(" %v  display on screen filenames downloaded (in realtime) - * %v1 short version - %v2 full animation");
   infomsg("  Q  no log - quiet mode");
   infomsg("  q  no questions - quiet mode");
   infomsg("  z  log - extra infos");
@@ -523,6 +526,9 @@ void help(char* app,int more) {
   infomsg(" #X *use optimized engine (limited memory boundary checks)");
   infomsg(" #0  filter test (-#0 '*.gif' 'www.bar.com/foo.gif')");
   infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
+  infomsg(" #R  cache repair (damaged cache)");
+  infomsg(" #d  debug parser");
+  infomsg(" #E  extract new.zip cache meta-data in meta.zip");
   infomsg(" #f  always flush log files");
   infomsg(" #FN maximum number of filters");
   infomsg(" #h  version info");
@@ -536,10 +542,15 @@ void help(char* app,int more) {
   infomsg(" #Z  generate transfer rate statictics every minutes");
   infomsg(" #!  execute a shell command (-#! \"echo hello\")");
   infomsg("");
+  infomsg("Dangerous options: (do NOT use unless you exactly know what you are doing)");
+  infomsg(" %!  bypass built-in security limits aimed to avoid bandwith abuses (bandwidth, simultaneous connections)");
+  infomsg("     IMPORTANT NOTE: DANGEROUS OPTION, ONLY SUITABLE FOR EXPERTS");
+  infomsg("                     USE IT WITH EXTREME CARE");
+  infomsg("");
   infomsg("Command-line specific options:");
   infomsg("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
   infomsg(" %U run the engine with another id when called as root (-%U smith)");
-  infomsg(" %W use an external library function as a wrapper (-%W link-detected=foo.so:myfunction)");
+  infomsg(" %W use an external library function as a wrapper (-%W link-detected=foo.so:myfunction[,myparameters])");
   /* infomsg(" %O do a chroot before setuid"); */
   infomsg("");
   infomsg("Details: Option N");
@@ -571,6 +582,7 @@ void help(char* app,int more) {
   infomsg("  '%h' Host name (ex: www.someweb.com)");
   infomsg("  '%M' URL MD5 (128 bits, 32 ascii bytes)");
   infomsg("  '%Q' query string MD5 (128 bits, 32 ascii bytes)");
+  infomsg("  '%r' protocol name (ex: http)");
   infomsg("  '%q' small query string MD5 (16 bits, 4 ascii bytes)");
   infomsg("     '%s?' Short name version (ex: %sN)");
   infomsg("  '%[param]' param variable in query string");
@@ -613,6 +625,8 @@ void help(char* app,int more) {
   infomsg("'start' : int   (* myfunction)(httrackp* opt);");
   infomsg("'end' : int   (* myfunction)(void);");
   infomsg("'change-options' : int   (* myfunction)(httrackp* opt);");
+  infomsg("'preprocess-html' : int   (* myfunction)(char** html,int* len,char* url_adresse,char* url_fichier);");
+  infomsg("'postprocess-html' : int   (* myfunction)(char** html,int* len,char* url_adresse,char* url_fichier);");
   infomsg("'check-html' : int   (* myfunction)(char* html,int len,char* url_adresse,char* url_fichier);");
   infomsg("'query' : char* (* myfunction)(char* question);");
   infomsg("'query2' : char* (* myfunction)(char* question);");
@@ -622,8 +636,10 @@ void help(char* app,int more) {
   infomsg("'pause' : void  (* myfunction)(char* lockfile);");
   infomsg("'save-file' : void  (* myfunction)(char* file);");
   infomsg("'link-detected' : int   (* myfunction)(char* link);");
+  infomsg("'link-detected2' : int   (* myfunction)(char* link, char* start_tag);");
   infomsg("'transfer-status' : int   (* myfunction)(lien_back* back);");
   infomsg("'save-name' : int   (* myfunction)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);");
+  infomsg("And <wrappername>_init() functions if defined, called upon plug");
   infomsg("");
   infomsg("");
   infomsg("example: httrack www.someweb.com/bob/");

@@ -50,6 +50,8 @@ Romanian
 LANGUAGE_25
 Greek
 LANGUAGE_26
+Bulgarian
+LANGUAGE_27
 LANGUAGE_NAME
 LANGUAGE_NAME
 LANGUAGE_FILE
@@ -60,6 +62,8 @@ LANGUAGE_AUTHOR
 LANGUAGE_AUTHOR
 LANGUAGE_CHARSET
 LANGUAGE_CHARSET
+LANGUAGE_WINDOWSID
+LANGUAGE_WINDOWSID
 LANG_OK
 OK
 LANG_CANCEL
@@ -236,6 +240,8 @@ LANG_F14
 scanning
 LANG_F15
 Waiting for scheduled time..
+LANG_F15b
+Transferring data..
 LANG_F16
 Connecting to provider
 LANG_F17
@@ -504,6 +510,8 @@ LANG_I1j
 Use old HTTP/1.0 requests (limits engine power!)
 LANG_I1k
 Attempt to limit retransfers through several tricks (file size test..)
+LANG_I1k2
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
 LANG_I30
 Write external links without login/password
 LANG_I30b
@@ -606,6 +614,8 @@ LANG_I62
 Tolerant requests (for servers)
 LANG_I62b
 Update hack (limit re-transfers)
+LANG_I62b2
+URL hacks (join similar URLs)
 LANG_I63
 Force old HTTP/1.0 requests (no 1.1)
 LANG_I64
@@ -822,6 +832,8 @@ LANG_S3
 Select existing project to update
 LANG_S4
 Click here to select path
+LANG_S5
+Select or create a new category name, to sort your mirrors in categories
 LANG_S10
 HTTrack Project Wizard...
 LANG_S11
@@ -832,6 +844,8 @@ LANG_S11c
 Project name:
 LANG_S12
 Base path:
+LANG_S13
+Project category:
 LANG_S20
 C:\\My Web Sites
 LANG_S30

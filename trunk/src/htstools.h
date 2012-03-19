@@ -40,8 +40,6 @@ Please visit our Website: http://www.httrack.com
 #define HTSTOOLS_DEFH 
 
 /* specific definitions */
-#include <stdio.h>
-#include <stdlib.h>
 #include "htsbase.h"
 #include "htscore.h"
 
@@ -54,6 +52,33 @@ Please visit our Website: http://www.httrack.com
 #include <sys/stat.h>
 #endif
 
+#ifndef HTTRACK_DEFLIB
+
+// Portable directory find functions
+#ifdef _WIN32
+typedef struct find_handle_struct {
+  WIN32_FIND_DATAA hdata;
+  HANDLE handle;
+} find_handle_struct;
+#else
+typedef struct find_handle_struct {
+  DIR * hdir;
+  struct dirent* dirp;
+  struct stat filestat;
+  char path[2048];
+} find_handle_struct;
+#endif
+typedef find_handle_struct* find_handle;
+typedef struct topindex_chain {
+  int level;                          /* sort level */
+  char* category;                     /* category */
+  char name[2048];                    /* path */
+  struct topindex_chain* next;        /* next element */
+} topindex_chain  ;
+#endif
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 int ident_url_relatif(char *lien,char* urladr,char* urlfil,char* adr,char* fil);
 int lienrelatif(char* s,char* link,char* curr);
 int link_has_authority(char* lien);
@@ -84,38 +109,15 @@ HTS_INLINE int __rech_tageqbegdigits(const char* adr,const char* s);
   )
 //HTS_INLINE int rech_tageq(const char* adr,const char* s);
 HTS_INLINE int rech_sampletag(const char* adr,const char* s);
+HTS_INLINE int rech_endtoken(const char* adr, const char** start);
 HTS_INLINE int check_tag(char* from,const char* tag);
 int verif_backblue(httrackp* opt,char* base);
 int verif_external(int nb,int test);
 
 int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type);
-
-#ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath);
-#endif
-
 
 // Portable directory find functions
-
-#ifndef HTTRACK_DEFLIB
-#ifdef _WIN32
-typedef struct {
-  WIN32_FIND_DATA hdata;
-  HANDLE handle;
-} find_handle_struct;
-#else
-typedef struct {
-  DIR * hdir;
-  struct dirent* dirp;
-  struct stat filestat;
-  char path[2048];
-} find_handle_struct;
-#endif
-typedef find_handle_struct* find_handle;
-typedef struct topindex_chain {
-  char name[2048];                    /* path */
-  struct topindex_chain* next;        /* next element */
-} topindex_chain  ;
 // Directory find functions
 HTSEXT_API find_handle hts_findfirst(char* path);
 HTSEXT_API int hts_findnext(find_handle find);
@@ -126,6 +128,7 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 HTSEXT_API int hts_findisdir(find_handle find);
 HTSEXT_API int hts_findisfile(find_handle find);
 HTSEXT_API int hts_findissystem(find_handle find);
+
 #endif
 
 #endif

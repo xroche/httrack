@@ -46,6 +46,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 // Main, récupère les paramètres et appelle le robot
 #if HTS_ANALYSTE
 #ifndef HTTRACK_DEFLIB
@@ -58,7 +60,7 @@ int main(int argc, char **argv);
 int cmdl_opt(char* s);
 int check_path(char* s,char* defaultname);
 
-
+#endif
 
 
 #endif

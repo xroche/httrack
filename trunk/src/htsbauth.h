@@ -48,11 +48,15 @@ typedef struct bauth_chain {
 
 
 // buffer pour les cookies et authentification
-typedef struct {
+typedef struct t_cookie {
   int max_len;
   char data[32768];
   bauth_chain auth;
 } t_cookie;
+
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 
 // cookies
 int cookie_add(t_cookie* cookie,char* cook_name,char* cook_value,char* domain,char* path);
@@ -70,5 +74,6 @@ int bauth_add(t_cookie* cookie,char* adr,char* fil,char* auth);
 char* bauth_check(t_cookie* cookie,char* adr,char* fil);
 char* bauth_prefix(char* adr,char* fil);
 
+#endif
 
 #endif

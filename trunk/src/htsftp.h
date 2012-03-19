@@ -45,9 +45,11 @@ Please visit our Website: http://www.httrack.com
 // lien_back
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 #if USE_BEGINTHREAD
 void launch_ftp(lien_back* back);
-PTHREAD_TYPE back_launch_ftp( void* pP );
+PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_ftp( void* pP );
 #else
 void launch_ftp(lien_back* back,char* path,char* exec);
 int back_launch_ftp(lien_back* back);
@@ -62,7 +64,7 @@ char* linejmp(char* line);
 int check_socket(T_SOC soc);
 int check_socket_connect(T_SOC soc);
 int wait_socket_receive(T_SOC soc,int timeout);
-
+#endif
 
 #endif
 

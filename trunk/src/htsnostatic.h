@@ -53,20 +53,11 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSNOSTATIC_DEFH
 #define HTSNOSTATIC_DEFH 
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 #include "htscore.h"
 #include "htsthread.h"
-
-/*
-#if USE_PTHREAD
-#if HTS_WIN
-#undef HTS_REENTRANT
-#else
-#define HTS_REENTRANT
-#endif
-#else
-#undef HTS_REENTRANT
-#endif
-*/
 
 #define HTS_VAR_MAIN_HASH 127
 
@@ -157,7 +148,61 @@ void hts_destroyvar_key(void* adr);
               &cKey
 
 */
-#if HTS_WIN
+#ifdef _WIN32
+
+#ifdef _WIN32_WCE
+
+/* Windows CE: static only */
+#define NOSTATIC_XRESERVE(name, type, nelt) do { \
+  /*__declspec( thread )*/ static type thValue[nelt]; \
+  /* __declspec( thread ) */ int static initValue = 0; \
+  name = thValue; \
+  if (!initValue) { \
+    initValue = 1; \
+    memset(&thValue, 0, sizeof(thValue)); \
+  } \
+} while(0)
+
+#elif 1
+
+/* New Windows version: TLS */
+/* Suggested by daan at zwif.com to be more gentle with LoadLibrary (04/2004)
+See http://msdn.microsoft.com/library/en-us/vccore/html/_core_rules_and_limitations_for_tls.asp
+And especially the "DLL declares any nonlocal data or object as __declspec( thread )" section
+*/
+#define NOSTATIC_XRESERVE(name,type,nelt) do { \
+  static DWORD tlsIndex = 0; \
+  static   int initValue = 0; \
+  if (initValue == 0) \
+  { \
+    if (!hts_maylockvar()) { \
+      abortLog("unable to lock mutex (not initialized?!)"); \
+      abort(); \
+    } \
+    hts_lockvar(); \
+    if (initValue == 0) { \
+      tlsIndex = TlsAlloc(); \
+      if (tlsIndex == 0xFFFFFFFF) { \
+        abortLog("unable to allocate thread local storage (TLS) for variable!"); \
+        abort(); \
+      } \
+      initValue = 1; \
+    } \
+    hts_unlockvar(); \
+  } \
+  name = (type*)TlsGetValue(tlsIndex); \
+  if (name == NULL) { \
+    name = (type*)malloc(sizeof(type)*nelt); \
+    if (name == NULL) { \
+      abortLog("unable to allocate memory for variable!"); \
+      abort(); \
+    } \
+    memset(name, 0, sizeof(type)*nelt); \
+    TlsSetValue(tlsIndex, name); \
+  } \
+} while(0)
+
+#else
 
 /* Windows: handled by the compiler */
 #define NOSTATIC_XRESERVE(name, type, nelt) do { \
@@ -169,6 +214,8 @@ void hts_destroyvar_key(void* adr);
     memset(&thValue, 0, sizeof(thValue)); \
   } \
 } while(0)
+
+#endif
 
 #else
 
@@ -224,6 +271,8 @@ else { \
   } \
 } \
 } while(0)
+#endif
+
 #endif
 
 #endif

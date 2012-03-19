@@ -35,15 +35,15 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htshash.h"
 
 /* specific definitions */
 #include "htsbase.h"
 #include "htsglobal.h"
 #include "htsmd5.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 /* END specific definitions */
 
 /* Specific macros */
@@ -63,7 +63,7 @@ Please visit our Website: http://www.httrack.com
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 // retour: position ou -1 si non trouvé
 int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
-  char normfil_[HTS_URLMAXSIZE*2];
+  char BIGSTK normfil_[HTS_URLMAXSIZE*2];
   char* normfil;
   char* normadr;
   unsigned int cle;
@@ -199,7 +199,7 @@ int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
 
 // enregistrement lien lpos dans les 3 tables hash1..3
 void hash_write(hash_struct* hash,int lpos,int normalized) {
-  char normfil_[HTS_URLMAXSIZE*2];
+  char BIGSTK normfil_[HTS_URLMAXSIZE*2];
   char* normfil;
   unsigned int cle;
   int pos; 

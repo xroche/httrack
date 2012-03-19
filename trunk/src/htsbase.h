@@ -44,9 +44,8 @@ extern "C" {
 
 #include "htsglobal.h"
 
-// size_t et mode_t
-#include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -76,30 +75,24 @@ extern "C" {
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
+#ifndef _WIN32
+#undef Sleep
+#define min(a,b) ((a)>(b)?(b):(a))
+#define max(a,b) ((a)>(b)?(a):(b))
+#define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
+#endif
+
 // teste égalité de 2 chars, case insensitive
 #define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
 #define streql(a,b) (hichar(a)==hichar(b))
 
-// is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
-#define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
-#define is_hypertext_mime(a) \
-   ( (strfield2((a),"text/html")!=0)\
-  || (strfield2((a),"application/x-javascript")!=0) \
-  || (strfield2((a),"text/css")!=0) \
-  /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/ \
-  || (strfield2((a),"image/svg+xml")!=0) \
-  || (strfield2((a),"image/svg-xml")!=0) \
-  /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */\
-  )
-
-#define may_be_hypertext_mime(a) \
-   (\
-     (strfield2((a),"audio/x-pn-realaudio")!=0) \
-  )
-
-
 // caractère maj
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
+
+
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 
 // functions
 #ifdef _WIN32
@@ -112,26 +105,15 @@ extern "C" {
 typedef void (*t_abortLog)(char* msg, char* file, int line);
 extern HTSEXT_API t_abortLog abortLog__;
 #define abortLog(a) abortLog__(a, __FILE__, __LINE__)
-#define abortLogFmt(a) do { \
-  FILE* fp = fopen("CRASH.TXT", "wb"); \
-  if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
-  if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
-  if (fp) { \
-    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
-    fprintf(fp, "Reason:\r\n"); \
-    fprintf(fp, a); \
-    fprintf(fp, "\r\n"); \
-    fflush(fp); \
-    fclose(fp); \
-  } \
-} while(0)
-
-
 #define _ ,
+#ifndef _WIN32_WCE
 #define abortLogFmt(a) do { \
   FILE* fp = fopen("CRASH.TXT", "wb"); \
   if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
   if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("\\Temp\\CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("\\CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("CRASH.TXT", "wb"); \
   if (fp) { \
     fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
     fprintf(fp, "Reason:\r\n"); \
@@ -141,6 +123,12 @@ extern HTSEXT_API t_abortLog abortLog__;
     fclose(fp); \
   } \
 } while(0)
+#else
+#define abortLogFmt(a) do { \
+  XCEShowMessageA("HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\nReason:\r\n%s\r\n", __LINE__, a); \
+} while(0)
+#endif
+
 #define assertf(exp) do { \
   if (! ( exp ) ) { \
     abortLog("assert failed: " #exp); \
@@ -167,17 +155,20 @@ extern HTSEXT_API t_abortLog abortLog__;
 #define malloct(A)          malloc(A)
 #define calloct(A,B)        calloc((A), (B))
 #define freet(A)            do { assertnf((A) != NULL); if ((A) != NULL) { free(A); (A) = NULL; } } while(0)
+#define strdupt(A)          strdup(A)
 #define realloct(A,B)       ( ((A) != NULL) ? realloc((A), (B)) : malloc(B) )
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
 #else
 /* debug version */
 #define malloct(A)    hts_malloc(A)
 #define calloct(A,B)  hts_calloc(A,B)
+#define strdupt(A)    hts_strdup(A)
 #define freet(A)      do { hts_free(A); (A) = NULL; } while(0)
 #define realloct(A,B) hts_realloc(A,B)
 void  hts_freeall();
 void* hts_malloc    (size_t);
 void* hts_calloc(size_t,size_t);
+char* hts_strdup(char*);
 void* hts_xmalloc(size_t,size_t);
 void  hts_free      (void*);
 void* hts_realloc   (void*,size_t);
@@ -379,9 +370,10 @@ extern HTSEXT_API int htsMemoryFastXfr;
 
 #endif
 
+#endif
 
 #ifdef __cplusplus
- };
+}
 #endif
 
 #endif

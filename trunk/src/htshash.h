@@ -42,10 +42,13 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 // tables de hashage
 int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized);
 void hash_write(hash_struct* hash,int lpos,int normalized);
 int* hash_calc_chaine(hash_struct* hash,int type,int pos);
 unsigned long int hash_cle(char* nom1,char* nom2);
+#endif
 
 #endif

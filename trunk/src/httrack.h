@@ -46,9 +46,9 @@ typedef struct {
   char name[1024];
   char file[1024];
   char state[256];
-  char url_sav[HTS_URLMAXSIZE*2];    // pour cancel
-  char url_adr[HTS_URLMAXSIZE*2];
-  char url_fil[HTS_URLMAXSIZE*2];
+  char BIGSTK url_sav[HTS_URLMAXSIZE*2];    // pour cancel
+  char BIGSTK url_adr[HTS_URLMAXSIZE*2];
+  char BIGSTK url_fil[HTS_URLMAXSIZE*2];
   LLint size;
   LLint sizetot;
   int offset;
@@ -79,29 +79,220 @@ typedef struct {
 } t_InpInfo;
 
 // wrappers
-void  __cdecl htsshow_init(void);
-void  __cdecl htsshow_uninit(void);
-int   __cdecl htsshow_start(httrackp* opt);
-int   __cdecl htsshow_chopt(httrackp* opt);
-int   __cdecl htsshow_end(void);
-int   __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier);
-int   __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats);
-char* __cdecl htsshow_query(char* question);
-char* __cdecl htsshow_query2(char* question);
-char* __cdecl htsshow_query3(char* question);
-int   __cdecl htsshow_check(char* adr,char* fil,int status);
-void  __cdecl htsshow_pause(char* lockfile);
-void  __cdecl htsshow_filesave(char* file);
-int   __cdecl htsshow_linkdetected(char* link);
-int   __cdecl htsshow_xfrstatus(lien_back* back);
-int   __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-  
+static void  __cdecl htsshow_init(void);
+static void  __cdecl htsshow_uninit(void);
+static int   __cdecl htsshow_start(httrackp* opt);
+static int   __cdecl htsshow_chopt(httrackp* opt);
+static int   __cdecl htsshow_end(void);
+static int   __cdecl htsshow_preprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier);
+static int   __cdecl htsshow_postprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier);
+static int   __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier);
+static int   __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats);
+static char* __cdecl htsshow_query(char* question);
+static char* __cdecl htsshow_query2(char* question);
+static char* __cdecl htsshow_query3(char* question);
+static int   __cdecl htsshow_check(char* adr,char* fil,int status);
+static void  __cdecl htsshow_pause(char* lockfile);
+static void  __cdecl htsshow_filesave(char* file);
+static int   __cdecl htsshow_linkdetected(char* link);
+static int   __cdecl htsshow_linkdetected2(char* link, char* start_tag);
+static int   __cdecl htsshow_xfrstatus(lien_back* back);
+static int   __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
+static int   __cdecl htsshow_sendheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
+static int   __cdecl htsshow_receiveheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
+
 int main(int argc, char **argv);
-void vt_color(int text,int back);
-void vt_clear(void);
-void vt_home(void);
+static void vt_color(int text,int back);
+static void vt_clear(void);
+static void vt_home(void);
 
 #endif
+
+/* */
+
+// Engine internal variables
+typedef void (* htsErrorCallback)(char* msg, char* file, int line);
+extern HTSEXT_API htsErrorCallback htsCallbackErr;
+extern HTSEXT_API int htsMemoryFastXfr;
+/* */
+extern HTSEXT_API hts_stat_struct HTS_STAT;
+extern int _DEBUG_HEAD;
+extern FILE* ioinfo;
+
+// from htsbase.h
+
+/* protected strcat, strncat and strcpy - definitely useful */
+#define strcatbuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strcat(A, B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int sz = (unsigned int) strlen(A); \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(sz + szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (sz + szf + 1 < sizeof(A)) { \
+          memcpy((A) + sz, (B), szf + 1); \
+        } \
+      } \
+    } else if (szf > 0) { \
+      memcpybuff((A) + sz, (B), szf + 1); \
+    } \
+  } \
+} while(0)
+#define strncatbuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strncat(A, B, N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int sz = (unsigned int) strlen(A); \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(sz + szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (sz + szf + 1 < sizeof(A)) { \
+          memcpy((A) + sz, (B), szf); \
+          * ( (A) + sz + szf) = '\0'; \
+        } \
+      } \
+    } else if (szf > 0) { \
+      memcpybuff((A) + sz, (B), szf); \
+      * ( (A) + sz + szf) = '\0'; \
+    } \
+  } \
+} while(0)
+#define strcpybuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strcpy(A, B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (szf + 1 < sizeof(A)) { \
+          memcpy((A), (B), szf + 1); \
+        } else { \
+          * (A) = '\0'; \
+        } \
+      } else { \
+        * (A) = '\0'; \
+      } \
+    } else { \
+      memcpybuff((A), (B), szf + 1); \
+    } \
+  } \
+} while(0)
+#define strncpybuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strncpy(A, B, N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (szf + 1 < sizeof(A)) { \
+          memcpy((A), (B), szf); \
+        } \
+      } \
+    } else { \
+      memcpybuff((A), (B), szf); \
+    } \
+  } \
+} while(0)
+
+// emergency log
+typedef void (*t_abortLog)(char* msg, char* file, int line);
+extern HTSEXT_API t_abortLog abortLog__;
+#define abortLog(a) abortLog__(a, __FILE__, __LINE__)
+#define abortLogFmt(a) do { \
+  FILE* fp = fopen("CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
+  if (fp) { \
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
+    fprintf(fp, "Reason:\r\n"); \
+    fprintf(fp, a); \
+    fprintf(fp, "\r\n"); \
+    fflush(fp); \
+    fclose(fp); \
+  } \
+} while(0)
+
+#define _ ,
+#define abortLogFmt(a) do { \
+  FILE* fp = fopen("CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
+  if (fp) { \
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
+    fprintf(fp, "Reason:\r\n"); \
+    fprintf(fp, a); \
+    fprintf(fp, "\r\n"); \
+    fflush(fp); \
+    fclose(fp); \
+  } \
+} while(0)
+#define assertf(exp) do { \
+  if (! ( exp ) ) { \
+    abortLog("assert failed: " #exp); \
+    if (htsCallbackErr != NULL) { \
+      htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
+    } \
+    assert(exp); \
+    abort(); \
+  } \
+} while(0)
+/* non-fatal assert */
+#define assertnf(exp) do { \
+  if (! ( exp ) ) { \
+    abortLog("assert failed: " #exp); \
+    if (htsCallbackErr != NULL) { \
+      htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
+    } \
+  } \
+} while(0)
+
+//
+
+#define malloct(A)          malloc(A)
+#define calloct(A,B)        calloc((A), (B))
+#define freet(A)            do { assertnf((A) != NULL); if ((A) != NULL) { free(A); (A) = NULL; } } while(0)
+#define strdupt(A)          strdup(A)
+#define realloct(A,B)       ( ((A) != NULL) ? realloc((A), (B)) : malloc(B) )
+#define memcpybuff(A, B, N) memcpy((A), (B), (N))
 
 #endif
 

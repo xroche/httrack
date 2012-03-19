@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 Antonín Matìjèík (matejcik@volny.cz) \r \n
 LANGUAGE_CHARSET
 ISO-8859-2
+LANGUAGE_WINDOWSID
+Czech
 OK
 Ano
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Použít starší verze HTTP/1.0 požadavkù (omezuje výkonost stroje)
 Attempt to limit retransfers through several tricks (file size test..)
 Pokus k zamezení opìtovného pøenosu pomocí rùzných zpùsobù (test velikosti souboru,..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Zápis externích odkazù bez pøihlášení/hesla
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Pøípustné požadavky (pro servery)
 Update hack (limit re-transfers)
 Aktualizovat chytrou obnovu (zabrání znovu pøenosu souborù)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Použít pouze staré HTTP/1.0 požadavky (ne HTTP/1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Zvolt existující projekt pro aktualizaci
 Click here to select path
 Klikni pro výbìr cesty
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Pomocník HTTrack projektu..
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Název projektu:
 Base path:
 Základní cesta:
+Project category:
+
 C:\\My Web Sites
 C:\\Temp\Projekty
 Type a new project name, \r\nor select existing project to update/resume

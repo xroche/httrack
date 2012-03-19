@@ -57,6 +57,8 @@ HTSEXT_API const char* hts_is_available(void);
 /* Other functions */
 HTSEXT_API int hts_resetvar(void);
 HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath);
+HTSEXT_API char* hts_getcategories(char* path, int type);
+HTSEXT_API char* hts_getcategory(char* filename);
 
 /* Catch-URL */
 HTSEXT_API T_SOC catch_url_init_std(int* port_prox,char* adr_prox);
@@ -111,11 +113,17 @@ HTSEXT_API char* unescape_http_unharm(char* s, int no_high);
 HTSEXT_API char* antislash_unescaped(char* s);
 HTSEXT_API void  escape_remove_control(char* s);
 
+/* Debugging */
+HTSEXT_API void hts_debug(int level);
+
 /* Portable directory API */
 
 typedef struct find_handle_struct find_handle_struct;
 typedef find_handle_struct* find_handle;
+
 typedef struct topindex_chain {
+  int level;                          /* sort level */
+  char* category;                     /* category */
   char name[2048];                    /* path */
   struct topindex_chain* next;        /* next element */
 } topindex_chain  ;

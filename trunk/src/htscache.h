@@ -42,9 +42,12 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
+
 // cache
 void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* url_fil,char* url_save);
-void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_ndx,FILE* cache_dat,int all_in_cache);
+void cache_add(cache_back* cache,htsblk r,char* url_adr,char* url_fil,char* url_save,int all_in_cache);
 htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
 htsblk cache_read_ro(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
 htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,char* return_save,int readonly);
@@ -56,6 +59,7 @@ int cache_readdata(cache_back* cache,char* str1,char* str2,char** inbuff,int* le
 
 int cache_wstr(FILE* fp,char* s);
 void cache_rstr(FILE* fp,char* s);
+char* cache_rstr_addr(FILE* fp);
 int  cache_brstr(char* adr,char* s);
 int  cache_quickbrstr(char* adr,char* s);
 int cache_brint(char* adr,int* i);
@@ -63,4 +67,7 @@ void cache_rint(FILE* fp,int* i);
 int cache_wint(FILE* fp,int i);
 void cache_rLLint(FILE* fp,LLint* i);
 int cache_wLLint(FILE* fp,LLint i);
+
+#endif
+
 #endif

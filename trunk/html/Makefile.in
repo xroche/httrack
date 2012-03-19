@@ -69,6 +69,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LFS_FLAG = @LFS_FLAG@
+LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
@@ -141,6 +142,7 @@ HelpHtmlimagesdir = $(datadir)/doc/httrack/html/images
 HelpHtmlTxtdir = $(datadir)/doc/httrack/html
 WebHtmldir = $(datadir)/doc/httrack/html/server
 WebHtmlimagesdir = $(datadir)/doc/httrack/html/server/images
+WebHtmlsfxdir = $(datadir)/doc/httrack/html/server/sfx
 WebPixmapdir = $(datadir)/pixmaps
 WebGPixmapdir = $(datadir)/httrack/icons
 VFolderEntrydir = $(prefix)/share/applications
@@ -153,6 +155,7 @@ HelpHtmlimages_DATA = images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = server/*.html
 WebHtmlimages_DATA = server/images/*
+WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
@@ -161,7 +164,7 @@ WebGPixmap_DATA = server/div/webhttrack.xpm
 VFolderEntry_DATA = server/div/*.desktop
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
-	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
+	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
 	$(WebPixmap_DATA) $(WebGPixmap_DATA) $(VFolderEntry_DATA) \
 	httrack.css
 
@@ -173,7 +176,7 @@ DIST_SOURCES =
 DATA = $(HelpHtml_DATA) $(HelpHtmlTxt_DATA) $(HelpHtmldiv_DATA) \
 	$(HelpHtmlimages_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlroot_DATA) \
 	$(VFolderEntry_DATA) $(WebGPixmap_DATA) $(WebHtml_DATA) \
-	$(WebHtmlimages_DATA) $(WebPixmap_DATA)
+	$(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) $(WebPixmap_DATA)
 
 DIST_COMMON = Makefile.am Makefile.in
 all: all-am
@@ -374,6 +377,24 @@ uninstall-WebHtmlimagesDATA:
 	  echo " rm -f $(DESTDIR)$(WebHtmlimagesdir)/$$f"; \
 	  rm -f $(DESTDIR)$(WebHtmlimagesdir)/$$f; \
 	done
+WebHtmlsfxDATA_INSTALL = $(INSTALL_DATA)
+install-WebHtmlsfxDATA: $(WebHtmlsfx_DATA)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(WebHtmlsfxdir)
+	@list='$(WebHtmlsfx_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " $(WebHtmlsfxDATA_INSTALL) $$d$$p $(DESTDIR)$(WebHtmlsfxdir)/$$f"; \
+	  $(WebHtmlsfxDATA_INSTALL) $$d$$p $(DESTDIR)$(WebHtmlsfxdir)/$$f; \
+	done
+
+uninstall-WebHtmlsfxDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(WebHtmlsfx_DATA)'; for p in $$list; do \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " rm -f $(DESTDIR)$(WebHtmlsfxdir)/$$f"; \
+	  rm -f $(DESTDIR)$(WebHtmlsfxdir)/$$f; \
+	done
 WebPixmapDATA_INSTALL = $(INSTALL_DATA)
 install-WebPixmapDATA: $(WebPixmap_DATA)
 	@$(NORMAL_INSTALL)
@@ -404,7 +425,7 @@ top_distdir = ..
 distdir = $(top_distdir)/$(PACKAGE)-$(VERSION)
 
 distdir: $(DISTFILES)
-	$(mkinstalldirs) $(distdir)/div $(distdir)/images $(distdir)/img $(distdir)/server $(distdir)/server/div $(distdir)/server/images
+	$(mkinstalldirs) $(distdir)/div $(distdir)/images $(distdir)/img $(distdir)/server $(distdir)/server/div $(distdir)/server/images $(distdir)/server/sfx
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
 	  case $$file in \
@@ -434,7 +455,7 @@ check: check-am
 all-am: Makefile $(DATA)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(HelpHtmldir) $(DESTDIR)$(HelpHtmlTxtdir) $(DESTDIR)$(HelpHtmldivdir) $(DESTDIR)$(HelpHtmlimagesdir) $(DESTDIR)$(HelpHtmlimgdir) $(DESTDIR)$(HelpHtmlrootdir) $(DESTDIR)$(VFolderEntrydir) $(DESTDIR)$(WebGPixmapdir) $(DESTDIR)$(WebHtmldir) $(DESTDIR)$(WebHtmlimagesdir) $(DESTDIR)$(WebPixmapdir)
+	$(mkinstalldirs) $(DESTDIR)$(HelpHtmldir) $(DESTDIR)$(HelpHtmlTxtdir) $(DESTDIR)$(HelpHtmldivdir) $(DESTDIR)$(HelpHtmlimagesdir) $(DESTDIR)$(HelpHtmlimgdir) $(DESTDIR)$(HelpHtmlrootdir) $(DESTDIR)$(VFolderEntrydir) $(DESTDIR)$(WebGPixmapdir) $(DESTDIR)$(WebHtmldir) $(DESTDIR)$(WebHtmlimagesdir) $(DESTDIR)$(WebHtmlsfxdir) $(DESTDIR)$(WebPixmapdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -481,7 +502,9 @@ install-data-am: install-HelpHtmlDATA install-HelpHtmlTxtDATA \
 	install-HelpHtmlimgDATA install-HelpHtmlrootDATA \
 	install-VFolderEntryDATA install-WebGPixmapDATA \
 	install-WebHtmlDATA install-WebHtmlimagesDATA \
-	install-WebPixmapDATA
+	install-WebHtmlsfxDATA install-WebPixmapDATA
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
 
 install-exec-am:
 
@@ -512,7 +535,8 @@ uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
 	uninstall-VFolderEntryDATA uninstall-WebGPixmapDATA \
 	uninstall-WebHtmlDATA uninstall-WebHtmlimagesDATA \
-	uninstall-WebPixmapDATA uninstall-info-am
+	uninstall-WebHtmlsfxDATA uninstall-WebPixmapDATA \
+	uninstall-info-am
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	distclean distclean-generic distclean-libtool distdir dvi \
@@ -521,19 +545,27 @@ uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	install-HelpHtmlimagesDATA install-HelpHtmlimgDATA \
 	install-HelpHtmlrootDATA install-VFolderEntryDATA \
 	install-WebGPixmapDATA install-WebHtmlDATA \
-	install-WebHtmlimagesDATA install-WebPixmapDATA install-am \
-	install-data install-data-am install-exec install-exec-am \
-	install-info install-info-am install-man install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am uninstall \
-	uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
-	uninstall-HelpHtmldivDATA uninstall-HelpHtmlimagesDATA \
-	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
-	uninstall-VFolderEntryDATA uninstall-WebGPixmapDATA \
-	uninstall-WebHtmlDATA uninstall-WebHtmlimagesDATA \
+	install-WebHtmlimagesDATA install-WebHtmlsfxDATA \
+	install-WebPixmapDATA install-am install-data install-data-am \
+	install-exec install-exec-am install-info install-info-am \
+	install-man install-strip installcheck installcheck-am \
+	installdirs maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
+	ps ps-am uninstall uninstall-HelpHtmlDATA \
+	uninstall-HelpHtmlTxtDATA uninstall-HelpHtmldivDATA \
+	uninstall-HelpHtmlimagesDATA uninstall-HelpHtmlimgDATA \
+	uninstall-HelpHtmlrootDATA uninstall-VFolderEntryDATA \
+	uninstall-WebGPixmapDATA uninstall-WebHtmlDATA \
+	uninstall-WebHtmlimagesDATA uninstall-WebHtmlsfxDATA \
 	uninstall-WebPixmapDATA uninstall-am uninstall-info-am
 
+
+install-data-hook:
+	if test ! -f $(DESTDIR)$(prefix)/share/httrack/html ; then \
+		( cd $(DESTDIR)$(prefix)/share/httrack \
+			&& $(LN_S) ../doc/httrack/html html \
+		) \
+	fi
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

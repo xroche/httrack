@@ -35,14 +35,16 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htstools.h"
 
 /* specific definitions */
 #include "htsbase.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
+/* String */
+#include "htsstrings.h"
 /* END specific definitions */
 
 
@@ -90,10 +92,14 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
       ok=-2;  // non supporté
     }
 #if HTS_USEOPENSSL
-  } else if (SSL_is_available && strfield(lien,"https://")) {
-    // Note: ftp:foobar.gif is not valid
-    if (ident_url_absolute(lien,adr,fil)==-1) {        
-      ok=-1;    // erreur URL
+  } else if (strfield(lien,"https://")) {
+    if (SSL_is_available) {
+      // Note: ftp:foobar.gif is not valid
+      if (ident_url_absolute(lien,adr,fil)==-1) {        
+        ok=-1;    // erreur URL
+      }
+    } else {
+      ok=-1;
     }
 #endif
   } else if ((scheme) && (
@@ -190,8 +196,8 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
 // créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
 // un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
 int lienrelatif(char* s,char* link,char* curr_fil) {
-  char _curr[HTS_URLMAXSIZE*2];
-  char newcurr_fil[HTS_URLMAXSIZE*2],newlink[HTS_URLMAXSIZE*2];
+  char BIGSTK _curr[HTS_URLMAXSIZE*2];
+  char BIGSTK newcurr_fil[HTS_URLMAXSIZE*2],newlink[HTS_URLMAXSIZE*2];
   char* curr;
   //int n=0;
   char* a;
@@ -325,7 +331,7 @@ void longfile_to_83(int mode,char* n83,char* save) {
     max=8;
     break;
   case 2:
-    max=30;
+    max=31;
     break;
   default:
     max=8;
@@ -348,21 +354,20 @@ void longfile_to_83(int mode,char* n83,char* save) {
     }
   }
   /* 
-    Avoid: (ISO9660, but also suitable for 8-3)
-    (Thanks to jonat@cellcast.com for te hint)
-    /:;?\#*~
-    0x00-0x1f and 0x80-0xff
+  Avoid: (ISO9660, but also suitable for 8-3)
+  (Thanks to jonat@cellcast.com for te hint)
+  /:;?\#*~
+  0x00-0x1f and 0x80-0xff
   */
-  for(i=0 ; i < (int) strlen(save) ; i++) {
-    if (
-      (strchr("/:;?\\#*~", save[i]))
-      ||
-      (save[i] < 32)
-      ||
-      (save[i] >= 127)
-      ) {
-      save[i]='_';
+  for(i = 0 ; save[i] != 0 ; i++) {
+    char a = save[i];
+    if (a >= 'a' && a <= 'z') {
+      a -= 'a' - 'A';
     }
+    else if ( ! ( (a >= 'A' && a <= 'Z') || (a >= '0' && a <= '9') || a == '_' || a == '.') ) {
+      a = '_';
+    }
+    save[i] = a;
   }
 
   i=j=0;
@@ -475,6 +480,20 @@ HTS_INLINE int __rech_tageq(const char* adr,const char* s) {
   }
   return 0;
 }
+
+HTS_INLINE int rech_endtoken(const char* adr, const char** start) {
+  char quote = '\0';
+  int length = 0;
+  while(is_space(*adr)) adr++;
+  if (*adr == '"' || *adr == '\'') 
+    quote = *adr++;
+  *start = adr;
+  while(*adr != 0 && *adr != quote && (quote != '\0' || !is_space(*adr)) ) {
+    length++;
+	adr++;
+  }
+  return length;
+}
 // same, but check begining of adr wirh s (for <object src="bar.mov" .. hotspot123="foo.html">)
 HTS_INLINE int __rech_tageqbegdigits(const char* adr,const char* s) { 
   int p;
@@ -519,7 +538,7 @@ HTS_INLINE int check_tag(char* from,const char* tag) {
 int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
   int ok=1;
   if (size>0) {
-    if (is_hypertext_mime(type)) {
+    if (is_hypertext_mime(type, "")) {
       if (maxhtml>0) {
         if (size>maxhtml)
           ok=0;
@@ -535,18 +554,34 @@ int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
 }
 
 
+static int sortTopIndexFnc(const void * a_, const void * b_) {
+  int cmp;
+  topindex_chain** a = (topindex_chain**) a_;
+  topindex_chain** b = (topindex_chain**) b_;
+  /* Category first, then name */
+  if ((cmp = (*a)->level - (*b)->level) == 0) {
+    if ((cmp = strcmpnocase((*a)->category, (*b)->category)) == 0) {
+      cmp = strcmpnocase((*a)->name, (*b)->name);
+    }
+  }
+  return cmp;
+}
+
+HTSEXT_API char* hts_getcategory(char* filename);
+
 HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
   FILE* fpo;
   int retval=0;
-  char rpath[1024*2];
-  char *toptemplate_header=NULL,*toptemplate_body=NULL,*toptemplate_footer=NULL;
+  char BIGSTK rpath[1024*2];
+  char *toptemplate_header=NULL,*toptemplate_body=NULL,*toptemplate_footer=NULL,*toptemplate_bodycat=NULL;
   
   // et templates html
   toptemplate_header=readfile_or(fconcat(binpath,"templates/topindex-header.html"),HTS_INDEX_HEADER);
   toptemplate_body=readfile_or(fconcat(binpath,"templates/topindex-body.html"),HTS_INDEX_BODY);
+  toptemplate_bodycat=readfile_or(fconcat(binpath,"templates/topindex-bodycat.html"),HTS_INDEX_BODYCAT);
   toptemplate_footer=readfile_or(fconcat(binpath,"templates/topindex-footer.html"),HTS_INDEX_FOOTER);
   
-  if (toptemplate_header && toptemplate_body && toptemplate_footer) {
+  if (toptemplate_header && toptemplate_body && toptemplate_footer && toptemplate_bodycat) {
     
     strcpybuff(rpath,path);
     if (rpath[0]) {
@@ -556,6 +591,7 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
     
     fpo=fopen(fconcat(rpath,"/index.html"),"wb");
     if (fpo) {
+      String iname = STRING_EMPTY;
       find_handle h;
       verif_backblue(opt,concat(rpath,"/"));    // générer gif
       // Header
@@ -568,16 +604,40 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
       if (h) {
         struct topindex_chain * chain=NULL;
         struct topindex_chain * startchain=NULL;
+        String iname = STRING_EMPTY;
+        int chainSize = 0;
         do {
           if (hts_findisdir(h)) {
-            char iname[HTS_URLMAXSIZE*2];
-            strcpybuff(iname,rpath);
-            strcatbuff(iname,"/");
-            strcatbuff(iname,hts_findgetname(h));
-            strcatbuff(iname,"/index.html");
-            if (fexist(iname)) {
+            StringStrcpy(iname,rpath);
+            StringStrcat(iname,"/");
+            StringStrcat(iname,hts_findgetname(h));
+            StringStrcat(iname,"/index.html");
+            if (fexist(StringBuff(iname))) {
+              int level = 0;
+              char* category = NULL;
               struct topindex_chain * oldchain=chain;
+              
+              /* Check for an existing category */
+              StringStrcpy(iname,rpath);
+              StringStrcat(iname,"/");
+              StringStrcat(iname,hts_findgetname(h));
+              StringStrcat(iname,"/hts-cache/winprofile.ini");
+              if (fexist(StringBuff(iname))) {
+                category = hts_getcategory(StringBuff(iname));
+                if (category != NULL) {
+                  if (*category == '\0') {
+                    freet(category);
+                    category = NULL;
+                  }
+                }
+              }
+              if (category == NULL) {
+                category = strdupt("No categories");
+                level = 1;
+              }
+
               chain=calloc(sizeof(struct topindex_chain), 1);
+              chainSize++;
               if (!startchain) {
                 startchain=chain;
               }
@@ -587,29 +647,63 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
                 }
                 chain->next=NULL;
                 strcpybuff(chain->name, hts_findgetname(h));
+                chain->category = category;
+                chain->level = level;
               }
             }
             
           }
         } while(hts_findnext(h));
         hts_findclose(h);
+        StringFree(iname);
+        
+        /* Sort chain */
+        {
+          struct topindex_chain** sortedElts = (struct topindex_chain**) calloct(sizeof(topindex_chain*), chainSize);
+          assertf(sortedElts != NULL);
+          if (sortedElts != NULL) {
+            int i;
+            char* category = "";
+            
+            /* Build array */
+            struct topindex_chain * chain = startchain;
+            for(i = 0 ; i < chainSize ; i++) {
+              assertf(chain != NULL);
+              sortedElts[i] = chain;
+              chain = chain->next;
+            }
+            qsort(sortedElts, chainSize, sizeof(topindex_chain*), sortTopIndexFnc);
+            
+            /* Build sorted index */
+            for(i = 0 ; i < chainSize ; i++) {
+              char BIGSTK hname[HTS_URLMAXSIZE*2];
+              strcpybuff(hname,sortedElts[i]->name);
+              escape_check_url(hname);
 
-        /* Build sorted index */
-        chain=startchain;
-        while(chain) {
-          char hname[HTS_URLMAXSIZE*2];
-          strcpybuff(hname,chain->name);
-          escape_check_url(hname);
-          fprintf(fpo,toptemplate_body,
-            hname,
-            chain->name
-            );
-
-          chain=chain->next;
+              /* Changed category */
+              if (strcmp(category, sortedElts[i]->category) != 0) {
+                category = sortedElts[i]->category;
+                fprintf(fpo,toptemplate_bodycat, category);
+              }
+              fprintf(fpo,toptemplate_body,
+                hname,
+                sortedElts[i]->name
+                );
+            }
+            
+            /* Wipe elements */
+            for(i = 0 ; i < chainSize ; i++) {
+              freet(sortedElts[i]->category);
+              freet(sortedElts[i]);
+              sortedElts[i] = NULL;
+            }
+            freet(sortedElts);
+            
+            /* Return value */
+            retval=1;
+          }
         }
-
-
-        retval=1;
+        
       }
       
       // Footer
@@ -629,8 +723,108 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
     freet(toptemplate_body);
   if (toptemplate_footer)
     freet(toptemplate_footer);
+  if (toptemplate_body)
+    freet(toptemplate_body);
   
   return retval;
+}
+
+HTSEXT_API char* hts_getcategory(char* filename) {
+  String categ = STRING_EMPTY;
+  if (fexist(filename)) {
+    FILE* fp = fopen(filename, "rb");
+    if (fp != NULL) {
+      int done=0;
+      while(!feof(fp) && !done) {
+        char BIGSTK line[1024];
+        int n = linput(fp, line, sizeof(line) - 2);
+        if (n > 0) {
+          if (strfield(line, "category=")) {
+            unescapehttp(line+9, &categ);
+            done=1;
+          }
+        }
+      }
+      fclose(fp);
+    }
+  }
+  return StringBuff(categ);
+}
+
+HTSEXT_API char* hts_getcategories(char* path, int type) {
+  String categ = STRING_EMPTY;
+  String profiles = STRING_EMPTY;
+  char* rpath = path;
+  find_handle h;
+  inthash hashCateg = NULL;
+  if (rpath[0]) {
+    if (rpath[strlen(rpath)-1]=='/') {
+      rpath[strlen(rpath)-1]='\0';      /* note: patching stored (inhash) value */
+    }
+  }
+  h = hts_findfirst(rpath);
+  if (h) {
+    struct topindex_chain * chain=NULL;
+    struct topindex_chain * startchain=NULL;
+    String iname = STRING_EMPTY;
+    if (type == 1) {
+      hashCateg = inthash_new(127);
+      StringStrcat(categ, "Test category 1");
+      StringStrcat(categ, "\r\nTest category 2");
+    }
+    do {
+      if (hts_findisdir(h)) {
+        char BIGSTK line2[1024];
+        StringStrcpy(iname,rpath);
+        StringStrcat(iname,"/");
+        StringStrcat(iname,hts_findgetname(h));
+        StringStrcat(iname,"/hts-cache/winprofile.ini");
+        if (fexist(StringBuff(iname))) {
+          if (type == 1) {
+            FILE* fp = fopen(StringBuff(iname), "rb");
+            if (fp != NULL) {
+              int done=0;
+              while(!feof(fp) && !done) {
+                int n = linput(fp, line2, sizeof(line2) - 2);
+                if (n > 0) {
+                  if (strfield(line2, "category=")) {
+                    if (*(line2+9)) {
+                      if (!inthash_read(hashCateg, line2+9, NULL)) {
+                        inthash_write(hashCateg, line2+9, 0);
+                        if (StringLength(categ) > 0) {
+                          StringStrcat(categ, "\r\n");
+                        }
+                        unescapehttp(line2+9, &categ);
+                      }
+                    }
+                    done=1;
+                  }
+                }
+              }
+              line2[0] = '\0';
+              fclose(fp);
+            }
+          } else {
+            if (StringLength(profiles) > 0) {
+              StringStrcat(profiles, "\r\n");
+            }
+            StringStrcat(profiles, hts_findgetname(h));
+          }
+        }
+        
+      }
+    } while(hts_findnext(h));
+    hts_findclose(h);
+    StringFree(iname);
+  }
+  if (hashCateg) {
+    inthash_delete(&hashCateg);
+    hashCateg = NULL;
+  }
+  if (type == 1)
+    return StringBuff(categ);
+  else
+    return StringBuff(profiles);
 }
 
 
@@ -658,14 +852,14 @@ HTSEXT_API find_handle hts_findfirst(char* path) {
         memset(find, 0, sizeof(find_handle_struct));
 #if HTS_WIN
         {
-          char rpath[1024*2];
+          char BIGSTK rpath[1024*2];
           strcpybuff(rpath,path);
           if (rpath[0]) {
             if (rpath[strlen(rpath)-1]!='\\')
               strcatbuff(rpath,"\\");
           }
           strcatbuff(rpath,"*.*");
-          find->handle = FindFirstFile(rpath,&find->hdata);
+          find->handle = FindFirstFileA(rpath,&find->hdata);
           if (find->handle != INVALID_HANDLE_VALUE)
             return find;
         }
@@ -693,7 +887,7 @@ HTSEXT_API find_handle hts_findfirst(char* path) {
 HTSEXT_API int hts_findnext(find_handle find) {
   if (find) {
 #if HTS_WIN
-    if ( (FindNextFile(find->handle,&find->hdata)))
+    if ( (FindNextFileA(find->handle,&find->hdata)))
       return 1;
 #else
     memset(&(find->filestat), 0, sizeof(find->filestat));

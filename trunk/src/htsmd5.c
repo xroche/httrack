@@ -39,6 +39,9 @@ Please visit our Website: http://www.httrack.com
 /* Modified 2000 by Xavier Roche for domd5mem                   */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
+
 #include "htsmd5.h"
 #include "md5.h"
 #include <string.h>
@@ -48,12 +51,25 @@ int domd5mem(unsigned char * buf, int len,
                     unsigned char * digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
+#if 1
+//#ifndef _WIN32_WCE
   MD5_CTX ctx;
 
   MD5Init(&ctx, * ( (char*) &endian));
   MD5Update(&ctx, buf, len);
   MD5Final(bindigest, &ctx);
-  
+#else
+  /* Broken md5.. temporary hack */
+  int i;
+  memset(bindigest, 0, 16);
+  if (len > 0) {
+    for(i = 0 ; i < len + 16 ; i++) {
+      bindigest[i % 16] ^= ( buf[i % len] + i + len );
+      bindigest[(i - 1) % 16] ^= bindigest[ ( i + buf[i % len]*buf[(i-1) % len] ) % 16];
+	}
+  }
+#endif
+
   if (!asAscii) {
     memcpy(digest, bindigest, 16);
   } else {
@@ -70,7 +86,8 @@ int domd5mem(unsigned char * buf, int len,
 }
 
 unsigned long int md5sum32(char* buff) {
-  char digest[16];
-  domd5mem(buff,strlen(buff),digest,0);
-  return *( (long int*)(char*)digest );
+  unsigned char md5digest[16];
+  unsigned char* md5digest_ = md5digest;
+  domd5mem(buff,strlen(buff),md5digest,0);
+  return *( (long int*)(char*)md5digest );
 }

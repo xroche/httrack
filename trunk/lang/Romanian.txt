@@ -8,8 +8,10 @@ LANGUAGE_AUTHOR
 Alin Gheorghe Miron (miron.alin@personal.ro)
 LANGUAGE_CHARSET
 ISO-8859-1
+LANGUAGE_WINDOWSID
+Romanian
 OK
-Da
+LANGUAGE_WINDOWSID
 Cancel
 Anuleazã
 Exit
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Foloseºte vechile cereri HTTP/1.0 (limiteazã puterea!)
 Attempt to limit retransfers through several tricks (file size test..)
 Încearcã sã limitezi retransferurile prin folosirea unor trucuri (file size test...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 Scrie linkurile externe fãrã login/password
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Cereri tolerante (pentru servere)
 Update hack (limit re-transfers)
 Actualizare forþatã (limiteazã re-transferurile)
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 Forþeazã vechile cereri HTTP/1.0 (fãrã cereri HTTP/1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Selecteazã un proiect existent pentru actualizare
 Click here to select path
 Click aici pentru a selecta calea
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 Vrãjitor  proiect HTTrack...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Nume proiect:
 Base path:
 Calea de bazã:
+Project category:
+
 C:\\My Web Sites
 C:\\Siturile Mele
 Type a new project name, \r\nor select existing project to update/resume

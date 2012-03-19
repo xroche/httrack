@@ -54,7 +54,7 @@ typedef struct inthash_chain {
 
 // structure behind inthash
 typedef void (* t_inthash_freehandler)(void* value);
-typedef struct {
+typedef struct struct_inthash {
   inthash_chain** hash;
   t_inthash_freehandler free_handler;
   unsigned int hash_size;
@@ -64,6 +64,8 @@ typedef struct {
 // main inthash type
 typedef struct_inthash* inthash;
 
+/* Library internal definictions */
+#ifdef HTS_INTERNAL_BYTECODE
 // subfunctions
 unsigned long int inthash_key(char* value);
 void inthash_init(inthash hashtable);
@@ -71,7 +73,6 @@ void inthash_delchain(inthash_chain* hash,t_inthash_freehandler free_handler);
 void inthash_default_free_handler(void* value);
 
 // main functions:
-
 
 /* Hash functions: */
 inthash inthash_new(int size);                                       /* Create a new hash table */
@@ -89,6 +90,6 @@ void*   inthash_addblk(inthash hashtable,char* name,int blksize);    /* Add entr
 int     inthash_write(inthash hashtable,char* name,long int value);  /* Overwrite/add entry in the hash table */
 int     inthash_inc(inthash hashtable,char* name);                   /* Increment entry in the hash table */
 /* End of hash functions: */
-
+#endif
 
 #endif

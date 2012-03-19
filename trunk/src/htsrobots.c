@@ -35,15 +35,14 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* Internal engine bytecode */
+#define HTS_INTERNAL_BYTECODE
 
 #include "htsrobots.h"
 
 /* specific definitions */
 #include "htsbase.h"
 #include "htslib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 /* END specific definitions */
 
 

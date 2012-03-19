@@ -8,8 +8,10 @@ LANGUAGE_AUTHOR
 Andrei Iliev (iliev at vitaplus.ru) \r\n
 LANGUAGE_CHARSET
 windows-1251
+LANGUAGE_WINDOWSID
+Russian
 OK
-ОК
+LANGUAGE_WINDOWSID
 Cancel
 Отмена
 Exit
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 Использовать старый протокол HTTP/1.0 (ограничит возможности программы!)
 Attempt to limit retransfers through several tricks (file size test..)
 Попытка ограничить перекачку испольуя некоторые приемы (тест на размер файла..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Ограничить число линков, удаляя аналогичные линки (www.foo.com==foo.com, http=https ..)
 Write external links without login/password
 Сохранять внешние линки без логина/пароля
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 Толерантные запросы (к серверам)
 Update hack (limit re-transfers)
 Update hack (ограничение  повторных закачек)
+URL hacks (join similar URLs)
+Хак URL  (объеденить аналогичные URLs)
 Force old HTTP/1.0 requests (no 1.1)
 Использовать старый протокол HTTP/1.0 (не 1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 Для обновления проекта, выберете его из списка
 Click here to select path
 Выбрать каталог проекта
+Select or create a new category name, to sort your mirrors in categories
+Выбрать или создать новую категорию для сортировки зеркал по категориям
 HTTrack Project Wizard...
 Мастер создания проекта HTTrack...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 Имя проекта:
 Base path:
 Каталог:
+Project category:
+Категория проекта:
 C:\\My Web Sites
 C:\\Мои Web Сайты
 Type a new project name, \r\nor select existing project to update/resume

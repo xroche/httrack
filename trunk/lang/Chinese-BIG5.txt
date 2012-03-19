@@ -8,6 +8,8 @@ LANGUAGE_AUTHOR
 David Hing Cheong Hung (DAVEHUNG@mtr.com.hk)\r\n
 LANGUAGE_CHARSET
 BIG5
+LANGUAGE_WINDOWSID
+Chinese (Taiwan)
 OK
 確定
 Cancel
@@ -452,6 +454,8 @@ Use old HTTP/1.0 requests (limits engine power!)
 使用舊的 HTTP/1.0 要求 (將限制鏡像能力!)
 Attempt to limit retransfers through several tricks (file size test..)
 試以若干方法限制再傳送 (如通過檔案大小測試)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
 Write external links without login/password
 寫入外部鏈結時不包括登入/密碼
 Write internal links without query string
@@ -554,6 +558,8 @@ Tolerant requests (for servers)
 允許對伺服器的非精確要求
 Update hack (limit re-transfers)
 更新時採取其他方法防止重複下載
+URL hacks (join similar URLs)
+
 Force old HTTP/1.0 requests (no 1.1)
 強制使用舊的HTTP/1.0要求 (不採用1.1)
 Max connections / seconds
@@ -770,6 +776,8 @@ Select existing project to update
 請選擇一個已有的專案以更新
 Click here to select path
 點擊此處以選擇路徑
+Select or create a new category name, to sort your mirrors in categories
+
 HTTrack Project Wizard...
 HTTrack 專案精靈...
 New project name:
@@ -780,6 +788,8 @@ Project name:
 專案名稱:
 Base path:
 總存檔路徑:
+Project category:
+
 C:\\My Web Sites
 C:\\My Websites
 Type a new project name, \r\nor select existing project to update/resume
@@ -869,7 +879,7 @@ Freeze Window
 More information:
 更多訊息:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-歡迎使用 WinHTTrack 網站拷貝器!\n\n請點擊'NEXT'按鈕去\n\n-開始一個新專案\n- 或 繼續一個未完成的下載 
+歡迎使用 WinHTTrack 網站拷貝器!\n\n請點擊'NEXT'按鈕去\n\n-開始一個新專案\n- 或 繼續一個未完成的下載
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
 檔案名中包含副檔名:\n檔案名中包含:\n此檔案名:\n檔案夾名中包含:\n此檔案夾名:\n此網域名稱:\n網域名稱中包含:\n此主機:\n鏈結中包含:\n此鏈結:\n所有鏈結
 Show all\nHide debug\nHide infos\nHide debug and infos
@@ -915,6 +925,6 @@ Thank you
 You can now close this window
 你現在可以關閉這視窗
 Server terminated
-伺服器已終止 
+伺服器已終止
 A fatal error has occured during this mirror
 這鏡像發生了不可回復的錯誤
