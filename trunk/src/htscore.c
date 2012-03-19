@@ -2934,9 +2934,15 @@ int back_fill(struct_back* sback,httrackp* opt,cache_back* cache,lien_url** lien
         if (numero_passe!=0)
           ok=0;
       }
-      if (ok && liens[p]->sav != NULL && liens[p]->sav[0] != '\0' 
-        && hash_read(opt->hash,liens[p]->sav,"",0,opt->urlhack) >= 0)     // lookup in liens_record
-      {
+
+      // Why in hell did I do that ?
+      //if (ok && liens[p]->sav != NULL && liens[p]->sav[0] != '\0' 
+      //  && hash_read(opt->hash,liens[p]->sav,"",0,opt->urlhack) >= 0)     // lookup in liens_record
+      //{
+      //  ok = 0;
+      //}
+      if (liens[p]->sav == NULL || liens[p]->sav[0] == '\0'
+        || hash_read(opt->hash,liens[p]->sav,"",0,opt->urlhack) < 0) {
         ok = 0;
       }
       
