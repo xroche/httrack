@@ -1,0 +1,11 @@
+/* HTTrack, Offline Browser for Windows and Unix */
+
+/* HTTrack system definition for Windows */
+/* This should be the only file you have to change */
+
+/* Solaris: 0 / Windows: 1 / AIX: 2 / Linux: 3 */
+
+
+/* Fix plateform number to 1 (Windows) */
+/* If it doesn't compile, try another one */
+#define HTS_PLATEFORM 1

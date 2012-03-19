@@ -1,0 +1,32 @@
+__PERL__
+# A simple script to convert DOS text files to
+# Unix one. Useful to strip all CR on .c and .h
+# sourcefiles.
+# Usage: strip_cr <files>
+foreach $fname (@ARGV) {
+  $ad=1;
+  if (open(FL,$fname)) {
+    if (open(FO,">".$fname.".tmp")) {
+      while(<FL>) {
+        s/\r\n$/\n/g;
+        print FO "$_";
+      }
+      close(FL);
+      close(FO);
+      if ((-s $fname) != (-s $fname.".tmp")) {
+        print("Stripping ".$fname."..\n");
+        rename($fname.".tmp",$fname);
+      } else {
+        unlink($fname.".tmp");
+      }
+    } else {
+      print "Unable to open ".$fname.".tmp\n";
+    }
+  } else {
+    print "Unable to open $fname\n";
+  }
+}
+if (!$ad) {
+  print "Ensure that a text file has no lines ended with CR (DOS)\n";
+  print "Usage: strip_cr <file>\n";
+}

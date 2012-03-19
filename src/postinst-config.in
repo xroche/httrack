@@ -1,0 +1,55 @@
+#!/bin/sh
+
+# Config file location
+cnfdir="__ETCPATH__"
+cnf="__ETCPATH__/httrack.conf"
+
+if test "`id -u`" -eq 0; then
+	mkdir -p "$cnfdir"
+	if ! test -f "$cnf"; then
+		echo "creating $cnf (please modify it) .."
+		cat>"$cnf" << EOF
+# HTTrack Website Copier Settings
+# See httrack --help for more information
+
+# Examples: (to uncomment)
+
+# set proxy proxy.myisp.com:8080
+# retries=2
+# set max-size 10000000
+# set max-time 36000
+# set user-agent Mouzilla/17.0 (compatible; HTTrack; I)
+#
+# There are MUCH more options.. try 'httrack --quiet --help | more'
+
+# Deny and allow for links
+# this will be used by default for all mirrors
+allow *.gif
+allow *.png
+deny ad.doubleclick.net/*
+
+# Path and other options
+# '~' in the *begining* means 'home dir'
+# '#' at the *end* means "projectname" (that is, the first URL given)
+# Example: '~/websites/#' will create /home/smith/websites/www.foo.com
+# folder when launching 'httrack www.foo.com'
+set path ~/websites/#
+
+EOF
+	fi
+
+	if ! grep "set path" "$cnf" >/dev/null; then
+		echo "default path set to <home dir>/websites/<first_site_name>"
+	fi
+
+	chown root:__ROOTGROUP__ "$cnf"
+	chmod 744 "$cnf"
+else
+	cat << EOF
+
+You are not root, therefore $cnf configuration file hasn't been created
+Re-run this sript ($0) as root if you want to do that
+
+EOF
+fi
+

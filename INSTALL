@@ -1,0 +1,36 @@
+HTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) Xavier Roche and other contributors
+
+* How to install (Linux/Unix) : 
+  tar xvfz httrack-xxxx.tar.gz
+  cd httrack-xxxx
+  cd src
+  ./configure
+  make
+  make install
+
+you can also use something like:
+  ./configure --prefix=/usr --etcdir=/etc --libdir=/usr/lib --bindir=/usr/bin --make --install
+
+or for static mode:
+  ./configure --static --prefix=/usr --etcdir=/etc --libdir=/usr/lib --bindir=/usr/bin --make --install
+
+If problems occurs, try
+  ./configure --help
+and follow the instructions
+
+* How to install (Windows with installshield) :
+  extract all files from the ZIP file and launch 'setup.exe'
+  after installing, launch WinHTTrack.exe
+
+* How to install (Windows without installshield) :
+  unzip all files in an empty folder
+  copy DLL's (if necessary) from dll/ in your windows dll directory (example: C:\WINNT\system32)
+  launch WinHTTrack.exe
+
+
+See other readme and doc files for more information!
+
+Have fun with HTTrack Website Copier!
+The authors
+
