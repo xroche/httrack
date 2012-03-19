@@ -121,6 +121,11 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 
 /*
+  Process user intercations: pause, add link, delete link..
+*/
+void hts_mirror_process_user_interaction(htsmoduleStruct* str, htsmoduleStructExtended* stre);
+
+/*
   Get the next file on the queue, waiting for it, handling other files in background..
   Parameters: The public module structure, and the private module variables
   Returns 0 upon success
@@ -141,7 +146,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
 /* Context state */
 
-#define ENGINE_LOAD_CONTEXT_BASE() \
+#define ENGINE_DEFINE_CONTEXT_BASE() \
   lien_url** const liens HTS_UNUSED = (lien_url**) str->liens; \
   httrackp* const opt HTS_UNUSED = (httrackp*) str->opt; \
   struct_back* const sback HTS_UNUSED = (struct_back*) str->sback; \
@@ -151,11 +156,20 @@ int hts_wait_delayed(htsmoduleStruct* str,
   hash_struct* const hashptr HTS_UNUSED = (hash_struct*) str->hashptr; \
   const int numero_passe HTS_UNUSED = str->numero_passe; \
   const int add_tab_alloc HTS_UNUSED = str->add_tab_alloc; \
-  /* */ \
-  int lien_tot HTS_UNUSED = *str->lien_tot_; \
-  int ptr HTS_UNUSED = *str->ptr_; \
-  size_t lien_size HTS_UNUSED = *str->lien_size_; \
-  char* lien_buffer HTS_UNUSED = *str->lien_buffer_
+  /* variable */ \
+  int lien_tot = *str->lien_tot_; \
+  int ptr = *str->ptr_; \
+  size_t lien_size = *str->lien_size_; \
+  char* lien_buffer = *str->lien_buffer_
+
+#define ENGINE_SET_CONTEXT_BASE() \
+  lien_tot = *str->lien_tot_; \
+  ptr = *str->ptr_; \
+  lien_size = *str->lien_size_; \
+  lien_buffer = *str->lien_buffer_
+
+#define ENGINE_LOAD_CONTEXT_BASE() \
+  ENGINE_DEFINE_CONTEXT_BASE()
 
 #define ENGINE_SAVE_CONTEXT_BASE() \
   /* Apply changes */ \

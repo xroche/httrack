@@ -568,20 +568,38 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
 }
 static const char* __cdecl htsshow_query(t_hts_callbackarg *carg, httrackp *opt, const char* question) {
   static char s[12]=""; /* ok */
-  printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n",question);
-  io_flush; linput(stdin,s,4);
+  printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n", question);
+  io_flush;
+  linput(stdin,s,4);
   return s;
 }
 static const char* __cdecl htsshow_query2(t_hts_callbackarg *carg, httrackp *opt, const char* question) {
   static char s[12]=""; /* ok */
-  printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n",question);
-  io_flush; linput(stdin,s,4);
+  printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n", question);
+  io_flush;
+  linput(stdin,s,4);
   return s;
 }
 static const char* __cdecl htsshow_query3(t_hts_callbackarg *carg, httrackp *opt, const char* question) {
   static char line[256]; /* ok */
+  printf(
+    "\n"
+    "A link, %s, is located beyond this mirror scope.\n"
+    "What should I do? (type in the choice + enter)\n\n"
+    "* Ignore all further links and do not ask any more questions\n"
+    "0 Ignore this link (default if empty entry)\n"
+    "1 Ignore directory and lower structures\n"
+    "2 Ignore all domain\n"
+    "\n"
+    "4 Get only this page/link, but not links inside this page\n"
+    "5 Mirror this link (useful)\n"
+    "6 Mirror all links located on the same domain as this link\n"
+    "\n",
+    question);
   do {
-    io_flush; linput(stdin,line,206);
+    printf(">> ");
+    io_flush;
+    linput(stdin, line, 200);
   } while(!strnotempty(line));
   printf("ok..\n");
   return line;

@@ -541,6 +541,22 @@ htsblk cache_read_ro(httrackp* opt,cache_back* cache,const char* adr,const char*
   return cache_readex(opt,cache,adr,fil,save,location,NULL,1);
 }
 
+htsblk cache_read_including_broken(httrackp* opt,cache_back* cache,const char* adr,const char* fil) {
+  htsblk r = cache_read(opt,cache,adr,fil,NULL,NULL);
+  if (r.statuscode = -1) {
+    lien_back *itemback = NULL;
+    if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
+      r = itemback->r;
+      /* cleanup */
+      back_clear_entry(itemback);				/* delete entry content */
+      freet(itemback);									/* delete item */
+      itemback = NULL;
+      return r;
+    }
+  }
+  return r;
+}
+
 static htsblk cache_readex_old(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location,
                                char* return_save, int readonly);
 
@@ -681,9 +697,9 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
               }
             }
             else if (!readonly && r.statuscode==HTTP_OK && !is_hypertext_mime(opt,r.contenttype, fil) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
-              
               r.is_write=1;    // écrire
-							if (!dataincache) {
+
+              if (!dataincache) {
 								if (fexist(fconv(catbuff, save))) {  // un fichier existe déja
 									//if (fsize(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
 									ok=1;    // plus rien à faire
@@ -701,7 +717,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                   strcpybuff(r.msg,"File deleted by user not recaught");
                   ok=1;     // ne pas récupérer (et pas d'erreur)
                 } else {
-                  file_notify(opt,adr, fil, save, 1, 1, 0);
+                  // ????? file_notify(opt,adr, fil, save, 1, 1, 0);
                   r.statuscode=STATUSCODE_INVALID;
                   strcpybuff(r.msg,"Previous cache file not found");
                   ok=1;    // ne pas récupérer
@@ -792,8 +808,11 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                 }
               }
             }
-          }    // si save==null, ne rien charger (juste en tête)
-
+          }
+          // si save==null, ne rien charger (juste en tête)
+          else if (r.statuscode==HTTP_OK && !is_hypertext_mime(opt,r.contenttype, fil)) {    // pas HTML, écrire sur disk directement
+            r.is_write = 1;  /* supposed to be on disk (informational) */
+          }
 
         } else {
           r.statuscode=STATUSCODE_INVALID;

@@ -1,13 +1,9 @@
 [Desktop Entry]
-Encoding=UTF-8
 Version=1.0
 Type=Application
-Categories=Application;Network
+Categories=Network;
 Terminal=false
 Name=WebHTTrack Website Copier
 Comment=Copy websites to your computer
 Exec=webhttrack
 Icon=/usr/share/httrack/icons/webhttrack.xpm
-Terminal=false
-MultipleArgs=false
-Type=Application

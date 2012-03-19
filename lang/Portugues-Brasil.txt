@@ -5,7 +5,7 @@ Portugues-Brasil
 LANGUAGE_ISO
 pt
 LANGUAGE_AUTHOR
-Paulo Neto (company at layout.com.br) \r\n
+Paulo Neto (layoutbr at lexxa.com.br) \r\n
 LANGUAGE_CHARSET
 ISO-8859-1
 LANGUAGE_WINDOWSID
@@ -175,7 +175,7 @@ Analizando arquivo HTML...
 Purging files..
 Limpando arquivos...
 Loading cache in progress..
-
+Carregando cache...
 Parsing HTML file (testing links)..
 Analizando arquivo HTML (testando links)...
 Pause - Toggle [Mirror]/[Pause download] to resume operation
@@ -186,6 +186,8 @@ scanning
 analizando
 Waiting for scheduled time..
 Aguardando horário programado para iniciar...
+Transferring data..
+Transferindo dados..
 Connecting to provider
 Conectando ao provedor
 [%d seconds] to go before start of operation
@@ -229,7 +231,7 @@ Caminho do arquivo de relatório
 Path
 Caminho
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-Método da lista de links -\n\nUtilize a caixa URL's para digitar o(s) endereço(s) da(s) página(s) contendo links para recebimento.
+- Método da lista de links -\n\nUtilize a caixa URL's para digitar o(s) endereço(s) da(s) página(s) contendo links para recebimento.
 New project / Import?
 Novo projeto / Importar?
 Choose criterion
@@ -375,7 +377,7 @@ Criar relatórios de erros e informações
 Generate DOS 8-3 filenames ONLY
 Gerar SOMENTE nomes de arquivos DOS (8+3 caracteres)
 Generate ISO9660 filenames ONLY for CDROM medias
-
+Gerar nomes de arquivo ISO9660 SOMENTE para mídias de CDROM
 Do not create HTML error pages
 Não criar páginas de erro HTML
 Select file types to be saved to disk
@@ -385,7 +387,7 @@ Selecionar direção de navegação no site
 Select global parsing direction
 Selecionar direção geral do site
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-
+Configurar regras de substituição de URL para links internos (já recebidos) e links externos (ainda não recebidos)
 Max simultaneous connections
 Máximo de conexões simultâneas
 File timeout
@@ -453,9 +455,9 @@ Tentar evitar alguns erros do servidor usando chamadas não padrão
 Use old HTTP/1.0 requests (limits engine power!)
 Utilizar chamadas antigas HTTP/1.0 limita a capacidade de captura!
 Attempt to limit retransfers through several tricks (file size test..)
-Tentativa de limitar a retransferência através de várias maneiras (teste do tamanho do arquivo..)
+Tentativa de limitar a retransferência através de várias maneiras (teste do tamanho do arquivo...)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
-
+Tentativas para limitar o número de links ignorando URLs similares (www.foo.com==foo.com, http=https ...)
 Write external links without login/password
 Gravar links externos sem login/senha
 Write internal links without query string
@@ -483,7 +485,7 @@ Relatórios
 DOS names (8+3)
 Nomes DOS (8+3)
 ISO9660 names (CDROM)
-
+Nomes ISO9660 (CDROM)
 No error pages
 Sem página de erros
 Primary Scan Rule
@@ -497,7 +499,7 @@ Normalmente estas configurações não devem ser alteradas!
 Activate Debugging Mode (winhttrack.log)
 Ativar método de debug (winhttrack.log)
 Rewrite links: internal / external
-
+Links substituídos: interno / externo
 Flow control
 Controle de fluxo
 Limits
@@ -521,9 +523,9 @@ usar servidor proxy para transferências FTP
 TimeOut(s)
 Limite de tempo
 Persistent connections (Keep-Alive)
-
+Conexões persistentes (Manter Ativo)
 Reduce connection time and type lookup time using persistent connections
-
+Reduza o tempo de conexão e o tempo do tipo de pesquisa usando conexões persistentes
 Retries
 Tentativas
 Size limit
@@ -559,7 +561,7 @@ Requisição de tolerância (para servidores)
 Update hack (limit re-transfers)
 Corte de atualização (limite da retransferência)
 URL hacks (join similar URLs)
-
+URL hacks (unir URLs similares)
 Force old HTTP/1.0 requests (no 1.1)
 Forçar requisição HTTP/1.0 anterior (não 1.1)
 Max connections / seconds
@@ -593,7 +595,7 @@ Relatório, Índice, Cache
 Proxy
 Servidor proxy
 MIME Types
-
+Tipos MIME
 Do you really want to quit WinHTTrack Website Copier?
 Você deseja realmente sair do WinHTTrack Website Copier?
 Do not connect to a provider (already connected)
@@ -635,7 +637,7 @@ Desconectar ao finalizar
 Disconnect modem on completion
 Desconectar o modem ao finalizar
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (Layout do Brasil, company@layout.com.br)
+\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (layoutbr@lexxa.com.br)
 About WinHTTrack Website Copier
 Sobre o WinHTTrack Website Copier
 Please visit our Web page
@@ -777,7 +779,7 @@ Selecionar um projeto existente para atualizar
 Click here to select path
 Clique aqui para selecionar o caminho
 Select or create a new category name, to sort your mirrors in categories
-
+Selecionar ou criar uma nova categoria, para classificar seus espelhos nas categorias
 HTTrack Project Wizard...
 Assistente de projetos HTTrack...
 New project name:
@@ -789,7 +791,7 @@ Nome do projeto:
 Base path:
 Caminho base:
 Project category:
-
+Categoria do projeto:
 C:\\My Web Sites
 C:\\Meus Sites
 Type a new project name, \r\nor select existing project to update/resume
@@ -900,31 +902,31 @@ normal\nextended\ndebug
 normal\nextendido\ncorrigir
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
 Copiar site(s) da Web\nCopiar site(s) interativos da Web (perguntas)\nReceber arquivos específicos\nCopiar todas as páginas do site (alternação múltipla)\nTestar links nas páginas (testar indicador)\n* Retomar download interrompido\n* Atualizar download existente
-Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
-
+Relative URL / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+URI Relativa / URL Absoluta (padrão)\nURL Absoluta / URL Absoluta\nURI Absoluta / URL Absoluta\nURL Original / URL Original
 Open Source offline browser
-
+Abrir origem offline no navegador
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-
+Copiador de website/Navegador Offline. Copia sites remotos para seu computador. Gratuito.
 httrack, winhttrack, webhttrack, offline browser
-
+httrack, winhttrack, webhttrack, navegador offline
 URL list (.txt)
-
+Lista de URL (.txt)
 Previous
-
+Anterior
 Next
-
+Próximo
 URLs
-
+URLs
 Warning
-
+Atenção
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-
+Seu Navegador atualmente não suporta javascript. Para melhores resultados, favor usar um navegador com javascript-aware.
 Thank you
-
+Obrigado
 You can now close this window
-
+Vocë pode fechar esta janela agora
 Server terminated
-
+Servidor finalizado
 A fatal error has occured during this mirror
-
+Um erro fatal ocorreu durante este espelho

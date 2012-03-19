@@ -1,8 +1,61 @@
-
+﻿
 HTTrack Website Copier release history:
 --------------------------------------
 
 This file lists all changes and fixes that have been made for HTTrack.
+
+3.43-12
++ Fixed: buffer overflow while repairing httrack cache if a damaged cache is found from a previous mirror (closes:#607704)
+
+3.43-11
++ Fixed: webhttrack fixes for icecat (closes:#605140)
+
+3.43-10
++ Fixed: capture URL not working properly when IPv6 is installed (John Bostelman)
+
+3.43-9
++ Fixed: application/xhtml+xml not seen as "html" (Peter Fritzsche)
++ Fixed: various linux fixes for desktop files (closes:#563691)
+
+3.43-8
++ Fixed: URL encoding bugs with filenames containing '%' characters (sandboxie32)
++ Fixed: MacPorts Darwin/Mac fixes to webhttrack (Ross Williams)
++ Fixed: Flash link extraction has been improved (Vincent/suei8423)
+
+3.43-7
++ Fixed: "Open error when decompressing" errors due to temporary file generation problems (Scott Mueller)
+
+3.43-6
++ Shell: WIN32 setup cosmetic fixes: do not probe the proxy on non-local network, do not force *.whtt registration
+
+3.43-5
++ Fixed: code tag handling bug in certain cases leading to produce invalid links (Tom-tmh13 and William Roeder)
+
+3.43-4
++ Fixed: horrible SSL slowdowns due to bogus select() calls (Patrick Pfeifer)
++ Fixed: Konqueror fixes
+
+3.43-3
++ Updated: Portugues-Brasil language file
+
+3.43-2
++ Fixed: wizard question buggy, and commandline version did not print it (Maz)
++ Fixed: do not rename xml subtypes (such as xsd schemas) (Eric Avrillon)
+
+3.43
++ Fixed: Fixed too aggressive javascript url= parsing (Chris)
++ Fixed: fixed --urllist option "sticking" the list content to the list of URL (Andreas Maier)
++ Fixed: "Previous cache file not found" not redownloading file when deleted before an update (William Roeder)
++ Fixed: *.rpm.src files renamed to *.src.src with bogus servers (Hippy Dave)
++ Fixed: "pause" is pausing much faster (William Roeder)
++ Fixed: binary real media files and related files are no longer being parsed as html (William Roeder)
++ Fixed: "File not parsed, looks like binary" check no longer corrupt the checked binary file
++ Fixed: multiple download of error pages (several identical '"Not Found" (404) at link [identical link]') leading to a slowdown in certain cases (William Roeder)
++ Fixed: sometimes, a double request was issued to update a broken file
++ Fixed: display bug "link is probably looping, type unknown, aborting .."
++ Fixed: missing library references at build time and other build related issues (Debarshi Ray)
++ Fixed: on windows, switched from wsock32.dll to ws2_32.dll
++ Fixed: minor argument size validation error for "-O" option (Joan CALVET)
 
 3.42-3
 + Fixed: Bad URL length validation in the commandline (Joan CALVET)
@@ -106,7 +159,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: connection/seconds limiter replugged
 + Fixed: "no files updated" display bug
 + Fixed: bogus links encoded with UTF (Lukasz Wozniak)
-+ New: --assume can be used to force a specific script type (Brian Schr�der)
++ New: --assume can be used to force a specific script type (Brian Schröder)
 
 3.32
 + Fixed: css and js files were not parsed!

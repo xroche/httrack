@@ -39,9 +39,9 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_GLOBAL_DEFH
 #define HTTRACK_GLOBAL_DEFH
 
-// Version
-#define HTTRACK_VERSION      "3.42-3"
-#define HTTRACK_VERSIONID    "3.42.3"
+// Version (also check external version information)
+#define HTTRACK_VERSION      "3.43-12"
+#define HTTRACK_VERSIONID    "3.43.12"
 #define HTTRACK_AFF_VERSION  "3.x"
 #define HTTRACK_LIB_VERSION  "2.0"
 
@@ -78,9 +78,11 @@ Please visit our Website: http://www.httrack.com
 // WIN32
 #ifndef _WIN32_WCE
 
+/*
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
+*/
 #ifndef DLLIB
 #define DLLIB 1
 #endif
@@ -104,12 +106,16 @@ Please visit our Website: http://www.httrack.com
 #undef HTS_MAKE_KEYWORD_INDEX
 #ifdef HTS_CECOMPAT
 #define HTS_DO_NOT_USE_FTIME 1
+/*
 #undef HAVE_SYS_STAT_H
 #undef HAVE_SYS_TYPES_H
+*/
 #else
 #undef HTS_DO_NOT_USE_FTIME
+/*
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
+*/
 #endif
 
 #define HTS_DLOPEN 0
@@ -260,7 +266,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Copyright (C) Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2007]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2010]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"

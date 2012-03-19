@@ -66,6 +66,7 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,const char* url_adr,
 void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_adr,const char* url_fil,const char* url_save,int all_in_cache,const char* path_prefix);
 htsblk cache_read(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location);
 htsblk cache_read_ro(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location);
+htsblk cache_read_including_broken(httrackp* opt,cache_back* cache,const char* adr,const char* fil);
 htsblk cache_readex(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location,char* return_save,int readonly);
 htsblk* cache_header(httrackp* opt,cache_back* cache,const char* adr,const char* fil,htsblk* r);
 void cache_init(cache_back* cache,httrackp* opt);

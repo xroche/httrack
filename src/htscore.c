@@ -779,6 +779,8 @@ int httpmirror(char* url1, httrackp* opt) {
   do {
     int error=0;          // si error alors sauter
     int store_errpage=0;  // c'est une erreur mais on enregistre le html
+    int is_binary=0;      // is a binary file
+    int is_loaded_from_file=0; // has been loaded from a file (implies is_write=1)
     char BIGSTK loc[HTS_URLMAXSIZE*2];    // adresse de relocation
 
     // Ici on charge le fichier (html, gif..) en mémoire
@@ -1010,7 +1012,35 @@ int httpmirror(char* url1, httrackp* opt) {
             }
           }
         }
-        
+
+        /* Load file if necessary and decode. */ \
+#define LOAD_IN_MEMORY_IF_NECESSARY() do { \
+        if (  \
+          may_be_hypertext_mime(opt,r.contenttype, urlfil)   /* Is HTML or Js, .. */ \
+          && (liens[ptr]->depth>0)            /* Depth > 0 (recurse depth) */ \
+          && (r.adr==NULL)        /* HTML Data exists */ \
+          && (!store_errpage)     /* Not an html error page */ \
+          && (savename[0]!='\0')  /* Output filename exists */ \
+          )  \
+        { \
+          is_loaded_from_file = 1; \
+          r.adr = readfile2(savename, &r.size); \
+          if (r.adr != NULL) { \
+            if ( (opt->debug>0) && (opt->log!=NULL) ) { \
+              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"File successfully loaded for parsing: %s%s (%d bytes)"LF,urladr,urlfil,(int)r.size); \
+              test_flush; \
+            } \
+          } else { \
+            if ( opt->log != NULL ) { \
+              HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"File could not be loaded for parsing: %s%s"LF,urladr,urlfil); \
+              test_flush; \
+            } \
+          } \
+        } \
+} while(0)
+        /* Load file and decode if necessary, before content-binary check. (3.43) */
+        LOAD_IN_MEMORY_IF_NECESSARY();
+
         // ------------------------------------
         // BOGUS MIME TYPE HACK II (the revenge)
         // Check if we have a bogus MIME type
@@ -1021,7 +1051,7 @@ int httpmirror(char* url1, httrackp* opt) {
             unsigned int map[256];
             int i;
             unsigned int nspec = 0;
-            map_characters((unsigned char*)r.adr, (unsigned int)r.size, (unsigned int*)map);
+            map_characters((unsigned char*)r.adr, (unsigned int)r.size, &map[0]);
             for(i = 1 ; i < 32 ; i++) {   //  null chars ignored..
               if (!is_realspace(i) 
                 && i != 27        /* Damn you ISO2022-xx! */
@@ -1136,6 +1166,7 @@ int httpmirror(char* url1, httrackp* opt) {
 #undef CH_ADD_RNG1
 #undef CH_ADD_RNG2
 						} else if ((nspec > r.size / 100) && (nspec > 10)) {    // too many special characters
+              is_binary = 1;
 							strcpybuff(r.contenttype,"application/octet-stream");
 							if (opt->log) {
 								HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File not parsed, looks like binary: %s%s"LF,urladr,urlfil);
@@ -1144,9 +1175,11 @@ int httpmirror(char* url1, httrackp* opt) {
 						}
 
 						/* This hack allows to avoid problems with parsing '\0' characters  */
-						for(i = 0 ; i < r.size ; i++) {
-							if (r.adr[i] == '\0') r.adr[i] = ' ';
-						}
+            if (!is_binary) {
+              for(i = 0 ; i < r.size ; i++) {
+                if (r.adr[i] == '\0') r.adr[i] = ' ';
+              }
+            }
 
           }
 
@@ -1302,31 +1335,10 @@ int httpmirror(char* url1, httrackp* opt) {
         io_flush;
       }
 #endif
-      
-      /* Load file if necessary */
-      if ( 
-        may_be_hypertext_mime(opt,r.contenttype, urlfil)   /* Is HTML or Js, .. */
-        && (liens[ptr]->depth>0)            /* Depth > 0 (recurse depth) */
-        && (r.adr==NULL)        /* HTML Data exists */
-        && (!store_errpage)     /* Not an html error page */
-        && (savename[0]!='\0')  /* Output filename exists */
-        ) 
-      {
-        r.adr = readfile2(savename, &r.size);
-        (void) unlink(fconv(OPT_GET_BUFF(opt),savename));
-        if (r.adr != NULL) {
-          if ( (opt->debug>0) && (opt->log!=NULL) ) {
-            HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"File successfully loaded for parsing: %s%s (%d bytes)"LF,urladr,urlfil,(int)r.size);
-            test_flush;
-          }
-        } else {
-          if ( opt->log != NULL ) {
-            HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"File could not be loaded for parsing: %s%s"LF,urladr,urlfil);
-            test_flush;
-          }
-        }
-      }
 
+      /* Load file and decode if necessary, after redirect check. */
+      LOAD_IN_MEMORY_IF_NECESSARY();
+      
       // ------------------------------------------------------
       // ok, fichier chargé localement
       // ------------------------------------------------------
@@ -1374,6 +1386,8 @@ int httpmirror(char* url1, httrackp* opt) {
 
       // traiter
       if (
+        ! is_binary
+        &&
            ( (is_hypertext_mime(opt,r.contenttype, urlfil))   /* Is HTML or Js, .. */
              || (may_be_hypertext_mime(opt,r.contenttype, urlfil) && r.adr != NULL )  /* Is real media, .. */
            )
@@ -1386,6 +1400,13 @@ int httpmirror(char* url1, httrackp* opt) {
         // -- -- -- --
         // Parsing HTML
         if (!error) {
+
+          /* Remove file if being processed */
+          if (is_loaded_from_file) {
+            (void) unlink(fconv(OPT_GET_BUFF(opt),savename));
+            is_loaded_from_file = 0;
+          }
+
           /* Info for wrappers */
           if ( (opt->debug>0) && (opt->log!=NULL) ) {
             HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: check-html: %s%s"LF,urladr,urlfil);

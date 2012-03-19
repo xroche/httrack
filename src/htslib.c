@@ -239,6 +239,14 @@ const char* hts_detectandleave[] = {
 const char* hts_mime_keep[] = {
   "application/octet-stream",
   "text/plain",
+  "application/xml",
+  "text/xml",
+  ""
+};
+
+/* bogus servers returns these mime types when the extension is seen within the filename */
+const char* hts_mime_bogus_multiple[] = {
+  "application/x-wais-source",  /* src (src.rpm) */
   ""
 };
 
@@ -3097,15 +3105,19 @@ int ishtml(httrackp *opt,const char* fil) {
     *a = '\0';
   }
   if (get_userhttptype(opt, mime, fil_noquery)) {
-    if (strfield2(mime, "text/html")) {
+    if (is_html_mime_type(mime)) {
       return 1;
     } else {
       return 0;
     }
   }
 
+  if (!strnotempty(fil_noquery)) {
+    return -2;
+  }
+
   /* Search for known ext */
-  for (a = fil_noquery + strlen(fil_noquery) - 1 ; (*a!='.') && (*a!='/')  && ( a > fil_noquery ) ; a-- );
+  for (a = fil_noquery + strlen(fil_noquery) - 1 ; *a != '.' && *a != '/' && a > fil_noquery ; a-- );
   if (*a == '.') {  // a une extension
     char BIGSTK fil_noquery[HTS_URLMAXSIZE*2];
     char* b;
@@ -3690,15 +3702,15 @@ HTSEXT_API char* unescape_http(char *catbuff, const char* s) {
 }
 
 // unescape in URL/URI ONLY what has to be escaped, to form a standard URL/URI
-// DOES NOT DECODE %25
+// DOES NOT DECODE %25 (part of CHAR_DELIM)
 HTSEXT_API char* unescape_http_unharm(char *catbuff, const char* s, int no_high) {
   int i,j=0;
   for (i=0;i<(int) strlen(s);i++) {
     if (s[i]=='%') {
       int nchar=(char) ehex(s+i+1);
 
-      int test = (  CHAR_RESERVED(nchar)
-                || ( nchar != '%' && CHAR_DELIM(nchar) )
+      int test = (  ( CHAR_RESERVED(nchar) && nchar != '+' ) /* %2B => + (not in query!) */
+                || CHAR_DELIM(nchar)
                 || CHAR_UNWISE(nchar)
                 || CHAR_LOW(nchar)        /* CHAR_SPECIAL */
                 || CHAR_XXAVOID(nchar) 
@@ -3810,9 +3822,13 @@ HTSEXT_API void x_escape_http(char* s,int mode) {
              || CHAR_XXAVOID(*s) );
     }
     else if (mode==30) {                   // échapper que ce qui est nécessaire
-      test = (
-                CHAR_LOW(*s)
-             || CHAR_XXAVOID(*s) );
+      test =
+        ( *s != '/' && CHAR_RESERVED(*s) )
+        || CHAR_DELIM(*s)
+        || CHAR_UNWISE(*s)
+        || CHAR_SPECIAL(*s)
+        || CHAR_XXAVOID(*s)
+        ;
     }
 
     if (test) {
@@ -4143,7 +4159,7 @@ HTSEXT_API int is_knowntype(httrackp *opt,const char *fil) {
   ext = get_ext(catbuff, fil);
   while(strnotempty(hts_mime[j][1])) {
     if (strfield2(hts_mime[j][1], ext)) {
-      if (strfield2(hts_mime[j][0], "text/html"))
+      if (is_html_mime_type(hts_mime[j][0]))
         return 2;
       else
         return 1;
@@ -4189,7 +4205,7 @@ HTSEXT_API int is_userknowntype(httrackp *opt,const char *fil) {
   get_userhttptype(opt, mime, fil);
   if (!strnotempty(mime))
     return 0;
-  else if (strfield2(mime,"text/html"))
+  else if (is_html_mime_type(mime))
     return 2;
   else
     return 1;
@@ -4229,6 +4245,43 @@ int may_unknown(httrackp *opt,const char* st) {
   return 0;
 }
 
+/* returns 1 if the mime/filename seems to be bogus because of badly recognized multiple extension
+  ; such as "application/x-wais-source" for "httrack-3.42-1.el5.src.rpm"
+  reported by Hippy Dave 08/2008 (3.43) */
+int may_bogus_multiple(httrackp *opt, const char* mime, const char *filename) {
+  int j;
+  for(j = 0 ; strnotempty(hts_mime_bogus_multiple[j]) ; j++) {
+    if (strfield2(hts_mime_bogus_multiple[j], mime)) {      /* found mime type in suspicious list */
+      char ext[64];
+      ext[0] = '\0';
+      give_mimext(ext, mime);
+      if (ext[0] != 0) {   /* we have an extension for that */
+        const size_t ext_size = strlen(ext);
+        const char *file = strrchr(filename, '/');  /* fetch terminal filename */
+        if (file != NULL) {
+          int i;
+          for(i = 0 ; file[i] != 0 ; i++) {
+            if (i > 0 && file[i - 1] == '.' && strncasecmp(&file[i], ext, ext_size) == 0 
+              && ( file[i + ext_size] == 0 || file[i + ext_size] == '.' || file[i + ext_size] == '?' ) ) {
+              return 1;  /* is ambiguous */
+            }
+          }
+        }
+      }
+      return 0;
+    }
+  }    
+  return 0;
+}
+
+/* filename extension should not be changed because potentially bogus ; replaces may_unknown() (3.43) */
+int may_unknown2(httrackp *opt, const char* mime, const char *filename) {
+  int ret = may_unknown(opt, mime);
+  if (ret == 0) {
+    ret = may_bogus_multiple(opt, mime, filename);
+  }
+  return ret;
+}
 
 // -- Utils fichiers
 
@@ -5567,6 +5620,76 @@ HTSEXT_API void hts_free(void* data) {
 HTSEXT_API int hts_resetvar(void) {
 	return 0;
 }
+
+#ifdef _WIN32
+
+typedef struct dirent dirent;
+DIR *opendir(const char *name) {
+  WIN32_FILE_ATTRIBUTE_DATA st;
+  DIR *dir;
+  size_t len;
+  int i;
+  if (name == NULL || *name == '\0') {
+    errno = ENOENT;
+    return NULL;
+  }
+  if (!GetFileAttributesEx(name, GetFileExInfoStandard, &st)
+    || ( st.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0) {
+    errno = ENOENT;
+    return NULL;
+  }
+  dir = calloc(sizeof(DIR), 1);
+  if (dir == NULL) {
+    errno = ENOMEM;
+    return NULL;
+  }
+  len = strlen(name);
+  dir->h = INVALID_HANDLE_VALUE;
+  dir->name = malloc(len + 2 + 1);
+  strcpy(dir->name, name);
+  for(i = 0 ; dir->name[i] != '\0' ; i++) {
+    if (dir->name[i] == '/') {
+      dir->name[i] = '\\';
+    }
+  }
+  strcat(dir->name, "\\*");
+  return dir;
+}
+
+struct dirent *readdir(DIR *dir) {
+  WIN32_FIND_DATAA find;
+  if (dir->h == INVALID_HANDLE_VALUE) {
+    dir->h = FindFirstFileA(dir->name, &find);
+  } else {
+    if (!FindNextFile(dir->h, &find)) {
+      FindClose(dir->h);
+      dir->h = INVALID_HANDLE_VALUE;
+    }
+  }
+  if (dir->h != INVALID_HANDLE_VALUE) {
+    dir->entry.d_name[0] = 0;
+    strncat(dir->entry.d_name, find.cFileName, HTS_DIRENT_SIZE - 1);
+    return &dir->entry;
+  }
+  errno = ENOENT;
+  return NULL;
+}
+
+int closedir(DIR *dir) {
+  if (dir != NULL) {
+    if (dir->h != INVALID_HANDLE_VALUE) {
+      CloseHandle(dir->h);
+    }
+    if (dir->name != NULL) {
+      free(dir->name);
+    }
+    free(dir);
+    return 0;
+  }
+  errno = EBADF;
+  return -1;
+}
+#endif
 
 // Fin
 

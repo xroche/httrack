@@ -684,30 +684,12 @@ static int hts_acceptlink_(httrackp* opt,
       
       // si primaire (plus bas) alors ...
       if ((ptr!=0) && (force_mirror==0)) {
-        HTS_REQUEST_START;
-        HT_PRINT("\n");
-        HT_PRINT("At "); HT_PRINT(urladr); HT_PRINT(", there is a link ("); HT_PRINT(adr); HT_PRINT("/"); HT_PRINT(fil); HT_PRINT(") which goes outside the address."LF);
-        HT_PRINT("What should I do? (press a key + enter)"LF LF);
-        HT_PRINT("* Ignore all further links" LF);
-        HT_PRINT("0 Ignore this link (default if empty entry)"LF);
-        HT_PRINT("1 Ignore directory and lower structures"LF);
-        HT_PRINT("2 Ignore all domain"LF);
-        //HT_PRINT("3 (Ignore location, not implemented)\n");
-        HT_PRINT(LF);
-        HT_PRINT("4 Get only this page/link"LF);
-        HT_PRINT("5 Mirror this link (useful)"LF);
-        HT_PRINT("6 Mirror links located in the same domain"LF);
-        HT_PRINT(LF);
-        HTS_REQUEST_END;
-          {
-            char BIGSTK tempo[HTS_URLMAXSIZE*2];
-            tempo[0]='\0';
-            strcatbuff(tempo,adr);
-            strcatbuff(tempo,"/");
-            strcatbuff(tempo,fil);
-            s = RUN_CALLBACK1(opt, query3, tempo);
-          }
-          if (strnotempty(s)==0)  // entrée
+        char BIGSTK tempo[HTS_URLMAXSIZE*2];
+        tempo[0]='\0';
+        strcatbuff(tempo,adr);
+        strcatbuff(tempo,fil);
+        s = RUN_CALLBACK1(opt, query3, tempo);
+        if (strnotempty(s)==0)  // entrée
             n=0;
           else if (isdigit((unsigned char)*s))
             sscanf(s,"%d",&n);

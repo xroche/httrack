@@ -48,16 +48,13 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
-#ifdef HAVE_UNISTD_H
+#ifndef _WIN32
 #include <unistd.h>
 #endif
-#if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
 #include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
-#endif
-#ifdef HAVE_DLFCN_H
+
+#ifndef _WIN32
 #include <dlfcn.h>
 #endif
 

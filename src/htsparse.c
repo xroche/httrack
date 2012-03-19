@@ -313,30 +313,50 @@ Please visit our Website: http://www.httrack.com
   } \
 }
 
+#define ENGINE_DEFINE_CONTEXT() \
+  ENGINE_DEFINE_CONTEXT_BASE(); \
+  /* */ \
+  htsblk* const r HTS_UNUSED = stre->r_; \
+  hash_struct* const hash HTS_UNUSED = stre->hash_; \
+  char* const codebase HTS_UNUSED = stre->codebase; \
+  char* const base HTS_UNUSED = stre->base; \
+  /* */ \
+  const char * const template_header HTS_UNUSED = stre->template_header_; \
+  const char * const template_body HTS_UNUSED = stre->template_body_; \
+  const char * const template_footer HTS_UNUSED = stre->template_footer_; \
+  /* */ \
+  char* const makeindex_firstlink = stre->makeindex_firstlink_; \
+  /* */ \
+  /* */ \
+  int error = * stre->error_; \
+  int store_errpage = * stre->store_errpage_; \
+  int lien_max = *stre->lien_max_; \
+  /* */ \
+  int makeindex_done = *stre->makeindex_done_; \
+  FILE* makeindex_fp = *stre->makeindex_fp_; \
+  int makeindex_links = *stre->makeindex_links_; \
+  /* */ \
+  LLint stat_fragment = *stre->stat_fragment_; \
+  TStamp makestat_time = stre->makestat_time; \
+  FILE* makestat_fp = stre->makestat_fp
+
+#define ENGINE_SET_CONTEXT() \
+  ENGINE_SET_CONTEXT_BASE(); \
+  /* */ \
+  error = * stre->error_; \
+  store_errpage = * stre->store_errpage_; \
+  lien_max = *stre->lien_max_; \
+  /* */ \
+  makeindex_done = *stre->makeindex_done_; \
+  makeindex_fp = *stre->makeindex_fp_; \
+  makeindex_links = *stre->makeindex_links_; \
+  /* */ \
+  stat_fragment = *stre->stat_fragment_; \
+  makestat_time = stre->makestat_time; \
+  makestat_fp = stre->makestat_fp
+
 #define ENGINE_LOAD_CONTEXT() \
-  ENGINE_LOAD_CONTEXT_BASE(); \
-  /* */ \
-  htsblk* r HTS_UNUSED = stre->r_; \
-  hash_struct* hash HTS_UNUSED = stre->hash_; \
-  int lien_max HTS_UNUSED = *stre->lien_max_; \
-  /* */ \
-  int error HTS_UNUSED = * stre->error_; \
-  int store_errpage HTS_UNUSED = * stre->store_errpage_; \
-  char* codebase HTS_UNUSED = stre->codebase; \
-  char* base HTS_UNUSED = stre->base; \
-  /* */ \
-  int makeindex_done HTS_UNUSED = *stre->makeindex_done_; \
-  FILE* makeindex_fp HTS_UNUSED = *stre->makeindex_fp_; \
-  int makeindex_links HTS_UNUSED = *stre->makeindex_links_; \
-  char* makeindex_firstlink HTS_UNUSED = stre->makeindex_firstlink_; \
-  /* */ \
-  char *template_header HTS_UNUSED = stre->template_header_; \
-  char *template_body HTS_UNUSED = stre->template_body_; \
-  char *template_footer HTS_UNUSED = stre->template_footer_; \
-  /* */ \
-  LLint stat_fragment HTS_UNUSED = *stre->stat_fragment_; \
-  TStamp makestat_time HTS_UNUSED = stre->makestat_time; \
-  FILE* makestat_fp HTS_UNUSED = stre->makestat_fp
+  ENGINE_DEFINE_CONTEXT()
 
 #define ENGINE_SAVE_CONTEXT() \
   ENGINE_SAVE_CONTEXT_BASE(); \
@@ -382,9 +402,9 @@ Please visit our Website: http://www.httrack.com
 
 /* Main parser */
 int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+	char catbuff[CATBUFF_SIZE];
   /* Load engine variables */
   ENGINE_LOAD_CONTEXT();
-	char catbuff[CATBUFF_SIZE];
 
   {
     char* cAddr = r->adr;
@@ -428,6 +448,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
     }
 
     if (!error) {
+      time_t user_interact_timestamp = 0;
       int detect_title=0;  // détection  du title
       int back_add_stats = opt->state.back_add_stats;
       //
@@ -1331,76 +1352,76 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           expected='(';    // parenthèse
                           expected_end=")";  // fin: parenthèse
                         }
-                        if (!nc) if ( (nc = strfield(adr,"url")) && (!isalnum(*(adr - 1))) 
-                          && *(adr - 1) != '_'
-                          ) { // url(url)
-                            expected='(';    // parenthèse
-                            expected_end=")";  // fin: parenthèse
-                            can_avoid_quotes=1;
-                            quotes_replacement=')';
-                          }
-                          if (!nc) if ( (nc = strfield(adr,"import")) ) { // import "url"
-                            if (is_space(*(adr+nc))) {
-                              expected=0;    // no char expected
-                            } else
-                              nc=0;
-                          }
-                          if (nc) {
-                            char *a;
-                            a=adr+nc;
+                        if (!nc && (nc = strfield(adr,"url")) && (!isalnum(*(adr - 1))) && *(adr - 1) != '_') { // url(url)
+                          expected='(';    // parenthèse
+                          expected_end=")";  // fin: parenthèse
+                          can_avoid_quotes=1;
+                          quotes_replacement=')';
+                        } else {
+                          nc = 0;
+                        }
+                        if (!nc) if ( (nc = strfield(adr,"import")) ) { // import "url"
+                          if (is_space(*(adr+nc))) {
+                            expected=0;    // no char expected
+                          } else
+                            nc=0;
+                        }
+                        if (nc) {
+                          char *a;
+                          a=adr+nc;
+                          while(is_realspace(*a)) a++;
+                          if ((*a == expected) || (!expected)) {
+                            if (expected)
+                              a++;
                             while(is_realspace(*a)) a++;
-                            if ((*a == expected) || (!expected)) {
-                              if (expected)
+                            if ((*a==34) || (*a=='\'') || (can_avoid_quotes)) {
+                              char *b,*c;
+                              int ndelim=1;
+                              if ((*a==34) || (*a=='\''))
                                 a++;
-                              while(is_realspace(*a)) a++;
-                              if ((*a==34) || (*a=='\'') || (can_avoid_quotes)) {
-                                char *b,*c;
-                                int ndelim=1;
-                                if ((*a==34) || (*a=='\''))
-                                  a++;
-                                else
-                                  ndelim=0;
-                                b=a;
-                                if (ndelim) {
-                                  while((*b!=34) && (*b!='\'') && (*b!='\0')) b++;
-                                }
-                                else {
-                                  while((*b != quotes_replacement) && (*b!='\0')) b++;
-                                }
-                                c=b--; c+=ndelim;
-                                while(*c==' ') c++;
-                                if ((strchr(expected_end,*c)) || (*c=='\n') || (*c=='\r')) {
-                                  c-=(ndelim+1);
-                                  if ((int) (c - a + 1)) {
-                                    if (ensure_not_mime) {
-                                      int i = 0;
-                                      while(a != NULL && hts_main_mime[i] != NULL && hts_main_mime[i][0] != '\0') {
-                                        int p;
-                                        if ((p=strfield(a, hts_main_mime[i])) && a[p] == '/') {
-                                          a=NULL;
-                                        }
-                                        i++;
+                              else
+                                ndelim=0;
+                              b=a;
+                              if (ndelim) {
+                                while((*b!=34) && (*b!='\'') && (*b!='\0')) b++;
+                              }
+                              else {
+                                while((*b != quotes_replacement) && (*b!='\0')) b++;
+                              }
+                              c=b--; c+=ndelim;
+                              while(*c==' ') c++;
+                              if ((strchr(expected_end,*c)) || (*c=='\n') || (*c=='\r')) {
+                                c-=(ndelim+1);
+                                if ((int) (c - a + 1)) {
+                                  if (ensure_not_mime) {
+                                    int i = 0;
+                                    while(a != NULL && hts_main_mime[i] != NULL && hts_main_mime[i][0] != '\0') {
+                                      int p;
+                                      if ((p=strfield(a, hts_main_mime[i])) && a[p] == '/') {
+                                        a=NULL;
                                       }
+                                      i++;
                                     }
-                                    if (a != NULL) {
-                                      if ((opt->debug>1) && (opt->log!=NULL)) {
-                                        char str[512];
-                                        str[0]='\0';
-                                        strncatbuff(str,a,minimum((int) (c - a + 1),32));
-                                        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"link detected in javascript: %s"LF,str); test_flush;
-                                      }
-                                      p=(int) (a - adr);    // p non nul: TRAITER CHAINE COMME FICHIER
-                                      if (can_avoid_quotes) {
-                                        ending_p=quotes_replacement;
-                                      }
+                                  }
+                                  if (a != NULL) {
+                                    if ((opt->debug>1) && (opt->log!=NULL)) {
+                                      char str[512];
+                                      str[0]='\0';
+                                      strncatbuff(str,a,minimum((int) (c - a + 1),32));
+                                      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"link detected in javascript: %s"LF,str); test_flush;
+                                    }
+                                    p=(int) (a - adr);    // p non nul: TRAITER CHAINE COMME FICHIER
+                                    if (can_avoid_quotes) {
+                                      ending_p=quotes_replacement;
                                     }
                                   }
                                 }
-
-
                               }
+
+
                             }
                           }
+                        }
 
                       }  /* HTSPARSE_NO_JAVASCRIPT */
 
@@ -1932,12 +1953,12 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                     unescape_amp(lien);
                     unescape_amp(query);
                     // décoder l'inutile (%2E par exemple) et coder espaces
-                    // XXXXXXXXXXXXXXXXX strcpybuff(lien,unescape_http(lien));
-                    //strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
+                    // Bad: strcpybuff(lien,unescape_http(lien));
+                    // Bad: strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
 										/* Never unescape high-chars (we don't know the encoding!!) */
                     strcpybuff(lien,unescape_http_unharm(catbuff,lien, 1));   /* note: '%' is still escaped */
                     escape_remove_control(lien);
-                    escape_spc_url(lien);
+                    // ???? No! escape_spc_url(lien);
                     strcatbuff(lien,query);     /* restore */
                   }
 
@@ -2114,7 +2135,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                             strcatbuff(lien, "/");
                           while( (a > lien) && (*a) && (*a!='/')) a--;
                           if (*a=='/') {     // ok on a repéré le dernier /
-                            if (start_of_filename != NULL && a >= start_of_filename) {
+                            if (start_of_filename != NULL && a + 1 >= start_of_filename) {
                               *(a+1)='\0';   // couper
                             }
                           } else {
@@ -2352,6 +2373,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                     if ((p_type!=2) && (p_type!=-2)) {  // pas base href ou codebase
                       if (forbidden_url!=1) {
                         char BIGSTK last_adr[HTS_URLMAXSIZE*2];
+
+                        /* Calc */
                         last_adr[0]='\0';
                         //char last_fil[HTS_URLMAXSIZE*2]="";
                         strcpybuff(last_adr,adr);    // ancienne adresse
@@ -2398,8 +2421,22 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                       && forbidden_url == 0
                       && IS_DELAYED_EXT(save)
                       )
-                    {  // pas d'erreur, on continue
+                    {
+                      time_t t;
+                      
+                      // pas d'erreur, on continue
                       r_sv = hts_wait_delayed(str, adr, fil, save, parenturladr, parenturlfil, former_adr, former_fil, &forbidden_url);
+
+                      /* User interaction, because hts_wait_delayed can be slow.. (3.43) */
+                      t = time(NULL);
+                      if (user_interact_timestamp == 0 || t - user_interact_timestamp > 0) {
+                        user_interact_timestamp = t;
+                        ENGINE_SAVE_CONTEXT();
+                        {
+                          hts_mirror_process_user_interaction(str, stre);
+                        }
+                        ENGINE_SET_CONTEXT();
+                      }
                     }
 
                     // record!
@@ -2715,6 +2752,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           if (!in_media) {    // In media (such as real audio): don't patch
 														/* Never escape high-chars (we don't know the encoding!!) */
 														escape_uri_utf(tempo);
+
                             //if (!no_esc_utf)
                             //  escape_uri(tempo);     // escape with %xx
                             //else {
@@ -3596,18 +3634,13 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
 
 }
 
-
-
 /*
-Wait for next file and
-check 301, 302, .. statuscodes (moved)
+  Process pause, link adding..
 */
-int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+void hts_mirror_process_user_interaction(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+  int b;
   /* Load engine variables */
   ENGINE_LOAD_CONTEXT();
-  /* */
-  int b;
-  int n;
 
 #if BDEBUG==1
   printf("\nBack test..\n");
@@ -3664,7 +3697,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
               }
               *stre->exit_xh_=1;  // exit requested
               XH_uninit;
-              return 0;
+              return ;
             }
         }
       }
@@ -3731,7 +3764,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
               }
               //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
               XH_uninit;    // désallocation mémoire & buffers
-              return 0;
+              return ;
             }
           } else {
             if ( (opt->debug>0) && (opt->log!=NULL) ) {
@@ -3781,15 +3814,35 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
         }
         *stre->exit_xh_=1;  // exit requested
         XH_uninit;
-        return 0;
+        return ;
       }
       Sleep(100);  // pause
     }
     opt->state._hts_in_html_parsing = prev;
   }
+  ENGINE_SAVE_CONTEXT();
+  return ;
+}
+
+/*
+Wait for next file and
+check 301, 302, .. statuscodes (moved)
+*/
+int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+  /* Load engine variables */
+  ENGINE_DEFINE_CONTEXT();
+  int b;
+  int n;
+
+  /* User interaction */
+  ENGINE_SAVE_CONTEXT();
+  {
+    hts_mirror_process_user_interaction(str, stre);
+  }
+  ENGINE_SET_CONTEXT();
 
   // si le fichier n'est pas en backing, le mettre..
-  if (!back_exist(sback,opt,urladr,urlfil,savename)) {
+  if (!back_exist(str->sback,str->opt,urladr,urlfil,savename)) {
 #if BDEBUG==1
     printf("crash backing: %s%s\n",liens[ptr]->adr,liens[ptr]->fil);
 #endif
@@ -3826,6 +3879,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
     // ------------------------------------------------------------
     // attendre que le fichier actuel soit prêt - BOUCLE D'ATTENTE
     do {
+      /* User interaction */
+      ENGINE_SAVE_CONTEXT();
+      {
+        hts_mirror_process_user_interaction(str, stre);
+      }
+      ENGINE_SET_CONTEXT();
 
       // index du lien actuel
       b=back_index(opt,sback,urladr,urlfil,savename);
@@ -4093,49 +4152,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
       back_maydelete(opt,cache,sback,b);
     }
 
-    // progression
-#if 0
-    if (opt->aff_progress) {
-      TStamp tl=time_local();
-      if ((tl-HTS_STAT.stat_timestart)>0) {
-        char s[32];
-        int i=0;
-        lastime=tl;
-        _CLRSCR; _GOTOXY("1","1");
-        printf("Rate=%d B/sec\n",(int) (HTS_STAT.HTS_TOTAL_RECV/(tl-HTS_STAT.stat_timestart)));
-        while(i<minimum(back_max,99)) {  // **
-          if (back[i].status>=0) {  // loading..
-            s[0]='\0';
-            if (strlen(back[i].url_fil)>16)
-              strcatbuff(s,back[i].url_fil+strlen(back[i].url_fil)-16);       
-            else
-              strncatbuff(s,back[i].url_fil,16);
-            printf("%s : ",s);
-
-            printf("[");
-            if (back[i].r.totalsize>0) {
-              int p;
-              int j;
-              p=(int)((back[i].r.size*10)/back[i].r.totalsize);
-              p=minimum(10,p);
-              for(j=0;j<p;j++) printf("*");
-              for(j=0;j<(10-p);j++) printf("-");
-            } else { 
-              printf(LLintP,(LLint)back[i].r.size);                      
-            }
-            printf("]");
-
-            //} else if (back[i].status==STATUS_READY) {
-            //  strcpybuff(s,"ENDED");
-          } 
-          printf("\n");
-          i++;
-        }
-        io_flush;
-      }
-    }
-#endif
-
     // débug graphique
 #if BDEBUG==2
     {
@@ -4163,12 +4179,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
 #endif
 
   }
-  /*else {
-  #if BDEBUG==1
-  printf("back index error\n");
-  #endif
-  }
-  */
 
   ENGINE_SAVE_CONTEXT();
   return 0;
@@ -4184,6 +4194,9 @@ int hts_wait_delayed(htsmoduleStruct* str,
   hash_struct* const hash = hashptr;
 
   int r_sv=0;
+  int in_error = 0;
+  LLint in_error_size = 0;
+  char in_error_msg[32];
 
   // resolve unresolved type
   if (opt->savename_delayed != 0
@@ -4385,20 +4398,12 @@ int hts_wait_delayed(htsmoduleStruct* str,
           /* Error */
           if (HTTP_IS_ERROR(back[b].r.statuscode))
           {
-            /* 'no error page' selected or file discarded by size rules! */
-            if (!opt->errpage || ( back[b].r.statuscode == STATUSCODE_TOO_BIG ) ) {
-              /* Note: the cache 'cached_tests' system will remember this error, and we'll only issue ONE request */
-              *forbidden_url = 1;          /* Forbidden! */
-              if (opt->log != NULL) {
-                if (back[b].r.statuscode == STATUSCODE_TOO_BIG) {
-                  HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"link not taken because of its size (%d bytes) at %s%s"LF,(int)back[b].r.totalsize,adr,fil);
-                } else {
-                  HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"link not taken because of error (%d '%s') at %s%s"LF,back[b].r.statuscode,back[b].r.msg,adr,fil);
-                }
-                test_flush;
-              }
-              break;
-            }
+            /* seen as in error */
+            in_error = back[b].r.statuscode;
+            in_error_msg[0] = 0;
+            strncat(in_error_msg, back[b].r.msg, sizeof(in_error_msg) - 1);
+            in_error_size = back[b].r.totalsize;
+            /* don't break, even with "don't take error pages" switch, because we need to process the slot anyway (and cache the error) */
           }
           /* Moved! */
           else if (HTTP_IS_REDIRECT(back[b].r.statuscode))
@@ -4541,12 +4546,38 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
     } // while(IS_DELAYED_EXT(save))
 
+    if (in_error != 0) {
+      /* 'no error page' selected or file discarded by size rules! */
+      if (!opt->errpage || ( in_error == STATUSCODE_TOO_BIG ) ) {
+        /* Note: the cache 'cached_tests' system will remember this error, and we'll only issue ONE request */
+#if 0
+        /* No (3.43) - don't do that. We must not post-exclude an authorized link, because this will prevent the cache
+        system from processing it, leading to refetch it endlessly. Just accept it, and handle the error as
+        usual during parsing.
+        */
+        *forbidden_url = 1;          /* Forbidden! */
+#endif
+        if (opt->log != NULL && opt->debug > 0) {
+          if (in_error == STATUSCODE_TOO_BIG) {
+            HTS_LOG(opt, LOG_INFO); fprintf(opt->log,"link not taken because of its size (%d bytes) at %s%s"LF,(int)in_error_size,adr,fil);
+          } else {
+            HTS_LOG(opt, LOG_INFO); fprintf(opt->log,"link not taken because of error (%d '%s') at %s%s"LF,in_error,in_error_msg,adr,fil);
+          }
+          test_flush;
+        }
+      }
+    }
+
     // error
     if (*forbidden_url != 1
       && IS_DELAYED_EXT(save)) {
       *forbidden_url = 1;
       if (opt->log!=NULL) {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"link is probably looping, type unknown, aborting: %s%s"LF, adr, fil);
+        if (in_error) {
+          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"link in error (%d '%s'), type unknown, aborting: %s%s"LF, in_error, in_error_msg, adr, fil);
+        } else {
+          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"link is probably looping, type unknown, aborting: %s%s"LF, adr, fil);
+        }
         test_flush;
       }
     }

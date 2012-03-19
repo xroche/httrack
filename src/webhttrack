@@ -4,14 +4,21 @@
 # Initializes the htsserver GUI frontend and launch the default browser
 
 BROWSEREXE=
-SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox firebird galeon konqueror opera netscape"
+SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox icecat iceweasel abrowser firebird galeon konqueror opera netscape"
 if test -n "${BROWSER}"; then
 # sensible-browser will f up if BROWSER is not set
 SRCHBROWSEREXE="xdg-open sensible-browser ${SRCHBROWSEREXE}"
 fi
-SRCHPATH="/usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /sw/bin ${HOME}/usr/bin ${HOME}/bin"
+# Patch for Darwin/Mac by Ross Williams
+if test "`uname -s`" == "Darwin"; then
+# Darwin/Mac OS X uses a system 'open' command to find
+# the default browser. The -W flag causes it to wait for
+# the browser to exit
+BROWSEREXE="/usr/bin/open -W"
+fi
+SRCHPATH="/usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin ${HOME}/usr/bin ${HOME}/bin"
 SRCHPATH="$SRCHPATH "`echo $PATH | tr ":" " "`
-SRCHDISTPATH="/usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share /sw ${HOME}/usr/local ${HOME}/usr/share"
+SRCHDISTPATH="/usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share /opt/local/share /sw ${HOME}/usr/local ${HOME}/usr/share"
 
 ###
 # And now some famous cuisine
@@ -33,6 +40,12 @@ echo "$1" | grep -q "firebird"
 [ $? -eq 0 ] && return 0 
 echo "$1" | grep -q "firefox"
 [ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "iceweasel"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "abrowser"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "icecat"
+[ $? -eq 0 ] && return 0 
 return 1;
 }
 function mozillaloaded  {
@@ -41,7 +54,7 @@ if ! test -n "${user_name}"; then
 user_name=`id -un`
 fi
 if test -n "${user_name}"; then
-ps -e --user "$user_name" | grep -qE "(iceape|mozilla|netscape|firebird|firefox)"
+ps -e -U "$user_name" | grep -E "(iceape|mozilla|netscape|firebird|firefox)" | grep -qv "grep -E"
 else
 false
 fi
