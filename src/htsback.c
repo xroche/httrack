@@ -3826,7 +3826,8 @@ int back_checkmirror(httrackp* opt) {
       fprintf(opt->log,"More than %d seconds passed.. giving up"LF,opt->maxtime);
       test_flush;
     }
-    return 0;  /* stop now */
+	  /* cancel mirror smoothly */
+      hts_request_stop(opt, 0);
   }
   return 1;   /* Ok, go on */
 }
