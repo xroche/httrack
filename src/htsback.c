@@ -479,23 +479,8 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 						back[p].compressed_size=back[p].r.size;
 						// en mémoire -> passage sur disque
 						if (!back[p].r.is_write) {
-#if 1
-#ifdef _WIN32
-#undef tempnam
-#define tempnam _tempnam
-#endif
-              char *const tmp = tempnam(NULL, "httrack_temporaryGzipFile_");
-              if (tmp != NULL) {
-							  strcpybuff(back[p].tmpfile_buffer, tmp);
-                free(tmp);
-                back[p].tmpfile = back[p].tmpfile_buffer;
-              } else {
-                back[p].tmpfile = NULL;
-              }
-#else
 							back[p].tmpfile_buffer[0]='\0';
-              back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
-#endif
+							back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
 							if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
 								back[p].r.out=fopen(back[p].tmpfile,"wb");
 								if (back[p].r.out) {
@@ -512,7 +497,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 								} else {
 									back[p].tmpfile[0]='\0';
 									back[p].r.statuscode=STATUSCODE_INVALID;
-									strcpybuff(back[p].r.msg,"Open error when decompressing (can not create a temporary file)");
+									strcpybuff(back[p].r.msg,"Open error when decompressing");
 								}
 							}
 						}
@@ -2734,23 +2719,8 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                 /* .gz are *NOT* depacked!! */
                                 (strfield(get_ext(catbuff,back[i].url_sav),"gz") == 0)
                                 ) {
-#if 1
-#ifdef _WIN32
-#undef tempnam
-#define tempnam _tempnam
-#endif
-                                char *const tmp = tempnam(NULL, "httrack_temporaryGzipFile_");
-                                if (tmp != NULL) {
-                                  strcpybuff(back[i].tmpfile_buffer, tmp);
-                                  free(tmp);
-                                  back[i].tmpfile = back[i].tmpfile_buffer;
-                                } else {
-                                  back[i].tmpfile = NULL;
-                                }
-#else
                                 back[i].tmpfile_buffer[0]='\0';
-                                back[i].tmpfile=tmpnam(back[p].tmpfile_buffer);
-#endif
+                                back[i].tmpfile=tmpnam(back[i].tmpfile_buffer);
                                 if (back[i].tmpfile != NULL && back[i].tmpfile[0]) {
                                   if ((back[i].r.out=fopen(back[i].tmpfile,"wb")) == NULL) {
                                     last_errno = errno;

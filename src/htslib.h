@@ -554,14 +554,8 @@ HTS_STATIC int strcmpnocase(char* a,char* b) {
 #else
 #define OPT_MMS(a) (0)
 #endif
-
-#define is_html_mime_type(a) \
-  ( (strfield2((a),"text/html")!=0)\
-  || (strfield2((a),"application/xhtml+xml")!=0) \
-  )
 #define is_hypertext_mime__(a) \
-  ( \
-  is_html_mime_type(a)\
+  ( (strfield2((a),"text/html")!=0)\
   || (strfield2((a),"application/x-javascript")!=0) \
   || (strfield2((a),"text/css")!=0) \
   /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/ \
@@ -577,6 +571,7 @@ HTS_STATIC int strcmpnocase(char* a,char* b) {
      /*|| (strfield2((a),"text/xml")!=0) || (strfield2((a),"application/xml")!=0) : TODO: content check */ \
      || OPT_MMS(a) \
   )
+
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE

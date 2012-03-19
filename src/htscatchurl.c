@@ -160,7 +160,9 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
   // connexion (accept)
   if (soc != INVALID_SOCKET) {
     T_SOC soc2;
-    while ( (soc2 = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET);
+    struct sockaddr dummyaddr;
+    int dummylen = sizeof(struct sockaddr);  
+    while ( (soc2 = (T_SOC) accept(soc,&dummyaddr,&dummylen)) == INVALID_SOCKET);
   /*
 #ifdef _WIN32
     closesocket(soc);

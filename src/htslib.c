@@ -3105,7 +3105,7 @@ int ishtml(httrackp *opt,const char* fil) {
     *a = '\0';
   }
   if (get_userhttptype(opt, mime, fil_noquery)) {
-    if (is_html_mime_type(mime)) {
+    if (strfield2(mime, "text/html")) {
       return 1;
     } else {
       return 0;
@@ -3702,15 +3702,15 @@ HTSEXT_API char* unescape_http(char *catbuff, const char* s) {
 }
 
 // unescape in URL/URI ONLY what has to be escaped, to form a standard URL/URI
-// DOES NOT DECODE %25 (part of CHAR_DELIM)
+// DOES NOT DECODE %25
 HTSEXT_API char* unescape_http_unharm(char *catbuff, const char* s, int no_high) {
   int i,j=0;
   for (i=0;i<(int) strlen(s);i++) {
     if (s[i]=='%') {
       int nchar=(char) ehex(s+i+1);
 
-      int test = (  ( CHAR_RESERVED(nchar) && nchar != '+' ) /* %2B => + (not in query!) */
-                || CHAR_DELIM(nchar)
+      int test = (  CHAR_RESERVED(nchar)
+                || ( nchar != '%' && CHAR_DELIM(nchar) )
                 || CHAR_UNWISE(nchar)
                 || CHAR_LOW(nchar)        /* CHAR_SPECIAL */
                 || CHAR_XXAVOID(nchar) 
@@ -3822,13 +3822,9 @@ HTSEXT_API void x_escape_http(char* s,int mode) {
              || CHAR_XXAVOID(*s) );
     }
     else if (mode==30) {                   // échapper que ce qui est nécessaire
-      test =
-        ( *s != '/' && CHAR_RESERVED(*s) )
-        || CHAR_DELIM(*s)
-        || CHAR_UNWISE(*s)
-        || CHAR_SPECIAL(*s)
-        || CHAR_XXAVOID(*s)
-        ;
+      test = (
+                CHAR_LOW(*s)
+             || CHAR_XXAVOID(*s) );
     }
 
     if (test) {
@@ -4159,7 +4155,7 @@ HTSEXT_API int is_knowntype(httrackp *opt,const char *fil) {
   ext = get_ext(catbuff, fil);
   while(strnotempty(hts_mime[j][1])) {
     if (strfield2(hts_mime[j][1], ext)) {
-      if (is_html_mime_type(hts_mime[j][0]))
+      if (strfield2(hts_mime[j][0], "text/html"))
         return 2;
       else
         return 1;
@@ -4205,7 +4201,7 @@ HTSEXT_API int is_userknowntype(httrackp *opt,const char *fil) {
   get_userhttptype(opt, mime, fil);
   if (!strnotempty(mime))
     return 0;
-  else if (is_html_mime_type(mime))
+  else if (strfield2(mime,"text/html"))
     return 2;
   else
     return 1;

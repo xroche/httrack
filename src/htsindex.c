@@ -172,7 +172,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
   }
 
   // Check MIME type
-  if (is_html_mime_type(mime)) {
+  if (strfield2(mime,"text/html")) {
     inscript=0;
   } 
   // FIXME - temporary fix for image/svg+xml (svg)
