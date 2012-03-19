@@ -1,0 +1,78 @@
+Informations on this project:
+
+This project has been developed by:
+Xavier Roche (xroche@httrack.com)
+  for the main engine and Windows interface
+  and maintener for v2.0 and v3.0
+Yann Philippot (yphilippot@lemel.fr)
+  for the java binary .class parser
+David Lawrie (dalawrie@lineone.net)
+Robert Lagadec (rlagadec@yahoo.fr)
+  for checking both English & French translations
+Juan Pablo Barrio Lera (University of León)
+  for Spanish translations
+Rainer Klueting (rainer@klueting.de)
+Bastian Gorke (bastiang@yahoo.com)
+Rudi Ferrari (Wyando@netcologne.de)
+Marcus Gaza (MarcusGaza@t-online.de)
+  for German translations
+Rudi Ferrari (Wyando@netcologne.de)
+  for Dutch translations
+Lukasz Jokiel (Opole University of Technology, Lukasz.Jokiel@po.opole.pl)
+  for Polish translations
+Rui Fernandes (CANTIC, ruiefe@mail.malhatlantica.pt)
+Pedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago@mail.iupi.pt)
+  for Portuguese translations
+Andrei Iliev (iliev@vitaplus.ru)
+  for Russian translations
+Witold Krakowski (wkrakowski@libero.it)
+  for Italian translations
+Jozsef Tamas Herczeg (hdodi@freemail.hu)
+  for Hungarian translation
+Paulo Neto (company@layout.com.br)
+  for Brazilian translation
+Brook Qin (brookqwr@sina.com) 
+   for simplified Chinese translation
+Addy Lin (addy1975@pchome.com.tw)
+   for traditional Chinese translation
+Jesper Bramm (bramm@get2net.dk)
+   for Danish translation
+Tõnu Virma
+   for Estonian translation
+Staffan Ström (staffan@fam-strom.org)
+   for Swedish translation
+Mehmet Akif Köeoðlu (mak@ttnet.net.tr)
+  for Turkish translation
+Aleksandar Savic (aleks@macedonia.eu.org)
+  for Macedonian translation
+Takayoshi Nakasikiryo
+  for Japanese translation
+Martin Sereday (sereday@slovanet.sk)
+  for Slovak translation
+Antonín Matìjèík (matejcik@volny.cz)
+  for Czech translation
+
+Thanks to:
+Kauler Leto (letok@optusnet.com.au)
+  for the site/logos design
+
+Special Thanks to:
+Patrick Ducrot & Daniel Carré (ENSI of Caen)
+  for their initial support
+Fred Cohen (fc@all.net)
+  for HTTrack user's guide
+
+Greetings to:
+Jean-loup Gailly from gzip.org
+  for the help provided with Zlib
+Eric A. Young (eay@cryptsoft.com)
+  for SSL cryptographic material (OpenSSL)
+
+Russ Freeman from gipsymedia
+  for hints on DLL dynamic load
+Paul DiLascia
+  for helping to fix problems with CHtmlView
+ISMRA/Ensi of Caen 
+  for their initial support
+..and all users that are using and supporting HTTrack!
+
