@@ -42,13 +42,15 @@ Please visit our Website: http://www.httrack.com
 
 // --assume standard
 #define HTS_ASSUME_STANDARD \
-  "php2,php3,php4,php,cgi,asp,jsp,pl,cfm=text/html"
+  "php2,php3,php4,php,cgi,asp,jsp,pl,cfm,nsf=text/html"
 
 #include "htsglobal.h"
 
 // Main, récupère les paramètres et appelle le robot
 #if HTS_ANALYSTE
-int hts_main(int argc, char **argv);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_main(int argc, char **argv);
+#endif
 #else
 int main(int argc, char **argv);
 #endif

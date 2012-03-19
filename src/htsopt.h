@@ -48,6 +48,7 @@ typedef struct {
   int active;
   char name[1024];
   int port;
+  char bindhost[256];   // bind this host
 } t_proxy; 
 
 /* Structure utile pour copier en bloc les paramètres */
@@ -60,6 +61,12 @@ typedef struct {
 /* Structure état du miroir */
 typedef struct {
   int stop;
+  int exit_xh;
+  int back_add_stats;
+  /* */
+  int mimehtml_created;
+  char mimemid[256];
+  FILE* mimefp;
 } htsoptstate;
 
 
@@ -92,12 +99,13 @@ typedef struct {
   int maxconn;          // nombre max de connexions/s
   int waittime;         // démarrage programmé
   int cache;            // génération d'un cache
-  int aff_progress;     // barre de progression
+  //int aff_progress;     // barre de progression
   int shell;            // gestion d'un shell par pipe stdin/stdout
   t_proxy proxy;        // configuration du proxy
   int savename_83;      // conversion 8-3 pour les noms de fichiers
   int savename_type;    // type de noms: structure originale/html-images en un seul niveau
   char savename_userdef[256];  // structure userdef (ex: %h%p/%n%q.%t)
+  int mimehtml;         // MIME-html
   int user_agent_send;  // user agent (ex: httrack/1.0 [sun])
   char user_agent[128];
   char path_log[1024];  // chemin pour cache et log
@@ -121,8 +129,10 @@ typedef struct {
   int accept_cookie;    // gestion des cookies
   t_cookie* cookie;
   int http10;           // forcer http 1.0
+  int nokeepalive;      // pas de keep-alive
   int nocompression;    // pas de compression
   int sizehack;         // forcer réponse "mis à jour" si taille identique
+  int urlhack;          // force "url normalization" to avoid loops
   int tolerant;         // accepter content-length incorrect
   int parseall;         // essayer de tout parser (tags inconnus contenant des liens, par exemple)
   int norecatch;        // ne pas reprendre les fichiers effacés localement par l'utilisateur
@@ -132,7 +142,9 @@ typedef struct {
   //int maxcache_anticipate; // maximum de liens à anticiper (majorant)
   int ftp_proxy;        // proxy http pour ftp
   char filelist[1024];  // fichier liste URL à inclure
+  char urllist[1024];   // fichier liste de filtres à inclure
   htsfilters filters;   // contient les pointeurs pour les filtres
+  void* hash;           // hash structure
   void* robotsptr;         // robots ptr
   char lang_iso[64];    // en, fr ..
   char mimedefs[2048];  // ext1=mimetype1\next2=mimetype2..
@@ -170,6 +182,8 @@ typedef struct {
   int stat_files;            // nombre de fichiers écrits
   int stat_updated_files;    // nombre de fichiers mis à jour
   //
+  int stat_nrequests;        // nombre de requêtes sur socket
+  int stat_sockid;           // nombre de sockets allouées au total
   int stat_nsocket;          // nombre de sockets
   int stat_errors;           // nombre d'erreurs
   int stat_errors_front;     // idem, mais au tout premier niveau

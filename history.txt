@@ -4,9 +4,95 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-To do & Known bugs: (fixed soon) 
-- Some interface problems the Windows release
 
+3.30
++ New: Webhttrack, a linux/unix/bsd Web GUI for httrack
++ New: "URL hack" feature
++ New: HTTP-headers charset is now propagated in the html file
++ New: loadable external engine callbacks
++ New: Experimental ".mht" archives format
++ Fixed: Query ?? bug
++ Fixed: Bogus base href without http://
++ Fixed: Several javascript bugs
++ Fixed: UCS2 pages badly detected
++ Fixed: Build structure change does not redownload files
++ Fixed: "?foo" URL bug (link with only a query string) fixed
++ Fixed: ' or " inside non-quoted URLs
++ Fixed: keep-alive problems with bogus servers
++ Fixed: Broken .ra files
++ Fixed: More javascript bugs
++ Fixed: ftp transfers not properly monitored in the shell
++ Fixed: various fixes in webhttrack
++ Fixed: Blank final page in webhttrack
++ Fixed: Javascript comments (//) are skipped
++ Fixed: Temporary fix for "archive" bug with multiple java archives
++ Fixed: Inlined js or css files have their path relative to the parent
++ Fixed: Unescaped quotes ("") when continuing/updating in commandline mode
++ Fixed: Null-character in html page bug
++ Fixed: External depth slightly less bogus
++ Fixed: Filters based on size bogus ("less than 1KiB" is now functionning)
++ Fixed: Strange behaviour with filters (last filter "crushed")
++ Fixed: Bogus downloads when using ftp (unable to save file)
++ Fixed: Freeze with keep-alive on certain sites due to bad chunk encoding handling
++ Fixed: Problems with javascript included paths
++ Fixed: The mirror now aborts when the filesystem is full
++ Fixed: "No external pages" option fixed
++ Fixed: Javascript and \" in document.write bug fixed
++ Fixed: Two memory leaks in temporary file generation, and in link build fixed
++ Fixed: Bogus compression with non-gzip format
++ Fixed: Larger range of charsets accepted
++ Fixed: Bogus robots.txt when using comments (#)
++ Fixed: Missing MIME types for files such as .ico
++ Shell: Fixed continuous proxy search
++ Shell: Fixed missing HelpHtml/ link
++ Fixed: Overflow in htsback.c:2779
++ Fixed: Bogus style and script expressions due to too aggressive parsing
++ Fixed: Javascript parsing bugs with \" and \'
++ Fixed: Javascript link detection bugs when comments were inserted between arguments
++ Fixed: Bug when valid empty gzip content was received
++ New: More aggressive "maximum mirroring time" and "maximum amount of bytes transfered" options
++ New: Windows file://server/path syntax handled
++ Fixed: mht archive fixes
++ Fixed: Serious bugs with filters given in commandline erased by the engine
++ Fixed: Bogus parsing of javascript: generated inside document.write() inside javascript code removed
+
+3.23
++ New: Keep-alive
++ New: URLs size limit is now 1024 bytes
++ New: Bogus UCS2 html files hack
++ Fixed: base href bugs
++ Fixed: windows "dos devices" bug fixed
++ Fixed: dirty parsing now avoids ","
++ Fixed: "get non-html files near a link" option sometimes caused huge mirrors
++ Fixed: Bugs if zlib library is not found
++ Fixed: Bug with "near" and "no external pages"
++ Fixed: "Link empty" crash
++ Fixed: Several javascript bugs
++ Fixed: Keep-alive problems ("unknown response structure")
++ Fixed: Major keep-alive bug (connection not closed)
++ Fixed: 8-3 options not working, ISO9660 option improved
++ Fixed: Bogus links with embedded CR, TAB..
++ Fixed: small ../ external link bug fixed
+
+3.22-3
++ Fixed: Slow engine due to (too strict) memory checks
++ Fixed: Overflow in htscore.c:2353
++ Fixed: Bogus chunked files with content-length fixed
++ Fixed: Folders renamed into ".txt" on Un*x platforms bug fixed!
++ New: Scan rule list (-%S) added
++ New: Cache debugging tool (-#C) added
+
+3.21-8
++ New: Basic Macromedia Flash support (links extraction)
++ New: Modular design for https, flash parser and zlib
++ New: Standard autoconf/configure design on Un*x platforms
++ New: Modular design also on Windows platforms (dll/lib)
++ Fixed: Text files without extension not renamed "html" anymore
++ Fixed: Bug with "?foo" urls
++ Fixed: No chmod 755 on home anymore
++ Fixed: Stability problems due to bad file structure checks
++ Fixed: Overflow in GUI/commandline when displaying statistics
++ Fixed: Directory creation error
 
 3.20-2
 + New: HTTPS support (SSL)

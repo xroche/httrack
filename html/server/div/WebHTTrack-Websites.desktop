@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Categories=Application;Network
+Terminal=false
+Name=Browse Mirrored Websites
+Comment=Browse Websites Mirrored by WebHTTrack
+Exec=webhttrack browse
+Icon=/usr/share/httrack/icons/webhttrack.xpm
+Terminal=false
+MultipleArgs=false
+Type=Application

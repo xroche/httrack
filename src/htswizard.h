@@ -43,8 +43,6 @@ Please visit our Website: http://www.httrack.com
 int hts_acceptlink(httrackp* opt,
                    int ptr,int lien_tot,lien_url** liens,
                    char* adr,char* fil,
-                   char*** filters,int* filptr,int filter_max,
-                   robots_wizard* robots,
                    int* set_prio_to_0,
                    int* just_test_it);
 int hts_testlinksize(httrackp* opt,

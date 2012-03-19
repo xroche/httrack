@@ -38,20 +38,43 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_BASICH
 #define HTS_BASICH
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "htsglobal.h"
 
 // size_t et mode_t
 #include <stdio.h>
-#if HTS_WIN
-#else
-#include <fcntl.h>
+#include <stdlib.h>
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+
+#ifndef _WIN32
+#include <errno.h>
 #endif
 
 #if HTS_WIN
 #else
- #define min(a,b) ((a)>(b)?(b):(a))
- #define max(a,b) ((a)>(b)?(a):(b))
+#include <fcntl.h>
 #endif
+#include <assert.h>
+
+#undef min
+#undef max
+#define min(a,b) ((a)>(b)?(b):(a))
+#define max(a,b) ((a)>(b)?(a):(b))
 
 // teste égalité de 2 chars, case insensitive
 #define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
@@ -63,6 +86,7 @@ Please visit our Website: http://www.httrack.com
    ( (strfield2((a),"text/html")!=0)\
   || (strfield2((a),"application/x-javascript")!=0) \
   || (strfield2((a),"text/css")!=0) \
+  /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/ \
   || (strfield2((a),"image/svg+xml")!=0) \
   || (strfield2((a),"image/svg-xml")!=0) \
   /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */\
@@ -77,60 +101,287 @@ Please visit our Website: http://www.httrack.com
 // caractère maj
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
 
-// conversion éventuelle / vers antislash
-#if HTS_WIN
-char* antislash(char* s);
-#else
-#define antislash(A) (A)
-#endif
-
-
 // functions
-#if HTS_PLATFORM!=3
-#ifdef __cplusplus
-extern "C" {
-#endif
-#if HTS_PLATFORM!=2
-#if HTS_PLATFORM!=1
- int   open      (const char *, int, ...);
-#endif
- //int   read      (int,const char*,int);
- //int   write     (int,char*,int);
-#endif
-#if HTS_PLATFORM!=1
- int   close     (int);
- void* calloc    (size_t,size_t);
- void* malloc    (size_t);
- void* realloc   (void*,size_t);
- void  free      (void*);
-#endif
-#if HTS_WIN
+#ifdef _WIN32
+#define DynamicGet(handle, sym) GetProcAddress(handle, sym)
 #else
- int   mkdir     (const char*,mode_t);
-#endif
-#ifdef __cplusplus
-}
-#endif
+#define DynamicGet(handle, sym) dlsym(handle, sym)
 #endif
 
+// emergency log
+typedef void (*t_abortLog)(char* msg, char* file, int line);
+extern HTSEXT_API t_abortLog abortLog__;
+#define abortLog(a) abortLog__(a, __FILE__, __LINE__)
+#define abortLogFmt(a) do { \
+  FILE* fp = fopen("CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
+  if (fp) { \
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
+    fprintf(fp, "Reason:\r\n"); \
+    fprintf(fp, a); \
+    fprintf(fp, "\r\n"); \
+    fflush(fp); \
+    fclose(fp); \
+  } \
+} while(0)
 
-// tracer malloc()
-#if HTS_TRACE_MALLOC
-#define malloct(A)    hts_malloc(A,0)
-#define calloct(A,B)  hts_malloc(A,B)
-#define freet(A)      hts_free(A)
+
+#define _ ,
+#define abortLogFmt(a) do { \
+  FILE* fp = fopen("CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
+  if (!fp) fp = fopen("C:\\CRASH.TXT", "wb"); \
+  if (fp) { \
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\n", __LINE__); \
+    fprintf(fp, "Reason:\r\n"); \
+    fprintf(fp, a); \
+    fprintf(fp, "\r\n"); \
+    fflush(fp); \
+    fclose(fp); \
+  } \
+} while(0)
+#define assertf(exp) do { \
+  if (! ( exp ) ) { \
+    abortLog("assert failed: " #exp); \
+    if (htsCallbackErr != NULL) { \
+      htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
+    } \
+    assert(exp); \
+    abort(); \
+  } \
+} while(0)
+/* non-fatal assert */
+#define assertnf(exp) do { \
+  if (! ( exp ) ) { \
+    abortLog("assert failed: " #exp); \
+    if (htsCallbackErr != NULL) { \
+      htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
+    } \
+  } \
+} while(0)
+
+
+/* regular malloc's() */
+#ifndef HTS_TRACE_MALLOC
+#define malloct(A)          malloc(A)
+#define calloct(A,B)        calloc((A), (B))
+#define freet(A)            do { assertnf((A) != NULL); if ((A) != NULL) { free(A); (A) = NULL; } } while(0)
+#define realloct(A,B)       ( ((A) != NULL) ? realloc((A), (B)) : malloc(B) )
+#define memcpybuff(A, B, N) memcpy((A), (B), (N))
+#else
+/* debug version */
+#define malloct(A)    hts_malloc(A)
+#define calloct(A,B)  hts_calloc(A,B)
+#define freet(A)      do { hts_free(A); (A) = NULL; } while(0)
 #define realloct(A,B) hts_realloc(A,B)
 void  hts_freeall();
-void* hts_malloc    (size_t,size_t);
+void* hts_malloc    (size_t);
+void* hts_calloc(size_t,size_t);
+void* hts_xmalloc(size_t,size_t);
 void  hts_free      (void*);
 void* hts_realloc   (void*,size_t);
+mlink* hts_find(char* adr);
+/* protected memcpy */
+#define memcpybuff(A, B, N) do { \
+  mlink* lnk = hts_find((void*)(A)); \
+  if (lnk != NULL) { \
+    assertf(lnk != NULL); \
+    assertf( * ( (t_htsboundary*) ( ((char*) lnk->adr) - sizeof(htsboundary) ) ) == htsboundary ); \
+    assertf( * ( (t_htsboundary*) ( ((char*) lnk->adr) + lnk->len ) ) == htsboundary ); \
+    assertf( ( ((char*)(A)) + (N)) < (char*) (lnk->adr + lnk->len) ); \
+  } \
+  memcpy(A, B, N); \
+} while(0)
+
+#endif
+
+typedef void (* htsErrorCallback)(char* msg, char* file, int line);
+extern HTSEXT_API htsErrorCallback htsCallbackErr;
+extern HTSEXT_API int htsMemoryFastXfr;
+
+/*
+*/
+
+
+#ifdef STRDEBUG
+
+/* protected strcat, strncat and strcpy - definitely useful */
+#define strcatbuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strcat(A, B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int sz = (unsigned int) strlen(A); \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(sz + szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (sz + szf + 1 < sizeof(A)) { \
+          memcpy((A) + sz, (B), szf + 1); \
+        } \
+      } \
+    } else if (szf > 0) { \
+      memcpybuff((A) + sz, (B), szf + 1); \
+    } \
+  } \
+} while(0)
+#define strncatbuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strncat(A, B, N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int sz = (unsigned int) strlen(A); \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(sz + szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (sz + szf + 1 < sizeof(A)) { \
+          memcpy((A) + sz, (B), szf); \
+          * ( (A) + sz + szf) = '\0'; \
+        } \
+      } \
+    } else if (szf > 0) { \
+      memcpybuff((A) + sz, (B), szf); \
+      * ( (A) + sz + szf) = '\0'; \
+    } \
+  } \
+} while(0)
+#define strcpybuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strcpy(A, B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (szf + 1 < sizeof(A)) { \
+          memcpy((A), (B), szf + 1); \
+        } else { \
+          * (A) = '\0'; \
+        } \
+      } else { \
+        * (A) = '\0'; \
+      } \
+    } else { \
+      memcpybuff((A), (B), szf + 1); \
+    } \
+  } \
+} while(0)
+#define strncpybuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (htsMemoryFastXfr) { \
+    if (sizeof(A) != sizeof(char*)) { \
+      (A)[sizeof(A) - 1] = '\0'; \
+    } \
+    strncpy(A, B, N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf((A)[sizeof(A) - 1] == '\0'); \
+    } \
+  } else { \
+    unsigned int szf = (unsigned int) strlen(B); \
+    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
+    if (sizeof(A) != sizeof(char*)) { \
+      assertf(szf + 1 < sizeof(A)); \
+      if (szf > 0) { \
+        if (szf + 1 < sizeof(A)) { \
+          memcpy((A), (B), szf); \
+        } \
+      } \
+    } else { \
+      memcpybuff((A), (B), szf); \
+    } \
+  } \
+} while(0)
+
 #else
-#define malloct(A)    malloc(A)
-#define calloct(A,B)  calloc(A,B)
-#define freet(A)      free(A)
-#define realloct(A,B) realloc(A,B)
+
+#ifdef STRDEBUGFAST
+
+/* protected strcat, strncat and strcpy - definitely useful */
+#define strcatbuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (sizeof(A) != sizeof(char*)) { \
+    (A)[sizeof(A) - 1] = '\0'; \
+  } \
+  strcat(A, B); \
+  if (sizeof(A) != sizeof(char*)) { \
+    assertf((A)[sizeof(A) - 1] == '\0'); \
+  } \
+} while(0)
+#define strncatbuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (sizeof(A) != sizeof(char*)) { \
+    (A)[sizeof(A) - 1] = '\0'; \
+  } \
+  strncat(A, B, N); \
+  if (sizeof(A) != sizeof(char*)) { \
+    assertf((A)[sizeof(A) - 1] == '\0'); \
+  } \
+} while(0)
+#define strcpybuff(A, B) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (sizeof(A) != sizeof(char*)) { \
+    (A)[sizeof(A) - 1] = '\0'; \
+  } \
+  strcpy(A, B); \
+  if (sizeof(A) != sizeof(char*)) { \
+    assertf((A)[sizeof(A) - 1] == '\0'); \
+  } \
+} while(0)
+#define strncpybuff(A, B, N) do { \
+  assertf( (A) != NULL ); \
+  if ( ! (B) ) { assertf( 0 ); } \
+  if (sizeof(A) != sizeof(char*)) { \
+    (A)[sizeof(A) - 1] = '\0'; \
+  } \
+  strncpy(A, B, N); \
+  if (sizeof(A) != sizeof(char*)) { \
+    assertf((A)[sizeof(A) - 1] == '\0'); \
+  } \
+} while(0)
+
+#else
+
+#define strcatbuff strcat
+#define strncatbuff strncat
+#define strcpybuff strcpy
+#define strncpybuff strncpy
+
+#endif
+
 #endif
 
 
+#ifdef __cplusplus
+ };
 #endif
 
+#endif

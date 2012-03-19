@@ -86,20 +86,20 @@ int cookie_add(t_cookie* cookie,char* cook_name,char* cook_value,char* domain,ch
     }
   }
   // construction du cookie
-  strcpy(cook,domain);
-  strcat(cook,"\t");
-  strcat(cook,"TRUE");
-  strcat(cook,"\t");
-  strcat(cook,path);
-  strcat(cook,"\t");
-  strcat(cook,"FALSE");
-  strcat(cook,"\t");
-  strcat(cook,"1999999999");
-  strcat(cook,"\t");
-  strcat(cook,cook_name);
-  strcat(cook,"\t");
-  strcat(cook,cook_value);
-  strcat(cook,"\n");
+  strcpybuff(cook,domain);
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,"TRUE");
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,path);
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,"FALSE");
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,"1999999999");
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,cook_name);
+  strcatbuff(cook,"\t");
+  strcatbuff(cook,cook_value);
+  strcatbuff(cook,"\n");
   if (!( ((int) strlen(cookie->data) + (int) strlen(cook)) < cookie->max_len)) return -1;      // impossible d'ajouter
   cookie_insert(insert,cook);
 #if DEBUG_COOK
@@ -179,8 +179,8 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
     WIN32_FIND_DATA find;
     HANDLE h;
     char  pth[MAX_PATH + 32];
-    strcpy(pth,fpath);
-    strcat(pth,"*@*.txt");
+    strcpybuff(pth,fpath);
+    strcatbuff(pth,"*@*.txt");
     h = FindFirstFile(pth,&find);
     if (h != INVALID_HANDLE_VALUE) {
       do {
@@ -233,10 +233,10 @@ int cookie_load(t_cookie* cookie,char* fpath,char* name) {
               char path[256];             // chemin (/)
               char cook_name[256];        // nom cookie (MYCOOK)
               char cook_value[8192];      // valeur (ID=toto,S=1234)
-              strcpy(domain,cookie_get(line,0));       // host
-              strcpy(path,cookie_get(line,2));         // path
-              strcpy(cook_name,cookie_get(line,5));    // name
-              strcpy(cook_value,cookie_get(line,6));   // value
+              strcpybuff(domain,cookie_get(line,0));       // host
+              strcpybuff(path,cookie_get(line,2));         // path
+              strcpybuff(cook_name,cookie_get(line,5));    // name
+              strcpybuff(cook_value,cookie_get(line,6));   // value
 #if DEBUG_COOK
               printf("%s\n",line);
 #endif
@@ -277,14 +277,14 @@ int cookie_save(t_cookie* cookie,char* name) {
 void cookie_insert(char* s,char* ins) {
   char* buff;
   if (strnotempty(s)==0) {    // rien à faire, juste concat
-    strcat(s,ins);
+    strcatbuff(s,ins);
   } else {
-    buff=(char*) malloc(strlen(s)+2);
+    buff=(char*) malloct(strlen(s)+2);
     if (buff) {
-      strcpy(buff,s);     // copie temporaire
-      strcpy(s,ins);      // insérer
-      strcat(s,buff);     // copier
-      free(buff);
+      strcpybuff(buff,s);     // copie temporaire
+      strcpybuff(s,ins);      // insérer
+      strcatbuff(s,buff);     // copier
+      freet(buff);
     }
   }
 }
@@ -294,11 +294,11 @@ void cookie_delete(char* s,int pos) {
   if (strnotempty(s+pos)==0) {    // rien à faire, effacer
     s[0]='\0';
   } else {
-    buff=(char*) malloc(strlen(s+pos)+2);
+    buff=(char*) malloct(strlen(s+pos)+2);
     if (buff) {
-      strcpy(buff,s+pos);     // copie temporaire
-      strcpy(s,buff);         // copier
-      free(buff);
+      strcpybuff(buff,s+pos);     // copie temporaire
+      strcpybuff(s,buff);         // copier
+      freet(buff);
     }
   }
 }
@@ -329,7 +329,7 @@ char* cookie_get(char* cookie_base,int param) {
         char* a = cookie_base;
         while( (*a) && (*a!='\t') && (*a!='\n')) a++;
         buffer[0]='\0';
-        strncat(buffer,cookie_base,(int) (a - cookie_base));
+        strncatbuff(buffer,cookie_base,(int) (a - cookie_base));
         return buffer;
       } else
         return "";
@@ -357,8 +357,8 @@ int bauth_add(t_cookie* cookie,char* adr,char* fil,char* auth) {
       if (chain->next) {
         chain=chain->next;
         chain->next=NULL;
-        strcpy(chain->auth,auth);
-        strcpy(chain->prefix,prefix);
+        strcpybuff(chain->auth,auth);
+        strcpybuff(chain->prefix,prefix);
         return 1;
       }
     }
@@ -388,8 +388,8 @@ char* bauth_prefix(char* adr,char* fil) {
   char* prefix;
   char* a;
   NOSTATIC_RESERVE(prefix, char, HTS_URLMAXSIZE*2);
-  strcpy(prefix,jump_identification(adr));
-  strcat(prefix,fil);
+  strcpybuff(prefix,jump_identification(adr));
+  strcatbuff(prefix,fil);
   a=strchr(prefix,'?');
   if (a) *a='\0';
   if (strchr(prefix,'/')) {

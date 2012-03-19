@@ -56,23 +56,26 @@ Please visit our Website: http://www.httrack.com
  #include <sys/socket.h>
  #include <netinet/in.h>
  #include <sys/time.h>
+ /* Force for sun env. */
+ #ifndef BSD_COMP
+ #define BSD_COMP
+ #endif
  #include <sys/ioctl.h>
  /* gethostname & co */
+#ifdef HAVE_UNISTD_H
  #include <unistd.h>
+#endif
  /* inet_addr */
  #include <arpa/inet.h>
  // pas la peine normalement..
-#if HTS_PLATFORM!=3
- #include <sys/filio.h>
-#else
 #ifndef HTS_DO_NOT_REDEFINE_in_addr_t
  typedef unsigned long in_addr_t;
 #endif
-#endif
-#ifndef min
- #define min(a,b) ((a)>(b)?(b):(a))
- #define max(a,b) ((a)>(b)?(a):(b))
-#endif
+#undef min
+#undef max
+#undef Sleep
+#define min(a,b) ((a)>(b)?(b):(a))
+#define max(a,b) ((a)>(b)?(a):(b))
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
 
@@ -104,8 +107,15 @@ typedef struct {
 
 /* Set port to sockaddr structure */
 #define SOCaddr_initport(server, port) do { \
-    SOCaddr_sinport(server) = htons((unsigned short int) (port)); \
+  SOCaddr_sinport(server) = htons((unsigned short int) (port)); \
 } while(0)
+
+#define SOCaddr_initany(server, server_len) do { \
+  SOCaddr_sinfamily(server) = AF_INET; \
+  memset(&SOCaddr_sinaddr(server), 0, sizeof(struct sockaddr_in)); \
+  server_len=sizeof(struct sockaddr_in); \
+} while(0)
+
 
 /* Copy sockaddr to another one */
 #define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize) do { \
@@ -169,6 +179,12 @@ typedef struct {
 /* Set port to sockaddr structure */
 #define SOCaddr_initport(server, port) do { \
     SOCaddr_sinport(server) = htons((unsigned short int) (port)); \
+} while(0)
+
+#define SOCaddr_initany(server, server_len) do { \
+  SOCaddr_sinfamily(server) = AF_INET; \
+  memset(&SOCaddr_sinaddr(server), 0, sizeof(struct sockaddr_in)); \
+  server_len=sizeof(struct sockaddr_in); \
 } while(0)
 
 /*

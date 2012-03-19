@@ -79,10 +79,11 @@ int checkrobots(robots_wizard* robots,char* adr,char* fil) {
   return 0;
 }
 int checkrobots_set(robots_wizard* robots,char* adr,char* data) {
-  if (((int) strlen(data)) > 999) return 0;
+  if (((int) strlen(adr)) >= sizeof(robots->adr) - 2) return 0;
+  if (((int) strlen(data)) >= sizeof(robots->token) - 2) return 0;
   while(robots) {
     if (strfield2(robots->adr,adr)) {    // entrée existe
-      strcpy(robots->token,data);
+      strcpybuff(robots->token,data);
 #if DEBUG_ROBOTS
         printf("robots.txt: set %s to %s\n",adr,data);
 #endif
@@ -92,8 +93,8 @@ int checkrobots_set(robots_wizard* robots,char* adr,char* data) {
       robots->next=(robots_wizard*) calloct(1,sizeof(robots_wizard));
       if (robots->next) {
         robots->next->next=NULL;
-        strcpy(robots->next->adr,adr);
-        strcpy(robots->next->token,data);
+        strcpybuff(robots->next->adr,adr);
+        strcpybuff(robots->next->token,data);
 #if DEBUG_ROBOTS
         printf("robots.txt: new set %s to %s\n",adr,data);
 #endif

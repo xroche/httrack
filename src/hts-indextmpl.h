@@ -167,7 +167,7 @@ regen:
   "	<BR>"LF\
   "	<BR>"LF\
   "  	<H6 ALIGN=\"RIGHT\">"LF\
-  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO'2002]</I>"LF\
+  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO'2003]</I>"LF\
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
@@ -186,7 +186,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2002 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 2003 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -317,7 +317,7 @@ regen:
   "	</TABLE>"LF\
   "	<BR>"LF\
   "	<H6 ALIGN=\"RIGHT\">"LF\
-  "         <I>Mirror and index made by HTTrack Website Copier [XR&CO'2002]</I>"LF\
+  "         <I>Mirror and index made by HTTrack Website Copier [XR&CO'2003]</I>"LF\
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
@@ -335,7 +335,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2002 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 2003 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -476,7 +476,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" height=\"100%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2002 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 2003 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -613,7 +613,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" height=\"100%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2002 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 2003 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\

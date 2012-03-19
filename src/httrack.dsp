@@ -43,8 +43,8 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
-# ADD CPP /nologo /MT /W3 /GX /Ot /Oi /Oy /Ob2 /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /FR /YX /FD /c
-# SUBTRACT CPP /Ox /Oa /Ow /Og /Os
+# ADD CPP /nologo /MD /W3 /Gi /O2 /Op /Ob2 /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /I "C:\Dev\Winhttrack" /D "NDEBUG" /D "WIN32" /D "_CONSOLE" /D "_MBCS" /D "HTS_ANALYSTE_CONSOLE" /YX /FD /Zm200 /c
+# SUBTRACT CPP /Fr
 # ADD BASE RSC /l 0x40c /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
 BSC32=bscmake.exe
@@ -52,7 +52,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:console /machine:I386
-# ADD LINK32 wsock32.lib zlib.lib ssleay32.lib libeay32.lib /nologo /subsystem:console /machine:I386 /out:"c:\temp\httrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll"
+# ADD LINK32 wsock32.lib libhttrack.lib /nologo /subsystem:console /machine:I386 /out:"L:\HTTrack\httrack\httrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll" /libpath:"C:\temp\Releaselib"
 # SUBTRACT LINK32 /verbose
 
 !ELSEIF  "$(CFG)" == "httrack - Win32 Debug"
@@ -69,7 +69,7 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
-# ADD CPP /nologo /MT /W3 /Gm /GR /GX /ZI /Od /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /FAcs /Fr /YX /FD /c
+# ADD CPP /nologo /MDd /W3 /Gm /GR /ZI /Od /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /I "C:\Dev\Winhttrack" /D "_DEBUG" /D "WIN32" /D "_CONSOLE" /D "_MBCS" /D "HTS_ANALYSTE_CONSOLE" /FAcs /Fr /FD /Zm200 /c
 # ADD BASE RSC /l 0x40c /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
@@ -77,8 +77,8 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:console /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 wsock32.lib zlib.lib ssleay32.lib libeay32.lib /nologo /subsystem:console /map /debug /debugtype:both /machine:I386 /out:"c:\temp\test\httrack.exe" /pdbtype:sept /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll"
-# SUBTRACT LINK32 /profile
+# ADD LINK32 wsock32.lib libhttrack.lib /nologo /subsystem:console /debug /debugtype:both /machine:I386 /out:"C:\temp\httrack.exe" /pdbtype:sept /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll" /libpath:"C:\temp\Debuglib"
+# SUBTRACT LINK32 /profile /map
 
 !ELSEIF  "$(CFG)" == "httrack - Win32 Release avec debug"
 
@@ -96,8 +96,7 @@ LINK32=link.exe
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /MT /W3 /GX /Ot /Oi /Oy /Ob2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_MBCS" /YX /FD /c
 # SUBTRACT BASE CPP /Ox /Oa /Ow /Og /Os
-# ADD CPP /nologo /MT /W3 /GX /Zi /Ot /Oi /Oy /Ob2 /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /D "WIN32" /D "_CONSOLE" /D "_MBCS" /FAcs /FR /YX /FD /c
-# SUBTRACT CPP /Ox /Oa /Ow /Og /Os
+# ADD CPP /nologo /MD /W3 /GX /Zi /Ot /Oi /Oy /Ob2 /I "C:\Dev\IPv6Kit\inc\\" /I "C:\Dev\zlib\\" /I "C:\Dev\openssl\include" /I "C:\Dev\Winhttrack" /D "WIN32" /D "_CONSOLE" /D "_MBCS" /D "HTS_ANALYSTE_CONSOLE" /FAcs /FR /YX /FD /Zm200 /c
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
 BSC32=bscmake.exe
@@ -106,7 +105,7 @@ BSC32=bscmake.exe
 LINK32=link.exe
 # ADD BASE LINK32 wsock32.lib /nologo /subsystem:console /machine:I386 /out:"c:\temp\httrack.exe"
 # SUBTRACT BASE LINK32 /verbose
-# ADD LINK32 wsock32.lib zlib.lib ssleay32.lib libeay32.lib /nologo /subsystem:console /debug /machine:I386 /out:"c:\temp\httrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll"
+# ADD LINK32 wsock32.lib libhttrack.lib /nologo /subsystem:console /debug /machine:I386 /out:"L:\HTTrack\httrack\httrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll"
 # SUBTRACT LINK32 /verbose
 
 !ENDIF 
@@ -118,207 +117,11 @@ LINK32=link.exe
 # Name "httrack - Win32 Release avec debug"
 # Begin Source File
 
-SOURCE=.\htsalias.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsalias.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsback.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsback.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsbauth.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsbauth.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscache.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscache.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscatchurl.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscatchurl.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsconfig.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscore.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscore.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscoremain.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htscoremain.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsdefines.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsfilters.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsfilters.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsftp.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsftp.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsglobal.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htshash.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htshash.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htshelp.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htshelp.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsindex.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsindex.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsjava.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsjava.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htslib.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htslib.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsmd5.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsmd5.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsname.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsname.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsnostatic.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsnostatic.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsrobots.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsrobots.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsthread.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htsthread.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htstools.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htstools.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htswizard.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htswizard.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\htswrap.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\htswrap.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\httrack.c
 # End Source File
 # Begin Source File
 
 SOURCE=.\httrack.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\md5.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\md5.h
 # End Source File
 # End Target
 # End Project

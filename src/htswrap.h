@@ -35,14 +35,16 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-
-
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH 
 
-int htswrap_init(void);
-int htswrap_add(char* name,void* fct);
-int htswrap_free(void);
-unsigned long int htswrap_read(char* name);
+#include "htsglobal.h"
+
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int htswrap_init(void);
+HTSEXT_API int htswrap_add(char* name,void* fct);
+HTSEXT_API int htswrap_free(void);
+HTSEXT_API unsigned long int htswrap_read(char* name);
+#endif
 
 #endif

@@ -1,0 +1,623 @@
+.\" Process this file with
+.\" groff -man -Tascii httrack.1
+.\"
+.TH httrack 1 "HTTrack version 3.30-RC-19+swf (compiled Oct  4 2003)" "httrack website copier"
+.SH NAME
+httrack \- offline browser : copy websites to a local directory
+.SH SYNOPSIS
+.B httrack [ url ]... [ -filter ]... [ +filter ]... [ 
+.B-O, --path 
+] [ 
+.B -w, --mirror 
+] [ 
+.B -W, --mirror-wizard 
+] [ 
+.B -g, --get-files 
+] [ 
+.B -i, --continue 
+] [ 
+.B -Y, --mirrorlinks 
+] [ 
+.B -P, --proxy 
+] [ 
+.B -%f, --httpproxy-ftp[=N] 
+] [ 
+.B -%b, --bind 
+] [ 
+.B -rN, --depth[=N] 
+] [ 
+.B -%eN, --ext-depth[=N] 
+] [ 
+.B -mN, --max-files[=N] 
+] [ 
+.B -MN, --max-size[=N] 
+] [ 
+.B -EN, --max-time[=N] 
+] [ 
+.B -AN, --max-rate[=N] 
+] [ 
+.B -%cN, --connection-per-second[=N] 
+] [ 
+.B -GN, --max-pause[=N] 
+] [ 
+.B -cN, --sockets[=N] 
+] [ 
+.B -TN, --timeout 
+] [ 
+.B -RN, --retries[=N] 
+] [ 
+.B -JN, --min-rate[=N] 
+] [ 
+.B -HN, --host-control[=N] 
+] [ 
+.B -%P, --extended-parsing[=N] 
+] [ 
+.B -n, --near 
+] [ 
+.B -t, --test 
+] [ 
+.B -%L, --list 
+] [ 
+.B -%S, --urllist 
+] [ 
+.B -NN, --structure[=N] 
+] [ 
+.B -%M, --mime-html[=N] 
+] [ 
+.B -LN, --long-names[=N] 
+] [ 
+.B -KN, --keep-links[=N] 
+] [ 
+.B -x, --replace-external 
+] [ 
+.B -%x, --disable-passwords 
+] [ 
+.B -%q, --include-query-string 
+] [ 
+.B -o, --generate-errors 
+] [ 
+.B -X, --purge-old[=N] 
+] [ 
+.B -%p, --preserve 
+] [ 
+.B -bN, --cookies[=N] 
+] [ 
+.B -u, --check-type[=N] 
+] [ 
+.B -j, --parse-java[=N] 
+] [ 
+.B -sN, --robots[=N] 
+] [ 
+.B -%h, --http-10 
+] [ 
+.B -%k, --keep-alive 
+] [ 
+.B -%B, --tolerant 
+] [ 
+.B -%s, --updatehack 
+] [ 
+.B -%u, --urlhack 
+] [ 
+.B -%A, --assume 
+] [ 
+.B -@iN, --protocol[=N] 
+] [ 
+.B -F, --user-agent 
+] [ 
+.B -%F, --footer 
+] [ 
+.B -%l, --language 
+] [ 
+.B -C, --cache[=N] 
+] [ 
+.B -k, --store-all-in-cache 
+] [ 
+.B -%n, --do-not-recatch 
+] [ 
+.B -%v, --display 
+] [ 
+.B -Q, --do-not-log 
+] [ 
+.B -q, --quiet 
+] [ 
+.B -z, --extra-log 
+] [ 
+.B -Z, --debug-log 
+] [ 
+.B -v, --verbose 
+] [ 
+.B -f, --file-log 
+] [ 
+.B -f2, --single-log 
+] [ 
+.B -I, --index 
+] [ 
+.B -%i, --build-top-index 
+] [ 
+.B -%I, --search-index 
+] [ 
+.B -pN, --priority[=N] 
+] [ 
+.B -S, --stay-on-same-dir 
+] [ 
+.B -D, --can-go-down 
+] [ 
+.B -U, --can-go-up 
+] [ 
+.B -B, --can-go-up-and-down 
+] [ 
+.B -a, --stay-on-same-address 
+] [ 
+.B -d, --stay-on-same-domain 
+] [ 
+.B -l, --stay-on-same-tld 
+] [ 
+.B -e, --go-everywhere 
+] [ 
+.B -%H, --debug-headers 
+] [ 
+.B -V, --userdef-cmd 
+] [ 
+.B -%U, --user 
+] [ 
+.B -%W, --callback 
+] [ 
+.B -K, --keep-links[=N] 
+] [ 
+.B 
+.SH DESCRIPTION
+.B httrack
+allows you to download a World Wide Web site from the Internet to a local directory, building recursively all directories, getting HTML, images, and other files from the server to your computer. HTTrack arranges the original site's relative link-structure. Simply open a page of the "mirrored" website in your browser, and you can browse the site from link to link, as if you were viewing it online. HTTrack can also update an existing mirrored site, and resume interrupted downloads.
+.SH EXAMPLES
+.TP
+.B httrack www.someweb.com/bob/
+ mirror site www.someweb.com/bob/ and only this site
+.TP
+.B httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg
+ mirror the two sites together (with shared links) and accept any .jpg files on .com sites
+.TP
+.B httrack www.someweb.com/bob/bobby.html +* -r6
+means get all files starting from bobby.html, with 6 link-depth, and possibility of going everywhere on the web
+.TP
+.B httrack www.someweb.com/bob/bobby.html --spider -P proxy.myhost.com:8080
+runs the spider on www.someweb.com/bob/bobby.html using a proxy
+.TP
+.B httrack --update
+updates a mirror in the current folder
+.TP
+.B httrack
+will bring you to the interactive mode
+.TP
+.B httrack --continue
+continues a mirror in the current folder
+.SH OPTIONS
+.SS General options:
+.IP -O
+path for mirror/logfiles+cache (-O path
+mirror[,path
+cache
+and
+logfiles]) (--path <param>)
+
+.SS Action options:
+.IP -w
+*mirror web sites (--mirror)
+.IP -W
+mirror web sites, semi-automatic (asks questions) (--mirror-wizard)
+.IP -g
+just get files (saved in the current directory) (--get-files)
+.IP -i
+continue an interrupted mirror using the cache (--continue)
+.IP -Y
+mirror ALL links located in the first level pages (mirror links) (--mirrorlinks)
+
+.SS Proxy options:
+.IP -P
+proxy use (-P proxy:port or -P user:pass@proxy:port) (--proxy <param>)
+.IP -%f
+*use proxy for ftp (f0 don t use) (--httpproxy-ftp[=N])
+.IP -%b
+use this local hostname to make/send requests (-%b hostname) (--bind <param>)
+
+.SS Limits options:
+.IP -rN
+set the mirror depth to N (* r9999) (--depth[=N])
+.IP -%eN
+set the external links depth to N (* %e0) (--ext-depth[=N])
+.IP -mN
+maximum file length for a non-html file (--max-files[=N])
+.IP -mN,N2
+maximum file length for non html (N) and html (N2)
+.IP -MN
+maximum overall size that can be uploaded/scanned (--max-size[=N])
+.IP -EN
+maximum mirror time in seconds (60=1 minute, 3600=1 hour) (--max-time[=N])
+.IP -AN
+maximum transfer rate in bytes/seconds (1000=1KB/s max) (--max-rate[=N])
+.IP -%cN
+maximum number of connections/seconds (*%c10) (--connection-per-second[=N])
+.IP -GN
+pause transfer if N bytes reached, and wait until lock file is deleted (--max-pause[=N])
+
+.SS Flow control:
+.IP -cN
+number of multiple connections (*c8) (--sockets[=N])
+.IP -TN
+timeout, number of seconds after a non-responding link is shutdown (--timeout)
+.IP -RN
+number of retries, in case of timeout or non-fatal errors (*R1) (--retries[=N])
+.IP -JN
+traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link (--min-rate[=N])
+.IP -HN
+host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (--host-control[=N])
+
+.SS Links options:
+.IP -%P
+*extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don t use) (--extended-parsing[=N])
+.IP -n
+get non-html files  near  an html file (ex: an image located outside) (--near)
+.IP -t
+test all URLs (even forbidden ones) (--test)
+.IP -%L
+<file> add all URL located in this text file (one URL per line) (--list <param>)
+.IP -%S
+<file> add all scan rules located in this text file (one scan rule per line) (--urllist <param>)
+
+.SS Build options:
+.IP -NN
+structure type (0 *original structure, 1+: see below) (--structure[=N])
+.IP -or
+user defined structure (-N "%h%p/%n%q.%t")
+.IP -%M
+generate a RFC MIME-encapsulated full-archive (.mht) (--mime-html[=N])
+.IP -LN
+long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible) (--long-names[=N])
+.IP -KN
+keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links) (--keep-links[=N])
+.IP -x
+replace external html links by error pages (--replace-external)
+.IP -%x
+do not include any password for external password protected websites (%x0 include) (--disable-passwords)
+.IP -%q
+*include query string for local files (useless, for information purpose only) (%q0 don t include) (--include-query-string)
+.IP -o
+*generate output html file in case of error (404..) (o0 don t generate) (--generate-errors)
+.IP -X
+*purge old files after update (X0 keep delete) (--purge-old[=N])
+.IP -%p
+preserve html files  as is  (identical to  -K4 -%F "" ) (--preserve)
+
+.SS Spider options:
+.IP -bN
+accept cookies in cookies.txt (0=do not accept,* 1=accept) (--cookies[=N])
+.IP -u
+check document type if unknown (cgi,asp..) (u0 don t check, * u1 check but /, u2 check always) (--check-type[=N])
+.IP -j
+*parse Java Classes (j0 don t parse) (--parse-java[=N])
+.IP -sN
+follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always) (--robots[=N])
+.IP -%h
+force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (--http-10)
+.IP -%k
+use keep-alive if possible, greately reducing latency for small files and test requests (%k0 don t use) (--keep-alive)
+.IP -%B
+tolerant requests (accept bogus responses on some servers, but not standard!) (--tolerant)
+.IP -%s
+update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..) (--updatehack)
+.IP -%u
+url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..) (--urlhack)
+.IP -%A
+assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip) (--assume <param>)
+.IP -@iN
+internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (--protocol[=N])
+
+.SS Browser ID:
+.IP -F
+user-agent field (-F "user-agent name") (--user-agent <param>)
+.IP -%F
+footer string in Html code (-%F "Mirrored [from host %s [file %s [at %s]]]" (--footer <param>)
+.IP -%l
+preffered language (-%l "fr, en, jp, *" (--language <param>)
+
+.SS Log, index, cache
+.IP -C
+create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) (--cache[=N])
+.IP -k
+store all files in cache (not useful if files on disk) (--store-all-in-cache)
+.IP -%n
+do not re-download locally erased files (--do-not-recatch)
+.IP -%v
+display on screen filenames downloaded (in realtime) - * %v1 short version (--display)
+.IP -Q
+no log - quiet mode (--do-not-log)
+.IP -q
+no questions - quiet mode (--quiet)
+.IP -z
+log - extra infos (--extra-log)
+.IP -Z
+log - debug (--debug-log)
+.IP -v
+log on screen (--verbose)
+.IP -f
+*log in files (--file-log)
+.IP -f2
+one single log file (--single-log)
+.IP -I
+*make an index (I0 don t make) (--index)
+.IP -%i
+make a top index for a project folder (* %i0 don t make) (--build-top-index)
+.IP -%I
+make an searchable index for this mirror (* %I0 don t make) (--search-index)
+
+.SS Expert options:
+.IP -pN
+priority mode: (* p3) (--priority[=N])
+.IP -p0
+just scan, don t save anything (for checking links)
+.IP -p1
+save only html files
+.IP -p2
+save only non html files
+.IP -*p3
+save all files
+.IP -p7
+get html files before, then treat other files
+.IP -S
+stay on the same directory (--stay-on-same-dir)
+.IP -D
+*can only go down into subdirs (--can-go-down)
+.IP -U
+can only go to upper directories (--can-go-up)
+.IP -B
+can both go up&down into the directory structure (--can-go-up-and-down)
+.IP -a
+*stay on the same address (--stay-on-same-address)
+.IP -d
+stay on the same principal domain (--stay-on-same-domain)
+.IP -l
+stay on the same TLD (eg: .com) (--stay-on-same-tld)
+.IP -e
+go everywhere on the web (--go-everywhere)
+.IP -%H
+debug HTTP headers in logfile (--debug-headers)
+
+.SS Guru options: (do NOT use if possible)
+.IP -#X
+*use optimized engine (limited memory boundary checks) (--fast-engine)
+.IP -#0
+filter test (-#0  *.gif   www.bar.com/foo.gif ) (--debug-testfilters <param>)
+.IP -#C
+cache list (-#C  *.com/spider*.gif  (--debug-cache <param>)
+.IP -#f
+always flush log files (--advanced-flushlogs)
+.IP -#FN
+maximum number of filters (--advanced-maxfilters[=N])
+.IP -#h
+version info (--version)
+.IP -#K
+scan stdin (debug) (--debug-scanstdin)
+.IP -#L
+maximum number of links (-#L1000000) (--advanced-maxlinks)
+.IP -#p
+display ugly progress information (--advanced-progressinfo)
+.IP -#P
+catch URL (--catch-url)
+.IP -#R
+old FTP routines (debug) (--debug-oldftp)
+.IP -#T
+generate transfer ops. log every minutes (--debug-xfrstats)
+.IP -#u
+wait time (--advanced-wait)
+.IP -#Z
+generate transfer rate statictics every minutes (--debug-ratestats)
+.IP -#!
+execute a shell command (-#! "echo hello") (--exec <param>)
+
+.SS Command-line specific options:
+.IP -V
+execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd <param>)
+.IP -%U
+run the engine with another id when called as root (-%U smith) (--user <param>)
+.IP -%W
+use an external library function as a wrapper (-%W link-detected=foo.so:myfunction) (--callback <param>)
+
+.SS Details: Option N
+.IP -N0
+Site-structure (default)
+.IP -N1
+HTML in web/, images/other files in web/images/
+.IP -N2
+HTML in web/HTML, images/other in web/images
+.IP -N3
+HTML in web/,  images/other in web/
+.IP -N4
+HTML in web/, images/other in web/xxx, where xxx is the file extension (all gif will be placed onto web/gif, for example)
+.IP -N5
+Images/other in web/xxx and HTML in web/HTML
+.IP -N99
+All files in web/, with random names (gadget !)
+.IP -N100
+Site-structure, without www.domain.xxx/
+.IP -N101
+Identical to N1 exept that "web" is replaced by the site s name
+.IP -N102
+Identical to N2 exept that "web" is replaced by the site s name
+.IP -N103
+Identical to N3 exept that "web" is replaced by the site s name
+.IP -N104
+Identical to N4 exept that "web" is replaced by the site s name
+.IP -N105
+Identical to N5 exept that "web" is replaced by the site s name
+.IP -N199
+Identical to N99 exept that "web" is replaced by the site s name
+.IP -N1001
+Identical to N1 exept that there is no "web" directory
+.IP -N1002
+Identical to N2 exept that there is no "web" directory
+.IP -N1003
+Identical to N3 exept that there is no "web" directory (option set for g option)
+.IP -N1004
+Identical to N4 exept that there is no "web" directory
+.IP -N1005
+Identical to N5 exept that there is no "web" directory
+.IP -N1099
+Identical to N99 exept that there is no "web" directory
+.SS Details: User-defined option N
+   %n  Name of file without file type (ex: image)
+   %N  Name of file, including file type (ex: image.gif)
+   %t  File type (ex: gif)
+   %p  Path [without ending /] (ex: /someimages)
+   %h  Host name (ex: www.someweb.com)
+   %M  URL MD5 (128 bits, 32 ascii bytes)
+   %Q  query string MD5 (128 bits, 32 ascii bytes)
+   %q  small query string MD5 (16 bits, 4 ascii bytes)
+      %s?  Short name version (ex: %sN)
+   %[param]  param variable in query string
+   %[param:before:after:notfound:empty]  advanced variable extraction
+.SS Details: User-defined option N and advanced variable extraction
+   %[param:before:after:notfound:empty]
+.IP -param
+: parameter name
+.IP -before
+: string to prepend if the parameter was found
+.IP -after
+: string to append if the parameter was found
+.IP -notfound
+: string replacement if the parameter could not be found
+.IP -empty
+: string replacement if the parameter was empty
+.IP -all
+fields, except the first one (the parameter name), can be empty
+
+.SS Details: Option K
+.IP -K0
+foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)
+.IP -K
+->  http://www.foobar.com/folder/foo.cgi?q=45 (absolute URL) (--keep-links[=N])
+.IP -K4
+->  foo.cgi?q=45 (original URL)
+.IP -K3
+->  /folder/foo.cgi?q=45 (absolute URI)
+
+.SS Shortcuts:
+.IP --mirror
+     <URLs> *make a mirror of site(s) (default)
+.IP --get
+        <URLs>  get the files indicated, do not seek other URLs (-qg)
+.IP --list
+  <text file>  add all URL located in this text file (-%L)
+.IP --mirrorlinks
+<URLs>  mirror all links in 1st level pages (-Y)
+.IP --testlinks
+  <URLs>  test links in pages (-r1p0C0I0t)
+.IP --spider
+     <URLs>  spider site(s), to test links: reports Errors & Warnings (-p0C0I0t)
+.IP --testsite
+   <URLs>  identical to --spider
+.IP --skeleton
+   <URLs>  make a mirror, but gets only html files (-p1)
+.IP --update
+             update a mirror, without confirmation (-iC2)
+.IP --continue
+           continue a mirror, without confirmation (-iC1)
+
+.IP --catchurl
+           create a temporary proxy to capture an URL or a form post URL
+.IP --clean
+              erase cache & log files
+
+.IP --http10
+             force http/1.0 requests (-%h)
+
+.SS Details: Option %W: External callbacks prototypes
+.SS  init  : void  (* myfunction)(void);
+.SS  free  : void  (* myfunction)(void);
+.SS  start  : int   (* myfunction)(httrackp* opt);
+.SS  end  : int   (* myfunction)(void);
+.SS  change-options  : int   (* myfunction)(httrackp* opt);
+.SS  check-html  : int   (* myfunction)(char* html,int len,char* url
+adresse,char* url
+fichier);
+.SS  query  : char* (* myfunction)(char* question);
+.SS  query2  : char* (* myfunction)(char* question);
+.SS  query3  : char* (* myfunction)(char* question);
+.SS  loop  : int   (* myfunction)(lien
+back* back,int back
+max,int back
+index,int lien
+tot,int lien
+ntot,int stat
+time,hts
+stat
+struct* stats);
+.SS  check-link  : int   (* myfunction)(char* adr,char* fil,int status);
+.SS  pause  : void  (* myfunction)(char* lockfile);
+.SS  save-file  : void  (* myfunction)(char* file);
+.SS  link-detected  : int   (* myfunction)(char* link);
+.SS  transfer-status  : int   (* myfunction)(lien
+back* back);
+.SS  save-name  : int   (* myfunction)(char* adr
+complete,char* fil
+complete,char* referer
+adr,char* referer
+fil,char* save);
+.SH FILES
+.I /etc/httrack.conf
+.RS
+The system wide configuration file.
+.SH ENVIRONMENT
+.IP HOME
+Is being used if you defined in /etc/httrack.conf the line
+.I path ~/websites/# 
+.SH DIAGNOSTICS
+Errors/Warnings are reported to 
+.I hts-log.txt
+by default, or to stderr if the
+.I -v
+option was specified.
+.SH LIMITS
+These are the principals limits of HTTrack for that moment. Note that we did not heard about any other utility
+that would have solved them.
+
+
+.SM - Several scripts generating complex filenames may not find them (ex: img.src='image'+a+Mobj.dst+'.gif')
+
+.SM - Some java classes may not find some files on them (class included)
+
+.SM - Cgi-bin links may not work properly in some cases (parameters needed). To avoid them: use filters like -*cgi-bin*
+
+.SH BUGS
+Please reports bugs to
+.B <bugs@httrack.com>.
+Include a complete, self-contained example that will allow the bug to be reproduced, and say which version of httrack you are using. Do not forget to detail options used, OS version, and any other information you deem necessary.
+.SH COPYRIGHT
+Copyright (C) Xavier Roche and other contributors
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+.SH AVAILABILITY
+The  most  recent released version of httrack can be found at:
+.B http://www.httrack.com
+.SH AUTHOR
+Xavier Roche <roche@httrack.com>
+.SH "SEE ALSO"
+The 
+.B HTML 
+documentation (available online at
+.B http://www.httrack.com/html/
+) contains more detailed information. Please also refer to the
+.B httrack FAQ
+(available online at
+.B http://www.httrack.com/html/faq.html
+)

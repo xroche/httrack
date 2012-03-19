@@ -60,9 +60,11 @@ Please visit our Website: http://www.httrack.com
 typedef struct {
   short int user_agent_send;  // user agent (ex: httrack/1.0 [sun])
   short int http11;           // l'en tête peut (doit) être signé HTTP/1.1 et non HTTP/1.0
+  short int nokeepalive;      // pas de keep-alive
   short int range_used;       // Range utilisé
   short int nocompression;    // Pas de compression
-  char user_agent[64];
+  short int flush_garbage;    // recycled
+  char user_agent[128];
   char lang_iso[64];
   t_proxy proxy;              // proxy
 } htsrequest;
@@ -75,11 +77,17 @@ typedef struct {
   short int is_write;    // sortie sur disque (out) ou en mémoire (adr)
   short int is_chunk;    // mode chunk
   short int compressed;  // compressé?
+  short int empty;       // vide?
+  short int keep_alive;  // Keep-Alive?
+  short int keep_alive_trailers;  // ..with trailers extension
+  int keep_alive_t;      // KA timeout
+  int keep_alive_max;    // KA number of requests
   char* adr;             // adresse du bloc de mémoire, NULL=vide
   FILE* out;             // écriture directe sur disque (si is_write=1)
   LLint size;            // taille fichier
   char msg[80];          // message éventuel si échec ("\0"=non précisé)
   char contenttype[64];  // content-type ("text/html" par exemple)
+  char charset[64];      // charset ("iso-8859-1" par exemple)
   char contentencoding[64];  // content-encoding ("gzip" par exemple)
   char* location;        // on copie dedans éventuellement la véritable 'location'
   LLint totalsize;       // taille totale à télécharger (-1=inconnue)
@@ -95,6 +103,7 @@ typedef struct {
   char etag[64];         // Etag
   char cdispo[256];      // Content-Disposition coupé
   LLint  crange;         // Content-Range
+  int debugid;           // debug connection
   /* */
   htsrequest req;  // paramètres pour la requête
   /*char digest[32+2];  // digest md5 généré par le moteur ("" si non généré)*/
@@ -147,9 +156,10 @@ int hts_read(htsblk* r,char* buff,int size);
 //int HTS_TOTAL_RECV_CHECK(int var);
 LLint check_downloadable_bytes(int rate);
 
-int hts_init(void);
-int hts_uninit(void);
-
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_init(void);
+HTSEXT_API int hts_uninit(void);
+#endif
 
 // fonctions principales
 int http_fopen(char* adr,char* fil,htsblk* retour);
@@ -159,26 +169,33 @@ htsblk httpget(char* url);
 //int newhttp(char* iadr,char* err=NULL);
 int newhttp(char* iadr,htsblk* retour,int port,int waitconnect);
 HTS_INLINE void deletehttp(htsblk* r);
+HTS_INLINE int  deleteaddr(htsblk* r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk* r);
 htsblk http_location(char* adr,char* fil,char* loc);
 htsblk http_test(char* adr,char* fil,char* loc);
 int check_readinput(htsblk* r);
+int check_readinput_t(T_SOC soc, int timeout);
 void http_fread(T_SOC soc,htsblk* retour);
 LLint http_fread1(htsblk* r);
 void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd);
 void treatfirstline(htsblk* retour,char* rcvd);
-void infostatuscode(char* msg,int statuscode);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API void infostatuscode(char* msg,int statuscode);
+#endif
 
 // sous-fonctions
 htsblk xhttpget(char* adr,char* fil);
 htsblk http_gethead(char* adr,char* fil);
 LLint http_xfread1(htsblk* r,int bufl);
 HTS_INLINE t_hostent* hts_gethostbyname(char* iadr, void* v_buffer);
-t_hostent* vxgethostbyname(char* hostname, void* v_buffer);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API t_hostent* vxgethostbyname(char* hostname, void* v_buffer);
+#endif
 t_hostent* _hts_ghbn(t_dnscache* cache,char* iadr,t_hostent* retour);
 int ftp_available(void);
 #if HTS_DNSCACHE
+void hts_cache_free(t_dnscache* cache);
 int hts_dnstest(char* _iadr);
 t_dnscache* _hts_cache(void);
 int _hts_lockdns(int i);
@@ -186,9 +203,13 @@ int _hts_lockdns(int i);
 
 // outils divers
 HTS_INLINE TStamp time_local(void);
-HTS_INLINE TStamp mtime_local(void);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API HTS_INLINE TStamp mtime_local(void);
+#endif
 void sec2str(char *s,TStamp t);
-void qsec2str(char *st,TStamp t);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API void qsec2str(char *st,TStamp t);
+#endif
 void time_gmt_rfc822(char* s);
 void time_local_rfc822(char* s);
 struct tm* convert_time_rfc822(char* s);
@@ -196,14 +217,18 @@ int set_filetime(char* file,struct tm* tm_time);
 int set_filetime_rfc822(char* file,char* date);
 HTS_INLINE void time_rfc822(char* s,struct tm * A);
 HTS_INLINE void time_rfc822_local(char* s,struct tm * A);
-char* int2char(int n);
-char* int2bytes(LLint n);
-char* int2bytessec(long int n);
-char** int2bytes2(LLint n);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char* int2char(int n);
+HTSEXT_API char* int2bytes(LLint n);
+HTSEXT_API char* int2bytessec(long int n);
+HTSEXT_API char** int2bytes2(LLint n);
+#endif
 HTS_INLINE int sendc(htsblk* r, char* s);
-void finput(int fd,char* s,int max);
+int finput(int fd,char* s,int max);
 int binput(char* buff,char* s,int max);
 int linput(FILE* fp,char* s,int max);
+int linputsoc(T_SOC soc, char* s, int max);
+int linputsoc_t(T_SOC soc, char* s, int max, int timeout);
 int linput_trim(FILE* fp,char* s,int max);
 int linput_cpp(FILE* fp,char* s,int max);
 void rawlinput(FILE* fp,char* s,int max);
@@ -226,23 +251,33 @@ int is_userknowntype(char *fil);
 int is_dyntype(char *fil);
 char* get_ext(char *fil);
 int may_unknown(char* st);
-char* jump_identification(char*);
-char* jump_toport(char*);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char* jump_identification(char*);
+HTSEXT_API char* jump_normalized(char*);
+HTSEXT_API char* jump_toport(char*);
+HTSEXT_API char* fil_normalized(char* source, char* dest);
+HTSEXT_API char* adr_normalized(char* source, char* dest);
+#endif
 char* strrchr_limit(char* s, char c, char* limit);
 HTS_INLINE char* jump_protocol(char* source);
-void code64(char* a,char* b);
-void unescape_amp(char* s);
-void escape_spc_url(char* s);
-void escape_in_url(char* s);
-void escape_uri(char* s);
-void escape_uri_utf(char* s);
-void escape_check_url(char* s);
-char* escape_check_url_addr(char* s);
-void x_escape_http(char* s,int mode);
-HTS_INLINE int ehexh(char c);
-char* unescape_http(char* s);
-char* unescape_http_unharm(char* s, int no_high);
-char* antislash_unescaped(char* s);
+void code64(unsigned char* a,int size_a,unsigned char* b,int crlf);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API void unescape_amp(char* s);
+HTSEXT_API void escape_spc_url(char* s);
+HTSEXT_API void escape_in_url(char* s);
+HTSEXT_API void escape_uri(char* s);
+HTSEXT_API void escape_uri_utf(char* s);
+HTSEXT_API void escape_check_url(char* s);
+HTSEXT_API char* escape_check_url_addr(char* s);
+HTSEXT_API void x_escape_http(char* s,int mode);
+HTSEXT_API void escape_remove_control(char* s);
+#endif
+int ehexh(char c);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char* unescape_http(char* s);
+HTSEXT_API char* unescape_http_unharm(char* s, int no_high);
+HTSEXT_API char* antislash_unescaped(char* s);
+#endif
 int ehex(char* s);
 char* concat(const char* a,const char* b);
 #define copychar(a) concat((a),NULL)
@@ -262,10 +297,11 @@ void hts_lowcase(char* s);
 void hts_replace(char *s,char from,char to);
 
 /* Spaces: CR,LF,TAB,FF */
-#define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)=='\'') )
-#define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12)                )
+#define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
+#define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )
 #define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
+#define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 //HTS_INLINE int is_space(char);
 //HTS_INLINE int is_realspace(char);
 
@@ -279,10 +315,12 @@ int sig_ignore_flag( int setflag );     // flag ignore
 void cut_path(char* fullpath,char* path,char* pname);
 int fexist(char* s);
 /*LLint fsize(char* s);    */
-int fpsize(FILE* fp);
-int fsize(char* s);    
+INTsys fpsize(FILE* fp);
+INTsys fsize(char* s);    
 /* root dir */
-char* hts_rootdir(char* file);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char* hts_rootdir(char* file);
+#endif
 
 // Threads
 #if USE_PTHREAD
@@ -301,19 +339,20 @@ unsigned long _beginthread( beginthread_type start_address, unsigned stack_size,
 /* variables globales */
 //extern LLint HTS_TOTAL_RECV;  // flux entrant reçu
 //extern int HTS_TOTAL_RECV_STATE;  // status: 0 tout va bien 1: ralentir un peu 2: ralentir 3: beaucoup
-extern hts_stat_struct HTS_STAT;
+extern HTSEXT_API hts_stat_struct HTS_STAT;
 extern int _DEBUG_HEAD;
 extern FILE* ioinfo;
 
 /* constantes */
-extern const char hts_mime_keep[][32];
-extern const char hts_mime[][2][32];
-extern const char hts_detect[][32];
-extern const char hts_detectbeg[][32];
-extern const char hts_nodetect[][32];
-extern const char hts_detectURL[][32];
-extern const char hts_detectandleave[][32];
-extern const char hts_detect_js[][32];
+extern const char* hts_mime_keep[];
+extern const char* hts_mime[][2];
+extern const char* hts_main_mime[];
+extern const char* hts_detect[];
+extern const char* hts_detectbeg[];
+extern const char* hts_nodetect[];
+extern const char* hts_detectURL[];
+extern const char* hts_detectandleave[];
+extern const char* hts_detect_js[];
 
 // defaut wrappers
 void  __cdecl htsdefault_init(void);

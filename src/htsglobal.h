@@ -40,10 +40,10 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version
-#define HTTRACK_VERSION      "3.20-2"
-#define HTTRACK_VERSIONID    "3.20.02"
+#define HTTRACK_VERSION      "3.30"
+#define HTTRACK_VERSIONID    "3.30.01"
 #define HTTRACK_AFF_VERSION  "3.x"
-//#define HTTRACK_AFF_WARNING  "This is a RELEASE CANDIDATE version of WinHTTrack Website Copier 3.0\nPlease report us any bug or problem"
+//#define HTTRACK_AFF_WARNING  "This is a BETA release of WinHTTrack Website Copier ("HTTRACK_VERSION")\nPlease report any crashes, bugs or problems"
 
 
 
@@ -51,11 +51,79 @@ Please visit our Website: http://www.httrack.com
 #include "htssystem.h"
 #include "htsconfig.h"
 
-// Socket windows ou socket unix
-#if HTS_PLATFORM==1
-#define HTS_WIN 1
+// config.h
+#ifdef _WIN32
+
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#ifndef DLLIB
+#define DLLIB 1
+#endif
+#ifndef HTS_INET6
+#define HTS_INET6 1
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m) ((m) & _S_IFREG)
+#endif
+
 #else
+
+#include "config.h"
+
+#ifndef FTIME
+#define HTS_DO_NOT_USE_FTIME
+#endif
+
+#ifndef SETUID
+#define HTS_DO_NOT_USE_UID
+#endif
+
+#ifndef HTS_LONGLONG
+#ifdef SIZEOF_LONG_LONG
+#if SIZEOF_LONG_LONG==8
+#define HTS_LONGLONG 1
+#endif
+#endif
+
+#ifndef HTS_LONGLONG
+#ifdef __sun
+#define HTS_LONGLONG 0
+#endif
+#ifdef __osf__
+#define HTS_LONGLONG 0
+#endif
+#ifdef __linux
+#define HTS_LONGLONG 1
+#endif
+#ifdef _WIN32
+#define HTS_LONGLONG 1
+#endif
+#endif
+#endif
+
+#ifdef DLLIB
+#define HTS_DLOPEN 1
+#else
+#define HTS_DLOPEN 0
+#endif
+
+#endif
+
+
+// Socket windows ou socket unix
+#ifdef _WIN32
+#undef HTS_PLATFORM
+#define HTS_PLATFORM 1
+#define HTS_WIN 1
+
+#else
+
 #define HTS_WIN 0
+#ifdef __linux
+#undef HTS_PLATFORM
+#define HTS_PLATFORM 3
+#endif
 #endif
 
 // compatibilité DOS
@@ -66,11 +134,9 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 // utiliser zlib?
-#if HTS_USEZLIB
-#else
-#ifdef _WINDOWS
+#ifndef HTS_USEZLIB
+// autoload
 #define HTS_USEZLIB 1
-#endif
 #endif
 
 #ifndef HTS_INET6
@@ -79,7 +145,16 @@ Please visit our Website: http://www.httrack.com
 
 // utiliser openssl?
 #ifndef HTS_USEOPENSSL
+// autoload
 #define HTS_USEOPENSSL 1
+#endif
+
+#ifndef HTS_DLOPEN
+#define HTS_DLOPEN 1
+#endif
+
+#ifndef HTS_USESWF
+#define HTS_USESWF 1
 #endif
 
 #if HTS_WIN
@@ -87,20 +162,10 @@ Please visit our Website: http://www.httrack.com
 #define __cdecl
 #endif
 
-/*
-#if HTS_XGETHOST
-#if HTS_PLATFORM==1
-#ifndef __cplusplus
-#undef HTS_XGMETHOD
-#undef HTS_XGETHOST
+#ifdef HTS_ANALYSTE_CONSOLE
+#undef HTS_ANALYSTE_CONSOLE
+#define HTS_ANALYSTE_CONSOLE 1
 #endif
-#endif
-#else
-#undef HTS_XGMETHOD
-#undef HTS_XGETHOST
-#endif
-*/
-
 
 #if HTS_ANALYSTE
 #else
@@ -134,19 +199,25 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_HTTRACKRC ".httrackrc"
 #define HTS_HTTRACKCNF HTS_ETCPATH"/httrack.conf"
-#define HTS_HTTRACKDIR HTS_PREFIX"/doc/httrack/"
+
+#ifdef DATADIR
+#define HTS_HTTRACKDIR DATADIR"/httrack/"
+#else
+#define HTS_HTTRACKDIR HTS_PREFIX"/share/httrack/"
+#endif
 
 #endif
 
 /* Gestion des tables de hashage */
 #define HTS_HASH_SIZE 20147
 /* Taille max d'une URL */
-#define HTS_URLMAXSIZE 512
+#define HTS_URLMAXSIZE 1024
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
 /* Copyright (C) Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2002]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2003]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
+#define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"
 
 #define H_CRLF "\x0d\x0a"
@@ -175,43 +246,69 @@ Please visit our Website: http://www.httrack.com
 #define HTS_INLINE
 #endif
 
+#ifdef _WIN32
+#ifdef LIBHTTRACK_EXPORTS
+#define HTSEXT_API __declspec(dllexport)
+#else
+#define HTSEXT_API __declspec(dllimport)
+#endif
+#else
+#define HTSEXT_API 
+#endif
+
+#ifndef HTS_LONGLONG
 #ifdef HTS_NO_64_BIT
 #define HTS_LONGLONG 0
 #else
 #define HTS_LONGLONG 1
 #endif
+#endif
 
 // long long int? (or int)
 // (and int cast for system functions like malloc() )
+
 #if HTS_LONGLONG
+#ifdef LLINT_FORMAT
+  typedef LLINT_TYPE LLint;
+  typedef LLINT_TYPE TStamp;
+  #define LLintP LLINT_FORMAT
+#else
  #if HTS_WIN
   typedef __int64 LLint;
   typedef __int64 TStamp;
-  typedef int INTsys;
   #define LLintP "%I64d"
  #else
  #if HTS_PLATFORM==0
   typedef long long int LLint;
   typedef long long int TStamp;
-  typedef int INTsys;
   #define LLintP "%lld"
  #else
   typedef long long int LLint;
   typedef long long int TStamp;
-  typedef int INTsys;
   #define LLintP "%Ld"
  #endif
  #endif
+#endif
 #else
  typedef int LLint;
- typedef int INTsys;
- typedef double TStamp;
  #define LLintP "%d"
+ typedef double TStamp;
 #endif
 
-/* Alignement */
+#ifdef LFS_FLAG
+typedef LLint INTsys;
+#define INTsysP LLintP
+#ifdef __linux
+#define HTS_FSEEKO
+#endif
+#else
+typedef int INTsys;
+#define INTsysP "%d"
+#endif
+
+/* Default alignement */
 #ifndef HTS_ALIGN
-#define HTS_ALIGN 4
+#define HTS_ALIGN (sizeof(void*))
 #endif
 
 /* IPV4, IPV6 and various unified structures */
@@ -265,6 +362,11 @@ Please visit our Website: http://www.httrack.com
 #if HTS_WIN
 #else
 // use pthreads.h
+
+#ifndef THREADS
+#define HTS_DO_NOT_USE_PTHREAD
+#endif
+
 #ifdef HTS_DO_NOT_USE_PTHREAD
 #define USE_PTHREAD 0
 #else
@@ -282,6 +384,27 @@ Please visit our Website: http://www.httrack.com
 #define USE_BEGINTHREAD 0
 #endif
 #endif
+
+#ifdef _DEBUG
+// trace mallocs
+//#define HTS_TRACE_MALLOC
+#ifdef HTS_TRACE_MALLOC
+typedef unsigned long int t_htsboundary;
+typedef struct _mlink {
+  char* adr;
+  int len;
+  int id;
+  struct _mlink* next;
+} mlink;
+static const t_htsboundary htsboundary = 0xDEADBEEF;
+#endif
+#endif
+
+/* strxxx debugging */
+#ifndef NOSTRDEBUG
+#define STRDEBUG 1
+#endif
+
 
 /* ------------------------------------------------------------ */
 /* Debugging                                                    */
@@ -309,8 +432,6 @@ Please visit our Website: http://www.httrack.com
 #define DEBUG_CHECKINT 0
 // nbr sockets debug
 #define NSDEBUG 0
-// tracer mallocs
-#define HTS_TRACE_MALLOC 0
 
 // débuggage HTSLib
 #define HDEBUG 0

@@ -90,7 +90,7 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
       ok=-2;  // non supporté
     }
 #if HTS_USEOPENSSL
-  } else if (strfield(lien,"https://")) {
+  } else if (SSL_is_available && strfield(lien,"https://")) {
     // Note: ftp:foobar.gif is not valid
     if (ident_url_absolute(lien,adr,fil)==-1) {        
       ok=-1;    // erreur URL
@@ -114,45 +114,56 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
       /* patch scheme if necessary */
       if (strfield(lien,"http:")) {
         lien+=5;
-        strcpy(adr, jump_protocol(origin_adr));    // même adresse ; protocole vide (http)
+        strcpybuff(adr, jump_protocol(origin_adr));    // même adresse ; protocole vide (http)
       } else if (strfield(lien,"https:")) {
         lien+=6;
-        strcpy(adr, "https://");   // même adresse forcée en https
-        strcat(adr, jump_protocol(origin_adr));
+        strcpybuff(adr, "https://");   // même adresse forcée en https
+        strcatbuff(adr, jump_protocol(origin_adr));
       } else if (strfield(lien,"ftp:")) {
         lien+=4;
-        strcpy(adr, "ftp://");   // même adresse forcée en ftp
-        strcat(adr, jump_protocol(origin_adr));
+        strcpybuff(adr, "ftp://");   // même adresse forcée en ftp
+        strcatbuff(adr, jump_protocol(origin_adr));
       } else {
-        strcpy(adr,origin_adr);    // même adresse ; et même éventuel protocole
+        strcpybuff(adr,origin_adr);    // même adresse ; et même éventuel protocole
       }
-
+      
       if (*lien!='/') {  // sinon c'est un lien absolu
-        a=strchr(origin_fil,'?');
-        if (!a) a=origin_fil+strlen(origin_fil);
-        while((*a!='/') && ( a > origin_fil) ) a--;
-        if (*a=='/') {    // ok on a un '/'
-          if ( (((int) (a - origin_fil))+1+strlen(lien)) < HTS_URLMAXSIZE) {
-            // copier chemin
-            strncpy(fil,origin_fil,((int) (a - origin_fil))+1);
-            *(fil + ((int) (a - origin_fil))+1)='\0';
-            
-            // copier chemin relatif
-            if (((int) strlen(fil)+(int) strlen(lien)) < HTS_URLMAXSIZE) {
-              strcat(fil,lien + ((*lien=='/')?1:0) );      
-              // simplifier url pour les ../
-              fil_simplifie(fil);
-            } else
-              ok=-1;    // erreur
+        if (*lien == '\0') {
+          strcpybuff(fil,origin_fil);
+        } else if (*lien == '?') {     // example: a href="?page=2"
+          char* a;
+          strcpybuff(fil,origin_fil);
+          a=strchr(fil,'?');
+          if (a) *a='\0';
+          strcatbuff(fil,lien);
+        } else {
+          a=strchr(origin_fil,'?');
+          if (a == NULL) a=origin_fil+strlen(origin_fil);
+          while((*a!='/') && ( a > origin_fil) ) a--;
+          if (*a=='/') {    // ok on a un '/'
+            if ( (((int) (a - origin_fil))+1+strlen(lien)) < HTS_URLMAXSIZE) {
+              // copier chemin
+              strncpy(fil,origin_fil,((int) (a - origin_fil))+1);
+              *(fil + ((int) (a - origin_fil))+1)='\0';
+              
+              // copier chemin relatif
+              if (((int) strlen(fil)+(int) strlen(lien)) < HTS_URLMAXSIZE) {
+                strcatbuff(fil,lien + ((*lien=='/')?1:0) );      
+                // simplifier url pour les ../
+                fil_simplifie(fil);
+              } else
+                ok=-1;    // erreur
+            } else {    // erreur
+              ok=-1;    // erreur URL
+            }
           } else {    // erreur
             ok=-1;    // erreur URL
           }
-        } else {    // erreur
-          ok=-1;    // erreur URL
         }
       } else { // chemin absolu
         // copier chemin directement
-        strcat(fil,lien);      
+        strcatbuff(fil,lien);      
+        fil_simplifie(fil);
       }  // *lien!='/'
     } else
       ok=-1;
@@ -191,17 +202,17 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
 
   // patch: éliminer les ? (paramètres) sinon bug
   if ( (a=strchr(curr_fil,'?')) ) {
-    strncat(newcurr_fil,curr_fil,(int) (a - curr_fil));
+    strncatbuff(newcurr_fil,curr_fil,(int) (a - curr_fil));
     curr_fil = newcurr_fil;
   }
   if ( (a=strchr(link,'?')) ) {
-    strncat(newlink,link,(int) (a - link));
+    strncatbuff(newlink,link,(int) (a - link));
     link = newlink;
   }
 
   // recopier uniquement le chemin courant
   curr=_curr;
-  strcpy(curr,curr_fil);
+  strcpybuff(curr,curr_fil);
   if ((a=strchr(curr,'?'))==NULL)  // couper au ? (params)
     a=curr+strlen(curr)-1;         // pas de params: aller à la fin
   while((*a!='/') && ( a> curr)) a--;       // chercher dernier / du chemin courant
@@ -234,13 +245,13 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
   // LES ../ ONT ETE SIMPLIFIES
   a=curr;
   if (*a=='/') a++;
-  while(*a) if (*(a++)=='/') strcat(s,"../");
-  //if (strlen(s)==0) strcat(s,"/");
+  while(*a) if (*(a++)=='/') strcatbuff(s,"../");
+  //if (strlen(s)==0) strcatbuff(s,"/");
 
-  if (slash) strcat(s,"/");    // garder absolu!!
+  if (slash) strcatbuff(s,"/");    // garder absolu!!
   
   // on est dans le répertoire de départ, copier
-  strcat(s,link + ((*link=='/')?1:0) );
+  strcatbuff(s,link + ((*link=='/')?1:0) );
 
   /* Security check */
   if (strlen(s) >= HTS_URLMAXSIZE)
@@ -294,10 +305,10 @@ void long_to_83(int mode,char* n83,char* save) {
     fnl[i]='\0';
     // conversion
     longfile_to_83(mode,fn83,fnl);
-    strcat(n83,fn83);
+    strcatbuff(n83,fn83);
 
     save+=i;
-    if (*save=='/') { strcat(n83,"/"); save++; }
+    if (*save=='/') { strcatbuff(n83,"/"); save++; }
   }
 }
 
@@ -375,15 +386,15 @@ void longfile_to_83(int mode,char* n83,char* save) {
   }
   // corriger vers 8-3
   n83[0]='\0';
-  strncat(n83,nom,8);
+  strncatbuff(n83,nom,8);
   if (strnotempty(ext)) {
-    strcat(n83,".");
-    strncat(n83,ext,3);    
+    strcatbuff(n83,".");
+    strncatbuff(n83,ext,3);    
   }
 }
 
 // écrire backblue.gif
-int verif_backblue(char* base) {
+int verif_backblue(httrackp* opt,char* base) {
   int* done;
   int ret=0;
   NOSTATIC_RESERVE(done, int, 1);
@@ -400,7 +411,7 @@ int verif_backblue(char* base) {
       if (fwrite(HTS_DATA_BACK_GIF,HTS_DATA_BACK_GIF_LEN,1,fp) != HTS_DATA_BACK_GIF_LEN)
         ret=1;
       fclose(fp);
-      usercommand(0,NULL,fconcat(base,"backblue.gif"));
+      usercommand(opt,0,NULL,fconcat(base,"backblue.gif"),"","");
     } else
       ret=1;
     //
@@ -409,7 +420,7 @@ int verif_backblue(char* base) {
       if (fwrite(HTS_DATA_FADE_GIF,HTS_DATA_FADE_GIF_LEN,1,fp) != HTS_DATA_FADE_GIF_LEN)
         ret=1;
       fclose(fp);
-      usercommand(0,NULL,fconcat(base,"fade.gif"));
+      usercommand(opt,0,NULL,fconcat(base,"fade.gif"),"","");
     } else
       ret=1;
   } 
@@ -524,7 +535,7 @@ int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
 }
 
 
-int hts_buildtopindex(char* path,char* binpath) {
+HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath) {
   FILE* fpo;
   int retval=0;
   char rpath[1024*2];
@@ -537,7 +548,7 @@ int hts_buildtopindex(char* path,char* binpath) {
   
   if (toptemplate_header && toptemplate_body && toptemplate_footer) {
     
-    strcpy(rpath,path);
+    strcpybuff(rpath,path);
     if (rpath[0]) {
       if (rpath[strlen(rpath)-1]=='/')
         rpath[strlen(rpath)-1]='\0';
@@ -546,7 +557,7 @@ int hts_buildtopindex(char* path,char* binpath) {
     fpo=fopen(fconcat(rpath,"/index.html"),"wb");
     if (fpo) {
       find_handle h;
-      verif_backblue(concat(rpath,"/"));    // générer gif
+      verif_backblue(opt,concat(rpath,"/"));    // générer gif
       // Header
       fprintf(fpo,toptemplate_header,
         "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"
@@ -560,10 +571,10 @@ int hts_buildtopindex(char* path,char* binpath) {
         do {
           if (hts_findisdir(h)) {
             char iname[HTS_URLMAXSIZE*2];
-            strcpy(iname,rpath);
-            strcat(iname,"/");
-            strcat(iname,hts_findgetname(h));
-            strcat(iname,"/index.html");
+            strcpybuff(iname,rpath);
+            strcatbuff(iname,"/");
+            strcatbuff(iname,hts_findgetname(h));
+            strcatbuff(iname,"/index.html");
             if (fexist(iname)) {
               struct topindex_chain * oldchain=chain;
               chain=calloc(sizeof(struct topindex_chain), 1);
@@ -575,7 +586,7 @@ int hts_buildtopindex(char* path,char* binpath) {
                   oldchain->next=chain;
                 }
                 chain->next=NULL;
-                strcpy(chain->name, hts_findgetname(h));
+                strcpybuff(chain->name, hts_findgetname(h));
               }
             }
             
@@ -587,7 +598,7 @@ int hts_buildtopindex(char* path,char* binpath) {
         chain=startchain;
         while(chain) {
           char hname[HTS_URLMAXSIZE*2];
-          strcpy(hname,chain->name);
+          strcpybuff(hname,chain->name);
           escape_check_url(hname);
           fprintf(fpo,toptemplate_body,
             hname,
@@ -639,7 +650,7 @@ if (h) {
   hts_findclose(h);
 }
 */
-find_handle hts_findfirst(char* path) {
+HTSEXT_API find_handle hts_findfirst(char* path) {
   if (path) {
     if (strnotempty(path)) {
       find_handle_struct* find = (find_handle_struct*) calloc(1,sizeof(find_handle_struct));
@@ -648,22 +659,22 @@ find_handle hts_findfirst(char* path) {
 #if HTS_WIN
         {
           char rpath[1024*2];
-          strcpy(rpath,path);
+          strcpybuff(rpath,path);
           if (rpath[0]) {
             if (rpath[strlen(rpath)-1]!='\\')
-              strcat(rpath,"\\");
+              strcatbuff(rpath,"\\");
           }
-          strcat(rpath,"*.*");
+          strcatbuff(rpath,"*.*");
           find->handle = FindFirstFile(rpath,&find->hdata);
           if (find->handle != INVALID_HANDLE_VALUE)
             return find;
         }
 #else
-        strcpy(find->path,path);
+        strcpybuff(find->path,path);
         {
           if (find->path[0]) {
             if (find->path[strlen(find->path)-1]!='/')
-              strcat(find->path,"/");
+              strcatbuff(find->path,"/");
           }
         }
         find->hdir=opendir(path);
@@ -678,7 +689,8 @@ find_handle hts_findfirst(char* path) {
   }
   return NULL;   
 }
-int hts_findnext(find_handle find) {
+
+HTSEXT_API int hts_findnext(find_handle find) {
   if (find) {
 #if HTS_WIN
     if ( (FindNextFile(find->handle,&find->hdata)))
@@ -693,7 +705,8 @@ int hts_findnext(find_handle find) {
   }
   return 0;
 }
-int hts_findclose(find_handle find) {
+
+HTSEXT_API int hts_findclose(find_handle find) {
   if (find) {
 #if HTS_WIN
     if (find->handle) {
@@ -710,7 +723,8 @@ int hts_findclose(find_handle find) {
   }
   return 0;
 }
-char* hts_findgetname(find_handle find) {
+
+HTSEXT_API char* hts_findgetname(find_handle find) {
   if (find) {
 #if HTS_WIN
     return find->hdata.cFileName;
@@ -721,7 +735,8 @@ char* hts_findgetname(find_handle find) {
   }
   return NULL;
 }
-int hts_findgetsize(find_handle find) {
+
+HTSEXT_API int hts_findgetsize(find_handle find) {
   if (find) {
 #if HTS_WIN
     return find->hdata.nFileSizeLow;
@@ -731,7 +746,8 @@ int hts_findgetsize(find_handle find) {
   }
   return -1;
 }
-int hts_findisdir(find_handle find) {
+
+HTSEXT_API int hts_findisdir(find_handle find) {
   if (find) {
     if (!hts_findissystem(find)) {
 #if HTS_WIN
@@ -745,7 +761,7 @@ int hts_findisdir(find_handle find) {
   }
   return 0;
 }
-int hts_findisfile(find_handle find) {
+HTSEXT_API int hts_findisfile(find_handle find) {
   if (find) {
     if (!hts_findissystem(find)) {
 #if HTS_WIN
@@ -759,7 +775,7 @@ int hts_findisfile(find_handle find) {
   }
   return 0;
 }
-int hts_findissystem(find_handle find) {
+HTSEXT_API int hts_findissystem(find_handle find) {
   if (find) {
 #if HTS_WIN
     if (find->hdata.dwFileAttributes  & (FILE_ATTRIBUTE_SYSTEM|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_TEMPORARY))

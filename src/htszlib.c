@@ -42,23 +42,26 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htscore.h"
 
-#if HTS_USEZLIB
+#include "htszlib.h"
 
+#if HTS_USEZLIB
 /* zlib */
+/*
 #include <zlib.h>
 #include "htszlib.h"
+*/
 
 /*
   Unpack file into a new file
   Return value: size of the new file, or -1 if an error occured
 */
 int hts_zunpack(char* filename,char* newfile) {
-  if (filename && newfile) {
+  if (gz_is_available && filename && newfile) {
     if (filename[0] && newfile[0]) {
       gzFile gz = gzopen (filename, "rb");
       if (gz) {
         FILE* fpout=fopen(fconv(newfile),"wb");
-        int size=0;
+        INTsys size=0;
         if (fpout) {
           int nr;
           do {
@@ -66,7 +69,7 @@ int hts_zunpack(char* filename,char* newfile) {
             nr=gzread (gz, buff, 1024);
             if (nr>0) {
               size+=nr;
-              if ((int)fwrite(buff,1,nr,fpout) != nr)
+              if ((INTsys)fwrite(buff,1,nr,fpout) != nr)
                 nr=size=-1;
             }
           } while(nr>0);

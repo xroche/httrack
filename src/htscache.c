@@ -91,8 +91,14 @@ with
    <int>(size)
    <string>(msg)
    <string>(contenttype)
+   <string>(charset) [version 3]
    <string>(last-modified)
    <string>(Etag)
+   <string>location
+   <string>Content-disposition [version 2]
+   <string>hostname [version 4]
+   <string>URI filename [version 4]
+   <string>local filename [version 4]
    [<string>"SD" <string>(supplemental data)]
    [<string>"SD" <string>(supplemental data)]
    ...
@@ -191,16 +197,22 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
 
   // Construction header
   ok=0;
-  if (cache_wint(cache_dat,r.statuscode)!=-1)       // statuscode
-  if (cache_wLLint(cache_dat,r.size)!=-1)           // size
-  if (cache_wstr(cache_dat,r.msg)!=-1)              // msg
-  if (cache_wstr(cache_dat,r.contenttype)!=-1)      // contenttype
-  if (cache_wstr(cache_dat,r.lastmodified)!=-1)     // last-modified
-  if (cache_wstr(cache_dat,r.etag)!=-1)             // Etag
-  if (cache_wstr(cache_dat,(r.location!=NULL)?r.location:"")!=-1)         // 'location' pour moved
-  if (cache_wstr(cache_dat,r.cdispo)!=-1)           // Content-disposition
-  if (cache_wstr(cache_dat,"HTS")!=-1)              // end of header
+  if (cache_wint(cache_dat,r.statuscode) != -1       // statuscode
+  && cache_wLLint(cache_dat,r.size) != -1           // size
+  && cache_wstr(cache_dat,r.msg) != -1              // msg
+  && cache_wstr(cache_dat,r.contenttype) != -1      // contenttype
+  && cache_wstr(cache_dat,r.charset) != -1          // contenttype
+  && cache_wstr(cache_dat,r.lastmodified) != -1     // last-modified
+  && cache_wstr(cache_dat,r.etag) != -1             // Etag
+  && cache_wstr(cache_dat,(r.location!=NULL)?r.location:"") != -1         // 'location' pour moved
+  && cache_wstr(cache_dat,r.cdispo) != -1           // Content-disposition
+  && cache_wstr(cache_dat,url_adr) != -1            // Original address
+  && cache_wstr(cache_dat,url_fil) != -1            // Original URI filename
+  && cache_wstr(cache_dat,url_save) != -1           // Original save filename
+  && cache_wstr(cache_dat,"HTS") != -1              // end of header
+  ) {
     ok=1;       /* ok */
+  }
   // Fin construction header
 
   /*if ((int) fwrite((char*) &r,1,sizeof(htsblk),cache_dat) == sizeof(htsblk)) {*/
@@ -212,7 +224,7 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
       } else if (r.is_write==0) {  // en mémoire, recopie directe
         if (cache_wLLint(cache_dat,r.size)!=-1) {
           if (r.size>0) {   // taille>0
-            if ((INTsys) fwrite(r.adr,1,(INTsys)r.size,cache_dat)!=r.size)
+            if (fwrite(r.adr,1,(INTsys)r.size,cache_dat)!=r.size)
               ok=0;
           } else    // taille=0, ne rien écrire
             ok=0;
@@ -227,11 +239,11 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
             fp=fopen(fconv(url_save),"rb");
             if (fp!=NULL) {
               char buff[32768];
-              int nl;
+              INTsys nl;
               do {
                 nl=fread(buff,1,32768,fp);
                 if (nl>0) { 
-                  if ((INTsys) fwrite(buff,1,(INTsys)nl,cache_dat)!=nl) {  // erreur
+                  if ((INTsys)fwrite(buff,1,(INTsys)nl,cache_dat)!=nl) {  // erreur
                     nl=-1;
                     ok=0;
                   }
@@ -254,7 +266,7 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
   // index
   // adresse+cr+fichier+cr
   if (ok) {
-    buff[0]='\0'; strcat(buff,url_adr); strcat(buff,"\n"); strcat(buff,url_fil); strcat(buff,"\n");
+    buff[0]='\0'; strcatbuff(buff,url_adr); strcatbuff(buff,"\n"); strcatbuff(buff,url_fil); strcatbuff(buff,"\n");
     cache_wstr(cache_ndx,buff);
     fwrite(s,1,strlen(s),cache_ndx);
   }  // si ok=0 on a peut être écrit des données pour rien mais on s'en tape
@@ -264,9 +276,18 @@ void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_n
 }
 
 
+htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location) {
+  return cache_readex(opt,cache,adr,fil,save,location,NULL,0);
+}
+
+htsblk cache_read_ro(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location) {
+  return cache_readex(opt,cache,adr,fil,save,location,NULL,1);
+}
+
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
-htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save) {
+htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,
+                    char* return_save, int readonly) {
 #if HTS_FAST_CACHE
   long int hash_pos;
   int hash_pos_return;
@@ -274,22 +295,38 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
   char* a;
 #endif
   char buff[HTS_URLMAXSIZE*2];
-  char location[HTS_URLMAXSIZE*2];
+  char location_default[HTS_URLMAXSIZE*2];
+  char previous_save[HTS_URLMAXSIZE*2];
   htsblk r;
   int ok=0;
   int header_only=0;
 
-  memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET; strcpy(location,""); r.location=location;
+  memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
+  if (location) {
+    r.location = location;
+  } else {
+    r.location = location_default;
+  }
+  strcpybuff(r.location, ""); 
 #if HTS_FAST_CACHE
-  strcpy(buff,adr); strcat(buff,fil);
+  strcpybuff(buff,adr); strcatbuff(buff,fil);
   hash_pos_return=inthash_read((inthash)cache->hashtable,buff,(long int*)&hash_pos);
 #else
-  buff[0]='\0'; strcat(buff,"\n"); strcat(buff,adr); strcat(buff,"\n"); strcat(buff,fil); strcat(buff,"\n");
+  buff[0]='\0'; strcatbuff(buff,"\n"); strcatbuff(buff,adr); strcatbuff(buff,"\n"); strcatbuff(buff,fil); strcatbuff(buff,"\n");
   if (cache->use)
     a=strstr(cache->use,buff);
   else
     a=NULL;       // forcer erreur
 #endif
+
+  /* avoid errors on data entries */
+  if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
+#if HTS_FAST_CACHE
+    hash_pos_return = 0;
+#else
+    a = NULL;
+#endif
+  }
 
   // en cas de succès
 #if HTS_FAST_CACHE
@@ -297,7 +334,7 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
 #else
   if (a!=NULL) {  // OK existe en cache!
 #endif
-    int pos;
+    INTsys pos;
 #if DEBUGCA
     fprintf(stdout,"..cache: %s%s at ",adr,fil);
 #endif
@@ -320,8 +357,8 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
         if (fread((char*) &old_r,1,sizeof(old_r),cache->olddat)==sizeof(old_r)) { // lire tout (y compris statuscode etc)
           r.statuscode=old_r.statuscode;
           r.size=old_r.size;        // taille fichier
-          strcpy(r.msg,old_r.msg);
-          strcpy(r.contenttype,old_r.contenttype);
+          strcpybuff(r.msg,old_r.msg);
+          strcpybuff(r.contenttype,old_r.contenttype);
           ok=1;     /* import  ok */
         }
       /* */
@@ -335,11 +372,22 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
         cache_rLLint(cache->olddat,&r.size);
         cache_rstr(cache->olddat,r.msg);
         cache_rstr(cache->olddat,r.contenttype);
+        if (cache->version >= 3)
+          cache_rstr(cache->olddat,r.charset);
         cache_rstr(cache->olddat,r.lastmodified);
         cache_rstr(cache->olddat,r.etag);
         cache_rstr(cache->olddat,r.location);
         if (cache->version >= 2)
           cache_rstr(cache->olddat,r.cdispo);
+        if (cache->version >= 4) {
+          cache_rstr(cache->olddat, previous_save);  // adr
+          cache_rstr(cache->olddat, previous_save);  // fil
+          previous_save[0] = '\0';
+          cache_rstr(cache->olddat, previous_save);  // save
+          if (return_save != NULL) {
+            strcpybuff(return_save, previous_save);
+          }
+        }
         //
         cache_rstr(cache->olddat,check);
         if (strcmp(check,"HTS")==0) {           /* intégrité OK */
@@ -377,14 +425,15 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
 #if HTS_DIRECTDISK
             // Court-circuit:
             // Peut-on stocker le fichier directement sur disque?
-            if ((r.statuscode==200) && (!is_hypertext_mime(r.contenttype)) && (strnotempty(save))) {    // pas HTML, écrire sur disk directement
+            if (!readonly && r.statuscode==200 && !is_hypertext_mime(r.contenttype) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
               int ok=0;
               
               r.is_write=1;    // écrire
-              if (fexist(antislash(save))) {  // un fichier existe déja
-                //if (fsize(antislash(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
+              if (fexist(fconv(save))) {  // un fichier existe déja
+                //if (fsize(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
                 ok=1;    // plus rien à faire
                 filenote(save,NULL);        // noter comme connu
+                //xxusercommand(opt,0,NULL,save,adr,fil);
                 //}
               }
               
@@ -393,11 +442,11 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
                   filecreateempty(save);
                   //
                   r.statuscode=-1;
-                  strcpy(r.msg,"File deleted by user not recaught");
+                  strcpybuff(r.msg,"File deleted by user not recaught");
                   ok=1;     // ne pas récupérer (et pas d'erreur)
                 } else {
                   r.statuscode=-1;
-                  strcpy(r.msg,"Previous cache file not found");
+                  strcpybuff(r.msg,"Previous cache file not found");
                   ok=1;    // ne pas récupérer
                 }
               }
@@ -409,29 +458,30 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
 #endif
                 if (r.out!=NULL) {
                   char buff[32768+4];
-                  LLint nl;
-                  LLint size;
-                  size=r.size;
-                  do {
-                    nl=fread(buff,1,(INTsys) minimum(size,32768),cache->olddat);
-                    if (nl>0) {
-                      size-=nl; 
-                      if ((INTsys) fwrite(buff,1,(INTsys)nl,r.out)!=nl) {  // erreur
-                        r.statuscode=-1;
-                        strcpy(r.msg,"Cache Read Error : Read To Disk");
+                  LLint size = r.size;
+                  if (size > 0) {
+                    INTsys nl;
+                    do {
+                      nl=fread(buff,1,(INTsys) minimum(size,32768),cache->olddat);
+                      if (nl>0) {
+                        size-=nl; 
+                        if ((INTsys)fwrite(buff,1,(INTsys)nl,r.out)!=nl) {  // erreur
+                          r.statuscode=-1;
+                          strcpybuff(r.msg,"Cache Read Error : Read To Disk");
+                        }
                       }
-                    }
-                  } while((nl>0) && (size>0) && (r.statuscode!=-1));
+                    } while((nl>0) && (size>0) && (r.statuscode!=-1));
+                  }
                   
                   fclose(r.out);
                   r.out=NULL;
 #if HTS_WIN==0
                   chmod(save,HTS_ACCESS_FILE);      
 #endif          
-                  usercommand(0,NULL,antislash(save));
+                  //xxusercommand(opt,0,NULL,fconv(save), adr, fil);
                 } else {
                   r.statuscode=-1;
-                  strcpy(r.msg,"Cache Write Error : Unable to Create File");
+                  strcpybuff(r.msg,"Cache Write Error : Unable to Create File");
                   //printf("%s\n",save);
                 }
               }
@@ -440,24 +490,46 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
 #endif
             { // lire en mémoire
               
-              if (pos<0) { // Pas de donnée en cache, bizarre car html!!!
-                r.statuscode=-1;
-                strcpy(r.msg,"Previous cache file not found (2)");
+              if (pos<0) {
+                if (strnotempty(save)) { // Pas de donnée en cache, bizarre car html!!!
+                  r.statuscode=-1;
+                  strcpybuff(r.msg,"Previous cache file not found (2)");
+                } else {                 /* Read in memory from cache */
+                  if (strnotempty(return_save) && fexist(return_save)) {
+                    FILE* fp = fopen(fconv(return_save), "rb");
+                    if (fp != NULL) {
+                      r.adr=(char*) malloct((INTsys)r.size + 4);
+                      if (adr != NULL) {
+                        if (r.size > 0 && fread(r.adr, 1, (INTsys) r.size, fp) != r.size) {
+                          r.statuscode=-1;
+                          strcpybuff(r.msg,"Read error in cache disk data");
+                        }
+                      } else {
+                        r.statuscode=-1;
+                        strcpybuff(r.msg,"Read error (memory exhausted) from cache");
+                      }
+                      fclose(fp);
+                    }
+                  } else {
+                    r.statuscode=-1;
+                    strcpybuff(r.msg,"Cache file not found on disk");
+                  }
+                }
               } else {
                 // lire fichier (d'un coup)
                 r.adr=(char*) malloct((INTsys)r.size+4);
                 if (r.adr!=NULL) {
-                  if ((INTsys) fread(r.adr,1,(INTsys)r.size,cache->olddat)!=r.size) {  // erreur
+                  if (fread(r.adr,1,(INTsys)r.size,cache->olddat)!=r.size) {  // erreur
                     freet(r.adr);
                     r.adr=NULL;
                     r.statuscode=-1;
-                    strcpy(r.msg,"Cache Read Error : Read Data");
+                    strcpybuff(r.msg,"Cache Read Error : Read Data");
                   } else
                     *(r.adr+r.size)='\0';
                   //printf(">%s status %d\n",back[p].r.contenttype,back[p].r.statuscode);
                 } else {  // erreur
                   r.statuscode=-1;
-                  strcpy(r.msg,"Cache Memory Error");
+                  strcpybuff(r.msg,"Cache Memory Error");
                 }
               }
             }
@@ -467,28 +539,31 @@ htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save
           printf("Cache Read Error : Bad Data");
 #endif
           r.statuscode=-1;
-          strcpy(r.msg,"Cache Read Error : Bad Data");
+          strcpybuff(r.msg,"Cache Read Error : Bad Data");
         }
       } else {  // erreur
 #if DEBUGCA
         printf("Cache Read Error : Read Header");
 #endif
         r.statuscode=-1;
-        strcpy(r.msg,"Cache Read Error : Read Header");
+        strcpybuff(r.msg,"Cache Read Error : Read Header");
       }
     } else {
 #if DEBUGCA
       printf("Cache Read Error : Seek Failed");
 #endif
       r.statuscode=-1;
-      strcpy(r.msg,"Cache Read Error : Seek Failed");
+      strcpybuff(r.msg,"Cache Read Error : Seek Failed");
     }
   } else {
 #if DEBUGCA
     printf("File Cache Not Found");
 #endif
     r.statuscode=-1;
-    strcpy(r.msg,"File Cache Not Found");
+    strcpybuff(r.msg,"File Cache Entry Not Found");
+  }
+  if (!location) {   /* don't export internal buffer */
+    r.location = NULL;
   }
   return r;
 }
@@ -504,12 +579,12 @@ int cache_writedata(FILE* cache_ndx,FILE* cache_dat,char* str1,char* str2,char* 
     pos=ftell(cache_dat);
     /* first write data */
     if (cache_wint(cache_dat,len)!=-1) {       // length
-      if ((INTsys) fwrite(outbuff,1,(INTsys)len,cache_dat) == (INTsys) len) {   // data
+      if ((INTsys)fwrite(outbuff,1,(INTsys)len,cache_dat) == (INTsys) len) {   // data
         /* then write index */
         sprintf(s,"%d\n",pos);
-        buff[0]='\0'; strcat(buff,str1); strcat(buff,"\n"); strcat(buff,str2); strcat(buff,"\n");
+        buff[0]='\0'; strcatbuff(buff,str1); strcatbuff(buff,"\n"); strcatbuff(buff,str2); strcatbuff(buff,"\n");
         cache_wstr(cache_ndx,buff);
-        if (fwrite(s,1,strlen(s),cache_ndx) == strlen(s)) {
+        if (fwrite(s,1,(INTsys)strlen(s),cache_ndx) == strlen(s)) {
           fflush(cache_dat); fflush(cache_ndx);
           return 1;
         }
@@ -526,15 +601,15 @@ int cache_readdata(cache_back* cache,char* str1,char* str2,char** inbuff,int* in
   if (cache->hashtable) {
     char buff[HTS_URLMAXSIZE*4];
     long int pos;
-    strcpy(buff,str1); strcat(buff,str2);
+    strcpybuff(buff,str1); strcatbuff(buff,str2);
     if (inthash_read((inthash)cache->hashtable,buff,(long int*)&pos)) {
       if (fseek(cache->olddat,((pos>0)?pos:(-pos)),SEEK_SET) == 0) {
-        int len;
+        INTsys len;
         cache_rint(cache->olddat,&len);
         if (len>0) {
           char* mem_buff=(char*)malloct(len+4);    /* Plus byte 0 */
           if (mem_buff) {
-            if ((int)fread(mem_buff,1,len,cache->olddat)==len) { // lire tout (y compris statuscode etc)*/
+            if ((INTsys)fread(mem_buff,1,len,cache->olddat)==len) { // lire tout (y compris statuscode etc)*/
               *inbuff=mem_buff;
               *inlen=len;
               return 1;
@@ -552,17 +627,16 @@ int cache_readdata(cache_back* cache,char* str1,char* str2,char** inbuff,int* in
 }
 
 // renvoyer uniquement en tête, ou NULL si erreur
-htsblk* cache_header(httrackp* opt,cache_back* cache,char* adr,char* fil) {
-  htsblk* r;
-  NOSTATIC_RESERVE(r, htsblk, 1);
-  *r=cache_read(opt,cache,adr,fil,NULL);              // test uniquement
+// return NULL upon error, and set -1 to r.statuscode
+htsblk* cache_header(httrackp* opt,cache_back* cache,char* adr,char* fil,htsblk* r) {
+  *r=cache_read(opt,cache,adr,fil,NULL,NULL);              // test uniquement
   if (r->statuscode != -1)
     return r;
   else
     return NULL;
 }
 
-          
+
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back* cache,httrackp* opt) {
   // ---
@@ -571,80 +645,91 @@ void cache_init(cache_back* cache,httrackp* opt) {
 #if DEBUGCA
     printf("cache init: ");
 #endif
+    if (!cache->ro) {
 #if HTS_WIN
-    mkdir(fconcat(opt->path_log,"hts-cache"));
+      mkdir(fconcat(opt->path_log,"hts-cache"));
 #else
-    mkdir(fconcat(opt->path_log,"hts-cache"),HTS_PROTECT_FOLDER);
+      mkdir(fconcat(opt->path_log,"hts-cache"),HTS_PROTECT_FOLDER);
 #endif
-    if ((fexist(fconcat(opt->path_log,"hts-cache/new.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
+      if ((fexist(fconcat(opt->path_log,"hts-cache/new.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
 #if DEBUGCA
-      printf("work with former cache\n");
+        printf("work with former cache\n");
 #endif
-      if (fexist(fconcat(opt->path_log,"hts-cache/old.dat")))
-        remove(fconcat(opt->path_log,"hts-cache/old.dat"));
-      if (fexist(fconcat(opt->path_log,"hts-cache/old.ndx")))
-        remove(fconcat(opt->path_log,"hts-cache/old.ndx"));
-      
-      rename(fconcat(opt->path_log,"hts-cache/new.dat"),fconcat(opt->path_log,"hts-cache/old.dat"));
-      rename(fconcat(opt->path_log,"hts-cache/new.ndx"),fconcat(opt->path_log,"hts-cache/old.ndx"));
-    } else {  // un des deux (ou les deux) fichiers cache absents: effacer l'autre éventuel
+        if (fexist(fconcat(opt->path_log,"hts-cache/old.dat")))
+          remove(fconcat(opt->path_log,"hts-cache/old.dat"));
+        if (fexist(fconcat(opt->path_log,"hts-cache/old.ndx")))
+          remove(fconcat(opt->path_log,"hts-cache/old.ndx"));
+        
+        rename(fconcat(opt->path_log,"hts-cache/new.dat"),fconcat(opt->path_log,"hts-cache/old.dat"));
+        rename(fconcat(opt->path_log,"hts-cache/new.ndx"),fconcat(opt->path_log,"hts-cache/old.ndx"));
+      } else {  // un des deux (ou les deux) fichiers cache absents: effacer l'autre éventuel
 #if DEBUGCA
-      printf("new cache\n");
+        printf("new cache\n");
 #endif
-      if (fexist(fconcat(opt->path_log,"hts-cache/new.dat")))
-        remove(fconcat(opt->path_log,"hts-cache/new.dat"));
-      if (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))
-        remove(fconcat(opt->path_log,"hts-cache/new.ndx"));
+        if (fexist(fconcat(opt->path_log,"hts-cache/new.dat")))
+          remove(fconcat(opt->path_log,"hts-cache/new.dat"));
+        if (fexist(fconcat(opt->path_log,"hts-cache/new.ndx")))
+          remove(fconcat(opt->path_log,"hts-cache/new.ndx"));
+      }
     }
     
     // charger index cache précédent
-    if ((fexist(fconcat(opt->path_log,"hts-cache/old.dat"))) && (fexist(fconcat(opt->path_log,"hts-cache/old.ndx")))) {  // cache précédent
-      if ((fsize(fconcat(opt->path_log,"hts-cache/old.dat"))>=0) && (fsize(fconcat(opt->path_log,"hts-cache/old.ndx"))>0)) {
-        FILE* oldndx=NULL;
+    if (
+      (
+      !cache->ro &&
+      fsize(fconcat(opt->path_log,"hts-cache/old.dat")) >=0 && fsize(fconcat(opt->path_log,"hts-cache/old.ndx")) >0
+      )
+      ||
+      (
+      cache->ro &&
+      fsize(fconcat(opt->path_log,"hts-cache/new.dat")) >=0 && fsize(fconcat(opt->path_log,"hts-cache/new.ndx")) > 0
+      )
+      ) {
+      FILE* oldndx=NULL;
 #if DEBUGCA
-        printf("..load cache\n");
+      printf("..load cache\n");
 #endif
+      if (!cache->ro) {
         cache->olddat=fopen(fconcat(opt->path_log,"hts-cache/old.dat"),"rb");        
         oldndx=fopen(fconcat(opt->path_log,"hts-cache/old.ndx"),"rb");        
-        // les deux doivent être ouvrables
-        if ((cache->olddat==NULL) && (oldndx!=NULL)) {
-          fclose(oldndx);
-          oldndx=NULL;
-        }
-        if ((cache->olddat!=NULL) && (oldndx==NULL)) {
-          fclose(cache->olddat);
-          cache->olddat=NULL;
-        }
-        // lire index
-        if (oldndx!=NULL) {
-          int buffl;
-          fclose(oldndx); oldndx=NULL;
-          // lire ndx, et lastmodified
+      } else {
+        cache->olddat=fopen(fconcat(opt->path_log,"hts-cache/new.dat"),"rb");        
+        oldndx=fopen(fconcat(opt->path_log,"hts-cache/new.ndx"),"rb");        
+      }
+      // les deux doivent être ouvrables
+      if ((cache->olddat==NULL) && (oldndx!=NULL)) {
+        fclose(oldndx);
+        oldndx=NULL;
+      }
+      if ((cache->olddat!=NULL) && (oldndx==NULL)) {
+        fclose(cache->olddat);
+        cache->olddat=NULL;
+      }
+      // lire index
+      if (oldndx!=NULL) {
+        int buffl;
+        fclose(oldndx); oldndx=NULL;
+        // lire ndx, et lastmodified
+        if (!cache->ro) {
           buffl=fsize(fconcat(opt->path_log,"hts-cache/old.ndx"));
           cache->use=readfile(fconcat(opt->path_log,"hts-cache/old.ndx"));
-          if (cache->use!=NULL) {
-            char firstline[256];
-            char* a=cache->use;
-            a+=cache_brstr(a,firstline);
-            if (strncmp(firstline,"CACHE-",6)==0) {       // Nouvelle version du cache
-              if (strncmp(firstline,"CACHE-1.",8)==0) {      // Version 1.1x
-                cache->version=(int)(firstline[8]-'0');           // cache 1.x
-                if (cache->version <= 2) {
-                  a+=cache_brstr(a,firstline);
-                  strcpy(cache->lastmodified,firstline);
-                } else {
-                  if (opt->errlog) {
-                    fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: version 1.%d not supported, ignoring current cache"LF,cache->version);
-                    fflush(opt->errlog);
-                  }
-                  fclose(cache->olddat);
-                  cache->olddat=NULL;
-                  freet(cache->use);
-                  cache->use=NULL;
-                }
-              } else {        // non supporté
+        } else {
+          buffl=fsize(fconcat(opt->path_log,"hts-cache/new.ndx"));
+          cache->use=readfile(fconcat(opt->path_log,"hts-cache/new.ndx"));
+        }
+        if (cache->use!=NULL) {
+          char firstline[256];
+          char* a=cache->use;
+          a+=cache_brstr(a,firstline);
+          if (strncmp(firstline,"CACHE-",6)==0) {       // Nouvelle version du cache
+            if (strncmp(firstline,"CACHE-1.",8)==0) {      // Version 1.1x
+              cache->version=(int)(firstline[8]-'0');           // cache 1.x
+              if (cache->version <= 4) {
+                a+=cache_brstr(a,firstline);
+                strcpybuff(cache->lastmodified,firstline);
+              } else {
                 if (opt->errlog) {
-                  fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: %s not supported, ignoring current cache"LF,firstline);
+                  fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: version 1.%d not supported, ignoring current cache"LF,cache->version);
                   fflush(opt->errlog);
                 }
                 fclose(cache->olddat);
@@ -652,126 +737,141 @@ void cache_init(cache_back* cache,httrackp* opt) {
                 freet(cache->use);
                 cache->use=NULL;
               }
-              /* */
-            } else {              // Vieille version du cache
-              /* */
-              if (opt->log) {
-                fspc(opt->log,"warning"); fprintf(opt->log,"Cache: importing old cache format"LF);
-                fflush(opt->log);
+            } else {        // non supporté
+              if (opt->errlog) {
+                fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: %s not supported, ignoring current cache"LF,firstline);
+                fflush(opt->errlog);
               }
-              cache->version=0;        // cache 1.0
-              strcpy(cache->lastmodified,firstline); 
-            }
-            opt->is_update=1;        // signaler comme update
-
-            /* Create hash table for the cache (MUCH FASTER!) */
-#if HTS_FAST_CACHE
-            if (cache->use) {
-              char line[HTS_URLMAXSIZE*2];
-              char linepos[256];
-              int  pos;
-              while ( (a!=NULL) && (a < (cache->use+buffl) ) ) {
-                a=strchr(a+1,'\n');     /* start of line */
-                if (a) {
-                  a++;
-                  /* read "host/file" */
-                  a+=binput(a,line,HTS_URLMAXSIZE);
-                  a+=binput(a,line+strlen(line),HTS_URLMAXSIZE);
-                  /* read position */
-                  a+=binput(a,linepos,200);
-                  sscanf(linepos,"%d",&pos);
-                  inthash_add((inthash)cache->hashtable,line,pos);
-                }
-              }
-              /* Not needed anymore! */
+              fclose(cache->olddat);
+              cache->olddat=NULL;
               freet(cache->use);
               cache->use=NULL;
             }
-#endif
+            /* */
+          } else {              // Vieille version du cache
+            /* */
+            if (opt->log) {
+              fspc(opt->log,"warning"); fprintf(opt->log,"Cache: importing old cache format"LF);
+              fflush(opt->log);
+            }
+            cache->version=0;        // cache 1.0
+            strcpybuff(cache->lastmodified,firstline); 
           }
-        }
-      }  // taille cache>0
-    }  // cache precedent existe
-    
-#if DEBUGCA
-    printf("..create cache\n");
+          opt->is_update=1;        // signaler comme update
+          
+          /* Create hash table for the cache (MUCH FASTER!) */
+#if HTS_FAST_CACHE
+          if (cache->use) {
+            char line[HTS_URLMAXSIZE*2];
+            char linepos[256];
+            int  pos;
+            while ( (a!=NULL) && (a < (cache->use+buffl) ) ) {
+              a=strchr(a+1,'\n');     /* start of line */
+              if (a) {
+                a++;
+                /* read "host/file" */
+                a+=binput(a,line,HTS_URLMAXSIZE);
+                a+=binput(a,line+strlen(line),HTS_URLMAXSIZE);
+                /* read position */
+                a+=binput(a,linepos,200);
+                sscanf(linepos,"%d",&pos);
+                inthash_add((inthash)cache->hashtable,line,pos);
+              }
+            }
+            /* Not needed anymore! */
+            freet(cache->use);
+            cache->use=NULL;
+          }
 #endif
-    // ouvrir caches actuels
-    cache->dat=fopen(fconcat(opt->path_log,"hts-cache/new.dat"),"wb");        
-    cache->ndx=fopen(fconcat(opt->path_log,"hts-cache/new.ndx"),"wb");        
-    // les deux doivent être ouvrables
-    if ((cache->dat==NULL) && (cache->ndx!=NULL)) {
-      fclose(cache->ndx);
-      cache->ndx=NULL;
-    }
-    if ((cache->dat!=NULL) && (cache->ndx==NULL)) {
-      fclose(cache->dat);
-      cache->dat=NULL;
-    }
-    
-    if (cache->ndx!=NULL) {
-      char s[256];
-      
-      cache_wstr(cache->dat,"CACHE-1.2");
-      fflush(cache->dat);
-      cache_wstr(cache->ndx,"CACHE-1.2");
-      fflush(cache->ndx);
-      //
-      time_gmt_rfc822(s);   // date et heure actuelle GMT pour If-Modified-Since..
-      cache_wstr(cache->ndx,s);        
-      fflush(cache->ndx);    // un petit fflush au cas où
-      
-      // supprimer old.lst
-      if (fexist(fconcat(opt->path_log,"hts-cache/old.lst")))
-        remove(fconcat(opt->path_log,"hts-cache/old.lst"));
-      // renommer
-      if (fexist(fconcat(opt->path_log,"hts-cache/new.lst")))
-        rename(fconcat(opt->path_log,"hts-cache/new.lst"),fconcat(opt->path_log,"hts-cache/old.lst"));
-      // ouvrir
-      cache->lst=fopen(fconcat(opt->path_log,"hts-cache/new.lst"),"wb");
-      {
-        filecreate_params tmp;
-        strcpy(tmp.path,opt->path_html);    // chemin
-        tmp.lst=cache->lst;                 // fichier lst
-        filenote("",&tmp);        // initialiser filecreate
+        }
       }
-
-      // supprimer old.txt
-      if (fexist(fconcat(opt->path_log,"hts-cache/old.txt")))
-        remove(fconcat(opt->path_log,"hts-cache/old.txt"));
-      // renommer
-      if (fexist(fconcat(opt->path_log,"hts-cache/new.txt")))
-        rename(fconcat(opt->path_log,"hts-cache/new.txt"),fconcat(opt->path_log,"hts-cache/old.txt"));
-      // ouvrir
-      cache->txt=fopen(fconcat(opt->path_log,"hts-cache/new.txt"),"wb");
-      if (cache->txt) {
-        fprintf(cache->txt,"date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
-        fprintf(cache->txt,"statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"LF);
+      }  // taille cache>0
+      
+#if DEBUGCA
+      printf("..create cache\n");
+#endif
+      if (!cache->ro) {
+        // ouvrir caches actuels
+        structcheck(fconcat(opt->path_log, "hts-cache/"));
+        cache->dat=fopen(fconcat(opt->path_log,"hts-cache/new.dat"),"wb");        
+        cache->ndx=fopen(fconcat(opt->path_log,"hts-cache/new.ndx"),"wb");        
+        // les deux doivent être ouvrables
+        if ((cache->dat==NULL) && (cache->ndx!=NULL)) {
+          fclose(cache->ndx);
+          cache->ndx=NULL;
+        }
+        if ((cache->dat!=NULL) && (cache->ndx==NULL)) {
+          fclose(cache->dat);
+          cache->dat=NULL;
+        }
+        
+        if (cache->ndx!=NULL) {
+          char s[256];
+          
+          cache_wstr(cache->dat,"CACHE-1.4");
+          fflush(cache->dat);
+          cache_wstr(cache->ndx,"CACHE-1.4");
+          fflush(cache->ndx);
+          //
+          time_gmt_rfc822(s);   // date et heure actuelle GMT pour If-Modified-Since..
+          cache_wstr(cache->ndx,s);        
+          fflush(cache->ndx);    // un petit fflush au cas où
+          
+          // supprimer old.lst
+          if (fexist(fconcat(opt->path_log,"hts-cache/old.lst")))
+            remove(fconcat(opt->path_log,"hts-cache/old.lst"));
+          // renommer
+          if (fexist(fconcat(opt->path_log,"hts-cache/new.lst")))
+            rename(fconcat(opt->path_log,"hts-cache/new.lst"),fconcat(opt->path_log,"hts-cache/old.lst"));
+          // ouvrir
+          cache->lst=fopen(fconcat(opt->path_log,"hts-cache/new.lst"),"wb");
+          {
+            filecreate_params tmp;
+            strcpybuff(tmp.path,opt->path_html);    // chemin
+            tmp.lst=cache->lst;                 // fichier lst
+            filenote("",&tmp);        // initialiser filecreate
+          }
+          
+          // supprimer old.txt
+          if (fexist(fconcat(opt->path_log,"hts-cache/old.txt")))
+            remove(fconcat(opt->path_log,"hts-cache/old.txt"));
+          // renommer
+          if (fexist(fconcat(opt->path_log,"hts-cache/new.txt")))
+            rename(fconcat(opt->path_log,"hts-cache/new.txt"),fconcat(opt->path_log,"hts-cache/old.txt"));
+          // ouvrir
+          cache->txt=fopen(fconcat(opt->path_log,"hts-cache/new.txt"),"wb");
+          if (cache->txt) {
+            fprintf(cache->txt,"date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
+            fprintf(cache->txt,"statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"LF);
+          }
+          
+          // test
+          // cache_writedata(cache->ndx,cache->dat,"//[TEST]//","test1","TEST PIPO",9);
+        }
+        
+      } else {
+        cache->lst = cache->dat = cache->ndx = NULL;
       }
-
-      // test
-      // cache_writedata(cache->ndx,cache->dat,"//[TEST]//","test1","TEST PIPO",9);
-    }
-    
+      
   }
   
 }
-  
-  
-  
+
+
+
 
 // lire un fichier.. (compatible \0)
 char* readfile(char* fil) {
   char* adr=NULL;
-  int len=0;
+  INTsys len=0;
   len=fsize(fil);
-  if (len>0) {  // existe
+  if (len >= 0) {  // exists
     FILE* fp;
     fp=fopen(fconv(fil),"rb");
     if (fp!=NULL) {  // n'existe pas (!)
       adr=(char*) malloct(len+1);
       if (adr!=NULL) {
-        if ((int) fread(adr,1,len,fp)!=len) {    // fichier endommagé ?
+        if (len > 0 && (INTsys)fread(adr,1,len,fp) != len) {    // fichier endommagé ?
           freet(adr);
           adr=NULL;
         } else
@@ -794,7 +894,7 @@ char* readfile_or(char* fil,char* defaultdata) {
   else {
     char *adr=malloct(strlen(defaultdata)+2);
     if (adr) {
-      strcpy(adr,defaultdata);
+      strcpybuff(adr,defaultdata);
       return adr;
     }
   }
@@ -804,22 +904,24 @@ char* readfile_or(char* fil,char* defaultdata) {
 // écriture/lecture d'une chaîne sur un fichier
 // -1 : erreur, sinon 0
 int cache_wstr(FILE* fp,char* s) {
-  int i;
+  INTsys i;
   char buff[256+4];
   i=strlen(s);
-  sprintf(buff,"%d\n",i);
-  if (fwrite(buff,1,strlen(buff),fp) != strlen(buff))
+  sprintf(buff,INTsysP "\n",i);
+  if (fwrite(buff,1,(INTsys)strlen(buff),fp) != strlen(buff))
     return -1;
   if (i>0)
-  if ((int) fwrite(s,1,i,fp) != i)
+  if ((INTsys)fwrite(s,1,i,fp) != i)
     return -1;
   return 0;
 }
 void cache_rstr(FILE* fp,char* s) {
-  int i;
+  INTsys i;
   char buff[256+4];
   linput(fp,buff,256);
-  sscanf(buff,"%d",&i);
+  sscanf(buff,INTsysP,&i);
+  if (i < 0 || i > 32768)    /* error, something nasty happened */
+    i=0;
   if (i>0)
     fread(s,1,i,fp);
   *(s+i)='\0';

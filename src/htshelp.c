@@ -48,7 +48,9 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #if HTS_WIN
 #else
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 /* END specific definitions */
 
@@ -115,15 +117,15 @@ void infomsg(char* msg) {
   }
 }
 void help_wizard(httrackp* opt) {
-  char* urls = (char*) malloc(HTS_URLMAXSIZE*2);
-  char* mainpath = (char*) malloc(256);
-  char* projname = (char*) malloc(256);
-  char* stropt = (char*) malloc(2048);     // options
-  char* stropt2 = (char*) malloc(2048);    // options longues
-  char* strwild = (char*) malloc(2048);    // wildcards
-  char* cmd = (char*) malloc(4096);
-  char* str = (char*) malloc(256);
-  char** argv = (char**) malloc(256 * sizeof(char*));
+  char* urls = (char*) malloct(HTS_URLMAXSIZE*2);
+  char* mainpath = (char*) malloct(256);
+  char* projname = (char*) malloct(256);
+  char* stropt = (char*) malloct(2048);     // options
+  char* stropt2 = (char*) malloct(2048);    // options longues
+  char* strwild = (char*) malloct(2048);    // wildcards
+  char* cmd = (char*) malloct(4096);
+  char* str = (char*) malloct(256);
+  char** argv = (char**) malloct(256 * sizeof(char*));
   //
   char* a;
   //
@@ -134,12 +136,12 @@ void help_wizard(httrackp* opt) {
   }
   urls[0] = mainpath[0] = projname[0] = stropt[0] = stropt2[0] = strwild[0] = cmd[0] = str[0] = '\0';
   //
-  strcpy(stropt,"-");
+  strcpybuff(stropt,"-");
   mainpath[0]=projname[0]=stropt2[0]=strwild[0]='\0';
   //
   
   printf("\n");
-  printf("Welcome to HTTrack Website Copier (Offline Browser) "HTTRACK_VERSION"\n");
+  printf("Welcome to HTTrack Website Copier (Offline Browser) "HTTRACK_VERSION"%s\n", WHAT_is_available);
   printf("Copyright (C) Xavier Roche and other contributors\n");
 #ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
@@ -174,13 +176,13 @@ void help_wizard(httrackp* opt) {
     printf("\nBase path (return=current directory) :");
   linput(stdin,str,250);
   if (!strnotempty(str)) {
-    strcat(str,hts_gethome());
-    strcat(str,"/websites/");
+    strcatbuff(str,hts_gethome());
+    strcatbuff(str,"/websites/");
   }
   if (strnotempty(str))
   if ((str[strlen(str)-1]!='/') && (str[strlen(str)-1]!='\\'))
-    strcat(str,"/");
-  strcat(stropt2,"-O \""); strcat(stropt2,str); strcat(stropt2,projname); strcat(stropt2,"\" ");
+    strcatbuff(str,"/");
+  strcatbuff(stropt2,"-O \""); strcatbuff(stropt2,str); strcatbuff(stropt2,projname); strcatbuff(stropt2,"\" ");
   // Créer si ce n'est fait un index.html 1er niveau
   make_empty_index(str);
   //
@@ -196,11 +198,11 @@ void help_wizard(httrackp* opt) {
     printf("\nAction:\n");
     switch(help_query("Mirror Web Site(s)|Mirror Web Site(s) with Wizard|Just Get Files Indicated|Mirror ALL links in URLs (Multiple Mirror)|Test Links In URLs (Bookmark Test)|Update/Continue a Mirror",1)) {
     case 1: break; 
-    case 2: strcat(stropt,"W"); break;
-    case 3: strcat(stropt2,"--get "); break;
-    case 4: strcat(stropt2,"--mirrorlinks "); break;
-    case 5: strcat(stropt2,"--testlinks "); break;
-    case 6: strcat(stropt2,"--update "); break;
+    case 2: strcatbuff(stropt,"W"); break;
+    case 3: strcatbuff(stropt2,"--get "); break;
+    case 4: strcatbuff(stropt2,"--mirrorlinks "); break;
+    case 5: strcatbuff(stropt2,"--testlinks "); break;
+    case 6: strcatbuff(stropt2,"--update "); break;
     case 0: return; break;
     }
       
@@ -213,17 +215,17 @@ void help_wizard(httrackp* opt) {
         char str2[256];
         printf("\nProxy port (return=8080) :");
         linput(stdin,str2,250);
-        strcat(str,":");
+        strcatbuff(str,":");
         if (strnotempty(str2)==0)
-          strcat(str,"8080");
+          strcatbuff(str,"8080");
         else
-          strcat(str,str2);
+          strcatbuff(str,str2);
       }
-      strcat(stropt2,"-P "); strcat(stropt2,str); strcat(stropt2," ");
+      strcatbuff(stropt2,"-P "); strcatbuff(stropt2,str); strcatbuff(stropt2," ");
     }
     
     // Display
-    strcat(stropt2," -%v ");
+    strcatbuff(stropt2," -%v ");
 
     // Wildcards
     printf("\nYou can define wildcards, like: -*.gif +www.*.com/*.zip -*img_*.zip\n");
@@ -239,8 +241,8 @@ void help_wizard(httrackp* opt) {
       if (strfield2(str,"help")) {
         help("httrack",2);
       } else if (strnotempty(str)) {
-        strcat(stropt2,str);
-        strcat(stropt2," ");
+        strcatbuff(stropt2,str);
+        strcatbuff(stropt2," ");
       }
     } while(strfield2(str,"help"));
     
@@ -288,14 +290,14 @@ void help_wizard(httrackp* opt) {
   }
 
   /* Free buffers */
-  free(urls);
-  free(mainpath);
-  free(projname);
-  free(stropt);
-  free(stropt2);
-  free(strwild);
-  free(cmd);
-  free(str);
+  freet(urls);
+  freet(mainpath);
+  freet(projname);
+  freet(stropt);
+  freet(stropt2);
+  freet(strwild);
+  freet(cmd);
+  freet(str);
 }
 int help_query(char* list,int def) {
   char s[256];
@@ -309,7 +311,7 @@ int help_query(char* list,int def) {
       char str[256];
       str[0]='\0';
       //
-      strncat(str,a,(int) (b - a));
+      strncatbuff(str,a,(int) (b - a));
       if (n==def)
         printf("(enter)\t%d\t%s\n",n++,str);
       else
@@ -394,12 +396,13 @@ void make_empty_index(char* str) {
 // mini-aide  (h: help)
 //           y
 void help(char* app,int more) {
+  char info[2048];
   infomsg("");
   if (more)
     infomsg("1");
   if (more != 2) {
-    char info[2048];
-    infomsg("HTTrack version "HTTRACK_VERSION" (compiled "__DATE__")");
+    sprintf(info, "HTTrack version "HTTRACK_VERSION"%s (compiled "__DATE__")", WHAT_is_available);
+    infomsg(info);
 #ifdef HTTRACK_AFF_WARNING
     infomsg("NOTE: "HTTRACK_AFF_WARNING);
 #endif
@@ -424,6 +427,7 @@ void help(char* app,int more) {
   infomsg("Proxy options:");
   infomsg("  P  proxy use (-P proxy:port or -P user:pass@proxy:port)");
   infomsg(" %f *use proxy for ftp (f0 don't use)");
+  infomsg(" %b  use this local hostname to make/send requests (-%b hostname)");
   infomsg("");
   infomsg("Limits options:");
   infomsg("  rN set the mirror depth to N (* r9999)");
@@ -448,10 +452,12 @@ void help(char* app,int more) {
   infomsg("  n  get non-html files 'near' an html file (ex: an image located outside)");
   infomsg("  t  test all URLs (even forbidden ones)");
   infomsg(" %L <file> add all URL located in this text file (one URL per line)");
+  infomsg(" %S <file> add all scan rules located in this text file (one scan rule per line)");
   infomsg("");
   infomsg("Build options:");
   infomsg("  NN structure type (0 *original structure, 1+: see below)");
   infomsg("     or user defined structure (-N \"%h%p/%n%q.%t\")");
+  infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
   infomsg("  LN long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible)");
   infomsg("  KN keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links)");
   infomsg("  x  replace external html links by error pages");
@@ -467,8 +473,10 @@ void help(char* app,int more) {
   infomsg("  j *parse Java Classes (j0 don't parse)");
   infomsg("  sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always)");
   infomsg(" %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies)");
+  infomsg(" %k  use keep-alive if possible, greately reducing latency for small files and test requests (%k0 don't use)");
   infomsg(" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
   infomsg(" %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..)");
+  infomsg(" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
   infomsg(" %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip)");
   infomsg("     shortcut: '--assume standard' is equivalent to -%A "HTS_ASSUME_STANDARD);
   infomsg(" @iN internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only)");
@@ -491,6 +499,7 @@ void help(char* app,int more) {
   infomsg("  f *log in files");
   infomsg("  f2 one single log file");
   infomsg("  I *make an index (I0 don't make)");
+  infomsg(" %i  make a top index for a project folder (* %i0 don't make)");
   infomsg(" %I  make an searchable index for this mirror (* %I0 don't make)");
   infomsg("");
   infomsg("Expert options:");
@@ -511,23 +520,26 @@ void help(char* app,int more) {
   infomsg(" %H  debug HTTP headers in logfile");
   infomsg("");
   infomsg("Guru options: (do NOT use if possible)");
-  infomsg(" #0  Filter test (-#0 '*.gif' 'www.bar.com/foo.gif')");
-  infomsg(" #f  Always flush log files");
-  infomsg(" #FN Maximum number of filters");
-  infomsg(" #h  Version info");
-  infomsg(" #K  Scan stdin (debug)");
-  infomsg(" #L  Maximum number of links (-#L1000000)");
-  infomsg(" #p  Display ugly progress information");
-  infomsg(" #P  Catch URL");
-  infomsg(" #R  Old FTP routines (debug)");
-  infomsg(" #T  Generate transfer ops. log every minutes");
-  infomsg(" #u  Wait time");
-  infomsg(" #Z  Generate transfer rate statictics every minutes");
-  infomsg(" #!  Execute a shell command (-#! \"echo hello\")");
+  infomsg(" #X *use optimized engine (limited memory boundary checks)");
+  infomsg(" #0  filter test (-#0 '*.gif' 'www.bar.com/foo.gif')");
+  infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
+  infomsg(" #f  always flush log files");
+  infomsg(" #FN maximum number of filters");
+  infomsg(" #h  version info");
+  infomsg(" #K  scan stdin (debug)");
+  infomsg(" #L  maximum number of links (-#L1000000)");
+  infomsg(" #p  display ugly progress information");
+  infomsg(" #P  catch URL");
+  infomsg(" #R  old FTP routines (debug)");
+  infomsg(" #T  generate transfer ops. log every minutes");
+  infomsg(" #u  wait time");
+  infomsg(" #Z  generate transfer rate statictics every minutes");
+  infomsg(" #!  execute a shell command (-#! \"echo hello\")");
   infomsg("");
   infomsg("Command-line specific options:");
   infomsg("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
   infomsg(" %U run the engine with another id when called as root (-%U smith)");
+  infomsg(" %W use an external library function as a wrapper (-%W link-detected=foo.so:myfunction)");
   /* infomsg(" %O do a chroot before setuid"); */
   infomsg("");
   infomsg("Details: Option N");
@@ -562,6 +574,15 @@ void help(char* app,int more) {
   infomsg("  '%q' small query string MD5 (16 bits, 4 ascii bytes)");
   infomsg("     '%s?' Short name version (ex: %sN)");
   infomsg("  '%[param]' param variable in query string");
+  infomsg("  '%[param:before:after:notfound:empty]' advanced variable extraction");
+  infomsg("Details: User-defined option N and advanced variable extraction");
+  infomsg("   %[param:before:after:notfound:empty]");
+  infomsg("   param : parameter name");
+  infomsg("   before : string to prepend if the parameter was found");
+  infomsg("   after : string to append if the parameter was found");
+  infomsg("   notfound : string replacement if the parameter could not be found");
+  infomsg("   empty : string replacement if the parameter was empty");
+  infomsg("   all fields, except the first one (the parameter name), can be empty");
   infomsg("");
   infomsg("Details: Option K");
   infomsg("  K0  foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)");
@@ -586,6 +607,24 @@ void help(char* app,int more) {
   infomsg("");
   infomsg("--http10              force http/1.0 requests (-%h)");
   infomsg("");
+  infomsg("Details: Option %W: External callbacks prototypes");
+  infomsg("'init' : void  (* myfunction)(void);");
+  infomsg("'free' : void  (* myfunction)(void);");
+  infomsg("'start' : int   (* myfunction)(httrackp* opt);");
+  infomsg("'end' : int   (* myfunction)(void);");
+  infomsg("'change-options' : int   (* myfunction)(httrackp* opt);");
+  infomsg("'check-html' : int   (* myfunction)(char* html,int len,char* url_adresse,char* url_fichier);");
+  infomsg("'query' : char* (* myfunction)(char* question);");
+  infomsg("'query2' : char* (* myfunction)(char* question);");
+  infomsg("'query3' : char* (* myfunction)(char* question);");
+  infomsg("'loop' : int   (* myfunction)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);");
+  infomsg("'check-link' : int   (* myfunction)(char* adr,char* fil,int status);");
+  infomsg("'pause' : void  (* myfunction)(char* lockfile);");
+  infomsg("'save-file' : void  (* myfunction)(char* file);");
+  infomsg("'link-detected' : int   (* myfunction)(char* link);");
+  infomsg("'transfer-status' : int   (* myfunction)(lien_back* back);");
+  infomsg("'save-name' : int   (* myfunction)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);");
+  infomsg("");
   infomsg("");
   infomsg("example: httrack www.someweb.com/bob/");
   infomsg("means:   mirror site www.someweb.com/bob/ and only this site");
@@ -608,7 +647,8 @@ void help(char* app,int more) {
   infomsg("example: httrack --continue");
   infomsg("continues a mirror in the current folder");
   infomsg("");
-  infomsg("HTTrack version "HTTRACK_VERSION" (compiled "__DATE__")");
+  sprintf(info, "HTTrack version "HTTRACK_VERSION"%s (compiled "__DATE__")", WHAT_is_available);
+  infomsg(info);
   infomsg("Copyright (C) Xavier Roche and other contributors");
 #ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: "HTS_PLATFORM_NAME"]");

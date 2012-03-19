@@ -30,641 +30,1040 @@ Please visit our Website: http://www.httrack.com
 
 
 /* ------------------------------------------------------------ */
-/* File: Main source                                            */
-/* DIRECT INCLUDE TO httrack.c                                  */
+/* File: htsparse.c parser                                      */
+/*       html/javascript/css parser                             */
+/*       and other parser routines                              */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
 
-#if HTS_ANALYSTE
-if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
-#endif          
-  FILE* fp=NULL;      // fichier écrit localement 
-  char* adr=r.adr;    // pointeur (on parcourt)
-  char* lastsaved;    // adresse du dernier octet sauvé + 1
-  if ( (opt.debug>1) && (opt.log!=NULL) ) {
-    fspc(opt.log,"debug"); fprintf(opt.log,"scan file.."LF); test_flush;
-  }
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <ctype.h>
+
+/* File defs */
+#include "htscore.h"
+
+/* specific definitions */
+#include "htsbase.h"
+#include "htsnet.h"
+#include "htsbauth.h"
+#include "htsmd5.h"
+#include "htsindex.h"
+
+/* external modules */
+#include "htsmodules.h"
+
+// htswrap_add
+#include "htswrap.h"
+
+// parser
+#include "htsparse.h"
 
 
-  // Indexing!
-#if HTS_MAKE_KEYWORD_INDEX
-  if (opt.kindex) {
-    if (index_keyword(r.adr,r.size,r.contenttype,savename,opt.path_html)) {
-      if ( (opt.debug>1) && (opt.log!=NULL) ) {
-        fspc(opt.log,"debug"); fprintf(opt.log,"indexing file..done"LF); test_flush;
-      }
-    } else {
-      if ( (opt.debug>1) && (opt.log!=NULL) ) {
-        fspc(opt.log,"debug"); fprintf(opt.log,"indexing file..error!"LF); test_flush;
-      }
-    }
+// specific defines
+#define urladr   (liens[ptr]->adr)
+#define urlfil   (liens[ptr]->fil)
+#define savename (liens[ptr]->sav)
+#define parenturladr   (liens[liens[ptr]->precedent]->adr)
+#define parenturlfil   (liens[liens[ptr]->precedent]->fil)
+#define parentsavename (liens[liens[ptr]->precedent]->sav)
+#define relativeurladr   ((!parent_relative)?urladr:parenturladr)
+#define relativeurlfil   ((!parent_relative)?urlfil:parenturlfil)
+#define relativesavename ((!parent_relative)?savename:parentsavename)
+
+#define test_flush if (opt->flush) { if (opt->log) { fflush(opt->log); } if (opt->errlog) { fflush(opt->errlog);  } }
+
+// does nothing
+#define XH_uninit do {} while(0)
+
+// version optimisée, qui permet de ne pas toucher aux html non modifiés (update)
+#define REALLOC_SIZE 8192
+#define HT_ADD_CHK(A) if (((int) (A)+ht_len+1) >= ht_size) { \
+  ht_size=(A)+ht_len+REALLOC_SIZE; \
+  ht_buff=(char*) realloct(ht_buff,ht_size); \
+  if (ht_buff==NULL) { \
+  printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
+  XH_uninit; \
+  abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct(%d) failed" _ ht_size); \
+  exit(1); \
+  } \
+  } \
+  ht_len+=A;
+#define HT_ADD_ADR \
+  if ((opt->getmode & 1) && (ptr>0)) { \
+  int i=((int) (adr - lastsaved)),j=ht_len; HT_ADD_CHK(i) \
+  memcpy(ht_buff+j, lastsaved, i); \
+  ht_buff[j+i]='\0'; \
+  lastsaved=adr; \
   }
+#define HT_ADD(A) \
+  if ((opt->getmode & 1) && (ptr>0)) { \
+  int i=strlen(A),j=ht_len; \
+  if (i) { \
+  HT_ADD_CHK(i) \
+  memcpy(ht_buff+j, A, i); \
+  ht_buff[j+i]='\0'; \
+  } }
+#define HT_ADD_START \
+  int ht_size=(int)(r->size*5)/4+REALLOC_SIZE; \
+  int ht_len=0; \
+  char* ht_buff=NULL; \
+  if ((opt->getmode & 1) && (ptr>0)) { \
+  ht_buff=(char*) malloct(ht_size); \
+  if (ht_buff==NULL) { \
+  printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
+  XH_uninit; \
+  abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct(%d) failed" _ ht_size); \
+  exit(1); \
+  } \
+  ht_buff[0]='\0'; \
+  }
+#define HT_ADD_END { \
+  int ok=0;\
+  if (ht_buff) { \
+  INTsys file_len=(INTsys) strlen(ht_buff);\
+  char digest[32+2];\
+  digest[0]='\0';\
+  domd5mem(ht_buff,file_len,digest,1);\
+  if (fsize(fconv(savename))==file_len) { \
+  int mlen;\
+  char* mbuff;\
+  cache_readdata(cache,"//[HTML-MD5]//",savename,&mbuff,&mlen);\
+  if (mlen) mbuff[mlen]='\0';\
+  if ((mlen == 32) && (strcmp(((mbuff!=NULL)?mbuff:""),digest)==0)) {\
+  ok=1;\
+  if ( (opt->debug>1) && (opt->log!=NULL) ) {\
+  fspc(opt->log,"debug"); fprintf(opt->log,"File not re-written (md5): %s"LF,savename);\
+  test_flush;\
+  }\
+  } else {\
+  ok=0;\
+  } \
+  }\
+  if (!ok) { \
+  fp=filecreate(savename); \
+  if (fp) { \
+  if (file_len>0) {\
+  if ((INTsys)fwrite(ht_buff,1,file_len,fp) != file_len) { \
+  int fcheck;\
+  if ((fcheck=check_fatal_io_errno())) {\
+  opt->state.exit_xh=-1;\
+  }\
+  if (opt->errlog) {   \
+  fspc(opt->errlog,"error"); fprintf(opt->errlog,"Unable to write HTML file %s: %s"LF, savename, strerror(errno));\
+  if (fcheck) {\
+  fspc(opt->errlog,"error");\
+  fprintf(opt->errlog,"* * Fatal write error, giving up"LF);\
+  }\
+  test_flush;\
+  }\
+  }\
+  }\
+  fclose(fp); fp=NULL; \
+  if (strnotempty(r->lastmodified)) \
+  set_filetime_rfc822(savename,r->lastmodified); \
+  } else {\
+  int fcheck;\
+  if ((fcheck=check_fatal_io_errno())) {\
+  opt->state.exit_xh=-1;\
+  }\
+  if (opt->errlog) { \
+  fspc(opt->errlog,"error");\
+  fprintf(opt->errlog,"Unable to save file %s : %s"LF, savename, strerror(errno));\
+  if (fcheck) {\
+  fspc(opt->errlog,"error");\
+  fprintf(opt->errlog,"* * Fatal write error, giving up"LF);\
+  }\
+  test_flush;\
+  }\
+  }\
+  } else {\
+  filenote(savename,NULL); \
+  }\
+  if (cache->ndx)\
+    cache_writedata(cache->ndx,cache->dat,"//[HTML-MD5]//",savename,digest,(int)strlen(digest));\
+  } \
+  freet(ht_buff); ht_buff=NULL; \
+  }
+#define HT_ADD_FOP 
+
+// COPY IN HTSCORE.C
+#define HT_INDEX_END do { \
+if (!makeindex_done) { \
+if (makeindex_fp) { \
+  char tempo[1024]; \
+  if (makeindex_links == 1) { \
+    sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,makeindex_firstlink); \
+  } else \
+    tempo[0]='\0'; \
+  fprintf(makeindex_fp,template_footer, \
+    "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
+    tempo \
+    ); \
+  fflush(makeindex_fp); \
+  fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
+  makeindex_fp=NULL; \
+  usercommand(opt,0,NULL,fconcat(opt->path_html,"index.html"),"primary","primary");  \
+} \
+} \
+makeindex_done=1;    /* ok c'est fait */  \
+} while(0)
+
+// Enregistrement d'un lien:
+// on calcule la taille nécessaire: taille des 3 chaînes à stocker (taille forcée paire, plus 2 octets de sécurité)
+// puis on vérifie qu'on a assez de marge dans le buffer - sinon on en réalloue un autre
+// enfin on écrit à l'adresse courante du buffer, qu'on incrémente. on décrémente la taille dispo d'autant ensuite
+// codebase: si non nul et si .class stockee on le note pour chemin primaire pour classes
+// FA,FS: former_adr et former_fil, lien original
+#if HTS_HASH
+#define liens_record_sav_len(A) 
+#else
+#define liens_record_sav_len(A) (A)->sav_len=strlen((A)->sav)
 #endif
 
-  // Now, parsing
-  if ((opt.getmode & 1) && (ptr>0)) {  // récupérer les html sur disque       
-    // créer le fichier html local
-    HT_ADD_FOP;   // écrire peu à peu le fichier
-  }
+// COPIE DE HTSCORE.C
+#define liens_record(A,F,S,FA,FF) { \
+int notecode=0; \
+int lienurl_len=((sizeof(lien_url)+HTS_ALIGN-1)/HTS_ALIGN)*HTS_ALIGN,\
+  adr_len=strlen(A),\
+  fil_len=strlen(F),\
+  sav_len=strlen(S),\
+  cod_len=0,\
+  former_adr_len=strlen(FA),\
+  former_fil_len=strlen(FF); \
+if (former_adr_len>0) {\
+  former_adr_len=(former_adr_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; \
+  former_fil_len=(former_fil_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; \
+} else former_adr_len=former_fil_len=0;\
+if (strlen(F)>6) if (strnotempty(codebase)) if (strfield(F+strlen(F)-6,".class")) { notecode=1; \
+cod_len=strlen(codebase); cod_len=(cod_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; } \
+adr_len=(adr_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; fil_len=(fil_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; sav_len=(sav_len/HTS_ALIGN)*HTS_ALIGN+HTS_ALIGN*2; \
+if ((int) lien_size < (int) (adr_len+fil_len+sav_len+cod_len+former_adr_len+former_fil_len+lienurl_len)) { \
+lien_buffer=(char*) ((void*) calloct(add_tab_alloc,1)); \
+lien_size=add_tab_alloc; \
+if (lien_buffer!=NULL) { \
+liens[lien_tot]=(lien_url*) (void*) lien_buffer; lien_buffer+=lienurl_len; lien_size-=lienurl_len; \
+liens[lien_tot]->firstblock=1; \
+} \
+} else { \
+liens[lien_tot]=(lien_url*) (void*) lien_buffer; lien_buffer+=lienurl_len; lien_size-=lienurl_len; \
+liens[lien_tot]->firstblock=0; \
+} \
+if (liens[lien_tot]!=NULL) { \
+liens[lien_tot]->adr=lien_buffer; lien_buffer+=adr_len; lien_size-=adr_len; \
+liens[lien_tot]->fil=lien_buffer; lien_buffer+=fil_len; lien_size-=fil_len; \
+liens[lien_tot]->sav=lien_buffer; lien_buffer+=sav_len; lien_size-=sav_len; \
+liens[lien_tot]->cod=NULL; \
+if (notecode) { liens[lien_tot]->cod=lien_buffer; lien_buffer+=cod_len; lien_size-=cod_len; strcpybuff(liens[lien_tot]->cod,codebase); } \
+if (former_adr_len>0) {\
+liens[lien_tot]->former_adr=lien_buffer; lien_buffer+=former_adr_len; lien_size-=former_adr_len; \
+liens[lien_tot]->former_fil=lien_buffer; lien_buffer+=former_fil_len; lien_size-=former_fil_len; \
+strcpybuff(liens[lien_tot]->former_adr,FA); \
+strcpybuff(liens[lien_tot]->former_fil,FF); \
+}\
+strcpybuff(liens[lien_tot]->adr,A); \
+strcpybuff(liens[lien_tot]->fil,F); \
+strcpybuff(liens[lien_tot]->sav,S); \
+liens_record_sav_len(liens[lien_tot]); \
+hash_write(hashptr,lien_tot,opt->urlhack);  \
+} \
+}
+
+#define ENGINE_LOAD_CONTEXT() \
+  lien_url** liens = (lien_url**) str->liens; \
+  httrackp* opt = (httrackp*) str->opt; \
+  lien_back* back = (lien_back*) str->back; \
+  cache_back* cache = (cache_back*) str->cache; \
+  hash_struct* hashptr = (hash_struct*) str->hashptr; \
+  int back_max = str->back_max; \
+  int numero_passe = str->numero_passe; \
+  int add_tab_alloc = str->add_tab_alloc; \
+  /* */ \
+  int lien_tot = * ( (int*) (str->lien_tot_) ); \
+  int ptr = * ( (int*) (str->ptr_) ); \
+  int lien_size = * ( (int*) (str->lien_size_) ); \
+  char* lien_buffer = * ( (char**) (str->lien_buffer_) ); \
+  /* */ \
+  /* */ \
+  htsblk* r = stre->r_; \
+  hash_struct* hash = stre->hash_; \
+  int lien_max = *stre->lien_max_; \
+  /* */ \
+  int error = * stre->error_; \
+  int store_errpage = * stre->store_errpage_; \
+  char* codebase = stre->codebase; \
+  char* base = stre->base; \
+  /* */ \
+  int makeindex_done = *stre->makeindex_done_; \
+  FILE* makeindex_fp = *stre->makeindex_fp_; \
+  int makeindex_links = *stre->makeindex_links_; \
+  char* makeindex_firstlink = stre->makeindex_firstlink_; \
+  /* */ \
+  char *template_header = stre->template_header_; \
+  char *template_body = stre->template_body_; \
+  char *template_footer = stre->template_footer_; \
+  /* */ \
+  LLint stat_fragment = *stre->stat_fragment_; \
+  TStamp makestat_time = stre->makestat_time; \
+  FILE* makestat_fp = stre->makestat_fp
+
+#define ENGINE_SAVE_CONTEXT() \
+  /* Apply changes */ \
+   * ( (int*) (str->lien_tot_) ) = lien_tot; \
+   * ( (int*) (str->ptr_) ) = ptr; \
+   * ( (int*) (str->lien_size_) ) = lien_size; \
+   * ( (char**) (str->lien_buffer_) ) = lien_buffer; \
+   /* */ \
+   * stre->error_ = error; \
+   * stre->store_errpage_ = store_errpage; \
+   * stre->lien_max_ = lien_max; \
+   /* */ \
+   *stre->makeindex_done_ = makeindex_done; \
+   *stre->makeindex_fp_ = makeindex_fp; \
+   *stre->makeindex_links_ = makeindex_links; \
+   /* */ \
+   *stre->stat_fragment_ = stat_fragment
+
+#define _FILTERS     (*opt->filters.filters)
+#define _FILTERS_PTR (opt->filters.filptr)
+#define _ROBOTS      ((robots_wizard*)opt->robotsptr)
+
+
+/* Main parser */
+int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+  /* Load engine variables */
+  ENGINE_LOAD_CONTEXT();
   
-  if (!error) {
-    int detect_title=0;  // détection  du title
-    //
-    char* in_media=NULL; // in other media type (real media and so..)
-    int intag=0;         // on est dans un tag
-    int incomment=0;     // dans un <!--
-    int inscript=0;      // dans un scipt pour applets javascript)
-    int inscript_tag=0;  // on est dans un <body onLoad="... terminé par >
-    char inscript_tag_lastc='\0';  
-                           // terminaison (" ou ') du "<body onLoad=.."
-    int inscriptgen=0;     // on est dans un code générant, ex après obj.write("..
-    char scriptgen_q='\0'; // caractère faisant office de guillemet (' ou ")
-    int no_esc_utf=0;      // ne pas echapper chars > 127
-    int nofollow=0;        // ne pas scanner
-    //
-    int parseall_lastc='\0';    // dernier caractère parsé pour parseall
-    int parseall_incomment=0;   // dans un /* */ (exemple: a = /* URL */ "img.gif";)
-    //
-    char* intag_start=adr;
-    char* intag_startattr=NULL;
-    int intag_start_valid=0;
-    HT_ADD_START;    // débuter
+#if HTS_ANALYSTE
+  if (hts_htmlcheck(r->adr,(int)r->size,urladr,urlfil)) {
+#endif          
+    FILE* fp=NULL;      // fichier écrit localement 
+    char* adr=r->adr;    // pointeur (on parcourt)
+    char* lastsaved;    // adresse du dernier octet sauvé + 1
+    if ( (opt->debug>1) && (opt->log!=NULL) ) {
+      fspc(opt->log,"debug"); fprintf(opt->log,"scan file.."LF); test_flush;
+    }
+    
+    
+    // Indexing!
+#if HTS_MAKE_KEYWORD_INDEX
+    if (opt->kindex) {
+      if (index_keyword(r->adr,r->size,r->contenttype,savename,opt->path_html)) {
+        if ( (opt->debug>1) && (opt->log!=NULL) ) {
+          fspc(opt->log,"debug"); fprintf(opt->log,"indexing file..done"LF); test_flush;
+        }
+      } else {
+        if ( (opt->debug>1) && (opt->log!=NULL) ) {
+          fspc(opt->log,"debug"); fprintf(opt->log,"indexing file..error!"LF); test_flush;
+        }
+      }
+    }
+#endif
+    
+    // Now, parsing
+    if ((opt->getmode & 1) && (ptr>0)) {  // récupérer les html sur disque       
+      // créer le fichier html local
+      HT_ADD_FOP;   // écrire peu à peu le fichier
+    }
+    
+    if (!error) {
+      int detect_title=0;  // détection  du title
+      int back_add_stats = opt->state.back_add_stats;
+      //
+      char* in_media=NULL; // in other media type (real media and so..)
+      int intag=0;         // on est dans un tag
+      int incomment=0;     // dans un <!--
+      int inscript=0;      // dans un scipt pour applets javascript)
+      signed char inscript_state[10][257];
+      typedef enum { 
+        INSCRIPT_START=0,
+        INSCRIPT_ANTISLASH,
+        INSCRIPT_INQUOTE,
+        INSCRIPT_INQUOTE2,
+        INSCRIPT_SLASH,
+        INSCRIPT_SLASHSLASH,
+        INSCRIPT_COMMENT,
+        INSCRIPT_COMMENT2,
+        INSCRIPT_ANTISLASH_IN_QUOTE,
+        INSCRIPT_ANTISLASH_IN_QUOTE2,
+        INSCRIPT_DEFAULT=256
+      } INSCRIPT;
+      INSCRIPT inscript_state_pos=INSCRIPT_START;
+      char* inscript_name=NULL; // script tag name
+      int inscript_tag=0;  // on est dans un <body onLoad="... terminé par >
+      char inscript_tag_lastc='\0';
+      // terminaison (" ou ') du "<body onLoad=.."
+      int inscriptgen=0;     // on est dans un code générant, ex après obj.write("..
+      //int inscript_check_comments=0, inscript_in_comments=0;    // javascript comments
+      char scriptgen_q='\0'; // caractère faisant office de guillemet (' ou ")
+      int no_esc_utf=0;      // ne pas echapper chars > 127
+      int nofollow=0;        // ne pas scanner
+      //
+      int parseall_lastc='\0';     // dernier caractère parsé pour parseall
+      //int parseall_incomment=0;   // dans un /* */ (exemple: a = /* URL */ "img.gif";)
+      //
+      char* intag_start=adr;
+      char* intag_startattr=NULL;
+      int intag_start_valid=0;
+      //
+      int   parent_relative=0;    // the parent is the base path (.js, .css..)
+      HT_ADD_START;    // débuter
+  
+      /* Initialize script automate for comments, quotes.. */
+      memset(inscript_state, 0xff, sizeof(inscript_state));
+      inscript_state[INSCRIPT_START][INSCRIPT_DEFAULT]=INSCRIPT_START;     /* by default, stay in START */
+      inscript_state[INSCRIPT_START]['\\']=INSCRIPT_ANTISLASH;             /* #1: \ escapes the next character whatever it is */
+      inscript_state[INSCRIPT_ANTISLASH][INSCRIPT_DEFAULT]=INSCRIPT_START;
+      inscript_state[INSCRIPT_START]['\'']=INSCRIPT_INQUOTE;               /* #2: ' opens quote and only ' returns to 0 */
+      inscript_state[INSCRIPT_INQUOTE][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE;
+      inscript_state[INSCRIPT_INQUOTE]['\'']=INSCRIPT_START;
+      inscript_state[INSCRIPT_INQUOTE]['\\']=INSCRIPT_ANTISLASH_IN_QUOTE;
+      inscript_state[INSCRIPT_START]['\"']=INSCRIPT_INQUOTE2;              /* #3: " opens double-quote and only " returns to 0 */
+      inscript_state[INSCRIPT_INQUOTE2][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE2;
+      inscript_state[INSCRIPT_INQUOTE2]['\"']=INSCRIPT_START;
+      inscript_state[INSCRIPT_INQUOTE2]['\\']=INSCRIPT_ANTISLASH_IN_QUOTE2;
+      inscript_state[INSCRIPT_START]['/']=INSCRIPT_SLASH;                  /* #4: / state, default to #0 */
+      inscript_state[INSCRIPT_SLASH][INSCRIPT_DEFAULT]=INSCRIPT_START;
+      inscript_state[INSCRIPT_SLASH]['/']=INSCRIPT_SLASHSLASH;             /* #5: // with only LF to escape */
+      inscript_state[INSCRIPT_SLASHSLASH][INSCRIPT_DEFAULT]=INSCRIPT_SLASHSLASH;
+      inscript_state[INSCRIPT_SLASHSLASH]['\n']=INSCRIPT_START;
+      inscript_state[INSCRIPT_SLASH]['*']=INSCRIPT_COMMENT;                /* #6: / * with only * / to escape */
+      inscript_state[INSCRIPT_COMMENT][INSCRIPT_DEFAULT]=INSCRIPT_COMMENT;
+      inscript_state[INSCRIPT_COMMENT]['*']=INSCRIPT_COMMENT2;             /* #7: closing comments */
+      inscript_state[INSCRIPT_COMMENT2][INSCRIPT_DEFAULT]=INSCRIPT_COMMENT;
+      inscript_state[INSCRIPT_COMMENT2]['/']=INSCRIPT_START;
+      inscript_state[INSCRIPT_COMMENT2]['*']=INSCRIPT_COMMENT2;
+      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE;    /* #8: escape in "" */
+      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE2;  /* #9: escape in '' */
 
 
-    /* statistics */
-    if ((opt.getmode & 1) && (ptr>0)) { 
+      /* statistics */
+      if ((opt->getmode & 1) && (ptr>0)) { 
       /*
       HTS_STAT.stat_files++;
-      HTS_STAT.stat_bytes+=r.size;
-      */
-    }
-
-    /* Primary list or URLs */
-    if (ptr == 0) {
-      intag=1;
-      intag_start_valid=0;
-    }
-    /* Check is the file is a .js file */
-    else if (
-      (strfield2(r.contenttype,"application/x-javascript")!=0)
-      || (strfield2(r.contenttype,"text/css")!=0)
-      ) {      /* JavaScript js file */
-      inscript=1;
-      intag=1;     // because après <script> on y est .. - pas utile
-      intag_start_valid=0;    // OUI car nous sommes dans du code, plus dans du "vrai" tag
-      if ((opt.debug>1) && (opt.log!=NULL)) {
-        fspc(opt.log,"debug"); fprintf(opt.log,"note: this file is a javascript file"LF); test_flush;
+      HTS_STAT.stat_bytes+=r->size;
+        */
       }
-    }
-    /* Or a real audio */
-    else if (strfield2(r.contenttype,"audio/x-pn-realaudio")!=0) {      /* realaudio link file */
-      inscript=intag=1;
-      intag_start_valid=0;
-      in_media="RAM";       // real media!
-    }
-    // Detect UTF8 format
-    if (is_unicode_utf8((unsigned char*) r.adr, (unsigned int) r.size) == 1) {
-      no_esc_utf=1;
-    } else {
-      no_esc_utf=0;
-    }
-    // Hack to prevent any problems with ram files of other files
-    * ( r.adr + r.size ) = '\0';
-
-
-    // ------------------------------------------------------------
-    // analyser ce qu'il y a en mémoire (fichier html)
-    // on scanne les balises
-    // ------------------------------------------------------------
+      
+      /* Primary list or URLs */
+      if (ptr == 0) {
+        intag=1;
+        intag_start_valid=0;
+      }
+      /* Check is the file is a .js file */
+      else if (
+        (strfield2(r->contenttype,"application/x-javascript")!=0)
+        || (strfield2(r->contenttype,"text/css")!=0)
+        ) {      /* JavaScript js file */
+        inscript=1; 
+        inscript_name="script";
+        intag=1;     // because après <script> on y est .. - pas utile
+        intag_start_valid=0;    // OUI car nous sommes dans du code, plus dans du "vrai" tag
+        if ((opt->debug>1) && (opt->log!=NULL)) {
+          fspc(opt->log,"debug"); fprintf(opt->log,"note: this file is a javascript file"LF); test_flush;
+        }
+        // all links must be checked against parent, not this link
+        if (liens[ptr]->precedent != 0) {
+          parent_relative=1;
+        }
+      }
+      /* Or a real audio */
+      else if (strfield2(r->contenttype,"audio/x-pn-realaudio")!=0) {      /* realaudio link file */
+        inscript=intag=1;
+        inscript_name="media";
+        intag_start_valid=0;
+        in_media="RAM";       // real media!
+      }
+      // Detect UTF8 format
+      if (is_unicode_utf8((unsigned char*) r->adr, (unsigned int) r->size) == 1) {
+        no_esc_utf=1;
+      } else {
+        no_esc_utf=0;
+      }
+      // Hack to prevent any problems with ram files of other files
+      * ( r->adr + r->size ) = '\0';
+      
+      
+      // ------------------------------------------------------------
+      // analyser ce qu'il y a en mémoire (fichier html)
+      // on scanne les balises
+      // ------------------------------------------------------------
 #if HTS_ANALYSTE
-    _hts_in_html_done=0;     // 0% scannés
-    _hts_cancel=0;           // pas de cancel
-    _hts_in_html_parsing=1;  // flag pour indiquer un parsing
+      _hts_in_html_done=0;     // 0% scannés
+      _hts_cancel=0;           // pas de cancel
+      _hts_in_html_parsing=1;  // flag pour indiquer un parsing
 #endif
-    base[0]='\0';    // effacer base-href
-    lastsaved=adr;
-    do {
-      int p=0;
-      int valid_p=0;      // force to take p even if == 0
-      int ending_p='\0';  // ending quote?
-      error=0;
-
-      /* Hack to avoid NULL char problems with C syntax */
-      /* Yes, some bogus HTML pages can embed null chars
-         and therefore can not be properly handled if this hack is not done
-      */
-      if ( ! (*adr) ) {
-        if ( ((int) (adr - r.adr)) < r.size)
-          *adr=' ';
-      }
-
-
-
-      /*
-      index.html built here
-      */
-      // Construction index.html (sommaire)
-      // Avant de tester les a href,
-      // Ici on teste si l'on doit construire l'index vers le(s) site(s) miroir(s)
-      if (!makeindex_done) {  // autoriation d'écrire un index
-        if (!detect_title) {
-          if (opt.depth == liens[ptr]->depth) {    // on note toujours les premiers liens
-            if (!in_media) {
-              if (opt.makeindex && (ptr>0)) {
-                if (opt.getmode & 1) {  // autorisation d'écrire
-                  p=strfield(adr,"title");  
-                  if (p) {
-                    if (*(adr-1)=='/') p=0;    // /title
-                  } else {
-                    if (strfield(adr,"/html"))
-                      p=-1;                    // noter, mais sans titre
-                    else if (strfield(adr,"body"))
-                      p=-1;                    // noter, mais sans titre
-                    else if ( ((int) (adr - r.adr) ) >= (r.size-1) )
-                      p=-1;                    // noter, mais sans titre
-                    else if ( (int) (adr - r.adr) >= r.size - 2)   // we got to hurry
-                      p=-1; // xxc xxc xxc
-                  }
-                } else
-                  p=0;
-                
-                if (p) {    // ok center                            
-                  if (makeindex_fp==NULL) {
-                    verif_backblue(opt.path_html);    // générer gif
-                    makeindex_fp=filecreate(fconcat(opt.path_html,"index.html"));
-                    if (makeindex_fp!=NULL) {
-
-                      // Header
-                      fprintf(makeindex_fp,template_header,
-                        "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"
-                        );
-
-                    } else makeindex_done=-1;    // fait, erreur
-                  }
-                  
-                  if (makeindex_fp!=NULL) {
-                    char tempo[HTS_URLMAXSIZE*2];
-                    char s[HTS_URLMAXSIZE*2];
-                    char* a=NULL;
-                    char* b=NULL;
-                    s[0]='\0';
-                    if (p>0) {
-                      a=strchr(adr,'>');
-                      if (a!=NULL) {
-                        a++;
-                        while(is_space(*a)) a++;    // sauter espaces & co
-                        b=strchr(a,'<');   // prochain tag
-                      }
+      base[0]='\0';    // effacer base-href
+      lastsaved=adr;
+      do {
+        int p=0;
+        int valid_p=0;      // force to take p even if == 0
+        int ending_p='\0';  // ending quote?
+        int archivetag_p=0;  // avoid multiple-archives with commas
+        INSCRIPT inscript_state_pos_prev=inscript_state_pos;
+        error=0;
+        
+        /* Hack to avoid NULL char problems with C syntax */
+        /* Yes, some bogus HTML pages can embed null chars
+        and therefore can not be properly handled if this hack is not done
+        */
+        if ( ! (*adr) ) {
+          if ( ((int) (adr - r->adr)) < r->size)
+            *adr=' ';
+        }
+        
+        
+        
+        /*
+        index.html built here
+        */
+        // Construction index.html (sommaire)
+        // Avant de tester les a href,
+        // Ici on teste si l'on doit construire l'index vers le(s) site(s) miroir(s)
+        if (!makeindex_done) {  // autoriation d'écrire un index
+          if (!detect_title) {
+            if (opt->depth == liens[ptr]->depth) {    // on note toujours les premiers liens
+              if (!in_media) {
+                if (opt->makeindex && (ptr>0)) {
+                  if (opt->getmode & 1) {  // autorisation d'écrire
+                    p=strfield(adr,"title");  
+                    if (p) {
+                      if (*(adr-1)=='/') p=0;    // /title
+                    } else {
+                      if (strfield(adr,"/html"))
+                        p=-1;                    // noter, mais sans titre
+                      else if (strfield(adr,"body"))
+                        p=-1;                    // noter, mais sans titre
+                      else if ( ((int) (adr - r->adr) ) >= (r->size-1) )
+                        p=-1;                    // noter, mais sans titre
+                      else if ( (int) (adr - r->adr) >= r->size - 2)   // we got to hurry
+                        p=-1; // xxc xxc xxc
                     }
-                    if (lienrelatif(tempo,liens[ptr]->sav,concat(opt.path_html,"index.html"))==0) {
-                      detect_title=1;      // ok détecté pour cette page!
-                      makeindex_links++;   // un de plus
-                      strcpy(makeindex_firstlink,tempo);
-                      //
-                      if ((b==a) || (a==NULL) || (b==NULL)) {    // pas de titre
-                        strcpy(s,tempo);
-                      } else if ((b-a)<256) {
-                        b--;
-                        while(is_space(*b)) b--;
-                        strncpy(s,a,b-a+1);
-                        *(s+(b-a)+1)='\0';
+                  } else
+                    p=0;
+                  
+                  if (p) {    // ok center                            
+                    if (makeindex_fp==NULL) {
+                      verif_backblue(opt,opt->path_html);    // générer gif
+                      makeindex_fp=filecreate(fconcat(opt->path_html,"index.html"));
+                      if (makeindex_fp!=NULL) {
+                        
+                        // Header
+                        fprintf(makeindex_fp,template_header,
+                          "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"
+                          );
+                        
+                      } else makeindex_done=-1;    // fait, erreur
+                    }
+                    
+                    if (makeindex_fp!=NULL) {
+                      char tempo[HTS_URLMAXSIZE*2];
+                      char s[HTS_URLMAXSIZE*2];
+                      char* a=NULL;
+                      char* b=NULL;
+                      s[0]='\0';
+                      if (p>0) {
+                        a=strchr(adr,'>');
+                        if (a!=NULL) {
+                          a++;
+                          while(is_space(*a)) a++;    // sauter espaces & co
+                          b=strchr(a,'<');   // prochain tag
+                        }
                       }
+                      if (lienrelatif(tempo,liens[ptr]->sav,concat(opt->path_html,"index.html"))==0) {
+                        detect_title=1;      // ok détecté pour cette page!
+                        makeindex_links++;   // un de plus
+                        strcpybuff(makeindex_firstlink,tempo);
+                        //
 
-                      // Body
-                      fprintf(makeindex_fp,template_body,
-                        tempo,
-                        s
-                        );
+                        /* Hack */
+                        if (opt->mimehtml) {
+                          strcpybuff(makeindex_firstlink, "cid:primary/primary");
+                        }
 
+                        if ((b==a) || (a==NULL) || (b==NULL)) {    // pas de titre
+                          strcpybuff(s,tempo);
+                        } else if ((b-a)<256) {
+                          b--;
+                          while(is_space(*b)) b--;
+                          strncpy(s,a,b-a+1);
+                          *(s+(b-a)+1)='\0';
+                        }
+                        
+                        // Body
+                        fprintf(makeindex_fp,template_body,
+                          tempo,
+                          s
+                          );
+                        
+                      }
                     }
                   }
                 }
               }
+              
+            } else if (liens[ptr]->depth<opt->depth) {   // on a sauté level1+1 et level1
+              HT_INDEX_END;
             }
-            
-          } else if (liens[ptr]->depth<opt.depth) {   // on a sauté level1+1 et level1
-            HT_INDEX_END;
-          }
-        } // if (opt.makeindex)
-      }
-      // FIN Construction index.html (sommaire)
-      /*
-      end -- index.html built here
-      */
-      
-
-
-      /* Parse */
-      if (
-           (*adr=='<')    /* No starting tag */
-        && (!inscript)    /* Not in (java)script */
-        && (!incomment)   /* Not in comment (<!--) */
-      ) { 
-        intag=1;
-        parseall_incomment=0;
-        //inquote=0;  // effacer quote
-        intag_start=adr; intag_start_valid=1;
-        codebase[0]='\0';    // effacer éventuel codebase
+          } // if (opt->makeindex)
+        }
+        // FIN Construction index.html (sommaire)
+        /*
+        end -- index.html built here
+        */
         
-        if (opt.getmode & 1) {  // sauver html
-          p=strfield(adr,"</html");
-          if (p==0) p=strfield(adr,"<head>");
-          // if (p==0) p=strfield(adr,"<doctype");
-          if (p) {
-            if (strnotempty(opt.footer)) {
-              char tempo[1024+HTS_URLMAXSIZE*2];
-              char gmttime[256];
-              char* eol="\n";
-              tempo[0]='\0';
-              if (strchr(r.adr,'\r'))
-                eol="\r\n";
-              time_gmt_rfc822(gmttime);
-              strcat(tempo,eol);
-              sprintf(tempo+strlen(tempo),opt.footer,jump_identification(urladr),urlfil,gmttime,"","","","","","","","");
-              strcat(tempo,eol);
-              //fwrite(tempo,1,strlen(tempo),fp);
-              HT_ADD(tempo);
-            }
-          }
-        }        
         
-        // éliminer les <!-- (commentaires) : intag dévalidé
-        if (*(adr+1)=='!')
-          if (*(adr+2)=='-')
-            if (*(adr+3)=='-') {
-              intag=0;
-              incomment=1;
-              intag_start_valid=0;
-            }
-            
-      }
-      else if (
-           (*adr=='>')                        /* ending tag */
-        && ( (!inscript) || (inscript_tag) )  /* and in tag (or in script) */
-      ) {
-        if (inscript_tag) {
-          inscript_tag=inscript=0;
-          intag=0;
-          incomment=0;
-          intag_start_valid=0;
-        } else if (!incomment) {
-          intag=0; //inquote=0;
+        
+        /* Parse */
+        if (
+          (*adr=='<')    /* No starting tag */
+          && (!inscript)    /* Not in (java)script */
+          && (!incomment)   /* Not in comment (<!--) */
+          ) { 
+          intag=1;
+          //parseall_incomment=0;
+          //inquote=0;  // effacer quote
+          intag_start=adr; intag_start_valid=1;
+          codebase[0]='\0';    // effacer éventuel codebase
           
-          // entrée dans du javascript?
-          // on parse ICI car il se peut qu'on ait eu a parser les src=.. dedans
-          //if (!inscript) {  // sinon on est dans un obj.write("..
-          if ((intag_start_valid) && 
-            (
-            check_tag(intag_start,"script")
-            ||
-            check_tag(intag_start,"style")
-            )
-            ) {
-            char* a=intag_start;    // <
-            // ** while(is_realspace(*(--a)));
-            if (*a=='<') {  // sûr que c'est un tag?
-              inscript=1;
-              intag=1;     // because après <script> on y est .. - pas utile
-              intag_start_valid=0;    // OUI car nous sommes dans du code, plus dans du "vrai" tag
+          if (opt->getmode & 1) {  // sauver html
+            p=strfield(adr,"</html");
+            if (p==0) p=strfield(adr,"<head>");
+            // if (p==0) p=strfield(adr,"<doctype");
+            if (p) {
+              char* eol="\n";
+              if (strchr(r->adr,'\r'))
+                eol="\r\n";
+              if (strnotempty(opt->footer)) {
+                char tempo[1024+HTS_URLMAXSIZE*2];
+                char gmttime[256];
+                tempo[0]='\0';
+                time_gmt_rfc822(gmttime);
+                strcatbuff(tempo,eol);
+                sprintf(tempo+strlen(tempo),opt->footer,jump_identification(urladr),urlfil,gmttime,HTTRACK_VERSIONID,"","","","","","","");
+                strcatbuff(tempo,eol);
+                //fwrite(tempo,1,strlen(tempo),fp);
+                HT_ADD(tempo);
+              }
+              if (r->charset[0]) {
+                HT_ADD("<meta http-equiv=\"content-type\" content=\"text/html;charset=");
+                HT_ADD(r->charset);
+                HT_ADD("\">");
+                HT_ADD(eol);
+              }
             }
-          }
-        } else {                               /* end of comment? */
-          // vérifier fermeture correcte
-          if ( (*(adr-1)=='-') && (*(adr-2)=='-') ) {
+          }        
+          
+          // éliminer les <!-- (commentaires) : intag dévalidé
+          if (*(adr+1)=='!')
+            if (*(adr+2)=='-')
+              if (*(adr+3)=='-') {
+                intag=0;
+                incomment=1;
+                intag_start_valid=0;
+              }
+              
+        }
+        else if (
+          (*adr=='>')                        /* ending tag */
+          && ( (!inscript) || (inscript_tag) )  /* and in tag (or in script) */
+          ) {
+          if (inscript_tag) {
+            inscript_tag=inscript=0;
             intag=0;
             incomment=0;
             intag_start_valid=0;
-          }
-#if GT_ENDS_COMMENT
-          /* wrong comment ending */
-          else {
-            /* check if correct ending does not exists
-               <!-- foo > example <!-- bar > is sometimes accepted by browsers
-               when no --> is used somewhere else.. darn those browsers are dirty
-            */
-            if (!strstr(adr,"-->")) {
+          } else if (!incomment) {
+            intag=0; //inquote=0;
+            
+            // entrée dans du javascript?
+            // on parse ICI car il se peut qu'on ait eu a parser les src=.. dedans
+            //if (!inscript) {  // sinon on est dans un obj.write("..
+            if ((intag_start_valid) && 
+              (
+              check_tag(intag_start,"script")
+              ||
+              check_tag(intag_start,"style")
+              )
+              ) {
+              char* a=intag_start;    // <
+              // ** while(is_realspace(*(--a)));
+              if (*a=='<') {  // sûr que c'est un tag?
+                if (check_tag(intag_start,"script"))
+                  inscript_name="script";
+                else
+                  inscript_name="style";
+                inscript=1;
+                inscript_state_pos=INSCRIPT_START;
+                intag=1;     // because après <script> on y est .. - pas utile
+                intag_start_valid=0;    // OUI car nous sommes dans du code, plus dans du "vrai" tag
+              }
+            }
+          } else {                               /* end of comment? */
+            // vérifier fermeture correcte
+            if ( (*(adr-1)=='-') && (*(adr-2)=='-') ) {
               intag=0;
               incomment=0;
               intag_start_valid=0;
             }
-          }
-#endif
-        }
-        //}
-      }
-      //else if (*adr==34) {
-      //  inquote=(inquote?0:1);
-      //}
-      else if (intag || inscript) {    // nous sommes dans un tag/commentaire, tester si on recoit un tag
-        int p_type=0;
-        int p_nocatch=0;
-        int p_searchMETAURL=0;  // chercher ..URL=<url>
-        int add_class=0;        // ajouter .class
-        int add_class_dots_to_patch=0;   // number of '.' in code="x.y.z<realname>"
-        char* p_flush=NULL;
-        
-        
-        // ------------------------------------------------------------
-        // parsing évolé
-        // ------------------------------------------------------------
-        if (((isalpha((unsigned char)*adr)) || (*adr=='/') || (inscript) || (inscriptgen))) {  // sinon pas la peine de tester..
-
-
-          /* caractère de terminaison pour "miniparsing" javascript=.. ? 
-             (ex: <a href="javascript:()" action="foo"> ) */
-          if (inscript_tag) {
-            if (inscript_tag_lastc) {
-              if (*adr == inscript_tag_lastc) {
-                /* sortir */
-                inscript_tag=inscript=0;
+#if GT_ENDS_COMMENT
+            /* wrong comment ending */
+            else {
+            /* check if correct ending does not exists
+            <!-- foo > example <!-- bar > is sometimes accepted by browsers
+            when no --> is used somewhere else.. darn those browsers are dirty
+              */
+              if (!strstr(adr,"-->")) {
+                intag=0;
                 incomment=0;
+                intag_start_valid=0;
               }
             }
+#endif
           }
+          //}
+        }
+        //else if (*adr==34) {
+        //  inquote=(inquote?0:1);
+        //}
+        else if (intag || inscript) {    // nous sommes dans un tag/commentaire, tester si on recoit un tag
+          int p_type=0;
+          int p_nocatch=0;
+          int p_searchMETAURL=0;  // chercher ..URL=<url>
+          int add_class=0;        // ajouter .class
+          int add_class_dots_to_patch=0;   // number of '.' in code="x.y.z<realname>"
+          char* p_flush=NULL;
           
           
-          // Note:
-          // Certaines pages ne respectent pas le html
-          // notamment les guillements ne sont pas fixés
-          // Nous sommes dans un tag, donc on peut faire un test plus
-          // large pour pouvoi prendre en compte ces particularités
-          
-          // à vérifier: ACTION, CODEBASE, VRML
-          
-          if (in_media) {
-            if (strcmp(in_media,"RAM")==0) { // real media
-              p=0;
-              valid_p=1;
-            }
-          } else if (ptr>0) {        /* pas première page 0 (primary) */
-            p=0;  // saut pour le nom de fichier: adresse nom fichier=adr+p
+          // ------------------------------------------------------------
+          // parsing évolé
+          // ------------------------------------------------------------
+          if (((isalpha((unsigned char)*adr)) || (*adr=='/') || (inscript) || (inscriptgen))) {  // sinon pas la peine de tester..
             
-            // ------------------------------
-            // détection d'écriture JavaScript.
-            // osons les obj.write et les obj.href=.. ! osons!
-            // note: inscript==1 donc on sautera après les \"
-            if (inscript) {
-              if (inscriptgen) {          // on est déja dans un objet générant..
-                if (*adr==scriptgen_q) {  // fermeture des " ou '
-                  if (*(adr-1)!='\\') {   // non
-                    inscriptgen=0;        // ok parsing terminé
-                  }
-                }
-              } else {
-                char* a=NULL;
-                char check_this_fking_line=0;  // parsing code javascript..
-                char must_be_terminated=0;     // caractère obligatoire de terminaison!
-                int token_size;
-                if (!(token_size=strfield(adr,".writeln"))) // détection ...objet.write[ln]("code html")...
-                  token_size=strfield(adr,".write");
-                if (token_size) {
-                  a=adr+token_size;
-                  while(is_realspace(*a)) a++; // sauter espaces
-                  if (*a=='(') {  // début parenthèse
-                    check_this_fking_line=2;  // à parser!
-                    must_be_terminated=')';
-                    a++;  // sauter (
-                  }
-                }
-                // euhh ??? ???
-                /* else if (strfield(adr,".href")) {  // détection ...objet.href="...
-                a=adr+5;
-                while(is_realspace(*a)) a++; // sauter espaces
-                if (*a=='=') {  // ohh un égal
-                check_this_fking_line=1;  // à noter!
-                must_be_terminated=';';   // et si t'as oublié le ; tu sais pas coder
-                a++;   // sauter =
-                }
-                
-                }*/
-                
-                // on a un truc du genre instruction"code généré" dont on parse le code
-                if (check_this_fking_line) {
-                  while(is_realspace(*a)) a++;
-                  if ((*a=='\'') || (*a=='"')) {  // départ de '' ou ""
-                    char *b;
-                    int ex=0;
-                    scriptgen_q=*a;    // quote
-                    b=a+1;      // départ de la chaîne
-                    // vérifier forme ("code") et pas ("code"+var), ingérable
-                    do {
-                      a++;  // caractère suivant
-                      if (*a==scriptgen_q) if (*(a-1)!='\\')  // quote non slash
-                        ex=1;            // sortie
-                      if ((*a==10) || (*a==13))
-                        ex=1;
-                    } while(!ex);
-                    if (*a==scriptgen_q) {  // fin du quote
-                      a++;
-                      while(is_realspace(*a)) a++;
-                      if (*a==must_be_terminated) {  // parenthèse fermante: ("..")
-                        
-                        // bon, on doit parser une ligne javascript
-                        // 1) si check.. ==1 alors c'est un nom de fichier direct, donc
-                        // on fixe p sur le saut nécessaire pour atteindre le nom du fichier
-                        // et le moteur se débrouillera ensuite tout seul comme un grand
-                        // 2) si check==2 c'est un peu plus tordu car là on génére du
-                        // code html au sein de code javascript au sein de code html
-                        // dans ce cas on doit fixer un flag à un puis ensuite dans la boucle
-                        // on devra parser les instructions standard comme <a href etc
-                        // NOTE: le code javascript autogénéré n'est pas pris en compte!!
-                        // (et ne marche pas dans 50% des cas de toute facon!)
-                        if (check_this_fking_line==1) {
-                          p=(int) (b - adr);    // calculer saut!
-                        } else {
-                          inscriptgen=1;        // SCRIPTGEN actif
-                          adr=b;                // jump
-                        }
-                        
-                        if ((opt.debug>1) && (opt.log!=NULL)) {
-                          char str[512];
-                          str[0]='\0';
-                          strncat(str,b,minimum((int) (a - b + 1), 32));
-                          fspc(opt.log,"debug"); fprintf(opt.log,"active code (%s) detected in javascript: %s"LF,(check_this_fking_line==2)?"parse":"pickup",str); test_flush;
-                        }
-                      }
-                      
-                    }
-                    
-                  }
-                  
-                  
+            
+                                                                                                 /* caractère de terminaison pour "miniparsing" javascript=.. ? 
+            (ex: <a href="javascript:()" action="foo"> ) */
+            if (inscript_tag) {
+              if (inscript_tag_lastc) {
+                if (*adr == inscript_tag_lastc) {
+                  /* sortir */
+                  inscript_tag=inscript=0;
+                  incomment=0;
                 }
               }
             }
-            // fin detection code générant javascript vers html
-            // ------------------------------
-            
-            
-            // analyse proprement dite, A HREF=.. etc..
-            if (!p) {
-              // si dans un tag, et pas dans un script - sauf si on analyse un obj.write("..
-              if ((intag && (!inscript)) || inscriptgen) {
-                if ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) {   // <tag < tag etc
-                  // <A HREF=.. pour les liens HTML
-                  p=rech_tageq(adr,"href");
-                  if (p) {    // href.. tester si c'est une bas href!
-                    if ((intag_start_valid) && check_tag(intag_start,"base")) {  // oui!
-                      // ** note: base href et codebase ne font pas bon ménage..
-                      p_type=2;    // c'est un chemin
-                    }
-                  }
-                  
-                  /* Tags supplémentaires à vérifier (<img src=..> etc) */
-                  if (p==0) {
-                    int i=0;
-                    while( (p==0) && (strnotempty(hts_detect[i])) ) {
-                      p=rech_tageq(adr,hts_detect[i]);
-                      i++;
-                    }
-                  }
 
-                  /* Tags supplémentaires en début à vérifier (<object .. hotspot1=..> etc) */
-                  if (p==0) {
-                    int i=0;
-                    while( (p==0) && (strnotempty(hts_detectbeg[i])) ) {
-                      p=rech_tageqbegdigits(adr,hts_detectbeg[i]);
-                      i++;
+            /* automate */
+            if (inscript) {
+              int new_state_pos;
+              new_state_pos=inscript_state[inscript_state_pos][(unsigned char)*adr];
+              if (new_state_pos < 0) {
+                new_state_pos=inscript_state[inscript_state_pos][INSCRIPT_DEFAULT];
+              }
+              assertf(new_state_pos >= 0);
+              assertf(new_state_pos*sizeof(inscript_state[0]) < sizeof(inscript_state));
+              inscript_state_pos=new_state_pos;
+            }
+            
+            
+            // Note:
+            // Certaines pages ne respectent pas le html
+            // notamment les guillements ne sont pas fixés
+            // Nous sommes dans un tag, donc on peut faire un test plus
+            // large pour pouvoi prendre en compte ces particularités
+            
+            // à vérifier: ACTION, CODEBASE, VRML
+            
+            if (in_media) {
+              if (strcmp(in_media,"RAM")==0) { // real media
+                p=0;
+                valid_p=1;
+              }
+            } else if (ptr>0) {        /* pas première page 0 (primary) */
+              p=0;  // saut pour le nom de fichier: adresse nom fichier=adr+p
+              
+              // ------------------------------
+              // détection d'écriture JavaScript.
+              // osons les obj.write et les obj.href=.. ! osons!
+              // note: inscript==1 donc on sautera après les \"
+              if (inscript) {
+                if (inscriptgen) {          // on est déja dans un objet générant..
+                  if (*adr==scriptgen_q) {  // fermeture des " ou '
+                    if (*(adr-1)!='\\') {   // non
+                      inscriptgen=0;        // ok parsing terminé
                     }
                   }
-                  
-                  /* Tags supplémentaires à vérifier : URL=.. */
-                  if (p==0) {
-                    int i=0;
-                    while( (p==0) && (strnotempty(hts_detectURL[i])) ) {
-                      p=rech_tageq(adr,hts_detectURL[i]);
-                      i++;
+                } else {
+                  char* a=NULL;
+                  char check_this_fking_line=0;  // parsing code javascript..
+                  char must_be_terminated=0;     // caractère obligatoire de terminaison!
+                  int token_size;
+                  if (!(token_size=strfield(adr,".writeln"))) // détection ...objet.write[ln]("code html")...
+                    token_size=strfield(adr,".write");
+                  if (token_size) {
+                    a=adr+token_size;
+                    while(is_realspace(*a)) a++; // sauter espaces
+                    if (*a=='(') {  // début parenthèse
+                      check_this_fking_line=2;  // à parser!
+                      must_be_terminated=')';
+                      a++;  // sauter (
                     }
-                    if (p)
-                      p_searchMETAURL=1;
+                  }
+                  // euhh ??? ???
+                  /* else if (strfield(adr,".href")) {  // détection ...objet.href="...
+                  a=adr+5;
+                  while(is_realspace(*a)) a++; // sauter espaces
+                  if (*a=='=') {  // ohh un égal
+                  check_this_fking_line=1;  // à noter!
+                  must_be_terminated=';';   // et si t'as oublié le ; tu sais pas coder
+                  a++;   // sauter =
                   }
                   
-                  /* Tags supplémentaires à vérifier, mais à ne pas capturer */
-                  if (p==0) {
-                    int i=0;
-                    while( (p==0) && (strnotempty(hts_detectandleave[i])) ) {
-                      p=rech_tageq(adr,hts_detectandleave[i]);
-                      i++;
-                    }
-                    if (p)
-                      p_nocatch=1;      /* ne pas rechercher */
-                  }
+                }*/
                   
-                  /* Evénements */
-                  if (p==0) {
-                    int i=0;
-                    /* détection onLoad etc */
-                    while( (p==0) && (strnotempty(hts_detect_js[i])) ) {
-                      p=rech_tageq(adr,hts_detect_js[i]);
-                      i++;
-                    }
-                    /* non détecté - détecter également les onXxxxx= */
-                    if (p==0) {
-                      if ( (*adr=='o') && (*(adr+1)=='n') && isUpperLetter(*(adr+2)) ) {
-                        p=0;
-                        while(isalpha((unsigned char)adr[p]) && (p<64) ) p++;
-                        if (p<64) {
-                          while(is_space(adr[p])) p++;
-                          if (adr[p]=='=')
-                            p++;
-                          else p=0;
-                        } else p=0;
-                      }
-                    }
-                    /* OK, événement repéré */
-                    if (p) {
-                      inscript_tag_lastc=*(adr+p);     /* à attendre à la fin */
-                      adr+=p;     /* saut */
-                                  /*
-                                  On est désormais dans du code javascript
-                      */
-                      inscript_tag=inscript=1;
-                    }
-                    p=0;        /* quoi qu'il arrive, ne rien démarrer ici */
-                  }
-                  
-                  // <APPLET CODE=.. pour les applet java.. [CODEBASE (chemin..) à faire]
-                  if (p==0) {
-                    p=rech_tageq(adr,"code");
-                    if (p) {
-                      if ((intag_start_valid) && check_tag(intag_start,"applet")) {  // dans un <applet !
-                        p_type=-1;  // juste le nom de fichier+dossier, écire avant codebase 
-                        add_class=1;   // ajouter .class au besoin                         
-                        
-                        // vérifier qu'il n'y a pas de codebase APRES
-                        // sinon on swappe les deux.
-                        // pas très propre mais c'est ce qu'il y a de plus simple à faire!!
-                        
-                        {
-                          char *a;
-                          a=adr;
-                          while((*a) && (*a!='>') && (!rech_tageq(a,"codebase"))) a++;
-                          if (rech_tageq(a,"codebase")) {  // banzai! codebase=
-                            char* b;
-                            b=strchr(a,'>');
-                            if (b) {
-                              if (((int) (b - adr)) < 1000) {    // au total < 1Ko
-                                char tempo[HTS_URLMAXSIZE*2];
-                                tempo[0]='\0';
-                                strncat(tempo,a,(int) (b - a) );
-                                strcat( tempo," ");
-                                strncat(tempo,adr,(int) (a - adr - 1));
-                                // éventuellement remplire par des espaces pour avoir juste la taille
-                                while((int) strlen(tempo)<((int) (b - adr)))
-                                  strcat(tempo," ");
-                                // pas d'erreur?
-                                if ((int) strlen(tempo) == ((int) (b - adr) )) {
-                                  strncpy(adr,tempo,strlen(tempo));   // PAS d'octet nul à la fin!
-                                  p=0;    // DEVALIDER!!
-                                  p_type=0;
-                                  add_class=0;
-                                }
-                              }
-                            }
+                  // on a un truc du genre instruction"code généré" dont on parse le code
+                  if (check_this_fking_line) {
+                    while(is_realspace(*a)) a++;
+                    if ((*a=='\'') || (*a=='"')) {  // départ de '' ou ""
+                      char *b;
+                      int ex=0;
+                      scriptgen_q=*a;    // quote
+                      b=a+1;      // départ de la chaîne
+                      // vérifier forme ("code") et pas ("code"+var), ingérable
+                      do {
+                        a++;  // caractère suivant
+                        if (*a==scriptgen_q && *(a-1)!='\\')  // quote non slash
+                          ex=1;            // sortie
+                        if (*a==10 && *(a-1) != '\\'  /* LF and no continue (\) character */
+                            && ( *(a-1) != '\r' || *(a-2) != '\\' ) )  /* and not CRLF and no .. */
+                          ex=1;
+                      } while(!ex);
+                      if (*a==scriptgen_q) {  // fin du quote
+                        a++;
+                        while(is_realspace(*a)) a++;
+                        if (*a==must_be_terminated) {  // parenthèse fermante: ("..")
+                          
+                          // bon, on doit parser une ligne javascript
+                          // 1) si check.. ==1 alors c'est un nom de fichier direct, donc
+                          // on fixe p sur le saut nécessaire pour atteindre le nom du fichier
+                          // et le moteur se débrouillera ensuite tout seul comme un grand
+                          // 2) si check==2 c'est un peu plus tordu car là on génére du
+                          // code html au sein de code javascript au sein de code html
+                          // dans ce cas on doit fixer un flag à un puis ensuite dans la boucle
+                          // on devra parser les instructions standard comme <a href etc
+                          // NOTE: le code javascript autogénéré n'est pas pris en compte!!
+                          // (et ne marche pas dans 50% des cas de toute facon!)
+                          if (check_this_fking_line==1) {
+                            p=(int) (b - adr);    // calculer saut!
+                          } else {
+                            inscriptgen=1;        // SCRIPTGEN actif
+                            adr=b;                // jump
+                          }
+                          
+                          if ((opt->debug>1) && (opt->log!=NULL)) {
+                            char str[512];
+                            str[0]='\0';
+                            strncatbuff(str,b,minimum((int) (a - b + 1), 32));
+                            fspc(opt->log,"debug"); fprintf(opt->log,"active code (%s) detected in javascript: %s"LF,(check_this_fking_line==2)?"parse":"pickup",str); test_flush;
                           }
                         }
                         
                       }
+                      
                     }
+                    
+                    
                   }
-                  
-                  // liens à patcher mais pas à charger (ex: codebase)
-                  if (p==0) {  // note: si non chargé (ex: ignorer .class) patché tout de même
-                    p=rech_tageq(adr,"codebase");
-                    if (p) {
-                      if ((intag_start_valid) && check_tag(intag_start,"applet")) {  // dans un <applet !
-                        p_type=-2;
-                      } else p=-1;   // ne plus chercher
+                }
+              }
+              // fin detection code générant javascript vers html
+              // ------------------------------
+              
+              
+              // analyse proprement dite, A HREF=.. etc..
+              if (!p) {
+                // si dans un tag, et pas dans un script - sauf si on analyse un obj.write("..
+                if ((intag && (!inscript)) || inscriptgen) {
+                  if ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) {   // <tag < tag etc
+                    // <A HREF=.. pour les liens HTML
+                    p=rech_tageq(adr,"href");
+                    if (p) {    // href.. tester si c'est une bas href!
+                      if ((intag_start_valid) && check_tag(intag_start,"base")) {  // oui!
+                        // ** note: base href et codebase ne font pas bon ménage..
+                        p_type=2;    // c'est un chemin
+                      }
                     }
-                  }
-                  
-                  
-                  // Meta tags pour robots
-                  if (p==0) {
-                    if (opt.robots) {
-                      if ((intag_start_valid) && check_tag(intag_start,"meta")) {
-                        if (rech_tageq(adr,"name")) {    // name=robots.txt
-                          char tempo[1100];
-                          char* a;
-                          tempo[0]='\0';
-                          a=strchr(adr,'>');
+                    
+                    /* Tags supplémentaires à vérifier (<img src=..> etc) */
+                    if (p==0) {
+                      int i=0;
+                      while( (p==0) && (strnotempty(hts_detect[i])) ) {
+                        p=rech_tageq(adr,hts_detect[i]);
+                        if (p) {
+                          /* This is a temporary hack to avoid archive=foo.jar,bar.jar .. */
+                          if (strcmp(hts_detect[i], "archive") == 0) {
+                            archivetag_p = 1;
+                          }
+                        }
+                        i++;
+                      }
+                    }
+                    
+                    /* Tags supplémentaires en début à vérifier (<object .. hotspot1=..> etc) */
+                    if (p==0) {
+                      int i=0;
+                      while( (p==0) && (strnotempty(hts_detectbeg[i])) ) {
+                        p=rech_tageqbegdigits(adr,hts_detectbeg[i]);
+                        i++;
+                      }
+                    }
+                    
+                    /* Tags supplémentaires à vérifier : URL=.. */
+                    if (p==0) {
+                      int i=0;
+                      while( (p==0) && (strnotempty(hts_detectURL[i])) ) {
+                        p=rech_tageq(adr,hts_detectURL[i]);
+                        i++;
+                      }
+                      if (p)
+                        p_searchMETAURL=1;
+                    }
+                    
+                    /* Tags supplémentaires à vérifier, mais à ne pas capturer */
+                    if (p==0) {
+                      int i=0;
+                      while( (p==0) && (strnotempty(hts_detectandleave[i])) ) {
+                        p=rech_tageq(adr,hts_detectandleave[i]);
+                        i++;
+                      }
+                      if (p)
+                        p_nocatch=1;      /* ne pas rechercher */
+                    }
+                    
+                    /* Evénements */
+                    if (p==0 && 
+                      ! inscript          /* we don't want events inside document.write */
+                      ) {
+                      int i=0;
+                      /* détection onLoad etc */
+                      while( (p==0) && (strnotempty(hts_detect_js[i])) ) {
+                        p=rech_tageq(adr,hts_detect_js[i]);
+                        i++;
+                      }
+                      /* non détecté - détecter également les onXxxxx= */
+                      if (p==0) {
+                        if ( (*adr=='o') && (*(adr+1)=='n') && isUpperLetter(*(adr+2)) ) {
+                          p=0;
+                          while(isalpha((unsigned char)adr[p]) && (p<64) ) p++;
+                          if (p<64) {
+                            while(is_space(adr[p])) p++;
+                            if (adr[p]=='=')
+                              p++;
+                            else p=0;
+                          } else p=0;
+                        }
+                      }
+                      /* OK, événement repéré */
+                      if (p) {
+                        inscript_tag_lastc=*(adr+p);     /* à attendre à la fin */
+                        adr+=p+1;   /* saut */
+                                    /*
+                                    On est désormais dans du code javascript
+                        */
+                        inscript_name="";
+                        inscript=inscript_tag=1;
+                        inscript_state_pos=INSCRIPT_START;
+                      }
+                      p=0;        /* quoi qu'il arrive, ne rien démarrer ici */
+                    }
+                    
+                    // <APPLET CODE=.. pour les applet java.. [CODEBASE (chemin..) à faire]
+                    if (p==0) {
+                      p=rech_tageq(adr,"code");
+                      if (p) {
+                        if ((intag_start_valid) && check_tag(intag_start,"applet")) {  // dans un <applet !
+                          p_type=-1;  // juste le nom de fichier+dossier, écire avant codebase 
+                          add_class=1;   // ajouter .class au besoin                         
+                          
+                          // vérifier qu'il n'y a pas de codebase APRES
+                          // sinon on swappe les deux.
+                          // pas très propre mais c'est ce qu'il y a de plus simple à faire!!
+                          
+                          {
+                            char *a;
+                            a=adr;
+                            while((*a) && (*a!='>') && (!rech_tageq(a,"codebase"))) a++;
+                            if (rech_tageq(a,"codebase")) {  // banzai! codebase=
+                              char* b;
+                              b=strchr(a,'>');
+                              if (b) {
+                                if (((int) (b - adr)) < 1000) {    // au total < 1Ko
+                                  char tempo[HTS_URLMAXSIZE*2];
+                                  tempo[0]='\0';
+                                  strncatbuff(tempo,a,(int) (b - a) );
+                                  strcatbuff( tempo," ");
+                                  strncatbuff(tempo,adr,(int) (a - adr - 1));
+                                  // éventuellement remplire par des espaces pour avoir juste la taille
+                                  while((int) strlen(tempo)<((int) (b - adr)))
+                                    strcatbuff(tempo," ");
+                                  // pas d'erreur?
+                                  if ((int) strlen(tempo) == ((int) (b - adr) )) {
+                                    strncpy(adr,tempo,strlen(tempo));   // PAS d'octet nul à la fin!
+                                    p=0;    // DEVALIDER!!
+                                    p_type=0;
+                                    add_class=0;
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          
+                        }
+                      }
+                    }
+                    
+                    // liens à patcher mais pas à charger (ex: codebase)
+                    if (p==0) {  // note: si non chargé (ex: ignorer .class) patché tout de même
+                      p=rech_tageq(adr,"codebase");
+                      if (p) {
+                        if ((intag_start_valid) && check_tag(intag_start,"applet")) {  // dans un <applet !
+                          p_type=-2;
+                        } else p=-1;   // ne plus chercher
+                      }
+                    }
+                    
+                    
+                    // Meta tags pour robots
+                    if (p==0) {
+                      if (opt->robots) {
+                        if ((intag_start_valid) && check_tag(intag_start,"meta")) {
+                          if (rech_tageq(adr,"name")) {    // name=robots.txt
+                            char tempo[1100];
+                            char* a;
+                            tempo[0]='\0';
+                            a=strchr(adr,'>');
 #if DEBUG_ROBOTS
-                          printf("robots.txt meta tag detected\n");
+                            printf("robots.txt meta tag detected\n");
 #endif
-                          if (a) {
-                            if (((int) (a - adr)) < 999 ) {
-                              strncat(tempo,adr,(int) (a - adr));
-                              if (strstrcase(tempo,"content")) {
-                                if (strstrcase(tempo,"robots")) {
-                                  if (strstrcase(tempo,"nofollow")) {
+                            if (a) {
+                              if (((int) (a - adr)) < 999 ) {
+                                strncatbuff(tempo,adr,(int) (a - adr));
+                                if (strstrcase(tempo,"content")) {
+                                  if (strstrcase(tempo,"robots")) {
+                                    if (strstrcase(tempo,"nofollow")) {
 #if DEBUG_ROBOTS
-                                    printf("robots.txt meta tag: nofollow in %s%s\n",urladr,urlfil);
+                                      printf("robots.txt meta tag: nofollow in %s%s\n",urladr,urlfil);
 #endif
-                                    nofollow=1;       // NE PLUS suivre liens dans cette page
-                                    if (opt.errlog) {
-                                      fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Link %s%s not scanned (follow robots meta tag)"LF,urladr,urlfil);
-                                      test_flush;
+                                      nofollow=1;       // NE PLUS suivre liens dans cette page
+                                      if (opt->errlog) {
+                                        fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Link %s%s not scanned (follow robots meta tag)"LF,urladr,urlfil);
+                                        test_flush;
+                                      }
                                     }
                                   }
                                 }
@@ -674,28 +1073,46 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                         }
                       }
                     }
-                  }
-                  
-                  // entrée dans une applet javascript
-                  /*if (!inscript) {  // sinon on est dans un obj.write("..
-                  if (p==0)
-                  if (rech_sampletag(adr,"script"))
-                  if (check_tag(intag_start,"script")) {
-                  inscript=1;
-                  }
+                    
+                    // entrée dans une applet javascript
+                    /*if (!inscript) {  // sinon on est dans un obj.write("..
+                    if (p==0)
+                    if (rech_sampletag(adr,"script"))
+                    if (check_tag(intag_start,"script")) {
+                    inscript=1;
+                    }
                         }*/
-                  
-                  // Ici on procède à une analyse du code javascript pour tenter de récupérer
-                  // certains fichiers évidents.
-                  // C'est devenu obligatoire vu le nombre de pages qui intègrent
-                  // des images réactives par exemple
+                    
+                    // Ici on procède à une analyse du code javascript pour tenter de récupérer
+                    // certains fichiers évidents.
+                    // C'est devenu obligatoire vu le nombre de pages qui intègrent
+                    // des images réactives par exemple
                 }
               } else if (inscript) {
+
+#if 0
+                /* Check // javascript comments */
+                if (*adr == 10 || *adr == 13) {
+                  inscript_check_comments = 1;
+                  inscript_in_comments = 0;
+                }
+                else if (inscript_check_comments) {
+                  if (!is_realspace(*adr)) {
+                    inscript_check_comments = 0;
+                    if (adr[0] == '/' && adr[1] == '/') {
+                      inscript_in_comments = 1;
+                    }
+                  }
+                }
+#endif
+
+                /* Parse */
+                assertf(inscript_name != NULL);
                 if (
                   (
-                  (strfield(adr,"/script"))
+                  (strfield(adr,"/script") && strfield(inscript_name, "script"))
                   ||
-                  (strfield(adr,"/style"))
+                  (strfield(adr,"/style")  && strfield(inscript_name, "style"))
                   )
                   ) {
                   char* a=adr;
@@ -705,26 +1122,29 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                   if (*a=='<') {  // sûr que c'est un tag?
                     inscript=0;
                   }
-                } else {
-                  /*
-                  Script Analyzing - different types supported:
-                    foo="url"
-                    foo("url") or foo(url)
-                    foo "url"
+                } else if (inscript_state_pos == INSCRIPT_START /*!inscript_in_comments*/) {
+                /*
+                Script Analyzing - different types supported:
+                foo="url"
+                foo("url") or foo(url)
+                foo "url"
                   */
                   int nc;
                   char  expected     = '=';          // caractère attendu après
                   char* expected_end = ";";
                   int can_avoid_quotes=0;
                   char quotes_replacement='\0';
+                  int ensure_not_mime=0;
                   if (inscript_tag)
                     expected_end=";\"\'";            // voir a href="javascript:doc.location='foo'"
                   nc = strfield(adr,".src");  // nom.src="image";
                   if (!nc) nc = strfield(adr,".location");  // document.location="doc"
+                  if (!nc) nc = strfield(adr,":location");  // javascript:location="doc"
                   if (!nc) nc = strfield(adr,".href");  // document.location="doc"
                   if (!nc) if ( (nc = strfield(adr,".open")) ) { // window.open("doc",..
                     expected='(';    // parenthèse
                     expected_end="),";  // fin: virgule ou parenthèse
+                    ensure_not_mime=1;  //* ensure the url is not a mime type */
                   }
                   if (!nc) if ( (nc = strfield(adr,".replace")) ) { // window.replace("url")
                     expected='(';    // parenthèse
@@ -734,7 +1154,9 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     expected='(';    // parenthèse
                     expected_end=")";  // fin: parenthèse
                   }
-                  if (!nc) if ( (nc = strfield(adr,"url")) ) { // url(url)
+                  if (!nc) if ( (nc = strfield(adr,"url")) && (!isalnum(*(adr - 1))) 
+                                                           && *(adr - 1) != '_'
+                                                           ) { // url(url)
                     expected='(';    // parenthèse
                     expected_end=")";  // fin: parenthèse
                     can_avoid_quotes=1;
@@ -773,15 +1195,27 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                         if ((strchr(expected_end,*c)) || (*c=='\n') || (*c=='\r')) {
                           c-=(ndelim+1);
                           if ((int) (c - a + 1)) {
-                            if ((opt.debug>1) && (opt.log!=NULL)) {
-                              char str[512];
-                              str[0]='\0';
-                              strncat(str,a,minimum((int) (c - a + 1),32));
-                              fspc(opt.log,"debug"); fprintf(opt.log,"link detected in javascript: %s"LF,str); test_flush;
+                            if (ensure_not_mime) {
+                              int i = 0;
+                              while(a != NULL && hts_main_mime[i] != NULL && hts_main_mime[i][0] != '\0') {
+                                int p;
+                                if ((p=strfield(a, hts_main_mime[i])) && a[p] == '/') {
+                                  a=NULL;
+                                }
+                                i++;
+                              }
                             }
-                            p=(int) (a - adr);    // p non nul: TRAITER CHAINE COMME FICHIER
-                            if (can_avoid_quotes) {
-                              ending_p=quotes_replacement;
+                            if (a != NULL) {
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                char str[512];
+                                str[0]='\0';
+                                strncatbuff(str,a,minimum((int) (c - a + 1),32));
+                                fspc(opt->log,"debug"); fprintf(opt->log,"link detected in javascript: %s"LF,str); test_flush;
+                              }
+                              p=(int) (a - adr);    // p non nul: TRAITER CHAINE COMME FICHIER
+                              if (can_avoid_quotes) {
+                                ending_p=quotes_replacement;
+                              }
                             }
                           }
                         }
@@ -808,176 +1242,205 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
         } else if (isspace((unsigned char)*adr)) {
           intag_startattr=adr+1;        // attribute in tag (for dirty parsing)
         }
-          
-          
-          // ------------------------------------------------------------
-          // dernier recours - parsing "sale" : détection systématique des .gif, etc.
-          // risque: générer de faux fichiers parazites
-          // fix: ne parse plus dans les commentaires
-          // ------------------------------------------------------------
-          if ( (opt.parseall) && (ptr>0) && (!in_media) ) {           // option parsing "brut"
-            int incomment_justquit=0;
-            if (!is_realspace(*adr)) {
-              int noparse=0;
-
-              // Gestion des /* */
-              if (inscript) {
-                if (parseall_incomment) {
-                  if ((*adr=='/') && (*(adr-1)=='*'))
-                    parseall_incomment=0;
-                  incomment_justquit=1;       // ne pas noter dernier caractère
-                } else {
-                  if ((*adr=='/') && (*(adr+1)=='*'))
-                    parseall_incomment=1;
-                }
-              } else
-                parseall_incomment=0;
-
-              /* vérifier que l'on est pas dans un <!-- --> pur */
-              if ( (!intag) && (incomment) && (!inscript))
-                noparse=1;        /* commentaire */
-
-              // recherche d'URLs
-              if ((!parseall_incomment) && (!noparse)) {
-                if (!p) {                   // non déja trouvé
-                  if (adr != r.adr) {     // >1 caractère
-                    // scanner les chaines
-                    if ((*adr == '\"') || (*adr=='\'')) {         // "xx.gif" 'xx.gif'
-                      if (strchr("=(,",parseall_lastc)) {    // exemple: a="img.gif..
-                        char *a=adr;
-                        char stop=*adr;  // " ou '
-                        int count=0;
-                        
-                        // sauter caractères
-                        a++;
-                        // copier
-                        while((*a) && (*a!='\'') && (*a!='\"') && (count<HTS_URLMAXSIZE)) { count++; a++; }
-                        
-                        // ok chaine terminée par " ou '
-                        if ((*a == stop) && (count<HTS_URLMAXSIZE) && (count>0)) {
-                          char c;
-                          char* aend;
-                          //
-                          aend=a;     // sauver début
-                          a++;
-                          while(is_taborspace(*a)) a++;
-                          c=*a;
-                          if (strchr("),;>/+\r\n",c)) {     // exemple: ..img.gif";
-                            // le / est pour funct("img.gif" /* URL */);
-                            char tempo[HTS_URLMAXSIZE*2];
-                            char type[256];
-                            int url_ok=0;      // url valide?
-                            tempo[0]='\0'; type[0]='\0';
-                            //
-                            strncat(tempo,adr+1,count);
-                            //
-                            if ((!strchr(tempo,' ')) || inscript) {   // espace dedans: méfiance! (sauf dans code javascript)
-                              int invalid_url=0;
-
-                              // escape                              
-                              unescape_amp(tempo);
-
-                              // Couper au # ou ? éventuel
-                              {
-                                char* a=strchr(tempo,'#');
-                                if (a)
-                                  *a='\0';
-                                a=strchr(tempo,'?');
-                                if (a)
-                                  *a='\0';
-                              }
-
-                              // vérifier qu'il n'y a pas de caractères spéciaux
-                              if (!strnotempty(tempo))
-                                invalid_url=1;
-                              else if (strchr(tempo,'*')
-                                || strchr(tempo,'<')
-                                || strchr(tempo,'>'))
-                                invalid_url=1;
-                              
-                              /* non invalide? */
-                              if (!invalid_url) {
-                                // Un plus à la fin? Alors ne pas prendre sauf si extension ("/toto.html#"+tag)
-                                if (c!='+') {    // PAS de plus à la fin
-                                  char* a;
-                                  // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)                                  
-                                  //if ((strncmp(tempo,"http://",7)==0) || (strncmp(tempo,"ftp://",6)==0))  // ok pas de problème
-                                  if (
-                                       (strfield(tempo,"http:")) 
-                                    || (strfield(tempo,"ftp:"))
-#if HTS_USEOPENSSL
-                                    || (strfield(tempo,"https:"))
+        
+        
+        // ------------------------------------------------------------
+        // dernier recours - parsing "sale" : détection systématique des .gif, etc.
+        // risque: générer de faux fichiers parazites
+        // fix: ne parse plus dans les commentaires
+        // ------------------------------------------------------------
+        if ( (opt->parseall) && (ptr>0) && (!in_media) /* && (!inscript_in_comments)*/ ) {   // option parsing "brut"
+          //int incomment_justquit=0;
+          if (!is_realspace(*adr)) {
+            int noparse=0;
+            
+            // Gestion des /* */
+#if 0
+            if (inscript) {
+              if (parseall_incomment) {
+                if ((*adr=='/') && (*(adr-1)=='*'))
+                  parseall_incomment=0;
+                incomment_justquit=1;       // ne pas noter dernier caractère
+              } else {
+                if ((*adr=='/') && (*(adr+1)=='*'))
+                  parseall_incomment=1;
+              }
+            } else
+              parseall_incomment=0;
 #endif
-                                    )  // ok pas de problème
+            /* ensure automate state  0 (not in comments, quotes..) */
+            if (inscript && ( 
+              inscript_state_pos != INSCRIPT_INQUOTE && inscript_state_pos != INSCRIPT_INQUOTE2
+              ) ) {
+              noparse=1;
+            }
+            
+            /* vérifier que l'on est pas dans un <!-- --> pur */
+            if ( (!intag) && (incomment) && (!inscript))
+              noparse=1;        /* commentaire */
+            
+            // recherche d'URLs
+            if (!noparse) {
+            //if ((!parseall_incomment) && (!noparse)) {
+              if (!p) {                   // non déja trouvé
+                if (adr != r->adr) {     // >1 caractère
+                  // scanner les chaines
+                  if ((*adr == '\"') || (*adr=='\'')) {         // "xx.gif" 'xx.gif'
+                    if (strchr("=(,",parseall_lastc)) {    // exemple: a="img.gif.. (handles comments)
+                      char *a=adr;
+                      char stop=*adr;  // " ou '
+                      int count=0;
+                      
+                      // sauter caractères
+                      a++;
+                      // copier
+                      while((*a) && (*a!='\'') && (*a!='\"') && (count<HTS_URLMAXSIZE)) { count++; a++; }
+                      
+                      // ok chaine terminée par " ou '
+                      if ((*a == stop) && (count<HTS_URLMAXSIZE) && (count>0)) {
+                        char c;
+                        char* aend;
+                        //
+                        aend=a;     // sauver début
+                        a++;
+                        while(is_taborspace(*a)) a++;
+                        c=*a;
+                        if (strchr("),;>/+\r\n",c)) {     // exemple: ..img.gif";
+                          // le / est pour funct("img.gif" /* URL */);
+                          char tempo[HTS_URLMAXSIZE*2];
+                          char type[256];
+                          int url_ok=0;      // url valide?
+                          tempo[0]='\0'; type[0]='\0';
+                          //
+                          strncatbuff(tempo,adr+1,count);
+                          //
+                          if ((!strchr(tempo,' ')) || inscript) {   // espace dedans: méfiance! (sauf dans code javascript)
+                            int invalid_url=0;
+                            
+                            // escape                              
+                            unescape_amp(tempo);
+                            
+                            // Couper au # ou ? éventuel
+                            {
+                              char* a=strchr(tempo,'#');
+                              if (a)
+                                *a='\0';
+                              a=strchr(tempo,'?');
+                              if (a)
+                                *a='\0';
+                            }
+                            
+                            // vérifier qu'il n'y a pas de caractères spéciaux
+                            if (!strnotempty(tempo))
+                              invalid_url=1;
+                            else if (strchr(tempo,'*')
+                              || strchr(tempo,'<')
+                              || strchr(tempo,'>')
+                              || strchr(tempo,',')    /* list of files ? */
+                              || strchr(tempo,'\"')    /* potential parsing bug */
+                              || strchr(tempo,'\'')    /* potential parsing bug */
+                              )
+                              invalid_url=1;
+                            else if (tempo[0] == '.' && isalnum(tempo[1]))   // ".gif"
+                              invalid_url=1;
+                            
+                            /* non invalide? */
+                            if (!invalid_url) {
+                              // Un plus à la fin? Alors ne pas prendre sauf si extension ("/toto.html#"+tag)
+                              if (c!='+') {    // PAS de plus à la fin
+#if 0
+                                char* a;
+#endif
+                                // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)                                  
+                                //if ((strncmp(tempo,"http://",7)==0) || (strncmp(tempo,"ftp://",6)==0))  // ok pas de problème
+                                if (
+                                  (strfield(tempo,"http:")) 
+                                  || (strfield(tempo,"ftp:"))
+#if HTS_USEOPENSSL
+                                  || (
+                                  SSL_is_available &&
+                                  (strfield(tempo,"https:"))
+                                  )
+#endif
+                                  )  // ok pas de problème
+                                  url_ok=1;
+                                else if (tempo[strlen(tempo)-1]=='/') {        // un slash: ok..
+                                  if (inscript)   // sinon si pas javascript, méfiance (répertoire style base?)
                                     url_ok=1;
-                                  else if (tempo[strlen(tempo)-1]=='/') {        // un slash: ok..
-                                    if (inscript)   // sinon si pas javascript, méfiance (répertoire style base?)
+                                } 
+#if 0
+                                else if ((a=strchr(tempo,'/'))) {        // un slash: ok..
+                                  if (inscript) {    // sinon si pas javascript, méfiance (style "text/css")
+                                    if (strchr(a+1,'/'))     // un seul / : abandon (STYLE type='text/css')
+                                    if (!strchr(tempo,' '))  // avoid spaces (too dangerous for comments)
                                       url_ok=1;
-                                  } else if ((a=strchr(tempo,'/'))) {        // un slash: ok..
-                                    if (inscript) {    // sinon si pas javascript, méfiance (style "text/css")
-                                      if (strchr(a+1,'/'))  // un seul / : abandon (STYLE type='text/css')
-                                        url_ok=1;
-                                    }
                                   }
                                 }
-                                // Prendre si extension reconnue
-                                if (!url_ok) {
-                                  get_httptype(type,tempo,0);
-                                  if (strnotempty(type))     // type reconnu!
-                                    url_ok=1;
-                                  else if (is_dyntype(get_ext(tempo)))  // reconnu php,cgi,asp..
-                                    url_ok=1;
-                                  // MAIS pas les foobar@aol.com !!
-                                  if (strchr(tempo,'@'))
-                                    url_ok=0;
-                                }
-                                //
-                                // Ok, cela pourrait être une URL
-                                if (url_ok) {
-                                  
-                                  // Check if not fodbidden tag (id,name..)
-                                  if (intag_start_valid) {
-                                    if (intag_start)
-                                      if (intag_startattr)
-                                        if (intag)
-                                          if (!inscript)
-                                            if (!incomment) {
-                                              int i=0,nop=0;
-                                              while( (nop==0) && (strnotempty(hts_nodetect[i])) ) {
-                                                nop=rech_tageq(intag_startattr,hts_nodetect[i]);
-                                                i++;
-                                              }
-                                              // Forbidden tag
-                                              if (nop) {
-                                                url_ok=0;
-                                                if ((opt.debug>1) && (opt.log!=NULL)) {
-                                                  fspc(opt.log,"debug"); fprintf(opt.log,"dirty parsing: bad tag avoided: %s"LF,hts_nodetect[i-1]); test_flush;
-                                                }
+#endif
+                              }
+                              // Prendre si extension reconnue
+                              if (!url_ok) {
+                                get_httptype(type,tempo,0);
+                                if (strnotempty(type))     // type reconnu!
+                                  url_ok=1;
+                                else if (is_dyntype(get_ext(tempo)))  // reconnu php,cgi,asp..
+                                  url_ok=1;
+                                // MAIS pas les foobar@aol.com !!
+                                if (strchr(tempo,'@'))
+                                  url_ok=0;
+                              }
+                              //
+                              // Ok, cela pourrait être une URL
+                              if (url_ok) {
+                                
+                                // Check if not fodbidden tag (id,name..)
+                                if (intag_start_valid) {
+                                  if (intag_start)
+                                    if (intag_startattr)
+                                      if (intag)
+                                        if (!inscript)
+                                          if (!incomment) {
+                                            int i=0,nop=0;
+                                            while( (nop==0) && (strnotempty(hts_nodetect[i])) ) {
+                                              nop=rech_tageq(intag_startattr,hts_nodetect[i]);
+                                              i++;
+                                            }
+                                            // Forbidden tag
+                                            if (nop) {
+                                              url_ok=0;
+                                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                                fspc(opt->log,"debug"); fprintf(opt->log,"dirty parsing: bad tag avoided: %s"LF,hts_nodetect[i-1]); test_flush;
                                               }
                                             }
-                                  }
-                                  
-                                  
-                                  // Accepter URL, on la traitera comme une URL normale!!
-                                  if (url_ok)
-                                    p=1;
-
+                                          }
                                 }
+                                
+                                
+                                // Accepter URL, on la traitera comme une URL normale!!
+                                if (url_ok) {
+                                  valid_p = 1;
+                                  p = 0;
+                                }
+                                
                               }
                             }
+                          }
                           }
                         }
                       }
                     }
                   }
-                }  // p == 0
-                
-                // plus dans un commentaire
-                if (!incomment_justquit)
-                  parseall_lastc=*adr;             // caractère avant le prochain
+                }  // p == 0               
                 
               } // not in comment
               
+              // plus dans un commentaire
+              if ( inscript_state_pos == INSCRIPT_START 
+                && inscript_state_pos_prev == INSCRIPT_START) {
+                parseall_lastc=*adr;             // caractère avant le prochain
+              }
+
+
             }  // if realspace
           }  // if parseall
           
@@ -992,14 +1455,16 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
             char* quote_adr=NULL;     /* adresse du ? dans l'adresse */
             int ok=1;
             char quote='\0';
+            int quoteinscript=0;
+            int  noquote=0;
             
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            if ((nofollow) || (opt.state.stop))
+            if ((nofollow) || (opt->state.stop))
               p_nocatch=1;
-
+            
             // écrire codebase avant, flusher avant code
             if ((p_type==-1) || (p_type==-2)) {
-              if ((opt.getmode & 1) && (ptr>0)) {
+              if ((opt->getmode & 1) && (ptr>0)) {
                 HT_ADD_ADR;    // refresh
               }
               lastsaved=adr;    // dernier écrit+1
@@ -1007,20 +1472,31 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
             
             // sauter espaces
             adr+=p;
-            while((is_space(*adr)) && (quote=='\0')) {
+            while( ( is_space(*adr) || (
+                                        inscriptgen 
+                                        && adr[0] == '\\' 
+                                        && is_space(adr[1])
+                                       )
+                   )
+                   && quote == '\0'
+                 ) {
               if (!quote)
-                if ((*adr=='\"') || (*adr=='\''))
+                if ((*adr=='\"') || (*adr=='\'')) {
                   quote=*adr;                     // on doit attendre cela à la fin
-                                                  // puis quitter
+                  if (inscriptgen && *(adr - 1) == '\\') {
+                    quoteinscript=1;  /* will wait for \" */
+                  }
+                }
+                // puis quitter
                 adr++;    // sauter les espaces, "" et cie
             }
-
+            
             /* Stop at \n (LF) if primary links*/
             if (ptr == 0)
               quote='\n';
             /* s'arrêter que ce soit un ' ou un " : pour document.write('<img src="foo'+a); par exemple! */
             else if (inscript)
-              quote='\0';
+              noquote=1;
             
             // sauter éventuel \" ou \' javascript
             if (inscript) {    // on est dans un obj.write("..
@@ -1035,7 +1511,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
             if (p_searchMETAURL) {
               int l=0;
               while(
-                (adr + l + 4 < r.adr + r.size)
+                (adr + l + 4 < r->adr + r->size)
                 && (!strfield(adr+l,"URL=")) 
                 && (l<128) ) l++;
               if (!strfield(adr+l,"URL="))
@@ -1043,15 +1519,19 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
               else
                 adr+=(l+4);
             }
-
+            
             /* éviter les javascript:document.location=.. : les parser, plutôt */
             if (ok!=-1) {
-              if (strfield(adr,"javascript:")) {
+              if (strfield(adr,"javascript:") 
+                && ! inscript       /* we don't want to parse 'javascript:' inside document.write inside scripts */
+                ) {
                 ok=-1;
                 /*
                 On est désormais dans du code javascript
                 */
+                inscript_name="";
                 inscript_tag=inscript=1;
+                inscript_state_pos=INSCRIPT_START;
                 inscript_tag_lastc=quote;     /* à attendre à la fin */
               }
             }
@@ -1065,7 +1545,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
             
             // ne pas flusher après code si on doit écrire le codebase avant!
             if ((p_type!=-1) && (p_type!=2) && (p_type!=-2)) {
-              if ((opt.getmode & 1) && (ptr>0)) {
+              if ((opt->getmode & 1) && (ptr>0)) {
                 HT_ADD_ADR;    // refresh
               }
               lastsaved=adr;    // dernier écrit+1
@@ -1086,7 +1566,11 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 if (ok > 0) {
                   //if (*eadr!=' ') {  
                   if (is_space(*eadr)) {   // guillemets,CR, etc
-                    if ((!quote) || (*eadr==quote))     // si pas d'attente de quote spéciale ou si quote atteinte
+                    if ( 
+                            ( *eadr == quote && ( !quoteinscript || *(eadr -1) == '\\') )  // end quote
+                         || ( noquote && (*eadr == '\"' || *eadr == '\'') )       // end at any quote
+                         || (!noquote && quote == '\0' && is_realspace(*eadr) )   // unquoted href
+                       )     // si pas d'attente de quote spéciale ou si quote atteinte
                       ok=0; 
                   } else if (ending_p && (*eadr==ending_p))
                     ok=0;
@@ -1114,7 +1598,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                   //}
                 } 
                 eadr++;
-              } while(ok==1);     
+              } while(ok==1);
               
               // Empty link detected
               if ( (((int) (eadr - adr))) <= 1) {       // link empty
@@ -1122,12 +1606,17 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 if (*adr != '#') {        // Not empty+unique #
                   if ( (((int) (eadr - adr)) == 1)) {       // 1=link empty with delim (end_adr-start_adr)
                     if (quote) {
-                      if ((opt.getmode & 1) && (ptr>0)) { 
+                      if ((opt->getmode & 1) && (ptr>0)) { 
                         HT_ADD("#");        // We add this for a <href="">
                       }
                     }
                   }
                 }
+              }
+
+              // This is a dirty and horrible hack to avoid parsing an Adobe GoLive bogus tag
+              if (strfield(adr, "(Empty Reference!)")) {
+                ok=-1;        // No
               }
               
             }
@@ -1145,7 +1634,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 //printf("link: %s\n",lien);          
                 // supprimer les espaces
                 while((lien[strlen(lien)-1]==' ') && (strnotempty(lien))) lien[strlen(lien)-1]='\0';
-
+                
                 
 #if HTS_STRIP_DOUBLE_SLASH
                 // supprimer les // en / (sauf pour http://)
@@ -1169,14 +1658,14 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     } else {
                       char tempo[HTS_URLMAXSIZE*2];
                       tempo[0]='\0';
-                      strncat(tempo,a,(int) p - (int) a);
-                      strcat (tempo,p+1);
-                      strcpy(a,tempo);    // recopier
+                      strncatbuff(tempo,a,(int) p - (int) a);
+                      strcatbuff (tempo,p+1);
+                      strcpybuff(a,tempo);    // recopier
                     }
                   }
                 }
 #endif
-
+                
               } else
                 lien[0]='\0';    // erreur
               
@@ -1194,57 +1683,61 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 // 0: autorisé
                 // 1: interdit (patcher tout de même adresse)
                 
-                if ((opt.debug>1) && (opt.log!=NULL)) {
-                  fspc(opt.log,"debug"); fprintf(opt.log,"link detected in html: %s"LF,lien); test_flush;
+                if ((opt->debug>1) && (opt->log!=NULL)) {
+                  fspc(opt->log,"debug"); fprintf(opt->log,"link detected in html: %s"LF,lien); test_flush;
                 }
-
+                
                 // external check
 #if HTS_ANALYSTE
                 if (!hts_htmlcheck_linkdetected(lien)) {
                   error=1;    // erreur
-                  if (opt.errlog) {
-                    fspc(opt.errlog,"error"); fprintf(opt.errlog,"Link %s refused by external wrapper"LF,lien);
+                  if (opt->errlog) {
+                    fspc(opt->errlog,"error"); fprintf(opt->errlog,"Link %s refused by external wrapper"LF,lien);
                     test_flush;
                   }
                 }
 #endif
                 
                 // purger espaces de début et fin, CR,LF résiduels
-                // (IMG SRC="foo.<\n>gif")
+                // (IMG SRC="foo.<\n><\t>gif<\t>")
                 {
-                  char* a;
-                  while (is_realspace(lien[0])) {
-                    char tempo[HTS_URLMAXSIZE*2];
-                    tempo[0]='\0';
-                    strcpy(tempo,lien+1);
-                    strcpy(lien,tempo);
-                  }
-                  while(strnotempty(lien)
-                        && (is_realspace(lien[max(0,(int)(strlen(lien))-1)])) ) {
-                    lien[strlen(lien)-1]='\0';
+                  char* a = lien;
+                  int llen;
+
+                  // strip ending spaces
+                  llen = ( *a != '\0' ) ? strlen(a) : 0;
+                  while(llen > 0 && is_realspace(lien[llen - 1]) ) {
+                    a[--llen]='\0';
                   } 
-                  while ((a=strchr(lien,'\n'))) {
-                    char tempo[HTS_URLMAXSIZE*2];
-                    tempo[0]='\0';
-                    strncat(tempo,lien,(int) (a - lien));
-                    strcat(tempo,a+1);
-                    strcpy(lien,tempo);
+                  //  skip leading ones
+                  while(is_realspace(*a)) a++;
+                  // strip cr, lf, tab inside URL
+                  llen = 0;
+                  while(*a) {
+                    if (*a != '\n' && *a != '\r' && *a != '\t') {
+                      lien[llen++] = *a;
+                    }
+                    a++;
                   }
-                  while ((a=strchr(lien,'\r'))) {
-                    char tempo[HTS_URLMAXSIZE*2];
-                    tempo[0]='\0';
-                    strncat(tempo,lien,(int) (a - lien));
-                    strcat(tempo,a+1);
-                    strcpy(lien,tempo);
-                  }
+                  lien[llen] = '\0';
                 }
+
+                // commas are forbidden
+                if (archivetag_p) {
+                  if (strchr(lien, ',')) {
+                    error=1;    // erreur
+                    if ((opt->debug>1) && (opt->log!=NULL)) {
+                      fspc(opt->log,"debug"); fprintf(opt->log,"link rejected (multiple-archive) %s"LF,lien); test_flush;
+                    }
+                  }
+                }               
                 
                 /* Unescape/escape %20 and other &nbsp; */
                 {
                   char query[HTS_URLMAXSIZE*2];
                   char* a=strchr(lien,'?');
                   if (a) {
-                    strcpy(query,a);
+                    strcpybuff(query,a);
                     *a='\0';
                   } else
                     query[0]='\0';
@@ -1252,10 +1745,11 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                   unescape_amp(lien);
                   unescape_amp(query);
                   // décoder l'inutile (%2E par exemple) et coder espaces
-                  // XXXXXXXXXXXXXXXXX strcpy(lien,unescape_http(lien));
-                  strcpy(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
+                  // XXXXXXXXXXXXXXXXX strcpybuff(lien,unescape_http(lien));
+                  strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
+                  escape_remove_control(lien);
                   escape_spc_url(lien);
-                  strcat(lien,query);     /* restore */
+                  strcatbuff(lien,query);     /* restore */
                 }
                 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
@@ -1267,11 +1761,11 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 // supprimer le(s) ./
                 while ((lien[0]=='.') && (lien[1]=='/')) {
                   char tempo[HTS_URLMAXSIZE*2];
-                  strcpy(tempo,lien+2);
-                  strcpy(lien,tempo);
+                  strcpybuff(tempo,lien+2);
+                  strcpybuff(lien,tempo);
                 }
                 if (strnotempty(lien)==0)  // sauf si plus de nom de fichier
-                  strcpy(lien,"./");
+                  strcpybuff(lien,"./");
                 
                 // vérifie les /~machin -> /~machin/
                 // supposition dangereuse?
@@ -1282,7 +1776,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                   // éviter aussi index~1.html
                   while (((int) a>(int) lien) && (*a!='~') && (*a!='/') && (*a!='.')) a--;
                   if (*a=='~') {
-                    strcat(lien,"/");    // ajouter slash
+                    strcatbuff(lien,"/");    // ajouter slash
                   }
                 }
 #endif
@@ -1305,7 +1799,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     } while((b != a) && (b));
                   }
                 }
-                
+
                 // éliminer les éventuels :80 (port par défaut!)
                 if (link_has_authority(lien)) {
                   char * a;
@@ -1329,9 +1823,9 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     if (port==defport) {  // port 80, default - c'est débile
                       char tempo[HTS_URLMAXSIZE*2];
                       tempo[0]='\0';
-                      strncat(tempo,lien,(int) (a - lien));
-                      strcat(tempo,a+3);  // sauter :80
-                      strcpy(lien,tempo);
+                      strncatbuff(tempo,lien,(int) (a - lien));
+                      strcatbuff(tempo,a+3);  // sauter :80
+                      strcpybuff(lien,tempo);
                     }
                   }
                 }
@@ -1339,9 +1833,9 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                 // filtrer les parazites (mailto & cie)
                 /*
                 if (strfield(lien,"mailto:")) {  // ne pas traiter
-                  error=1;
+                error=1;
                 } else if (strfield(lien,"news:")) {  // ne pas traiter
-                  error=1;
+                error=1;
                 }
                 */
                 
@@ -1351,16 +1845,16 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     char *a = lien+strlen(lien)-1;
                     while(( a > lien) && (*a!='/') && (*a!='.')) a--;
                     if (*a != '.')
-                      strcat(lien,".class");    // ajouter .class
+                      strcatbuff(lien,".class");    // ajouter .class
                     else if (!strfield2(a,".class"))
-                      strcat(lien,".class");    // idem
+                      strcatbuff(lien,".class");    // idem
                   }
                 }
                 
                 // si c'est un chemin, alors vérifier (toto/toto.html -> http://www/toto/)
                 if (!error) {
-                  if ((opt.debug>1) && (opt.log!=NULL)) {
-                    fspc(opt.log,"debug"); fprintf(opt.log,"position link check %s"LF,lien); test_flush;
+                  if ((opt->debug>1) && (opt->log!=NULL)) {
+                    fspc(opt->log,"debug"); fprintf(opt->log,"position link check %s"LF,lien); test_flush;
                   }
                   
                   if ((p_type==2) || (p_type==-2)) {   // code ou codebase                        
@@ -1368,14 +1862,24 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     if (p_type==-2) {    // codebase
                       if (strnotempty(lien)) {
                         if (fil[strlen(lien)-1]!='/') {  // pas répertoire
-                          strcat(lien,"/");
+                          strcatbuff(lien,"/");
                         }
                       }
                     }
+
+                    /* base has always authority */
+                    if (p_type==2 && !link_has_authority(lien)) {
+                      char tmp[HTS_URLMAXSIZE*2];
+                      strcpybuff(tmp, "http://");
+                      strcatbuff(tmp, lien);
+                      strcpybuff(lien, tmp);
+                    }
+
                     /* only one ending / (bug on some pages) */
                     if ((int)strlen(lien)>2) {
-                      while( (lien[strlen(lien)-2]=='/') && ((int)strlen(lien)>2) )    /* double // (bug) */
-                        lien[strlen(lien)-1]='\0';
+                      int len = (int) strlen(lien);
+                      while(len > 1 && lien[len-1] == '/' && lien[len-2] == '/' )    /* double // (bug) */
+                        lien[--len]='\0';
                     }
                     // copier nom host si besoin est
                     if (!link_has_authority(lien)) {  // pas de http://
@@ -1383,11 +1887,11 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                       if (ident_url_relatif(lien,urladr,urlfil,adr2,fil2)<0) {                        
                         error=1;
                       } else {
-                        strcpy(lien,"http://");
-                        strcat(lien,adr2);
+                        strcpybuff(lien,"http://");
+                        strcatbuff(lien,adr2);
                         if (*fil2!='/')
-                          strcat(lien,"/");
-                        strcat(lien,fil2);
+                          strcatbuff(lien,"/");
+                        strcatbuff(lien,fil2);
                         {
                           char* a;
                           a=lien+strlen(lien)-1;
@@ -1397,12 +1901,12 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                           }
                         }
                         //char tempo[HTS_URLMAXSIZE*2];
-                        //strcpy(tempo,"http://");
-                        //strcat(tempo,urladr);    // host
+                        //strcpybuff(tempo,"http://");
+                        //strcatbuff(tempo,urladr);    // host
                         //if (*lien!='/')
-                        //  strcat(tempo,"/");
-                        //strcat(tempo,lien);
-                        //strcpy(lien,tempo);
+                        //  strcatbuff(tempo,"/");
+                        //strcatbuff(tempo,lien);
+                        //strcpybuff(lien,tempo);
                       }
                     }
                     
@@ -1421,19 +1925,19 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                       // stocker base ou codebase?
                       switch(p_type) {
                       case 2: { 
-                        //if (*lien!='/') strcat(base,"/");
-                        strcpy(base,lien);
+                        //if (*lien!='/') strcatbuff(base,"/");
+                        strcpybuff(base,lien);
                               }
                         break;      // base
                       case -2: {
-                        //if (*lien!='/') strcat(codebase,"/");
-                        strcpy(codebase,lien); 
+                        //if (*lien!='/') strcatbuff(codebase,"/");
+                        strcpybuff(codebase,lien); 
                                }
                         break;  // base
                       }
                       
-                      if ((opt.debug>1) && (opt.log!=NULL)) {
-                        fspc(opt.log,"debug"); fprintf(opt.log,"code/codebase link %s base %s"LF,lien,base); test_flush;
+                      if ((opt->debug>1) && (opt->log!=NULL)) {
+                        fspc(opt->log,"debug"); fprintf(opt->log,"code/codebase link %s base %s"LF,lien,base); test_flush;
                       }
                       //printf("base code: %s - %s\n",lien,base);
                     }
@@ -1449,438 +1953,463 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                     // ajouter chemin de base href..
                     if (strnotempty(_base)) {       // considérer base
                       if (!link_has_authority(lien)) {    // non absolue
-                        //if (*lien!='/') {           // non absolu sur le site (/)
-                        if ( ((int) strlen(_base)+(int) strlen(lien))<HTS_URLMAXSIZE) {
-                          // mailto: and co: do NOT add base
-                          if (ident_url_relatif(lien,urladr,urlfil,adr,fil)>=0) {
-                            char tempo[HTS_URLMAXSIZE*2];
-                            // base est absolue
-                            strcpy(tempo,_base);
-                            strcat(tempo,lien + ((*lien=='/')?1:0) );
-                            strcpy(lien,tempo);        // patcher en considérant base
-                            // ** vérifier que ../ fonctionne (ne doit pas arriver mais bon..)
-                            
-                            if ((opt.debug>1) && (opt.log!=NULL)) {
-                              fspc(opt.log,"debug"); fprintf(opt.log,"link modified with code/codebase %s"LF,lien); test_flush;
+                        if (*lien!='/') {           // non absolu sur le site (/)
+                          if ( ((int) strlen(_base)+(int) strlen(lien))<HTS_URLMAXSIZE) {
+                            // mailto: and co: do NOT add base
+                            if (ident_url_relatif(lien,urladr,urlfil,adr,fil)>=0) {
+                              char tempo[HTS_URLMAXSIZE*2];
+                              // base est absolue
+                              strcpybuff(tempo,_base);
+                              strcatbuff(tempo,lien + ((*lien=='/')?1:0) );
+                              strcpybuff(lien,tempo);        // patcher en considérant base
+                              // ** vérifier que ../ fonctionne (ne doit pas arriver mais bon..)
+                              
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                fspc(opt->log,"debug"); fprintf(opt->log,"link modified with code/codebase %s"LF,lien); test_flush;
+                              }
+                            }
+                          } else {
+                            error=1;    // erreur
+                            if (opt->errlog) {
+                              fspc(opt->errlog,"error"); fprintf(opt->errlog,"Link %s too long with base href"LF,lien);
+                              test_flush;
                             }
                           }
                         } else {
-                          error=1;    // erreur
-                          if (opt.errlog) {
-                            fspc(opt.errlog,"error"); fprintf(opt.errlog,"Link %s too long with base href"LF,lien);
-                            test_flush;
-                          }
-                        }
-                        //}
-                      }
-                    }
-                    
-                    
-                  }
-                  }
-                  
-                  
-                  // transformer lien quelconque (http, relatif, etc) en une adresse
-                  // et un chemin+fichier (adr,fil)
-                  if (!error) {
-                    int reponse;
-                    if ((opt.debug>1) && (opt.log!=NULL)) {
-                      fspc(opt.log,"debug"); fprintf(opt.log,"build relative link %s with %s%s"LF,lien,urladr,urlfil); test_flush;
-                    }
-                    if ((reponse=ident_url_relatif(lien,urladr,urlfil,adr,fil))<0) {                        
-                      adr[0]='\0';    // erreur
-                      if (reponse==-2) {
-                        if (opt.errlog) {
-                          fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Link %s not caught (unknown ftp:// protocol)"LF,lien);
-                          test_flush;
-                        }
-                      } else {
-                        if ((opt.debug>1) && (opt.errlog!=NULL)) {
-                          fspc(opt.errlog,"debug"); fprintf(opt.errlog,"ident_url_relatif failed for %s with %s%s"LF,lien,urladr,urlfil); test_flush;
-                        }
-                      }
-                    }
-                  } else {
-                    if ((opt.debug>1) && (opt.log!=NULL)) {
-                      fspc(opt.log,"debug"); fprintf(opt.log,"link %s not build, error detected before"LF,lien); test_flush;
-                    }
-                    adr[0]='\0';
-                  }
-                  
-#if HTS_CHECK_STRANGEDIR
-                  // !ATTENTION!
-                  // Ici on teste les exotiques du genre www.truc.fr/machin (sans slash à la fin)
-                  // je n'ai pas encore trouvé le moyen de faire la différence entre un répertoire
-                  // et un fichier en http A PRIORI : je fais donc un test
-                  // En cas de moved xxx, on recalcule adr et fil, tout simplement
-                  // DEFAUT: test effectué plusieurs fois! à revoir!!!
-                  if ((adr[0]!='\0') && (strcmp(adr,"file://") && (p_type!=2) && (p_type!=-2)) {
-                    //## if ((adr[0]!='\0') && (adr[0]!=lOCAL_CHAR) && (p_type!=2) && (p_type!=-2)) {
-                    if (fil[strlen(fil)-1]!='/') {  // pas répertoire
-                      if (ishtml(fil)==-2) {    // pas d'extension
-                        char loc[HTS_URLMAXSIZE*2];  // éventuelle nouvelle position
-                        loc[0]='\0';
-                        if ((opt.debug>1) && (opt.log!=NULL)) {
-                          fspc(opt.log,"debug"); fprintf(opt.log,"link-check-directory: %s%s"LF,adr,fil);
-                          test_flush;
-                        }
-                        
-                        // tester éventuelle nouvelle position
-                        switch (http_location(adr,fil,loc).statuscode) {
-                        case 200: // ok au final
-                          if (strnotempty(loc)) {  // a changé d'adresse
-                            if (opt.errlog) {
-                              fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Link %s%s has moved to %s for %s%s"LF,adr,fil,loc,urladr,urlfil);
-                              test_flush;
-                            }
-                            
-                            // recalculer adr et fil!
-                            if (ident_url_absolute(loc,adr,fil)==-1) {
-                              adr[0]='\0';  // cancel
-                              if ((opt.debug>1) && (opt.log!=NULL)) {
-                                fspc(opt.log,"debug"); fprintf(opt.log,"link-check-dir: %s%s"LF,adr,fil);
+                          char badr[HTS_URLMAXSIZE*2], bfil[HTS_URLMAXSIZE*2];
+                          if (ident_url_absolute(_base, badr, bfil) >=0 ) {
+                            if ( ((int) strlen(badr)+(int) strlen(lien)) < HTS_URLMAXSIZE) {
+                              char tempo[HTS_URLMAXSIZE*2];
+                              // base est absolue
+                              tempo[0] = '\0';
+                              if (!link_has_authority(badr)) {
+                                strcatbuff(tempo, "http://");
+                              }
+                              strcatbuff(tempo,badr);
+                              strcatbuff(tempo,lien);
+                              strcpybuff(lien,tempo);        // patcher en considérant base
+                              
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                fspc(opt->log,"debug"); fprintf(opt->log,"link modified with code/codebase %s"LF,lien); test_flush;
+                              }
+                            } else {
+                              error=1;    // erreur
+                              if (opt->errlog) {
+                                fspc(opt->errlog,"error"); fprintf(opt->errlog,"Link %s too long with base href"LF,lien);
                                 test_flush;
                               }
                             }
-                            
                           }
-                          break;
-                        case -2: case -3:  // timeout ou erreur grave
-                          if (opt.errlog) {
-                            fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Connection too slow for testing link %s%s (from %s%s)"LF,adr,fil,urladr,urlfil);
+                        }
+                      }
+                    }
+                    
+                    
+                  }
+                }
+                
+                
+                // transformer lien quelconque (http, relatif, etc) en une adresse
+                // et un chemin+fichier (adr,fil)
+                if (!error) {
+                  int reponse;
+                  if ((opt->debug>1) && (opt->log!=NULL)) {
+                    fspc(opt->log,"debug"); fprintf(opt->log,"build relative link %s with %s%s"LF,lien,relativeurladr,relativeurlfil); test_flush;
+                  }
+                  if ((reponse=ident_url_relatif(lien,relativeurladr,relativeurlfil,adr,fil))<0) {                        
+                    adr[0]='\0';    // erreur
+                    if (reponse==-2) {
+                      if (opt->errlog) {
+                        fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Link %s not caught (unknown protocol)"LF,lien);
+                        test_flush;
+                      }
+                    } else {
+                      if ((opt->debug>1) && (opt->errlog!=NULL)) {
+                        fspc(opt->errlog,"debug"); fprintf(opt->errlog,"ident_url_relatif failed for %s with %s%s"LF,lien,relativeurladr,relativeurlfil); test_flush;
+                      }
+                    }
+                  } else {
+                    if ((opt->debug>1) && (opt->log!=NULL)) {
+                      fspc(opt->log,"debug"); fprintf(opt->log,"built relative link %s with %s%s -> %s%s"LF,lien,relativeurladr,relativeurlfil,adr,fil); test_flush;
+                    }
+                  }
+                } else {
+                  if ((opt->debug>1) && (opt->log!=NULL)) {
+                    fspc(opt->log,"debug"); fprintf(opt->log,"link %s not build, error detected before"LF,lien); test_flush;
+                  }
+                  adr[0]='\0';
+                }
+                
+#if HTS_CHECK_STRANGEDIR
+                // !ATTENTION!
+                // Ici on teste les exotiques du genre www.truc.fr/machin (sans slash à la fin)
+                // je n'ai pas encore trouvé le moyen de faire la différence entre un répertoire
+                // et un fichier en http A PRIORI : je fais donc un test
+                // En cas de moved xxx, on recalcule adr et fil, tout simplement
+                // DEFAUT: test effectué plusieurs fois! à revoir!!!
+                if ((adr[0]!='\0') && (strcmp(adr,"file://") && (p_type!=2) && (p_type!=-2)) {
+                  //## if ((adr[0]!='\0') && (adr[0]!=lOCAL_CHAR) && (p_type!=2) && (p_type!=-2)) {
+                  if (fil[strlen(fil)-1]!='/') {  // pas répertoire
+                    if (ishtml(fil)==-2) {    // pas d'extension
+                      char loc[HTS_URLMAXSIZE*2];  // éventuelle nouvelle position
+                      loc[0]='\0';
+                      if ((opt->debug>1) && (opt->log!=NULL)) {
+                        fspc(opt->log,"debug"); fprintf(opt->log,"link-check-directory: %s%s"LF,adr,fil);
+                        test_flush;
+                      }
+                      
+                      // tester éventuelle nouvelle position
+                      switch (http_location(adr,fil,loc).statuscode) {
+                      case 200: // ok au final
+                        if (strnotempty(loc)) {  // a changé d'adresse
+                          if (opt->errlog) {
+                            fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Link %s%s has moved to %s for %s%s"LF,adr,fil,loc,urladr,urlfil);
                             test_flush;
                           }
                           
-                          break;
+                          // recalculer adr et fil!
+                          if (ident_url_absolute(loc,adr,fil)==-1) {
+                            adr[0]='\0';  // cancel
+                            if ((opt->debug>1) && (opt->log!=NULL)) {
+                              fspc(opt->log,"debug"); fprintf(opt->log,"link-check-dir: %s%s"LF,adr,fil);
+                              test_flush;
+                            }
+                          }
+                          
+                        }
+                        break;
+                      case -2: case -3:  // timeout ou erreur grave
+                        if (opt->errlog) {
+                          fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Connection too slow for testing link %s%s (from %s%s)"LF,adr,fil,urladr,urlfil);
+                          test_flush;
                         }
                         
+                        break;
                       }
-                    } 
-                  }
+                      
+                    }
+                  } 
+                }
 #endif
-                  
-                  // Le lien doit juste être réécrit, mais ne doit pas générer un lien
-                  // exemple: <FORM ACTION="url_cgi">
-                  if (p_nocatch) {
-                    forbidden_url=1;    // interdire récupération du lien
-                    if ((opt.debug>1) && (opt.log!=NULL)) {
-                      fspc(opt.log,"debug"); fprintf(opt.log,"link forced external at %s%s"LF,adr,fil);
-                      test_flush;
-                    }
+                
+                // Le lien doit juste être réécrit, mais ne doit pas générer un lien
+                // exemple: <FORM ACTION="url_cgi">
+                if (p_nocatch) {
+                  forbidden_url=1;    // interdire récupération du lien
+                  if ((opt->debug>1) && (opt->log!=NULL)) {
+                    fspc(opt->log,"debug"); fprintf(opt->log,"link forced external at %s%s"LF,adr,fil);
+                    test_flush;
                   }
-                  
-                  // Tester si un lien doit être accepté ou refusé (wizard)
-                  // forbidden_url=1 : lien refusé
-                  // forbidden_url=0 : lien accepté
-                  //if ((ptr>0) && (p_type!=2) && (p_type!=-2)) {    // tester autorisations?
-                  if ((p_type!=2) && (p_type!=-2)) {    // tester autorisations?
-                    if (!p_nocatch) {
-                      if (adr[0]!='\0') {          
-                        if ((opt.debug>1) && (opt.log!=NULL)) {
-                          fspc(opt.log,"debug"); fprintf(opt.log,"wizard link test at %s%s.."LF,adr,fil);
-                          test_flush;
-                        }
-                        forbidden_url=hts_acceptlink(&opt,ptr,lien_tot,liens,
-                          adr,fil,
-                          &filters,&filptr,opt.maxfilter,
-                          &robots,
-                          &set_prio_to,
-                          &just_test_it);
-                        if ((opt.debug>1) && (opt.log!=NULL)) {
-                          fspc(opt.log,"debug"); fprintf(opt.log,"result for wizard link test: %d"LF,forbidden_url);
-                          test_flush;
-                        }
+                }
+                
+                // Tester si un lien doit être accepté ou refusé (wizard)
+                // forbidden_url=1 : lien refusé
+                // forbidden_url=0 : lien accepté
+                //if ((ptr>0) && (p_type!=2) && (p_type!=-2)) {    // tester autorisations?
+                if ((p_type!=2) && (p_type!=-2)) {    // tester autorisations?
+                  if (!p_nocatch) {
+                    if (adr[0]!='\0') {          
+                      if ((opt->debug>1) && (opt->log!=NULL)) {
+                        fspc(opt->log,"debug"); fprintf(opt->log,"wizard link test at %s%s.."LF,adr,fil);
+                        test_flush;
+                      }
+                      forbidden_url=hts_acceptlink(opt,ptr,lien_tot,liens,
+                        adr,fil,
+                        &set_prio_to,
+                        &just_test_it);
+                      if ((opt->debug>1) && (opt->log!=NULL)) {
+                        fspc(opt->log,"debug"); fprintf(opt->log,"result for wizard link test: %d"LF,forbidden_url);
+                        test_flush;
                       }
                     }
                   }
+                }
+                
+                // calculer meme_adresse
+                meme_adresse=strfield2(jump_identification(adr),jump_identification(urladr));
+                
+                
+                
+                // Début partie sauvegarde
+                
+                // ici on forme le nom du fichier à sauver, et on patche l'URL
+                if (adr[0]!='\0') {
+                  // savename: simplifier les ../ et autres joyeusetés
+                  char save[HTS_URLMAXSIZE*2];
+                  int r_sv=0;
+                  // En cas de moved, adresse première
+                  char former_adr[HTS_URLMAXSIZE*2];
+                  char former_fil[HTS_URLMAXSIZE*2];
+                  //
+                  save[0]='\0'; former_adr[0]='\0'; former_fil[0]='\0';
+                  //
                   
-                  // calculer meme_adresse
-                  meme_adresse=strfield2(jump_identification(adr),jump_identification(urladr));
-                  
-                  
-                  
-                  // Début partie sauvegarde
-                  
-                  // ici on forme le nom du fichier à sauver, et on patche l'URL
-                  if (adr[0]!='\0') {
-                    // savename: simplifier les ../ et autres joyeusetés
-                    char save[HTS_URLMAXSIZE*2];
-                    int r_sv=0;
-                    // En cas de moved, adresse première
-                    char former_adr[HTS_URLMAXSIZE*2];
-                    char former_fil[HTS_URLMAXSIZE*2];
-                    //
-                    save[0]='\0'; former_adr[0]='\0'; former_fil[0]='\0';
-                    //
-                    
-                    // nom du chemin à sauver si on doit le calculer
-                    // note: url_savename peut décider de tester le lien si il le trouve
-                    // suspect, et modifier alors adr et fil
-                    // dans ce cas on aura une référence directe au lieu des traditionnels
-                    // moved en cascade (impossible à reproduire à priori en local, lorsque des fichiers
-                    // gif sont impliqués par exemple)
-                    if ((p_type!=2) && (p_type!=-2)) {  // pas base href ou codebase
-                      if (forbidden_url!=1) {
-                        char last_adr[HTS_URLMAXSIZE*2];
-                        last_adr[0]='\0';
-                        //char last_fil[HTS_URLMAXSIZE*2]="";
-                        strcpy(last_adr,adr);    // ancienne adresse
-                        //strcpy(last_fil,fil);    // ancien chemin
-                        r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,&opt,liens,lien_tot,back,back_max,&cache,&hash,ptr,numero_passe);
-                        if (strcmp(jump_identification(last_adr),jump_identification(adr)) != 0) {  // a changé
-                          
-                          // 2e test si moved
-                          
-                          // Tester si un lien doit être accepté ou refusé (wizard)
-                          // forbidden_url=1 : lien refusé
-                          // forbidden_url=0 : lien accepté
-                          if ((ptr>0) && (p_type!=2) && (p_type!=-2)) {    // tester autorisations?
-                            if (!p_nocatch) {
-                              if (adr[0]!='\0') {          
-                                if ((opt.debug>1) && (opt.log!=NULL)) {
-                                  fspc(opt.log,"debug"); fprintf(opt.log,"wizard moved link retest at %s%s.."LF,adr,fil);
-                                  test_flush;
-                                }
-                                forbidden_url=hts_acceptlink(&opt,ptr,lien_tot,liens,
-                                  adr,fil,
-                                  &filters,&filptr,opt.maxfilter,
-                                  &robots,
-                                  &set_prio_to,
-                                  &just_test_it);
-                                if ((opt.debug>1) && (opt.log!=NULL)) {
-                                  fspc(opt.log,"debug"); fprintf(opt.log,"result for wizard moved link retest: %d"LF,forbidden_url);
-                                  test_flush;
-                                }
+                  // nom du chemin à sauver si on doit le calculer
+                  // note: url_savename peut décider de tester le lien si il le trouve
+                  // suspect, et modifier alors adr et fil
+                  // dans ce cas on aura une référence directe au lieu des traditionnels
+                  // moved en cascade (impossible à reproduire à priori en local, lorsque des fichiers
+                  // gif sont impliqués par exemple)
+                  if ((p_type!=2) && (p_type!=-2)) {  // pas base href ou codebase
+                    if (forbidden_url!=1) {
+                      char last_adr[HTS_URLMAXSIZE*2];
+                      last_adr[0]='\0';
+                      //char last_fil[HTS_URLMAXSIZE*2]="";
+                      strcpybuff(last_adr,adr);    // ancienne adresse
+                      //strcpybuff(last_fil,fil);    // ancien chemin
+                      r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,back,back_max,cache,hash,ptr,numero_passe);
+                      if (strcmp(jump_identification(last_adr),jump_identification(adr)) != 0) {  // a changé
+                        
+                        // 2e test si moved
+                        
+                        // Tester si un lien doit être accepté ou refusé (wizard)
+                        // forbidden_url=1 : lien refusé
+                        // forbidden_url=0 : lien accepté
+                        if ((ptr>0) && (p_type!=2) && (p_type!=-2)) {    // tester autorisations?
+                          if (!p_nocatch) {
+                            if (adr[0]!='\0') {          
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                fspc(opt->log,"debug"); fprintf(opt->log,"wizard moved link retest at %s%s.."LF,adr,fil);
+                                test_flush;
+                              }
+                              forbidden_url=hts_acceptlink(opt,ptr,lien_tot,liens,
+                                adr,fil,
+                                &set_prio_to,
+                                &just_test_it);
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                fspc(opt->log,"debug"); fprintf(opt->log,"result for wizard moved link retest: %d"LF,forbidden_url);
+                                test_flush;
                               }
                             }
                           }
-                          
-                          //import_done=1;    // c'est un import!
-                          meme_adresse=0;   // on a changé
                         }
-                      } else {
-                        strcpy(save,"");  // dummy
+                        
+                        //import_done=1;    // c'est un import!
+                        meme_adresse=0;   // on a changé
                       }
+                    } else {
+                      strcpybuff(save,"");  // dummy
                     }
-                    if (r_sv!=-1) {  // pas d'erreur, on continue
-                      /* log */
-                      if ((opt.debug>1) && (opt.log!=NULL)) {
-                        fspc(opt.log,"debug");
-                        if (forbidden_url!=1) {    // le lien va être chargé
-                          if ((p_type==2) || (p_type==-2)) {  // base href ou codebase, pas un lien
-                            fprintf(opt.log,"Code/Codebase: %s%s"LF,adr,fil);
-                          } else if ((opt.getmode & 4)==0) {
-                            fprintf(opt.log,"Record: %s%s -> %s"LF,adr,fil,save);
-                          } else {
-                            if (!ishtml(fil))
-                              fprintf(opt.log,"Record after: %s%s -> %s"LF,adr,fil,save);
-                            else
-                              fprintf(opt.log,"Record: %s%s -> %s"LF,adr,fil,save);
-                          } 
-                        } else
-                          fprintf(opt.log,"External: %s%s"LF,adr,fil);
-                        test_flush;
-                      }
-                      /* FIN log */
-                      
-                      // écrire lien
-                      if ((p_type==2) || (p_type==-2)) {  // base href ou codebase, sauter
-                        lastsaved=eadr-1+1;  // sauter "
-                      }
-                      /* */
-                      else if (opt.urlmode==0) {    // URL absolue dans tous les cas
-                        if ((opt.getmode & 1) && (ptr>0)) {    // ecrire les html
-                          if (!link_has_authority(adr)) {
-                            HT_ADD("http://");
-                          } else {
-                            char* aut = strstr(adr, "//");
-                            if (aut) {
-                              char tmp[256];
-                              tmp[0]='\0';
-                              strncat(tmp, adr, (int) (aut - adr));   // scheme
-                              HT_ADD(tmp);          // Protocol
-                              HT_ADD("//");
-                            }
+                  }
+                  if (r_sv!=-1) {  // pas d'erreur, on continue
+                    /* log */
+                    if ((opt->debug>1) && (opt->log!=NULL)) {
+                      fspc(opt->log,"debug");
+                      if (forbidden_url!=1) {    // le lien va être chargé
+                        if ((p_type==2) || (p_type==-2)) {  // base href ou codebase, pas un lien
+                          fprintf(opt->log,"Code/Codebase: %s%s"LF,adr,fil);
+                        } else if ((opt->getmode & 4)==0) {
+                          fprintf(opt->log,"Record: %s%s -> %s"LF,adr,fil,save);
+                        } else {
+                          if (!ishtml(fil))
+                            fprintf(opt->log,"Record after: %s%s -> %s"LF,adr,fil,save);
+                          else
+                            fprintf(opt->log,"Record: %s%s -> %s"LF,adr,fil,save);
+                        } 
+                      } else
+                        fprintf(opt->log,"External: %s%s"LF,adr,fil);
+                      test_flush;
+                    }
+                    /* FIN log */
+                    
+                    // écrire lien
+                    if ((p_type==2) || (p_type==-2)) {  // base href ou codebase, sauter
+                      lastsaved=eadr-1+1;  // sauter "
+                    }
+                    /* */
+                    else if (opt->urlmode==0) {    // URL absolue dans tous les cas
+                      if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
+                        if (!link_has_authority(adr)) {
+                          HT_ADD("http://");
+                        } else {
+                          char* aut = strstr(adr, "//");
+                          if (aut) {
+                            char tmp[256];
+                            tmp[0]='\0';
+                            strncatbuff(tmp, adr, (int) (aut - adr));   // scheme
+                            HT_ADD(tmp);          // Protocol
+                            HT_ADD("//");
                           }
-
-                          if (!opt.passprivacy) {
-                            HT_ADD(jump_protocol(adr));           // Password
-                          } else {
-                            HT_ADD(jump_identification(adr));     // No Password
-                          }
-                          if (*fil!='/')
-                            HT_ADD("/");
-                          HT_ADD(fil);
                         }
-                        lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                        
+                        if (!opt->passprivacy) {
+                          HT_ADD(jump_protocol(adr));           // Password
+                        } else {
+                          HT_ADD(jump_identification(adr));     // No Password
+                        }
+                        if (*fil!='/')
+                          HT_ADD("/");
+                        HT_ADD(fil);
+                      }
+                      lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                       /* */
-                      } else if (opt.urlmode >= 4) {    // ne rien faire dans tous les cas!
+                    } else if (opt->urlmode >= 4) {    // ne rien faire dans tous les cas!
                       /* */
                       /* leave the link 'as is' */
                       /* Sinon, dépend de interne/externe */
-                      } else if (forbidden_url==1) {    // le lien ne sera pas chargé, référence externe!
-                        if ((opt.getmode & 1) && (ptr>0)) {
-                          if (p_type!=-1) {     // pas que le nom de fichier (pas classe java)
-                            if (!opt.external) {
-                              if (!link_has_authority(adr)) {
-                                HT_ADD("http://");
-                                if (!opt.passprivacy) {
-                                  HT_ADD(adr);     // Password
+                    } else if (forbidden_url==1) {    // le lien ne sera pas chargé, référence externe!
+                      if ((opt->getmode & 1) && (ptr>0)) {
+                        if (p_type!=-1) {     // pas que le nom de fichier (pas classe java)
+                          if (!opt->external) {
+                            if (!link_has_authority(adr)) {
+                              HT_ADD("http://");
+                              if (!opt->passprivacy) {
+                                HT_ADD(adr);     // Password
+                              } else {
+                                HT_ADD(jump_identification(adr));     // No Password
+                              }
+                              if (*fil!='/')
+                                HT_ADD("/");
+                              HT_ADD(fil);
+                            } else {
+                              char* aut = strstr(adr, "//");
+                              if (aut) {
+                                char tmp[256];
+                                tmp[0]='\0';
+                                strncatbuff(tmp, adr, (int) (aut - adr));   // scheme
+                                HT_ADD(tmp);          // Protocol
+                                HT_ADD("//");
+                                if (!opt->passprivacy) {
+                                  HT_ADD(jump_protocol(adr));          // Password
                                 } else {
                                   HT_ADD(jump_identification(adr));     // No Password
                                 }
                                 if (*fil!='/')
                                   HT_ADD("/");
                                 HT_ADD(fil);
-                              } else {
-                                char* aut = strstr(adr, "//");
-                                if (aut) {
-                                  char tmp[256];
-                                  tmp[0]='\0';
-                                  strncat(tmp, adr, (int) (aut - adr));   // scheme
-                                  HT_ADD(tmp);          // Protocol
-                                  HT_ADD("//");
-                                  if (!opt.passprivacy) {
-                                    HT_ADD(jump_protocol(adr));          // Password
-                                  } else {
-                                    HT_ADD(jump_identification(adr));     // No Password
-                                  }
-                                  if (*fil!='/')
-                                    HT_ADD("/");
-                                  HT_ADD(fil);
-                                }
                               }
-                              //
-                            } else {    // fichier/page externe, mais on veut générer une erreur
-                              //
-                              int patch_it=0;
-                              int add_url=0;
-                              char* cat_name=NULL;
-                              char* cat_data=NULL;
-                              int cat_nb=0;
-                              int cat_data_len=0;
-                              
-                              // ajouter lien external
-                              switch ( (link_has_authority(adr)) ? 1 : ( (fil[strlen(fil)-1]=='/')?1:(ishtml(fil))  ) ) {
-                              case 1: case -2:       // html ou répertoire
-                                if (opt.getmode & 1) {  // sauver html
-                                  patch_it=1;   // redirect
-                                  add_url=1;    // avec link?
-                                  cat_name="external.html";
-                                  cat_nb=0;
-                                  cat_data=HTS_DATA_UNKNOWN_HTML;
-                                  cat_data_len=HTS_DATA_UNKNOWN_HTML_LEN;
-                                }
-                                break;
-                              default:    // inconnu
-                                // asp, cgi..
-                                if (is_dyntype(get_ext(fil))) {
-                                  patch_it=1;   // redirect
-                                  add_url=1;    // avec link?
-                                  cat_name="external.html";
-                                  cat_nb=0;
-                                  cat_data=HTS_DATA_UNKNOWN_HTML;
-                                  cat_data_len=HTS_DATA_UNKNOWN_HTML_LEN;
-                                } else if ( (strfield2(fil+max(0,(int)strlen(fil)-4),".gif")) 
-                                  || (strfield2(fil+max(0,(int)strlen(fil)-4),".jpg")) 
-                                  || (strfield2(fil+max(0,(int)strlen(fil)-4),".xbm")) 
-                                  || (ishtml(fil)!=0) ) {
-                                  patch_it=1;   // redirect
-                                  add_url=1;    // avec link aussi
-                                  cat_name="external.gif";
-                                  cat_nb=1;
-                                  cat_data=HTS_DATA_UNKNOWN_GIF;
-                                  cat_data_len=HTS_DATA_UNKNOWN_GIF_LEN;
-                                }
-                                break;
-                              }// html,gif
-                              
-                              if (patch_it) {
-                                char save[HTS_URLMAXSIZE*2];
-                                char tempo[HTS_URLMAXSIZE*2];
-                                strcpy(save,opt.path_html);
-                                strcat(save,cat_name);
-                                if (lienrelatif(tempo,save,savename)==0) {
-                                  if (!no_esc_utf)
-                                    escape_uri(tempo);     // escape with %xx
-                                  else
-                                    escape_uri_utf(tempo);     // escape with %xx
-                                  HT_ADD(tempo);    // page externe
-                                  if (add_url) {
-                                    HT_ADD("?link=");    // page externe
-                                    
-                                    // same as above
-                                    if (!link_has_authority(adr)) {
-                                      HT_ADD("http://");
-                                      if (!opt.passprivacy) {
-                                        HT_ADD(adr);     // Password
+                            }
+                            //
+                          } else {    // fichier/page externe, mais on veut générer une erreur
+                            //
+                            int patch_it=0;
+                            int add_url=0;
+                            char* cat_name=NULL;
+                            char* cat_data=NULL;
+                            int cat_nb=0;
+                            int cat_data_len=0;
+                            
+                            // ajouter lien external
+                            switch ( (link_has_authority(adr)) ? 1 : ( (fil[strlen(fil)-1]=='/')?1:(ishtml(fil))  ) ) {
+                            case 1: case -2:       // html ou répertoire
+                              if (opt->getmode & 1) {  // sauver html
+                                patch_it=1;   // redirect
+                                add_url=1;    // avec link?
+                                cat_name="external.html";
+                                cat_nb=0;
+                                cat_data=HTS_DATA_UNKNOWN_HTML;
+                                cat_data_len=HTS_DATA_UNKNOWN_HTML_LEN;
+                              }
+                              break;
+                            default:    // inconnu
+                              // asp, cgi..
+                              if ( (strfield2(fil+max(0,(int)strlen(fil)-4),".gif")) 
+                                || (strfield2(fil+max(0,(int)strlen(fil)-4),".jpg")) 
+                                || (strfield2(fil+max(0,(int)strlen(fil)-4),".xbm")) 
+                                /*|| (ishtml(fil)!=0)*/ ) {
+                                patch_it=1;   // redirect
+                                add_url=1;    // avec link aussi
+                                cat_name="external.gif";
+                                cat_nb=1;
+                                cat_data=HTS_DATA_UNKNOWN_GIF;
+                                cat_data_len=HTS_DATA_UNKNOWN_GIF_LEN;
+                              } else /* if (is_dyntype(get_ext(fil))) */ {
+                                patch_it=1;   // redirect
+                                add_url=1;    // avec link?
+                                cat_name="external.html";
+                                cat_nb=0;
+                                cat_data=HTS_DATA_UNKNOWN_HTML;
+                                cat_data_len=HTS_DATA_UNKNOWN_HTML_LEN;
+                              }
+                              break;
+                            }// html,gif
+                            
+                            if (patch_it) {
+                              char save[HTS_URLMAXSIZE*2];
+                              char tempo[HTS_URLMAXSIZE*2];
+                              strcpybuff(save,opt->path_html);
+                              strcatbuff(save,cat_name);
+                              if (lienrelatif(tempo,save, relativesavename)==0) {
+                                if (!no_esc_utf)
+                                  escape_uri(tempo);     // escape with %xx
+                                else
+                                  escape_uri_utf(tempo);     // escape with %xx
+                                HT_ADD(tempo);    // page externe
+                                if (add_url) {
+                                  HT_ADD("?link=");    // page externe
+                                  
+                                  // same as above
+                                  if (!link_has_authority(adr)) {
+                                    HT_ADD("http://");
+                                    if (!opt->passprivacy) {
+                                      HT_ADD(adr);     // Password
+                                    } else {
+                                      HT_ADD(jump_identification(adr));     // No Password
+                                    }
+                                    if (*fil!='/')
+                                      HT_ADD("/");
+                                    HT_ADD(fil);
+                                  } else {
+                                    char* aut = strstr(adr, "//");
+                                    if (aut) {
+                                      char tmp[256];
+                                      tmp[0]='\0';
+                                      strncatbuff(tmp, adr, (int) (aut - adr) + 2);   // scheme
+                                      HT_ADD(tmp);
+                                      if (!opt->passprivacy) {
+                                        HT_ADD(jump_protocol(adr));          // Password
                                       } else {
                                         HT_ADD(jump_identification(adr));     // No Password
                                       }
                                       if (*fil!='/')
                                         HT_ADD("/");
                                       HT_ADD(fil);
-                                    } else {
-                                      char* aut = strstr(adr, "//");
-                                      if (aut) {
-                                        char tmp[256];
-                                        tmp[0]='\0';
-                                        strncat(tmp, adr, (int) (aut - adr) + 2);   // scheme
-                                        HT_ADD(tmp);
-                                        if (!opt.passprivacy) {
-                                          HT_ADD(jump_protocol(adr));          // Password
-                                        } else {
-                                          HT_ADD(jump_identification(adr));     // No Password
-                                        }
-                                        if (*fil!='/')
-                                          HT_ADD("/");
-                                        HT_ADD(fil);
-                                      }
                                     }
-                                    //
-
                                   }
+                                  //
+                                  
                                 }
-                                
-                                // écrire fichier?
-                                if (verif_external(cat_nb,1)) {
-                                //if (!fexist(fconcat(opt.path_html,cat_name))) {
-                                  FILE* fp = filecreate(fconcat(opt.path_html,cat_name));
-                                  if (fp) {
-                                    if (cat_data_len==0) {   // texte
-                                      verif_backblue(opt.path_html);
-                                      fprintf(fp,"%s%s","<!-- Created by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"LF,cat_data);
-                                    } else {                    // data
-                                      fwrite(cat_data,cat_data_len,1,fp);
-                                    }
-                                    fclose(fp);
-                                    usercommand(0,NULL,fconcat(opt.path_html,cat_name));
+                              }
+                              
+                              // écrire fichier?
+                              if (verif_external(cat_nb,1)) {
+                                //if (!fexist(fconcat(opt->path_html,cat_name))) {
+                                FILE* fp = filecreate(fconcat(opt->path_html,cat_name));
+                                if (fp) {
+                                  if (cat_data_len==0) {   // texte
+                                    verif_backblue(opt,opt->path_html);
+                                    fprintf(fp,"%s%s","<!-- Created by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"LF,cat_data);
+                                  } else {                    // data
+                                    fwrite(cat_data,cat_data_len,1,fp);
                                   }
+                                  fclose(fp);
+                                  usercommand(opt,0,NULL,fconcat(opt->path_html,cat_name),"","");
                                 }
-                              }  else {    // écrire normalement le nom de fichier
-                                HT_ADD("http://");
-                                if (!opt.passprivacy) {
-                                  HT_ADD(adr);       // Password
-                                } else {
-                                  HT_ADD(jump_identification(adr));       // No Password
-                                }
-                                if (*fil!='/')
-                                  HT_ADD("/");
-                                HT_ADD(fil);
-                              }// patcher?
+                              }
+                            }  else {    // écrire normalement le nom de fichier
+                              HT_ADD("http://");
+                              if (!opt->passprivacy) {
+                                HT_ADD(adr);       // Password
+                              } else {
+                                HT_ADD(jump_identification(adr));       // No Password
+                              }
+                              if (*fil!='/')
+                                HT_ADD("/");
+                              HT_ADD(fil);
+                            }// patcher?
                             }  // external
                           } else {  // que le nom de fichier (classe java)
                             // en gros recopie de plus bas: copier codebase et base
                             if (p_flush) {
                               char tempo[HTS_URLMAXSIZE*2];    // <-- ajouté
                               char tempo_pat[HTS_URLMAXSIZE*2];
-
+                              
                               // Calculer chemin
                               tempo_pat[0]='\0';
-                              strcpy(tempo,fil);  // <-- ajouté
+                              strcpybuff(tempo,fil);  // <-- ajouté
                               {
                                 char* a=strrchr(tempo,'/');
-
+                                
                                 // Example: we converted code="x.y.z.foo.class" into "x/y/z/foo.class"
                                 // we have to do the contrary now
                                 if (add_class_dots_to_patch>0) {
@@ -1891,30 +2420,30 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                                   }
                                   // if add_class_dots_to_patch, this is because there is a problem!!
                                   if (add_class_dots_to_patch) {
-                                    if (opt.errlog) {
-                                      fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Error: can not rewind java path %s, check html code"LF,tempo);
+                                    if (opt->errlog) {
+                                      fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Error: can not rewind java path %s, check html code"LF,tempo);
                                       test_flush;
                                     }
                                   }
                                 }
-
+                                
                                 // Cut path/filename
                                 if (a) {
                                   char tempo2[HTS_URLMAXSIZE*2];
-                                  strcpy(tempo2,a+1);         // FICHIER
-                                  strncat(tempo_pat,tempo,(int) (a - tempo)+1);  // chemin
-                                  strcpy(tempo,tempo2);                     // fichier
+                                  strcpybuff(tempo2,a+1);         // FICHIER
+                                  strncatbuff(tempo_pat,tempo,(int) (a - tempo)+1);  // chemin
+                                  strcpybuff(tempo,tempo2);                     // fichier
                                 }
                               }
                               
                               // érire codebase="chemin"
-                              if ((opt.getmode & 1) && (ptr>0)) {
+                              if ((opt->getmode & 1) && (ptr>0)) {
                                 char tempo4[HTS_URLMAXSIZE*2];
                                 tempo4[0]='\0';
                                 
                                 if (strnotempty(tempo_pat)) {
                                   HT_ADD("codebase=\"http://");
-                                  if (!opt.passprivacy) {
+                                  if (!opt->passprivacy) {
                                     HT_ADD(adr);  // Password
                                   } else {
                                     HT_ADD(jump_identification(adr));  // No Password
@@ -1924,7 +2453,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                                   HT_ADD("\" ");
                                 }
                                 
-                                strncat(tempo4,lastsaved,(int) (p_flush - lastsaved));
+                                strncatbuff(tempo4,lastsaved,(int) (p_flush - lastsaved));
                                 HT_ADD(tempo4);    // refresh code="
                                 HT_ADD(tempo);
                               }
@@ -1934,9 +2463,9 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                         lastsaved=eadr-1;
                       }
                       /*
-                      else if (opt.urlmode==1) {    // ABSOLU, c'est le cas le moins courant
+                      else if (opt->urlmode==1) {    // ABSOLU, c'est le cas le moins courant
                       //  NE FONCTIONNE PAS!!  (et est inutile)
-                      if ((opt.getmode & 1) && (ptr>0)) {    // ecrire les html
+                      if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
                       // écrire le lien modifié, absolu
                       HT_ADD("file:");
                       if (*save=='/')
@@ -1947,24 +2476,34 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                       lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                       }
                       */
-                      else if (opt.urlmode==3) {    // URI absolue /
-                        if ((opt.getmode & 1) && (ptr>0)) {    // ecrire les html
-                          HT_ADD(fil);
-                        }
-                        lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                    else if (opt->mimehtml) {
+                      char buff[HTS_URLMAXSIZE*3];
+                      HT_ADD("cid:");
+                      strcpybuff(buff, adr);
+                      strcatbuff(buff, fil);
+                      escape_in_url(buff);
+                      { char* a = buff; while((a = strchr(a, '%'))) { *a = 'X'; a++; } }
+                      HT_ADD(buff);
+                      lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                    }
+                    else if (opt->urlmode==3) {    // URI absolue /
+                      if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
+                        HT_ADD(fil);
                       }
-                      else if (opt.urlmode==2) {  // RELATIF
+                      lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                    }
+                    else if (opt->urlmode==2) {  // RELATIF
                         char tempo[HTS_URLMAXSIZE*2];
                         tempo[0]='\0';
                         // calculer le lien relatif
                         
-                        if (lienrelatif(tempo,save,savename)==0) {
+                        if (lienrelatif(tempo,save,relativesavename)==0) {
                           if (!no_esc_utf)
                             escape_uri(tempo);     // escape with %xx
                           else
                             escape_uri_utf(tempo);     // escape with %xx
-                          if ((opt.debug>1) && (opt.log!=NULL)) {
-                            fspc(opt.log,"debug"); fprintf(opt.log,"relative link at %s build with %s and %s: %s"LF,adr,save,savename,tempo);
+                          if ((opt->debug>1) && (opt->log!=NULL)) {
+                            fspc(opt->log,"debug"); fprintf(opt->log,"relative link at %s build with %s and %s: %s"LF,adr,save,relativesavename,tempo);
                             test_flush;
                           }
                           
@@ -1976,7 +2515,7 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                               tempo_pat[0]='\0';
                               {
                                 char* a=strrchr(tempo,'/');
-
+                                
                                 // Example: we converted code="x.y.z.foo.class" into "x/y/z/foo.class"
                                 // we have to do the contrary now
                                 if (add_class_dots_to_patch>0) {
@@ -1987,23 +2526,23 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                                   }
                                   // if add_class_dots_to_patch, this is because there is a problem!!
                                   if (add_class_dots_to_patch) {
-                                    if (opt.errlog) {
-                                      fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Error: can not rewind java path %s, check html code"LF,tempo);
+                                    if (opt->errlog) {
+                                      fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Error: can not rewind java path %s, check html code"LF,tempo);
                                       test_flush;
                                     }
                                   }
                                 }
-
+                                
                                 if (a) {
                                   char tempo2[HTS_URLMAXSIZE*2];
-                                  strcpy(tempo2,a+1);
-                                  strncat(tempo_pat,tempo,(int) (a - tempo)+1);  // chemin
-                                  strcpy(tempo,tempo2);                     // fichier
+                                  strcpybuff(tempo2,a+1);
+                                  strncatbuff(tempo_pat,tempo,(int) (a - tempo)+1);  // chemin
+                                  strcpybuff(tempo,tempo2);                     // fichier
                                 }
                               }
                               
                               // érire codebase="chemin"
-                              if ((opt.getmode & 1) && (ptr>0)) {
+                              if ((opt->getmode & 1) && (ptr>0)) {
                                 char tempo4[HTS_URLMAXSIZE*2];
                                 tempo4[0]='\0';
                                 
@@ -2013,20 +2552,20 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                                   HT_ADD("\" ");
                                 }
                                 
-                                strncat(tempo4,lastsaved,(int) (p_flush - lastsaved));
+                                strncatbuff(tempo4,lastsaved,(int) (p_flush - lastsaved));
                                 HT_ADD(tempo4);    // refresh code="
                               }
                             }
                             //lastsaved=adr;    // dernier écrit+1
                           }                              
                           
-                          if ((opt.getmode & 1) && (ptr>0)) {
+                          if ((opt->getmode & 1) && (ptr>0)) {
                             // écrire le lien modifié, relatif
                             HT_ADD(tempo);
-
+                            
                             // Add query-string, for informational purpose only
                             // Useless, because all parameters-pages are saved into different targets
-                            if (opt.includequery) {
+                            if (opt->includequery) {
                               char* a=strchr(lien,'?');
                               if (a) {
                                 HT_ADD(a);
@@ -2035,8 +2574,8 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                           }
                           lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                         } else {
-                          if (opt.errlog) {
-                            fprintf(opt.errlog,"Error building relative link %s and %s"LF,save,savename);
+                          if (opt->errlog) {
+                            fprintf(opt->errlog,"Error building relative link %s and %s"LF,save,relativesavename);
                             test_flush;
                           }
                         }
@@ -2046,9 +2585,9 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
 #if 0
                       if (fexist(save)) {    // le fichier existe..
                         adr[0]='\0';
-                        //if ((opt.debug>0) && (opt.log!=NULL)) {
-                        if (opt.errlog) {
-                          fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Link has already been written on disk, cancelled: %s"LF,save);
+                        //if ((opt->debug>0) && (opt->log!=NULL)) {
+                        if (opt->errlog) {
+                          fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Link has already been written on disk, cancelled: %s"LF,save);
                           test_flush;
                         }
                       }
@@ -2057,30 +2596,30 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                       /* Security check */
                       if (strlen(save) >= HTS_URLMAXSIZE) {
                         adr[0]='\0';
-                        if (opt.errlog) {
-                          fspc(opt.errlog,"warning"); fprintf(opt.errlog,"Link is too long: %s"LF,save);
+                        if (opt->errlog) {
+                          fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Link is too long: %s"LF,save);
                           test_flush;
                         }
                       }
-
-                      if ((adr[0]!='\0') && (p_type!=2) && (p_type!=-2) && ( (forbidden_url!=1) || (just_test_it))) {  // si le fichier n'existe pas, ajouter à la liste                            
+                      
+                      if ((adr[0]!='\0') && (p_type!=2) && (p_type!=-2) && (forbidden_url!=1) ) {  // si le fichier n'existe pas, ajouter à la liste                            
                         // n'y a-t-il pas trop de liens?
                         if (lien_tot+1 >= lien_max-4) {    // trop de liens!
                           printf("PANIC! : Too many URLs : >%d [%d]\n",lien_tot,__LINE__);
-                          if (opt.errlog) {
-                            fprintf(opt.errlog,LF"Too many URLs, giving up..(>%d)"LF,lien_max);
-                            fprintf(opt.errlog,"To avoid that: use #L option for more links (example: -#L1000000)"LF);
+                          if (opt->errlog) {
+                            fprintf(opt->errlog,LF"Too many URLs, giving up..(>%d)"LF,lien_max);
+                            fprintf(opt->errlog,"To avoid that: use #L option for more links (example: -#L1000000)"LF);
                             test_flush;
                           }
-                          if ((opt.getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
+                          if ((opt->getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
                           XH_uninit;   // désallocation mémoire & buffers
-                          return 0;
+                          return -1;
                           
                         } else {    // noter le lien sur la listes des liens à charger
                           int pass_fix,dejafait=0;
                           
                           // Calculer la priorité de ce lien
-                          if ((opt.getmode & 4)==0) {    // traiter html après
+                          if ((opt->getmode & 4)==0) {    // traiter html après
                             pass_fix=0;
                           } else {    // vérifier que ce n'est pas un !html
                             if (!ishtml(fil))
@@ -2092,11 +2631,11 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                           /* If the file seems to be an html file, get depth-1 */
                           /*
                           if (strnotempty(save)) {
-                            if (ishtml(save) == 1) {
-                              // descore_prio = 2;
-                            } else {
-                              // descore_prio = 1;
-                            }
+                          if (ishtml(save) == 1) {
+                          // descore_prio = 2;
+                          } else {
+                          // descore_prio = 1;
+                          }
                           }
                           */
                           
@@ -2107,8 +2646,17 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                           // On part de la fin et on essaye de se presser (économise temps machine)
 #if HTS_HASH
                           {
-                            int i=hash_read(&hash,save,"",0);      // lecture type 0 (sav)
+                            int i=hash_read(hash,save,"",0,opt->urlhack);      // lecture type 0 (sav)
                             if (i>=0) {
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                if (
+                                  strcmp(adr, liens[i]->adr) != 0 
+                                  || strcmp(fil, liens[i]->fil) != 0
+                                  ) {
+                                  fspc(opt->log,"debug"); fprintf(opt->log,"merging similar links %s%s and %s%s"LF,adr,fil,liens[i]->adr,liens[i]->fil);
+                                  test_flush;
+                                }
+                              }
                               liens[i]->depth=maximum(liens[i]->depth,liens[ptr]->depth - 1);
                               dejafait=1;
                             }
@@ -2143,23 +2691,23 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                             if (!just_test_it) {
                               if (
                                 (!strfield(adr,"ftp://"))         // non ftp
-                             && (!strfield(adr,"file://")) ) {    // non file
-                                if (opt.robots) {    // récupérer robots
+                                && (!strfield(adr,"file://")) ) {    // non file
+                                if (opt->robots) {    // récupérer robots
                                   if (ishtml(fil)!=0) {                       // pas la peine pour des fichiers isolés
-                                    if (checkrobots(&robots,adr,"") != -1) {    // robots.txt ?
-                                      checkrobots_set(&robots,adr,"");          // ajouter entrée vide
-                                      if (checkrobots(&robots,adr,"") == -1) {    // robots.txt ?
+                                    if (checkrobots(_ROBOTS,adr,"") != -1) {    // robots.txt ?
+                                      checkrobots_set(_ROBOTS ,adr,"");          // ajouter entrée vide
+                                      if (checkrobots(_ROBOTS,adr,"") == -1) {    // robots.txt ?
                                         // enregistrer robots.txt (MACRO)
                                         liens_record(adr,"/robots.txt","","","");
                                         if (liens[lien_tot]==NULL) {  // erreur, pas de place réservée
                                           printf("PANIC! : Not enough memory [%d]\n",__LINE__);
-                                          if (opt.errlog) { 
-                                            fprintf(opt.errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                                          if (opt->errlog) { 
+                                            fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
                                             test_flush;
                                           }
-                                          if ((opt.getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
+                                          if ((opt->getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
                                           XH_uninit;    // désallocation mémoire & buffers
-                                          return 0;
+                                          return -1;
                                         }  
                                         liens[lien_tot]->testmode=0;          // pas mode test
                                         liens[lien_tot]->link_import=0;       // pas mode import     
@@ -2172,13 +2720,13 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
 #if DEBUG_ROBOTS
                                         printf("robots.txt: added file robots.txt for %s\n",adr);
 #endif
-                                        if ((opt.debug>1) && (opt.log!=NULL)) {
-                                          fspc(opt.log,"debug"); fprintf(opt.log,"robots.txt added at %s"LF,adr);
+                                        if ((opt->debug>1) && (opt->log!=NULL)) {
+                                          fspc(opt->log,"debug"); fprintf(opt->log,"robots.txt added at %s"LF,adr);
                                           test_flush;
                                         }
                                       } else {
-                                        if (opt.errlog) {   
-                                          fprintf(opt.errlog,"Unexpected robots.txt error at %d"LF,__LINE__);
+                                        if (opt->errlog) {   
+                                          fprintf(opt->errlog,"Unexpected robots.txt error at %d"LF,__LINE__);
                                           test_flush;
                                         }
                                       }
@@ -2193,13 +2741,13 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                             liens_record(adr,fil,save,former_adr,former_fil);
                             if (liens[lien_tot]==NULL) {  // erreur, pas de place réservée
                               printf("PANIC! : Not enough memory [%d]\n",__LINE__);
-                              if (opt.errlog) { 
-                                fprintf(opt.errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                              if (opt->errlog) { 
+                                fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
                                 test_flush;
                               }
-                              if ((opt.getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
+                              if ((opt->getmode & 1) && (ptr>0)) { if (fp) { fclose(fp); fp=NULL; } }
                               XH_uninit;    // désallocation mémoire & buffers
-                              return 0;
+                              return -1;
                             }  
                             
                             // mode test?
@@ -2226,24 +2774,24 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
                               liens[lien_tot]->depth=max(0,min(liens[ptr]->depth-1,set_prio_to-1));         // PRIORITE NULLE (catch page)
                             // noter pass
                             liens[lien_tot]->pass2=pass_fix;
-                            liens[lien_tot]->retry=opt.retry;
+                            liens[lien_tot]->retry=opt->retry;
                             
-                            //strcpy(liens[lien_tot]->adr,adr);
-                            //strcpy(liens[lien_tot]->fil,fil);
-                            //strcpy(liens[lien_tot]->sav,save); 
-                            if ((opt.debug>1) && (opt.log!=NULL)) {
+                            //strcpybuff(liens[lien_tot]->adr,adr);
+                            //strcpybuff(liens[lien_tot]->fil,fil);
+                            //strcpybuff(liens[lien_tot]->sav,save); 
+                            if ((opt->debug>1) && (opt->log!=NULL)) {
                               if (!just_test_it) {
-                                fspc(opt.log,"debug"); fprintf(opt.log,"OK, NOTE: %s%s -> %s"LF,liens[lien_tot]->adr,liens[lien_tot]->fil,liens[lien_tot]->sav);
+                                fspc(opt->log,"debug"); fprintf(opt->log,"OK, NOTE: %s%s -> %s"LF,liens[lien_tot]->adr,liens[lien_tot]->fil,liens[lien_tot]->sav);
                               } else {
-                                fspc(opt.log,"debug"); fprintf(opt.log,"OK, TEST: %s%s"LF,liens[lien_tot]->adr,liens[lien_tot]->fil);
+                                fspc(opt->log,"debug"); fprintf(opt->log,"OK, TEST: %s%s"LF,liens[lien_tot]->adr,liens[lien_tot]->fil);
                               }
                               test_flush;
                             }
                             
                             lien_tot++;  // UN LIEN DE PLUS
                           } else { // if !dejafait
-                            if ((opt.debug>1) && (opt.log!=NULL)) {
-                              fspc(opt.log,"debug"); fprintf(opt.log,"link has already been recorded, cancelled: %s"LF,save);
+                            if ((opt->debug>1) && (opt->log!=NULL)) {
+                              fspc(opt->log,"debug"); fprintf(opt->log,"link has already been recorded, cancelled: %s"LF,save);
                               test_flush;
                             }
                             
@@ -2263,15 +2811,20 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
               }   // if ok==0      
               
               adr=eadr-1;  // ** sauter
-              
+
+              /* We skipped bytes and skip the " : reset state */
+              if (inscript) {
+                inscript_state_pos = INSCRIPT_START;
+              }
+
             }  // if (p) 
             
           }  // si '<' ou '>'
           
           // plus loin
           adr++;
-
-
+          
+          
           /* Otimization: if we are scanning in HTML data (not in tag or script), 
           then jump to the next starting tag */
           if (ptr>0) {
@@ -2282,18 +2835,23 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
               ) 
             {
               /* Not at the end */
-              if (( ((int) (adr - r.adr)) ) < r.size) {
+              if (( ((int) (adr - r->adr)) ) < r->size) {
                 /* Not on a starting tag yet */
                 if (*adr != '<') {
-                  char* adr_next = strchr(adr,'<');
+                  /* strchr does not well behave with null chrs.. */
+                  /* char* adr_next = strchr(adr,'<'); */
+                  char* adr_next = adr;
+                  while(*adr_next != '<' && (adr_next - r->adr) < r->size ) {
+                    adr_next++;
+                  }
                   /* Jump to near end (index hack) */
-                  if (!adr_next) {
+                  if (!adr_next || *adr_next != '<') {
                     if (
-                      ( (int)(adr - r.adr) < (r.size - 4)) 
+                      ( (int)(adr - r->adr) < (r->size - 4)) 
                       &&
-                      (r.size > 4)
+                      (r->size > 4)
                       ) {
-                      adr = r.adr + r.size - 2;
+                      adr = r->adr + r->size - 2;
                     }
                   } else {
                     adr = adr_next;
@@ -2305,20 +2863,30 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
           
           // ----------
           // écrire peu à peu
-          if ((opt.getmode & 1) && (ptr>0)) HT_ADD_ADR;
+          if ((opt->getmode & 1) && (ptr>0)) HT_ADD_ADR;
           lastsaved=adr;    // dernier écrit+1
           // ----------
-          
+
+          // Checks
+          if (back_add_stats != opt->state.back_add_stats) {
+            back_add_stats = opt->state.back_add_stats;
+
+            // Check max time
+            if (!back_checkmirror(opt)) {
+              adr = r->adr + r->size;
+            }
+          }
+
           // pour les stats du shell si parsing trop long
 #if HTS_ANALYSTE
-          if (r.size)
-            _hts_in_html_done=(100 * ((int) (adr - r.adr)) ) / (int)(r.size);
+          if (r->size)
+            _hts_in_html_done=(100 * ((int) (adr - r->adr)) ) / (int)(r->size);
           if (_hts_in_html_poll) {
             _hts_in_html_poll=0;
             // temps à attendre, et remplir autant que l'on peut le cache (backing)
-            back_wait(back,back_max,&opt,&cache,HTS_STAT.stat_timestart);        
-            back_fillmax(back,back_max,&opt,&cache,liens,ptr,numero_passe,lien_tot);
-
+            back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);        
+            back_fillmax(back,back_max,opt,cache,liens,ptr,numero_passe,lien_tot);
+            
             // Transfer rate
             engine_stats();
             
@@ -2329,35 +2897,35 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
             HTS_STAT.stat_infos=fspc(NULL,"info");
             HTS_STAT.nbk=backlinks_done(liens,lien_tot,ptr);
             HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,back,back_max);
-
+            
             if (!hts_htmlcheck_loop(back,back_max,0,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) {
-              if (opt.errlog) {
-                fspc(opt.errlog,"info"); fprintf(opt.errlog,"Exit requested by shell or user"LF);
+              if (opt->errlog) {
+                fspc(opt->errlog,"info"); fprintf(opt->errlog,"Exit requested by shell or user"LF);
                 test_flush;
               } 
-              exit_xh=1;  // exit requested
+              *stre->exit_xh_=1;  // exit requested
               XH_uninit;
-              return 0;
-              //adr = r.adr + r.size;  // exit
+              return -1;
+              //adr = r->adr + r->size;  // exit
             } else if (_hts_cancel==1) {
-              // adr = r.adr + r.size;  // exit
+              // adr = r->adr + r->size;  // exit
               nofollow=1;               // moins violent
               _hts_cancel=0;
             }
           }
-
+          
           // refresh the backing system each 2 seconds
           if (engine_stats()) {
-            back_wait(back,back_max,&opt,&cache,HTS_STAT.stat_timestart);        
-            back_fillmax(back,back_max,&opt,&cache,liens,ptr,numero_passe,lien_tot);
+            back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);        
+            back_fillmax(back,back_max,opt,cache,liens,ptr,numero_passe,lien_tot);
           }
 #endif
-        } while(( ((int) (adr - r.adr)) ) < r.size);
+        } while(( ((int) (adr - r->adr)) ) < r->size);
 #if HTS_ANALYSTE
         _hts_in_html_parsing=0;  // flag
         _hts_cancel=0;           // pas de cancel
 #endif
-        if ((opt.getmode & 1) && (ptr>0)) {
+        if ((opt->getmode & 1) && (ptr>0)) {
           HT_ADD_END;    // achever
         }
         //
@@ -2366,12 +2934,1030 @@ if (hts_htmlcheck(r.adr,(int)r.size,urladr,urlfil)) {
       }  // if !error
       
       
-      if (opt.getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+      if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
       // sauver fichier
       //structcheck(savename);
-      //filesave(r.adr,r.size,savename);
+      //filesave(opt,r->adr,r->size,savename);
       
 #if HTS_ANALYSTE
     }  // analyse OK
 #endif
+
+    /* Apply changes */
+    ENGINE_SAVE_CONTEXT();
+    
+    return 0;
+}
+
+
+
+
+/*
+  Check 301, 302, .. statuscodes (moved)
+*/
+int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+  /* Load engine variables */
+  ENGINE_LOAD_CONTEXT();  
+  
+  // DEBUT rattrapage des 301,302,307..
+  // ------------------------------------------------------------
+  if (!error) {
+    ////////{
+    // on a chargé un fichier en plus
+    // if (!error) stat_loaded+=r.size;
+    
+    // ------------------------------------------------------------
+    // Rattrapage des 301,302,307 (moved) et 412,416 - les 304 le sont dans le backing 
+    // ------------------------------------------------------------
+    if ( (r->statuscode==301) 
+      || (r->statuscode==302)
+      || (r->statuscode==303)
+      || (r->statuscode==307)
+      ) {          
+      //if (r->adr!=NULL) {   // adr==null si fichier direct. [catch: davename normalement si cgi]
+      //int i=0;
+      char *rn=NULL;
+      // char* p;
+      
+      if ( (opt->debug>0) && (opt->errlog!=NULL) ) {
+        //if (opt->errlog) {
+        fspc(opt->errlog,"warning"); fprintf(opt->errlog,"%s for %s%s"LF,r->msg,urladr,urlfil);
+        test_flush;
+      }
+      
+      
+      {
+        char mov_url[HTS_URLMAXSIZE*2],mov_adr[HTS_URLMAXSIZE*2],mov_fil[HTS_URLMAXSIZE*2];
+        int get_it=0;         // ne pas prendre le fichier à la même adresse par défaut
+        int reponse=0;
+        mov_url[0]='\0'; mov_adr[0]='\0'; mov_fil[0]='\0';
+        //
         
+        strcpybuff(mov_url,r->location);
+        
+        // url qque -> adresse+fichier
+        if ((reponse=ident_url_relatif(mov_url,urladr,urlfil,mov_adr,mov_fil))>=0) {                        
+          int set_prio_to=0;    // pas de priotité fixéd par wizard
+          
+          //if (ident_url_absolute(mov_url,mov_adr,mov_fil)!=-1) {    // ok URL reconnue
+          // c'est (en gros) la même URL..
+          // si c'est un problème de casse dans le host c'est que le serveur est buggé
+          // ("RFC says.." : host name IS case insensitive)
+          if ((strfield2(mov_adr,urladr)!=0) && (strfield2(mov_fil,urlfil)!=0)) {  // identique à casse près
+            // on tourne en rond
+            if (strcmp(mov_fil,urlfil)==0) {
+              error=1;
+              get_it=-1;        // ne rien faire
+              if (opt->errlog) {
+                fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Can not bear crazy server (%s) for %s%s"LF,r->msg,urladr,urlfil);
+                test_flush;
+              }
+            } else {    // mauvaise casse, effacer entrée dans la pile et rejouer une fois
+              get_it=1;
+            }
+          } else {        // adresse différente
+            if (ishtml(mov_url)==0) {   // pas même adresse MAIS c'est un fichier non html (pas de page moved possible)
+              // -> on prend à cette adresse, le lien sera enregistré avec lien_record() (hash)
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"wizard link test for moved file at %s%s.."LF,mov_adr,mov_fil);
+                test_flush;
+              }
+              // accepté?
+              if (hts_acceptlink(opt,ptr,lien_tot,liens,
+                mov_adr,mov_fil,
+                &set_prio_to,
+                NULL) != 1) {                /* nouvelle adresse non refusée ? */
+                get_it=1;
+                if ((opt->debug>1) && (opt->log!=NULL)) {
+                  fspc(opt->log,"debug"); fprintf(opt->log,"moved link accepted: %s%s"LF,mov_adr,mov_fil);
+                  test_flush;
+                }
+              }
+            } /* sinon traité normalement */
+          }
+          
+          //if ((strfield2(mov_adr,urladr)!=0) && (strfield2(mov_fil,urlfil)!=0)) {  // identique à casse près
+          if (get_it==1) {
+            // court-circuiter le reste du traitement
+            // et reculer pour mieux sauter
+            if (opt->errlog) {
+              fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Warning moved treated for %s%s (real one is %s%s)"LF,urladr,urlfil,mov_adr,mov_fil);
+              test_flush;
+            }          
+            // canceller lien actuel
+            error=1;
+            strcpybuff(liens[ptr]->adr,"!");  // caractère bidon (invalide hash)
+#if HTS_HASH
+#else
+            liens[ptr]->sav_len=-1;       // taille invalide
+#endif
+            // noter NOUVEAU lien
+            //xxc xxc
+            //  set_prio_to=0+1;  // protection if the moved URL is an html page!!
+            //xxc xxc
+            {
+              char mov_sav[HTS_URLMAXSIZE*2];
+              // calculer lien et éventuellement modifier addresse/fichier
+              if (url_savename(mov_adr,mov_fil,mov_sav,NULL,NULL,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil,opt,liens,lien_tot,back,back_max,cache,hash,ptr,numero_passe)!=-1) { 
+                if (hash_read(hash,mov_sav,"",0,0)<0) {      // n'existe pas déja
+                  // enregistrer lien (MACRO) avec SAV IDENTIQUE
+                  liens_record(mov_adr,mov_fil,liens[ptr]->sav,"","");
+                  //liens_record(mov_adr,mov_fil,mov_sav,"","");
+                  if (liens[lien_tot]!=NULL) {    // OK, pas d'erreur
+                    // mode test?
+                    liens[lien_tot]->testmode=liens[ptr]->testmode;
+                    liens[lien_tot]->link_import=0;       // mode normal
+                    if (!set_prio_to)
+                      liens[lien_tot]->depth=liens[ptr]->depth;
+                    else
+                      liens[lien_tot]->depth=max(0,min(set_prio_to-1,liens[ptr]->depth));       // PRIORITE NULLE (catch page)
+                    liens[lien_tot]->pass2=max(liens[ptr]->pass2,numero_passe);
+                    liens[lien_tot]->retry=liens[ptr]->retry;
+                    liens[lien_tot]->premier=liens[ptr]->premier;
+                    liens[lien_tot]->precedent=liens[ptr]->precedent;
+                    lien_tot++;
+                  } else {  // oups erreur, plus de mémoire!!
+                    printf("PANIC! : Not enough memory [%d]\n",__LINE__);
+                    if (opt->errlog) {
+                      fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                      test_flush;
+                    }
+                    //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+                    XH_uninit;    // désallocation mémoire & buffers
+                    return 0;
+                  }
+                } else {
+                  if ( (opt->debug>0) && (opt->errlog!=NULL) ) {
+                    fspc(opt->errlog,"warning"); fprintf(opt->errlog,"moving %s to an existing file %s"LF,liens[ptr]->fil,urlfil);
+                    test_flush;
+                  }
+                }
+                
+              }
+            }
+            
+            //printf("-> %s %s %s\n",liens[lien_tot-1]->adr,liens[lien_tot-1]->fil,liens[lien_tot-1]->sav);
+            
+            // note métaphysique: il se peut qu'il y ait un index.html et un INDEX.HTML
+            // sous DOS ca marche pas très bien... mais comme je suis génial url_savename()
+            // est à même de régler ce problème
+          }
+            } // ident_url_xx
+            
+            if (get_it==0) {    // adresse vraiment différente et potentiellement en html (pas de possibilité de bouger la page tel quel à cause des <img src..> et cie)
+              rn=(char*) calloct(8192,1);
+              if (rn!=NULL) {
+                if (opt->errlog) {
+                  fspc(opt->errlog,"warning"); fprintf(opt->errlog,"File has moved from %s%s to %s"LF,urladr,urlfil,mov_url);
+                  test_flush;
+                }
+                if (!opt->mimehtml) {
+                  escape_uri(mov_url);
+                } else {
+                  char buff[HTS_URLMAXSIZE*3];
+                  strcpybuff(buff, mov_adr);
+                  strcatbuff(buff, mov_fil);
+                  escape_in_url(buff);
+                  { char* a = buff; while((a = strchr(a, '%'))) { *a = 'X'; a++; } }
+                  strcpybuff(mov_url, "cid:");
+                  strcatbuff(mov_url, buff);
+                }
+                // On prépare une page qui sautera immédiatement sur la bonne URL
+                // Le scanner re-changera, ensuite, cette URL, pour la mirrorer!
+                strcpybuff(rn,"<HTML>"CRLF);
+                strcatbuff(rn,"<!-- Created by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"CRLF);
+                strcatbuff(rn,"<HEAD>"CRLF"<TITLE>Page has moved</TITLE>"CRLF"</HEAD>"CRLF"<BODY>"CRLF);
+                strcatbuff(rn,"<META HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=");
+                strcatbuff(rn,mov_url);    // URL
+                strcatbuff(rn,"\">"CRLF);
+                strcatbuff(rn,"<A HREF=\"");
+                strcatbuff(rn,mov_url);
+                strcatbuff(rn,"\">");
+                strcatbuff(rn,"<B>Click here...</B></A>"CRLF);
+                strcatbuff(rn,"</BODY>"CRLF);
+                strcatbuff(rn,"<!-- Created by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"CRLF);
+                strcatbuff(rn,"</HTML>"CRLF);
+                
+                // changer la page
+                if (r->adr) { 
+                  freet(r->adr); 
+                  r->adr=NULL; 
+                }
+                r->adr=rn;
+                r->size=strlen(r->adr);
+                strcpybuff(r->contenttype,"text/html");
+              }
+            }  // get_it==0
+            
+          }     // bloc
+          // erreur HTTP (ex: 404, not found)
+        } else if (
+          (r->statuscode==412)
+          || (r->statuscode==416)
+          ) {    // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
+          if (fexist(liens[ptr]->sav)) {
+            remove(liens[ptr]->sav);    // Eliminer
+            if (!fexist(liens[ptr]->sav)) {  // Bien éliminé? (sinon on boucle..)
+#if HDEBUG
+              printf("Partial content NOT up-to-date, reget all file for %s\n",liens[ptr]->sav);
+#endif
+              if ( (opt->debug>1) && (opt->errlog!=NULL) ) {
+                //if (opt->errlog) {
+                fspc(opt->errlog,"debug"); fprintf(opt->errlog,"Partial file reget (%s) for %s%s"LF,r->msg,urladr,urlfil);
+                test_flush;
+              }
+              // enregistrer le MEME lien (MACRO)
+              liens_record(liens[ptr]->adr,liens[ptr]->fil,liens[ptr]->sav,"","");
+              if (liens[lien_tot]!=NULL) {    // OK, pas d'erreur
+                liens[lien_tot]->testmode=liens[ptr]->testmode;          // mode test?
+                liens[lien_tot]->link_import=0;       // pas mode import
+                liens[lien_tot]->depth=liens[ptr]->depth;
+                liens[lien_tot]->pass2=max(liens[ptr]->pass2,numero_passe);
+                liens[lien_tot]->retry=liens[ptr]->retry;
+                liens[lien_tot]->premier=liens[ptr]->premier;
+                liens[lien_tot]->precedent=ptr;
+                lien_tot++;
+                //
+                // canceller lien actuel
+                error=1;
+                strcpybuff(liens[ptr]->adr,"!");  // caractère bidon (invalide hash)
+#if HTS_HASH
+#else
+                liens[ptr]->sav_len=-1;       // taille invalide
+#endif
+                //
+              } else {  // oups erreur, plus de mémoire!!
+                printf("PANIC! : Not enough memory [%d]\n",__LINE__);
+                if (opt->errlog) {
+                  fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                  test_flush;
+                }
+                //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+                XH_uninit;    // désallocation mémoire & buffers
+                return 0;
+              } 
+            } else {
+              if (opt->errlog!=NULL) {
+                fspc(opt->errlog,"error"); fprintf(opt->errlog,"Can not remove old file %s"LF,urlfil);
+                test_flush;
+              }
+            }
+          } else {
+            if (opt->errlog!=NULL) {
+              fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Unexpected 412/416 error (%s) for %s%s"LF,r->msg,urladr,urlfil);
+              test_flush;
+            }
+          }
+        } else if (r->statuscode!=200) {
+          int can_retry=0;
+          
+          // cas où l'on peut reessayer
+          // -2=timeout -3=rateout (interne à httrack)
+          switch(r->statuscode) {
+            //case -1: can_retry=1; break;
+          case -2: if (opt->hostcontrol) {    // timeout et retry épuisés
+            if ((opt->hostcontrol & 1) && (liens[ptr]->retry<=0)) {
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"Link banned: %s%s"LF,urladr,urlfil); test_flush;
+              }
+              host_ban(opt,liens,ptr,lien_tot,back,back_max,jump_identification(urladr));
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"Info: previous log - link banned: %s%s"LF,urladr,urlfil); test_flush;
+              }
+            } else can_retry=1;
+                   } else can_retry=1;
+            break;
+          case -3: if ((opt->hostcontrol) && (liens[ptr]->retry<=0)) {    // too slow
+            if (opt->hostcontrol & 2) {
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"Link banned: %s%s"LF,urladr,urlfil); test_flush;
+              }
+              host_ban(opt,liens,ptr,lien_tot,back,back_max,jump_identification(urladr));
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                fspc(opt->log,"debug"); fprintf(opt->log,"Info: previous log - link banned: %s%s"LF,urladr,urlfil); test_flush;
+              }
+            } else can_retry=1;
+                   } else can_retry=1;
+            break;
+          case -4:            // connect closed
+            can_retry=1;
+            break;
+          case -5:            // other (non fatal) error
+            can_retry=1;
+            break;
+          case -6:            // bad SSL handskake
+            can_retry=1;
+            break;
+          case 408: case 409: case 500: case 502: case 504: can_retry=1;
+            break;
+          }
+          
+          if ( strcmp(liens[ptr]->fil,"/primary") != 0 ) {  // no primary (internal page 0)
+            if ((liens[ptr]->retry<=0) || (!can_retry) ) {  // retry épuisés (ou retry impossible)
+              if (opt->errlog) {
+                if ((opt->retry>0) && (can_retry)){
+                  fspc(opt->errlog,"error"); 
+                  fprintf(opt->errlog,"\"%s\" (%d) after %d retries at link %s%s (from %s%s)"LF,r->msg,r->statuscode,opt->retry,urladr,urlfil,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil);
+                } else {
+                  if (r->statuscode==-10) {    // test OK
+                    if ((opt->debug>0) && (opt->errlog!=NULL)) {
+                      fspc(opt->errlog,"info"); 
+                      fprintf(opt->errlog,"Test OK at link %s%s (from %s%s)"LF,urladr,urlfil,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil);
+                    }
+                  } else {
+                    if (strcmp(urlfil,"/robots.txt")) {       // ne pas afficher d'infos sur robots.txt par défaut
+                      fspc(opt->errlog,"error"); 
+                      fprintf(opt->errlog,"\"%s\" (%d) at link %s%s (from %s%s)"LF,r->msg,r->statuscode,urladr,urlfil,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil);
+                    } else {
+                      if (opt->debug>1) {
+                        fspc(opt->errlog,"info"); fprintf(opt->errlog,"No robots.txt rules at %s"LF,urladr);
+                        test_flush;
+                      }
+                    }
+                  }
+                }
+                test_flush;
+              }
+              
+              // NO error in trop level
+              // due to the "no connection -> previous restored" hack
+              // This prevent the engine from wiping all data if the website has been deleted (or moved)
+              // since last time (which is quite annoying)
+              if (liens[ptr]->precedent != 0) {
+                // ici on teste si on doit enregistrer la page tout de même
+                if (opt->errpage) {
+                  store_errpage=1;
+                }
+              } else {
+                if (strcmp(urlfil,"/robots.txt") != 0) {
+                /*
+                This is an error caused by a link entered by the user
+                That is, link(s) entered by user are invalid (404, 500, connect error, proxy error->.)
+                If all links entered are invalid, the session failed and we will attempt to restore
+                the previous one
+                Example: Try to update a website which has been deleted remotely: this may delete
+                the website locally, which is really not desired (especially if the website disappeared!)
+                With this hack, the engine won't wipe local files (how clever)
+                  */
+                  HTS_STAT.stat_errors_front++;
+                }
+              }
+              
+            } else {    // retry!!
+              if (opt->debug>0 && opt->errlog != NULL) {  // on fera un alert si le retry échoue               
+                fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Retry after error %d (%s) at link %s%s (from %s%s)"LF,r->statuscode,r->msg,urladr,urlfil,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil);
+                test_flush;
+              }
+              // redemander fichier
+              liens_record(urladr,urlfil,savename,"","");
+              if (liens[lien_tot]!=NULL) {    // OK, pas d'erreur
+                liens[lien_tot]->testmode=liens[ptr]->testmode;          // mode test?
+                liens[lien_tot]->link_import=0;       // pas mode import
+                liens[lien_tot]->depth=liens[ptr]->depth;
+                liens[lien_tot]->pass2=max(liens[ptr]->pass2,numero_passe);
+                liens[lien_tot]->retry=liens[ptr]->retry-1;    // moins 1 retry!
+                liens[lien_tot]->premier=liens[ptr]->premier;
+                liens[lien_tot]->precedent=liens[ptr]->precedent;
+                lien_tot++;
+              } else {  // oups erreur, plus de mémoire!!
+                printf("PANIC! : Not enough memory [%d]\n",__LINE__);
+                if (opt->errlog) {
+                  fspc(opt->errlog,"panic"); 
+                  fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                  test_flush;
+                }
+                //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+                XH_uninit;    // désallocation mémoire & buffers
+                return 0;
+              } 
+            }
+          } else {
+            if (opt->errlog) {
+              if (opt->debug>1) {
+                fspc(opt->errlog,"info"); 
+                fprintf(opt->errlog,"Info: no robots.txt at %s%s"LF,urladr,urlfil);
+              }
+            }
+          }
+          if (!store_errpage) {
+            if (r->adr) {     // désalloc
+              freet(r->adr); 
+              r->adr=NULL; 
+            }
+            error=1;  // erreur!
+          }
+        }
+        // FIN rattrapage des 301,302,307..
+        // ------------------------------------------------------------
+        
+      }  // if !error
+      
+      
+      /* Apply changes */
+      ENGINE_SAVE_CONTEXT();
+      
+      return 0;
+      
+      
+}
+
+
+
+/*
+  Wait for next file and
+  check 301, 302, .. statuscodes (moved)
+*/
+int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
+  /* Load engine variables */
+  ENGINE_LOAD_CONTEXT();
+  /* */
+  int b;
+  int n;
+  
+#if BDEBUG==1
+  printf("\nBack test..\n");
+#endif
+  
+  // pause/lock files
+  {
+    int do_pause=0;
+    
+    // user pause lockfile : create hts-paused.lock --> HTTrack will be paused
+    if (fexist(fconcat(opt->path_log,"hts-stop.lock"))) {
+      // remove lockfile
+      remove(fconcat(opt->path_log,"hts-stop.lock"));
+      if (!fexist(fconcat(opt->path_log,"hts-stop.lock"))) {
+        do_pause=1;
+      }
+    }
+    
+    // after receving N bytes, pause
+    if (opt->fragment>0) {
+      if ((HTS_STAT.stat_bytes-stat_fragment) > opt->fragment) {
+        do_pause=1;
+      }
+    }
+    
+    // pause?
+    if (do_pause) {
+      if ( (opt->debug>0) && (opt->log!=NULL) ) {
+        fspc(opt->log,"info"); fprintf(opt->log,"engine: pause requested.."LF);
+      }
+      while (back_nsoc(back,back_max)>0) {                  // attendre fin des transferts
+        back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);
+        Sleep(200);
+#if HTS_ANALYSTE
+        {
+          back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);
+          
+          // Transfer rate
+          engine_stats();
+          
+          // Refresh various stats
+          HTS_STAT.stat_nsocket=back_nsoc(back,back_max);
+          HTS_STAT.stat_errors=fspc(NULL,"error");
+          HTS_STAT.stat_warnings=fspc(NULL,"warning");
+          HTS_STAT.stat_infos=fspc(NULL,"info");
+          HTS_STAT.nbk=backlinks_done(liens,lien_tot,ptr);
+          HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,back,back_max);
+          
+          b=0;
+          if (!hts_htmlcheck_loop(back,back_max,b,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)
+            || !back_checkmirror(opt)) {
+            if (opt->errlog) {
+              fspc(opt->errlog,"info"); fprintf(opt->errlog,"Exit requested by shell or user"LF);
+              test_flush;
+            }
+            *stre->exit_xh_=1;  // exit requested
+            XH_uninit;
+            return 0;
+          }
+        }
+#endif
+      }
+      // On désalloue le buffer d'enregistrement des chemins créée, au cas où pendant la pause
+      // l'utilisateur ferait un rm -r après avoir effectué un tar
+      // structcheck_init(1);
+      {
+        FILE* fp = fopen(fconcat(opt->path_log,"hts-paused.lock"),"wb");
+        if (fp) {
+          fspc(fp,"info");  // dater
+          fprintf(fp,"Pause"LF"HTTrack is paused after retreiving "LLintP" bytes"LF"Delete this file to continue the mirror->.."LF""LF"",(LLint)HTS_STAT.stat_bytes);
+          fclose(fp);
+        }
+      }
+      stat_fragment=HTS_STAT.stat_bytes;
+      /* Info for wrappers */
+      if ( (opt->debug>0) && (opt->log!=NULL) ) {
+        fspc(opt->log,"info"); fprintf(opt->log,"engine: pause: %s"LF,fconcat(opt->path_log,"hts-paused.lock"));
+      }
+#if HTS_ANALYSTE
+      hts_htmlcheck_pause(fconcat(opt->path_log,"hts-paused.lock"));
+#else
+      while (fexist(fconcat(opt->path_log,"hts-paused.lock"))) {
+        //back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);   inutile!! (plus de sockets actives)
+        Sleep(1000);
+      }
+#endif
+    }
+    //
+  }
+  // end of pause/lock files
+  
+#if HTS_ANALYSTE
+  // changement dans les préférences
+  /*
+  if (_hts_setopt) {
+  copy_htsopt(_hts_setopt,opt);    // copier au besoin
+  _hts_setopt=NULL;                 // effacer callback
+  }
+  */
+  if (_hts_addurl) {
+    char add_adr[HTS_URLMAXSIZE*2];
+    char add_fil[HTS_URLMAXSIZE*2];
+    while(*_hts_addurl) {
+      char add_url[HTS_URLMAXSIZE*2];
+      add_adr[0]=add_fil[0]=add_url[0]='\0';
+      if (!link_has_authority(*_hts_addurl))
+        strcpybuff(add_url,"http://");          // ajouter http://
+      strcatbuff(add_url,*_hts_addurl);
+      if (ident_url_absolute(add_url,add_adr,add_fil)>=0) {
+        // ----Ajout----
+        // noter NOUVEAU lien
+        char add_sav[HTS_URLMAXSIZE*2];
+        // calculer lien et éventuellement modifier addresse/fichier
+        if (url_savename(add_adr,add_fil,add_sav,NULL,NULL,NULL,NULL,opt,liens,lien_tot,back,back_max,cache,hash,ptr,numero_passe)!=-1) { 
+          if (hash_read(hash,add_sav,"",0,0)<0) {      // n'existe pas déja
+            // enregistrer lien (MACRO)
+            liens_record(add_adr,add_fil,add_sav,"","");
+            if (liens[lien_tot]!=NULL) {    // OK, pas d'erreur
+              liens[lien_tot]->testmode=0;          // mode test?
+              liens[lien_tot]->link_import=0;       // mode normal
+              liens[lien_tot]->depth=opt->depth;
+              liens[lien_tot]->pass2=max(0,numero_passe);
+              liens[lien_tot]->retry=opt->retry;
+              liens[lien_tot]->premier=lien_tot;
+              liens[lien_tot]->precedent=lien_tot;
+              lien_tot++;
+              //
+              if ((opt->debug>0) && (opt->log!=NULL)) {
+                fspc(opt->log,"info"); fprintf(opt->log,"Link added by user: %s%s"LF,add_adr,add_fil); test_flush;
+              }
+              //
+            } else {  // oups erreur, plus de mémoire!!
+              printf("PANIC! : Not enough memory [%d]\n",__LINE__);
+              if (opt->errlog) {
+                fprintf(opt->errlog,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
+                test_flush;
+              }
+              //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+              XH_uninit;    // désallocation mémoire & buffers
+              return 0;
+            }
+          } else {
+            if ( (opt->debug>0) && (opt->errlog!=NULL) ) {
+              fspc(opt->errlog,"warning"); fprintf(opt->errlog,"Existing link %s%s not added after user request"LF,add_adr,add_fil);
+              test_flush;
+            }
+          }
+          
+        }
+      } else {
+        if (opt->errlog) {
+          fspc(opt->errlog,"error");
+          fprintf(opt->errlog,"Error during URL decoding for %s"LF,add_url);
+          test_flush;
+        }
+      }
+      // ----Fin Ajout----
+      _hts_addurl++;                  // suivante
+    }
+    _hts_addurl=NULL;           // libérer _hts_addurl
+  }
+  // si une pause a été demandée
+  if (_hts_setpause) {
+    // index du lien actuel
+    int b=back_index(back,back_max,urladr,urlfil,savename);
+    if (b<0) b=0;    // forcer pour les stats
+    while(_hts_setpause) {    // on fait la pause..
+      back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);
+      
+      // Transfer rate
+      engine_stats();
+      
+      // Refresh various stats
+      HTS_STAT.stat_nsocket=back_nsoc(back,back_max);
+      HTS_STAT.stat_errors=fspc(NULL,"error");
+      HTS_STAT.stat_warnings=fspc(NULL,"warning");
+      HTS_STAT.stat_infos=fspc(NULL,"info");
+      HTS_STAT.nbk=backlinks_done(liens,lien_tot,ptr);
+      HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,back,back_max);
+      
+      if (!hts_htmlcheck_loop(back,back_max,b,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) {
+        if (opt->errlog) {
+          fspc(opt->errlog,"info"); fprintf(opt->errlog,"Exit requested by shell or user"LF);
+          test_flush;
+        }
+        *stre->exit_xh_=1;  // exit requested
+        XH_uninit;
+        return 0;
+      }
+      if (back_nsoc(back,back_max)==0)
+        Sleep(250);  // tite pause
+    }
+  }
+#endif
+  
+  // si le fichier n'est pas en backing, le mettre..
+  if (!back_exist(back,back_max,urladr,urlfil,savename)) {
+#if BDEBUG==1
+    printf("crash backing: %s%s\n",liens[ptr]->adr,liens[ptr]->fil);
+#endif
+    if (back_add(back,back_max,opt,cache,urladr,urlfil,savename,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil,liens[ptr]->testmode,&liens[ptr]->pass2)==-1) {
+      printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",__LINE__);
+#if BDEBUG==1
+      printf("error while crash adding\n");
+#endif
+      if (opt->errlog) {
+        fspc(opt->errlog,"error"); fprintf(opt->errlog,"Unexpected backing error for %s%s"LF,urladr,urlfil);
+        test_flush;
+      } 
+      
+    }
+  }
+  
+#if BDEBUG==1
+  printf("test number of socks\n");
+#endif
+  
+  // ajouter autant de socket qu'on peut ajouter
+  n=opt->maxsoc-back_nsoc(back,back_max);
+#if BDEBUG==1
+  printf("%d sockets available for backing\n",n);
+#endif
+  
+#if HTS_ANALYSTE
+  if ((n>0) && (!_hts_setpause)) {   // si sockets libre et pas en pause, ajouter
+#else
+    if (n>0) {                         // si sockets libre
+#endif
+      // remplir autant que l'on peut le cache (backing)
+      back_fillmax(back,back_max,opt,cache,liens,ptr,numero_passe,lien_tot);
+    }
+    
+    // index du lien actuel
+    /*
+    b=back_index(back,back_max,urladr,urlfil,savename);
+    
+      if (b>=0) 
+    */
+    {
+      // ------------------------------------------------------------
+      // attendre que le fichier actuel soit prêt - BOUCLE D'ATTENTE
+      do {
+        
+        // index du lien actuel
+        b=back_index(back,back_max,urladr,urlfil,savename);
+#if BDEBUG==1
+        printf("back index %d, waiting\n",b);
+#endif
+        // Continue to the loop if link still present
+        if (b<0)
+          continue;
+        
+        // Receive data
+        if (back[b].status>0)
+          back_wait(back,back_max,opt,cache,HTS_STAT.stat_timestart);
+        
+        // Continue to the loop if link still present
+        b=back_index(back,back_max,urladr,urlfil,savename);
+        if (b<0)
+          continue;
+        
+        // Stop the mirror
+        if (!back_checkmirror(opt)) {
+          *stre->exit_xh_=1;  // exit requested
+          XH_uninit;
+          return 0;
+        }
+        
+        // And fill the backing stack
+        if (back[b].status>0)
+          back_fillmax(back,back_max,opt,cache,liens,ptr,numero_passe,lien_tot);
+        
+        // Continue to the loop if link still present
+        b=back_index(back,back_max,urladr,urlfil,savename);
+        if (b<0)
+          continue;
+        
+        // autres occupations de HTTrack: statistiques, boucle d'attente, etc.
+        if ((opt->makestat) || (opt->maketrack)) {
+          TStamp l=time_local();
+          if ((int) (l-makestat_time) >= 60) {   
+            if (makestat_fp != NULL) {
+              fspc(makestat_fp,"info");
+              fprintf(makestat_fp,"Rate= %d (/"LLintP") \11NewLinks= %d (/%d)"LF,(int) ((HTS_STAT.HTS_TOTAL_RECV-*stre->makestat_total_)/(l-makestat_time)), (LLint)HTS_STAT.HTS_TOTAL_RECV,(int) lien_tot-*stre->makestat_lnk_,(int) lien_tot);
+              fflush(makestat_fp);
+              *stre->makestat_total_=HTS_STAT.HTS_TOTAL_RECV;
+              *stre->makestat_lnk_=lien_tot;
+            }
+            if (stre->maketrack_fp != NULL) {
+              int i;
+              fspc(stre->maketrack_fp,"info"); fprintf(stre->maketrack_fp,LF);
+              for(i=0;i<back_max;i++) {
+                back_info(back,i,3,stre->maketrack_fp);
+              }
+              fprintf(stre->maketrack_fp,LF);
+              
+            }
+            makestat_time=l;
+          }
+        }
+#if HTS_ANALYSTE
+        {
+          int i;
+          {
+            char* s=hts_cancel_file("");
+            if (strnotempty(s)) {    // fichier à canceller
+              for(i=0;i<back_max;i++) {
+                if ((back[i].status>0)) {
+                  if (strcmp(back[i].url_sav,s)==0) {  // ok trouvé
+                    if (back[i].status != 1000) {
+#if HTS_DEBUG_CLOSESOCK
+                      DEBUG_W("user cancel: deletehttp\n");
+#endif
+                      if (back[i].r.soc!=INVALID_SOCKET) deletehttp(&back[i].r);
+                      back[i].r.soc=INVALID_SOCKET;
+                      back[i].r.statuscode=-1;
+                      strcpybuff(back[i].r.msg,"Cancelled by User");
+                      back[i].status=0;  // terminé
+                    } else    // cancel ftp.. flag à 1
+                      back[i].stop_ftp = 1;
+                  }
+                }
+              }
+              s[0]='\0';
+            }
+          }
+          
+          // Transfer rate
+          engine_stats();
+          
+          // Refresh various stats
+          HTS_STAT.stat_nsocket=back_nsoc(back,back_max);
+          HTS_STAT.stat_errors=fspc(NULL,"error");
+          HTS_STAT.stat_warnings=fspc(NULL,"warning");
+          HTS_STAT.stat_infos=fspc(NULL,"info");
+          HTS_STAT.nbk=backlinks_done(liens,lien_tot,ptr);
+          HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,back,back_max);
+          
+          if (!hts_htmlcheck_loop(back,back_max,b,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) {
+            if (opt->errlog) {
+              fspc(opt->errlog,"info"); fprintf(opt->errlog,"Exit requested by shell or user"LF);
+              test_flush;
+            } 
+            *stre->exit_xh_=1;  // exit requested
+            XH_uninit;
+            return 0;
+          }
+        }
+        
+#endif
+#if HTS_POLL
+        if ((opt->shell) || (opt->keyboard) || (opt->verbosedisplay) || (!opt->quiet)) {
+          TStamp tl;
+          *stre->info_shell_=1;
+          
+          /* Toggle with ENTER */
+          if (!opt->quiet) {
+            if (check_stdin()) {
+              char com[256];
+              linput(stdin,com,200);
+              if (opt->verbosedisplay==2)
+                opt->verbosedisplay=1;
+              else
+                opt->verbosedisplay=2;
+              /* Info for wrappers */
+              if ( (opt->debug>0) && (opt->log!=NULL) ) {
+                fspc(opt->log,"info"); fprintf(opt->log,"engine: change-options"LF);
+              }
+#if HTS_ANALYSTE
+              hts_htmlcheck_chopt(opt);
+#endif
+            }
+          }
+          
+          tl=time_local();
+          
+          // générer un message d'infos sur l'état actuel
+          if (opt->shell) {    // si shell
+            if ((tl-*stre->last_info_shell_)>0) {    // toute les 1 sec
+              FILE* fp=stdout;
+              int a=0;
+              *stre->last_info_shell_=tl;
+              if (fexist(fconcat(opt->path_log,"hts-autopsy"))) {  // débuggage: teste si le robot est vivant
+                // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
+                // (libérons les robots esclaves de l'internet!)
+                remove(fconcat(opt->path_log,"hts-autopsy"));
+                fp=fopen(fconcat(opt->path_log,"hts-isalive"),"wb");
+                a=1;
+              }
+              if ((*stre->info_shell_) || a) {
+                int i,j;
+                
+                fprintf(fp,"TIME %d"LF,(int) (tl-HTS_STAT.stat_timestart));
+                fprintf(fp,"TOTAL %d"LF,(int) HTS_STAT.stat_bytes);
+                fprintf(fp,"RATE %d"LF,(int) (HTS_STAT.HTS_TOTAL_RECV/(tl-HTS_STAT.stat_timestart)));
+                fprintf(fp,"SOCKET %d"LF,back_nsoc(back,back_max));
+                fprintf(fp,"LINK %d"LF,lien_tot);
+                {
+                  LLint mem=0;
+                  for(i=0;i<back_max;i++)
+                    if (back[i].r.adr!=NULL)
+                      mem+=back[i].r.size;
+                    fprintf(fp,"INMEM "LLintP""LF,(LLint)mem);
+                }
+                for(j=0;j<2;j++) {  // passes pour ready et wait
+                  for(i=0;i<back_max;i++) {
+                    back_info(back,i,j+1,stdout);    // maketrack_fp a la place de stdout ?? // **
+                  }
+                }
+                fprintf(fp,LF);
+                if (a)
+                  fclose(fp);
+                io_flush;
+              }
+            }
+          }  // si shell
+          
+        }  // si shell ou keyboard (option)
+        //
+#endif
+      } while((b>=0) && (back[max(b,0)].status>0));
+            
+            
+      // If link not found on the stack, it's because it has already been downloaded
+      // in background
+      // Then, skip it and go to the next one
+      if (b<0) {
+        if ((opt->debug>1) && (opt->log!=NULL)) {
+          fspc(opt->log,"debug"); fprintf(opt->log,"link #%d is ready, no more on the stack, skipping: %s%s.."LF,ptr,urladr,urlfil);
+          test_flush;
+        }
+        
+        // prochain lien
+        // ptr++;
+        
+        return 2; // goto jump_if_done;
+        
+      }
+      /* link put in cache by the backing system for memory spare - reclaim */
+      else if (back[b].finalized) {
+        assertf(back[b].r.adr == NULL);
+        /* read file in cache */
+        back[b].r = cache_read_ro(opt,cache,back[b].url_adr,back[b].url_fil,back[b].url_sav, back[b].location_buffer);
+        /* ensure correct location buffer set */
+        back[b].r.location=back[b].location_buffer;
+        if (back[b].r.statuscode == -1) {
+          if (opt->errlog) {
+            fspc(opt->errlog,"error"); fprintf(opt->errlog,"Unexpected error: %s%s not found anymore in cache"LF,back[b].url_adr,back[b].url_fil);
+            test_flush;
+          }
+        } else {
+          if ( (opt->debug>1) && (opt->log!=NULL) ) {
+            fspc(opt->log,"debug"); fprintf(opt->log,"reclaim file %s%s (%d)"LF,back[b].url_adr,back[b].url_fil,back[b].r.statuscode); test_flush;
+          }
+        }
+      }
+            
+            
+#if HTS_ANALYSTE==2
+#else
+      //if (!opt->quiet) {  // petite animation
+      if (!opt->verbosedisplay) {
+        if (!opt->quiet) {
+          static int roll=0;  /* static: ok */
+          roll=(roll+1)%4;
+          printf("%c\x0d",("/-\\|")[roll]);
+          fflush(stdout);
+        }
+      } else if (opt->verbosedisplay==1) {
+        if (back[b].r.statuscode==200)
+          printf("%d/%d: %s%s ("LLintP" bytes) - OK\33[K\r",ptr,lien_tot,back[b].url_adr,back[b].url_fil,(LLint)back[b].r.size);
+        else
+          printf("%d/%d: %s%s ("LLintP" bytes) - %d\33[K\r",ptr,lien_tot,back[b].url_adr,back[b].url_fil,(LLint)back[b].r.size,back[b].r.statuscode);
+        fflush(stdout);
+      }
+      //}
+#endif
+      // ------------------------------------------------------------
+      // Vérificateur d'intégrité
+#if DEBUG_CHECKINT
+      _CHECKINT(&back[b],"Retour de back_wait, après le while")
+      {
+        int i;
+        for(i=0;i<back_max;i++) {
+          char si[256];
+          sprintf(si,"Test global après back_wait, index %d",i);
+          _CHECKINT(&back[i],si)
+        }
+      }
+#endif
+      
+      // copier structure réponse htsblk
+      memcpy(r, &(back[b].r), sizeof(htsblk));
+      r->location=stre->loc_;    // ne PAS copier location!! adresse, pas de buffer
+      if (back[b].r.location) 
+        strcpybuff(r->location,back[b].r.location);
+      back[b].r.adr=NULL;    // ne pas faire de desalloc ensuite
+      
+      // libérer emplacement backing
+      back_maydelete(opt,back,b);
+      
+      // progression
+#if 0
+      if (opt->aff_progress) {
+        TStamp tl=time_local();
+        if ((tl-HTS_STAT.stat_timestart)>0) {
+          char s[32];
+          int i=0;
+          lastime=tl;
+          _CLRSCR; _GOTOXY("1","1");
+          printf("Rate=%d B/sec\n",(int) (HTS_STAT.HTS_TOTAL_RECV/(tl-HTS_STAT.stat_timestart)));
+          while(i<minimum(back_max,99)) {  // **
+            if (back[i].status>=0) {  // loading..
+              s[0]='\0';
+              if (strlen(back[i].url_fil)>16)
+                strcatbuff(s,back[i].url_fil+strlen(back[i].url_fil)-16);       
+              else
+                strncatbuff(s,back[i].url_fil,16);
+              printf("%s : ",s);
+              
+              printf("[");
+              if (back[i].r.totalsize>0) {
+                int p;
+                int j;
+                p=(int)((back[i].r.size*10)/back[i].r.totalsize);
+                p=minimum(10,p);
+                for(j=0;j<p;j++) printf("*");
+                for(j=0;j<(10-p);j++) printf("-");
+              } else { 
+                printf(LLintP,(LLint)back[i].r.size);                      
+              }
+              printf("]");
+              
+              //} else if (back[i].status==0) {
+              //  strcpybuff(s,"ENDED");
+            } 
+            printf("\n");
+            i++;
+          }
+          io_flush;
+        }
+      }
+#endif
+      
+      // débug graphique
+#if BDEBUG==2
+      {
+        char s[12];
+        int i=0;
+        _GOTOXY(1,1);
+        printf("Rate=%d B/sec\n",(int) (HTS_STAT.HTS_TOTAL_RECV/(time_local()-HTS_STAT.stat_timestart)));
+        while(i<minimum(back_max,160)) {
+          if (back[i].status>0) {
+            sprintf(s,"%d",back[i].r.size);
+          } else if (back[i].status==0) {
+            strcpybuff(s,"ENDED");
+          } else 
+            strcpybuff(s,"   -   ");
+          while(strlen(s)<8) strcatbuff(s," ");
+          printf("%s",s); io_flush;
+          i++;
+        }
+      }
+#endif
+      
+      
+#if BDEBUG==1
+      printf("statuscode=%d with %s / msg=%s\n",r->statuscode,r->contenttype,r->msg);
+#endif
+      
+    }
+    /*else {
+    #if BDEBUG==1
+    printf("back index error\n");
+    #endif
+    }
+    */
+    
+    
+    
+    ENGINE_SAVE_CONTEXT();
+    
+    return 0;
+    
+    
+}
+
+
