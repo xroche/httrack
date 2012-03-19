@@ -3473,12 +3473,24 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
               if (opt->log!=NULL) {
                 HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Can not remove old file %s"LF,urlfil);
                 test_flush;
+                error = 1;
               }
             }
           } else {
             if (opt->log!=NULL) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unexpected 412/416 error (%s) for %s%s"LF,r->msg,urladr,urlfil);
+              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unexpected 412/416 error (%s) for %s%s, '%s' could not be found on disk"LF,r->msg,urladr,urlfil,liens[ptr]->sav != NULL ? liens[ptr]->sav : "");
               test_flush;
+              error = 1;
+            }
+          }
+
+          // Error ?
+          if (error) {
+            if (!opt->errpage) {
+              if (r->adr) {     // désalloc
+                freet(r->adr); 
+                r->adr=NULL; 
+              }
             }
           }
         } else if (r->statuscode!=HTTP_OK) {
@@ -3619,8 +3631,8 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
               freet(r->adr); 
               r->adr=NULL; 
             }
-            error=1;  // erreur!
           }
+          error=1;  // erreur!
         }
         // FIN rattrapage des 301,302,307..
         // ------------------------------------------------------------
