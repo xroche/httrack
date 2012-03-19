@@ -231,6 +231,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
       /* Vérifier argv[] non vide */
       if (strnotempty(argv[na])) {
+		  assertf(strlen(argv[na]) < HTS_CDLMAXSIZE);
         
         /* Vérifier Commande (alias) */
         result=optalias_check(argc,(const char * const *)argv,na,
@@ -1242,23 +1243,32 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 htsmain_free();
                 return -1;
               } else {
-                char callbackname[128];
-                char* a = argv[na + 1];
-                char* pos; /*  = strchr(a, '='); */
-                for(pos = a ; *pos != '\0' && *pos != '=' && *pos != ',' && *pos != ':' ; pos++);
+                char* pos;
+                na++;
+                for(pos = argv[na] ; *pos != '\0' && *pos != '=' && *pos != ',' && *pos != ':' ; pos++);
                 /* httrack --wrapper callback[,foo] */
                 if (*pos == 0 || *pos == ',' || *pos == ':') {
-                  int ret = plug_wrapper(opt, argv[na + 1], argv[na + 1]);
+                  int ret;
+                  char *moduleName;
+                  if (*pos == ',' || *pos == ':') {
+                    *pos = '\0';
+                    moduleName = strdupt(argv[na]);
+                    *pos = ',';   /* foce seperator to ',' */
+                  } else {
+                    moduleName = strdupt(argv[na]);
+                  }
+                  ret = plug_wrapper(opt, moduleName, argv[na]);
+                  freet(moduleName);
                   if (ret == 0) {
                     char BIGSTK tmp[1024 * 2];
-                    sprintf(tmp, "option %%W : unable to plug the module %s (returncode != 1)", a);
+                    sprintf(tmp, "option %%W : unable to plug the module %s (returncode != 1)", argv[na]);
                     HTS_PANIC_PRINTF(tmp);
                     htsmain_free();
                     return -1;
                   } else if (ret == -1) {
                     char BIGSTK tmp[1024 * 2];
                     int last_errno = errno;
-                    sprintf(tmp, "option %%W : unable to load the module %s: %s (check the library path ?)", a, strerror(last_errno));
+                    sprintf(tmp, "option %%W : unable to load the module %s: %s (check the library path ?)", argv[na], strerror(last_errno));
                     HTS_PANIC_PRINTF(tmp);
                     htsmain_free();
                     return -1;
@@ -1266,9 +1276,9 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 }
                 /* Old style */
                 /* httrack --wrapper save-name=callback:process,string */
-                else if (*pos == '=' && (pos - a) > 0 && (pos - a + 2) < sizeof(callbackname)) {
+                else if (*pos == '=') {
                   fprintf(stderr, "Syntax error in option %%W : the old (<3.41) API is no more supported!\n");
-                  HTS_PANIC_PRINTF("Syntax error in option %W : this function needs to be followed by a blank space, and a module name");
+                  HTS_PANIC_PRINTF("Syntax error in option %W : the old (<3.41) API is no more supported!");
                   printf("Example: -%%W check-link=checklink.so:check\n");
                   htsmain_free();
                   return -1;
@@ -1776,11 +1786,17 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         
       }  else {  // URL/filters
 				char catbuff[CATBUFF_SIZE];
-        char BIGSTK tempo[1024];       
-        if (strnotempty(url)) strcatbuff(url," ");  // espace de séparation
-        strcpybuff(tempo,unescape_http_unharm(catbuff,argv[na],1));
-        escape_spc_url(tempo);
-        strcatbuff(url,tempo);
+        char BIGSTK tempo[CATBUFF_SIZE];
+		const int urlSize = (int) strlen(argv[na]);
+		const int capa = (int) ( strlen(url) + urlSize + 32 );
+		assertf(urlSize < HTS_URLMAXSIZE);
+		if (urlSize < HTS_URLMAXSIZE) {
+			ensureUrlCapacity(url, url_sz, capa);
+			if (strnotempty(url)) strcatbuff(url," ");  // espace de séparation
+			strcpybuff(tempo,unescape_http_unharm(catbuff,argv[na],1));
+			escape_spc_url(tempo);
+			strcatbuff(url,tempo);
+		}
       }  // if argv=- etc. 
       
     }  // for

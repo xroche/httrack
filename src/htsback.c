@@ -3649,19 +3649,27 @@ int back_checksize(httrackp* opt,lien_back* eback,int check_only_totalsize) {
 }
 
 int back_checkmirror(httrackp* opt) {
-  // Check max time
+  // Check max size
   if ((opt->maxsite>0) && (HTS_STAT.stat_bytes >= opt->maxsite)) {
-    if (opt->log) {
-      fprintf(opt->log,"More than "LLintP" bytes have been transfered.. giving up"LF,(LLint)opt->maxsite);
-      test_flush;
-    } 
-    return 0;
-  } else if ((opt->maxtime>0) && ((time_local()-HTS_STAT.stat_timestart)>opt->maxtime)) {            
+    if (!opt->state.stop) {  /* not yet stopped */
+      if (opt->log) {
+        fprintf(opt->log,"More than "LLintP" bytes have been transfered.. giving up"LF,(LLint)opt->maxsite);
+        test_flush;
+      }
+	  /* cancel mirror smoothly */
+      hts_request_stop(opt, 0);
+	}
+    return 1;  /* don'k break mirror too sharply for size limits, but stop requested */
+    /*return 0;
+	*/
+  }
+  // Check max time
+  if ((opt->maxtime>0) && ((time_local()-HTS_STAT.stat_timestart)>opt->maxtime)) {            
     if (opt->log) {
       fprintf(opt->log,"More than %d seconds passed.. giving up"LF,opt->maxtime);
       test_flush;
-    } 
-    return 0;
+    }
+    return 0;  /* stop now */
   }
   return 1;   /* Ok, go on */
 }

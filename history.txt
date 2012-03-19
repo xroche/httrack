@@ -4,7 +4,23 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.41-beta
+3.42-3
++ Fixed: Bad URL length validation in the commandline (Joan CALVET)
+
+3.42-2
++ Fixed: Random crashes at the end of the mirror due to a dangling file pointer (Carlos, angus at quovadis.com.ar)
+
+3.42
++ Fixed: size limits are stopping the mirror gently, finishing pending transfers (David Stevenson)
+
+3.41-3
++ Fixed: text/plain advertised files renamed into .txt
++ Fixed: broken configure.in
+
+3.41-2
++ Fixed: major WIN32 inlined function bug caused the cache not to be used at all, causing update not to work
+
+3.41
 + New: changed API/ABI to thread-safe ones (libhttrack1 2), big cleanup in all .h definitions
 + Fixed: Major memory usage bug when downloading large sites
 + Fixed: do not rename files if the original MIME type was compatible

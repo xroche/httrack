@@ -7,7 +7,7 @@ BROWSEREXE=
 SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox firebird galeon konqueror opera netscape"
 if test -n "${BROWSER}"; then
 # sensible-browser will f up if BROWSER is not set
-SRCHBROWSEREXE="sensible-browser ${SRCHBROWSEREXE}"
+SRCHBROWSEREXE="xdg-open sensible-browser ${SRCHBROWSEREXE}"
 fi
 SRCHPATH="/usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /sw/bin ${HOME}/usr/bin ${HOME}/bin"
 SRCHPATH="$SRCHPATH "`echo $PATH | tr ":" " "`

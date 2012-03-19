@@ -53,6 +53,7 @@ Please visit our Website: http://www.httrack.com
 extern int gz_is_available;
 extern int hts_zunpack(char* filename,char* newfile);
 extern int hts_extract_meta(const char* path);
+extern const char* hts_get_zerror(int err);
 #endif
 
 #endif
