@@ -131,15 +131,13 @@ clear language!
 
 <li><a href="#QG0b">Is there any risks of viruses with this software?</a><br></li>
 
-<li><a href="#QG1">The install is not working on Windows without administrator rights!</a><br></li>
+<li><a href="#QG1">The install is not working on NT without administrator rights!</a><br></li>
 
 <li><a href="#QG2">Where can I find French/other languages documentation?</a><br></li>
 
-<li><a href="#QG3b">Is HTTrack working on Windows Vista or Windows Seven?</a><br></li>
-
 <li><a href="#QG3">Is HTTrack working on NT/2000?</a><br></li>
 
-<li><a href="#QG4">What's the difference between HTTrack, WinHTTrack and WebHTTrack?</a><br></li>
+<li><a href="#QG4">What's the difference between HTTrack and WinHTTrack?</a><br></li>
 
 <li><a href="#QG5">Is HTTrack Mac compatible?</a><br></li>
 
@@ -369,23 +367,28 @@ All official releases (at httrack.com) are checked against all known viruses, an
 For files you are downloading on the WWW using HTTrack: You may encounter websites which were corrupted by viruses, and downloading data on these websites might be dangerous (as dangerous as if using a regular Browser). Always ensure that websites you are crawling are safe.
  (Note: remember that using an antivirus software is a good idea once you are connected to the Internet)</em>
 
-<br><br><a NAME="QG1">Q: <strong>The install is not working on Windows without administrator rights!</strong></a><br>
+<br><br><a NAME="QG1">Q: <strong>The install is not working on NT without administrator rights!</strong></a><br>
 A: <em>That's right. You can, however, install WinHTTrack on your own machine, and then copy your <tt>WinHTTrack</tt> folder from your <tt>Program Files</tt> folder to another machine, in a temporary directory (e.g. <tt>C:\temp\</tt>)</em>
 
 <br><br><a NAME="QG2">Q: <strong>Where can I find French/other languages documentation?</strong></a><br>
 A: <em>Windows interface is available on several languages, but not yet the documentation!</em>
 
-<br><br><a NAME="QG3b">Q: <strong>Is HTTrack working on Windows Vista or Windows Seven?</strong></a><br>
-A: <em>Yes, it does</em>
-
 <br><br><a NAME="QG3">Q: <strong>Is HTTrack working on NT/2000?</strong></a><br>
 A: <em>Yes, it does</em>
 
-<br><br><a NAME="QG4">Q: <strong>What's the difference between HTTrack, WinHTTrack and WebHTTrack?</strong></a><br>
-A: <em>WinHTTrack is the Windows GUI release of HTTrack (with a native graphic shell) and WebHTTrack is the Linux/Posix release of HTTrack (with an html graphic shell)</em>
+<br><br><a NAME="QG4">Q: <strong>What's the difference between HTTrack and WinHTTrack?</strong></a><br>
+A: <em>WinHTTrack is the Windows release of HTTrack (with a graphic shell)</em>
 
 <br><br><a NAME="QG5">Q: <strong>Is HTTrack Mac compatible?</strong></a><br>
-A: <em>Yes, using the original sources, or with MacPorts.
+A: <em>Yes, using the original sources:
+
+<pre>
+tar xvfz httrack-*.tar.gz
+cd httrack-*
+./configure --prefix=/usr/local && make && make install
+/usr/local/bin/httrack
+</pre>
+But there are no official binaries, because of a lack of time</em>
 
 <br><br><a NAME="QG6">Q: <strong>Can HTTrack be compiled on all Un*x?</strong></a><br>
 A: <em>It should. The <tt>Makefile</tt> may be modified in some cases, however</em>
@@ -393,16 +396,16 @@ A: <em>It should. The <tt>Makefile</tt> may be modified in some cases, however</
 <br><br><a NAME="QG7">Q: <strong>I use HTTrack for professional purpose. What about restrictions/license fee?</strong></a><br>
 A: <em>HTTrack is covered by the GNU General Public License (GPL). There is no restrictions using HTTrack for professional purpose, 
 except if you develop a software which uses HTTrack components (parts of the source, or any other component).
-See the <tt>license.txt</tt> file for more information</em>. See also the next question regarding copyright issues when reditributing downloaded material.
+See the <tt>license.txt</tt> file for more information</em>
 
 <br><br><a NAME="QG7b">Q: <strong>Is there any license royalties for distributing a mirror made with HTTrack?</strong></a><br>
-A: <em>On the HTTrack side, no. However, sharing, publishing or reusing copyrighted material downloaded from a site requires the authorization of the copyright holders, and possibly paying royalty fees. Always ask the authorization before creating a mirror of a site, even if the site appears to be royalty-free and/or without copyright notice.</em>
+A: <em>No.</em>
 
 <br><br><a NAME="QG8">Q: <strong>Is a DLL/library version available?</strong></a><br>
 A: <em>Yes. The default distribution includes a DLL (Windows) or a .so (Un*X), used by the program</em>
 
-<br><br><a NAME="QG9">Q: <strong>Is there a GUI version available for Linux and Un*x?</strong></a><br>
-A: <em>Yes. It is called WebHTTrack. See the download section at <a href="http://www.httrack.com">www.httrack.com!</a></em>
+<br><br><a NAME="QG9">Q: <strong>Is there a X11/KDE shell available for Linux and Un*x?</strong></a><br>
+A: <em>Yes. See the download/contribution section at <a href="http://www.httrack.com">www.httrack.com!</a></em>
 
 <br><br>
 <u><strong>Troubleshooting:<br>

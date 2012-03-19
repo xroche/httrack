@@ -186,8 +186,6 @@ scanning
 analizando
 Waiting for scheduled time..
 Aguardando horário programado para iniciar...
-Transferring data..
-Transferindo dados..
 Connecting to provider
 Conectando ao provedor
 [%d seconds] to go before start of operation
@@ -231,7 +229,7 @@ Caminho do arquivo de relatório
 Path
 Caminho
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-- Método da lista de links -\n\nUtilize a caixa URL's para digitar o(s) endereço(s) da(s) página(s) contendo links para recebimento.
+Método da lista de links -\n\nUtilize a caixa URL's para digitar o(s) endereço(s) da(s) página(s) contendo links para recebimento.
 New project / Import?
 Novo projeto / Importar?
 Choose criterion
@@ -637,7 +635,7 @@ Desconectar ao finalizar
 Disconnect modem on completion
 Desconectar o modem ao finalizar
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (layoutbr@lexxa.com.br)
+\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (Layout do Brasil, company@layout.com.br)
 About WinHTTrack Website Copier
 Sobre o WinHTTrack Website Copier
 Please visit our Web page
@@ -930,3 +928,4 @@ Server terminated
 Servidor finalizado
 A fatal error has occured during this mirror
 Um erro fatal ocorreu durante este espelho
+

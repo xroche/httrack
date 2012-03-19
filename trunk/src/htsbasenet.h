@@ -47,15 +47,9 @@ Please visit our Website: http://www.httrack.com
 #ifndef _WIN32_WCE
 #undef HTS_USESCOPEID
 #define WIN32_LEAN_AND_MEAN
-// KB955045 (http://support.microsoft.com/kb/955045)
-// To execute an application using this function on earlier versions of Windows
-// (Windows 2000, Windows NT, and Windows Me/98/95), then it is mandatary to #include Ws2tcpip.h
-// and also Wspiapi.h. When the Wspiapi.h header file is included, the 'getaddrinfo' function is
-// #defined to the 'WspiapiGetAddrInfo' inline function in Wspiapi.h. 
+#include <winsock2.h>
 #include <ws2tcpip.h>
-#include <Wspiapi.h>
-//#include <winsock2.h>
-//#include <tpipv6.h>
+#include <tpipv6.h>
 #else
  #include <winsock2.h>
  #include <socket.h>

@@ -263,35 +263,30 @@ void htspe_init(void) {
       handle = LoadLibraryA((char*)"ssleay32");
 #else
       /* We are compatible with 0.9.6/7/8/8b and potentially above */
-      static const char *const libs[] = {
-        "libssl.so.1.0",
-        "libssl.so.1",
-        "libssl.so.1.0.0",
-        /* */
-        "libssl.so.0",
-        "libssl.so.0.9",
-        "libssl.so.0.9.8p",
-        "libssl.so.0.9.8o",
-        "libssl.so.0.9.8n",
-        "libssl.so.0.9.8m",
-        "libssl.so.0.9.8l",
-        "libssl.so.0.9.8k", /* (Debarshi Ray) */
-        "libssl.so.0.9.8j", /* (Debarshi Ray) */
-        "libssl.so.0.9.8g", /* Added 8g release too (Debarshi Ray) */
-        "libssl.so.0.9.8b",
-        "libssl.so.0.9.8",
-        "libssl.so.0.9.7",
-        "libssl.so.0.9.6",
-        "libssl.so",        /* Try harder with devel link */
-        NULL
-      };
-      int i;
-      for(i = 0, handle = NULL ; handle == NULL && libs[i] != NULL ; i++) {
-        handle = dlopen(libs[i], RTLD_LAZY);
+      handle = dlopen("libssl.so.0.9.8g", RTLD_LAZY);  /* added 8g release too (Debarshi Ray) */
+      if (handle == NULL) {
+		handle = dlopen("libssl.so.0.9.8b", RTLD_LAZY);
+	  }
+      if (handle == NULL) {
+		handle = dlopen("libssl.so.0.9.8", RTLD_LAZY);
+	  }
+      if (handle == NULL) {
+        handle = dlopen("libssl.so.0.9.7", RTLD_LAZY);
+      }
+      if (handle == NULL) {
+        handle = dlopen("libssl.so.0.9.6", RTLD_LAZY);
+      }
+      if (handle == NULL) {
+        /* Try harder with .0 if any */
+        handle = dlopen("libssl.so.0", RTLD_LAZY);
+      }
+      if (handle == NULL) {
+        /* Try harder with devel link */
+        handle = dlopen("libssl.so", RTLD_LAZY);
       }
 #endif
       ssl_handle = handle;
-      if (handle != NULL) {
+      if (handle) {
         SSL_shutdown = (t_SSL_shutdown) DynamicGet(handle, (char*)"SSL_shutdown");
         SSL_free = (t_SSL_free) DynamicGet(handle, (char*)"SSL_free");
         SSL_new = (t_SSL_new) DynamicGet(handle, (char*)"SSL_new");

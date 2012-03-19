@@ -653,7 +653,9 @@ int run_launch_ftp(FTPDownloadStruct *pStruct) {
             _CHECK_HALT_FTP;	  
             if (line[0]=='1') {
               //T_SOC soc_dat;
-              if ( (soc_dat=accept(soc_servdat, NULL, NULL)) == INVALID_SOCKET) {
+              struct sockaddr dummyaddr;
+              int dummylen = sizeof(struct sockaddr);
+              if ( (soc_dat=accept(soc_servdat,&dummyaddr,&dummylen)) == INVALID_SOCKET) {
                 strcpybuff(back->r.msg,"Unable to accept connection");
                 // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;

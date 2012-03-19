@@ -1953,12 +1953,12 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                     unescape_amp(lien);
                     unescape_amp(query);
                     // décoder l'inutile (%2E par exemple) et coder espaces
-                    // Bad: strcpybuff(lien,unescape_http(lien));
-                    // Bad: strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
+                    // XXXXXXXXXXXXXXXXX strcpybuff(lien,unescape_http(lien));
+                    //strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
 										/* Never unescape high-chars (we don't know the encoding!!) */
                     strcpybuff(lien,unescape_http_unharm(catbuff,lien, 1));   /* note: '%' is still escaped */
                     escape_remove_control(lien);
-                    // ???? No! escape_spc_url(lien);
+                    escape_spc_url(lien);
                     strcatbuff(lien,query);     /* restore */
                   }
 
@@ -2752,7 +2752,6 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           if (!in_media) {    // In media (such as real audio): don't patch
 														/* Never escape high-chars (we don't know the encoding!!) */
 														escape_uri_utf(tempo);
-
                             //if (!no_esc_utf)
                             //  escape_uri(tempo);     // escape with %xx
                             //else {
