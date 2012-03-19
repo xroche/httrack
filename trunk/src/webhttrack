@@ -59,8 +59,9 @@ fi
 # -remote if needed. Change the URL into openURL($url) too. 
 # (thanks to Torsten Werner for the patch)
 # see http://www.mozilla.org/unix/remote.html
+# 04/2006: openurl() fix from Samuel Suther
 if mozillabrowser ${browser}; then
-	if ! ${browser} -remote "${url}"; then
+	if ! ${browser} -remote "openurl(${url})"; then
 		log "spawning browser.."
 		${browser} "${url}"
 	fi
@@ -129,7 +130,18 @@ test -n "$BROWSEREXE" || ! log "cound not find any suitable browser" || exit 1
 
 # "browse" command
 if test "$1" = "browse"; then
-launch_browser "${BROWSEREXE}" "file://${HOME}/websites/index.html"
+if test -f "${HOME}/.httrack.ini"; then
+INDEXF=`cat ${HOME}/.httrack.ini | tr '\r' '\n' | grep -E "^path=" | cut -f2- -d'='`
+if test -n "${INDEXF}" -a -d "${INDEXF}" -a -f "${INDEXF}/index.html"; then
+INDEXF="${INDEXF}/index.html"
+else
+INDEXF=""
+fi
+fi
+if ! test -n "$INDEXF"; then 
+INDEXF="${HOME}/websites/index.html"
+fi
+launch_browser "${BROWSEREXE}" "file://${INDEXF}"
 exit $?
 fi
 

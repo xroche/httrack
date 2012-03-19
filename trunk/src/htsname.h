@@ -42,9 +42,24 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
+#define DELAYED_EXT "delayed"
+#define IS_DELAYED_EXT(a) ( ((a) != NULL) && ((a)[0] != 0) && strendwith_(a, "." DELAYED_EXT) )
+static int strendwith_(const char* a, const char* b) {
+  int i, j;
+  for(i = 0 ; a[i] != 0 ; i++);
+  for(j = 0 ; b[j] != 0 ; j++);
+  while(i >= 0 && j >= 0 && a[i] == b[j]) {
+    i--;
+    j--;
+  }
+  return (j == -1);
+}
+
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int url_savename(char* adr_complete,char* fil_complete,char* save,char* former_adr,char* former_fil,char* referer_adr,char* referer_fil,httrackp* opt,lien_url** liens,int lien_tot,lien_back* back,int back_max,cache_back* cache,hash_struct* hash,int ptr,int numero_passe);
+// note: 'headers' can either be null, or incomplete (only r member filled)
+int url_savename(char* adr_complete,char* fil_complete,char* save,char* former_adr,char* former_fil,char* referer_adr,char* referer_fil,httrackp* opt,lien_url** liens,int lien_tot,struct_back* sback,cache_back* cache,hash_struct* hash,int ptr,int numero_passe,const lien_back* headers);
 void standard_name(char* b,char* dot_pos,char* nom_pos,char* fil_complete,int short_ver);
 void url_savename_addstr(char* d,char* s);
 char* url_md5(char* fil_complete);

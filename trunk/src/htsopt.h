@@ -77,6 +77,7 @@ typedef struct htsoptstate {
   int mimehtml_created;
   char mimemid[256];
   FILE* mimefp;
+  int delayedId;
   /* */
   htscallbacks callbacks;
 } htsoptstate;
@@ -108,6 +109,9 @@ typedef struct httrackp {
   int rateout;          // nombre d'octets minium pour le transfert
   int maxtime;          // temps max en secondes
   int maxrate;          // taux de transfert max
+#if HTS_USEMMS
+  int mms_maxtime;      // max duration of a mms file
+#endif
   float maxconn;        // nombre max de connexions/s
   int waittime;         // démarrage programmé
   int cache;            // génération d'un cache
@@ -117,6 +121,8 @@ typedef struct httrackp {
   int savename_83;      // conversion 8-3 pour les noms de fichiers
   int savename_type;    // type de noms: structure originale/html-images en un seul niveau
   char savename_userdef[256];  // structure userdef (ex: %h%p/%n%q.%t)
+  int savename_delayed; // delayed type check
+  int delayed_cached;   // delayed type check can be cached to speedup updates
   int mimehtml;         // MIME-html
   int user_agent_send;  // user agent (ex: httrack/1.0 [sun])
   char user_agent[128];
@@ -197,6 +203,7 @@ typedef struct hts_stat_struct {
   //
   int stat_files;            // nombre de fichiers écrits
   int stat_updated_files;    // nombre de fichiers mis à jour
+  int stat_background;       // nombre de fichiers écrits en arrière plan
   //
   int stat_nrequests;        // nombre de requêtes sur socket
   int stat_sockid;           // nombre de sockets allouées au total

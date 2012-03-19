@@ -380,7 +380,15 @@ A: <em>Yes, it does</em>
 A: <em>WinHTTrack is the Windows release of HTTrack (with a graphic shell)</em>
 
 <br><br><a NAME="QG5">Q: <strong>Is HTTrack Mac compatible?</strong></a><br>
-A: <em>No, because of a lack of time. But sources are available</em>
+A: <em>Yes, using the original sources:
+
+<pre>
+tar xvfz httrack-*.tar.gz
+cd httrack-*
+./configure --prefix=/usr/local && make && make install
+/usr/local/bin/httrack
+</pre>
+But there are no official binaries, because of a lack of time</em>
 
 <br><br><a NAME="QG6">Q: <strong>Can HTTrack be compiled on all Un*x?</strong></a><br>
 A: <em>It should. The <tt>Makefile</tt> may be modified in some cases, however</em>

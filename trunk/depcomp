@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # depcomp - compile a program generating dependencies as side-effects
-# Copyright 1999, 2000 Free Software Foundation, Inc.
+# Copyright 1999, 2000, 2003 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -172,19 +172,25 @@ sgi)
 
 aix)
   # The C for AIX Compiler uses -M and outputs the dependencies
-  # in a .u file.  This file always lives in the current directory.
-  # Also, the AIX compiler puts `$object:' at the start of each line;
-  # $object doesn't have directory information.
-  stripped=`echo "$object" | sed -e 's,^.*/,,' -e 's/\(.*\)\..*$/\1/'`
+  # in a .u file.  In older versions, this file always lives in the
+  # current directory.  Also, the AIX compiler puts `$object:' at the
+  # start of each line; $object doesn't have directory information.
+  # Version 6 uses the directory in both cases.
+  stripped=`echo "$object" | sed 's/\(.*\)\..*$/\1/'`
   tmpdepfile="$stripped.u"
-  outname="$stripped.o"
   if test "$libtool" = yes; then
     "$@" -Wc,-M
   else
     "$@" -M
   fi
-
   stat=$?
+
+  if test -f "$tmpdepfile"; then :
+  else
+    stripped=`echo "$stripped" | sed 's,^.*/,,'`
+    tmpdepfile="$stripped.u"
+  fi
+
   if test $stat -eq 0; then :
   else
     rm -f "$tmpdepfile"
@@ -192,6 +198,7 @@ aix)
   fi
 
   if test -f "$tmpdepfile"; then
+    outname="$stripped.o"
     # Each line is of the form `foo.o: dependent.h'.
     # Do two passes, one to just change these to
     # `$object: dependent.h' and one to simply `dependent.h:'.
@@ -203,6 +210,44 @@ aix)
     # "include basename.Plo" scheme.
     echo "#dummy" > "$depfile"
   fi
+  rm -f "$tmpdepfile"
+  ;;
+
+icc)
+  # Intel's C compiler understands `-MD -MF file'.  However on
+  #    icc -MD -MF foo.d -c -o sub/foo.o sub/foo.c
+  # ICC 7.0 will fill foo.d with something like
+  #    foo.o: sub/foo.c
+  #    foo.o: sub/foo.h
+  # which is wrong.  We want:
+  #    sub/foo.o: sub/foo.c
+  #    sub/foo.o: sub/foo.h
+  #    sub/foo.c:
+  #    sub/foo.h:
+  # ICC 7.1 will output
+  #    foo.o: sub/foo.c sub/foo.h
+  # and will wrap long lines using \ :
+  #    foo.o: sub/foo.c ... \
+  #     sub/foo.h ... \
+  #     ...
+
+  "$@" -MD -MF "$tmpdepfile"
+  stat=$?
+  if test $stat -eq 0; then :
+  else
+    rm -f "$tmpdepfile"
+    exit $stat
+  fi
+  rm -f "$depfile"
+  # Each line is of the form `foo.o: dependent.h',
+  # or `foo.o: dep1.h dep2.h \', or ` dep3.h dep4.h \'.
+  # Do two passes, one to just change these to
+  # `$object: dependent.h' and one to simply `dependent.h:'.
+  sed "s,^[^:]*:,$object :," < "$tmpdepfile" > "$depfile"
+  # Some versions of the HPUX 10.20 sed can't process this invocation
+  # correctly.  Breaking it into two sed invocations is a workaround.
+  sed 's,^[^:]*: \(.*\)$,\1,;s/^\\$//;/^$/d;/:$/d' < "$tmpdepfile" |
+    sed -e 's/$/ :/' >> "$depfile"
   rm -f "$tmpdepfile"
   ;;
 
@@ -240,8 +285,8 @@ tru64)
    fi
    if test -f "$tmpdepfile"; then
       sed -e "s,^.*\.[a-z]*:,$object:," < "$tmpdepfile" > "$depfile"
-      # That's a space and a tab in the [].
-      sed -e 's,^.*\.[a-z]*:[ 	]*,,' -e 's,$,:,' < "$tmpdepfile" >> "$depfile"
+      # That's a tab and a space in the [].
+      sed -e 's,^.*\.[a-z]*:[	 ]*,,' -e 's,$,:,' < "$tmpdepfile" >> "$depfile"
    else
       echo "#dummy" > "$depfile"
    fi
@@ -254,7 +299,7 @@ tru64)
 
 dashmstdout)
   # Important note: in order to support this mode, a compiler *must*
-  # always write the proprocessed file to stdout, regardless of -o.
+  # always write the preprocessed file to stdout, regardless of -o.
   "$@" || exit $?
 
   # Remove the call to Libtool.
@@ -265,9 +310,7 @@ dashmstdout)
     shift
   fi
 
-  # Remove `-o $object'.  We will use -o /dev/null later,
-  # however we can't do the remplacement now because
-  # `-o $object' might simply not be used
+  # Remove `-o $object'.
   IFS=" "
   for arg
   do
@@ -287,7 +330,11 @@ dashmstdout)
   done
 
   test -z "$dashmflag" && dashmflag=-M
-  "$@" -o /dev/null $dashmflag | sed 's:^[^:]*\:[ 	]*:'"$object"'\: :' > "$tmpdepfile"
+  # Require at least two characters before searching for `:'
+  # in the target name.  This is to cope with DOS-style filenames:
+  # a dependency such as `c:/foo/bar' could be seen as target `c' otherwise.
+  "$@" $dashmflag |
+    sed 's:^[  ]*[^: ][^:][^:]*\:[    ]*:'"$object"'\: :' > "$tmpdepfile"
   rm -f "$depfile"
   cat < "$tmpdepfile" > "$depfile"
   tr ' ' '
@@ -306,6 +353,13 @@ dashXmstdout)
 
 makedepend)
   "$@" || exit $?
+  # Remove any Libtool call
+  if test "$libtool" = yes; then
+    while test $1 != '--mode=compile'; do
+      shift
+    done
+    shift
+  fi
   # X makedepend
   shift
   cleared=no
@@ -318,7 +372,9 @@ makedepend)
     case "$arg" in
     -D*|-I*)
       set fnord "$@" "$arg"; shift ;;
-    -*)
+    # Strip any option that makedepend may not understand.  Remove
+    # the object too, otherwise makedepend will parse it as a source file.
+    -*|$object)
       ;;
     *)
       set fnord "$@" "$arg"; shift ;;
@@ -339,7 +395,7 @@ makedepend)
 
 cpp)
   # Important note: in order to support this mode, a compiler *must*
-  # always write the proprocessed file to stdout.
+  # always write the preprocessed file to stdout.
   "$@" || exit $?
 
   # Remove the call to Libtool.
@@ -381,7 +437,7 @@ cpp)
 
 msvisualcpp)
   # Important note: in order to support this mode, a compiler *must*
-  # always write the proprocessed file to stdout, regardless of -o,
+  # always write the preprocessed file to stdout, regardless of -o,
   # because we must use -o when running libtool.
   "$@" || exit $?
   IFS=" "

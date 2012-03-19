@@ -4,8 +4,53 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.33-2
-+ Fixed: Added network bandwidth limiters by default to prevent excessive bandwidth usage using the commandline version
+3.40-2
++ Fixed: bogus '.del' filenames with ISO-9660 option
++ Fixed: now merges the header charset even with an empty footer string
++ New: --port option for webhttrack
+3.40
++ New: mms:// streaming capture (thanks to Nicolas Benoit!)
++ New: proxyTrack project released
++ New: new experimental parser that no longer needs link testing ('testing link type..')
++ New: Redirect handled transparently with delayed type check and broken links made external when the "no error page" option is enabled
++ New: improved background download to handle large sites
++ New: '--assume foo/bar.cgi=text/html' is now possible
++ New: MIME type scan rules (such as -mime:video/* +mime:video/mpeg)
++ New: size scan rules now allows to rewrite uncaught links as external links
++ Fixed: crash fixed when ftime()/localtime()==NULL
++ Fixed: iso-9660 option now using '_' for collision character
++ Fixed: collision problems with CaSe SeNsItIvItY
++ Fixed: a href='..' fixed!
++ Fixed: redirects are now handled by the new experimental parser
++ Fixed: "./" links generated with fixed outbound links (../../)
++ Fixed: 'base href' bogus in many cases
++ Fixed: enforce security limits to avoid bandwidth abuses
++ Fixed: bogus external (swf) parser, fixed remaining .delayed files
++ New: new check-mime and save-file2 callbacks
++ New: "always delayed type check" enabled
++ Fixed: totally bogus finalizer causing compressed files not to be uncompressed, and many files to be truncated
++ Shell: new Finnish interface added!
++ Fixed: "..html" bogus type
++ Fixed: remaining bogus .delayed entries
++ Fixed: flush before user-defined command
++ Fixed: fixed user-defined command call and background cleaner
++ Fixed: fixed 'Crash adding error, unexpected error found.. [4250]' error
++ Fixed: fixed cache absolute file reference (the reference is now relative) preventing the cache form being moved to another place
++ Fixed: webhttrack 'Browse Sites' path bug
++ Fixed: old httrack cache format fixes (import of older versions did not work anymore)
++ Fixed: port fixes in htsnet.h
++ Fixed: -N option with advanced extraction (bogus "not found" member)
++ Fixed: javascript: location=URL was not recognized
++ Fixed: no more character escaping when not needed (such as UTF-8 codes)
++ Fixed: possibly temporary files left on disk with bogus servers giving compressed content on HEAD reuests
++ Fixed: URL hack caused unexpected filename collisions (index.html vs INDEX.HTML)
++ Fixed: "do not erase already downloaded file" option now correctly works (it leaves files linked in the mirror)
++ Fixed: UCS2 encoded pages are now converted properly into UTF-8
++ New: "near" option now also catch embedded (images, css, ..) files
++ Fixed: bogus chunked multimedia link text files (such as x-ms-asf files)
++ Fixed: compilation problems on Un*x version
+
+3.33
 + Fixed: Bogus redirects with same location in https
 + Fixed: Bogus file naming with URL hack
 + Fixed: Extremly slow redirections and empty files

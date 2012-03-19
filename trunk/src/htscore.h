@@ -94,11 +94,7 @@ typedef struct lien_url {
   char* former_adr;     // adresse initiale (avant éventuel moved), peut être nulle
   char* former_fil;     // nom du fichier distant initial (avant éventuel moved), peut être nul
   // pour optimisation:
-#if HTS_HASH
   int hash_next[3];     // prochain lien avec même valeur hash
-#else
-  int sav_len;          // taille de sav
-#endif
 } lien_url;
 
 // chargement de fichiers en 'arrière plan'
@@ -116,6 +112,7 @@ typedef struct lien_back {
   char tmpfile_buffer[HTS_URLMAXSIZE*2];   // buffer pour le nom à sauver temporairement
   char send_too[1024];    // données à envoyer en même temps que le header
   int status;             // status (-1=non utilisé, 0: prêt, >0: opération en cours)
+  int locked;             // locked (to be used soon)
   int testmode;           // mode de test
   int timeout;            // gérer des timeouts? (!=0  : nombre de secondes)
   TStamp timeout_refresh; // si oui, time refresh
@@ -145,6 +142,12 @@ typedef struct lien_back {
   char magic2;
 #endif
 } lien_back;
+
+typedef struct struct_back {
+  lien_back* lnk;
+  int count;
+  void* ready;
+} struct_back;
 
 typedef struct cache_back_zip_entry cache_back_zip_entry;
 
@@ -182,11 +185,6 @@ typedef struct hash_struct {
   int max_lien;                         // indice le plus grand rencontré
   int hash[3][HTS_HASH_SIZE];           // tables pour sav/adr-fil/former_adr-former_fil
 } hash_struct;
-
-#if HTS_HASH
-#else
-#define hash_write(A,B)
-#endif
 
 typedef struct filecreate_params {
   FILE* lst;
@@ -277,10 +275,12 @@ typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url
 typedef char* (* t_hts_htmlcheck_query)(char* question);
 typedef char* (* t_hts_htmlcheck_query2)(char* question);
 typedef char* (* t_hts_htmlcheck_query3)(char* question);
-typedef int   (* t_hts_htmlcheck_loop)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
+typedef int   (* t_hts_htmlcheck_loop)(struct_back* sback,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
 typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
+typedef int   (* t_hts_htmlcheck_check_mime)(char* adr,char* fil,char* mime,int status);
 typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
 typedef void  (* t_hts_htmlcheck_filesave)(char* file);
+typedef void  (* t_hts_htmlcheck_filesave2)(char* hostname,char* filename,char* localfile,int is_new,int is_modified, int not_updated);
 typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
 typedef int   (* t_hts_htmlcheck_linkdetected2)(char* link, char* tag_start);
 typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
@@ -306,8 +306,10 @@ extern t_hts_htmlcheck_query2     hts_htmlcheck_query2;
 extern t_hts_htmlcheck_query3     hts_htmlcheck_query3;
 extern t_hts_htmlcheck_loop       hts_htmlcheck_loop;
 extern t_hts_htmlcheck_check      hts_htmlcheck_check;
+extern t_hts_htmlcheck_check_mime hts_htmlcheck_check_mime;
 extern t_hts_htmlcheck_pause      hts_htmlcheck_pause;
 extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
+extern t_hts_htmlcheck_filesave2  hts_htmlcheck_filesave2;
 extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
 extern t_hts_htmlcheck_linkdetected2 hts_htmlcheck_linkdetected2;
 extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
@@ -356,10 +358,12 @@ int httpmirror(char* url1,httrackp* opt);
 int filesave(httrackp* opt,char* adr,int len,char* s,char* url_adr /* = NULL */,char* url_fil /* = NULL */);
 int check_fatal_io_errno(void);
 int engine_stats(void);
-void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,lien_back* back,int back_max,char* host);
+void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* sback,char* host);
 FILE* filecreate(char* s);
+FILE* fileappend(char* s);
 int filecreateempty(char* filename);
 int filenote(char* s,filecreate_params* params);
+void file_notify(char* adr,char* fil,char* save,int create,int modify,int wasupdated);
 HTS_INLINE void usercommand(httrackp* opt,int exe,char* cmd,char* file,char* adr,char* fil);
 void usercommand_exe(char* cmd,char* file);
 //void* structcheck_init(int init);
@@ -371,6 +375,7 @@ HTS_INLINE int fspc(FILE* fp,char* type);
 char* next_token(char* p,int flag);
 //
 char* readfile(char* fil);
+char* readfile2(char* fil, LLint* size);
 char* readfile_or(char* fil,char* defaultdata);
 #if 0
 void check_rate(TStamp stat_timestart,int maxrate);
@@ -381,11 +386,11 @@ int liens_record(char* adr,char* fil,char* save,char* former_adr,char* former_fi
 
 
 // backing, routines externes
-int back_pluggable_sockets(lien_back* back, int back_max, httrackp* opt);
-int back_pluggable_sockets_strict(lien_back* back, int back_max, httrackp* opt);
-int back_fill(lien_back* back,int back_max,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
-int backlinks_done(lien_url** liens,int lien_tot,int ptr);
-int back_fillmax(lien_back* back,int back_max,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
+int back_pluggable_sockets(struct_back* sback, httrackp* opt);
+int back_pluggable_sockets_strict(struct_back* sback, httrackp* opt);
+int back_fill(struct_back* sback,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
+int backlinks_done(struct_back* sback,lien_url** liens,int lien_tot,int ptr);
+int back_fillmax(struct_back* sback,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
 
 // cancel file
 #if HTS_ANALYSTE

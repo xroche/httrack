@@ -108,4 +108,63 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 */
 int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 
+/*
+  Wair for (adr, fil, save) to be started, that is, 
+  to be ready for naming, having its header MIME type
+  If the final URL is to be forbidden, sets 'forbidden_url' to the corresponding value
+*/
+int hts_wait_delayed(htsmoduleStruct* str, 
+                     char* adr, char* fil, char* save, 
+                     char* former_adr, char* former_fil, 
+                     int* forbidden_url);
+
+
+/* Context state */
+
+#define ENGINE_LOAD_CONTEXT_BASE() \
+  lien_url** liens = (lien_url**) str->liens; \
+  httrackp* opt = (httrackp*) str->opt; \
+  struct_back* sback = (struct_back*) str->sback; \
+  lien_back* const back = sback->lnk; \
+  const int back_max = sback->count; \
+  cache_back* cache = (cache_back*) str->cache; \
+  hash_struct* hashptr = (hash_struct*) str->hashptr; \
+  int numero_passe = str->numero_passe; \
+  int add_tab_alloc = str->add_tab_alloc; \
+  /* */ \
+  int lien_tot = * ( (int*) (str->lien_tot_) ); \
+  int ptr = * ( (int*) (str->ptr_) ); \
+  int lien_size = * ( (int*) (str->lien_size_) ); \
+  char* lien_buffer = * ( (char**) (str->lien_buffer_) )
+
+#define ENGINE_SAVE_CONTEXT_BASE() \
+  /* Apply changes */ \
+  * ( (int*) (str->lien_tot_) ) = lien_tot; \
+  * ( (int*) (str->ptr_) ) = ptr; \
+  * ( (int*) (str->lien_size_) ) = lien_size; \
+  * ( (char**) (str->lien_buffer_) ) = lien_buffer
+
+#define WAIT_FOR_AVAILABLE_SOCKET() do { \
+  int prev = _hts_in_html_parsing; \
+  while(back_pluggable_sockets_strict(sback, opt) <= 0) { \
+    _hts_in_html_parsing = 6; \
+    /* Wait .. */ \
+    back_wait(sback,opt,cache,0); \
+    /* Transfer rate */ \
+    engine_stats(); \
+    /* Refresh various stats */ \
+    HTS_STAT.stat_nsocket=back_nsoc(sback); \
+    HTS_STAT.stat_errors=fspc(NULL,"error"); \
+    HTS_STAT.stat_warnings=fspc(NULL,"warning"); \
+    HTS_STAT.stat_infos=fspc(NULL,"info"); \
+    HTS_STAT.nbk=backlinks_done(sback,liens,lien_tot,ptr); \
+    HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,sback); \
+    /* Check */ \
+    if (!hts_htmlcheck_loop(sback->lnk, sback->count, -1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
+      return -1; \
+    } \
+  } \
+  _hts_in_html_parsing = prev; \
+} while(0)
+
 #endif

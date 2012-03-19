@@ -59,7 +59,7 @@ Please visit our Website: http://www.httrack.com
 // optionnel: taille à contrôller (ou numéro, etc) en pointeur
 //            (en de détection de *size, la taille limite est écrite par dessus *size)
 // exemple: +-*.gif*[<5] == supprimer GIF si <5KB
-int fa_strjoker(char** filters,int nfil,char* nom,LLint* size,int* size_flag,int* depth) {
+int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size_flag,int* depth) {
   int verdict = 0;  // on sait pas
   int i;
   LLint sizelimit=0;
@@ -67,9 +67,18 @@ int fa_strjoker(char** filters,int nfil,char* nom,LLint* size,int* size_flag,int
     sizelimit=*size;
   for(i=0;i<nfil;i++) {
     LLint sz;
+    int filteroffs = 1;
+    if (strncmp(filters[i] + filteroffs, "mime:", 5) == 0) {
+      if (type == 0)      // regular filters
+        continue;
+      filteroffs += 5;    // +mime:text/html
+    } else {              // mime filters
+      if (type != 0)
+        continue;
+    }
     if (size)
       sz=*size;
-    if (strjoker(nom,filters[i] + 1,&sz,size_flag)) {    // reconnu
+    if (strjoker(nom, filters[i] + filteroffs, &sz, size_flag)) {    // reconnu
       if (size)
       if (sz != *size)
         sizelimit=sz;
@@ -208,6 +217,9 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
               } else err=1;
               i+=3;
             } else {            // 1 car, ex: *[ ]
+              if (joker[i+2]=='\\' && joker[i+3] != 0) {  // escaped char, such as *[\[] or *[\]]
+                i++;
+              }
               pass[(int) (unsigned char) joker[i]]=1;
               i++;
             }
@@ -225,7 +237,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
       int i;
       for(i=0;i<256;i++) pass[i]=1;    // tout autoriser
       jmp=1;
-      if (joker[2]==LEFT) jmp=3;        // permet de recher *<crochet ouvrant>
+      ////if (joker[2]==LEFT) jmp=3;        // permet de recher *<crochet ouvrant>
     }
     
     {

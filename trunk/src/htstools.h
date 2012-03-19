@@ -87,6 +87,7 @@ void long_to_83(int mode,char* n83,char* save);
 void longfile_to_83(int mode,char* n83,char* save);
 HTS_INLINE int __rech_tageq(const char* adr,const char* s);
 HTS_INLINE int __rech_tageqbegdigits(const char* adr,const char* s);
+HTS_INLINE int rech_tageq_all(const char* adr, const char* s);
 #define rech_tageq(adr,s) \
   ( \
     ( (*((adr)-1)=='<') || (is_space(*((adr)-1))) ) ? \

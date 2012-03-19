@@ -166,12 +166,14 @@ Log: "check-html: <url>"
   hts_htmlcheck_query3       = (t_hts_htmlcheck_query3)         htswrap_read("query3");
   hts_htmlcheck_loop         = (t_hts_htmlcheck_loop)           htswrap_read("loop");
   hts_htmlcheck_check        = (t_hts_htmlcheck_check)          htswrap_read("check-link");
+  hts_htmlcheck_check_mime   = (t_hts_htmlcheck_check_mime)     htswrap_read("check-mime");
 Log: none
 
   hts_htmlcheck_pause        = (t_hts_htmlcheck_pause)          htswrap_read("pause");
 Log: "pause: <lockfile>"
 
   hts_htmlcheck_filesave     = (t_hts_htmlcheck_filesave)       htswrap_read("save-file");
+  hts_htmlcheck_filesave2    = (t_hts_htmlcheck_filesave2)      htswrap_read("save-file2");
   hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
   hts_htmlcheck_linkdetected2 = (t_hts_htmlcheck_linkdetected2)   htswrap_read("link-detected2");
 Log: none
@@ -200,8 +202,10 @@ Log:
   htswrap_add("query2",htsshow_query2);
   htswrap_add("query3",htsshow_query3);
   htswrap_add("check-link",htsshow_check);
+  htswrap_add("check-mime",htsshow_check_mime);
   htswrap_add("pause",htsshow_pause);
   htswrap_add("save-file",htsshow_filesave);
+  htswrap_add("save-file2",htsshow_filesave2);
   htswrap_add("link-detected",htsshow_linkdetected);
   htswrap_add("link-detected2",htsshow_linkdetected2);
   htswrap_add("transfer-status",htsshow_xfrstatus);
@@ -592,12 +596,17 @@ static char* __cdecl htsshow_query3(char* question) {
 static int __cdecl htsshow_check(char* adr,char* fil,int status) {
   return -1;
 }
+static int __cdecl htsshow_check_mime(char* adr,char* fil,char* mime,int status) {
+  return -1;
+}
 static void __cdecl htsshow_pause(char* lockfile) {
   while (fexist(lockfile)) {
     Sleep(1000);
   }
 }
 static void __cdecl htsshow_filesave(char* file) {
+}
+static void __cdecl htsshow_filesave2(char* adr, char* fil, char* save, int is_new, int is_modified,int not_updated) {
 }
 static int __cdecl htsshow_linkdetected(char* link) {
   return 1;

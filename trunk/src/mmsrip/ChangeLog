@@ -1,0 +1,156 @@
+2006-01-24  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* README, NEWS: getting ready for 0.7.0 release.
+	* gentoo/mmsrip-0.7.0.ebuild: ebuild script for 0.7.0 release.
+	* spec/mmsrip.spec: updated for 0.7.0 release.
+
+
+2006-01-23  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.h, src/mms.c, src/main.c, doc/mmsrip.1: renamed compatibility mode to trick enabled mode (-c/--compat switches are now -k/--trick).
+	* src/mms.c, src/main.c: fixed parsing of urls that look like 'stream.asf?digest=7Q2bjXo&provider=lala'.
+	* src/mms.c, src/mms.h, src/main.c, doc/mmsrip.1, configure.ac: replaced configure's --enable-debug switch by a -gFILE/--debug=FILE runtime switch.
+	* doc/mmsrip.1: improved presentation.
+
+
+2006-01-22  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.c: fixed presentation in debug output.
+	* AUTHORS: updated.
+	* src/mms.c: improved debug ouput for header interpretation.
+	* src/mms.c: fixed expected file size.
+	* src/mms.c: added a few calls to mms_get_32() for code lisibility.
+	* src/mms.c: added mms_get_64() function (improves lisibility in mms_interp_header()).
+	* src/mms.c: improved ASF header interpretation.
+	* src/mms.h, src/mms.c, src/main.c, doc/mmsrip.1: added compatibility mode and -c/--compat switches.
+	* src/main.c: minor presentation improvements.
+	* src/mms.c: added an entry for mmsh:// protocol though we don't support it.
+
+
+2006-01-21  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.h, src/mms.c, src/error.c, src/error.h, src/main.c, configure.ac: fixed compilation on Win32 (thanks to Xavier ROCHE for the initial port).
+	* AUTHORS: updated.
+	* src/mms.c: fixed URL parsing (mmst:// is now ok).
+	* src/mms.c, doc/mmsrip.1: the user should read the manpage when the server sends a no auth error.
+	* configure.ac: added a switch to enable debug output to stdout.
+
+
+2006-01-20  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.h, src/main.c, configure.ac: fixed compilation on Solaris (from Jeff FULMER's Solaris port).
+	* AUTHORS: updated.
+	* gentoo/mmsrip-0.6.6.ebuild: ebuild script for 0.6.6 release.
+	* spec/mmsrip.spec: spec file for RPM building (thanks to Federico SIMONCELLI).
+	* src/mms.c, configure.ac: added the display of the ripping speed.
+
+
+2006-01-17  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.h: fixed compilation on Cygwin (greetings to Kyuzz for bug reporting).
+
+
+2006-01-06  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.6.5 release.
+
+
+2006-01-06  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.c: fixed a call to error().
+	* src/mms.h: reordered some error codes.
+	* src/main.c: improved the error code returned by the program.
+	* doc/mmsrip.1: added some documentation about the program's returned value.
+	* gentoo/mmsrip-0.6.5.ebuild: ebuild script for 0.6.5 release.
+	* README, NEWS: getting ready for 0.6.5 release.
+
+
+2005-11-23  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.h, src/mms.c, src/main.c: replaced a few values with #defines.
+	* src/mms.c: added the support for no auth errors (this happens sometimes, for example on canalplus.fr).
+
+
+2005-07-09  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.6.4 release.
+
+
+2005-07-09  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* doc/mmsrip.1: added man page.
+	* doc/Makefile.am, Makefile.am, configure.ac: added the man page to the package.
+	* src/main.c: fixed a compilation warning about variable `end` initialization.
+	* src/mms.c: fixed a potential security issue in the handling of files containing more than 20 streams (patch ported from MPlayer).
+	* src/mms.c: fixed a bug in the media stream MBR selection that prevented ASF files from being ripped properly (bug reported by Jozef RIHA).
+	* gentoo/mmsrip-0.6.4.ebuild: ebuild script for 0.6.4 release.
+	* README, NEWS: getting ready for 0.6.4 release.
+
+
+2005-06-05  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.6.2 release.
+
+
+2005-06-05  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* Makefile.am: ebuild script moved in a dedicated gentoo directory.
+	* gentoo/mmsrip-0.6.2.ebuild: ebuild script for 0.6.2 release.
+	* src/main.c: added '-d' switch which makes mmsrip exit after the specified delay (idea and patch by Luis COSTA).
+	* src/main.c: fixed bug that made mmsrip attempt to use invalid URLs.
+	* AUTHORS: updated.
+	* src/main.c: added support for long options.
+	* README, NEWS: getting ready for 0.6.2 release.
+
+
+2005-05-29  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac: 0.6.0 release.
+
+
+2005-05-29  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/main.c: added '-q' switch which makes mmsrip quiet.
+	* src/mms.c, src/mms.h: added support for quiet mode.
+	* src/main.c: added '-t' switch which makes mmsrip check stream availability only.
+	* src/main.c: added '-o' switch which makes mmsrip output stream to specified file.
+	* src/main.c: fixed a bug in args handling.
+	* README, NEWS, src/common.h: getting ready for 0.6.0 release.
+
+
+2005-05-28  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* mmsrip-0.6.0.ebuild: added Aurelien REQUIEM's ebuild.
+	* README: updated.
+	* AUTHORS: updated.
+	* Makefile.am: added ebuild script to EXTRA_DIST.
+	* configure.ac: added CVS infos.
+
+
+2005-02-21  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.4.2 release.
+
+
+2005-02-21  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/mms.c: Removed bad EOF handling in mms_recv_packet().
+	* README, NEWS: Getting ready for 0.4.2.
+
+
+2005-02-20  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.4.1 release.
+
+
+2005-02-20  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* src/main.c: Fixed bug with multiple streams (mmsrip used to download the same stream every time).
+	* configure.ac: Removed unnecessary checks.
+	* src/mms.c: Removed strndup() because a lot of people don't have it.
+	* README, NEWS: Getting ready for 0.4.1.
+
+
+2005-02-20  Nicolas BENOIT  <nbenoit@tuxfamily.org>
+
+	* configure.ac, src/common.h: 0.4.0 release.

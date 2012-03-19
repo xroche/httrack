@@ -44,7 +44,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int fa_strjoker(char** filters,int nfil,char* nom,LLint* size,int* size_flag,int* depth);
+int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size_flag,int* depth);
 HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag);
 char* strjokerfind(char* chaine,char* joker);
 #endif

@@ -118,10 +118,12 @@ typedef struct SOCaddr {
 if (hpsize == sizeof(struct sockaddr_in)) { \
   server_len=sizeof(struct sockaddr_in); \
   SOCaddr_sinfamily(server) = (*(struct sockaddr_in*)(hpaddr)).sin_family; \
+	SOCaddr_sinport(server) = (*(struct sockaddr_in*)(hpaddr)).sin_port; \
   memcpy(&SOCaddr_sinaddr(server), &(*(struct sockaddr_in*)(hpaddr)).sin_addr, sizeof(SOCaddr_sinaddr(server))); \
 } else if (hpsize == 4) {\
   server_len=sizeof(struct sockaddr_in); \
   SOCaddr_sinfamily(server) = AF_INET; \
+	SOCaddr_sinport(server) = 0; \
   memcpy(&SOCaddr_sinaddr(server), (hpaddr), sizeof(SOCaddr_sinaddr(server))); \
 } else if ((hpsize > 0) && (hpsize <= sizeof(server))) { \
   server_len=hpsize; \
@@ -194,22 +196,27 @@ typedef struct SOCaddr {
 if (hpsize == sizeof(struct sockaddr_in6)) { \
   server_len=sizeof(struct sockaddr_in6); \
   SOCaddr_sinfamily(server) = (*(struct sockaddr_in6*)(hpaddr)).sin6_family; \
+	SOCaddr_sinport(server) = (*(struct sockaddr_in6*)(hpaddr)).sin6_port; \
   SOCaddr_sinflowinfo(server) = (*(struct sockaddr_in6*)(hpaddr)).sin6_flowinfo; \
   memcpy(&SOCaddr_sinaddr(server), &(*(struct sockaddr_in6*)(hpaddr)).sin6_addr, sizeof(SOCaddr_sinaddr(server))); \
 } else if (hpsize > sizeof(struct sockaddr_in6)) { \
   server_len=hpsize; \
+	SOCaddr_sinport(server) = 0; \
   memcpy(&(server), hpaddr, hpsize); \
 } else if (hpsize == sizeof(struct sockaddr_in)) { \
   server_len=sizeof(struct sockaddr_in); \
   (*(struct sockaddr_in*)(&server)).sin_family = AF_INET; \
+	SOCaddr_sinport(server) = (*(struct sockaddr_in*)(hpaddr)).sin_port; \
   memcpy(&(*(struct sockaddr_in*)&(server)).sin_addr, &(*(struct sockaddr_in*)(hpaddr)).sin_addr, sizeof((*(struct sockaddr_in*)(hpaddr)).sin_addr)); \
 } else if (hpsize == 4) {\
   server_len=sizeof(struct sockaddr_in); \
   (*(struct sockaddr_in*)(&server)).sin_family = AF_INET; \
+	SOCaddr_sinport(server) = 0; \
   memcpy(&(*(struct sockaddr_in*)&(server)).sin_addr, hpaddr, 4); \
 } else if (hpsize == 16) {\
   server_len=sizeof(struct sockaddr_in6); \
   SOCaddr_sinfamily(server) = AF_INET6; \
+	SOCaddr_sinport(server) = 0; \
   memcpy(&SOCaddr_sinaddr(server), (hpaddr), 16); \
 } else if ((hpsize > 0) && (hpsize <= sizeof(server))) { \
   server_len=hpsize; \

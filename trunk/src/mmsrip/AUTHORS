@@ -1,0 +1,27 @@
+Nicolas BENOIT (main developper)
+nbenoit@tuxfamily.org
+http://nbenoit.tuxfamily.org
+
+Major MMS (author of mmsclient)
+http://www.geocities.com/majormms
+
+SDP Multimedia (author of the only doc about MMS)
+http://get.to/sdp
+
+Aurelien REQUIEM (author of mmsrip's ebuild script)
+aurelien@menfin.net
+
+Luis COSTA (initial idea and patch for the -d/--delay option)
+izhirahider@gmail.com
+
+Jeff FULMER (Solaris port)
+jeff@joedog.org
+
+Federico SIMONCELLI (RPMs for Fedora Core 4)
+federico.simoncelli@gmail.com
+
+Kyuzz (Fix for Cygwin compilation)
+kyuzz.org
+
+Xavier ROCHE (Initial port to Win32)
+roche@httrack.com

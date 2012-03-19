@@ -40,8 +40,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version
-#define HTTRACK_VERSION      "3.33-2"
-#define HTTRACK_VERSIONID    "3.33.16"
+#define HTTRACK_VERSION      "3.40-2"
+#define HTTRACK_VERSIONID    "3.40.4"
 #define HTTRACK_AFF_VERSION  "3.x"
 //#define HTTRACK_AFF_WARNING  "This is a BETA release of WinHTTrack Website Copier ("HTTRACK_VERSION")\nPlease report any crashes, bugs or problems"
 
@@ -211,6 +211,11 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USEOPENSSL 1
 #endif
 
+// utiliser mms://?
+#ifndef HTS_USEMMS
+#define HTS_USEMMS 1
+#endif
+
 #ifndef HTS_DLOPEN
 #define HTS_DLOPEN 1
 #endif
@@ -287,7 +292,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Copyright (C) Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2005]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2006]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"

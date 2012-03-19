@@ -49,6 +49,11 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 
 #include <ctype.h>
+#if USE_BEGINTHREAD
+#if HTS_WIN
+#include <process.h>
+#endif
+#endif
 #if HTS_WIN
 #else
 #ifndef HTS_DO_NOT_USE_UID
@@ -120,8 +125,10 @@ void set_wrappers(void) {
   hts_htmlcheck_query3       = (t_hts_htmlcheck_query3)         htswrap_read("query3");
   hts_htmlcheck_loop         = (t_hts_htmlcheck_loop)           htswrap_read("loop");
   hts_htmlcheck_check        = (t_hts_htmlcheck_check)          htswrap_read("check-link");
+  hts_htmlcheck_check_mime   = (t_hts_htmlcheck_check_mime)     htswrap_read("check-mime");
   hts_htmlcheck_pause        = (t_hts_htmlcheck_pause)          htswrap_read("pause");
   hts_htmlcheck_filesave     = (t_hts_htmlcheck_filesave)       htswrap_read("save-file");
+  hts_htmlcheck_filesave2    = (t_hts_htmlcheck_filesave2)      htswrap_read("save-file2");
   hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
   hts_htmlcheck_linkdetected2 = (t_hts_htmlcheck_linkdetected2) htswrap_read("link-detected2");
   hts_htmlcheck_xfrstatus    = (t_hts_htmlcheck_xfrstatus)      htswrap_read("transfer-status");
@@ -204,6 +211,8 @@ int main(int argc, char **argv) {
   strcpybuff(httrack.from, "");
   httrack.savename_83=0;     // noms longs par défaut
   httrack.savename_type=0;   // avec structure originale
+  httrack.savename_delayed=2;// hard delayed type (default)
+  httrack.delayed_cached=1;  // cached delayed type (default)
   httrack.mimehtml=0;        // pas MIME-html
   httrack.parsejava=1;       // parser classes
   httrack.hostcontrol=0;     // PAS de control host pour timeout et traffic jammer
@@ -254,7 +263,10 @@ int main(int argc, char **argv) {
   httrack.maxcache=1048576*32;  // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //httrack.maxcache_anticipate=256;  // maximum de liens à anticiper
   httrack.maxtime=-1;        // temps max en secondes
-  httrack.maxrate=25000;     // default max rate
+#if HTS_USEMMS
+	httrack.mms_maxtime = 60*3600;		// max time for mms streams (one hour)
+#endif
+  httrack.maxrate=25000;     // taux maxi
   httrack.maxconn=5.0;       // nombre connexions/s
   httrack.waittime=-1;       // wait until.. hh*3600+mm*60+ss
   //
@@ -521,44 +533,42 @@ int main(int argc, char **argv) {
                 htsmain_free();
                 return -1;
               } else {
-                char* a;
+								int i, j;
+								int inQuote;
+								char* path;
+								int noDbl = 0;
+								if (com[1] == '1') {			/* only 1 arg */
+									com++;
+									noDbl = 1;
+								}
                 na++;
-                strcpybuff(httrack.path_html,"");
-                strcpybuff(httrack.path_log,"");
-                a=strstr(argv[na],"\",\"");  // rechercher en premier, au cas ou -O "c:\pipo,test","c:\test"
-                if (!a)
-                  a=strchr(argv[na],',');  // 2 path
-                else
-                  a++;  // position ,
-                if (a) {
-                  strncatbuff(httrack.path_html,argv[na],(int) (a-argv[na]));
-                  strcatbuff(httrack.path_log,a+1);
-                } else {
-                  strcpybuff(httrack.path_log,argv[na]);
-                  strcpybuff(httrack.path_html,argv[na]);
-                }
-                // Eliminer les cas comme -O "C:\mirror\"
-                if (httrack.path_log[0]=='"') {  // Guillemets
-                  char tmp[256];
-                  strcpybuff(tmp,httrack.path_log+1);
-                  if (tmp[strlen(tmp)-1]=='"')
-                    tmp[strlen(tmp)-1]='\0';
-                  strcpybuff(httrack.path_log,tmp);
-                }
-                if (httrack.path_html[0]=='"') {
-                  char tmp[256];
-                  strcpybuff(tmp,httrack.path_html+1);
-                  if (tmp[strlen(tmp)-1]=='"')
-                    tmp[strlen(tmp)-1]='\0';
-                  strcpybuff(httrack.path_html,tmp);
-                }
+								httrack.path_html[0] = '\0';
+                httrack.path_log[0] = '\0';
+								for(i = 0, j = 0, inQuote = 0, path = httrack.path_html ; argv[na][i] != 0 ; i++) {
+									if (argv[na][i] == '"') {
+										if (inQuote)
+											inQuote = 0;
+										else
+											inQuote = 1;
+									} else if (!inQuote && !noDbl && argv[na][i] == ',') {
+										path[j++] = '\0';
+										j = 0;
+										path = httrack.path_log;
+									} else {
+										path[j++] = argv[na][i];
+									}
+								}
+								path[j++] = '\0';
+								if (httrack.path_log[0] == '\0') {
+									strcpybuff(httrack.path_log, httrack.path_html);
+								}
+
                 check_path(httrack.path_log,argv_firsturl);
                 if (check_path(httrack.path_html,argv_firsturl)) {
                   httrack.dir_topindex=1;     // rebuilt top index
                 }
                 
-                //printf("-->%s\n%s\n",httrack.path_html,httrack.path_log);
-                
+                //printf("-->%s\n%s\n",httrack.path_html,httrack.path_log);                
               }
               break;
             }  // switch
@@ -1231,7 +1241,12 @@ int main(int argc, char **argv) {
             case 'u': httrack.urlhack=1; if (*(com+1)=='0') { httrack.urlhack=0; com++; } break;   // url hack
             case 'v': httrack.verbosedisplay=2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.verbosedisplay); while(isdigit((unsigned char)*(com+1))) com++; } break;
             case 'i': httrack.dir_topindex = 1; if (*(com+1)=='0') { httrack.dir_topindex=0; com++; } break;
+            case 'N': httrack.savename_delayed = 2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.savename_delayed); while(isdigit((unsigned char)*(com+1))) com++; } break;
+            case 'D': httrack.delayed_cached=1; if (*(com+1)=='0') { httrack.delayed_cached=0; com++; } break;   // url hack
             case '!': httrack.bypass_limits = 1; if (*(com+1)=='0') { httrack.bypass_limits=0; com++; } break;
+#if HTS_USEMMS
+						case 'm': sscanf(com+1,"%d",&httrack.mms_maxtime); while(isdigit((unsigned char)*(com+1))) com++; break;
+#endif
 
             // preserve: no footer, original links
             case 'p':
@@ -1307,7 +1322,6 @@ int main(int argc, char **argv) {
                 htsmain_free();
                 return -1;
               } else{
-                char* a;
                 na++;
                 if ( (strlen(argv[na]) + strlen(httrack.mimedefs) + 4) >= sizeof(httrack.mimedefs)) {
                   HTS_PANIC_PRINTF("Mime definition string too long");
@@ -1315,22 +1329,24 @@ int main(int argc, char **argv) {
                   return -1;
                 }
                 // --assume standard
-                if (strcmp(argv[na],"standard") == 0) {
+                if (strcmp(argv[na], "standard") == 0) {
                   strcpybuff(httrack.mimedefs,"\n");
                   strcatbuff(httrack.mimedefs,HTS_ASSUME_STANDARD);
                   strcatbuff(httrack.mimedefs,"\n");
                 } else {
-                  strcatbuff(httrack.mimedefs,argv[na]);
-                  strcatbuff(httrack.mimedefs,"\n");
-                }
-                a=httrack.mimedefs;
-                while(*a) {
-                  switch(*a) {
-                  case ',': case ' ': case '\r': case ';': case '\t':
-                    *a='\n';
-                    break;
+                  char* a;
+                  char* b = httrack.mimedefs + strlen(httrack.mimedefs);
+                  for(a = argv[na] ; *a != '\0' ; a++) {
+                    if (*a == ';') {    /* next one */
+                      *b++ = '\n';
+                    } else if (*a == ',' || *a == '\n' || *a == '\r' || *a == '\t') {
+                      *b++ = ' ';
+                    } else {
+                      *b++ = *a;
+                    }
                   }
-                  a++;
+                  *b++ = '\n';    /* next def */
+                  *b++ = '\0';
                 }
               }
               break;
@@ -1661,8 +1677,8 @@ int main(int argc, char **argv) {
                               fprintf(stdout, "X-URL: %s%s%s\r\n", 
                                 (link_has_authority(adr)) ? "" : "http://", 
                                 adr, fil);
-                              if (url_savename(adr, fil, sav, NULL, NULL, NULL, NULL,
-                                &httrack, NULL, 0, NULL, 0, &cache, NULL, 0, 0)!=-1) {
+                              if (url_savename(adr, fil, sav, /*former_adr*/NULL, /*former_fil*/NULL, /*referer_adr*/NULL, /*referer_fil*/NULL,
+                                /*opt*/&httrack, /*liens*/NULL, /*lien_tot*/0, /*sback*/NULL, /*cache*/&cache, /*hash*/NULL, /*ptr*/0, /*numero_passe*/0, /*mime_type*/NULL)!=-1) {
                                 if (fexist(sav)) {
                                   fprintf(stdout, "Content-location: %s\r\n", sav);
                                 }
@@ -1828,12 +1844,40 @@ int main(int argc, char **argv) {
             case '1':   /* test #1 : fil_simplifie */
               if (na+1>=argc) {
                 HTS_PANIC_PRINTF("Option #1 needs to be followed by an URL");
-                printf("Example: '-#0' ./foo/bar/../foobar\n");
+                printf("Example: '-#1' ./foo/bar/../foobar\n");
                 htsmain_free();
                 return -1;
               } else {
                 fil_simplifie(argv[na+1]);
                 printf("simplified=%s\n", argv[na+1]);
+                htsmain_free();
+                return 0;
+              }
+              break;
+            case '2':   // mimedefs
+              if (na+1>=argc) {
+                HTS_PANIC_PRINTF("Option #1 needs to be followed by an URL");
+                printf("Example: '-#2' /foo/bar.php\n");
+                htsmain_free();
+                return -1;
+              } else {
+                char mime[256];
+                // initialiser mimedefs
+                get_userhttptype(1,httrack.mimedefs,NULL);
+                // check
+                mime[0] = '\0';
+                get_httptype(mime, argv[na+1], 0);
+                if (mime[0] != '\0') {
+                  char ext[256];
+                  printf("%s is '%s'\n", argv[na+1], mime);
+                  ext[0] = '\0';
+                  give_mimext(ext, mime);
+                  if (ext[0]) {
+                    printf("and its local type is '.%s'\n", ext);
+                  }
+                } else {
+                  printf("%s is of an unknown MIME type\n", argv[na+1]);
+                }
                 htsmain_free();
                 return 0;
               }
@@ -1863,6 +1907,9 @@ int main(int argc, char **argv) {
                      }
             break; 
           case 'O':    // output path
+						while(isdigit(com[1])) {
+							com++;
+						}
             na++;     // sauter, déja traité
             break;
           case 'P':    // proxy
@@ -2232,6 +2279,14 @@ int main(int argc, char **argv) {
         }
         fprintf(fp,LF);
         fprintf(fp, "To pause the engine: create an empty file named 'hts-stop.lock'"LF);
+#if USE_BEGINTHREAD
+				fprintf(fp, "PID=%d\n", (int)getpid());
+#ifndef _WIN32
+				fprintf(fp, "UID=%d\n", (int)getuid());
+				fprintf(fp, "GID=%d\n", (int)getuid());
+#endif
+				fprintf(fp, "START=%d\n", (int)time(NULL));
+#endif
         fclose(fp); fp=NULL;
       }
       
@@ -2298,7 +2353,9 @@ int main(int argc, char **argv) {
     fspc(httrack.log,"info"); fprintf(httrack.log,"engine: init"LF);
   }
 #if HTS_ANALYSTE
-  hts_htmlcheck_init();
+  if (hts_htmlcheck_init != NULL) {
+    hts_htmlcheck_init();
+  }
   set_wrappers();   // init() is allowed to set other wrappers
 #endif
 
@@ -2373,7 +2430,9 @@ deprecated - see SIGCHLD
       fspc(httrack.log,"info"); fprintf(httrack.log,"engine: free"LF);
     }
 #if HTS_ANALYSTE
-    hts_htmlcheck_uninit();
+    if (hts_htmlcheck_uninit != NULL) {
+      hts_htmlcheck_uninit();
+    }
 #endif
 
     if (httrack_logmode!=1) {

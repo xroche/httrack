@@ -7,7 +7,7 @@ cz
 LANGUAGE_AUTHOR
 Antonín Matìjèík (matejcik@volny.cz) \r \n
 LANGUAGE_CHARSET
-ISO-8859-2
+WINDOWS-1250
 LANGUAGE_WINDOWSID
 Czech
 OK

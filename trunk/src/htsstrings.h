@@ -94,7 +94,7 @@ static void* StringAcquire(String* blk) {
   blk->len = 0;
   return buff;
 }
-#define StringStrcat(blk, str) StringMemcat(blk, str, ((str) != NULL) ? strlen(str) : 0)
+#define StringStrcat(blk, str) StringMemcat(blk, str, ((str) != NULL) ? (int)strlen(str) : 0)
 #define StringStrcpy(blk, str) do { \
   StringClear(blk); \
   StringStrcat(blk, str); \

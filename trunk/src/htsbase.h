@@ -282,32 +282,6 @@ extern HTSEXT_API int htsMemoryFastXfr;
     } \
   } \
 } while(0)
-#define strncpybuff(A, B, N) do { \
-  assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
-  if (htsMemoryFastXfr) { \
-    if (sizeof(A) != sizeof(char*)) { \
-      (A)[sizeof(A) - 1] = '\0'; \
-    } \
-    strncpy(A, B, N); \
-    if (sizeof(A) != sizeof(char*)) { \
-      assertf((A)[sizeof(A) - 1] == '\0'); \
-    } \
-  } else { \
-    unsigned int szf = (unsigned int) strlen(B); \
-    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
-    if (sizeof(A) != sizeof(char*)) { \
-      assertf(szf + 1 < sizeof(A)); \
-      if (szf > 0) { \
-        if (szf + 1 < sizeof(A)) { \
-          memcpy((A), (B), szf); \
-        } \
-      } \
-    } else { \
-      memcpybuff((A), (B), szf); \
-    } \
-  } \
-} while(0)
 
 #else
 
@@ -347,24 +321,12 @@ extern HTSEXT_API int htsMemoryFastXfr;
     assertf((A)[sizeof(A) - 1] == '\0'); \
   } \
 } while(0)
-#define strncpybuff(A, B, N) do { \
-  assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
-  if (sizeof(A) != sizeof(char*)) { \
-    (A)[sizeof(A) - 1] = '\0'; \
-  } \
-  strncpy(A, B, N); \
-  if (sizeof(A) != sizeof(char*)) { \
-    assertf((A)[sizeof(A) - 1] == '\0'); \
-  } \
-} while(0)
 
 #else
 
 #define strcatbuff strcat
 #define strncatbuff strncat
 #define strcpybuff strcpy
-#define strncpybuff strncpy
 
 #endif
 
