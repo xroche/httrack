@@ -214,6 +214,14 @@ struct cache_back_zip_entry {
     line[0] = '\0'; \
 	} \
 } while(0)
+#define ZIP_READFIELD_LLINT(line, value, refline, refvalue) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    LLint intval = 0; \
+    sscanf(value, LLintP, &intval); \
+    (refvalue) = intval; \
+    line[0] = '\0'; \
+	} \
+} while(0)
 
 
 /* Ajout d'un fichier en cache */
@@ -654,7 +662,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
               ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg);              // msg
-              ZIP_READFIELD_INT(line, value, "X-Size", r.size);           // size
+              ZIP_READFIELD_LLINT(line, value, "X-Size", r.size);           // size
               ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype);      // contenttype
               ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset);          // contenttype
               ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified);     // last-modified
