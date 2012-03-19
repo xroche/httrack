@@ -52,24 +52,11 @@ int domd5mem(const unsigned char * buf, size_t len,
                     unsigned char * digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
-#if 1
-//#ifndef _WIN32_WCE
   MD5_CTX ctx;
 
   MD5Init(&ctx, * ( (char*) &endian));
   MD5Update(&ctx, buf, (unsigned int) len);
   MD5Final(bindigest, &ctx);
-#else
-  /* Broken md5.. temporary hack */
-  int i;
-  memset(bindigest, 0, 16);
-  if (len > 0) {
-    for(i = 0 ; i < len + 16 ; i++) {
-      bindigest[i % 16] ^= ( buf[i % len] + i + len );
-      bindigest[(i - 1) % 16] ^= bindigest[ ( i + buf[i % len]*buf[(i-1) % len] ) % 16];
-	}
-  }
-#endif
 
   if (!asAscii) {
     memcpy(digest, bindigest, 16);
@@ -80,7 +67,6 @@ int domd5mem(const unsigned char * buf, size_t len,
       bindigest[4],  bindigest[5],  bindigest[6],  bindigest[7],
       bindigest[8],  bindigest[9],  bindigest[10], bindigest[11],
       bindigest[12], bindigest[13], bindigest[14], bindigest[15]);
-    
   }
   
   return 0;

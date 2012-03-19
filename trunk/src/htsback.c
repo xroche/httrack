@@ -479,8 +479,23 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 						back[p].compressed_size=back[p].r.size;
 						// en mémoire -> passage sur disque
 						if (!back[p].r.is_write) {
+#if 1
+#ifdef _WIN32
+#undef tempnam
+#define tempnam _tempnam
+#endif
+              char *const tmp = tempnam(NULL, "httrack_temporaryGzipFile_");
+              if (tmp != NULL) {
+							  strcpybuff(back[p].tmpfile_buffer, tmp);
+                free(tmp);
+                back[p].tmpfile = back[p].tmpfile_buffer;
+              } else {
+                back[p].tmpfile = NULL;
+              }
+#else
 							back[p].tmpfile_buffer[0]='\0';
-							back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
+              back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
+#endif
 							if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
 								back[p].r.out=fopen(back[p].tmpfile,"wb");
 								if (back[p].r.out) {
@@ -497,7 +512,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 								} else {
 									back[p].tmpfile[0]='\0';
 									back[p].r.statuscode=STATUSCODE_INVALID;
-									strcpybuff(back[p].r.msg,"Open error when decompressing");
+									strcpybuff(back[p].r.msg,"Open error when decompressing (can not create a temporary file)");
 								}
 							}
 						}
@@ -545,6 +560,11 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					freet(back[p].r.adr);
 					back[p].r.adr = NULL;
 				}
+
+        /* remove reference file, if any */
+        if (back[p].r.is_write) {
+          url_savename_refname_remove(opt, back[p].url_adr, back[p].url_fil);
+        }
 
 				/* ************************************************************************
 					REAL MEDIA HACK
@@ -882,6 +902,46 @@ int back_unserialize(FILE *fp, lien_back** dst) {
 		freet(dst);
 	*dst = NULL;
 	return 1;		/* error */
+}
+
+/* serialize a reference ; used to store references of files being downloaded in case of broken download */
+int back_serialize_ref(httrackp* opt, const lien_back* src) {
+  char *filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
+  FILE *fp = fopen(filename, "wb");
+  if (fp == NULL) {
+#ifdef _WIN32
+    if (mkdir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME)) == 0)
+#else
+    if (mkdir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME), S_IRWXU | S_IRWXG | S_IRWXO) == 0)
+#endif
+    {
+      filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
+      fp = fopen(filename, "wb");
+    }
+  }
+  if (fp != NULL) {
+    int ser = back_serialize(fp, src);
+    fclose(fp);
+    return ser;
+  }
+  return 1;
+}
+
+/* unserialize a reference ; used to store references of files being downloaded in case of broken download */
+int back_unserialize_ref(httrackp* opt, const char *adr, const char *fil, lien_back** dst) {
+  char *filename = url_savename_refname_fullpath(opt, adr, fil);
+  FILE *fp = fopen(filename, "rb");
+  if (fp != NULL) {
+    int ser = back_unserialize(fp, dst);
+    fclose(fp);
+    if (ser != 0) {                 /* back_unserialize_ref() != 0 does not need cleaning up */
+      back_clear_entry(*dst);				/* delete entry content */
+      freet(*dst);									/* delete item */
+      *dst = NULL;
+    }
+    return ser;
+  }
+  return 1;
 }
 
 // clear, or leave for keep-alive
@@ -1253,6 +1313,7 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
   int p=0;
 	char catbuff[CATBUFF_SIZE];
 	char catbuff2[CATBUFF_SIZE];
+  lien_back* itemback = NULL;
 
 #if (defined(_DEBUG) || defined(DEBUG))
   if (!test && back_exist(sback,opt,adr,fil,save)) {
@@ -1399,31 +1460,41 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
             a+=strlen(buff);
             sscanf(a,"%d",&pos);    // lire position
 #endif
+
+#if HTS_FAST_CACHE==0
             if (pos<0) {    // pas de mise en cache data, vérifier existence
+#endif
               /* note: no check with IS_DELAYED_EXT() enabled - postcheck by client please! */
-              if (!IS_DELAYED_EXT(save) && fsize(fconv(catbuff,save)) <= 0) {  // fichier existe pas ou est vide!
+              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize(fconv(catbuff,save)) <= 0) {  // fichier final n'existe pas ou est vide!
                 int found=0;
 
                 /* It is possible that the file has been moved due to changes in build structure */
                 {
                   char BIGSTK previous_save[HTS_URLMAXSIZE*2];
+                  htsblk r;
                   previous_save[0] = '\0';
-                  back[p].r = cache_readex(opt, cache, adr, fil, NULL, back[p].location_buffer, previous_save, 0);
-                  if (previous_save[0] != '\0' && fexist(fconv(catbuff,previous_save))) {
-                    rename(fconv(catbuff,previous_save), fconv(catbuff2,save));
-                    if (fexist(fconv(catbuff,save))) {
-                      found = 1;
-                      if ((opt->debug>1) && (opt->log!=NULL)) {
-                        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File '%s' has been renamed since last mirror to '%s' ; applying changes"LF, previous_save, save); test_flush;
-                      }
-                    } else {
-                      if ((opt->debug>0) && (opt->log!=NULL)) {
-                        HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Could not rename '%s' to '%s' ; will have to retransfer it"LF, previous_save, save); test_flush;
+                  r = cache_readex(opt, cache, adr, fil, /*head*/NULL, /*bound to back[p] (temporary)*/back[p].location_buffer, previous_save, /*ro*/1);
+                  /* Is supposed to be on disk only */
+                  if (r.is_write && previous_save[0] != '\0') {
+                    /* Exists, but with another (old) filename: rename (almost) silently */
+                    if (strcmp(previous_save, save) != 0 && fexist(fconv(catbuff, previous_save))) {
+                      rename(fconv(catbuff, previous_save), fconv(catbuff2,save));
+                      if (fexist(fconv(catbuff,save))) {
+                        found = 1;
+                        if ((opt->debug>1) && (opt->log!=NULL)) {
+                          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File '%s' has been renamed since last mirror to '%s' ; applying changes"LF, previous_save, save); test_flush;
+                        }
+                      } else {
+                        if ((opt->debug>0) && (opt->log!=NULL)) {
+                          HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Could not rename '%s' to '%s' ; will have to retransfer it"LF, previous_save, save); test_flush;
+                        }
                       }
                     }
                   }
+                  back[p].location_buffer[0] = '\0';
                 }
                 
+                /* Not found ? */
                 if (!found) {
 #if HTS_FAST_CACHE
                   hash_pos_return=0;
@@ -1438,22 +1509,29 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
                       FILE* fp=fopen(fconv(catbuff,save),"wb");
                       if (fp) fclose(fp);
                       if (opt->log!=NULL) {
-                        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File must have been erased by user, ignoring: %s%s"LF,back[p].url_adr,back[p].url_fil); test_flush;
+                        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file not found (erased by user ?), ignoring: %s%s"LF,back[p].url_adr,back[p].url_fil); test_flush;
                       }
+                    }
+                  } else {
+                    if (opt->log!=NULL) {
+                      HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file not found (erased by user ?), recatching: %s%s"LF,back[p].url_adr,back[p].url_fil); test_flush;
                     }
                   }
                 }
               }  // fsize() <= 0
+#if HTS_FAST_CACHE==0
             }
+#endif
           }
         }
         //
-      } else
+      } else {
 #if HTS_FAST_CACHE
         hash_pos_return=0;
 #else
         a=NULL;
 #endif
+      }
 
       // Existe pas en cache, ou bien pas de cache présent
 #if HTS_FAST_CACHE
@@ -1567,83 +1645,113 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
           printf("..is modified test %s\n",back[p].send_too);
 #endif
         } 
-        // Okay, pas trouvé dans le cache
-        // Et si le fichier existe sur disque?
-        // Pas dans le cache: fichier n'a pas été transféré du tout, donc pas sur disque?
-      } else {
-        if (fexist(save)) {    // fichier existe? aghl!
-          off_t sz=fsize(save);
-          // Bon, là il est possible que le fichier ait été partiellement transféré
-          // (s'il l'avait été en totalité il aurait été inscrit dans le cache ET existerait sur disque)
-          // PAS de If-Modified-Since, on a pas connaissance des données à la date du cache
-          // On demande juste les données restantes si le date est valide (206), tout sinon (200)
-          if ((ishtml(opt,save) != 1) && (ishtml(opt,back[p].url_fil)!=1)) {   // NON HTML (liens changés!!)
-            if (sz>0) {    // Fichier non vide? (question bête, sinon on transfert tout!)
-              char lastmodified[256];
-              get_filetime_rfc822(save, lastmodified);
-              if (strnotempty(lastmodified)) {     /* pas de If-.. possible */
-#if DEBUGCA
-                printf("..if unmodified since %s size "LLintP"\n", lastmodified, (LLint)sz);
-#endif
-                if ((opt->debug>1) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File partially present ("LLintP" bytes): %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); test_flush;
-                }
-                
-                /* impossible - don't have etag or date
-                if (strnotempty(back[p].r.etag)) {  // ETag (RFC2616)
-                sprintf(back[p].send_too,"If-None-Match: %s\r\n",back[p].r.etag);
-                back[p].http11=1;    // En tête 1.1
-                } else if (strnotempty(back[p].r.lastmodified)) {
-                sprintf(back[p].send_too,"If-Unmodified-Since: %s\r\n",back[p].r.lastmodified);
-                back[p].http11=1;    // En tête 1.1
-                } else 
-                */
-                if (strlen(lastmodified)) {
-                  sprintf(back[p].send_too,
-                    "If-Unmodified-Since: %s\r\nRange: bytes="LLintP"-\r\n"
-                    , lastmodified, (LLint)sz);
-                  back[p].http11=1;    // En tête 1.1
-                  back[p].range_req_size=sz;
-                  back[p].r.req.range_used=1;
-                  back[p].r.req.nocompression=1;
-                } else {
-                  if ((opt->debug>0) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Could not find timestamp for partially present file, restarting (lost "LLintP" bytes): %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); test_flush;
-                  }
-                }
-                
-              } else { 
-                if ((opt->debug>0) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_WARNING);
-                  /*
-                  if (opt->http10)
-                  fprintf(opt->log,"File partially present (%d bytes) retransfered due to HTTP/1.0 settings: %s%s"LF,sz,back[p].url_adr,back[p].url_fil);
-                  else
-                  */
-                  fprintf(opt->log,"File partially present ("LLintP" bytes) retransfered due to lack of cache: %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); 
-                  test_flush;
-                }
-                /* Sinon requête normale... */
-                back[p].http11=0;
-              }
-            } else if (opt->norecatch) {              // tester norecatch
-              filenote(&opt->state.strc,save,NULL);       // ne pas purger tout de même
-              file_notify(opt,back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0, back[p].r.notmodified);
-              back[p].status=STATUS_READY;  // OK prêt
-              back_set_finished(sback, p);
-              back[p].r.statuscode=STATUSCODE_INVALID;  // erreur
-              strcpybuff(back[p].r.msg,"Null-size file not recaught");
-              return 0;
-            }
-          } else {
-            if ((opt->debug>0) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_WARNING);
-              fprintf(opt->log,"HTML file ("LLintP" bytes) retransfered due to lack of cache: %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); 
-              test_flush;
-            }
-            /* Sinon requête normale... */
-            back[p].http11=0;
+      } 
+      /* Not in cache ; maybe in temporary cache ? Warning: non-movable "url_sav" */
+      else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
+        const long file_size = fsize(itemback->url_sav);
+        /* Found file on disk */
+        if (file_size > 0) {
+          char *send_too = back[p].send_too;
+          sprintf(send_too, "Range: bytes="LLintP"-\r\n", (LLint) file_size);
+          send_too += strlen(send_too);
+          /* add etag information */
+          if (strnotempty(itemback->r.etag)) {
+            sprintf(send_too,"If-Match: %s\r\n", itemback->r.etag);
+            send_too += strlen(send_too);
           }
+          /* add date information */
+          if (strnotempty(itemback->r.lastmodified)) {
+            sprintf(send_too,"If-Unmodified-Since: %s\r\n", itemback->r.lastmodified);
+            send_too += strlen(send_too);
+          }
+          back[p].http11=1;                /* 1.1 */
+          back[p].range_req_size=(LLint) file_size;
+          back[p].r.req.range_used=1;
+          back[p].is_update=1;             /* this is an update of a file */
+          back[p].r.req.nocompression=1;   /* Do not compress when updating! */
+        } else {
+          /* broken ; remove */
+          url_savename_refname_remove(opt, adr, fil);
+        }
+        /* cleanup */
+        back_clear_entry(itemback);				/* delete entry content */
+        freet(itemback);									/* delete item */
+        itemback = NULL;
+      }
+      /* Not in cache or temporary cache ; found on disk ? (hack) */
+      else if (fexist(save)) {
+        off_t sz=fsize(save);
+        // Bon, là il est possible que le fichier ait été partiellement transféré
+        // (s'il l'avait été en totalité il aurait été inscrit dans le cache ET existerait sur disque)
+        // PAS de If-Modified-Since, on a pas connaissance des données à la date du cache
+        // On demande juste les données restantes si le date est valide (206), tout sinon (200)
+        if ((ishtml(opt,save) != 1) && (ishtml(opt,back[p].url_fil)!=1)) {   // NON HTML (liens changés!!)
+          if (sz>0) {    // Fichier non vide? (question bête, sinon on transfert tout!)
+            char lastmodified[256];
+            get_filetime_rfc822(save, lastmodified);
+            if (strnotempty(lastmodified)) {     /* pas de If-.. possible */
+#if DEBUGCA
+              printf("..if unmodified since %s size "LLintP"\n", lastmodified, (LLint)sz);
+#endif
+              if ((opt->debug>1) && (opt->log!=NULL)) {
+                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File partially present ("LLintP" bytes): %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); test_flush;
+              }
+
+              /* impossible - don't have etag or date
+              if (strnotempty(back[p].r.etag)) {  // ETag (RFC2616)
+              sprintf(back[p].send_too,"If-None-Match: %s\r\n",back[p].r.etag);
+              back[p].http11=1;    // En tête 1.1
+              } else if (strnotempty(back[p].r.lastmodified)) {
+              sprintf(back[p].send_too,"If-Unmodified-Since: %s\r\n",back[p].r.lastmodified);
+              back[p].http11=1;    // En tête 1.1
+              } else 
+              */
+              if (strlen(lastmodified)) {
+                sprintf(back[p].send_too,
+                  "If-Unmodified-Since: %s\r\nRange: bytes="LLintP"-\r\n"
+                  , lastmodified, (LLint)sz);
+                back[p].http11=1;    // En tête 1.1
+                back[p].is_update=1;             /* this is an update of a file */
+                back[p].range_req_size=sz;
+                back[p].r.req.range_used=1;
+                back[p].r.req.nocompression=1;
+              } else {
+                if ((opt->debug>0) && (opt->log!=NULL)) {
+                  HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Could not find timestamp for partially present file, restarting (lost "LLintP" bytes): %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); test_flush;
+                }
+              }
+
+            } else { 
+              if ((opt->debug>0) && (opt->log!=NULL)) {
+                HTS_LOG(opt,LOG_WARNING);
+                /*
+                if (opt->http10)
+                fprintf(opt->log,"File partially present (%d bytes) retransfered due to HTTP/1.0 settings: %s%s"LF,sz,back[p].url_adr,back[p].url_fil);
+                else
+                */
+                fprintf(opt->log,"File partially present ("LLintP" bytes) retransfered due to lack of cache: %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); 
+                test_flush;
+              }
+              /* Sinon requête normale... */
+              back[p].http11=0;
+            }
+          } else if (opt->norecatch) {              // tester norecatch
+            filenote(&opt->state.strc,save,NULL);       // ne pas purger tout de même
+            file_notify(opt,back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0, back[p].r.notmodified);
+            back[p].status=STATUS_READY;  // OK prêt
+            back_set_finished(sback, p);
+            back[p].r.statuscode=STATUSCODE_INVALID;  // erreur
+            strcpybuff(back[p].r.msg,"Null-size file not recaught");
+            return 0;
+          }
+        } else {
+          if ((opt->debug>0) && (opt->log!=NULL)) {
+            HTS_LOG(opt,LOG_WARNING);
+            fprintf(opt->log,"HTML file ("LLintP" bytes) retransfered due to lack of cache: %s%s"LF,(LLint)sz,back[p].url_adr,back[p].url_fil); 
+            test_flush;
+          }
+          /* Sinon requête normale... */
+          back[p].http11=0;
         }
       }
     }
@@ -2264,24 +2372,27 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
           
           // vérification de sécurité
           if (back[i].r.soc!=INVALID_SOCKET) {  // hey, you never know..
-            do_wait=1;
-            
-            // noter socket read
-            FD_SET(back[i].r.soc,&fds);
-            
-            // noter socket error
-            FD_SET(back[i].r.soc,&fds_e);
-            
-            // incrémenter nombre de sockets
-            nsockets++;
+            // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
+            if (!(back[i].r.ssl && back[i].status > 0 && back[i].status < 1000)) {
+              do_wait=1;
 
-            // calculer max
-            if (max_c) {
-              max_c=0;
-              nfds=back[i].r.soc;
-            } else if (back[i].r.soc>nfds) {
-              // ID socket la plus élevée
-              nfds=back[i].r.soc;
+              // noter socket read
+              FD_SET(back[i].r.soc,&fds);
+
+              // noter socket error
+              FD_SET(back[i].r.soc,&fds_e);
+
+              // incrémenter nombre de sockets
+              nsockets++;
+
+              // calculer max
+              if (max_c) {
+                max_c=0;
+                nfds=back[i].r.soc;
+              } else if (back[i].r.soc>nfds) {
+                // ID socket la plus élevée
+                nfds=back[i].r.soc;
+              }
             }
           } else {
             back[i].r.statuscode=STATUSCODE_CONNERROR;
@@ -2623,8 +2734,23 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                 /* .gz are *NOT* depacked!! */
                                 (strfield(get_ext(catbuff,back[i].url_sav),"gz") == 0)
                                 ) {
+#if 1
+#ifdef _WIN32
+#undef tempnam
+#define tempnam _tempnam
+#endif
+                                char *const tmp = tempnam(NULL, "httrack_temporaryGzipFile_");
+                                if (tmp != NULL) {
+                                  strcpybuff(back[i].tmpfile_buffer, tmp);
+                                  free(tmp);
+                                  back[i].tmpfile = back[i].tmpfile_buffer;
+                                } else {
+                                  back[i].tmpfile = NULL;
+                                }
+#else
                                 back[i].tmpfile_buffer[0]='\0';
-                                back[i].tmpfile=tmpnam(back[i].tmpfile_buffer);
+                                back[i].tmpfile=tmpnam(back[p].tmpfile_buffer);
+#endif
                                 if (back[i].tmpfile != NULL && back[i].tmpfile[0]) {
                                   if ((back[i].r.out=fopen(back[i].tmpfile,"wb")) == NULL) {
                                     last_errno = errno;
@@ -2662,13 +2788,19 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                   test_flush;
                                 }
                                 back[i].r.is_write=0;    // erreur, abandonner
-#if HDEBUG
-                                printf("..error!\n");
-#endif
-                              }
+                              } else {
 #ifndef _WIN32
-                              else chmod(back[i].url_sav,HTS_ACCESS_FILE);      
+                                chmod(back[i].url_sav, HTS_ACCESS_FILE);      
 #endif          
+                                /* create a temporary reference file in case of broken mirror */
+                                if (back[i].r.out != NULL) {
+                                  if (back_serialize_ref(opt, &back[i]) != 0) {
+                                    if (opt->log != NULL) {
+                                      HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "Could not create temporary reference file for %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
+                                    }
+                                  }
+                                }
+                              }
                             } else {  // on coupe tout!
                               if ((opt->debug>1) && (opt->log!=NULL)) {
                                 HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File cancelled (non HTML): %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
@@ -3409,6 +3541,12 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                 if (back[i].r.totalsize>0)
                                   back[i].r.totalsize+=sz;    // plus en fait
                                 fseek(back[i].r.out,0,SEEK_END);  // à la fin
+                                /* create a temporary reference file in case of broken mirror */
+                                if (back_serialize_ref(opt, &back[i]) != 0) {
+                                  if (opt->log != NULL) {
+                                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "Could not create temporary reference file for %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
+                                  }
+                                }
 #if HDEBUG
                                 printf("continue interrupted file\n");
 #endif

@@ -100,6 +100,8 @@ void back_move(lien_back* src, lien_back* dst);
 void back_copy_static(const lien_back* src, lien_back* dst);
 int back_serialize(FILE *fp, const lien_back* src);
 int back_unserialize(FILE *fp, lien_back** dst);
+int back_serialize_ref(httrackp* opt, const lien_back* src);
+int back_unserialize_ref(httrackp* opt, const char *adr, const char *fil, lien_back** dst);
 void back_set_finished(struct_back* sback, int p);
 void back_set_locked(struct_back* sback, int p);
 void back_set_unlocked(struct_back* sback, int p);

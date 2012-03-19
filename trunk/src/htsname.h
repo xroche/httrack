@@ -54,6 +54,7 @@ HTS_STATIC int strendwith_(const char* a, const char* b)  {
   }
   return (j == -1);
 }
+#define CACHE_REFNAME "hts-cache/ref"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -98,6 +99,9 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
 void standard_name(char* b,char* dot_pos,char* nom_pos,char* fil_complete,int short_ver);
 void url_savename_addstr(char* d,char* s);
 char* url_md5(char* digest_buffer, char* fil_complete);
+void url_savename_refname(const char *adr, const char *fil, char *filename);
+char *url_savename_refname_fullpath(httrackp* opt, const char *adr, const char *fil);
+void url_savename_refname_remove(httrackp* opt, const char *adr, const char *fil);
 #endif
 
 #endif

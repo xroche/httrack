@@ -43,12 +43,8 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 // Includes & définitions
-#if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
 #include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
-#endif
 #ifdef _WIN32
 #ifndef  _WIN32_WCE
 #include <conio.h>
@@ -57,7 +53,7 @@ Please visit our Website: http://www.httrack.com
 #include <direct.h>
 #endif
 #else
-#ifdef HAVE_UNISTD_H
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #endif

@@ -62,6 +62,12 @@ typedef struct t_dnscache t_dnscache;
 #include "htsnet.h"
 #include "htsdefines.h"
 
+/* readdir() */
+#ifndef _WIN32
+#include <sys/types.h>
+#include <dirent.h>
+#endif
+
 /* cookies et auth */
 #include "htsbauth.h"
 
@@ -349,6 +355,8 @@ HTSEXT_API int is_dyntype(const char *fil);
 HTSEXT_API char* get_ext(char *catbuff, const char *fil);
 #endif
 int may_unknown(httrackp *opt,const char* st);
+int may_bogus_multiple(httrackp *opt, const char* mime, const char *filename);
+int may_unknown2(httrackp *opt,const char* mime, const char *filename);
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API char* jump_identification(const char*);
 HTSEXT_API char* jump_normalized(const char*);
@@ -546,8 +554,14 @@ HTS_STATIC int strcmpnocase(char* a,char* b) {
 #else
 #define OPT_MMS(a) (0)
 #endif
-#define is_hypertext_mime__(a) \
+
+#define is_html_mime_type(a) \
   ( (strfield2((a),"text/html")!=0)\
+  || (strfield2((a),"application/xhtml+xml")!=0) \
+  )
+#define is_hypertext_mime__(a) \
+  ( \
+  is_html_mime_type(a)\
   || (strfield2((a),"application/x-javascript")!=0) \
   || (strfield2((a),"text/css")!=0) \
   /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/ \
@@ -563,7 +577,6 @@ HTS_STATIC int strcmpnocase(char* a,char* b) {
      /*|| (strfield2((a),"text/xml")!=0) || (strfield2((a),"application/xml")!=0) : TODO: content check */ \
      || OPT_MMS(a) \
   )
-
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -634,6 +647,25 @@ HTS_STATIC char *getcwd_ce(char *buffer, int maxlen) {
 #define getcwd getcwd_ce
 #endif
 
+/* dirent() compatibility */
+#ifdef _WIN32
+#define HTS_DIRENT_SIZE 256
+struct dirent {
+  ino_t          d_ino;       /* ignored */
+  off_t          d_off;       /* ignored */
+  unsigned short d_reclen;    /* ignored */
+  unsigned char  d_type;      /* ignored */
+  char           d_name[HTS_DIRENT_SIZE]; /* filename */
+};
+typedef struct DIR DIR;
+struct DIR {
+  HANDLE h;
+  struct dirent entry;
+  char *name;
+};
+DIR *opendir(const char *name);
+struct dirent *readdir(DIR *dir);
+int closedir(DIR *dir);
 #endif
 
-
+#endif

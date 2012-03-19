@@ -4,9 +4,9 @@
 
     How to build: (callback.so or callback.dll)
       With GNU-GCC:
-        gcc -O -g3 -Wall -D_REENTRANT -shared -o mycallback.so callbacks-example.c -lhttrack1
+        gcc -O -g3 -Wall -D_REENTRANT -shared -o mycallback.so callbacks-example.c -lhttrack2
       With MS-Visual C++:
-        cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.dll" callbacks-example.c libhttrack1.lib
+        cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.dll" callbacks-example.c libhttrack.lib
 
       Note: the httrack library linker option is only necessary when using libhttrack's functions inside the callback
 */

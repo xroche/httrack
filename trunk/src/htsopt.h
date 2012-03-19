@@ -217,7 +217,7 @@ struct htsoptstate {
 	int verif_external_status;
 	t_dnscache *dns_cache;
 	/* HTML parsing state */
-	char _hts_errmsg[1024];
+	char _hts_errmsg[HTS_CDLMAXSIZE + 256];
 	int _hts_in_html_parsing;
 	int _hts_in_html_done;
 	int _hts_in_html_poll;

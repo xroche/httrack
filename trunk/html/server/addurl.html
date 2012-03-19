@@ -78,14 +78,20 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 
 <script language="javascript">
 <!--
+
+// initialize wparent to false if necessary (Konqueror bug workaround)
+if ((typeof wparent) == "undefined") {
+	wparent=false;
+}
+
 function do_load() {
 	window.status=' ';
 }
 function do_unload() {
 }
 function do_add() {
-	if (document.wparent)
-		pparent = document.wparent;
+	if (wparent)
+		pparent = wparent;
 	else if (parent && parent.document)
 		pparent = parent.document;
 	if (pparent

@@ -65,8 +65,8 @@ Please visit our Website: http://www.httrack.com
  #endif
  #include <sys/ioctl.h>
  /* gethostname & co */
-#ifdef HAVE_UNISTD_H
- #include <unistd.h>
+#ifndef _WIN32
+#include <unistd.h>
 #endif
  /* inet_addr */
  #include <arpa/inet.h>

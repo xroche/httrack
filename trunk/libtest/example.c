@@ -8,7 +8,7 @@
 
     How to build: (callback.so or callback.dll)
       With GNU-GCC:
-        gcc -I/usr/include/httrack -O -g3 -Wall -D_REENTRANT -o example example.c -lhttrack1
+        gcc -I/usr/include/httrack -O -g3 -Wall -D_REENTRANT -o example example.c -lhttrack2
       With MS-Visual C++:
         cl -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.exe" callbacks-example.c wsock32.lib libhttrack.lib
 */

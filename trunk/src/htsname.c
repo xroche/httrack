@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htsname.h"
+#include "md5.h"
 #include "htsmd5.h"
 #include "htstools.h"
 #include <ctype.h>
@@ -112,7 +113,8 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
 								 struct_back* sback, cache_back* cache, hash_struct* hash, 
 								 int ptr, int numero_passe, const lien_back* headers) {
 	char catbuff[CATBUFF_SIZE];
-  const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ? headers->r.contenttype : NULL;
+  const char* mime_type = ( headers && !HTTP_IS_REDIRECT(headers->r.statuscode) ) ? headers->r.contenttype : NULL;
+  /*const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ? headers->r.contenttype : NULL;*/
   lien_back* const back = sback->lnk;
   /* */
   char BIGSTK newfil[HTS_URLMAXSIZE*2];   /* ="" */
@@ -349,7 +351,7 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
       if (!(   (opt->check_type==1) && (fil[strlen(fil)-1]=='/')   ))    // slash doit être html?
       if ( opt->savename_delayed == 2 || (ishtest=ishtml(opt,fil)) < 0) { // on ne sait pas si c'est un html ou un fichier..
         // lire dans le cache
-        htsblk r = cache_read(opt,cache,adr,fil,NULL,NULL);              // test uniquement
+        htsblk r = cache_read_including_broken(opt,cache,adr,fil);              // test uniquement
         if (r.statuscode != -1) {  // pas d'erreur de lecture cache
           char s[16]; s[0]='\0';
           if ( (opt->debug>1) && (opt->log!=NULL) ) {
@@ -360,7 +362,7 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
             ext_chg=2;      /* change filename */
             strcpybuff(ext,r.cdispo);
           }
-          else if (!may_unknown(opt,r.contenttype) || ishtest == -2) {  // on peut patcher à priori?
+          else if (!may_unknown2(opt,r.contenttype,fil) || ishtest == -2) {  // on peut patcher à priori?
             give_mimext(s,r.contenttype);  // obtenir extension
             if (strnotempty(s)>0) {        // on a reconnu l'extension
               ext_chg=1;
@@ -395,7 +397,7 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
               mime_from_file[0] = 0;
               get_httptype(opt, mime_from_file, fil, 1);
               if (!strnotempty(mime_from_file) || strcasecmp(mime_type, mime_from_file) != 0) {    /* different mime for this type */
-                if (!may_unknown(opt, mime_type)) {
+                if (!may_unknown2(opt, mime_type, fil)) {
                   ext_chg = 1;
                 }
               } else {
@@ -599,7 +601,7 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
                     ext_chg=2;      /* change filename */
                     strcpybuff(ext,back[b].r.cdispo);
                   }
-                  else if (!may_unknown(opt,back[b].r.contenttype) || ishtest == -2 ) {  // on peut patcher à priori? (pas interdit ou pas de type)
+                  else if (!may_unknown2(opt, back[b].r.contenttype, back[b].url_fil) || ishtest == -2 ) {  // on peut patcher à priori? (pas interdit ou pas de type)
                     give_mimext(s,back[b].r.contenttype);  // obtenir extension
                     if (strnotempty(s)>0) {    // on a reconnu l'extension
                       ext_chg=1;
@@ -1481,6 +1483,37 @@ void url_savename_addstr(char* d,char* s) {
     s++;
   }
   d[i]='\0';
+}
+
+/* "filename" should be at least 64 bytes. */
+void url_savename_refname(const char *adr, const char *fil, char *filename) {
+  unsigned char bindigest[16];
+  MD5_CTX ctx;
+  MD5Init(&ctx, 0);
+  MD5Update(&ctx, adr, (unsigned int) strlen(adr));
+  MD5Update(&ctx, ",", 1);
+  MD5Update(&ctx, fil, (unsigned int) strlen(fil));
+  MD5Final(bindigest, &ctx);
+  sprintf(filename, CACHE_REFNAME "/"
+    "%02x%02x%02x%02x%02x%02x%02x%02x"
+    "%02x%02x%02x%02x%02x%02x%02x%02x"
+    ".ref",
+    bindigest[0],  bindigest[1],  bindigest[2],  bindigest[3],
+    bindigest[4],  bindigest[5],  bindigest[6],  bindigest[7],
+    bindigest[8],  bindigest[9],  bindigest[10], bindigest[11],
+    bindigest[12], bindigest[13], bindigest[14], bindigest[15]);
+}
+
+char *url_savename_refname_fullpath(httrackp* opt, const char *adr, const char *fil) {
+  char digest_filename[64];
+  url_savename_refname(adr, fil, digest_filename);
+  return fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), digest_filename);
+}
+
+/* remove refname if any */
+void url_savename_refname_remove(httrackp* opt, const char *adr, const char *fil) {
+  char *filename = url_savename_refname_fullpath(opt, adr, fil);
+  (void) unlink(filename);
 }
 
 #undef test_flush

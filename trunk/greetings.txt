@@ -1,4 +1,4 @@
-Informations on this project:
+ï»¿Informations on this project:
 
 This project has been developed by:
 Xavier Roche (xroche at httrack.com)
@@ -13,6 +13,11 @@ Leto Kauler (molotov at tasmail.com)
   http://kauler.com/
 Christian Marillat (marillat.christian at wanadoo.fr)
   for autoconf compliance and .deb package
+Fred Cohen (fc at all.net)
+  for HTTrack user's guide
+  http://all.net/
+
+And the help of the following third party developers:
 Nicolas Benoit (nbenoit at tuxfamily.org), SDP Multimedia and Major MMS
   for the mms plugin core routines (MMSRIP)
   http://nbenoit.tuxfamily.org/
@@ -22,15 +27,15 @@ Jean-loup Gailly from gzip.org
 Eric A. Young (eay at cryptsoft.com)
   for SSL cryptographic material (OpenSSL)
   http://www.openssl.org/
-Fred Cohen (fc at all.net)
-  for HTTrack user's guide
-  http://all.net/
+Jordan Russell
+  for the Windows setup tool (Inno Setup)
+  http://www.jrsoftware.org/isinfo.php
 
 Translations written by:
 David Lawrie (dalawrie at lineone.net)
 Robert Lagadec (rlagadec at yahoo.fr)
   for checking both English & French translations
-Juan Pablo Barrio Lera (University of León)
+Juan Pablo Barrio Lera (University of LeÃ³n)
   for Spanish translations
 Rainer Klueting (rk-htt at centermail.net)
 Bastian Gorke (bastiang at yahoo.com)
@@ -59,12 +64,12 @@ Addy Lin (addy1975 at pchome.com.tw)
    for traditional Chinese translation
 Jesper Bramm (bramm at get2net.dk)
    for Danish translation
-Tõnu Virma
+TÃµnu Virma
    for Estonian translation
-Staffan Ström (staffan at fam-strom.org)
+Staffan StrÃ¶m (staffan at fam-strom.org)
    for Swedish translation
 Arman (Armish) Aksoy (armish at linux-sevenler.de)
-Mehmet Akif Köeoðlu (mak at ttnet.net.tr)
+Mehmet Akif KÃ¶eoÃ°lu (mak at ttnet.net.tr)
   for Turkish translation
 Aleksandar Savic (aleks at macedonia.eu.org)
   for Macedonian translation
@@ -72,7 +77,7 @@ Takayoshi Nakasikiryo
   for Japanese translation
 Martin Sereday (sereday at slovanet.sk)
   for Slovak translation
-Antonín Matìjèík (matejcik at volny.cz)
+AntonÃ­n MatÃ¬jÃ¨Ã­k (matejcik at volny.cz)
   for Czech translation
 Andrij Shevchuk (http://programy.com.ua)
   for Ukrainian translation
@@ -86,18 +91,18 @@ Michael Papadakis (mikepap at freemail.gr)
   for Greek translation
 Ilia Lindov (ilia at infomat-bg.com)
   for Bulgarian translation
-Mika Kähkönen (mika.kahkonen at mbnet.fi)
+Mika KÃ¤hkÃ¶nen (mika.kahkonen at mbnet.fi)
   for Finnish translation
 
 Thanks to:
-Patrick Ducrot & Daniel Carré (ENSI of Caen)
+Patrick Ducrot & Daniel CarrÃ© (ENSI of Caen)
   for their initial support
   http://www.ducrot.org/
   http://www.greyc.ensicaen.fr/~dcarre/
 Ensi of Caen
   for their initial support
   http://www.ensicaen.fr/
-La sonothèque du Terrier
+La sonothÃ¨que du Terrier
   for the sound fx :)
 
 ..and all users who are using and supporting HTTrack!

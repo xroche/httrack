@@ -140,7 +140,19 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
 	// Create options
 	_DEBUG_HEAD=0;            // pas de debuggage en têtes
-  
+
+  /* command max-size check (3.43 ; 3.42-4) */
+  {
+    int i;
+    for(i = 0 ; i < argc ; i++) {
+      if (strlen(argv[i]) >= HTS_CDLMAXSIZE) {
+        HTS_PANIC_PRINTF("argument too long");
+        htsmain_free();
+        return -1;
+      }
+    }
+  }
+
   /* Init root dir */
   hts_rootdir(argv[0]);
 
@@ -231,7 +243,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
       /* Vérifier argv[] non vide */
       if (strnotempty(argv[na])) {
-		  assertf(strlen(argv[na]) < HTS_CDLMAXSIZE);
         
         /* Vérifier Commande (alias) */
         result=optalias_check(argc,(const char * const *)argv,na,
@@ -261,6 +272,9 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             if (strcmp(tmp_argv[0],"-h")==0) {
               help(argv[0],!opt->quiet);
               htsmain_free();
+              return 0;
+            } else if (strcmp(tmp_argv[0],"-#h")==0) {
+              printf("HTTrack version "HTTRACK_VERSION"%s\n", hts_get_version_info(opt));
               return 0;
             } else {
               if (strncmp(tmp_argv[0],"--",2)) {   /* pas */
@@ -535,7 +549,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             //
           } else if (strfield2(argv[i]+2,"updatehttrack")) {
 #ifdef _WIN32
-            char s[HTS_CDLMAXSIZE];
+            char s[HTS_CDLMAXSIZE + 256];
             sprintf(s,"%s not available in this version",argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
@@ -562,7 +576,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           }
           //
           else {
-            char s[HTS_CDLMAXSIZE];
+            char s[HTS_CDLMAXSIZE + 256];
             sprintf(s,"%s not recognized",argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
@@ -728,10 +742,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       }
       
     } else {    // aucune URL définie et pas de cache
-      if (argc > 1 && strcmp(argv[0], "-#h") == 0) {
-        printf("HTTrack version "HTTRACK_VERSION"%s\n", hts_get_version_info(opt));
-        exit(0);
-      }
+      //if (argc > 1 && strcmp(argv[1], "-#h") == 0) {
+      //  printf("HTTrack version "HTTRACK_VERSION"%s\n", hts_get_version_info(opt));
+      //  exit(0);
+      //}
       if (opt->quiet) {
         help(argv[0],!opt->quiet);
         htsmain_free();
@@ -819,10 +833,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     for(na=1;na<argc;na++) {
 
       if (argv[na][0]=='"') {
-        char BIGSTK tempo[HTS_CDLMAXSIZE];
+        char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
         strcpybuff(tempo,argv[na]+1);
         if (tempo[strlen(tempo)-1]!='"') {
-          char s[HTS_CDLMAXSIZE];
+          char s[HTS_CDLMAXSIZE + 256];
           sprintf(s,"Missing quote in %s",argv[na]);
           HTS_PANIC_PRINTF(s);
           htsmain_free();
@@ -1119,6 +1133,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                   if (fp != NULL) {
                     int cl = (int) strlen(url);
                     ensureUrlCapacity(url, url_sz, cl + fz + 8192);
+                    if (cl > 0) {  /* don't stick! (3.43) */
+                      url[cl] = ' ';
+                      cl++;
+                    }
                     if (fread(url + cl, 1, fz, fp) != fz) {
                       HTS_PANIC_PRINTF("File url list could not be read");
                       htsmain_free();
@@ -1325,7 +1343,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               break;
 
             default: {
-              char s[HTS_CDLMAXSIZE];
+              char s[HTS_CDLMAXSIZE + 256];
               sprintf(s,"invalid option %%%c\n",*com);
               HTS_PANIC_PRINTF(s);
               htsmain_free();
@@ -1372,7 +1390,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               break;
               
                 default: {
-                  char s[HTS_CDLMAXSIZE];
+                  char s[HTS_CDLMAXSIZE + 256];
                   sprintf(s,"invalid option %%%c\n",*com);
                   HTS_PANIC_PRINTF(s);
                   htsmain_free();
@@ -1587,11 +1605,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               return 0;
               break;
             case '~': /* internal lib test */
-              {
-                char thisIsATestYouShouldSeeAnError[12];
-                strcpybuff(thisIsATestYouShouldSeeAnError, "0123456789012345678901234567890123456789");
-                return 0;
-              }
+              //Disabled because choke on GCC 4.3 (toni from links2linux.de)
+              //{
+              //  char thisIsATestYouShouldSeeAnError[12];
+              //  const char *const bufferOverflowTest = "0123456789012345678901234567890123456789";
+              //  strcpybuff(thisIsATestYouShouldSeeAnError, bufferOverflowTest);
+              //  return 0;
+              //}
               break;
             case 'f': opt->flush=1; break;
             case 'h':
@@ -1773,7 +1793,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             break;
             //
           default: {
-            char s[HTS_CDLMAXSIZE];
+            char s[HTS_CDLMAXSIZE + 256];
             sprintf(s,"invalid option %c\n",*com);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
@@ -1958,13 +1978,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       else
         opt->errlog=opt->log;
       if (opt->log==NULL) {
-        char s[HTS_CDLMAXSIZE];
+        char s[HTS_CDLMAXSIZE + 256];
         sprintf(s,"Unable to create log file %s",fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-log.txt"));
         HTS_PANIC_PRINTF(s);
         htsmain_free();
         return -1;
       } else if (opt->errlog==NULL) {
-        char s[HTS_CDLMAXSIZE];
+        char s[HTS_CDLMAXSIZE + 256];
         sprintf(s,"Unable to create log file %s",fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-err.txt"));
         HTS_PANIC_PRINTF(s);
         htsmain_free();
@@ -2198,6 +2218,27 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       if (opt->log) {
         fprintf(opt->log,"* * MIRROR ABORTED! * *\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\nThis can easily be done here by erasing the hts-cache/new.* files]\n");
       }
+    }
+
+    /* Not or cleanly interrupted; erase hts-cache/ref temporary directory */
+    if (opt->state.exit_xh == 0) {
+      // erase ref files if not interrupted
+      DIR *dir;
+      struct dirent *entry;
+      for(dir = opendir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME)) 
+        ; dir != NULL && ( entry = readdir(dir) ) != NULL 
+        ; )
+      {
+        if (entry->d_name[0] != '\0' && entry->d_name[0] != '.') {
+          char *f = OPT_GET_BUFF(opt);
+          sprintf(f, "%s/%s", CACHE_REFNAME, entry->d_name);
+          (void)unlink(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), f));
+        }
+      }
+      if (dir != NULL) {
+        (void) closedir(dir);
+      }
+      (void)rmdir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME));
     }
 
     /* Info for wrappers */

@@ -99,13 +99,16 @@ function info(str) {
 }
 function doOpenWindow() {
   childWn=window.open('addurl.html', 'addurl', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480');
-  setTimeout(do_check_child, 500);
+  setTimeout("do_check_child()", 100);
 }
 function do_check_child() {
-  if (childWn && childWn.document.location=="about:blank") {
-    setTimeout(do_check_child, 500);
-  } else if (childWn) {
-    childWn.document.wparent=document;
+  if (childWn && childWn.document) {
+    if ((typeof childWn.wparent) == "undefined") {
+      childWn.wparent=document;
+      setTimeout("do_check_child()", 1000);
+    } else {
+      childWn.wparent=document;
+    }
   }
 }
 // -->
@@ -177,22 +180,6 @@ ${do:end-if}
 <form method="POST" action="step4.html" name="form">
 <input type="hidden" name="sid" value="${sid}">
 <input type="hidden" name="redirect" value="">
-
-<script language="javascript">
-<!--
-function doOpenWindow() {
-childWn=window.open('addurl.html', 'addurl', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480');
-setTimeout(do_check_child, 500);
-}
-function do_check_child() {
-if (childWn && childWn.document.location=="about:blank") {
-setTimeout(do_check_child, 500);
-} else if (childWn) {
-childWn.document.wparent=document;
-}
-}
-// -->
-</script>
 
 <table border="0" width="100%">
 <tr><td>
