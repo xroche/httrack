@@ -3427,8 +3427,8 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
         }     // bloc
         // erreur HTTP (ex: 404, not found)
       } else if (
-        (r->statuscode==412)
-        || (r->statuscode==416)
+        (r->statuscode==HTTP_PRECONDITION_FAILED)
+        || (r->statuscode==HTTP_REQUESTED_RANGE_NOT_SATISFIABLE)
         ) {    // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
           if (fexist(liens[ptr]->sav)) {
             remove(liens[ptr]->sav);    // Eliminer
@@ -4283,6 +4283,9 @@ int hts_wait_delayed(htsmoduleStruct* str,
           return -1;
         }
 
+        /* We added the link before the parser recorded it -- the background download MUST NOT clean silently this entry! (Petr Gajdusek) */
+        back[b].early_add = 1;
+
         /* Cache read failed because file does not exists (bad delayed name!)
         Just re-add with the correct name, as we know the MIME now!
         */
@@ -4329,6 +4332,10 @@ int hts_wait_delayed(htsmoduleStruct* str,
             XH_uninit;    // désallocation mémoire & buffers
             return -1;
           }
+
+          /* We added the link before the parser recorded it -- the background download MUST NOT clean silently this entry! (Petr Gajdusek) */
+          back[b].early_add = 1;
+
           if ((opt->debug>1) && (opt->log!=NULL)) {
             HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Type immediately loaded from cache: %s"LF, delayed_back.r.contenttype);
             test_flush;

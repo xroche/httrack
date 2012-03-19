@@ -207,6 +207,7 @@ struct lien_back {
   char info[256];         // éventuel status pour le ftp
   int stop_ftp;           // flag stop pour ftp
   int finalized;          // finalized (optim memory)
+  int early_add;          // was added before link heap saw it
 #if DEBUG_CHECKINT
   char magic2;
 #endif

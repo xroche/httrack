@@ -2150,10 +2150,12 @@ static int slot_can_be_cleaned(const lien_back* back) {
 
 static int slot_can_be_finalized(httrackp* opt, const lien_back* back) {
   return
-    (back->r.is_write                             // not in memory (on disk, ready)
+    back->r.is_write                             // not in memory (on disk, ready)
     && !is_hypertext_mime(opt,back->r.contenttype, back->url_fil)        // not HTML/hypertext
     && !may_be_hypertext_mime(opt,back->r.contenttype, back->url_fil)    // may NOT be parseable mime type
-    );
+    /* Has not been added before the heap saw the link, or now exists on heap */
+    && ( !back->early_add || hash_read(opt->hash,back->url_sav,"",0,opt->urlhack) >= 0 )
+    ;
 }
 
 void back_clean(httrackp* opt,cache_back* cache,struct_back* sback) {
@@ -3243,7 +3245,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                     /*
                     Solve "false" 416 problems
                     */
-                    if (back[i].r.statuscode==416) {  // 'Requested Range Not Satisfiable'
+                    if (back[i].r.statuscode==HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) {  // 'Requested Range Not Satisfiable'
                       // Example:
                       // Range: bytes=2830-
                       // ->

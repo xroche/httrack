@@ -4,6 +4,9 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.44-1
++ Fixed: Randomly corrupted files during updates due to "engine: warning: entry cleaned up, but no trace on heap"/"Unexpected 412/416 error" errors (Petr Gajdusek ; closes:#614966)
+
 3.43-12
 + Fixed: buffer overflow while repairing httrack cache if a damaged cache is found from a previous mirror (closes:#607704)
 
