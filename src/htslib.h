@@ -122,6 +122,11 @@ typedef struct htsblk {
 
 /* ANCIENNE STURCTURE pour cache 1.0 */
 typedef struct {
+  int active;
+  char name[1024];
+  int port;
+} OLD_t_proxy; 
+typedef struct {
   int statuscode;  // ANCIENNE STURCTURE - status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
   int notmodified; // ANCIENNE STURCTURE - page ou fichier NON modifié (transféré)
   int is_write;    // ANCIENNE STURCTURE - sortie sur disque (out) ou en mémoire (adr)
@@ -135,7 +140,7 @@ typedef struct {
   int is_file;     // ANCIENNE STURCTURE - ce n'est pas une socket mais un descripteur de fichier si 1
   T_SOC soc;       // ANCIENNE STURCTURE - ID socket
   FILE* fp;        // ANCIENNE STURCTURE - fichier pour file://
-  t_proxy proxy;   // ANCIENNE STURCTURE - proxy
+  OLD_t_proxy proxy;   // ANCIENNE STURCTURE - proxy
   int user_agent_send;  // ANCIENNE STURCTURE - user agent (ex: httrack/1.0 [sun])
   char user_agent[64];
   int http11;           // ANCIENNE STURCTURE - l'en tête doit être signé HTTP/1.1 et non HTTP/1.0
@@ -249,8 +254,8 @@ int ishtml_ext(const char* a);
 int ishttperror(int err);
 void guess_httptype(char *s,const char *fil);
 void get_httptype(char *s,const char *fil,int flag);
-int get_userhttptype(int setdefs,char *s,const char *ext);
-void give_mimext(char *s,char *st);
+int get_userhttptype(int setdefs,char *s,const char *fil);
+void give_mimext(char *s,const char *st);
 int is_knowntype(const char *fil);
 int is_userknowntype(const char *fil);
 int is_dyntype(const char *fil);
@@ -362,8 +367,10 @@ char* __cdecl htsdefault_query(char* question);
 char* __cdecl htsdefault_query2(char* question);
 char* __cdecl htsdefault_query3(char* question);
 int   __cdecl htsdefault_check(char* adr,char* fil,int status);
+int   __cdecl htsdefault_check_mime(char* adr,char* fil,char* mime,int status);
 void  __cdecl htsdefault_pause(char* lockfile);
 void  __cdecl htsdefault_filesave(char*);
+void  __cdecl htsdefault_filesave2(char* adr, char* file, char* sav, int is_new, int is_modified,int not_updated);
 int   __cdecl htsdefault_linkdetected(char* link);
 int   __cdecl htsdefault_linkdetected2(char* link, char* tag_start);
 int   __cdecl htsdefault_xfrstatus(void* back);
@@ -391,6 +398,18 @@ extern void clearCallbacks(htscallbacks* chain);
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 //HTS_INLINE int is_space(char);
 //HTS_INLINE int is_realspace(char);
+
+#define HTTP_IS_REDIRECT(code) ( \
+     (code) == 301               \
+  || (code) == 302               \
+  || (code) == 303               \
+  || (code) == 307               \
+  )
+#define HTTP_IS_NOTMODIFIED(code) ( \
+     (code) == 304               \
+  )
+#define HTTP_IS_OK(code) ( ( (code) / 100 ) == 2 )
+#define HTTP_IS_ERROR(code) ( !HTTP_IS_OK(code) && !HTTP_IS_REDIRECT(code) && !HTTP_IS_NOTMODIFIED(code) )
 
 // compare le début de f avec s et retourne la position de la fin
 // 'A=a' (case insensitive)
@@ -422,6 +441,12 @@ static int strcmpnocase(char* a,char* b) {
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
+
+#if HTS_USEMMS
+#define OPT_MMS(a) (strfield2((a), "video/x-ms-asf") != 0)
+#else
+#define OPT_MMS(a) (false)
+#endif
 #define is_hypertext_mime__(a) \
   ( (strfield2((a),"text/html")!=0)\
   || (strfield2((a),"application/x-javascript")!=0) \
@@ -436,6 +461,7 @@ static int strcmpnocase(char* a,char* b) {
    (\
      (strfield2((a),"audio/x-pn-realaudio")!=0) \
      || (strfield2((a),"audio/x-mpegurl")!=0) \
+     || OPT_MMS(a) \
   )
 
 

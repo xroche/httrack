@@ -1,7 +1,7 @@
 AC_INIT(src/httrack.c)
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(httrack, 3.33.16)
-VERSION_INFO="1:33:0"
+AM_INIT_AUTOMAKE(httrack, 3.40.4)
+VERSION_INFO="1:40:0"
 AM_MAINTAINER_MODE
 
 AC_PREREQ(2.50)
@@ -167,6 +167,9 @@ AC_DEFINE(FTIME, 1,[Check for ftime])], AC_MSG_RESULT([not found]))
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [
 AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
+
+### Check for snprintf
+AC_FUNC_SNPRINTF()
 
 AC_OUTPUT([ Makefile
 src/Makefile

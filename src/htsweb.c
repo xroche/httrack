@@ -81,7 +81,7 @@ Please visit our Website: http://www.httrack.com
 
 static PTHREAD_LOCK_TYPE refreshMutex;
 
-static int help_server(char* dest_path);
+static int help_server(char* dest_path, int defaultPort);
 extern int commandRunning;
 extern int commandEnd;
 extern int commandReturn;
@@ -97,6 +97,7 @@ int main(int argc, char* argv[])
 {
   int i;
   int ret = 0;
+  int defaultPort = 0;
   printf("Initialzing the server..\n");
 
 #ifdef _WIN32
@@ -119,7 +120,7 @@ int main(int argc, char* argv[])
 
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
-    fprintf(stderr, "usage: %s <path-to-html-root-dir> [key value [key value]..]\n", argv[0]);
+    fprintf(stderr, "usage: %s [--port <port>] <path-to-html-root-dir> [key value [key value]..]\n", argv[0]);
     fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
     return 1;
   }
@@ -188,8 +189,15 @@ int main(int argc, char* argv[])
   }
 
   /* set commandline keys */
-  for(i = 2 ; i < argc ; i += 2) {
-    smallserver_setkey(argv[i], argv[i + 1]);
+	for(i = 2 ; i < argc ; i += 2) {
+		if (strcmp(argv[i], "--port") == 0) {
+			if (sscanf(argv[i + 1], "%d", &defaultPort) != 1 || defaultPort < 0 || defaultPort >= 65535 ) {
+				fprintf(stderr, "couldn't set the port number to %d\n", argv[i + 1]);
+				return -1;
+			}
+		} else {
+			smallserver_setkey(argv[i], argv[i + 1]);
+		}
   }
 
   /* sigpipe */
@@ -198,7 +206,7 @@ int main(int argc, char* argv[])
 #endif
 
   /* launch */
-  ret = help_server(argv[1]);
+  ret = help_server(argv[1], defaultPort);
 
   htsthread_wait();
   hts_uninit();
@@ -292,8 +300,10 @@ static int webhttrack_runmain(int argc, char** argv) {
   htswrap_add("query2",htsshow_query2);
   htswrap_add("query3",htsshow_query3);
   htswrap_add("check-link",htsshow_check);
+  htswrap_add("check-mime",htsshow_check_mime);
   htswrap_add("pause",htsshow_pause);
   htswrap_add("save-file",htsshow_filesave);
+  htswrap_add("save-file2",htsshow_filesave2);
   htswrap_add("link-detected",htsshow_linkdetected);
   htswrap_add("link-detected2",htsshow_linkdetected2);
   htswrap_add("transfer-status",htsshow_xfrstatus);
@@ -304,11 +314,11 @@ static int webhttrack_runmain(int argc, char** argv) {
  
 }
 
-static int help_server(char* dest_path) {
+static int help_server(char* dest_path, int defaultPort) {
   int returncode = 0;
   char adr_prox[HTS_URLMAXSIZE*2];
   int port_prox;
-  T_SOC soc=smallserver_init_std(&port_prox,adr_prox);
+  T_SOC soc=smallserver_init_std(&port_prox, adr_prox, defaultPort);
   if (soc!=INVALID_SOCKET) {
     char url[HTS_URLMAXSIZE*2];
     char method[32];
@@ -327,7 +337,7 @@ static int help_server(char* dest_path) {
     fflush(stderr);
     //
     if (!smallserver(soc,url,method,data,dest_path)) {
-      fprintf(stderr, "Unable to create the server\n");
+      fprintf(stderr, "Unable to create the server: %s\n", strerror(errno));
 #ifdef _WIN32
       closesocket(soc);
 #else
@@ -500,17 +510,27 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
                   strcpybuff(StatsBuffer[index].state,"request"); ok=1;
                 }
                 else if (back[i].status==100) {
-                  strcpybuff(StatsBuffer[index].state,"connect"); ok=1;
-                }
-                else if (back[i].status==101) {
-                  strcpybuff(StatsBuffer[index].state,"search"); ok=1;
-                }
-                else if (back[i].status==1000) {    // ohh le beau ftp
-                  sprintf(StatsBuffer[index].state,"ftp: %s",back[i].info); ok=1;
-                }
-                break;
-              default:
-                if (back[i].status==0) {  // prêt
+									strcpybuff(StatsBuffer[index].state,"connect"); ok=1;
+								}
+								else if (back[i].status==101) {
+									strcpybuff(StatsBuffer[index].state,"search"); ok=1;
+								}
+								else if (back[i].status==1000) {    // ohh le beau ftp
+									char proto[] = "ftp";
+									if (back[i].url_adr[0]) {
+										char* ep = strchr(back[i].url_adr, ':');
+										char* eps = strchr(back[i].url_adr, '/');
+										int count;
+										if (ep != NULL && ep < eps && (count = (ep - back[i].url_adr) ) < 4) {
+											proto[0] = '\0';
+											strncat(proto, back[i].url_adr, count);
+										}
+									}
+									sprintf(StatsBuffer[index].state,"%s: %s",proto,back[i].info); ok=1;
+								}
+								break;
+							default:
+								if (back[i].status==0) {  // prêt
                   if ((back[i].r.statuscode==200)) {
                     strcpybuff(StatsBuffer[index].state,"ready"); ok=1;
                   }
@@ -655,9 +675,14 @@ char* __cdecl htsshow_query3(char* question) {
 int __cdecl htsshow_check(char* adr,char* fil,int status) {
   return -1;
 }
+int __cdecl htsshow_check_mime(char* adr,char* fil,char* mime,int status) {
+  return -1;
+}
 void __cdecl htsshow_pause(char* lockfile) {
 }
 void __cdecl htsshow_filesave(char* file) {
+}
+void  __cdecl htsshow_filesave2(char* adr, char* fil, char* save, int is_new, int is_modified,int not_updated) {
 }
 int __cdecl htsshow_linkdetected(char* link) {
   return 1;

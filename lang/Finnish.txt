@@ -1,0 +1,933 @@
+LANGUAGE_NAME
+Finnish
+LANGUAGE_FILE
+Finnish
+LANGUAGE_ISO
+fi
+LANGUAGE_AUTHOR
+Mika Kähkönen (mika.kahkonen at mbnet.fi)
+LANGUAGE_CHARSET
+ISO-8859-1
+LANGUAGE_WINDOWSID
+Finnish
+OK
+OK
+Cancel
+Peruuta
+Exit
+Poistu
+Close
+Sulje
+Cancel changes
+Peruuta muutokset
+Click to confirm
+Hyväksy
+Click to get help!
+Apua!
+Click to return to previous screen
+Palaa edelliseen ruutuun
+Click to go to next screen
+Mene seuraavaan ruutuun
+Hide password
+Kätke salasana
+Save project
+Tallenna projekti
+Close current project?
+Sulje nykyinen projekti?
+Delete this project?
+Poista projekti?
+Delete empty project %s?
+Poista tyhjä projekti %s?
+Action not yet implemented
+Toimintoa ei toteutettu vielä
+Error deleting this project
+Virhe poistettaessa projektia
+Select a rule for the filter
+Valitse suodattimen sääntö
+Enter keywords for the filter
+Kirjoita suodattimen avainsanat
+Cancel
+Peruuta
+Add this rule
+Lisää sääntö
+Please enter one or several keyword(s) for the rule
+Valitse yksi tai useampi avainsana säännöksi
+Add Scan Rule
+Lisää lukusääntö
+Criterion
+Kriteeri
+String
+Teksti
+Add
+Lisää
+Scan Rules
+Lukusäännöt
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Käytä jokerimerkkejä sisällyttääksesi URL:iä tai linkkejä.\nVoit kirjoittaa useita lukujonoja samalle riville.\nKäytä välilyöntiä erottelijana.\n\nEsimerkki: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Hylkää linkkejä
+Include link(s)
+Sisällytä linkkejä
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Vinkki: Saadaksesi KAIKKI gif-tiedostot, kirjoita tähän tapaan: +www.jokin.fi/*.gif. \n(+*.gif / -*.gif sisällyttää/hylkää KAIKKi giffit kaikilta sivuilta)
+Save prefs
+Tallenna asetukset
+Matching links will be excluded:
+Sopivat linkit hylätään:
+Matching links will be included:
+Sopivat linkit sisällytetään:
+Example:
+Esimerkki:
+gif\r\nWill match all GIF files
+gif\r\nSopii kaikiin gif-tiedostoihin
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+sini\r\nLöytää kaikki tiedostot, joissa on 'sini', myös sanan keskeltä kuten 'sinitaivas_pieni.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+iso.mov\r\nSopii tiedostoon 'iso.mov', muttei tiedostoon 'iso2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nLöytää linkit, joiden kansion nimi sisältää tekstin 'cgi' kuten /cgi-bin/jokincgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nLöytää linkit, joiden kansion nimessä on vain teksti 'cgi-bin' (mutta ei cgi-bin-2, esimerkiksi)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+jokinnetti.fi\r\nLöytää linkit, jotka sisältävät tekstin 'jokinnetti.fi', esimerkiksi www.jokinnetti.fi, yksityinen.jokinnetti.fi jne.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+jokinnetti\r\nLöytää linkit, joka sisältää tämän tekstin, kuten www.jokinnetti.fi, www.jokinnetti.eu, yksityinen.jokinnetti.toinennetti.fi jne.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.jokinnetti.fi\r\nLöytää linkit, joissa on 'www.jokinnetti.fi' (mutta ei linkkejä yksityinen.jokinnetti.fi/...)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+jokinnetti\r\nLöytää kaikki linkit, jotka sisältävät tämän tekstin, kuten www.jokinnetti.fi/..., www.testi.abc/fromjokinnetti/index.html, www.testi.abc/test/jokinnetti.html jne.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.testi.com/test/jokinnetti.html\r\nLöytää vain tiedoston 'www.testi.com/test/jokinnetti.html'. Huomaa, että sinun pitää kirjoittaa koko polku (URL + paikan polku)
+All links will match
+Kaikki linkit sopii
+Add exclusion filter
+Lisää hylkäävä suodatin
+Add inclusion filter
+Lisää sisällyttävä suodatin
+Existing filters
+Suodattimet
+Cancel changes
+Peruuta muutokset
+Save current preferences as default values
+Tallenna nykyiset asetukset vakioarvoiksi
+Click to confirm
+Hyväksy
+No log files in %s!
+Ei lokitiedostoja: %s!
+No 'index.html' file in %s!
+Ei 'index.html'-tiedostoa: %s!
+Click to quit WinHTTrack Website Copier
+Poistu WinHTTrack Website Copierista
+View log files
+Näytä lokitiedostot
+Browse HTML start page
+Selaa HTML-alkusivua
+End of mirror
+Peilin loppu
+View log files
+Näytä lokitiedostot
+Browse Mirrored Website
+Selaa peilisivua
+New project...
+Uusi projekti...
+View error and warning reports
+Näytä virhe- ja varoitusraportit
+View report
+Näytä raportti
+Close the log file window
+Sulje lokitiedostoikkuna
+Info type:
+Infotyyppi:
+Errors
+Virheet
+Infos
+Infot
+Find
+Etsi
+Find a word
+Etsi sana
+Info log file
+Infolokitiedosto
+Warning/Errors log file
+Varoitukset/virheet -loki
+Unable to initialize the OLE system
+Ei voi alustaa OLE-järjestelmää
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack ei voi löytää keskeytettyä latausta määritetystä kansiosta! 
+Could not connect to provider
+Ei voi yhdistää tarjoajaan
+receive
+vastaanota
+request
+kutsu
+connect
+yhdistä
+search
+etsi
+ready
+valmis
+error
+virhe
+Receiving files..
+Vastaanottaa tiedostoja...
+Parsing HTML file..
+Parsii HTML-tiedostoa...
+Purging files..
+Puhdistaa tiedostoja...
+Loading cache in progress..
+Välimuistin lataus käynnissä...
+Parsing HTML file (testing links)..
+Parsii HTML-tiedostoa (testaa linkkejä)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Pysäytys - Vaihda [Peili]/[Pysäytä lataus] jatkaaksesi operaatiota
+Finishing pending transfers - Select [Cancel] to stop now!
+Päättää avoimia siirtoja - Valitse [Peruuta] lopettaaksesi nyt!
+scanning
+lukee
+Waiting for scheduled time..
+Odottaa ajoitettua hetkeä...
+Transferring data..
+Siirtää tietoa...
+Connecting to provider
+Yhdistää tarjoajaan
+[%d seconds] to go before start of operation
+[%d sekuntia] operaation alkuun
+Site mirroring in progress [%s, %s bytes]
+Sivun peilaus käynnissä [%s, %s tavua]
+Site mirroring finished!
+Sivun peilaus valmis!
+A problem occured during the mirroring operation\n
+Ongelma peilausoperaation aikana\n
+\nDuring:\n
+\nAikana:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nKatso lokitiedostoa tarvittaessa.\n\nPaina VALMIS poistuaksesi WinHTTrack Website Copierista.\n\nKiitoksia WinHTTrackin käytöstä!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Peilausoperaatio valmis.\nPaina poistu sulkeaksesi WinHTTrackin.\nKatso lokitiedosto(j)a varmistaaksesi, että kaikki on kunnossa.\n\nKiitoksia WinHTTrackin käytöstä!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * PEILI KESKEYTETTY! * *\r\nNykyistä välimuistia tarvitaan päivitysoperaatioihin ja se sisältää tietoa vain äsken keskeytetystä imuroinnista.\r\nAiempi välimuisti saattaa sisältää täydellisempää tietoa; jos et halua menettää tätä tietoa, sinun pitää palauttaa se ja poistaa nykyinen välimuisti.\r\n[Huomaa: Tämän voi helposti tehdä nyt poistamalla hts-cache/new.*-tiedostot]\r\n\r\nLuuletko, että edellinen välimuisti sisältäisi täydellisempää tietoa, ja että haluat palauttaa sen?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * PEILIVIRHE! * *\r\nHTTrack huomasi, että nykyinen peili on tyhjä. Jos se oli päivitys, edellinen peli on palautettu.\r\nSyy: ensimmäiset sivut eivät löytyneet tai tapahtui yhteysvirhe.\r\n=> Varmista että nettisivu on yhä olemassa ja tarkista välityspalvelinasetuksesi! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nVinkki: Paina [Näytä lokitiedosto] nähdäksesi varoitus- ja virheviestit
+Error deleting a hts-cache/new.* file, please do it manually
+Virhe hts-cache/new.* -tiedostojen poistamisessa, tee se itse.
+Do you really want to quit WinHTTrack Website Copier?
+Haluatko varmasti poistua WinHTTrack Website Copierista?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Peilaustapa -\n\nKirjoita osoitteet URL-laatikkoon
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Vuorovaikutteisen velhon tapa (kysymyksiä) -\n\nKirjoita osoitteet URL-laatikkoon
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Tiedoston lataus -tapa -\n\nKirjoita tiedostojen osoitteet URL-laatikkoon
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Linkkien testaus -tapa -\n\nKirjoita nettiosoitteet ja testattavat linkit URL-laatikkoon
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Päivitystapa -\n\nTarkista URL-laatikon osoitteet, tarkista määritteet tarvittaessa ja paina 'SEURAAVA'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Jatkamistapa (keskeytetyt operaatiot) -\n\nTarkista URL-laatikon osoitteet, tarkista määritteet tarvittaessa ja paina 'SEURAAVA'
+Log files Path
+Lokitiedostojen polku
+Path
+Polku
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Linkkilistatapa -\n\nKirjoita URL-laatikkoon sivujen osoitteet, joilla on linkkejä peileihin
+New project / Import?
+Uusi projekti / Tuonti?
+Choose criterion
+Valitse kriteeri
+Maximum link scanning depth
+Linkkien lukemisen enimmäissyvyys
+Enter address(es) here
+Kirjoita osoitteet tähän
+Define additional filtering rules
+Määritä lisäsuodatinsäännöt
+Proxy Name (if needed)
+Välityspalvelimen nimi (tarvittaessa)
+Proxy Port
+Välityspalvelimen portti
+Define proxy settings
+Määritä välityspalvelinasetukset
+Use standard HTTP proxy as FTP proxy
+Käytä standardia HTTP-välityspalvelinta FTP-välityspalvelimena
+Path
+Polku
+Select Path
+Valitse polku
+Path
+Polku
+Select Path
+Valitse polku
+Quit WinHTTrack Website Copier
+Poistu WinHTTrack Website Copierista
+About WinHTTrack
+Tietoja WinHTTrack
+Save current preferences as default values
+Tallenna nykyiset asetukset vakioarvoiksi
+Click to continue
+Jatka
+Click to define options
+Määritä asetukset
+Click to add a URL
+Lisää URL
+Load URL(s) from text file
+Lataa URL:t tekstitiedostosta
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack-asetukset (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Osoitelistaustekstitiedosto (*.txt)|*.txt||
+File not found!
+Tiedostoa ei löydy!
+Do you really want to change the project name/path?
+Haluatko varmasti vaihtaa projektin nimeä tai polkua?
+Load user-default options?
+Ladataanko käyttäjän vakioasetukset?
+Save user-default options?
+Tallennetaanko käyttäjän vakioasetukset?
+Reset all default options?
+Palautetaanko kaikki vakioasetukset?
+Welcome to WinHTTrack!
+Tervetuloa WinHTTrackiin!
+Action:
+Toiminto:
+Max Depth
+Enimmäissyvyys
+Maximum external depth:
+Ulkoinen enimmäissyvyys:
+Filters (refuse/accept links) :
+Suodattimet (hylkää/hyväksy linkit) :
+Paths
+Polut
+Save prefs
+Tallenna asetukset
+Define..
+Määritä...
+Set options..
+Asetukset...
+Preferences and mirror options:
+Asetukset ja peilivalinnat:
+Project name
+Projektin nimi
+Add a URL...
+Lisää URL...
+Web Addresses: (URL)
+Nettiosoitteet: (URL)
+Stop WinHTTrack?
+Pysäytä WinHTTrack?
+No log files in %s!
+Ei lokitiedostoja %s!
+Pause Download?
+Pysäytä imurointi?
+Stop the mirroring operation
+Pysäytä peilausoperaatio
+Minimize to System Tray
+Pienennä tehtäväpalkkiin
+Click to skip a link or stop parsing
+Ohita linkki tai pysäytä parsinta
+Click to skip a link
+Ohita linkki
+Bytes saved
+Tavuja tallennettu
+Links scanned
+Linkkejä luettu
+Time:
+Aika:
+Connections:
+Yhteydet:
+Running:
+Menossa:
+Hide
+Piilota
+Transfer rate
+Siirtonopeus
+SKIP
+OHITA
+Information
+Tiedot
+Files written:
+Kirjoitetut tiedostot:
+Files updated:
+Päivitetyt tiedostot:
+Errors:
+Virheet:
+In progress:
+Käynnissä:
+Follow external links
+Seuraa ulkoisia linkkejä
+Test all links in pages
+Testaa kaikki sivujen linkit
+Try to ferret out all links
+Yritä nuuskia kaikki linkit
+Download HTML files first (faster)
+Lataa HTML-tiedostot ensin (nopeampi)
+Choose local site structure
+Valitse paikallisen sivun rakenne
+Set user-defined structure on disk
+Aseta käyttäjän määrittelemä rakenne levyllä
+Use a cache for updates and retries
+Käytä välimuistia päivityksiin ja uudelleenyrityksiin
+Do not update zero size or user-erased files
+Älä päivitä tyhjiä tai käyttäjän luomia tiedostoja
+Create a Start Page
+Luo aloitussivu
+Create a word database of all html pages
+Luo sanatietokanta kaikista html-sivuista
+Create error logging and report files
+Luo virheloki- ja raporttitiedostot
+Generate DOS 8-3 filenames ONLY
+Kehitä VAIN DOSin 8-3 tiedostonimet
+Generate ISO9660 filenames ONLY for CDROM medias
+Kehitä ISO9660-tiedostonimet VAIN cd-rom-medioille
+Do not create HTML error pages
+Älä luo HTML-virhesivuja
+Select file types to be saved to disk
+Valitse levylle tallennettavat tiedostotyypit
+Select parsing direction
+Valitse parsintasuunta
+Select global parsing direction
+Valitse yleinen parsintasuunta
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Aseta URL-uudelleenkirjoitusssäännöt sisäisille (ladatut) ja ulkoisille (ei ladattu) linkeille
+Max simultaneous connections
+Yhtäaikaisten yhteyksien enimmäismäärä
+File timeout
+Tiedoston aikakatkaisu
+Cancel all links from host if timeout occurs
+Peruuta kaikki linkit isännältä jos aikakatkaistaan
+Minimum admissible transfer rate
+Hyväksyttävä vähimmäissiirtonopeus
+Cancel all links from host if too slow
+Peruuta kaikki linkit isännältä jos liian hidasta
+Maximum number of retries on non-fatal errors
+Uudelleenyrittämisten enimmäismäärä vähemmän vakavissa virheissä
+Maximum size for any single HTML file
+Yksittäisen HTML-tiedoston enimmäiskoko
+Maximum size for any single non-HTML file
+Yksittäisen tiedoston enimmäiskoko (muu kuin HTML)
+Maximum amount of bytes to retrieve from the Web
+Netistä ladattavien tavujen enimmäismäärä
+Make a pause after downloading this amount of bytes
+Pysäytä, kun on ladattu tämän verran tavuja
+Maximum duration time for the mirroring operation
+Peilausoperaation enimmäiskesto
+Maximum transfer rate
+Enimmäissiirtonopeus
+Maximum connections/seconds (avoid server overload)
+Enimmillään yhteyksiä sekunnissa (välttää palvelimen ylikuormitusta)
+Maximum number of links that can be tested (not saved!)
+Testattavien linkkien enimmäismäärä (ei tallennettujen!)
+Browser identity
+Esittäydy selaimena
+Comment to be placed in each HTML file
+Jokaiseen HTML-tiedostoon pantava kommentti
+Back to starting page
+Palaa aloitussivulle
+Save current preferences as default values
+Tallenna nykyiset asetukset vakioarvoiksi
+Click to continue
+Paina jatkaaksesi
+Click to cancel changes
+Paina peruuttaaksesi muutokset
+Follow local robots rules on sites
+Noudata paikallisia robottisääntöjä sivuilla
+Links to non-localised external pages will produce error pages
+Linkit paikallisoimattoimiin ulkoisiin sivuihin antavat virhesivuja
+Do not erase obsolete files after update
+Älä poista vanhentuneita tiedostoja päivityksen jälkeen
+Accept cookies?
+Hyväksytäänkö evästeet?
+Check document type when unknown?
+Tarkistetaanko dokumentin tuntematon tyyppi?
+Parse java applets to retrieve included files that must be downloaded?
+Parsitaanko java-apletit saadaksesi ladattua myös tarvittavat sisällytetyt tiedostot?
+Store all files in cache instead of HTML only
+Tallenna kaikki tiedostot välimuistiin vain HTML-tiedostojen asemesta
+Log file type (if generated)
+Lokitiedoston tyyppi (jos luodaan)
+Maximum mirroring depth from root address
+Juuriosoitteesta peilauksen enimmäissyvyys
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Peilauksen enimmäissyvyys ulkoisiin/kielletyihin osoitteisiin (0 eli ei mitään on vakiona)
+Create a debugging file
+Luo debuggaustiedosto
+Use non-standard requests to get round some server bugs
+Käytä epästandardeja pyyntöjä kiertääksesi joitakin palvelinbugeja
+Use old HTTP/1.0 requests (limits engine power!)
+Käytä vanhoja HTTP/1.0-pyyntöjä (rajoittaa moottorin tehoa!)
+Attempt to limit retransfers through several tricks (file size test..)
+Yritä rajoittaa uudelleensiirtoja eri tempuilla (tiedostokoon testi, ...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Yritä rajoittaa linkkien määrää hylkäämällä samankaltaiset URL:t (www.foo.com==foo.com, http=https ...)
+Write external links without login/password
+Kirjoita ulkoiset linkit ilman tunnusta ja salasanaa
+Write internal links without query string
+Kirjoita sisäiset linkit ilman kyselytekstiä
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Ota linkkiä koskevat muut kuin HTML-tiedostot, esimerkiksi ulkoiset zipit tai kuvat
+Test all links (even forbidden ones)
+Testaa kaikki linkit (kielletytkin)
+Try to catch all URLs (even in unknown tags/code)
+Yritä napata kaikki URL:t (jopa tuntemattomissa tageissa/koodeissa)
+Get HTML files first!
+Ota HTML-tiedostot ensin!
+Structure type (how links are saved)
+Rakenteen tyyppi (kuinka linkit tallennetaan)
+Use a cache for updates
+Käytä välimuistia päivitykseen
+Do not re-download locally erased files
+Älä imuroi uudelleen paikallisesti poistettuja tiedostoja
+Make an index
+Tee indeksi
+Make a word database
+Tee sanatietokanta
+Log files
+Lokitiedostot
+DOS names (8+3)
+DOS-nimet (8+3)
+ISO9660 names (CDROM)
+ISO9660-nimet (CDROM)
+No error pages
+Ei virhesivuja
+Primary Scan Rule
+Päälukusääntö
+Travel mode
+Kulkutapa
+Global travel mode
+Yleinen kulkutapa
+These options should be modified only exceptionally
+Nämä asetukset pitäisi muuttaa poikkeustapauksissa
+Activate Debugging Mode (winhttrack.log)
+Aktivoi debuggaustapa (winhttrack.log)
+Rewrite links: internal / external
+Kirjoita linkit uudelleen: sisäiset / ulkoiset
+Flow control
+Datavuon ohjaus
+Limits
+Rajoitukset
+Identity
+Esittäydy
+HTML footer
+HTML-alatunniste
+N# connections
+Yhteyksiä
+Abandon host if error
+Hylkää isäntä, jos virhe
+Minimum transfer rate (B/s)
+Vähimmäissiirtonopeus (t/s)
+Abandon host if too slow
+Hylkää isäntä, jos liian hidas
+Configure
+Säädä
+Use proxy for ftp transfers
+Käytä välityspalvelinta ftp-siirtoihin
+TimeOut(s)
+Aikakatkaisut
+Persistent connections (Keep-Alive)
+Pysyvät yhteydet (herkistele)
+Reduce connection time and type lookup time using persistent connections
+Vähennä yhteysaikaa ja tyypintarkastusaikaa käyttämällä pysyviä yhteyksiä
+Retries
+Uudelleenyritykset
+Size limit
+Kokorajoitus
+Max size of any HTML file (B)
+HTML-tiedostojen enimmäiskoko
+Max size of any non-HTML file
+Muiden kuin HTML:ien enimmäiskoko
+Max site size
+Sivuston enimmäiskoko
+Max time
+Enimmäisaika
+Save prefs
+Tallenna asetukset
+Max transfer rate
+Enimmäissiirtonopeus
+Follow robots.txt
+Noudata robots.txt:tä
+No external pages
+Ei ulkoisia sivuja
+Do not purge old files
+Älä puhdista vanhoja tiedostoja
+Accept cookies
+Hyväksy evästeet
+Check document type
+Valitse dokumentin tyyppi
+Parse java files
+Parsi java-tiedostot
+Store ALL files in cache
+Tallenna KAIKKI tiedostot välimuistiin
+Tolerant requests (for servers)
+Hyväksyvät pyynnöt (palvelimille)
+Update hack (limit re-transfers)
+Päivityspilkeet (rajoita uudelleensiirtoja)
+URL hacks (join similar URLs)
+URL-pilkkeet (liitä samanlaiset URL:t)
+Force old HTTP/1.0 requests (no 1.1)
+Pakota vanhat HTTP/1.0-pyynnöt (ei 1.1)
+Max connections / seconds
+Yhteyksien enimmäismäärä sekunnissa
+Maximum number of links
+Linkkien enimmäismäärä
+Pause after downloading..
+Pysäytä, kun imuroitu...
+Hide passwords
+Kätke salasanat
+Hide query strings
+Kätke kyselytekstit
+Links
+Linkit
+Build
+Rakenna
+Experts Only
+Ammattilaisille
+Flow Control
+Datavuon ohjaus
+Limits
+Rajoitukset
+Browser ID
+Selaimen ID
+Scan Rules
+Lukusäännöt
+Spider
+Nettirobotti
+Log, Index, Cache
+Loki, indeksi, välimuisti
+Proxy
+Välityspalvelin
+MIME Types
+MIME-tyypit
+Do you really want to quit WinHTTrack Website Copier?
+Haluatko varmasti poistua WinHTTrack Website Copierista?
+Do not connect to a provider (already connected)
+Älä yhdistä tarjoajaan (on jo yhditetty)
+Do not use remote access connection
+Älä käytä etäyhteyttä
+Schedule the mirroring operation
+Ajoita peilausoperaatio
+Quit WinHTTrack Website Copier
+Poistu WinHTTrack Website Copierista
+Back to starting page
+Palaa aloitussivulle
+Click to start!
+Aloita!
+No saved password for this connection!
+Ei tallennettuja salasanoja tälle yhteydelle!
+Can not get remote connection settings
+Ei voi ottaa etäyhteyden asetuksia
+Select a connection provider
+Valitse puhelinverkkoyhteys
+Start
+Aloita
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Säädä yhteysasetukset tarvittaessa,\nsen jälkeen paina VALMIS peilioperaation aloittamiseksi.
+Save settings only, do not launch download now.
+Tallenna vain asetukset, älä aloita lataamista vielä
+On hold
+Odottele
+Transfer scheduled for: (hh/mm/ss)
+Siirtäminen ajastettu: (tt/mm/ss)
+Start
+Aloita
+Connect to provider (RAS)
+Yhdistä tarjoajaan (RAS)
+Connect to this provider
+Yhdistä tähän tarjoajaan
+Disconnect when finished
+Katkaise yhteys, kun on valmista
+Disconnect modem on completion
+Katkaise modeemiyhteys, kun on valmista
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Kerro meille bugeista ja ongelmista)\r\n\r\nKehitys:\r\nKäyttöliittymä (Windows): Xavier Roche\r\nNettirobotti: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C) 1998-2003 Xavier Roche ja muut avustajat\r\nSuomentanut Mika Kähkönen 22.-24.7.2005\r\nmika.kahkonen@mbnet.fi\r\nhttp://koti.mbnet.fi/kahoset
+About WinHTTrack Website Copier
+Tietoja WinHTTrack Website Copier
+Please visit our Web page
+Käy nettisivuillamme
+Wizard query
+Velhokysely
+Your answer:
+Vastauksesi:
+Link detected..
+Linkki havaittu...
+Choose a rule
+Valitse sääntö
+Ignore this link
+Sivuuta tämä linkki
+Ignore directory
+Sivuuta hakemisto
+Ignore domain
+Sivuuta verkkotunnus
+Catch this page only
+Huomioi vain tämä sivu
+Mirror site
+Peilisivu
+Mirror domain
+Peiliverkkotunnus
+Ignore all
+Sivuuta kaikki
+Wizard query
+Velhokysely
+NO
+EI
+File
+&Tiedosto
+Options
+&Valinnat
+Log
+&Loki
+Window
+&Ikkuna
+Help
+O&hje
+Pause transfer
+Pysäytä siirto
+Exit
+&Poistu
+Modify options
+&Muokkaa valintoja
+View log
+&Näytä loki
+View error log
+Näytä &virheloki
+View file transfers
+Näytä tiedostosiirrot
+Hide
+P&iilota
+About WinHTTrack Website Copier
+&Tietoja WinHTTrack Website Copier
+Check program updates...
+Tarkista ohjelman &päivitykset...
+&Toolbar
+&Työkalupalkki
+&Status Bar
+T&ilapalkki
+S&plit
+J&ako
+File
+&Tiedosto
+Preferences
+&Asetukset
+Mirror
+P&eili
+Log
+&Loki
+Window
+&Ikkuna
+Help
+O&hje
+Exit
+&Poistu
+Load default options
+&Lataa vakioasetukset
+Save default options
+&Tallenna vakioasetukset
+Reset to default options
+&Palaa vakioasetuksiin
+Load options...
+Lataa &valinnat...
+Save options as...
+Tallenna valinnat &nimellä...
+Language preference...
+&Kieliasetukset...
+Contents...
+&Ohjeen aiheet...
+About WinHTTrack...
+&Tietoja WinHTTrack...
+New project\tCtrl+N
+&Uusi projekti\tCtrl+N
+&Open...\tCtrl+O
+&Avaa...\tCtrl+O
+&Save\tCtrl+S
+&Tallenna\tCtrl+S
+Save &As...
+Tallenna &nimellä...
+&Delete...
+P&oista...
+&Browse sites...
+S&elaa sivuja...
+User-defined structure
+Käyttäjän määrittelemä rakenne
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tTiedostonimi ilman tyyppiä (esim: kuva)\r\n%N\tTiedostonimi ja tyyppi (esim: kuva.png)\r\n%t\tVain tiedostotyyppi (esim: png)\r\n%p\tPolku [loppuun ei /] (esim: /kuvia)\r\n%h\tIsäntänimi (esim: www.jokinnetti.fi)\r\n%M\tMD5-URL (128 bittiä, 32 ascii-tavua)\r\n%Q\tMD5-kyselyjono (128 bittiä, 32 ascii-tavua)\r\n%q\tPieni MD5-kyselyjono (16 bittiä, 4 ascii-tavua)\r\n\r\n%s?\tLyhyt nimi(esim: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Esimerkki:\t%h%p/%n%q.%t\n->\t\tc:\\peili\\www.jokinnetti.com\\jotainkuvia\\kuva.gif
+Proxy settings
+Välityspalvelinasetukset
+Proxy address:
+Välityspalvelimen osoite:
+Proxy port:
+Välityspalvelimen portti:
+Authentication (only if needed)
+Autentisointi (vain tarvittaessa)
+Login
+Kirjaudu
+Password
+Salasana
+Enter proxy address here
+Välityspalvelimen osoite
+Enter proxy port here
+Välityspalvelimen portti
+Enter proxy login
+Välityspalvelimen kirjautuminen
+Enter proxy password
+Välityspalvelimen salasana
+Enter project name here
+Projektin nimi
+Enter saving path here
+Tallennuspolku
+Select existing project to update
+Valitse päivitettävä projekti
+Click here to select path
+Valitse polku
+Select or create a new category name, to sort your mirrors in categories
+Valitse tai luo uusi luokka peilaustesi luokittelemiseen
+HTTrack Project Wizard...
+HTTrackin projektivelho...
+New project name:
+Uuden projektin nimi:
+Existing project name:
+Vanhan projektin nimi:
+Project name:
+Projektin nimi:
+Base path:
+Peruspolku:
+Project category:
+Projektin luokka:
+C:\\My Web Sites
+C:\\Nettisivuni
+Type a new project name, \r\nor select existing project to update/resume
+Kirjoita uuden projektin nimi, \r\tai valitse päivitettävä tai jatkettava projekti
+New project
+Uusi projekti
+Insert URL
+Lisää URL
+URL:
+URL:
+Authentication (only if needed)
+Autentisointi (vain tarvittaessa)
+Login
+Kirjaudu
+Password
+Salasana
+Forms or complex links:
+Lomakkeet tai monimutkaiset linkit:
+Capture URL...
+Kaappaa URL...
+Enter URL address(es) here
+Kirjoita URL-osoitteet tähän
+Enter site login
+Kirjoita sivun tunnus
+Enter site password
+Kirjoita sivun salasana
+Use this capture tool for links that can only be accessed through forms or javascript code
+Käytä tätä kaappaustyökalua linkkeihin, joihin voi päästä vain lomakkeiden tai javascript-koodien avulla
+Choose language according to preference
+Valitse asetettu kieli
+Catch URL!
+Nappaa URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Aseta väliaikaisesti selaimen välityspalvelinasetukset seuraavilla arvoilla (Kopioi osoite ja portti).\nSen jälkeen paina lomakkeen Lähetä-painiketta selaimesi sivulla tai paina linkkiä, jonka haluat kaapata.
+This will send the desired link from your browser to WinHTTrack.
+Tämä lähettää halutun linkit selaimeltasi WinHTTrackiin.
+ABORT
+KESKEYTÄ
+Copy/Paste the temporary proxy parameters here
+Kopioi ja liitä väliaikaiset välityspalvelinparametrit tähän
+Cancel
+Peruuta
+Unable to find Help files!
+Ohje-tiedostoja ei löydy!
+Unable to save parameters!
+Ei voi tallentaa parametrejä!
+Please drag only one folder at a time
+Raahaa vain yksi kansio kerrallaan
+Please drag only folders, not files
+Raahaa vain kansiot, ei tiedostoja
+Please drag folders only
+Raahaa vain kansiot
+Select user-defined structure?
+Valitse käyttäjän määrittelemä rakenne?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Varmista, että käyttäjän määrittelemä merkkijono on oikea,\nmuutoin tiedostonimistä tulee roskaa!
+Do you really want to use a user-defined structure?
+Haluatko varmasti käyttää käyttäjän määrittelemää rakennetta?
+Too manu URLs, cannot handle so many links!!
+Liian monta URL:ä, ei voi käsitellä niin monta!!!
+Not enough memory, fatal internal error..
+Ei tarpeeksi muistia, vakava sisäinen virhe...
+Unknown operation!
+Tuntematon operaatio!
+Add this URL?\r\n
+Lisää URL?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Varoitus: pääprosessi ei vieläkään vastaa, ei voi lisätä URL:iä...
+Type/MIME associations
+Tyyppi/MIME-kytkennät
+File types:
+Tiedostotyypit:
+MIME identity:
+MIME-identiteetti:
+Select or modify your file type(s) here
+Valitse tai muokkaa tiedostotyyppejäsi
+Select or modify your MIME type(s) here
+Valitse tai muokkaa MIME-tyyppejäsi
+Go up
+Ylös
+Go down
+Alas
+File download information
+Tiedoston imuroinnin tiedot
+Freeze Window
+Jäädytä ikkuna
+More information:
+Lisätietoa:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Tervetuloa WinHTTrack Website Copieriin!\n\Paina seuraava\n\n- aloittaaksesi uuden projektin\n- tai jatkaaksesi keskeytynyttä latausta
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Tiedostonimet, joilla pääte:\nTiedostonimet, joissa on:\nTämä tiedostonimi:\nKansionimet, joissa on:\nTämä kansionimi:\nTämän verkkotunnuksen linkit:\nLinkit verkkotunnuksissa, joissa on:\nLinkit tältä isännältä:\nLinkit, joissa on:\nTämä linkki:\nKAIKKI LINKIT
+Show all\nHide debug\nHide infos\nHide debug and infos
+Näytä kaikki\nKätke debug\nKätke infot\nKätke debug and infot
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Sivuston rakenne (vakio)\nHtml:t kansioon web/,       kuvat ja muut web/images/\nHtml:t kansioon web/html/,   kuvat ja muut web/images/\nHtml:t kansioon web/,       kuvat ja muut web/\nHtml:t kansioon web/,       kuvat ja muut web/xxx/, missä xxx on tiedostopääte\nHtml:t kansioon web/html/,   kuvat ja muut web/xxx/\nSivuston rakenne, ilman www.domain.xxx/\nHtml:t kansioon sivuston_nimi/, kuvat ja muut sivuston_nimi/images/\nHtml:t kansioon sivuston_nimi/html/, kuvat ja muut sivuston_nimi/images/\nHtml:t kansioon sivuston_nimi/, kuvat ja muut sivuston_nimi/\nHtml:t kansioon sivuston_nimi/, kuvat ja muut sivuston_nimi/xxx/\nHtml:t kansioon sivuston_nimi/html/, kuvat ja muut sivuston_nimi/xxx/\nKaikki kansioon web/, luo satunnaiset nimet (!)\nKaikki kansioon sivuston_nimi/, luo satunnaiset nimet (!)\nKäyttäjän määrittelemä rakenne...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Vain lue\nSäilö html-tiedostot\nSäilö muut kuin html-tiedostot\nSäilö kaikki tiedostot (vakio)\nSäilö html-tiedostot ensin
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Pysy samassa hakemistossa\nVoi mennä alas (vakio)\nVoi mennä ylös\nVoi mennä sekä ylös että alas
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Pysy samassa osoitteessa (vakio)\nPysy samalla verkkotunnuksella\nPysy samalla ylimmän tason verkkotunnuksella\nMene kaikkialle nettiin
+Never\nIf unknown (except /)\nIf unknown
+Ei koskaan\nJos tuntematon (paitsi /)\nJos tuntematon
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+ei robots.txt-sääntöjä\nrobots.txt paitsi velhoa\nnoudata robots.txt-sääntöjä
+normal\nextended\ndebug
+normaali\nlaajennettu\ndebug
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Imuroi nettisivut\nImuroi nettisivut ja kysymykset\nOta yksittäiset tiedostot\nImuroi kaikki sivut sivustolla (useat peilit)\nTestaa sivujen linkit (kirjanmerkkitestaus)\n* Jatka keskeytynyttä latausta\n* Päivitä jo imuroitu
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Suhteellinen URI / tarkka URL (vakio)\nTarkka URL / tarkka URL\nTarkka URI / tarkka URL\nAlkuperäinen URL / alkuperäinen URL
+Open Source offline browser
+Avoimen lähdekoodin yhteydetön selain
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Nettisivun lataaja/Offline-selain. Kopioi nettisivut koneellesi. Ilmainen.
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline-selain
+URL list (.txt)
+URL-luettelo (.txt)
+Previous
+Edellinen
+Next
+Seuraava
+URLs
+URL:t
+Warning
+Varoitus
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Selaimesi ei tue javascriptiä juuri nyt. Parempia tuloksia tulee javascriptiä käyttävällä selaimella.
+Thank you
+Kiitos
+You can now close this window
+Voit nyt sulkea tämän ikkunan
+Server terminated
+Palvelin lopetettu
+A fatal error has occured during this mirror
+Tällä peilillä tapahtui vakava virhe
+

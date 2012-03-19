@@ -42,7 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htscore.h"
 
-typedef struct {
+typedef struct t_StatsBuffer {
   char name[1024];
   char file[1024];
   char state[256];
@@ -58,7 +58,7 @@ typedef struct {
   int actived;    // pour disabled
 } t_StatsBuffer;
 
-typedef struct {
+typedef struct t_InpInfo {
   int ask_refresh;
   int refresh;
   LLint stat_bytes;
@@ -92,8 +92,10 @@ static char* __cdecl htsshow_query(char* question);
 static char* __cdecl htsshow_query2(char* question);
 static char* __cdecl htsshow_query3(char* question);
 static int   __cdecl htsshow_check(char* adr,char* fil,int status);
+static int   __cdecl htsshow_check_mime(char* adr,char* fil,char* mime,int status);
 static void  __cdecl htsshow_pause(char* lockfile);
 static void  __cdecl htsshow_filesave(char* file);
+static void  __cdecl htsshow_filesave2(char* adr, char* fil, char* save, int is_new, int is_modified,int not_updated);
 static int   __cdecl htsshow_linkdetected(char* link);
 static int   __cdecl htsshow_linkdetected2(char* link, char* start_tag);
 static int   __cdecl htsshow_xfrstatus(lien_back* back);
@@ -203,32 +205,6 @@ extern FILE* ioinfo;
       } \
     } else { \
       memcpybuff((A), (B), szf + 1); \
-    } \
-  } \
-} while(0)
-#define strncpybuff(A, B, N) do { \
-  assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
-  if (htsMemoryFastXfr) { \
-    if (sizeof(A) != sizeof(char*)) { \
-      (A)[sizeof(A) - 1] = '\0'; \
-    } \
-    strncpy(A, B, N); \
-    if (sizeof(A) != sizeof(char*)) { \
-      assertf((A)[sizeof(A) - 1] == '\0'); \
-    } \
-  } else { \
-    unsigned int szf = (unsigned int) strlen(B); \
-    if (szf > (unsigned int) (N)) szf = (unsigned int) (N); \
-    if (sizeof(A) != sizeof(char*)) { \
-      assertf(szf + 1 < sizeof(A)); \
-      if (szf > 0) { \
-        if (szf + 1 < sizeof(A)) { \
-          memcpy((A), (B), szf); \
-        } \
-      } \
-    } else { \
-      memcpybuff((A), (B), szf); \
     } \
   } \
 } while(0)

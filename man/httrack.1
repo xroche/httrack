@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "May 2005" "httrack website copier"
+.TH httrack 1 "HTTrack version 3.40-2 (compiled Apr  9 2006)" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -40,6 +40,8 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B -GN, --max-pause[=N] 
 ] [ 
+.B -%mN, --max-mms-time[=N] 
+] [ 
 .B -cN, --sockets[=N] 
 ] [ 
 .B -TN, --timeout 
@@ -61,6 +63,8 @@ httrack \- offline browser : copy websites to a local directory
 .B -%S, --urllist 
 ] [ 
 .B -NN, --structure[=N] 
+] [ 
+.B -%D, --cached-delayed-type-check 
 ] [ 
 .B -%M, --mime-html 
 ] [ 
@@ -244,6 +248,8 @@ maximum transfer rate in bytes/seconds (1000=1KB/s max) (--max-rate[=N])
 maximum number of connections/seconds (*%c10) (--connection-per-second[=N])
 .IP -GN
 pause transfer if N bytes reached, and wait until lock file is deleted (--max-pause[=N])
+.IP -%mN
+maximum mms stream download time in seconds (60=1 minute, 3600=1 hour) (--max-mms-time[=N])
 
 .SS Flow control:
 .IP -cN
@@ -276,6 +282,8 @@ structure type (0 *original structure, 1+: see below) (--structure[=N])
 user defined structure (-N "%h%p/%n%q.%t")
 .IP -%N
 delayed type check, don t make any link test but wait for files download to start instead (experimental) (%N0 don t use, %N1 use for unknown extensions, * %N2 always use)
+.IP -%D
+cached delayed type check, don t wait for remote type during updates, to speedup them (%D0 wait, * %D1 don t wait) (--cached-delayed-type-check)
 .IP -%M
 generate a RFC MIME-encapsulated full-archive (.mht) (--mime-html)
 .IP -LN
@@ -506,9 +514,9 @@ Identical to N99 exept that there is no "web" directory
    %q  small query string MD5 (16 bits, 4 ascii bytes)
       %s?  Short name version (ex: %sN)
    %[param]  param variable in query string
-   %[param:before:after:notfound:empty]  advanced variable extraction
+   %[param:before:after:empty:notfound]  advanced variable extraction
 .SS Details: User-defined option N and advanced variable extraction
-   %[param:before:after:notfound:empty]
+   %[param:before:after:empty:notfound]
 .IP -param
 : parameter name
 .IP -before
@@ -592,6 +600,9 @@ struct* stats);
 .SS  check-link  : int   (* myfunction)(char* adr,char* fil,int status);
 .SS  pause  : void  (* myfunction)(char* lockfile);
 .SS  save-file  : void  (* myfunction)(char* file);
+.SS  save-file2  : void  (* myfunction)(char* hostname,char* filename,char* localfile,int is
+new,int is
+modified);
 .SS  link-detected  : int   (* myfunction)(char* link);
 .SS  link-detected2  : int   (* myfunction)(char* link, char* start
 tag);

@@ -59,7 +59,6 @@ Please visit our Website: http://www.httrack.com
 // hash[no_enregistrement][pos]->hash est un index dans le tableau général liens
 // #define HTS_HASH_SIZE 8191  (premier si possible!)
 // type: numero enregistrement - 0 est case insensitive (sav) 1 (adr+fil) 2 (former_adr+former_fil)
-#if HTS_HASH
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 // retour: position ou -1 si non trouvé
 int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
@@ -311,6 +310,5 @@ int* hash_calc_chaine(hash_struct* hash,int type,int pos) {
 #endif
   return &(hash->liens[pos]->hash_next[type]);
 }
-#endif
 // FIN GESTION DES TABLES DE HACHAGE
 

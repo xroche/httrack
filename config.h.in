@@ -18,6 +18,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define to 1 if you have the `snprintf' function. */
+#undef HAVE_SNPRINTF
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -38,6 +41,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Define to 1 if you have the `vsnprintf' function. */
+#undef HAVE_VSNPRINTF
 
 /* Check for in_addr_t */
 #undef HTS_DO_NOT_REDEFINE_in_addr_t
@@ -77,6 +83,9 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* "enable replacement (v)snprintf if system (v)snprintf is broken" */
+#undef PREFER_PORTABLE_SNPRINTF
 
 /* Check for setuid */
 #undef SETUID

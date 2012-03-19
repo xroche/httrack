@@ -42,13 +42,18 @@ Please visit our Website: http://www.httrack.com
 
 // inthash -- simple hash table, using a key (char[]) and a value (ulong int)
 
+// value
+typedef union inthash_value {
+  unsigned long int intg;        /* integer value */
+  void* ptr;                     /* ptr value */
+} inthash_value;
+
+#define INTHASH_VALUE_NULL { 0 }
+
 // simple hash table for other routines
 typedef struct inthash_chain {
   char* name;                    /* key (name) */
-  union {
-  unsigned long int intg;        /* integer value */
-  void* ptr;                     /* ptr value */
-  } value;
+  inthash_value value;           /* value */
   struct inthash_chain* next;    /* next element */
 } inthash_chain;
 
@@ -56,6 +61,7 @@ typedef struct inthash_chain {
 typedef void (* t_inthash_freehandler)(void* value);
 typedef struct struct_inthash {
   inthash_chain** hash;
+  unsigned int nitems;
   t_inthash_freehandler free_handler;
   unsigned int hash_size;
   unsigned short flag_valueismalloc;
@@ -64,31 +70,47 @@ typedef struct struct_inthash {
 // main inthash type
 typedef struct_inthash* inthash;
 
+// enumeration
+typedef struct struct_inthash_enum {
+  inthash table;
+  int index;
+  inthash_chain* item;
+} struct_inthash_enum;
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-// subfunctions
-unsigned long int inthash_key(char* value);
-void inthash_init(inthash hashtable);
-void inthash_delchain(inthash_chain* hash,t_inthash_freehandler free_handler);
-void inthash_default_free_handler(void* value);
 
 // main functions:
 
 /* Hash functions: */
-inthash inthash_new(int size);                                       /* Create a new hash table */
-int     inthash_created(inthash hashtable);                          /* Test if the hash table was successfully created */
-void    inthash_delete(inthash* hashtable);                          /* Delete an hash table */
-void    inthash_value_is_malloc(inthash hashtable,int flag);         /* Is the 'value' member a value that needs to be free()'ed ? */
-void    inthash_value_set_free_handler(inthash hashtable,             /* value free() handler (default one is 'free') */
-                                    t_inthash_freehandler free_handler);
+inthash inthash_new(int size);                                            /* Create a new hash table */
+int     inthash_created(inthash hashtable);                               /* Test if the hash table was successfully created */
+unsigned int inthash_nitems(inthash hashtable);                           /* Number of items */
+void    inthash_delete(inthash* hashtable);                               /* Delete an hash table */
+void    inthash_value_is_malloc(inthash hashtable,int flag);              /* Is the 'value' member a value that needs to be free()'ed ? */
+void    inthash_value_set_free_handler(inthash hashtable,                 /* value free() handler (default one is 'free') */
+                                       t_inthash_freehandler free_handler);
 /* */
-int     inthash_read(inthash hashtable,char* name,long int* value);    /* Read entry from the hash table */
-int     inthash_readptr(inthash hashtable,char* name,long int* value); /* Same function, but returns 0 upon null ptr */
+int     inthash_read(inthash hashtable,const char* name,long int* intvalue);    /* Read entry from the hash table */
+int     inthash_readptr(inthash hashtable,const char* name,long int* intvalue); /* Same function, but returns 0 upon null ptr */
+int     inthash_exists(inthash hashtable, const char* name);                    /* Is the key existing ? */
 /* */
-void    inthash_add(inthash hashtable,char* name,long int value);    /* Add entry in the hash table */
-void*   inthash_addblk(inthash hashtable,char* name,int blksize);    /* Add entry in the hash table and set value to a new memory block */
-int     inthash_write(inthash hashtable,char* name,long int value);  /* Overwrite/add entry in the hash table */
-int     inthash_inc(inthash hashtable,char* name);                   /* Increment entry in the hash table */
+int     inthash_read_value(inthash hashtable,const char* name,inthash_value* value);
+int     inthash_write_value(inthash hashtable,const char* name,inthash_value value);
+void    inthash_add_value(inthash hashtable, const char* name, inthash_value value);
+/* */
+int     inthash_read_pvoid(inthash hashtable,const char* name, void** value);
+int     inthash_write_pvoid(inthash hashtable,const char* name, void* value);
+void    inthash_add_pvoid(inthash hashtable, const char* name, void* value);
+/* */
+void    inthash_add(inthash hashtable,const char* name,long int value);    /* Add entry in the hash table */
+void*   inthash_addblk(inthash hashtable,const char* name,int blksize);    /* Add entry in the hash table and set value to a new memory block */
+int     inthash_write(inthash hashtable,const char* name,long int value);  /* Overwrite/add entry in the hash table */
+int     inthash_inc(inthash hashtable,const char* name);                   /* Increment entry in the hash table */
+int     inthash_remove(inthash hashtable,const char* name);                /* Remove an entry from the hashtable */
+/* */
+struct_inthash_enum inthash_enum_new(inthash hashtable);             /* Start a new enumerator */
+inthash_chain* inthash_enum_next(struct_inthash_enum* e);           /* Fetch an item in the enumerator */
 /* End of hash functions: */
 #endif
 

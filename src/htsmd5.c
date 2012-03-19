@@ -47,7 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <stdio.h>
 
-int domd5mem(unsigned char * buf, int len, 
+int domd5mem(const unsigned char * buf, int len, 
                     unsigned char * digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
@@ -85,7 +85,7 @@ int domd5mem(unsigned char * buf, int len,
   return 0;
 }
 
-unsigned long int md5sum32(char* buff) {
+unsigned long int md5sum32(const char* buff) {
   unsigned char md5digest[16];
   unsigned char* md5digest_ = md5digest;
   domd5mem(buff,strlen(buff),md5digest,0);

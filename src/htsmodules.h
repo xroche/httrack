@@ -83,8 +83,7 @@ struct htsmoduleStruct {
   /* Internal use - please don't touch */
   void* liens;
   void* opt;
-  void* back;
-  int back_max;
+  void* sback;
   void* cache;
   void* hashptr;
   int numero_passe;

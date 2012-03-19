@@ -1,0 +1,68 @@
+ MMS Ripper v0.7.0:
+====================
+
+   - Added '-k' and '--trick' switches that activate a trick for some recalcitrant servers.
+   - Added the display of the ripping speed.
+   - Added '-gFILE' and '--debug=FILE' switches which activate debug output to specified file.
+   - Fixed parsing of urls that include options after file name (stream.asf?dig=7QXo&pr=lala).
+   - Fixed protocol checking in URL parsing.
+   - Fixed expected file size calculation.
+   - Fixed compilation on Solaris, Cygwin and Win32 (check AUTHORS file for greetings).
+   - Improved debug output.
+   - Improved ASF header interpretation.
+   - Improved presentation in manpage.
+   - Minor code cleanups.
+   - A spec file is now distributed.
+
+
+ MMS Ripper v0.6.5:
+====================
+
+   - Added the handling of the no auth error during streaming.
+     (this should fix mmsrip behavior on some servers such as canalplus.fr)
+   - Improved the diagnostic value returned by mmsrip in case of error (please read the manpage).
+
+
+ MMS Ripper v0.6.4:
+====================
+
+   - Added a man page.
+   - Fixed a compilation warning.
+   - Fixed a potential security issue.
+   - Fixed the ripping of some ASF files (bug reported by Jozef RIHA).
+
+
+ MMS Ripper v0.6.2:
+====================
+
+   - Added '-d' switch which makes mmsrip exit after DELAY seconds.
+   - Added support for long options.
+   - Fixed bug that made mmsrip attempt to use invalid URLs.
+
+
+ MMS Ripper v0.6.0:
+====================
+
+   - Added '-q' switch which enables quiet mode.
+   - Added '-t' switch which makes mmsrip check stream availability only.
+   - Added '-o' switch so the user can choose the output file for every stream.
+   - Fixed a bug in arguments handling.
+
+
+ MMS Ripper v0.4.2:
+====================
+
+   - Fixed a serious bug in packet reception (mmsrip went crazy).
+
+
+ MMS Ripper v0.4.1:
+====================
+
+   - Fixed a bug that made mmsrip download the same stream every time.
+   - Compilation fixes.
+
+
+ MMS Ripper v0.4.0:
+====================
+
+   - First Release of mmsrip.

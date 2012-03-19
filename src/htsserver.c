@@ -127,19 +127,24 @@ static int linput(FILE* fp,char* s,int max);
 // 0- Init the URL catcher with standard port
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init_std(int* port_prox,char* adr_prox) {
-  T_SOC soc;
-  int try_to_listen_to[]={8080,8081,8082,8083,8084,8085,8086,8087,8088,8089,
-                          32000,32001,32002,32003,32004,32005,32006,32007,32008,32009,
-                          42000,42001,42002,42003,42004,42005,42006,42007,42008,42009,
-                          0,-1};
-  int i=0;
-  do {
-    soc=smallserver_init(&try_to_listen_to[i],adr_prox);
-    *port_prox=try_to_listen_to[i];
-    i++;
-  } while( (soc == INVALID_SOCKET) && (try_to_listen_to[i]>=0));
-  return soc;
+T_SOC smallserver_init_std(int* port_prox, char* adr_prox, int defaultPort) {
+	T_SOC soc;
+	if (defaultPort <= 0) {
+		int try_to_listen_to[]={8080,8081,8082,8083,8084,8085,8086,8087,8088,8089,
+			32000,32001,32002,32003,32004,32006,32006,32007,32008,32009,
+			42000,42001,42002,42003,42004,42006,42006,42007,42008,42009,
+			0,-1};
+		int i=0;
+		do {
+			soc=smallserver_init(&try_to_listen_to[i],adr_prox);
+			*port_prox=try_to_listen_to[i];
+			i++;
+		} while( (soc == INVALID_SOCKET) && (try_to_listen_to[i]>=0));
+	} else {
+		soc=smallserver_init(&defaultPort, adr_prox);
+		*port_prox = defaultPort;
+	}
+	return soc;
 }
 
 
@@ -293,7 +298,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     };
     initStrElt initStr[] = {
       { "user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" },
-      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2005], %s -->" },
+      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2006], %s -->" },
       { "url2", "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/*" },
       { NULL, NULL }
     };
@@ -1613,22 +1618,7 @@ static char* LANGINTKEY(char* name) {
 
 
 
-static int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;           // poll structures
-    struct timeval tv;          // structure for select
-    FD_ZERO(&fds);
-    FD_SET(soc,&fds);           
-    tv.tv_sec=timeout;
-    tv.tv_usec=0;
-    select(soc + 1,&fds,NULL,NULL,&tv);
-    if (FD_ISSET(soc,&fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
-}
+
 
 static int recv_bl(T_SOC soc, void* buffer, size_t len, int timeout) {
   if (check_readinput_t(soc, timeout)) {
@@ -1647,28 +1637,6 @@ static int recv_bl(T_SOC soc, void* buffer, size_t len, int timeout) {
   return -1;
 }
 
-static int linputsoc(T_SOC soc, char* s, int max) {
-  int c;
-  int j=0;
-  do {
-    unsigned char ch;
-    if (recv(soc, &ch, 1, 0) == 1) {
-      c = ch;
-    } else {
-      c = EOF;
-    }
-    if (c!=EOF) {
-      switch(c) {
-        case 13: break;  // sauter CR
-        case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
-        default: s[j++]=(char) c; break;
-      }
-    }
-  }  while((c!=-1) && (c!=EOF) && (j<(max-1)));
-  s[j]='\0';
-  return j;
-}
 
 // check if data is available
 static int check_readinput(htsblk* r) {
@@ -1688,12 +1656,6 @@ static int check_readinput(htsblk* r) {
     return 0;
 }
 
-static int linputsoc_t(T_SOC soc, char* s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
-  }
-  return -1;
-}
 
 /*int strfield(const char* f,const char* s) {
   int r=0;

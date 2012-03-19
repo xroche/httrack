@@ -406,7 +406,7 @@ void help(char* app,int more) {
 #ifdef HTTRACK_AFF_WARNING
     infomsg("NOTE: "HTTRACK_AFF_WARNING);
 #endif
-    sprintf(info,"\tusage: %s <URLs> [-option] [+<FILTERs>] [-<FILTERs>]",app);
+    sprintf(info,"\tusage: %s <URLs> [-option] [+<URL_FILTER>] [-<URL_FILTER>] [+<mime:MIME_FILTER>] [-<mime:MIME_FILTER>]",app);
     infomsg(info);
     infomsg("\twith options listed below: (* is the default value)");
     infomsg("");
@@ -439,6 +439,9 @@ void help(char* app,int more) {
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");
   infomsg(" %cN maximum number of connections/seconds (*%c10)");
   infomsg("  GN pause transfer if N bytes reached, and wait until lock file is deleted");
+#if HTS_USEMMS
+  infomsg(" %mN maximum mms stream download time in seconds (60=1 minute, 3600=1 hour)");
+#endif
   infomsg("");
   infomsg("Flow control:");
   infomsg("  cN number of multiple connections (*c8)");
@@ -457,6 +460,8 @@ void help(char* app,int more) {
   infomsg("Build options:");
   infomsg("  NN structure type (0 *original structure, 1+: see below)");
   infomsg("     or user defined structure (-N \"%h%p/%n%q.%t\")");
+  infomsg(" %N  delayed type check, don't make any link test but wait for files download to start instead (experimental) (%N0 don't use, %N1 use for unknown extensions, * %N2 always use)");
+  infomsg(" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
   infomsg("  LN long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible)");
   infomsg("  KN keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links)");
@@ -525,6 +530,8 @@ void help(char* app,int more) {
   infomsg("Guru options: (do NOT use if possible)");
   infomsg(" #X *use optimized engine (limited memory boundary checks)");
   infomsg(" #0  filter test (-#0 '*.gif' 'www.bar.com/foo.gif')");
+  infomsg(" #1  simplify test (-#1 ./foo/bar/../foobar)");
+  infomsg(" #2  type test (-#2 /foo/bar.php)");
   infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
   infomsg(" #R  cache repair (damaged cache)");
   infomsg(" #d  debug parser");
@@ -586,9 +593,9 @@ void help(char* app,int more) {
   infomsg("  '%q' small query string MD5 (16 bits, 4 ascii bytes)");
   infomsg("     '%s?' Short name version (ex: %sN)");
   infomsg("  '%[param]' param variable in query string");
-  infomsg("  '%[param:before:after:notfound:empty]' advanced variable extraction");
+	infomsg("  '%[param:before:after:empty:notfound]' advanced variable extraction");
   infomsg("Details: User-defined option N and advanced variable extraction");
-  infomsg("   %[param:before:after:notfound:empty]");
+	infomsg("   %[param:before:after:empty:notfound]");
   infomsg("   param : parameter name");
   infomsg("   before : string to prepend if the parameter was found");
   infomsg("   after : string to append if the parameter was found");
@@ -635,6 +642,7 @@ void help(char* app,int more) {
   infomsg("'check-link' : int   (* myfunction)(char* adr,char* fil,int status);");
   infomsg("'pause' : void  (* myfunction)(char* lockfile);");
   infomsg("'save-file' : void  (* myfunction)(char* file);");
+  infomsg("'save-file2' : void  (* myfunction)(char* hostname,char* filename,char* localfile,int is_new,int is_modified);");
   infomsg("'link-detected' : int   (* myfunction)(char* link);");
   infomsg("'link-detected2' : int   (* myfunction)(char* link, char* start_tag);");
   infomsg("'transfer-status' : int   (* myfunction)(lien_back* back);");
@@ -645,7 +653,7 @@ void help(char* app,int more) {
   infomsg("example: httrack www.someweb.com/bob/");
   infomsg("means:   mirror site www.someweb.com/bob/ and only this site");
   infomsg("");
-  infomsg("example: httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg");
+  infomsg("example: httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg -mime:application/*");
   infomsg("means:   mirror the two sites together (with shared links) and accept any .jpg files on .com sites");
   infomsg("");
   infomsg("example: httrack www.someweb.com/bob/bobby.html +* -r6");

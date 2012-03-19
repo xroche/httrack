@@ -307,8 +307,11 @@ void htspe_init() {
 #ifdef _WIN32
       handle = LoadLibraryA((char*)"ssleay32");
 #else
-      /* We are compatible with 0.9.6/7 and potentially above */
-      handle = dlopen("libssl.so.0.9.7", RTLD_LAZY);
+      /* We are compatible with 0.9.6/7/8 and potentially above */
+      handle = dlopen("libssl.so.0.9.8", RTLD_LAZY);
+      if (handle == NULL) {
+        handle = dlopen("libssl.so.0.9.7", RTLD_LAZY);
+      }
       if (handle == NULL) {
         handle = dlopen("libssl.so.0.9.6", RTLD_LAZY);
       }

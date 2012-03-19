@@ -58,7 +58,6 @@ Please visit our Website: http://www.httrack.com
 #define PTHREAD_TYPE_FNC __cdecl
 #define PTHREAD_LOCK_TYPE HANDLE
 #define PTHREAD_HANDLE HANDLE
-#define PTHREAD_WAIT_THREAD(A) do { WaitForSingleObject(A, INFINITE); CloseHandle(A); } while(0)
 
 
 /* Useless - see '__declspec( thread )' */
@@ -82,7 +81,6 @@ Please visit our Website: http://www.httrack.com
 #define PTHREAD_KEY_SET(key, val, ptrtype)      pthread_setspecific(key, (void*)val)
 #define PTHREAD_KEY_GET(key, ptrval, ptrtype)   do { *(ptrval)=(ptrtype)pthread_getspecific(key); } while(0)
 #define PTHREAD_HANDLE pthread_t
-#define PTHREAD_WAIT_THREAD(A) do { pthread_join(A, NULL); CloseHandle(A); } while(0)
 
 #endif
 

@@ -52,6 +52,10 @@ int hts_acceptlink(httrackp* opt,
 int hts_testlinksize(httrackp* opt,
                      char* adr,char* fil,
                      LLint size);
+int hts_acceptmime(httrackp* opt,
+                   int ptr,int lien_tot,lien_url** liens,
+                   char* adr,char* fil,
+                   char* mime);
 #endif
 
 #endif

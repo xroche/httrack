@@ -55,6 +55,9 @@ Please visit our Website: http://www.httrack.com
 // nom par défaut pour / en ftp
 #define DEFAULT_FTP "index.txt"
 
+// nom par défaut pour / en mms
+#define DEFAULT_MMS "default.avi"
+
 // extension par défaut pour fichiers n'en ayant pas
 #define DEFAULT_EXT       ".html"
 #define DEFAULT_EXT_SHORT ".htm"
@@ -82,8 +85,12 @@ Please visit our Website: http://www.httrack.com
 // écriture directe dur disque possible (0/1)
 #define HTS_DIRECTDISK 1
 
+// always direct-to-disk (0/1)
+#define HTS_DIRECTDISK_ALWAYS 1
+
 // gérer une table de hachage?
-#define HTS_HASH 1
+// REMOVED
+// #define HTS_HASH 1
 
 // fast cache (build hash table)
 #define HTS_FAST_CACHE 1
@@ -100,7 +107,8 @@ Please visit our Website: http://www.httrack.com
 // case-sensitive pour les dossiers et fichiers (0/1)
 // [normalement 1, mais pose des problèmes (url malformée par exemple) et n'est pas très utile..
 // ..et pas bcp respecté]
-#define HTS_CASSE 0
+// REMOVED
+// #define HTS_CASSE 0
 
 // Un fichier ayant une taille différente du content-length doit il être annulé?
 // SEE opt.tolerant and opt.http10

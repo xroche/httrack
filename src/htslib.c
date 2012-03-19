@@ -624,7 +624,7 @@ htsblk httpget(char* url) {
     retour.adr=NULL;
     retour.size=0;
     retour.msg[0]='\0';
-    retour.statuscode=-1;    
+    retour.statuscode=STATUSCODE_INVALID;    
     strcpybuff(retour.msg,"Error invalid URL");
     return retour;
   }
@@ -655,7 +655,7 @@ int http_xfopen(int mode,int treat,int waitconnect,char* xsend,char* adr,char* f
     retour->adr=NULL;
     retour->size=0;
     retour->msg[0]='\0';
-    retour->statuscode=-5;          // a priori erreur non fatale
+    retour->statuscode=STATUSCODE_NON_FATAL;          // a priori erreur non fatale
   }
 
 #if HDEBUG
@@ -697,7 +697,11 @@ int http_xfopen(int mode,int treat,int waitconnect,char* xsend,char* adr,char* f
     if (retour) {
       if (retour->msg) {
         if (!strnotempty(retour->msg)) {
-          strcpybuff(retour->msg,"Connect error");
+#ifdef _WIN32
+          sprintf(retour->msg,"Connect error: %s", strerror(WSAGetLastError()));
+#else
+          sprintf(retour->msg,"Connect error: %s", strerror(errno));
+#endif
         }
       }
     }
@@ -1189,11 +1193,11 @@ void treatfirstline(htsblk* retour,char* rcvd) {
           // type MIME par défaut2
           strcpybuff(retour->contenttype,HTS_HYPERTEXT_DEFAULT_MIME);
         } else {  // pas de code!
-          retour->statuscode=-1;
+          retour->statuscode=STATUSCODE_INVALID;
           strcpybuff(retour->msg,"Unknown response structure");
         }
       } else {  // euhh??
-        retour->statuscode=-1;
+        retour->statuscode=STATUSCODE_INVALID;
         strcpybuff(retour->msg,"Unknown response structure");
       }
     } else {
@@ -1204,7 +1208,7 @@ void treatfirstline(htsblk* retour,char* rcvd) {
         strcpybuff(retour->msg, "Unknown, assuming junky server");
         strcpybuff(retour->contenttype,HTS_HYPERTEXT_DEFAULT_MIME);
 			} else if (strnotempty(a)) {
-        retour->statuscode=-1;
+        retour->statuscode=STATUSCODE_INVALID;
         strcpybuff(retour->msg,"Unknown (not HTTP/xx) response structure");
       } else {
         /* This is dirty .. */
@@ -1216,7 +1220,7 @@ void treatfirstline(htsblk* retour,char* rcvd) {
     }
   } else {  // vide!
     /*
-    retour->statuscode=-1;
+    retour->statuscode=STATUSCODE_INVALID;
     strcpybuff(retour->msg,"Empty reponse or internal error");
     */
     /* This is dirty .. */
@@ -1483,19 +1487,32 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
           //if (*a==';') {  // finit par un ;
           // vérifier débordements
           if ( (((int) (token_end - token_st))<200) && (((int) (value_end - value_st))<8000)
-            && (((int) (token_end - token_st))>0)   && (((int) (value_end - value_st))>0) ) {
+            && (((int) (token_end - token_st))>0)   && (((int) (value_end - value_st))>0) ) 
+          {
+            int name_len = (int) (token_end - token_st);
+            int value_len = (int) (value_end - value_st);
             name[0]='\0';
             value[0]='\0';
-            strncatbuff(name,token_st,(int) (token_end - token_st));
-            strncatbuff(value,value_st,(int) (value_end - value_st));
+            strncatbuff(name,token_st,name_len);
+            strncatbuff(value,value_st,value_len);
 #if DEBUG_COOK
             printf("detected cookie-av: name=\"%s\" value=\"%s\"\n",name,value);
 #endif
             if (strfield2(name,"domain")) {
-              strcpybuff(domain,value);
+              if (value_len < sizeof(domain) - 1) {
+                strcpybuff(domain,value);
+              } else {
+                cook_name[0] = 0;
+                break;
+              }
             }
             else if (strfield2(name,"path")) {
-              strcpybuff(path,value);
+              if (value_len < sizeof(path) - 1) {
+                strcpybuff(path,value);
+              } else {
+                cook_name[0] = 0;
+                break;
+              }
             }
             else if (strfield2(name,"max-age")) {
               // ignoré..
@@ -1513,12 +1530,17 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
               // ignoré
             }
             else {
-              if (strnotempty(cook_name)==0) {          // noter premier: nom et valeur cookie
-                strcpybuff(cook_name,name);
-                strcpybuff(cook_value,value);
-              } else {                             // prochain cookie
-                a=start_loop;      // on devra recommencer à cette position
-                next=1;            // enregistrer
+              if (value_len < sizeof(cook_value) - 1 && name_len < sizeof(cook_name) - 1) {
+                if (strnotempty(cook_name)==0) {          // noter premier: nom et valeur cookie
+                  strcpybuff(cook_name,name);
+                  strcpybuff(cook_value,value);
+                } else {                             // prochain cookie
+                  a=start_loop;      // on devra recommencer à cette position
+                  next=1;            // enregistrer
+                }
+              } else {
+                cook_name[0] = 0;
+                break;
               }
             }
           }
@@ -1791,7 +1813,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
         if (nl > 0) { 
           r->size+=nl;
           if ((INTsys)fwrite(buff,1,nl,r->out)!=nl) {
-            r->statuscode=-1;
+            r->statuscode=STATUSCODE_INVALID;
             strcpybuff(r->msg,"Write error on disk");
             nl=READ_ERROR;
           }
@@ -1994,7 +2016,7 @@ htsblk http_test(char* adr,char* fil,char* loc) {
         if (retour.adr!=NULL) { freet(retour.adr); retour.adr=NULL; }
       }
     } else {
-      retour.statuscode=-2;
+      retour.statuscode=STATUSCODE_TIMEOUT;
       strcpybuff(retour.msg,"Timeout While Testing");
     }
     
@@ -2081,7 +2103,11 @@ int newhttp(char* _iadr,htsblk* retour,int port,int waitconnect) {
 #endif
       if (retour)
       if (retour->msg)
-        strcpybuff(retour->msg,"Unable to get server's address");
+#ifdef _WIN32
+        sprintf(retour->msg,"Unable to get server's address: %s", strerror(WSAGetLastError()));
+#else
+        sprintf(retour->msg,"Unable to get server's address: %s", strerror(errno));
+#endif
       return INVALID_SOCKET;
     }  
     // copie adresse
@@ -2108,7 +2134,11 @@ int newhttp(char* _iadr,htsblk* retour,int port,int waitconnect) {
     if (soc==INVALID_SOCKET) {
       if (retour)
       if (retour->msg)
-        strcpybuff(retour->msg,"Unable to create a socket");
+#ifdef _WIN32
+        sprintf(retour->msg,"Unable to create a socket: %s", strerror(WSAGetLastError()));
+#else
+        sprintf(retour->msg,"Unable to create a socket: %s", strerror(errno));
+#endif
       return INVALID_SOCKET;                        // erreur création socket impossible
     }
 
@@ -2120,7 +2150,11 @@ int newhttp(char* _iadr,htsblk* retour,int port,int waitconnect) {
         bind(soc, (struct sockaddr *)hp->h_addr_list[0], hp->h_length) != 0) {
         if (retour)
           if (retour->msg)
-            strcpybuff(retour->msg,"Unable to bind the specificied server address");
+#ifdef _WIN32
+            sprintf(retour->msg,"Unable to bind the specificied server address: %s", strerror(WSAGetLastError()));
+#else
+            sprintf(retour->msg,"Unable to bind the specificied server address: %s", strerror(errno));
+#endif
           deletesoc(soc);
           return INVALID_SOCKET;
       }
@@ -2164,7 +2198,11 @@ int newhttp(char* _iadr,htsblk* retour,int port,int waitconnect) {
 #endif
           if (retour)
           if (retour->msg)
-            strcpybuff(retour->msg,"Unable to connect to the server");
+#ifdef _WIN32
+            sprintf(retour->msg,"Unable to connect to the server: %s", strerror(WSAGetLastError()));
+#else
+            sprintf(retour->msg,"Unable to connect to the server: %s", strerror(errno));
+#endif
           /* Close the socket and notify the error!!! */
           deletesoc(soc);
           return INVALID_SOCKET;
@@ -2230,6 +2268,10 @@ int ident_url_absolute(char* url,char* adr,char* fil) {
 #if HTS_USEOPENSSL
   } else if (SSL_is_available && (pos=strfield(url,"https:"))) {    // HTTPS
     strcpybuff(adr,"https://");
+#endif
+#if HTS_USEMMS
+  } else if ((pos = strfield(url,"mms:"))) {    // mms
+    strcpybuff(adr,"mms://");
 #endif
   } else if (scheme) {
     return -1;    // erreur non reconnu
@@ -2323,22 +2365,29 @@ void fil_simplifie(char* f) {
   int rollid = 0;
   char lc = '/';
   int query = 0;
+  int wasAbsolute = (*f == '/');
   for(a = b = f ; *a != '\0' ; ) {
     if (*a == '?')
       query = 1;
     if (query == 0 && lc == '/' && a[0] == '.' && a[1] == '/') {    /* foo/./bar or ./foo  */
       a += 2;
     }
-    else if (query == 0 && lc == '/' && a[0] == '.' && a[1] == '.' && a[2] == '/') {    /* foo/../bar or ../foo  */
-      a += 3;
+    else if (query == 0 && lc == '/' && a[0] == '.' && a[1] == '.' && ( a[2] == '/' || a[2] == '\0' ) ) {    /* foo/../bar or ../foo or .. */
+      if (a[2] == '\0')
+        a += 2;
+      else
+        a += 3;
       if (rollid > 1) {
         rollid--;
         b = rollback[rollid - 1];
-      } else {
+      } else {   /* too many ../ */
         rollid = 0;
         b = f;
+        if (wasAbsolute)
+          b++;   /* after the / */
       }
-    } else {
+    }
+    else {
       *b++ = lc = *a;
       if (*a == '/') {
         rollback[rollid++] = b;
@@ -2352,9 +2401,14 @@ void fil_simplifie(char* f) {
   }
   *b = '\0';
   if (*f == '\0') {
-    f[0] = '.';
-    f[1] = '/';
-    f[2] = '\0';
+    if (wasAbsolute) {
+      f[0] = '/';
+      f[1] = '\0';
+    } else {
+      f[0] = '.';
+      f[1] = '/';
+      f[2] = '\0';
+    }
   }
 }
 
@@ -2633,8 +2687,10 @@ int get_filetime_rfc822(char* file,char* date) {
     A=gmtime(&tt);
     if (A==NULL)
       A=localtime(&tt);
-    time_rfc822(date, A);
-    return 1;
+    if (A != NULL) {
+      time_rfc822(date, A);
+      return 1;
+    }
   }
   return 0;
 }
@@ -2804,7 +2860,7 @@ int binput(char* buff, char* s, int max) {
   int destCount = 0;
 
   // Note: \0 will return 1
-  while(count < max && buff != NULL && buff[count] != '\0' && buff[count] != '\n') {
+  while(destCount < max && buff != NULL && buff[count] != '\0' && buff[count] != '\n') {
     if (buff[count] != '\r') {
       s[destCount++] = buff[count];
     }
@@ -3024,28 +3080,50 @@ void map_characters(unsigned char* buffer, unsigned int size, unsigned int* map)
 // -1 : on sait pas
 // -2 : on sait pas, pas d'extension
 int ishtml(const char* fil) {
-  const char *a;
+  /* User-defined MIME types (overrides ishtml()) */
+  char BIGSTK fil_noquery[HTS_URLMAXSIZE*2];
+  char mime[256];
+  char* a;
+  strcpybuff(fil_noquery, fil);
+  if ((a = strchr(fil_noquery, '?')) != NULL) {
+    *a = '\0';
+  }
+  if (get_userhttptype(0, mime, fil_noquery)) {
+    if (strfield2(mime, "text/html")) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
 
-  // patch pour les truc.html?Choix=toto
-  if ( (a=strchr(fil,'?')) )  // paramètres?
-    a--;  // pointer juste avant le ?
-  else
-    a=fil+strlen(fil)-1;  // pointer sur le dernier caractère
-
-  if (*a=='/') return -1;    // répertoire, on sait pas!!
-  //if (*a=='/') return 1;    // ok répertoire, html
-
-  while ( (*a!='.') && (*a!='/')  && ( a > fil)) a--;
-  if (*a=='.') {  // a une extension
+  /* Search for known ext */
+  for (a = fil_noquery + strlen(fil_noquery) - 1 ; (*a!='.') && (*a!='/')  && ( a > fil_noquery ) ; a-- );
+  if (*a == '.') {  // a une extension
     char BIGSTK fil_noquery[HTS_URLMAXSIZE*2];
     char* b;
+    int ret;
+    char* dotted = a;
     fil_noquery[0]='\0';
     a++;  // pointer sur extension
     strncatbuff(fil_noquery,a,HTS_URLMAXSIZE);
     b=strchr(fil_noquery,'?');
     if (b)
       *b='\0';
-    return ishtml_ext(fil_noquery);     // retour
+    ret = ishtml_ext(fil_noquery);     // retour
+    if (ret == -1) {
+      switch(is_knowntype(dotted)) {
+      case 1:
+        ret = 0;     // connu, non html
+        break;
+      case 2:
+        ret = 1;     // connu, html
+        break;
+      default:
+        ret = -1;    // inconnu..
+        break;
+      }
+    }
+    return ret;
   } else return -2;   // indéterminé, par exemple /truc
 }
 
@@ -3064,7 +3142,11 @@ int ishtml_ext(const char* a) {
   //
   // insuccès..
   else {
-    switch(is_knowntype(a)) {
+#if 1
+    html = -1;    // inconnu..
+#else
+    // XXXXXX not suitable (ext)
+    switch(is_knownext(a)) {
     case 1:
       html = 0;     // connu, non html
       break;
@@ -3075,6 +3157,7 @@ int ishtml_ext(const char* a) {
       html = -1;    // inconnu..
       break;
     }
+#endif
   }
   return html;  
 }
@@ -3259,6 +3342,10 @@ HTS_INLINE char* jump_protocol(char* source) {
     source+=p;
   else if ((p=strfield(source,"file:")))
     source+=p;
+#if HTS_USEMMS
+  else if ((p=strfield(source,"mms:")))
+    source+=p;
+#endif
   // net_path
   if (strncmp(source,"//",2)==0)
     source+=2;
@@ -3596,6 +3683,7 @@ HTSEXT_API char* unescape_http(char* s) {
 }
 
 // unescape in URL/URI ONLY what has to be escaped, to form a standard URL/URI
+// DOES NOT DECODE %25
 HTSEXT_API char* unescape_http_unharm(char* s, int no_high) {
   char* tempo;
   int i,j=0;
@@ -3605,7 +3693,7 @@ HTSEXT_API char* unescape_http_unharm(char* s, int no_high) {
       int nchar=(char) ehex(s+i+1);
 
       int test = (  CHAR_RESERVED(nchar)
-                || CHAR_DELIM(nchar)
+                || ( nchar != '%' && CHAR_DELIM(nchar) )
                 || CHAR_UNWISE(nchar)
                 || CHAR_LOW(nchar)        /* CHAR_SPECIAL */
                 || CHAR_XXAVOID(nchar) 
@@ -3870,33 +3958,40 @@ HTS_INLINE int is_realspace(char c) {
 // deviner type d'un fichier local..
 // ex: fil="toto.gif" -> s="image/gif"
 void guess_httptype(char *s,const char *fil) {
-  get_httptype(s,fil,1);
+  get_httptype(s, fil, 1);
 }
 // idem
 // flag: 1 si toujours renvoyer un type
 void get_httptype(char *s,const char *fil,int flag) {
-  if (ishtml(fil)==1)
+  // userdef overrides get_httptype
+  if (get_userhttptype(0, s, fil)) {
+    return ;
+  }
+  // regular tests
+  if (ishtml(fil) == 1) {
     strcpybuff(s,"text/html");
-  else {
-    const char *a=fil+strlen(fil)-1;    
-    while ( (*a!='.') && (*a!='/')  && (a>fil)) a--;
+  } else {
+    /* Check html -> text/html */
+    const char* a = fil + strlen(fil) - 1;    
+    while ( (*a!='.') && (*a!='/') && (a>fil)) a--;
     if (*a=='.' && strlen(a) < 32) {
-      int ok=0;
       int j=0;
       a++;
-      while( (!ok) && (strnotempty(hts_mime[j][1])) ) {
+      while(strnotempty(hts_mime[j][1])) {
         if (strfield2(hts_mime[j][1],a)) {
           if (hts_mime[j][0][0]!='*') {    // Une correspondance existe
             strcpybuff(s,hts_mime[j][0]);
-            ok=1;
+            return;
           }
         }
         j++;
       }
       
-      if (!ok) if (flag) sprintf(s,"application/%s",a);
+      if (flag)
+        sprintf(s,"application/%s",a);
     } else {
-      if (flag) strcpybuff(s,"application/octet-stream");
+      if (flag)
+        strcpybuff(s,"application/octet-stream");
     }
   }
 }
@@ -3904,7 +3999,7 @@ void get_httptype(char *s,const char *fil,int flag) {
 // get type of fil (php)
 // s: buffer (text/html) or NULL
 // return: 1 if known by user
-int get_userhttptype(int setdefs,char *s,const char *ext) {
+int get_userhttptype(int setdefs, char *s, const char *fil) {
   char** buffer=NULL;
   NOSTATIC_RESERVE(buffer, char*, 1);
   if (setdefs) {
@@ -3913,11 +4008,72 @@ int get_userhttptype(int setdefs,char *s,const char *ext) {
   } else {
     if (s)
       s[0]='\0';
-    if (!ext)
+    if (fil == NULL || *fil == '\0')
       return 0;
+#if 1
+    if (*buffer) {
+
+      /* Check --assume foooo/foo/bar.cgi=text/html, then foo/bar.cgi=text/html, then bar.cgi=text/html */
+      /* also: --assume baz,bar,foooo/foo/bar.cgi=text/html */
+      /* start from path begining */
+      do {
+        char* next;
+        char* mimedefs = *buffer;    /* loop through mime definitions : \nfoo=bar\nzoo=baz\n.. */
+        while(*mimedefs != '\0') {
+          const char* segment = fil + 1;
+          if (*mimedefs == '\n') {
+            mimedefs++;
+          }
+          /* compare current segment with user's definition */
+          do {
+            int i;
+            /* check current item */
+            for(i = 0 ; 
+              mimedefs[i] != '\0'           /* end of all defs */
+              && mimedefs[i] != ' '         /* next item in left list */
+              && mimedefs[i] != '='         /* end of left list */
+              && mimedefs[i] != '\n'        /* end of this def (?) */
+              && mimedefs[i] == segment[i]  /* same item */
+              ; i++);
+            /* success */
+            if ( ( mimedefs[i] == '=' || mimedefs[i] == ' ' ) && segment[i] == '\0') {
+              int i2;
+              while(mimedefs[i] != 0 && mimedefs[i] != '\n' && mimedefs[i] != '=') i++;
+              if (mimedefs[i] == '=') {
+                i++;
+                for(i2 = 0 ; mimedefs[i + i2] != '\n' && mimedefs[i + i2] != '\0' ; i2++) {
+                  s[i2] = mimedefs[i + i2];
+                }
+                s[i2] = '\0';
+                return 1;   /* SUCCESS! */
+              }
+            }
+            /* next item in list */
+            for(mimedefs += i ; 
+              *mimedefs != '\0' && *mimedefs != '\n' && *mimedefs != '=' && *mimedefs != ' ' ; 
+              mimedefs++);
+            if (*mimedefs == ' ') {
+              mimedefs++;
+            }
+          } while(*mimedefs != '\0' && *mimedefs != '\n' && *mimedefs != '=');
+          /* next user-def */
+          for( ; *mimedefs != '\0' && *mimedefs != '\n' ; mimedefs++);
+        }
+        /* shorten segment */
+        next = strchr(fil + 1, '/');
+        if (next == NULL) {
+          /* ext tests */
+          next = strchr(fil + 1, '.');
+        }
+        fil = next;
+      } while(fil != NULL);
+    }
+#else
     if (*buffer) {
       char BIGSTK search[1024];
       char* detect;
+
+
       sprintf(search,"\n%s=",ext);    // php=text/html
       detect=strstr(*buffer,search);
       if (!detect) {
@@ -3939,12 +4095,13 @@ int get_userhttptype(int setdefs,char *s,const char *ext) {
         }
       }
     }
+#endif
   }
   return 0;
 }
 // renvoyer extesion d'un type mime..
 // ex: "image/gif" -> gif
-void give_mimext(char *s,char *st) {   
+void give_mimext(char *s,const char *st) {   
   int ok=0;
   int j=0;
   s[0]='\0';
@@ -3963,7 +4120,7 @@ void give_mimext(char *s,char *st) {
   // application/mp3
   if (!ok) {
     int p;
-    char* a=NULL;
+    const char* a=NULL;
     if ((p=strfield(st,"application/x-")))
       a=st+p;
     else if ((p=strfield(st,"application/")))
@@ -3983,12 +4140,14 @@ void give_mimext(char *s,char *st) {
 //  1 : oui
 //  2 : html
 int is_knowntype(const char *fil) {
+  const char *ext;
   int j=0;
   if (!fil)
     return 0;
+  ext = get_ext(fil);
   while(strnotempty(hts_mime[j][1])) {
-    if (strfield2(hts_mime[j][1],fil)) {
-      if (strfield2(hts_mime[j][0],"text/html"))
+    if (strfield2(hts_mime[j][1], ext)) {
+      if (strfield2(hts_mime[j][0], "text/html"))
         return 2;
       else
         return 1;
@@ -4899,6 +5058,7 @@ HTSEXT_API int hts_init(void) {
     htswrap_add("check-link",htsdefault_check);
     htswrap_add("pause",htsdefault_pause);
     htswrap_add("save-file",htsdefault_filesave);
+    htswrap_add("save-file2",htsdefault_filesave2);
     htswrap_add("link-detected",htsdefault_linkdetected);
     htswrap_add("link-detected2",htsdefault_linkdetected2);
     htswrap_add("transfer-status",htsdefault_xfrstatus);
@@ -4985,12 +5145,17 @@ char* __cdecl htsdefault_query3(char* question) {
 int __cdecl htsdefault_check(char* adr,char* fil,int status) {
   return -1;
 }
+int __cdecl htsdefault_check_mime(char* adr,char* fil,char* mime,int status) {
+  return -1;
+}
 void __cdecl htsdefault_pause(char* lockfile) {
   while (fexist(lockfile)) {
     Sleep(1000);
   }
 }
 void __cdecl htsdefault_filesave(char* file) {
+}
+void __cdecl htsdefault_filesave2(char* adr, char* file, char* sav, int is_new, int is_modified, int not_updated) {
 }
 int __cdecl htsdefault_linkdetected(char* link) {
   return 1;

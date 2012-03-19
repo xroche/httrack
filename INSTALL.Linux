@@ -1,0 +1,10 @@
+HTTrack Website Copier - Install notes
+--------------------------------------
+
+On most systems (including GNU/Linux), installing can be easily acheived using the following command:
+
+./configure && make && make install
+-or- (if not compiling as root)
+./configure && make && su -c 'make install'
+
+See also the INSTALL generic help file.

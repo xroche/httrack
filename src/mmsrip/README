@@ -1,0 +1,37 @@
+	MMS Ripper release 0.7.0
+
+These are the release notes for mmsrip version 0.7.0
+Read them carefully, as they tell you what this is all about.
+
+
+WHAT IS MMSRIP ?
+
+ MMSRIP allows you to save on your hard-disk the content being streamed
+ by an MMS server. This program has been written for personnal use, so
+ don't blame me if you think I am stupid doing such tool for the others.
+
+ It should run on every POSIX compliant Operating System, but I can't
+ give you any complete list.
+
+
+HOW TO INSTALL ?
+
+ Read the file INSTALL in order to get the answer of this question... ;)
+ If you use a gentoo based distribution, enjoy the ebuild script contributed by Aurelien REQUIEM.
+ If you use a RPM based distribution, you may use the spec file provided by Frederico SIMONCELLI.
+
+
+HOW TO RUN ?
+
+ Once you have compiled & installed, you should be able to run the program.
+
+
+IMPORTANT NOTE
+
+ All the credits go to SDP Multimedia and Major MMS.
+
+
+--
+
+$RCSfile: README,v $
+$Date: 2006/01/24 18:13:07 $ - $Revision: 1.13 $

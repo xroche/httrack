@@ -42,7 +42,7 @@ Please visit our Website: http://www.httrack.com
 
 // --assume standard
 #define HTS_ASSUME_STANDARD \
-  "php2,php3,php4,php,cgi,asp,jsp,pl,cfm,nsf=text/html"
+  "php2 php3 php4 php cgi asp jsp pl cfm nsf=text/html"
 
 #include "htsglobal.h"
 

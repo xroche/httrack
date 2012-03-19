@@ -1,0 +1,10 @@
+HTTrack Website Copier - Install notes
+--------------------------------------
+
+FreeBSD systems not including libpthread.so (-lpthread) must use the -pthread gcc flag:
+
+./configure CC='gcc -pthread' && make && make install
+-or- (if not compiling as root)
+./configure CC='gcc -pthread' && make && su -c 'make install'
+
+See also the INSTALL generic help file.

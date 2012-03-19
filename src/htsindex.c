@@ -180,6 +180,10 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
     (strfield2(mime,"image/svg+xml"))
     ||
     (strfield2(mime,"image/svg-xml"))
+#if HTS_USEMMS
+		||
+		strfield2(mime,"video/x-ms-asf")
+#endif
     ) {
     inscript=0;
   }

@@ -46,7 +46,15 @@ void linput(FILE* fp,char* s,int max);
 void hts_lowcase(char* s);
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
-#define is_realspace(c) (strchr(" \x0d\x0a\x09\x0b\x0c",(c))!=NULL)
+// #define is_realspace(c) (strchr(" \x0d\x0a\x09\x0b\x0c",(c))!=NULL)
+#define is_realspace(c) ( \
+	   (c) == ' '				\
+	|| (c) == '\x09'		\
+	|| (c) == '\x0a'		\
+	|| (c) == '\x0b'		\
+	|| (c) == '\x0c'		\
+	|| (c) == '\x0d'		\
+)
 
 // COPY OF cmdl_ins in htsmain.c
 // Insert a command in the argc/argv
@@ -99,6 +107,7 @@ const char* hts_optalias[][4] = {
   {"max-files","-m","param",""},
   {"max-size","-M","param",""},
   {"max-time","-E","param",""},
+  {"max-mms-time","-%m","param",""},
   {"max-rate","-A","param",""},
   {"max-pause","-G","param",""},
   {"sockets","-c","param","number of simultaneous connections allowed"},{"socket","-c","param","number of simultaneous connections allowed"},{"connection","-c","param","number of simultaneous connections allowed"},
@@ -109,6 +118,9 @@ const char* hts_optalias[][4] = {
   {"host-control","-H","param",""},
   {"extended-parsing","-%P","param",""},
   {"near","-n","single",""},
+  {"delayed-type-check","-%N","single",""},
+  {"cached-delayed-type-check","-%D","single",""},
+  {"delayed-type-check-always","-%N2","single",""},
   {"disable-security-limits","-%!","single",""},
   {"test","-t","single",""},
   {"list","-%L","param1",""},

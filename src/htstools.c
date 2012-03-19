@@ -91,6 +91,12 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
     } else {
       ok=-2;  // non supporté
     }
+#if HTS_USEMMS
+	} else if (strfield(lien,"mms://")) {
+		if (ident_url_absolute(lien,adr,fil)==-1) {        
+			ok=-1;    // erreur URL
+		}
+#endif
 #if HTS_USEOPENSSL
   } else if (strfield(lien,"https://")) {
     if (SSL_is_available) {
@@ -106,6 +112,9 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
     (!strfield(lien,"http:"))
     && (!strfield(lien,"https:"))
     && (!strfield(lien,"ftp:"))
+#if HTS_USEMMS
+    && (!strfield(lien,"mms:"))
+#endif
     )) {
     ok=-1;      // unknown scheme
   } else {    // c'est un lien relatif
@@ -129,6 +138,12 @@ int ident_url_relatif(char *lien,char* origin_adr,char* origin_fil,char* adr,cha
         lien+=4;
         strcpybuff(adr, "ftp://");   // même adresse forcée en ftp
         strcatbuff(adr, jump_protocol(origin_adr));
+#if HTS_USEMMS
+      } else if (strfield(lien,"mms:")) {
+        lien+=4;
+        strcpybuff(adr, "mms://");   // même adresse forcée en ftp
+        strcatbuff(adr, jump_protocol(origin_adr));
+#endif
       } else {
         strcpybuff(adr,origin_adr);    // même adresse ; et même éventuel protocole
       }
@@ -235,11 +250,7 @@ int lienrelatif(char* s,char* link,char* curr_fil) {
     l=link;
     c=curr;
     // couper ce qui est commun
-#if HTS_CASSE
-    while ((*link==*curr) && (*link!=0)) {link++; curr++; }
-#else
     while ((streql(*link,*curr)) && (*link!=0)) {link++; curr++; }
-#endif
     // mais on veut un répertoirer entier!
     // si on a /toto/.. et /toto2/.. on ne veut pas sauter /toto !
     while(((*link!='/') || (*curr!='/')) && ( link > l)) { link--; curr--; }
@@ -391,7 +402,7 @@ void longfile_to_83(int mode,char* n83,char* save) {
   }
   // corriger vers 8-3
   n83[0]='\0';
-  strncatbuff(n83,nom,8);
+  strncatbuff(n83,nom,max);
   if (strnotempty(ext)) {
     strcatbuff(n83,".");
     strncatbuff(n83,ext,3);    
@@ -478,6 +489,40 @@ HTS_INLINE int __rech_tageq(const char* adr,const char* s) {
       return p+1;
     }
   }
+  return 0;
+}
+
+HTS_INLINE int rech_tageq_all(const char* adr, const char* s) { 
+	int p;
+	char quot = 0;
+	const char *token = NULL;
+	int s_len = (int) strlen(s);
+	if (adr == NULL) {
+		return 0;
+	}
+	for(p = 0 ; adr[p] != 0 ; p++) {
+		if (quot == 0) {
+			if (adr[p] == '"' || adr[p] == '\'' ) {
+				quot = adr[p];
+			} else if (adr[p] == '=' || is_realspace(adr[p]) ) {
+				token = NULL;
+			} else if (adr[p] == '>') {
+				break;
+			} else {				/* note: bogus for bogus foo = bar */
+				if (token == NULL) {
+					if (strncasecmp(&adr[p], s, s_len) == 0 
+						&& (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')
+						) {
+						for( p += s_len ; is_realspace(adr[p]) || adr[p] == '=' ; p++ );
+						return p;
+					}
+					token = &adr[p];
+				}
+			}
+		} else if (adr[p] == quot) {
+			quot = 0;
+		}
+	}
   return 0;
 }
 

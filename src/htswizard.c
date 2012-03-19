@@ -67,7 +67,32 @@ Please visit our Website: http://www.httrack.com
   assertf((*opt->filters.filptr) < opt->maxfilter); \
 } while(0)
 
+typedef struct htspair_t {
+	char *tag;
+	char *attr;
+} htspair_t;
 
+/* "embedded" */
+htspair_t hts_detect_embed[] = {
+	{ "img", "src" },
+	{ "link", "href" },
+
+	/* embedded script hack */
+	{ "script", ".src" },
+
+	/* style */
+	{ "style", "import" },
+
+	{ NULL, NULL }
+};
+
+/* Internal */
+static int hts_acceptlink_(httrackp* opt,
+													int ptr,int lien_tot,lien_url** liens,
+													char* adr,char* fil,
+													char* tag, char* attribute,
+													int* set_prio_to,
+													int* just_test_it);
 
 /*
 httrackp opt	 bloc d'options
@@ -84,19 +109,53 @@ int* set_prio_to
 int* just_test_it
 							 callback optionnel "ne faire que tester ce lien éventuellement"
 retour:
-               0 accepté
-               1 refusé
-               -1 pas d'avis
+0 accepté
+1 refusé
+-1 pas d'avis
 */
+
 int hts_acceptlink(httrackp* opt,
-                   int ptr,int lien_tot,lien_url** liens,
-                   char* adr,char* fil,
-                   char* tag, char* attribute,
-                   int* set_prio_to,
-                   int* just_test_it) {
-  
+									 int ptr,int lien_tot,lien_url** liens,
+									 char* adr,char* fil,
+									 char* tag, char* attribute,
+									 int* set_prio_to,
+									 int* just_test_it) 
+{
+	int forbidden_url = hts_acceptlink_(opt, ptr, lien_tot, liens,
+		adr, fil, tag, attribute, set_prio_to, just_test_it);
+	int prev_prio = set_prio_to ? *set_prio_to : 0;
+
+	// -------------------- PHASE 6 --------------------
+#if HTS_ANALYSTE
+	if (hts_htmlcheck_check != NULL) {
+		int test_url = hts_htmlcheck_check(adr, fil, forbidden_url);
+		if (test_url != -1) {
+			forbidden_url = test_url;
+			if (set_prio_to)
+				*set_prio_to = prev_prio;
+		}
+	}
+#endif
+
+	return forbidden_url;
+}
+
+static int cmp_token(const char *tag, const char *cmp) {
+	int p;
+	return (strncasecmp(tag, cmp, ( p = (int) strlen(cmp) ) ) == 0
+		&& !isalnum((unsigned char) tag[p]));
+}
+
+static int hts_acceptlink_(httrackp* opt,
+													int ptr,int lien_tot,lien_url** liens,
+													char* adr,char* fil,
+													char* tag, char* attribute,
+													int* set_prio_to,
+													int* just_test_it) 
+{
   int forbidden_url=-1;
   int meme_adresse;
+	int embedded_triggered = 0;
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
@@ -119,6 +178,23 @@ int hts_acceptlink(httrackp* opt,
     return 0;  /* Yokai */
   }
   
+  // -------------------- PRELUDE OF PHASE 3-BIS --------------------
+
+	/* Built-in known tags (<img src=..>, ..) */
+	if (forbidden_url != 0 && opt->nearlink && tag != NULL && attribute != NULL) {
+		int i;
+		for(i = 0 ; hts_detect_embed[i].tag != NULL ; i++) {
+			if (cmp_token(tag, hts_detect_embed[i].tag)
+				&& cmp_token(attribute, hts_detect_embed[i].attr)
+				) 
+			{
+				embedded_triggered = 1;
+				break;
+			}
+		}
+	}
+
+
   // -------------------- PHASE 1 --------------------
 
   /* Doit-on traiter les non html? */
@@ -136,7 +212,7 @@ int hts_acceptlink(httrackp* opt,
   
   /* Niveau 1: ne pas parser suivant! */
   if (ptr>0) {
-    if (liens[ptr]->depth <= 1) {
+    if ( ( liens[ptr]->depth <= 0 ) || ( liens[ptr]->depth <= 1 && !embedded_triggered ) ) {
       forbidden_url=1;    // interdire récupération du lien
       if ((opt->debug>1) && (opt->log!=NULL)) {
         fspc(opt->log,"debug"); fprintf(opt->log,"file from too far level ignored at %s : %s"LF,adr,fil);
@@ -146,7 +222,7 @@ int hts_acceptlink(httrackp* opt,
   }
 
   /* en cas d'échec en phase 1, retour immédiat! */
-  if (forbidden_url==1) {
+  if (forbidden_url == 1) {
     return forbidden_url;
   }
   
@@ -394,7 +470,7 @@ int hts_acceptlink(httrackp* opt,
   // -------------------- PHASE 3 --------------------
 
   // récupérer les liens à côtés d'un lien (nearlink) (nvelle pos)
-  if (opt->nearlink) {
+  if (forbidden_url != 0 && opt->nearlink) {
     if (!ishtml(fil)) {  // non html
       //printf("ok %s%s\n",ad,fil);
       forbidden_url=0;    // autoriser
@@ -405,7 +481,20 @@ int hts_acceptlink(httrackp* opt,
       }
     }
   }
-  
+
+  // -------------------- PHASE 3-BIS --------------------
+
+	/* Built-in known tags (<img src=..>, ..) */
+	if (forbidden_url != 0 && embedded_triggered) {
+		forbidden_url=0;    // autoriser
+		may_set_prio_to=1+1; // set prio to 1 (parse but skip urls) if near is the winner
+		if ((opt->debug>1) && (opt->log!=NULL)) {
+			fspc(opt->log,"debug"); fprintf(opt->log,"near link authorized (friendly tag): %s%s"LF,adr,fil);
+			test_flush;
+		}
+	}
+
+
   // -------------------- PHASE 4 --------------------
   
   // ------------------------------------------------------
@@ -479,8 +568,8 @@ int hts_acceptlink(httrackp* opt,
         {
           int jokDepth1=0,jokDepth2=0;
           int jok1=0,jok2=0;
-          jok1  = fa_strjoker(_FILTERS,*_FILTERS_PTR,lfull,NULL,NULL,&jokDepth1);
-          jok2 =  fa_strjoker(_FILTERS,*_FILTERS_PTR,l,    NULL,NULL,&jokDepth2);
+          jok1  = fa_strjoker(/*url*/0, _FILTERS,*_FILTERS_PTR,lfull,NULL,NULL,&jokDepth1);
+          jok2 =  fa_strjoker(/*url*/0, _FILTERS,*_FILTERS_PTR,l,    NULL,NULL,&jokDepth2);
           if (jok2 == 0) {      // #2 doesn't know
             jok = jok1;        // then, use #1
             mdepth = _FILTERS[jokDepth1];
@@ -816,7 +905,11 @@ int hts_acceptlink(httrackp* opt,
   if (just_test_it) {
     if (forbidden_url==1) {
       if (opt->travel&256) {    // tester tout de même
-        if (strfield(adr,"ftp://")==0) {    // PAS ftp!
+        if (strfield(adr,"ftp://")==0
+#if HTS_USEMMS
+					&& strfield(adr,"mms://")==0
+#endif
+					) {    // PAS ftp!
           forbidden_url=1;    // oui oui toujours interdit (note: sert à rien car ==1 mais c pour comprendre)
           *just_test_it=1;     // mais on teste
           if ((opt->debug>1) && (opt->log!=NULL)) {
@@ -828,17 +921,6 @@ int hts_acceptlink(httrackp* opt,
     //adr[0]='\0';  // cancel
   }
 
-  // -------------------- PHASE 6 --------------------
-#if HTS_ANALYSTE
-  {
-    int test_url=hts_htmlcheck_check(adr,fil,forbidden_url);
-    if (test_url!=-1) {
-      forbidden_url=test_url;
-      may_set_prio_to=0;    // clear may-set flag
-    }
-  }
-#endif
-
   // -------------------- FINAL PHASE --------------------
   // Test if the "Near" test won
   if (may_set_prio_to && forbidden_url == 0) {
@@ -846,6 +928,55 @@ int hts_acceptlink(httrackp* opt,
   }
 
   return forbidden_url;
+#undef _FILTERS
+#undef _FILTERS_PTR
+#undef _ROBOTS
+}
+
+int hts_acceptmime(httrackp* opt,
+                   int ptr,int lien_tot,lien_url** liens,
+                   char* adr,char* fil,
+                   char* mime) 
+{
+#define _FILTERS     (*opt->filters.filters)
+#define _FILTERS_PTR (opt->filters.filptr)
+#define _ROBOTS      ((robots_wizard*)opt->robotsptr)
+  int forbidden_url = -1;
+  char* mdepth="";
+  int jokDepth = 0;
+  int jok = 0;
+
+  /* Authorized ? */
+  jok  = fa_strjoker(/*mime*/1, _FILTERS, *_FILTERS_PTR, mime, NULL, NULL, &jokDepth);
+  if (jok != 0) {
+    mdepth = _FILTERS[jokDepth];
+    if (jok == 1) {   // autorisé
+      forbidden_url=0;  // URL autorisée
+      if ((opt->debug>1) && (opt->log!=NULL)) {
+        fspc(opt->log,"debug"); fprintf(opt->log,"(wizard) explicit authorized (%s) link %s%s: mime '%s'"LF,mdepth,adr,fil,mime);
+        test_flush;
+      }
+    } else if (jok == -1) {  // forbidden
+      forbidden_url=1;   // URL interdite
+      if ((opt->debug>1) && (opt->log!=NULL)) {
+        fspc(opt->log,"debug"); fprintf(opt->log,"(wizard) explicit forbidden (%s) link %s%s: mime '%s'"LF,mdepth,adr,fil,mime);
+        test_flush;
+      }
+    }  // sinon on touche à rien
+  }
+  /* userdef test */
+#if HTS_ANALYSTE
+  if (hts_htmlcheck_check_mime != NULL) {
+    int test_url=hts_htmlcheck_check_mime(adr,fil,mime,forbidden_url);
+    if (test_url!=-1) {
+      forbidden_url=test_url;
+    }
+  }
+#endif
+  return forbidden_url;
+#undef _FILTERS
+#undef _FILTERS_PTR
+#undef _ROBOTS
 }
 
 // tester taille
@@ -873,17 +1004,14 @@ int hts_testlinksize(httrackp* opt,
       if (*fil!='/') strcatbuff(l,"/");
       strcatbuff(lfull,fil);
       
-      // tester filtres (taille)
-      // jok = fa_strjoker(opt->filters.filters,*opt->filters.filptr,l,&sz,&size_flag,NULL);
-
       // filters, 0=sait pas 1=ok -1=interdit
       {
         int jokDepth1=0,jokDepth2=0;
         int jok1=0,jok2=0;
         LLint sz1=size,sz2=size;
         int size_flag1=0,size_flag2=0;
-        jok1  = fa_strjoker(*opt->filters.filters,*opt->filters.filptr,lfull,&sz1,&size_flag1,&jokDepth1);
-        jok2 =  fa_strjoker(*opt->filters.filters,*opt->filters.filptr,l,    &sz2,&size_flag2,&jokDepth2);
+        jok1  = fa_strjoker(/*url*/0, *opt->filters.filters,*opt->filters.filptr,lfull,&sz1,&size_flag1,&jokDepth1);
+        jok2 =  fa_strjoker(/*url*/0, *opt->filters.filters,*opt->filters.filptr,l,    &sz2,&size_flag2,&jokDepth2);
         if (jok2 == 0) {      // #2 doesn't know
           jok = jok1;        // then, use #1
           sz = sz1;
