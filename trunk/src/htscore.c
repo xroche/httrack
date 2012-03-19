@@ -1044,8 +1044,9 @@ int httpmirror(char* url1, httrackp* opt) {
         // ------------------------------------
         // BOGUS MIME TYPE HACK II (the revenge)
         // Check if we have a bogus MIME type
-        if ( (is_hypertext_mime(opt,r.contenttype, urlfil))   /* Is HTML or Js, .. */
-          || (may_be_hypertext_mime(opt,r.contenttype, urlfil))  /* Is real media, .. */
+        if (HTTP_IS_OK(r.statuscode) &&
+          (is_hypertext_mime(opt,r.contenttype, urlfil)   /* Is HTML or Js, .. */
+          || may_be_hypertext_mime(opt,r.contenttype, urlfil))  /* Is real media, .. */
           ) {
           if ((r.adr) && (r.size)) {
             unsigned int map[256];
