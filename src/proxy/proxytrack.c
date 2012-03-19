@@ -1365,10 +1365,7 @@ static int proxytrack_process_HTTP_threaded(PT_Indexes indexes, T_SOC soc) {
 static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
 	while(soc != INVALID_SOCKET) {
     T_SOC soc_c;
-		struct sockaddr clientAddr;
-		int clientAddrLen = sizeof(struct sockaddr);
-		memset(&clientAddr, 0, sizeof(clientAddr));
-		if ( (soc_c = (T_SOC) accept(soc, &clientAddr, &clientAddrLen)) != INVALID_SOCKET) {
+		if ( (soc_c = (T_SOC) accept(soc, NULL, NULL)) != INVALID_SOCKET) {
 			if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
 				CRITICAL("proxytrack_start_HTTP::Can not fork a thread");
 			}

@@ -1605,11 +1605,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               return 0;
               break;
             case '~': /* internal lib test */
-              {
-                char thisIsATestYouShouldSeeAnError[12];
-                strcpybuff(thisIsATestYouShouldSeeAnError, "0123456789012345678901234567890123456789");
-                return 0;
-              }
+              //Disabled because choke on GCC 4.3 (toni from links2linux.de)
+              //{
+              //  char thisIsATestYouShouldSeeAnError[12];
+              //  const char *const bufferOverflowTest = "0123456789012345678901234567890123456789";
+              //  strcpybuff(thisIsATestYouShouldSeeAnError, bufferOverflowTest);
+              //  return 0;
+              //}
               break;
             case 'f': opt->flush=1; break;
             case 'h':
