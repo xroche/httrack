@@ -1,6 +1,6 @@
 AC_INIT(src/httrack.c)
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(httrack, 3.45.2)
+AM_INIT_AUTOMAKE(httrack, 3.45.3)
 VERSION_INFO="2:45:0"
 AM_MAINTAINER_MODE
 
