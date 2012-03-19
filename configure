@@ -1776,7 +1776,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=httrack
- VERSION=3.40.4
+ VERSION=3.41.20
 
 
 cat >>confdefs.h <<_ACEOF
@@ -1902,7 +1902,7 @@ INSTALL_STRIP_PROGRAM="\${SHELL} \$(install_sh) -c -s"
 
 
 
-VERSION_INFO="1:40:0"
+VERSION_INFO="2:41:0"
 echo "$as_me:$LINENO: checking whether to enable maintainer-specific portions of Makefiles" >&5
 echo $ECHO_N "checking whether to enable maintainer-specific portions of Makefiles... $ECHO_C" >&6
     # Check whether --enable-maintainer-mode or --disable-maintainer-mode was given.
@@ -19038,28 +19038,12 @@ DEFAULT_CFLAGS="-O -g3 -Wall -Wcast-align -Wstrict-prototypes \
 
 
 ### Check for platform
-case $host in
-AIX)
-cat >>confdefs.h <<\_ACEOF
-#define HTS_PLATFORM 1
-_ACEOF
-;;
-*-solaris*)
-cat >>confdefs.h <<\_ACEOF
-#define HTS_PLATFORM 2
-_ACEOF
-;;
-*-linux-gnu | *-irix6*)
-cat >>confdefs.h <<\_ACEOF
-#define HTS_PLATFORM 3
-_ACEOF
-;;
-*)
-cat >>confdefs.h <<\_ACEOF
-#define HTS_PLATFORM 3
-_ACEOF
-;;
-esac
+#case $host in
+#AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
+#*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
+#*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
+#*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
+#esac
 
 ### Check size of long and long long.
 echo "$as_me:$LINENO: checking for long" >&5
@@ -21655,7 +21639,7 @@ _ACEOF
 
 fi
 
-                                                                                ac_config_files="$ac_config_files Makefile src/Makefile man/Makefile m4/Makefile libtest/Makefile templates/Makefile lang/Makefile html/Makefile"
+                                                                                ac_config_files="$ac_config_files Makefile src/Makefile man/Makefile m4/Makefile templates/Makefile lang/Makefile html/Makefile libtest/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -22223,10 +22207,10 @@ do
   "src/Makefile" ) CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
   "man/Makefile" ) CONFIG_FILES="$CONFIG_FILES man/Makefile" ;;
   "m4/Makefile" ) CONFIG_FILES="$CONFIG_FILES m4/Makefile" ;;
-  "libtest/Makefile" ) CONFIG_FILES="$CONFIG_FILES libtest/Makefile" ;;
   "templates/Makefile" ) CONFIG_FILES="$CONFIG_FILES templates/Makefile" ;;
   "lang/Makefile" ) CONFIG_FILES="$CONFIG_FILES lang/Makefile" ;;
   "html/Makefile" ) CONFIG_FILES="$CONFIG_FILES html/Makefile" ;;
+  "libtest/Makefile" ) CONFIG_FILES="$CONFIG_FILES libtest/Makefile" ;;
   "depfiles" ) CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5

@@ -34,7 +34,7 @@ EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	httrack.css
 
 install-data-hook:
-	if test ! -f $(DESTDIR)$(prefix)/share/httrack/html ; then \
+	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
 		( cd $(DESTDIR)$(prefix)/share/httrack \
 			&& mv -f ../doc/httrack/html html \
 			&& cd ../doc/httrack/ \

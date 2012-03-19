@@ -40,10 +40,10 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version
-#define HTTRACK_VERSION      "3.40-2"
-#define HTTRACK_VERSIONID    "3.40.4"
+#define HTTRACK_VERSION      "3.41"
+#define HTTRACK_VERSIONID    "3.41.20"
 #define HTTRACK_AFF_VERSION  "3.x"
-//#define HTTRACK_AFF_WARNING  "This is a BETA release of WinHTTrack Website Copier ("HTTRACK_VERSION")\nPlease report any crashes, bugs or problems"
+#define HTTRACK_LIB_VERSION  "2.0"
 
 #ifndef HTS_NOINCLUDES
 #ifndef _WIN32_WCE
@@ -61,7 +61,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 // Définition plate-forme
-#include "htssystem.h"
 #include "htsconfig.h"
 
 // WIN32 types
@@ -90,6 +89,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
+#define S_ISDIR(m) ((m) & _S_IFDIR)
 #endif
 
 #else
@@ -164,21 +164,6 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-// Socket windows ou socket unix
-#ifdef _WIN32
-#undef HTS_PLATFORM
-#define HTS_PLATFORM 1
-#define HTS_WIN 1
-
-#else
-
-#define HTS_WIN 0
-#ifdef __linux
-#undef HTS_PLATFORM
-#define HTS_PLATFORM 3
-#endif
-#endif
-
 // don't spare memory usage by default
 #ifndef HTS_SPARE_MEMORY
 #define HTS_SPARE_MEMORY 0
@@ -189,7 +174,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 // compatibilité DOS
-#if HTS_WIN
+#ifdef _WIN32
 #define HTS_DOSNAME 1
 #else
 #define HTS_DOSNAME 0
@@ -224,30 +209,13 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USESWF 1
 #endif
 
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #define __cdecl
 #endif
 
-#ifdef HTS_ANALYSTE_CONSOLE
-#undef HTS_ANALYSTE_CONSOLE
-#define HTS_ANALYSTE_CONSOLE 1
-#endif
-
-#if HTS_ANALYSTE
-#else
-#if HTS_WIN
-#else
-#undef HTS_ANALYSTE
-// Analyste
-#define HTS_ANALYSTE 1
-#define HTS_ANALYSTE_CONSOLE 1
-#endif
-#endif
-
-
 /* rc file */
-#if HTS_WIN
+#ifdef _WIN32
 #define HTS_HTTRACKRC "httrackrc"
 #else
 
@@ -292,14 +260,14 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Copyright (C) Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2006]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2007]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"
 
 #define H_CRLF "\x0d\x0a"
 #define CRLF   "\x0d\x0a"
-#if HTS_WIN
+#ifdef _WIN32
 #define LF "\x0d\x0a"
 #else
 #define LF "\x0a"
@@ -350,22 +318,23 @@ Please visit our Website: http://www.httrack.com
   typedef LLINT_TYPE TStamp;
   #define LLintP LLINT_FORMAT
 #else
- #if HTS_WIN
-  typedef __int64 LLint;
-  typedef __int64 TStamp;
-  #define LLintP "%I64d"
- #else
- #if HTS_PLATFORM==0
+
+#ifdef _WIN32
+ typedef __int64 LLint;
+ typedef __int64 TStamp;
+ #define LLintP "%I64d"
+#elif (defined(__x86_64__) || defined(_LP64) || defined(__64BIT__))
+  typedef unsigned long int LLint;
+  typedef unsigned long int TStamp;
+  #define LLintP "%ld"
+#else
   typedef long long int LLint;
   typedef long long int TStamp;
   #define LLintP "%lld"
- #else
-  typedef long long int LLint;
-  typedef long long int TStamp;
-  #define LLintP "%Ld"
- #endif
- #endif
 #endif
+
+#endif  /* HTS_LONGLONG */
+
 #else
  typedef int LLint;
  #define LLintP "%d"
@@ -383,6 +352,16 @@ typedef int INTsys;
 #define INTsysP "%d"
 #endif
 
+#ifdef _WIN32
+#if defined(_WIN64)
+typedef unsigned __int64 T_SOC;
+#else
+typedef unsigned __int32 T_SOC;
+#endif
+#else
+typedef int T_SOC;
+#endif
+
 /* Default alignement */
 #ifndef HTS_ALIGN
 #define HTS_ALIGN (sizeof(void*))
@@ -391,7 +370,7 @@ typedef int INTsys;
 /* IPV4, IPV6 and various unified structures */
 #define HTS_MAXADDRLEN 64
 
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #define __cdecl 
 #endif
@@ -440,43 +419,26 @@ typedef int INTsys;
 #define TAILLE_BUFFER 8192
 #endif
 
-#if HTS_WIN
-#else
-// use pthreads.h
-
-#ifndef THREADS
-#define HTS_DO_NOT_USE_PTHREAD
-#endif
-
 #ifdef HTS_DO_NOT_USE_PTHREAD
-#define USE_PTHREAD 0
-#else
-#define USE_PTHREAD 1
+#error needs threads support
 #endif
-#endif
-
-#if HTS_WIN
 #define USE_BEGINTHREAD 1
-#else
-#if USE_PTHREAD
-#define USE_BEGINTHREAD 1
-#else
-/* sh*t.. */
-#define USE_BEGINTHREAD 0
-#endif
-#endif
 
 #ifdef _DEBUG
 // trace mallocs
 //#define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
 typedef unsigned long int t_htsboundary;
-typedef struct mlink {
+#ifndef HTS_DEF_FWSTRUCT_mlink
+#define HTS_DEF_FWSTRUCT_mlink
+typedef struct mlink mlink;
+#endif
+struct mlink {
   char* adr;
   int len;
   int id;
   struct mlink* next;
-} mlink;
+};
 static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
 #endif

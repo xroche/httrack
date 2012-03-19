@@ -4,7 +4,7 @@
 # Initializes the htsserver GUI frontend and launch the default browser
 
 BROWSEREXE=
-SRCHBROWSEREXE="x-www-browser www-browser mozilla firefox firebird galeon konqueror opera netscape"
+SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox firebird galeon konqueror opera netscape"
 if test -n "${BROWSER}"; then
 # sensible-browser will f up if BROWSER is not set
 SRCHBROWSEREXE="sensible-browser ${SRCHBROWSEREXE}"
@@ -23,6 +23,8 @@ return 0
 
 function mozillabrowser {
 # returns 0, if the browser is mozilla type
+echo "$1" | grep -q "iceape"
+[ $? -eq 0 ] && return 0 
 echo "$1" | grep -q "mozilla"
 [ $? -eq 0 ] && return 0 
 echo "$1" | grep -q "netscape"
@@ -39,7 +41,7 @@ if ! test -n "${user_name}"; then
 user_name=`id -un`
 fi
 if test -n "${user_name}"; then
-ps -e --user "$user_name" | grep -qE "(mozilla|netscape|firebird|firefox)"
+ps -e --user "$user_name" | grep -qE "(iceape|mozilla|netscape|firebird|firefox)"
 else
 false
 fi

@@ -25,10 +25,9 @@
 #include "htsdefines.h"
 
 /* Local function definitions */
-static int process(t_hts_callbackarg *carg, httrackp *opt, 
-                   char* buff, const char* adr, const char* fil, 
-                   const char* referer_adr, const char* referer_fil, 
-                   htsblk* incoming);
+static int postprocess(t_hts_callbackarg *carg, httrackp *opt, 
+                       char** html, int* len,
+                       const char* url_address, const char* url_file);
 
 /* external functions */
 EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
@@ -42,25 +41,25 @@ EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
     arg++;
 
   /* Plug callback functions */
-  CHAIN_FUNCTION(opt, receivehead, process, NULL);
+  CHAIN_FUNCTION(opt, postprocess, postprocess, NULL);
 
   return 1;  /* success */
 }
 
-static int process(t_hts_callbackarg *carg, httrackp *opt, 
-                   char* buff, const char* adr, const char* fil, 
-                   const char* referer_adr, const char* referer_fil, 
-                   htsblk* incoming) {
+static int postprocess(t_hts_callbackarg *carg, httrackp *opt, char** html,int* len,const char* url_address,const char* url_file) {
+  char *old = *html;
 
   /* Call parent functions if multiple callbacks are chained. */
-  if (CALLBACKARG_PREV_FUN(carg, receivehead) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, receivehead)(CALLBACKARG_PREV_CARG(carg), opt, buff, adr, fil, referer_adr, referer_fil, incoming)) {
-      return 0;  /* Abort */
+  if (CALLBACKARG_PREV_FUN(carg, postprocess) != NULL) {
+    if (CALLBACKARG_PREV_FUN(carg, postprocess)(CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
+      /* Modified *html */
+      old = *html;
     }
   }
 
   /* Process */
-  printf("[ %s%s ]\n%s\n", adr, fil, buff);
+  *html = strdup(*html);
+  hts_free(old);
 
-  return 1;   /* success */
+  return 1;
 }

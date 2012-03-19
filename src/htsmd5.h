@@ -44,7 +44,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int domd5mem(const unsigned char * buf, int len, 
+int domd5mem(const unsigned char * buf, size_t len, 
 						 unsigned char * digest, int asAscii);
 unsigned long int md5sum32(const char* buff);
 #endif

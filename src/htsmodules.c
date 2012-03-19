@@ -41,7 +41,10 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsmodules.h"
 #include "htsopt.h"
-extern int fspc(FILE* fp,char* type);
+#include "htsbasenet.h"
+#include "htslib.h"
+
+extern int fspc(httrackp *opt,FILE* fp,const char* type);
 
 #ifndef _WIN32
 #if HTS_DLOPEN
@@ -52,22 +55,9 @@ extern int fspc(FILE* fp,char* type);
 /* >>> Put all modules definitions here */
 #include "htszlib.h"
 #include "htsbase.h"
-
-typedef int (*t_hts_detect_swf)(htsmoduleStruct* str);
-typedef int (*t_hts_parse_swf)(htsmoduleStruct* str);
-/* <<< */
-
-/* >>> Put all modules includes here */
-#include "htsjava.h"
-#if HTS_USESWF
-#endif
 /* <<< */
 
 /* >>> Put all modules variables here */
-
-int swf_is_available = 0;
-t_hts_detect_swf hts_detect_swf = NULL;
-t_hts_parse_swf hts_parse_swf = NULL;
 
 int gz_is_available = 0;
 #if 0
@@ -98,8 +88,27 @@ t_SSL_load_error_strings SSL_load_error_strings = NULL;
 
 int V6_is_available = HTS_INET6;
 
-char WHAT_is_available[64]="";
+static char WHAT_is_available[64]="";
 /* <<< */
+
+HTSEXT_API const char* hts_get_version_info(httrackp *opt) {
+  size_t size;
+  int i;
+  strcpy(opt->state.HTbuff, WHAT_is_available);
+  size = strlen(opt->state.HTbuff);
+  for(i = 0 ; i < opt->libHandles.count ; i++) {
+    const char *name = opt->libHandles.handles[i].moduleName;
+    if (name != NULL) {
+      size_t nsize = strlen(name) + sizeof("+");
+      size += nsize;
+      if (size + 1 >= sizeof(opt->state.HTbuff))
+        break;
+      strcat(opt->state.HTbuff, "+");
+      strcat(opt->state.HTbuff, name);
+    }
+  }
+  return opt->state.HTbuff;
+}
 
 /* memory checks */
 HTSEXT_API htsErrorCallback htsCallbackErr = NULL;
@@ -119,44 +128,39 @@ void abortLog__fnc(char* msg, char* file, int line) {
 }
 HTSEXT_API t_abortLog abortLog__ = abortLog__fnc;    /* avoid VC++ inlining */
 
-static void htspe_log(htsmoduleStruct* str, char* msg);
+static void htspe_log(htsmoduleStruct* str, const char* msg);
 
 int hts_parse_externals(htsmoduleStruct* str) {
-  /* >>> Put all module calls here */
+  str->wrapper_name = "wrapper-lib";
 
-  /* JAVA */
-  if (hts_detect_java(str)) {
-    htspe_log(str, "java-lib");
-    return hts_parse_java(str);
+  /* External callback */
+  if (RUN_CALLBACK1(str->opt, detect, str)) {
+    if (str->wrapper_name == NULL)
+      str->wrapper_name = "wrapper-lib";
+    /* Blacklisted */
+    if (multipleStringMatch(str->wrapper_name, StringBuff(str->opt->mod_blacklist))) {
+      return -1;
+    } else {
+      htspe_log(str, str->wrapper_name);
+      return RUN_CALLBACK1(str->opt, parse, str);
+    }
   }
 
-#if HTS_USESWF
-  /* FLASH 
-   (external module derivated from Macromedia(tm)'s classes) 
-  */
-  else if (swf_is_available && hts_detect_swf(str)) {
-    htspe_log(str, "swf-lib");
-    return hts_parse_swf(str);
-  }
-#endif
-
-  /* <<< */
-  
   /* Not detected */
   return -1;
 }
 
-static void addCallback(htscallbacks* chain, void* moduleHandle, htscallbacksfncptr exitFnc) {
-  while(chain->next != NULL) {
-    chain = chain->next;
-  }
-  chain->next = calloct(1, sizeof(htscallbacks));
-  assertf(chain->next != NULL);
-  chain = chain->next;
-  memset(chain, 0, sizeof(*chain));
-  chain->exitFnc = exitFnc;
-  chain->moduleHandle = moduleHandle;
-}
+//static void addCallback(htscallbacks* chain, void* moduleHandle, htscallbacksfncptr exitFnc) {
+//  while(chain->next != NULL) {
+//    chain = chain->next;
+//  }
+//  chain->next = calloct(1, sizeof(htscallbacks));
+//  assertf(chain->next != NULL);
+//  chain = chain->next;
+//  memset(chain, 0, sizeof(*chain));
+//  chain->exitFnc = exitFnc;
+//  chain->moduleHandle = moduleHandle;
+//}
 
 void clearCallbacks(htscallbacks* chain_);
 void clearCallbacks(htscallbacks* chain_) {
@@ -189,116 +193,67 @@ void clearCallbacks(htscallbacks* chain_) {
   chain_->next = NULL;    // Empty
 }
 
-void* getFunctionPtr(httrackp* opt, char* file_, char* fncname);
-void* getFunctionPtr(httrackp* opt, char* file_, char* fncname) {
-  char BIGSTK file[1024];
+void* openFunctionLib(const char* file_) {
   void* handle;
-  void* userfunction = NULL;
-  strcpybuff(file, file_);
+  char *file = malloct(strlen(file_) + 32);
+  strcpy(file, file_);
 #ifdef _WIN32
-  handle = LoadLibraryA((char*)file);
+  handle = LoadLibraryA(file);
   if (handle == NULL) {
-    strcatbuff(file, ".dll");
-    handle = LoadLibraryA((char*)file);
+    sprintf(file, "%s.dll", file_);
+    handle = LoadLibraryA(file);
   }
 #else
   handle = dlopen(file, RTLD_LAZY);
   if (handle == NULL) {
-    strcatbuff(file, ".so");
+    sprintf(file, "lib%s.so", file_);
     handle = dlopen(file, RTLD_LAZY);
   }
 #endif
+  freet(file);
+  return handle;
+}
+
+void closeFunctionLib(void* handle) {
+#ifdef _WIN32
+  FreeLibrary(handle);
+#else
+  dlclose(handle);
+#endif
+}
+
+void* getFunctionPtr(void* handle, const char* fncname_) {
   if (handle) {
-    /* Thanks to Lars Clausen for the "wrapper-init" patch */
-    /* If given arguments, call "<wrappername>_init" */
-    char BIGSTK tmpName[1024];
+    void* userfunction = NULL;
+    char *fncname = strdupt(fncname_);
+
+    /* Strip optional comma */
     char *comma;
     if ((comma = strchr(fncname, ',')) != NULL) {   /* empty arg */
       *comma++ = '\0';
     }
     
-    /* speficic plug init */
-    {
-      t_htsWrapperPlugInit initfunction;
-      sprintf(tmpName, "%s_init", fncname);
-      initfunction = (t_htsWrapperPlugInit)DynamicGet(handle, (char*)tmpName);
-      if (initfunction  != NULL) {
-        int result = (int) initfunction(comma);
-        if (!result) {
-          if (userfunction == NULL) {
-#ifdef _WIN32
-            FreeLibrary(handle);
-#else
-            dlclose(handle);
-#endif
-          }
-          return NULL;
-        }       
-      }
-    }
-    /* wrapper_init() */
-    {
-      t_htsWrapperInit initfunction = (t_htsWrapperInit)DynamicGet(handle, (char*)"wrapper_init");
-      if (initfunction != NULL) {
-        if (! initfunction(fncname, comma)) {
-          if (userfunction == NULL) {
-#ifdef _WIN32
-            FreeLibrary(handle);
-#else
-            dlclose(handle);
-#endif
-          }
-          return NULL;
-        }
-      }
-    }
     /* the function itself */
     userfunction = (void*) DynamicGet(handle, (char*)fncname);
-    if (userfunction == NULL) {
-#ifdef _WIN32
-      FreeLibrary(handle);
-#else
-      dlclose(handle);
-#endif
-    } else {
-      /* optional exit wrapper */
-      t_htsWrapperExit exitFnc = (t_htsWrapperExit) DynamicGet(handle, (char*)"wrapper_exit");
-      addCallback(&opt->state.callbacks, handle, exitFnc);      // exitFnc can be null
-    }
+
+    freet(fncname);
+
+    return userfunction;
   }
-  return userfunction;
+  return NULL;
 }
 
-void htspe_init() {
+void* ssl_handle = NULL;
+#ifdef _WIN32
+void* ssl_handle_2 = NULL;
+#endif
+void htspe_init(void) {
   static int initOk = 0;
   if (!initOk) {
     initOk = 1;
     
-    /* >>> Put all module initializations here */
-    
-
-    /* Zlib */
+    /* Zlib is now statically linked */
     gz_is_available = 1;
-    /*
-#if HTS_DLOPEN
-    {
-      void* handle;
-#ifdef _WIN32
-      handle = LoadLibrary("zlib");
-#else
-      handle = dlopen("libz.so.1", RTLD_LAZY);
-#endif
-      if (handle) {
-        gzopen = (t_gzopen) DynamicGet(handle, "gzopen");
-        gzread = (t_gzread) DynamicGet(handle, "gzread");
-        gzclose = (t_gzclose) DynamicGet(handle, "gzclose");
-        if (gzopen && gzread && gzclose) {
-          gz_is_available = 1;
-        }
-      }
-    }
-#endif
-    */
 
     /* OpenSSL */
 #if HTS_DLOPEN
@@ -317,9 +272,14 @@ void htspe_init() {
       }
       if (handle == NULL) {
         /* Try harder */
+        handle = dlopen("libssl.so", RTLD_LAZY);
+      }
+      if (handle == NULL) {
+        /* Try harder */
         handle = dlopen("libssl.so.0", RTLD_LAZY);
       }
 #endif
+      ssl_handle = handle;
       if (handle) {
         SSL_shutdown = (t_SSL_shutdown) DynamicGet(handle, (char*)"SSL_shutdown");
         SSL_free = (t_SSL_free) DynamicGet(handle, (char*)"SSL_free");
@@ -339,6 +299,7 @@ void htspe_init() {
         SSL_CTX_ctrl = (t_SSL_CTX_ctrl) DynamicGet(handle, (char*)"SSL_CTX_ctrl");
 #ifdef _WIN32
         handle = LoadLibraryA((char*)"libeay32");
+        ssl_handle_2 = handle;
 #endif
         ERR_load_crypto_strings = (t_ERR_load_crypto_strings) DynamicGet(handle, (char*)"ERR_load_crypto_strings");
         ERR_error_string = (t_ERR_error_string) DynamicGet(handle, (char*)"ERR_error_string");
@@ -354,53 +315,35 @@ void htspe_init() {
 #endif
     /* */
     
-    /* 
-    FLASH
-    Load the library on-the-fly, if available
-    If not, that's not a problem
-    */
-#if HTS_DLOPEN
-    {
-#ifdef _WIN32
-      void* handle = LoadLibraryA((char*)"htsswf");
-#else
-      void* handle = dlopen("libhtsswf.so.1", RTLD_LAZY);
-#endif
-      if (handle) {
-        hts_detect_swf = (t_hts_detect_swf) DynamicGet(handle, "hts_detect_swf");
-        hts_parse_swf = (t_hts_parse_swf) DynamicGet(handle, "hts_parse_swf");
-        if (hts_detect_swf && hts_parse_swf) {
-          swf_is_available = 1;
-        }
-      }
-      // FreeLibrary(handle);
-      // dlclose(handle);
-    }
-#endif
-
-    /* <<< */
-
     /* Options availability */
-    sprintf(WHAT_is_available, "%s%s%s%s",
+    sprintf(WHAT_is_available, "%s%s%s",
       V6_is_available ? "" : "-noV6",
       gz_is_available ? "" : "-nozip",
-      SSL_is_available ? "" : "-nossl",
-      swf_is_available ? "+swf" : "");
-
-    
+      SSL_is_available ? "" : "-nossl");
   }
 }
 
-static void htspe_log(htsmoduleStruct* str, char* msg) {
-  char* savename = str->filename;
+void htspe_uninit(void) {
+#ifdef _WIN32
+  CloseHandle(ssl_handle);
+  CloseHandle(ssl_handle_2);
+  ssl_handle = NULL;
+  ssl_handle_2 = NULL;
+#else
+  dlclose(ssl_handle);
+  ssl_handle = NULL;
+#endif
+}
+
+static void htspe_log(htsmoduleStruct* str, const char* msg) {
+  const char* savename = str->filename;
   httrackp* opt = (httrackp*) str->opt;
   if ((opt->debug>1) && (opt->log!=NULL)) {
-    fspc(opt->log,"debug"); fprintf(opt->log,"(External module): parsing %s using module %s"LF, 
+    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(External module): parsing %s using module %s"LF, 
       savename, msg);
   }
 }
 
-HTSEXT_API const char* hts_is_available(void);
 HTSEXT_API const char* hts_is_available(void) {
   return WHAT_is_available;
 }

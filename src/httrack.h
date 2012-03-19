@@ -37,12 +37,14 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSTOOLS_DEFH
 #define HTSTOOLS_DEFH 
 
-#if HTS_ANALYSTE_CONSOLE
-
 #include "htsglobal.h"
 #include "htscore.h"
 
-typedef struct t_StatsBuffer {
+#ifndef HTS_DEF_FWSTRUCT_t_StatsBuffer
+#define HTS_DEF_FWSTRUCT_t_StatsBuffer
+typedef struct t_StatsBuffer t_StatsBuffer;
+#endif
+struct t_StatsBuffer {
   char name[1024];
   char file[1024];
   char state[256];
@@ -56,9 +58,13 @@ typedef struct t_StatsBuffer {
   int back;
   //
   int actived;    // pour disabled
-} t_StatsBuffer;
+};
 
-typedef struct t_InpInfo {
+#ifndef HTS_DEF_FWSTRUCT_t_InpInfo
+#define HTS_DEF_FWSTRUCT_t_InpInfo
+typedef struct t_InpInfo t_InpInfo;
+#endif
+struct t_InpInfo {
   int ask_refresh;
   int refresh;
   LLint stat_bytes;
@@ -76,38 +82,9 @@ typedef struct t_InpInfo {
   int stat_infos;
   TStamp stat_timestart;
   int stat_back;
-} t_InpInfo;
-
-// wrappers
-static void  __cdecl htsshow_init(void);
-static void  __cdecl htsshow_uninit(void);
-static int   __cdecl htsshow_start(httrackp* opt);
-static int   __cdecl htsshow_chopt(httrackp* opt);
-static int   __cdecl htsshow_end(void);
-static int   __cdecl htsshow_preprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier);
-static int   __cdecl htsshow_postprocesshtml(char** html,int* len,char* url_adresse,char* url_fichier);
-static int   __cdecl htsshow_checkhtml(char* html,int len,char* url_adresse,char* url_fichier);
-static int   __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats);
-static char* __cdecl htsshow_query(char* question);
-static char* __cdecl htsshow_query2(char* question);
-static char* __cdecl htsshow_query3(char* question);
-static int   __cdecl htsshow_check(char* adr,char* fil,int status);
-static int   __cdecl htsshow_check_mime(char* adr,char* fil,char* mime,int status);
-static void  __cdecl htsshow_pause(char* lockfile);
-static void  __cdecl htsshow_filesave(char* file);
-static void  __cdecl htsshow_filesave2(char* adr, char* fil, char* save, int is_new, int is_modified,int not_updated);
-static int   __cdecl htsshow_linkdetected(char* link);
-static int   __cdecl htsshow_linkdetected2(char* link, char* start_tag);
-static int   __cdecl htsshow_xfrstatus(lien_back* back);
-static int   __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-static int   __cdecl htsshow_sendheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
-static int   __cdecl htsshow_receiveheader(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
+};
 
 int main(int argc, char **argv);
-static void vt_color(int text,int back);
-static void vt_clear(void);
-static void vt_home(void);
-
 #endif
 
 /* */
@@ -269,6 +246,3 @@ extern HTSEXT_API t_abortLog abortLog__;
 #define strdupt(A)          strdup(A)
 #define realloct(A,B)       ( ((A) != NULL) ? realloc((A), (B)) : malloc(B) )
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
-
-#endif
-

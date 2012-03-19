@@ -38,14 +38,24 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH 
 
-#include "htsglobal.h"
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-HTSEXT_API int htswrap_init(void);
-HTSEXT_API int htswrap_add(char* name,void* fct);
-HTSEXT_API int htswrap_free(void);
-HTSEXT_API unsigned long int htswrap_read(char* name);
+
+#include "htsglobal.h"
+#include "htsinthash.h"
+
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+
+HTSEXT_API int htswrap_init(void);	// LEGACY
+HTSEXT_API int htswrap_free(void);	// LEGACY
+
+HTSEXT_API int htswrap_add(httrackp *opt, const char* name, void* fct);
+HTSEXT_API uintptr_t htswrap_read(httrackp *opt, const char* name);
+
 #endif
 
 #endif

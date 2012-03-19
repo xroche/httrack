@@ -36,8 +36,27 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include "htsglobal.h"
 
-typedef struct htsmoduleStructExtended {
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_htsblk
+#define HTS_DEF_FWSTRUCT_htsblk
+typedef struct htsblk htsblk;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_robots_wizard
+#define HTS_DEF_FWSTRUCT_robots_wizard
+typedef struct robots_wizard robots_wizard;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_hash_struct
+#define HTS_DEF_FWSTRUCT_hash_struct
+typedef struct hash_struct hash_struct;
+#endif
+
+#ifndef HTS_DEF_FWSTRUCT_htsmoduleStructExtended
+#define HTS_DEF_FWSTRUCT_htsmoduleStructExtended
+typedef struct htsmoduleStructExtended htsmoduleStructExtended;
+#endif
+struct htsmoduleStructExtended {
   /* Main object */
   htsblk* r_;
 
@@ -81,7 +100,7 @@ typedef struct htsmoduleStructExtended {
   TStamp* last_info_shell_;
   int* info_shell_;
 
-} htsmoduleStructExtended;
+};
 
 
 /* Library internal definictions */
@@ -115,6 +134,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
 */
 int hts_wait_delayed(htsmoduleStruct* str, 
                      char* adr, char* fil, char* save, 
+                     char* parent_adr, char* parent_fil,
                      char* former_adr, char* former_fil, 
                      int* forbidden_url);
 
@@ -122,49 +142,49 @@ int hts_wait_delayed(htsmoduleStruct* str,
 /* Context state */
 
 #define ENGINE_LOAD_CONTEXT_BASE() \
-  lien_url** liens = (lien_url**) str->liens; \
-  httrackp* opt = (httrackp*) str->opt; \
-  struct_back* sback = (struct_back*) str->sback; \
-  lien_back* const back = sback->lnk; \
-  const int back_max = sback->count; \
-  cache_back* cache = (cache_back*) str->cache; \
-  hash_struct* hashptr = (hash_struct*) str->hashptr; \
-  int numero_passe = str->numero_passe; \
-  int add_tab_alloc = str->add_tab_alloc; \
+  lien_url** const liens HTS_UNUSED = (lien_url**) str->liens; \
+  httrackp* const opt HTS_UNUSED = (httrackp*) str->opt; \
+  struct_back* const sback HTS_UNUSED = (struct_back*) str->sback; \
+  lien_back* const back HTS_UNUSED = sback->lnk; \
+  const int back_max HTS_UNUSED = sback->count; \
+  cache_back* const cache HTS_UNUSED = (cache_back*) str->cache; \
+  hash_struct* const hashptr HTS_UNUSED = (hash_struct*) str->hashptr; \
+  const int numero_passe HTS_UNUSED = str->numero_passe; \
+  const int add_tab_alloc HTS_UNUSED = str->add_tab_alloc; \
   /* */ \
-  int lien_tot = * ( (int*) (str->lien_tot_) ); \
-  int ptr = * ( (int*) (str->ptr_) ); \
-  int lien_size = * ( (int*) (str->lien_size_) ); \
-  char* lien_buffer = * ( (char**) (str->lien_buffer_) )
+  int lien_tot HTS_UNUSED = *str->lien_tot_; \
+  int ptr HTS_UNUSED = *str->ptr_; \
+  size_t lien_size HTS_UNUSED = *str->lien_size_; \
+  char* lien_buffer HTS_UNUSED = *str->lien_buffer_
 
 #define ENGINE_SAVE_CONTEXT_BASE() \
   /* Apply changes */ \
-  * ( (int*) (str->lien_tot_) ) = lien_tot; \
-  * ( (int*) (str->ptr_) ) = ptr; \
-  * ( (int*) (str->lien_size_) ) = lien_size; \
-  * ( (char**) (str->lien_buffer_) ) = lien_buffer
+  * str->lien_tot_ = lien_tot; \
+  * str->ptr_ = ptr; \
+  * str->lien_size_ = lien_size; \
+  * str->lien_buffer_ = lien_buffer
 
 #define WAIT_FOR_AVAILABLE_SOCKET() do { \
-  int prev = _hts_in_html_parsing; \
+  int prev = opt->state._hts_in_html_parsing; \
   while(back_pluggable_sockets_strict(sback, opt) <= 0) { \
-    _hts_in_html_parsing = 6; \
+    opt->state._hts_in_html_parsing = 6; \
     /* Wait .. */ \
     back_wait(sback,opt,cache,0); \
     /* Transfer rate */ \
     engine_stats(); \
     /* Refresh various stats */ \
     HTS_STAT.stat_nsocket=back_nsoc(sback); \
-    HTS_STAT.stat_errors=fspc(NULL,"error"); \
-    HTS_STAT.stat_warnings=fspc(NULL,"warning"); \
-    HTS_STAT.stat_infos=fspc(NULL,"info"); \
+    HTS_STAT.stat_errors=fspc(opt,NULL,"error"); \
+    HTS_STAT.stat_warnings=fspc(opt,NULL,"warning"); \
+    HTS_STAT.stat_infos=fspc(opt,NULL,"info"); \
     HTS_STAT.nbk=backlinks_done(sback,liens,lien_tot,ptr); \
     HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,sback); \
     /* Check */ \
-    if (!hts_htmlcheck_loop(sback->lnk, sback->count, -1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
+    if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, -1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
       return -1; \
     } \
   } \
-  _hts_in_html_parsing = prev; \
+  opt->state._hts_in_html_parsing = prev; \
 } while(0)
 
 #endif

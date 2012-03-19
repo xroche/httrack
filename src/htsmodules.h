@@ -38,24 +38,50 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_MODULES
 #define HTS_MODULES
 
+/* Forware definitions */
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_struct_back
+#define HTS_DEF_FWSTRUCT_struct_back
+typedef struct struct_back struct_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_cache_back
+#define HTS_DEF_FWSTRUCT_cache_back
+typedef struct cache_back cache_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_hash_struct
+#define HTS_DEF_FWSTRUCT_hash_struct
+typedef struct hash_struct hash_struct;
+#endif
+
 /* Function type to add links inside the module 
   link : link to add (absolute or relative)
   str : structure defined below
   Returns 1 if the link was added, 0 if not
 */
+#ifndef HTS_DEF_FWSTRUCT_htsmoduleStruct
+#define HTS_DEF_FWSTRUCT_htsmoduleStruct
 typedef struct htsmoduleStruct htsmoduleStruct;
+#endif
 typedef int (* t_htsAddLink)(htsmoduleStruct* str, char* link);
 
 /* Structure passed to the module */
 struct htsmoduleStruct {
   /* Read-only elements */
-  char* filename;                 /* filename (C:\My Web Sites\...) */
+  const char* filename;           /* filename (C:\My Web Sites\...) */
   int   size;                     /* size of filename (should be > 0) */
-  char* mime;                     /* MIME type of the object */
-  char* url_host;                 /* incoming hostname (www.foo.com) */
-  char* url_file;                 /* incoming filename (/bar/bar.gny) */
+  const char* mime;               /* MIME type of the object */
+  const char* url_host;           /* incoming hostname (www.foo.com) */
+  const char* url_file;           /* incoming filename (/bar/bar.gny) */
   
   /* Write-only */
+  const char* wrapper_name;       /* name of wrapper (static string) */
   char* err_msg;                  /* if an error occured, the error message (max. 1KB) */
   
   /* Read/Write */
@@ -78,20 +104,20 @@ struct htsmoduleStruct {
   void* userdef;                  /* can be used by callback routines
                                   */
 
-  /* ---- ---- ---- */
+  /* The parser httrackp structure (may be used) */
+  httrackp* opt;
 
   /* Internal use - please don't touch */
-  void* liens;
-  void* opt;
-  void* sback;
-  void* cache;
-  void* hashptr;
+  lien_url** liens;
+  struct_back* sback;
+  cache_back* cache;
+  hash_struct* hashptr;
   int numero_passe;
   int add_tab_alloc;
   /* */
   int* lien_tot_;
   int* ptr_;
-  int* lien_size_;
+  size_t* lien_size_;
   char** lien_buffer_;
   /* Internal use - please don't touch */
 
@@ -105,14 +131,16 @@ typedef int (*t_htsWrapperPlugInit)(char *args);
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+HTSEXT_API const char* hts_get_version_info(httrackp *opt);
+HTSEXT_API const char* hts_is_available(void);
 extern void htspe_init(void);
+extern void htspe_uninit(void);
 extern int hts_parse_externals(htsmoduleStruct* str);
 
 extern int gz_is_available;
-extern int swf_is_available;
+/*extern int swf_is_available;*/
 extern int SSL_is_available;
 extern int V6_is_available;
-extern char WHAT_is_available[64];
 #endif
 
 #endif

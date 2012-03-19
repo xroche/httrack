@@ -35,16 +35,15 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 // Fichier librairie .h
-#ifndef HTTRACK_DEFH
-#define HTTRACK_DEFH
-
+#ifndef HTS_CORE_DEFH
+#define HTS_CORE_DEFH
 
 #include "htsglobal.h"
 
 /* specific definitions */
 #include "htsbase.h"
 // Includes & définitions
-#ifdef HAVE_SYS_TYPES_H
+#if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
 #include <sys/types.h>
 #endif
 #ifdef HAVE_SYS_STAT_H
@@ -55,29 +54,99 @@ Please visit our Website: http://www.httrack.com
 #include <conio.h>
 #endif
 #ifndef  _WIN32_WCE
-#include <signal.h>
 #include <direct.h>
-#else
-#ifndef HTS_CECOMPAT
-#include "signal.h"
-#endif
 #endif
 #else
-#include <signal.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #endif
 /* END specific definitions */
 
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_struct_back
+#define HTS_DEF_FWSTRUCT_struct_back
+typedef struct struct_back struct_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_cache_back
+#define HTS_DEF_FWSTRUCT_cache_back
+typedef struct cache_back cache_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_hash_struct
+#define HTS_DEF_FWSTRUCT_hash_struct
+typedef struct hash_struct hash_struct;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_filecreate_params
+#define HTS_DEF_FWSTRUCT_filecreate_params
+typedef struct filecreate_params filecreate_params;
+#endif
 
 // Include htslib.h for all types
 #include "htslib.h"
 
+// options
 #include "htsopt.h"
 
+// INCLUDES .H PARTIES DE CODE HTTRACK
+
+// routine main
+#include "htscoremain.h"
+
+// core routines
+#include "htscore.h"
+
+// divers outils pour httrack.c
+#include "htstools.h"
+
+// aide pour la version en ligne de commande
+#include "htshelp.h"
+
+// génération du nom de fichier à sauver
+#include "htsname.h"
+
+// gestion ftp
+#include "htsftp.h"
+
+// gestion interception d'URL
+#include "htscatchurl.h"
+
+// gestion robots.txt
+#include "htsrobots.h"
+
+// routines d'acceptation de liens
+#include "htswizard.h"
+
+// routines de regexp
+#include "htsfilters.h"
+
+// gestion backing
+#include "htsback.h"
+
+// gestion cache
+#include "htscache.h"
+
+// gestion hashage
+#include "htshash.h"
+#include "htsinthash.h"
+
+#include "htsdefines.h"
+
+#include "hts-indextmpl.h"
+
 // structure d'un lien
-typedef struct lien_url {
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+struct lien_url {
   char firstblock;      // flag 1=premier malloc 
   char link_import;     // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
   int depth;            // profondeur autorisée lien ; >0 forte 0=faible
@@ -95,10 +164,14 @@ typedef struct lien_url {
   char* former_fil;     // nom du fichier distant initial (avant éventuel moved), peut être nul
   // pour optimisation:
   int hash_next[3];     // prochain lien avec même valeur hash
-} lien_url;
+};
 
 // chargement de fichiers en 'arrière plan'
-typedef struct lien_back {
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+struct lien_back {
 #if DEBUG_CHECKINT
   char magic;
 #endif
@@ -133,7 +206,7 @@ typedef struct lien_back {
   LLint chunk_blocksize;  // taille data declaree par le chunk
   LLint compressed_size;  // taille compressés (stats uniquement)
   //
-  int* pass2_ptr;         // pointeur sur liens[ptr]->pass2
+  //int links_index;        // to access liens[links_index]
   //
   char info[256];         // éventuel status pour le ftp
   int stop_ftp;           // flag stop pour ftp
@@ -141,18 +214,27 @@ typedef struct lien_back {
 #if DEBUG_CHECKINT
   char magic2;
 #endif
-} lien_back;
+};
 
-typedef struct struct_back {
+#ifndef HTS_DEF_FWSTRUCT_struct_back
+#define HTS_DEF_FWSTRUCT_struct_back
+typedef struct struct_back struct_back;
+#endif
+struct struct_back {
   lien_back* lnk;
   int count;
-  void* ready;
-} struct_back;
+  inthash ready;
+	LLint ready_size_bytes;
+};
 
 typedef struct cache_back_zip_entry cache_back_zip_entry;
 
 // cache
-typedef struct cache_back {
+#ifndef HTS_DEF_FWSTRUCT_cache_back
+#define HTS_DEF_FWSTRUCT_cache_back
+typedef struct cache_back cache_back;
+#endif
+struct cache_back {
   int version;        // 0 ou 1
   /* */
   int type;
@@ -163,9 +245,9 @@ typedef struct cache_back {
   FILE *txt;      // liste des fichiers (info)
   char lastmodified[256];
   // HASH
-  void* hashtable;
+  inthash hashtable;
   // HASH for tests (naming subsystem)
-  void* cached_tests;
+  inthash cached_tests;
   // fichiers log optionnels
   FILE* log;
   FILE* errlog;
@@ -173,32 +255,40 @@ typedef struct cache_back {
   int ptr_ant;      // pointeur pour anticiper
   int ptr_last;     // pointeur pour anticiper
   //
-  void* zipInput;
-  void* zipOutput;
+  void *zipInput;
+  void *zipOutput;
   cache_back_zip_entry* zipEntries;
   int zipEntriesOffs;
   int zipEntriesCapa;
-} cache_back;
+};
 
-typedef struct hash_struct {
+#ifndef HTS_DEF_FWSTRUCT_hash_struct
+#define HTS_DEF_FWSTRUCT_hash_struct
+typedef struct hash_struct hash_struct;
+#endif
+struct hash_struct {
   lien_url** liens;                     // pointeur sur liens
   int max_lien;                         // indice le plus grand rencontré
   int hash[3][HTS_HASH_SIZE];           // tables pour sav/adr-fil/former_adr-former_fil
-} hash_struct;
+};
 
-typedef struct filecreate_params {
+#ifndef HTS_DEF_FWSTRUCT_filecreate_params
+#define HTS_DEF_FWSTRUCT_filecreate_params
+typedef struct filecreate_params filecreate_params;
+#endif
+struct filecreate_params {
   FILE* lst;
   char path[HTS_URLMAXSIZE*2];
-} filecreate_params;
+};
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
-static int cache_writable(cache_back* cache) {
+HTS_STATIC int cache_writable(cache_back* cache) {
   return (cache != NULL && ( cache->dat != NULL || cache->zipOutput != NULL ) );
 }
 
-static int cache_readable(cache_back* cache) {
+HTS_STATIC int cache_readable(cache_back* cache) {
   return (cache != NULL && ( cache->olddat != NULL || cache->zipInput != NULL ) );
 }
 
@@ -208,146 +298,29 @@ static int cache_readable(cache_back* cache) {
 
 // INCLUDES .H PARTIES DE CODE HTTRACK
 
-// routine main
-#include "htscoremain.h"
-
-// divers outils pour httrack.c
-#include "htstools.h"
-
-// aide pour la version en ligne de commande
-#include "htshelp.h"
-
-// génération du nom de fichier à sauver
-#include "htsname.h"
-
-// gestion ftp
-#include "htsftp.h"
-
-// routine parser java
-#include "htsjava.h"
-
-// gestion interception d'URL
-#include "htscatchurl.h"
-
-// gestion robots.txt
-#include "htsrobots.h"
-
-// routines d'acceptation de liens
-#include "htswizard.h"
-
-// routines de regexp
-#include "htsfilters.h"
-
-// gestion backing
-#include "htsback.h"
-
-// gestion cache
-#include "htscache.h"
-
-// gestion hashage
-#include "htshash.h"
-#include "htsinthash.h"
-
-// gestion réentrance
-#include "htsnostatic.h"
-
-// infos console
-#if HTS_ANALYSTE_CONSOLE
-#include "httrack.h"
-#endif
-
-#include "htsdefines.h"
-
-#include "hts-indextmpl.h"
-
-// INCLUDES .H PARTIES DE CODE HTTRACK
-
-//
-
-/*
-typedef void  (* t_hts_htmlcheck_init)(void);
-typedef void  (* t_hts_htmlcheck_uninit)(void);
-typedef int   (* t_hts_htmlcheck_start)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck_end)(void);
-typedef int   (* t_hts_htmlcheck_chopt)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck_process)(char** html,int* len,char* url_adresse,char* url_fichier);
-typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url_fichier);
-typedef char* (* t_hts_htmlcheck_query)(char* question);
-typedef char* (* t_hts_htmlcheck_query2)(char* question);
-typedef char* (* t_hts_htmlcheck_query3)(char* question);
-typedef int   (* t_hts_htmlcheck_loop)(struct_back* sback,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
-typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
-typedef int   (* t_hts_htmlcheck_check_mime)(char* adr,char* fil,char* mime,int status);
-typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
-typedef void  (* t_hts_htmlcheck_filesave)(char* file);
-typedef void  (* t_hts_htmlcheck_filesave2)(char* hostname,char* filename,char* localfile,int is_new,int is_modified, int not_updated);
-typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
-typedef int   (* t_hts_htmlcheck_linkdetected2)(char* link, char* tag_start);
-typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
-typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
-typedef int   (* t_hts_htmlcheck_receivehead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
-*/
-
-// demande d'interaction avec le shell
-#if HTS_ANALYSTE
-//char HTbuff[1024];
-/*
-extern t_hts_htmlcheck_init       hts_htmlcheck_init;
-extern t_hts_htmlcheck_uninit     hts_htmlcheck_uninit;
-extern t_hts_htmlcheck_start      hts_htmlcheck_start;
-extern t_hts_htmlcheck_end        hts_htmlcheck_end;
-extern t_hts_htmlcheck_chopt      hts_htmlcheck_chopt;
-extern t_hts_htmlcheck_process    hts_htmlcheck_preprocess;
-extern t_hts_htmlcheck_process    hts_htmlcheck_postprocess;
-extern t_hts_htmlcheck            hts_htmlcheck;
-extern t_hts_htmlcheck_query      hts_htmlcheck_query;
-extern t_hts_htmlcheck_query2     hts_htmlcheck_query2;
-extern t_hts_htmlcheck_query3     hts_htmlcheck_query3;
-extern t_hts_htmlcheck_loop       hts_htmlcheck_loop;
-extern t_hts_htmlcheck_check      hts_htmlcheck_check;
-extern t_hts_htmlcheck_check_mime hts_htmlcheck_check_mime;
-extern t_hts_htmlcheck_pause      hts_htmlcheck_pause;
-extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
-extern t_hts_htmlcheck_filesave2  hts_htmlcheck_filesave2;
-extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
-extern t_hts_htmlcheck_linkdetected2 hts_htmlcheck_linkdetected2;
-extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
-extern t_hts_htmlcheck_savename   hts_htmlcheck_savename;
-extern t_hts_htmlcheck_sendhead   hts_htmlcheck_sendhead;
-extern t_hts_htmlcheck_receivehead hts_htmlcheck_receivehead;
-*/
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
 //
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API int hts_is_parsing(int flag);
-HTSEXT_API int hts_is_testing(void);
-HTSEXT_API int hts_is_exiting(void);
-HTSEXT_API int hts_setopt(httrackp* opt);
-HTSEXT_API int hts_addurl(char** url);
-HTSEXT_API int hts_resetaddurl(void);
-HTSEXT_API int copy_htsopt(httrackp* from,httrackp* to);
-HTSEXT_API char* hts_errmsg(void);
-HTSEXT_API int hts_setpause(int);      // pause transfer
-HTSEXT_API int hts_request_stop(int force);
+HTSEXT_API int hts_is_parsing(httrackp *opt, int flag);
+HTSEXT_API int hts_is_testing(httrackp *opt);
+HTSEXT_API int hts_addurl(httrackp *opt, char** url);
+HTSEXT_API int hts_resetaddurl(httrackp *opt);
+HTSEXT_API int copy_htsopt(const httrackp* from,httrackp* to);
+HTSEXT_API char* hts_errmsg(httrackp *opt);
+HTSEXT_API int hts_setpause(httrackp *opt, int);
 //
-HTSEXT_API char* hts_cancel_file(char * s);
-HTSEXT_API void hts_cancel_test(void);
-HTSEXT_API void hts_cancel_parsing(void);
+HTSEXT_API int hts_is_exiting(httrackp *opt);
+HTSEXT_API int hts_request_stop(httrackp* opt, int force);
+//
+HTSEXT_API int hts_cancel_file_push(httrackp *opt, const char *url);
+HTSEXT_API void hts_cancel_test(httrackp *opt);
+HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 #endif
-//
-// Variables globales
-extern int _hts_in_html_parsing;
-extern int _hts_in_html_done;  // % réalisés
-extern int _hts_in_html_poll;  // parsing
-extern char _hts_errmsg[1100];
-extern int _hts_setpause;
-//extern httrackp* _hts_setopt;
-extern char** _hts_addurl;
-extern int _hts_cancel;
+
+char* hts_cancel_file_pop(httrackp *opt);
+
 #endif
 
 //
@@ -355,23 +328,24 @@ extern int _hts_cancel;
 
 //int httpmirror(char* url,int level,httrackp opt);
 int httpmirror(char* url1,httrackp* opt);
-int filesave(httrackp* opt,char* adr,int len,char* s,char* url_adr /* = NULL */,char* url_fil /* = NULL */);
+int filesave(httrackp* opt,const char* adr,int len,const char* s,const char* url_adr /* = NULL */,const char* url_fil /* = NULL */);
+char* hts_cancel_file_pop(httrackp *opt);
 int check_fatal_io_errno(void);
 int engine_stats(void);
 void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* sback,char* host);
-FILE* filecreate(char* s);
-FILE* fileappend(char* s);
-int filecreateempty(char* filename);
-int filenote(char* s,filecreate_params* params);
-void file_notify(char* adr,char* fil,char* save,int create,int modify,int wasupdated);
-HTS_INLINE void usercommand(httrackp* opt,int exe,char* cmd,char* file,char* adr,char* fil);
-void usercommand_exe(char* cmd,char* file);
-//void* structcheck_init(int init);
+FILE* filecreate(filenote_strc *strct,const char* s);
+FILE* fileappend(filenote_strc *strct,const char* s);
+int filecreateempty(filenote_strc *strct, const char* filename);
+int filenote(filenote_strc *strct,const char* s,filecreate_params* params);
+void file_notify(httrackp* opt,const char* adr,const char* fil,const char* save,int create,int modify,int wasupdated);
+HTS_INLINE void usercommand(httrackp* opt,int exe,const char* cmd,const char* file,const char* adr,const char* fil);
+void usercommand_exe(const char* cmd,const char* file);
 int filters_init(char*** ptrfilters, int maxfilter, int filterinc);
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API int structcheck(char* s);
+HTSEXT_API int structcheck(const char* path);
+HTSEXT_API int dir_exists(const char* path);
 #endif
-HTS_INLINE int fspc(FILE* fp,char* type);
+HTS_INLINE int fspc(httrackp *opt,FILE* fp,const char* type);
 char* next_token(char* p,int flag);
 //
 char* readfile(char* fil);
@@ -393,15 +367,13 @@ int backlinks_done(struct_back* sback,lien_url** liens,int lien_tot,int ptr);
 int back_fillmax(struct_back* sback,httrackp* opt,cache_back* cache,lien_url** liens,int ptr,int numero_passe,int lien_tot);
 
 // cancel file
-#if HTS_ANALYSTE
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API char* hts_cancel_file(char * s);
-HTSEXT_API void hts_cancel_test(void);
-HTSEXT_API void hts_cancel_parsing(void);
-#endif
+HTSEXT_API int hts_cancel_file_push(httrackp *opt, const char *url);
+HTSEXT_API void hts_cancel_test(httrackp *opt);
+HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 #endif
 
-int ask_continue(void);
+int ask_continue(httrackp *opt);
 int nombre_digit(int n);
 
 // Java
@@ -418,19 +390,6 @@ int read_stdin(char* s,int max);
 HTS_INLINE int check_sockerror(T_SOC s);
 HTS_INLINE int check_sockdata(T_SOC s);
 
-httrackp* hts_declareoptbuffer(httrackp* optdecl);
-void sig_finish( int code );     // finir et quitter
-void sig_term( int code );       // quitter
-#if HTS_WIN
-void sig_ask( int code );        // demander
-#else
-void sig_back( int code );       // ignorer et mettre en backing 
-void sig_ask( int code );        // demander
-void sig_ignore( int code );     // ignorer signal
-void sig_brpipe( int code );     // treat if necessary
-void sig_doback(int);            // mettre en arrière plan
-#endif
-
 /* external modules */
 int htsAddLink(htsmoduleStruct* str, char* link);
 
@@ -440,7 +399,3 @@ void voidf(void);
 #define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
 
 #endif
-
-#endif
-
-

@@ -1,34 +1,31 @@
 /*
-    HTTrack external callbacks example : changing the destination filename
-    Example of <wrappername>_init and <wrappername>_exit call (httrack >> 3.31)
-    .c file
+    How to build: (callback.so or callback.dll)
+      With GNU-GCC:
+        gcc -O -g3 -Wall -D_REENTRANT -shared -o mycallback.so callbacks-example.c -lhttrack1
+      With MS-Visual C++:
+        cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.dll" callbacks-example.c libhttrack1.lib
+
+      Note: the httrack library linker option is only necessary when using libhttrack's functions inside the callback
 
     How to use:
-    - compile this file as a module (callback.so or callback.dll)
-      example:
-      (with gcc)
-      gcc -O -g3 -Wall -D_REENTRANT -DINET6 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -shared -o callback.so callbacks-example-filename.c
-      or (with visual c++)
-      cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"callback.dll" callbacks-example-filename.c
-    - use the --wrapper option in httrack:
-      httrack --wrapper save-name=callback:mysavename,string1,string2
+      httrack --wrapper mycallback,string1,string2 ..
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* "External" */
-#ifdef _WIN32
-#define EXTERNAL_FUNCTION __declspec(dllexport)
-#else
-#define EXTERNAL_FUNCTION 
-#endif
+/* Standard httrack module includes */
+#include "httrack-library.h"
+#include "htsopt.h"
+#include "htsdefines.h"
 
 /* Function definitions */
-EXTERNAL_FUNCTION int mysavename(char* adr_complete, char* fil_complete, char* referer_adr, char* referer_fil, char* save);
-EXTERNAL_FUNCTION int wrapper_init(char* module, char* initString);
-EXTERNAL_FUNCTION int wrapper_exit(void);
+static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save);
+static int myend(t_hts_callbackarg *carg, httrackp *opt);
+
+/* external functions */
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
 
 /* TOLOWER */
 #define TOLOWER_(a) (a >= 'A' && a <= 'Z') ? (a + ('a' - 'A')) : a
@@ -40,24 +37,82 @@ EXTERNAL_FUNCTION int wrapper_exit(void);
   httrack --wrapper save-name=callback:mysavename,string1,string2 ..
 */
 
-static char string1[256];
-static char string2[256];
-static int initialized = 0;
+typedef struct t_my_userdef {
+  char string1[256];
+  char string2[256];
+} t_my_userdef;
 
-/*
-"check-html" callback
-from htsdefines.h:
-typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
+/* 
+module entry point 
 */
-EXTERNAL_FUNCTION int mysavename(char* adr_complete, char* fil_complete, char* referer_adr, char* referer_fil, char* save) {
-  char* buff = strdup(save);
-  char* a = buff;
-  char* b = save;
-  if (!initialized) {
-    fprintf(stderr, "** ERROR! mysavename_init() was not called by httrack - you are probably using an old version (<3.31)\n");
-    fprintf(stderr, "** bailing out..\n");
-    exit(1);
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+  const char *arg = strchr(argv, ',');
+  if (arg != NULL)
+    arg++;
+
+  /* Check args */
+  if (arg == NULL || *arg == '\0' || strchr(arg, ',') == NULL) {
+    fprintf(stderr, "** callback error: arguments expected or bad arguments\n");
+    fprintf(stderr, "usage: httrack --wrapper save-name=callback:mysavename,string1,string2\n");
+    fprintf(stderr, "example: httrack --wrapper save-name=callback:mysavename,foo,bar\n");
+    return 0;   /* failed */
+  } else {
+    char *pos = strchr(arg, ',');
+    t_my_userdef *userdef = (t_my_userdef*) malloc(sizeof(t_my_userdef));
+    char * const string1 = userdef->string1;
+    char * const string2 = userdef->string2;
+
+    /* Split args */
+    fprintf(stderr, "** info: wrapper_init(%s) called!\n", arg);
+    fprintf(stderr, "** callback example: changing destination filename word by another one\n");
+    string1[0] = string1[1] = '\0';
+    strncat(string1, arg, pos - arg);
+    strcpy(string2, pos + 1);
+    fprintf(stderr, "** callback info: will replace %s by %s in filenames!\n", string1, string2);
+
+    /* Plug callback functions */
+    CHAIN_FUNCTION(opt, savename, mysavename, userdef);
+    CHAIN_FUNCTION(opt, end, myend, userdef);
   }
+
+  return 1;  /* success */
+}
+
+static int myend(t_hts_callbackarg *carg, httrackp *opt) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+
+  fprintf(stderr, "** info: wrapper_exit() called!\n");
+  if (userdef != NULL) {
+    free(userdef);
+    userdef = NULL;
+  }
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
+    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+  }
+
+  return 1;  /* success */
+}
+
+static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+  char * const string1 = userdef->string1;
+  char * const string2 = userdef->string2;
+  /* */
+  char *buff, *a, *b;
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, savename) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, savename)(CALLBACKARG_PREV_CARG(carg), opt, adr_complete, fil_complete, referer_adr, referer_fil, save)) {
+      return 0;  /* Abort */
+    }
+  }
+
+  /* Process */
+  buff = strdup(save);
+  a = buff;
+  b = save;
   *b = '\0';          /* the "save" variable points to a buffer with "sufficient" space */
   while(*a) {
     if (strncmp(a, string1, (int)strlen(string1)) == 0) {
@@ -70,31 +125,6 @@ EXTERNAL_FUNCTION int mysavename(char* adr_complete, char* fil_complete, char* r
     }
   }
   free(buff);
-  return 1;  /* success */
-}
 
-/* <wrappername>_init() will be called, if exists, upon startup */
-EXTERNAL_FUNCTION int wrapper_init(char* module, char* initString) {
-  char* pos;
-  fprintf(stderr, "** info: wrapper_init(%s, %s) called!\n", module, initString);
-  fprintf(stderr, "** callback example: changing destination filename word by another one\n");
-  if (initString == NULL || *initString == '\0' || (pos = strchr(initString, ',') ) == NULL) {
-    fprintf(stderr, "** callback error: arguments expected or bad arguments\n");
-    fprintf(stderr, "usage: httrack --wrapper save-name=callback:mysavename,string1,string2\n");
-    fprintf(stderr, "example: httrack --wrapper save-name=callback:mysavename,foo,bar\n");
-    return 0;
-  }
-  string1[0] = string1[1] = '\0';
-  strncat(string1, initString, pos - initString);
-  strcpy(string2, pos + 1);
-  fprintf(stderr, "** callback info: will replace %s by %s in filenames!\n", string1, string2);
-  initialized = 1;      /* we're ok */
   return 1;  /* success */
-}
-
-/* <wrappername>_exit() will be called, if exists, upon exit */
-EXTERNAL_FUNCTION int wrapper_exit(void) {
-  fprintf(stderr, "** info: wrapper_exit() called!\n");
-  initialized = 0;
-  return 1;   /* success (result ignored anyway in xx_exit) */
 }

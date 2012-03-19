@@ -335,6 +335,8 @@ uninstall-am: uninstall-info-am uninstall-langDATA \
 	ps ps-am uninstall uninstall-am uninstall-info-am \
 	uninstall-langDATA uninstall-langrootDATA
 
+
+#dist-hook:
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

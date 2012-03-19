@@ -40,10 +40,11 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFNETH
 
 /* basic net definitions */
+#include "htsglobal.h"
 #include "htsbasenet.h"
 
 #include <ctype.h>
-#if HTS_WIN
+#ifdef _WIN32
  // pour read
 #ifndef  _WIN32_WCE
  #include <io.h>
@@ -83,7 +84,11 @@ Please visit our Website: http://www.httrack.com
 /* Ipv4 structures */
 typedef struct in_addr INaddr;
 /* This should handle all cases */
-typedef struct SOCaddr {
+#ifndef HTS_DEF_FWSTRUCT_SOCaddr
+#define HTS_DEF_FWSTRUCT_SOCaddr
+typedef struct SOCaddr SOCaddr;
+#endif
+struct SOCaddr {
   union {
     struct sockaddr_in in;
     struct sockaddr sa;
@@ -91,7 +96,7 @@ typedef struct SOCaddr {
     unsigned char v6data[16];
     unsigned char pad[128];
   } m_addr;
-} SOCaddr;
+};
 
 /* Ipv4 structure members */
 #define SOCaddr_sinaddr(server) ((server).m_addr.in.sin_addr)
@@ -153,7 +158,11 @@ strcpy(namebuf, dot); \
 /* Ipv4 structures */
 typedef struct in6_addr INaddr;
 /* This should handle all cases */
-typedef struct SOCaddr {
+#ifndef HTS_DEF_FWSTRUCT_SOCaddr
+#define HTS_DEF_FWSTRUCT_SOCaddr
+typedef struct SOCaddr SOCaddr;
+#endif
+struct SOCaddr {
   union {
     struct sockaddr_in6 in6;
     struct sockaddr_in in;
@@ -162,7 +171,7 @@ typedef struct SOCaddr {
     unsigned char v6data[16];
     unsigned char pad[128];
   } m_addr;
-} SOCaddr;
+};
 
 /* Ipv4 structure members */
 #define SOCaddr_sinaddr(server)     ((server).m_addr.in6.sin6_addr)
@@ -239,12 +248,16 @@ getnameinfo((struct sockaddr *)&(ss), sslen, \
 #endif
 
 /* Buffer structure to copy various hostent structures */
-typedef struct t_fullhostent {
+#ifndef HTS_DEF_FWSTRUCT_t_fullhostent
+#define HTS_DEF_FWSTRUCT_t_fullhostent
+typedef struct t_fullhostent t_fullhostent;
+#endif
+struct t_fullhostent {
   t_hostent hp;
   char* list[2];
   char addr[HTS_MAXADDRLEN];    /* various struct sockaddr structures */
   unsigned int addr_maxlen;
-} t_fullhostent;
+};
 
 /* Initialize a t_fullhostent structure */
 #define fullhostent_init(h) do { \

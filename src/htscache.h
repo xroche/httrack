@@ -40,32 +40,49 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSCACHE_DEFH
 #define HTSCACHE_DEFH 
 
-#include "htscore.h"
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include "htsglobal.h"
+
+#include <stdlib.h>
+
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_cache_back
+#define HTS_DEF_FWSTRUCT_cache_back
+typedef struct cache_back cache_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_htsblk
+#define HTS_DEF_FWSTRUCT_htsblk
+typedef struct htsblk htsblk;
+#endif
+
 // cache
-void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* url_fil,char* url_save);
-void cache_add(cache_back* cache,htsblk r,char* url_adr,char* url_fil,char* url_save,int all_in_cache,char* path_prefix);
-htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
-htsblk cache_read_ro(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
-htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,char* return_save,int readonly);
-htsblk* cache_header(httrackp* opt,cache_back* cache,char* adr,char* fil,htsblk* r);
+void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,const char* url_adr,const char* url_fil,const char* url_save);
+void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_adr,const char* url_fil,const char* url_save,int all_in_cache,const char* path_prefix);
+htsblk cache_read(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location);
+htsblk cache_read_ro(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location);
+htsblk cache_readex(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location,char* return_save,int readonly);
+htsblk* cache_header(httrackp* opt,cache_back* cache,const char* adr,const char* fil,htsblk* r);
 void cache_init(cache_back* cache,httrackp* opt);
 
-int cache_writedata(FILE* cache_ndx,FILE* cache_dat,char* str1,char* str2,char* outbuff,int len);
-int cache_readdata(cache_back* cache,char* str1,char* str2,char** inbuff,int* len);
+int cache_writedata(FILE* cache_ndx,FILE* cache_dat,const char* str1,const char* str2,char* outbuff,int len);
+int cache_readdata(cache_back* cache,const char* str1,const char* str2,char** inbuff,int* len);
 
-int cache_wstr(FILE* fp,char* s);
 void cache_rstr(FILE* fp,char* s);
 char* cache_rstr_addr(FILE* fp);
 int  cache_brstr(char* adr,char* s);
 int  cache_quickbrstr(char* adr,char* s);
 int cache_brint(char* adr,int* i);
 void cache_rint(FILE* fp,int* i);
-int cache_wint(FILE* fp,int i);
 void cache_rLLint(FILE* fp,LLint* i);
+
+int cache_wstr(FILE* fp,const char* s);
+int cache_wint(FILE* fp,int i);
 int cache_wLLint(FILE* fp,LLint i);
 
 #endif

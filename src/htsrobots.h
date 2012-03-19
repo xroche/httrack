@@ -40,11 +40,15 @@ Please visit our Website: http://www.httrack.com
 #define HTSROBOTS_DEFH 
 
 // robots wizard
-typedef struct robots_wizard {
+#ifndef HTS_DEF_FWSTRUCT_robots_wizard
+#define HTS_DEF_FWSTRUCT_robots_wizard
+typedef struct robots_wizard robots_wizard;
+#endif
+struct robots_wizard {
   char adr[128];
   char token[4096];
   struct robots_wizard* next;
-} robots_wizard;
+};
 
 
 /* Library internal definictions */

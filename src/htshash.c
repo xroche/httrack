@@ -42,8 +42,10 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsopt.h"
 #include "htsglobal.h"
 #include "htsmd5.h"
+#include "htscore.h"
 /* END specific definitions */
 
 /* Specific macros */
@@ -63,6 +65,7 @@ Please visit our Website: http://www.httrack.com
 // retour: position ou -1 si non trouvé
 int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE*2];
+	char catbuff[CATBUFF_SIZE];
   char* normfil;
   char* normadr;
   unsigned int cle;
@@ -71,7 +74,7 @@ int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
   if (type)
     cle = hash_cle(nom1,nom2);
   else
-    cle = hash_cle(convtolower(nom1),nom2);         // case insensitive
+    cle = hash_cle(convtolower(catbuff,nom1),nom2);         // case insensitive
   // la position se calcule en modulant
   pos = (int) (cle%HTS_HASH_SIZE);
   // entrée trouvée?
@@ -199,6 +202,7 @@ int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
 // enregistrement lien lpos dans les 3 tables hash1..3
 void hash_write(hash_struct* hash,int lpos,int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE*2];
+	char catbuff[CATBUFF_SIZE];
   char* normfil;
   unsigned int cle;
   int pos; 
@@ -212,7 +216,7 @@ void hash_write(hash_struct* hash,int lpos,int normalized) {
     // élément actuel sur -1 (fin de chaine)
     hash->liens[lpos]->hash_next[0]=hash->liens[lpos]->hash_next[1]=hash->liens[lpos]->hash_next[2]=-1;
     //
-    cle = hash_cle(convtolower(hash->liens[lpos]->sav),"");    // CASE INSENSITIVE
+    cle = hash_cle(convtolower(catbuff,hash->liens[lpos]->sav),"");    // CASE INSENSITIVE
     pos = (int) (cle%HTS_HASH_SIZE);
     ptr = hash_calc_chaine(hash,0,pos);         // calculer adresse chaine
     *ptr = lpos;                   // noter dernier enregistré

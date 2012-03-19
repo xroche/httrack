@@ -39,26 +39,87 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_DEFLIB
 
 #include "htsglobal.h"
-#include "htsopt.h"
-#include "htswrap.h"
 
-/* Main functions */
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_strc_int2bytes2
+#define HTS_DEF_FWSTRUCT_strc_int2bytes2
+typedef struct strc_int2bytes2 strc_int2bytes2;
+#endif
+
+/* Helpers for plugging callbacks
+requires: htsdefines.h */
+
+/*
+Add a function callback 'FUNCTION' to the option structure 'OPT' callback member 'MEMBER', 
+with an optional (may be NULL) argument 'ARGUMENT'
+*/
+#define CHAIN_FUNCTION(OPT, MEMBER, FUNCTION, ARGUMENT) do { \
+  t_hts_callbackarg *carg = (t_hts_callbackarg*) hts_malloc(sizeof(t_hts_callbackarg)); \
+  carg->userdef = ( ARGUMENT ); \
+  carg->prev.fun = (void*) ( OPT )->callbacks_fun-> MEMBER .fun; \
+  carg->prev.carg = ( OPT )->callbacks_fun-> MEMBER .carg; \
+  ( OPT )->callbacks_fun-> MEMBER .fun = ( FUNCTION ); \
+  ( OPT )->callbacks_fun-> MEMBER .carg = carg; \
+} while(0)
+
+/* The following helpers are useful only if you know that an existing callback migh be existing before before the call to CHAIN_FUNCTION()
+If your functions were added just after hts_create_opt(), no need to make the previous function check */
+
+/* Get the user-defined pointer initially passed to CHAIN_FUNCTION(), given the callback's carg argument */
+#define CALLBACKARG_USERDEF(CARG) ( ( (CARG) != NULL ) ? (CARG)->userdef : NULL )
+
+/* Get the previously existing function before the call to CHAIN_FUNCTION(), given the callback's carg argument */
+#define CALLBACKARG_PREV_FUN(CARG, NAME) ( (t_hts_htmlcheck_ ##NAME) ( ( (CARG) != NULL ) ? (CARG)->prev.fun : NULL ) )
+
+/* Get the previously existing function argument before the call to CHAIN_FUNCTION(), given the callback's carg argument */
+#define CALLBACKARG_PREV_CARG(CARG) ( ( (CARG) != NULL ) ? (CARG)->prev.carg : NULL )
+
+/* Functions */
+
+/* Initialization */
 HTSEXT_API int hts_init(void);
 HTSEXT_API int hts_uninit(void);
-HTSEXT_API int hts_main(int argc, char **argv);
+HTSEXT_API void htsthread_wait(void);
 
-/* Wrapper functions */
-HTSEXT_API int htswrap_init(void);
-HTSEXT_API int htswrap_add(char* name,void* fct);
-HTSEXT_API int htswrap_free(void);
-HTSEXT_API unsigned long int htswrap_read(char* name);
+/* Main functions */
+HTSEXT_API int hts_main(int argc, char **argv);
+HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
+
+/* Options handling */
+HTSEXT_API httrackp* hts_create_opt(void);
+HTSEXT_API void hts_free_opt(httrackp *opt);
+HTSEXT_API void set_wrappers(httrackp *opt);	// DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int plug_wrapper(httrackp *opt, const char *moduleName, const char* argv);
+
+/* Logging */
+HTSEXT_API int hts_log(httrackp *opt, const char* prefix, const char *msg);
+
+/* Infos */
+HTSEXT_API const char* hts_get_version_info(httrackp *opt);
 HTSEXT_API const char* hts_is_available(void);
 
+/* Wrapper functions */
+HTSEXT_API int htswrap_init(void);	// DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int htswrap_free(void);	// DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int htswrap_add(httrackp *opt, const char* name, void* fct);
+HTSEXT_API unsigned long int htswrap_read(httrackp *opt, const char* name);
+HTSEXT_API int htswrap_set_userdef(httrackp *opt, void *userdef);
+HTSEXT_API void* htswrap_get_userdef(httrackp *opt);
+
+/* Internal library allocators, if a different libc is being used by the client */
+HTSEXT_API char* hts_strdup(const char* string);
+HTSEXT_API void* hts_malloc(size_t size);
+HTSEXT_API void* hts_realloc(void* data, size_t size);
+HTSEXT_API void hts_free(void* data);
+
 /* Other functions */
-HTSEXT_API int hts_resetvar(void);
-HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath);
-HTSEXT_API char* hts_getcategories(char* path, int type);
-HTSEXT_API char* hts_getcategory(char* filename);
+HTSEXT_API int hts_resetvar(void);				// DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int hts_buildtopindex(httrackp* opt,const char* path,const char* binpath);
+HTSEXT_API const char* hts_getcategories(const char* path, int type);
+HTSEXT_API const char* hts_getcategory(const char* filename);
 
 /* Catch-URL */
 HTSEXT_API T_SOC catch_url_init_std(int* port_prox,char* adr_prox);
@@ -66,32 +127,32 @@ HTSEXT_API T_SOC catch_url_init(int* port,char* adr);
 HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data);
 
 /* State */
-HTSEXT_API int hts_is_parsing(int flag);
-HTSEXT_API int hts_is_testing(void);
-HTSEXT_API int hts_is_exiting(void);
-HTSEXT_API int hts_setopt(httrackp* opt);
-HTSEXT_API int hts_addurl(char** url);
-HTSEXT_API int hts_resetaddurl(void);
+HTSEXT_API int hts_is_parsing(httrackp *opt, int flag);
+HTSEXT_API int hts_is_testing(httrackp *opt);
+HTSEXT_API int hts_is_exiting(httrackp *opt);
+/*HTSEXT_API int hts_setopt(httrackp* opt); DEPRECATED ; see copy_htsopt() */
+HTSEXT_API int hts_addurl(httrackp *opt, char** url);
+HTSEXT_API int hts_resetaddurl(httrackp *opt);
 HTSEXT_API int copy_htsopt(httrackp* from, httrackp* to);
-HTSEXT_API char* hts_errmsg(void);
-HTSEXT_API int hts_setpause(int);      // pause transfer
-HTSEXT_API int hts_request_stop(int force);
-HTSEXT_API char* hts_cancel_file(char * s);
-HTSEXT_API void hts_cancel_test(void);
-HTSEXT_API void hts_cancel_parsing(void);
-HTSEXT_API char* hts_cancel_file(char * s);
-HTSEXT_API void hts_cancel_test(void);
-HTSEXT_API void hts_cancel_parsing(void);
+HTSEXT_API char* hts_errmsg(httrackp *opt);
+HTSEXT_API int hts_setpause(httrackp *opt, int);      // pause transfer
+HTSEXT_API int hts_request_stop(httrackp* opt, int force);
+HTSEXT_API int hts_cancel_file_push(httrackp *opt, const char *url);
+HTSEXT_API void hts_cancel_test(httrackp *opt);
+HTSEXT_API void hts_cancel_parsing(httrackp *opt);
+HTSEXT_API void hts_cancel_test(httrackp *opt);
+HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 
 /* Tools */
-HTSEXT_API int structcheck(char* s);
+HTSEXT_API int structcheck(const char* path);
+HTSEXT_API int dir_exists(const char* path);
 HTSEXT_API void infostatuscode(char* msg,int statuscode);
 HTSEXT_API HTS_INLINE TStamp mtime_local(void);
 HTSEXT_API void qsec2str(char *st,TStamp t);
-HTSEXT_API char* int2char(int n);
-HTSEXT_API char* int2bytes(LLint n);
-HTSEXT_API char* int2bytessec(long int n);
-HTSEXT_API char** int2bytes2(LLint n);
+HTSEXT_API char* int2char(strc_int2bytes2* strc, int n);
+HTSEXT_API char* int2bytes(strc_int2bytes2* strc, LLint n);
+HTSEXT_API char* int2bytessec(strc_int2bytes2* strc, long int n);
+HTSEXT_API char** int2bytes2(strc_int2bytes2* strc, LLint n);
 HTSEXT_API char* jump_identification(char*);
 HTSEXT_API char* jump_normalized(char*);
 HTSEXT_API char* jump_toport(char*);
@@ -108,25 +169,42 @@ HTSEXT_API void escape_uri_utf(char* s);
 HTSEXT_API void escape_check_url(char* s);
 HTSEXT_API char* escape_check_url_addr(char* s);
 HTSEXT_API void  x_escape_http(char* s,int mode);
-HTSEXT_API char* unescape_http(char* s);
-HTSEXT_API char* unescape_http_unharm(char* s, int no_high);
-HTSEXT_API char* antislash_unescaped(char* s);
+HTSEXT_API char* unescape_http(char *catbuff, const char* s);
+HTSEXT_API char* unescape_http_unharm(char *catbuff, const char* s, int no_high);
+HTSEXT_API char* antislash_unescaped(char *catbuff, const char* s);
 HTSEXT_API void  escape_remove_control(char* s);
+HTSEXT_API void  get_httptype(httrackp *opt,char *s,const char *fil,int flag);
+HTSEXT_API int is_knowntype(httrackp *opt,const char *fil);
+HTSEXT_API int is_userknowntype(httrackp *opt,const char *fil);
+HTSEXT_API int is_dyntype(const char *fil);
+HTSEXT_API char* get_ext(char *catbuff, const char *fil);
+
+/* Ugly string tools */
+HTSEXT_API char* concat(char *catbuff,const char* a,const char* b) ;
+HTSEXT_API char* fconcat(char *catbuff, const char* a, const char* b);
+HTSEXT_API char* fconv(char *catbuff, const char* a);
 
 /* Debugging */
 HTSEXT_API void hts_debug(int level);
 
 /* Portable directory API */
 
+#ifndef HTS_DEF_FWSTRUCT_find_handle_struct
+#define HTS_DEF_FWSTRUCT_find_handle_struct
 typedef struct find_handle_struct find_handle_struct;
 typedef find_handle_struct* find_handle;
+#endif
 
-typedef struct topindex_chain {
+#ifndef HTS_DEF_FWSTRUCT_topindex_chain
+#define HTS_DEF_FWSTRUCT_topindex_chain
+typedef struct topindex_chain topindex_chain;
+#endif
+struct topindex_chain {
   int level;                          /* sort level */
   char* category;                     /* category */
   char name[2048];                    /* path */
   struct topindex_chain* next;        /* next element */
-} topindex_chain  ;
+};
 HTSEXT_API find_handle hts_findfirst(char* path);
 HTSEXT_API int hts_findnext(find_handle find);
 HTSEXT_API int hts_findclose(find_handle find);
@@ -135,72 +213,5 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 HTSEXT_API int hts_findisdir(find_handle find);
 HTSEXT_API int hts_findisfile(find_handle find);
 HTSEXT_API int hts_findissystem(find_handle find);
-
-/* Wrapper functions types (commented) : */
-/*
-typedef void  (* t_hts_htmlcheck_init)(void);
-typedef void  (* t_hts_htmlcheck_uninit)(void);
-typedef int   (* t_hts_htmlcheck_start)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck_end)(void);
-typedef int   (* t_hts_htmlcheck_chopt)(httrackp* opt);
-typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url_fichier);
-typedef char* (* t_hts_htmlcheck_query)(char* question);
-typedef char* (* t_hts_htmlcheck_query2)(char* question);
-typedef char* (* t_hts_htmlcheck_query3)(char* question);
-typedef int   (* t_hts_htmlcheck_loop)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
-typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
-typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
-typedef void  (* t_hts_htmlcheck_filesave)(char* file);
-typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
-typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
-typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
-typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
-typedef int   (* t_hts_htmlcheck_receivehead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
-*/
-
-/* Wrapper functions names : */
-/*
-  hts_htmlcheck_init         = (t_hts_htmlcheck_init)           htswrap_read("init");
-Log: "engine: init"
-
-  hts_htmlcheck_uninit       = (t_hts_htmlcheck_uninit)         htswrap_read("free");
-Log: "engine: free"
-
-  hts_htmlcheck_start        = (t_hts_htmlcheck_start)          htswrap_read("start");
-Log: "engine: start"
-
-  hts_htmlcheck_end          = (t_hts_htmlcheck_end)            htswrap_read("end");
-Log: "engine: end"
-
-  hts_htmlcheck_chopt        = (t_hts_htmlcheck_chopt)          htswrap_read("change-options");
-Log: "engine: change-options"
-
-  hts_htmlcheck              = (t_hts_htmlcheck)                htswrap_read("check-html");
-Log: "check-html: <url>"
-
-  hts_htmlcheck_query        = (t_hts_htmlcheck_query)          htswrap_read("query");
-  hts_htmlcheck_query2       = (t_hts_htmlcheck_query2)         htswrap_read("query2");
-  hts_htmlcheck_query3       = (t_hts_htmlcheck_query3)         htswrap_read("query3");
-  hts_htmlcheck_loop         = (t_hts_htmlcheck_loop)           htswrap_read("loop");
-  hts_htmlcheck_check        = (t_hts_htmlcheck_check)          htswrap_read("check-link");
-Log: none
-
-  hts_htmlcheck_pause        = (t_hts_htmlcheck_pause)          htswrap_read("pause");
-Log: "pause: <lockfile>"
-
-  hts_htmlcheck_filesave     = (t_hts_htmlcheck_filesave)       htswrap_read("save-file");
-  hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
-Log: none
-
-  hts_htmlcheck_xfrstatus    = (t_hts_htmlcheck_xfrstatus)      htswrap_read("transfer-status");
-Log: 
-    "engine: transfer-status: link updated: <url> -> <file>"
-  | "engine: transfer-status: link added: <url> -> <file>"
-  | "engine: transfer-status: link recorded: <url> -> <file>"
-  | "engine: transfer-status: link link error (<errno>, '<err_msg>'): <url>"
-  hts_htmlcheck_savename     = (t_hts_htmlcheck_savename  )     htswrap_read("save-name");
-Log: 
-    "engine: save-name: local name: <url> -> <file>"
-*/
 
 #endif

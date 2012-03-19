@@ -265,7 +265,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
       // tester
       i=0; 
       if (!unique)
-        max=strlen(chaine);
+        max = (int) strlen(chaine);
       else        /* *(a) only match a (not aaaaa) */
         max=1;
       while(i<(int) max) {

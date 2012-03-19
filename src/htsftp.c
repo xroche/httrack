@@ -42,17 +42,15 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsftp.h"
 
-#include "htsglobal.h"
-#include "htsbase.h"
-#include "htsnet.h"
+#include "htscore.h"
 #include "htsthread.h"
-#if HTS_WIN
+#ifdef _WIN32
 #else
 //inet_ntoa
 #include <arpa/inet.h>
 #endif
 
-#if HTS_WIN
+#ifdef _WIN32
 #ifndef __cplusplus
 // DOS
 #ifndef  _WIN32_WCE
@@ -72,17 +70,18 @@ Please visit our Website: http://www.httrack.com
 #define FTP_DEBUG 0
 //#define FORK_DEBUG 0
 
-#define FTP_STATUS_READY 1001
-
 #if USE_BEGINTHREAD
 
-PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_ftp( void* pP ) {
-  lien_back* back=(lien_back*) pP;
-  if (back == NULL) {
+void back_launch_ftp( void* pP ) {
+	FTPDownloadStruct *pStruct = (FTPDownloadStruct*)pP;
+  if (pStruct == NULL)
+    return ;
+
+	if (pStruct == NULL) {
 #if FTP_DEBUG
     printf("[ftp error: no args]\n");
 #endif
-    return PTHREAD_RETURN;
+    return ;
   }
 
   /* Initialize */ 
@@ -92,72 +91,28 @@ PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_ftp( void* pP ) {
 #if FTP_DEBUG
   printf("[Launching main ftp routine]\n");
 #endif
-  run_launch_ftp(back);
+  run_launch_ftp(pStruct);
   // prêt
-  back->status=FTP_STATUS_READY;
-  
+	pStruct->pBack->status=STATUS_FTP_READY;
+
+	/* Delete structure */
+	free(pP);
+
   /* Uninitialize */
   hts_uninit();
-  return PTHREAD_RETURN;
+  return ;
 }
 // lancer en back
-void launch_ftp(lien_back* back) {
+void launch_ftp(FTPDownloadStruct* params) {
   // DOS
 #if FTP_DEBUG
   printf("[Launching main ftp thread]\n");
 #endif
-  (void)hts_newthread(back_launch_ftp, 0, (void*) back);
+  hts_newthread(back_launch_ftp, (void*) params);
 }
 
 #else
-// Unix sans pthread
-int back_launch_ftp(lien_back* back) {
-  // lancer ftp
-  run_launch_ftp(back);
-  // prêt
-  back->status=FTP_STATUS_READY;
-  return 0;
-}
-void launch_ftp(lien_back* back,char* path,char* exec) {
-  FILE* fp = fopen(fconv(path),"wb");
-  if (fp) {
-    char _args[8][256];
-    char *args[8];
-    fclose(fp); fp=NULL;
-    
-    strcpybuff(_args[0],exec);
-    strcpybuff(_args[1],"-#R");
-    strcpybuff(_args[2],back->url_adr);
-    strcpybuff(_args[3],back->url_fil);
-    strcpybuff(_args[4],back->url_sav);
-    strcpybuff(_args[5],path);
-    //strcpybuff(_args[6],"");
-    args[0]=_args[0];
-    args[1]=_args[1];
-    args[2]=_args[2];
-    args[3]=_args[3];
-    args[4]=_args[4];
-    args[5]=_args[5];
-    args[6]=NULL;
-    switch (fork()) {    // note: vfork déconne un max'
-    case -1: printf("Can not vfork() process\n"); break;
-    case 0: 
-      if (execvp(args[0],args)==-1) {
-        fp=fopen(fconv(path),"wb");
-        if (fp) {
-          fprintf(fp,"-1 unable to launch %s",args[0]);
-          fclose(fp); fp=NULL;
-          rename(path,concat(path,".ok"));
-        } else remove(path);
-      }
-      _exit(0);    // exit 'propre'
-      break;
-    default:  // parent
-      // bah on fait rien..
-      break;         
-    }
-  }
-}
+#error No more supported
 #endif
 
 // pour l'arrêt du ftp
@@ -178,7 +133,9 @@ void launch_ftp(lien_back* back,char* path,char* exec) {
   }
 
 // la véritable fonction une fois lancées les routines thread/fork
-int run_launch_ftp(lien_back* back) {
+int run_launch_ftp(FTPDownloadStruct *pStruct) {
+	lien_back* back = pStruct->pBack;
+	httrackp *opt = pStruct->pOpt;
   char user[256]="anonymous";
   char pass[256]="user@";
   char line_retr[2048];
@@ -253,7 +210,8 @@ int run_launch_ftp(lien_back* back) {
 #endif
       ftp_filename=a;
       if (strnotempty(a)) {
-        char* ua=unescape_http(a);
+				char catbuff[CATBUFF_SIZE];
+        char* ua=unescape_http(catbuff,a);
         int len_a = (int) strlen(ua);
         if (len_a > 0 && ua[len_a -1] == '/') {     /* obviously a directory listing */
           transfer_list=1;
@@ -275,7 +233,7 @@ int run_launch_ftp(lien_back* back) {
       }
     } else {
       strcpybuff(back->r.msg,"Unexpected PORT error");
-      // back->status=FTP_STATUS_READY;    // fini
+      // back->status=STATUS_FTP_READY;    // fini
       back->r.statuscode=STATUSCODE_INVALID;
     }
   }
@@ -306,10 +264,10 @@ int run_launch_ftp(lien_back* back) {
     
     // récupérer adresse résolue
     strcpybuff(back->info,"host name");
-    hp = hts_gethostbyname(_adr, &fullhostent_buffer);
+    hp = hts_gethostbyname(opt,_adr, &fullhostent_buffer);
     if (hp == NULL) {
       strcpybuff(back->r.msg,"Unable to get server's address");
-      // back->status=FTP_STATUS_READY;    // fini
+      // back->status=STATUS_FTP_READY;    // fini
       back->r.statuscode=STATUSCODE_NON_FATAL;
       _HALT_FTP
         return 0;
@@ -323,10 +281,10 @@ int run_launch_ftp(lien_back* back) {
     // memcpy(&server.sin_addr, hp->h_addr, hp->h_length);
     
     // créer ("attachement") une socket (point d'accès) internet,en flot
-    soc_ctl=socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+    soc_ctl = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
     if (soc_ctl==INVALID_SOCKET) {
       strcpybuff(back->r.msg,"Unable to create a socket");
-      // back->status=FTP_STATUS_READY;    // fini
+      // back->status=STATUS_FTP_READY;    // fini
       back->r.statuscode=STATUSCODE_INVALID;
       _HALT_FTP
         return 0;
@@ -338,17 +296,17 @@ int run_launch_ftp(lien_back* back) {
     // connexion (bloquante, on est en thread)
     strcpybuff(back->info,"connect");
 
-#if HTS_WIN
+#ifdef _WIN32
     if (connect(soc_ctl, (const struct sockaddr FAR *)&server, server_size) != 0) {
 #else
       if (connect(soc_ctl, (struct sockaddr *)&server, server_size) == -1) {
 #endif
         strcpybuff(back->r.msg,"Unable to connect to the server");
-        // back->status=FTP_STATUS_READY;    // fini
+        // back->status=STATUS_FTP_READY;    // fini
         back->r.statuscode=STATUSCODE_INVALID;
         _HALT_FTP
           return 0;
-#if HTS_WIN
+#ifdef _WIN32
       }
 #else
     }
@@ -384,7 +342,7 @@ int run_launch_ftp(lien_back* back) {
               // ok
             } else {
               strcpybuff(back->r.msg,"TYPE I error");
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }
 #if 0
@@ -411,34 +369,34 @@ int run_launch_ftp(lien_back* back) {
                   // ok..
                 } else {
                   strcpybuff(back->r.msg,"TYPE I error");
-                  // back->status=FTP_STATUS_READY;    // fini
+                  // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode=STATUSCODE_INVALID;
                 }
               } else {
                 sprintf(back->r.msg,"CWD error: %s",linejmp(line));
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
               }    // sinon on est prêts
             } else {
               strcpybuff(back->r.msg,"Unexpected ftp error");
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }
 #endif
             
           } else {
             sprintf(back->r.msg,"Bad password: %s",linejmp(line));
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }
         } else {
           sprintf(back->r.msg,"Bad user name: %s",linejmp(line));
-          // back->status=FTP_STATUS_READY;    // fini
+          // back->status=STATUS_FTP_READY;    // fini
           back->r.statuscode=STATUSCODE_INVALID;
         }
       } else {
         sprintf(back->r.msg,"Connection refused: %s",linejmp(line));
-        // back->status=FTP_STATUS_READY;    // fini
+        // back->status=STATUS_FTP_READY;    // fini
         back->r.statuscode=STATUSCODE_INVALID;
       }
      
@@ -497,7 +455,7 @@ int run_launch_ftp(lien_back* back) {
             // -- fin analyse de l'adresse IP et du port --
           } else {
             sprintf(back->r.msg,"PASV incorrect: %s",linejmp(line));
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }    // sinon on est prêts
         } else {
@@ -529,12 +487,12 @@ int run_launch_ftp(lien_back* back) {
               }
             } else {
               sprintf(back->r.msg,"EPSV incorrect: %s",linejmp(line));
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }
           } else {
             sprintf(back->r.msg,"PASV/EPSV error: %s",linejmp(line));
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }    // sinon on est prêts
         }
@@ -548,7 +506,8 @@ int run_launch_ftp(lien_back* back) {
           // SIZE
           if (back->r.statuscode != -1) {
             if (!transfer_list) {
-              char* ua=unescape_http(ftp_filename);
+							char catbuff[CATBUFF_SIZE];
+              char* ua=unescape_http(catbuff,ftp_filename);
               if (
                 (strchr(ua, ' '))
                 ||
@@ -611,7 +570,7 @@ int run_launch_ftp(lien_back* back) {
           
           // résoudre
           if (adr_ip[0]) {
-            hp = hts_gethostbyname(adr_ip, &fullhostent_buffer);
+            hp = hts_gethostbyname(opt,adr_ip, &fullhostent_buffer);
             if (hp) {
               SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0], hp->h_length);
             } else {
@@ -629,12 +588,12 @@ int run_launch_ftp(lien_back* back) {
 #endif
           if (server_size > 0) {
             // socket
-            soc_dat=socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+            soc_dat = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
             if (soc_dat != INVALID_SOCKET) {
               // structure: connexion au domaine internet, port 80 (ou autre)
               SOCaddr_initport(server, port_pasv);
               // server.sin_port = htons((unsigned short int) port_pasv);
-#if HTS_WIN
+#ifdef _WIN32
               if (connect(soc_dat, (const struct sockaddr FAR *)&server, server_size) == 0) {
 #else
               if (connect(soc_dat, (struct sockaddr *)&server, server_size) != -1) {
@@ -650,7 +609,7 @@ int run_launch_ftp(lien_back* back) {
                   deletesoc(soc_dat); soc_dat=INVALID_SOCKET;
                   //
                   sprintf(back->r.msg,"RETR command errror: %s",linejmp(line));
-                  // back->status=FTP_STATUS_READY;    // fini
+                  // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode=STATUSCODE_INVALID;
                 }    // sinon on est prêts
               } else {
@@ -660,22 +619,22 @@ int run_launch_ftp(lien_back* back) {
                 deletesoc(soc_dat); soc_dat=INVALID_SOCKET;
                 //
                 strcpybuff(back->r.msg,"Unable to connect");
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
               }    // sinon on est prêts
             } else {
               strcpybuff(back->r.msg,"Unable to create a socket");
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }    // sinon on est prêts
           } else {
             sprintf(back->r.msg,"Unable to resolve IP %s",adr_ip);
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }    // sinon on est prêts
         } else {
           sprintf(back->r.msg,"PASV incorrect: %s",linejmp(line));
-          // back->status=FTP_STATUS_READY;    // fini
+          // back->status=STATUS_FTP_READY;    // fini
           back->r.statuscode=STATUSCODE_INVALID;
         }    // sinon on est prêts
 #else
@@ -698,27 +657,27 @@ int run_launch_ftp(lien_back* back) {
               int dummylen = sizeof(struct sockaddr);
               if ( (soc_dat=accept(soc_servdat,&dummyaddr,&dummylen)) == INVALID_SOCKET) {
                 strcpybuff(back->r.msg,"Unable to accept connection");
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
               }
             } else {
               sprintf(back->r.msg,"RETR command errror: %s",linejmp(line));
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }
           } else {
             sprintf(back->r.msg,"PORT command error: %s",linejmp(line));
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }
-#if HTS_WIN
+#ifdef _WIN32
           closesocket(soc_servdat);
 #else
           close(soc_servdat);
 #endif
         } else {
           strcpybuff(back->r.msg,"Unable to listen to a port");
-          // back->status=FTP_STATUS_READY;    // fini
+          // back->status=STATUS_FTP_READY;    // fini
           back->r.statuscode=STATUSCODE_INVALID;
         }
 #endif
@@ -728,11 +687,11 @@ int run_launch_ftp(lien_back* back) {
         //
         if (soc_dat != INVALID_SOCKET) {
           if (rest_understood) {         // REST envoyée et comprise
-            file_notify(back->url_adr, back->url_fil, back->url_sav, 0, 1, 0);
-            back->r.fp = fileappend(back->url_sav);
+            file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 0, 1, 0);
+						back->r.fp = fileappend(&opt->state.strc, back->url_sav);
           } else {
-            file_notify(back->url_adr, back->url_fil, back->url_sav, 1, 1, 0);
-            back->r.fp = filecreate(back->url_sav);
+            file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 1, 1, 0);
+            back->r.fp = filecreate(&opt->state.strc, back->url_sav);
           }
           strcpybuff(back->info,"receiving");
           if (back->r.fp != NULL) {
@@ -747,13 +706,13 @@ int run_launch_ftp(lien_back* back) {
               switch(wait_socket_receive(soc_dat,timeout)) {
               case -1:
                 strcpybuff(back->r.msg,"FTP read error");
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
                 len=0;    // fin
                 break;
               case 0:
                 sprintf(back->r.msg,"Time out (%d)",timeout);
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
                 len=0;    // fin
                 break;
@@ -774,17 +733,17 @@ int run_launch_ftp(lien_back* back) {
                       }
                       */
                       strcpybuff(back->r.msg,"Write error");
-                      // back->status=FTP_STATUS_READY;    // fini
+                      // back->status=STATUS_FTP_READY;    // fini
                       back->r.statuscode=STATUSCODE_INVALID;
                       len=0;  // error
                     }
                   } else {
                     strcpybuff(back->r.msg,"Unexpected write error");
-                    // back->status=FTP_STATUS_READY;    // fini
+                    // back->status=STATUS_FTP_READY;    // fini
                     back->r.statuscode=STATUSCODE_INVALID;
                   }
                 } else {        // Erreur ou terminé
-                  // back->status=FTP_STATUS_READY;    // fini
+                  // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode=0;
                   if (back->r.totalsize > 0 && back->r.size != back->r.totalsize) {
                     back->r.statuscode=STATUSCODE_INVALID;
@@ -801,10 +760,10 @@ int run_launch_ftp(lien_back* back) {
             }
           } else {
             strcpybuff(back->r.msg,"Unable to write file");
-            // back->status=FTP_STATUS_READY;    // fini
+            // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode=STATUSCODE_INVALID;
           }
-#if HTS_WIN
+#ifdef _WIN32
           closesocket(soc_dat);
 #else
           close(soc_dat);
@@ -817,16 +776,16 @@ int run_launch_ftp(lien_back* back) {
               get_ftp_line(soc_ctl,line,timeout);
               if (line[0]=='2') {       // OK
                 strcpybuff(back->r.msg,"OK");
-                // back->status=FTP_STATUS_READY;    // fini
-                back->r.statuscode=200;
+                // back->status=STATUS_FTP_READY;    // fini
+                back->r.statuscode=HTTP_OK;
               } else {
                 sprintf(back->r.msg,"RETR incorrect: %s",linejmp(line));
-                // back->status=FTP_STATUS_READY;    // fini
+                // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode=STATUSCODE_INVALID;
               }
             } else {
               strcpybuff(back->r.msg,"FTP read error");
-              // back->status=FTP_STATUS_READY;    // fini
+              // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode=STATUSCODE_INVALID;
             }
           }
@@ -844,7 +803,7 @@ int run_launch_ftp(lien_back* back) {
     strcpybuff(back->info,"quit");
     send_line(soc_ctl,"QUIT");    // bye bye
     get_ftp_line(soc_ctl,NULL,timeout);
-#if HTS_WIN
+#ifdef _WIN32
     closesocket(soc_ctl);
 #else
     close(soc_ctl);
@@ -852,10 +811,10 @@ int run_launch_ftp(lien_back* back) {
   }
   
   if (back->r.statuscode!=-1) {
-    back->r.statuscode=200;
+    back->r.statuscode=HTTP_OK;
     strcpybuff(back->r.msg,"OK");
   }
-  // back->status=FTP_STATUS_READY;    // fini
+  // back->status=STATUS_FTP_READY;    // fini
   return 0;
 }
 
@@ -881,7 +840,7 @@ T_SOC get_datasocket(char* to_send) {
       // copie adresse
       SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0], hp_loc->h_length);
 
-      if ( (soc=socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) != INVALID_SOCKET) {
+      if ( (soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) != INVALID_SOCKET) {
 
         if ( bind(soc,(struct sockaddr*) &server, server_size) == 0 ) {
           SOCaddr server2;
@@ -923,7 +882,7 @@ T_SOC get_datasocket(char* to_send) {
 #endif
               
             } else {
-#if HTS_WIN
+#ifdef _WIN32
               closesocket(soc);
 #else
               close(soc);
@@ -933,7 +892,7 @@ T_SOC get_datasocket(char* to_send) {
             
             
           } else {
-#if HTS_WIN
+#ifdef _WIN32
             closesocket(soc);
 #else
             close(soc);
@@ -943,7 +902,7 @@ T_SOC get_datasocket(char* to_send) {
           
           
         } else {
-#if HTS_WIN
+#ifdef _WIN32
           closesocket(soc);
 #else
           close(soc);
@@ -991,7 +950,7 @@ int send_line(T_SOC soc,char* data) {
     return r;
   }
 #else
-  return (send(soc,line,strlen(line),0) == (int) strlen(line));
+  return (send(soc,line,(int)strlen(line),0) == (int) strlen(line));
 #endif
 }
 
@@ -1140,8 +1099,8 @@ int wait_socket_receive(T_SOC soc,int timeout) {
 // cancel reçu?
 int stop_ftp(lien_back* back) {
   if (back->stop_ftp) {
-    strcpybuff(back->r.msg,"Cancelled by User");
-    // back->status=FTP_STATUS_READY;    // fini
+    strcpybuff(back->r.msg, "Cancelled by User");
+    // back->status=STATUS_FTP_READY;    // fini
     back->r.statuscode=STATUSCODE_INVALID;
     return 1;
   }

@@ -38,13 +38,13 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#include "htsrobots.h"
-
 /* specific definitions */
+#include "htscore.h"
 #include "htsbase.h"
 #include "htslib.h"
 /* END specific definitions */
 
+#include "htsrobots.h"
 
 // -- robots --
 

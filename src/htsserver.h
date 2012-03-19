@@ -81,6 +81,8 @@ extern inthash NewLangStrKeys;
 extern int NewLangListSz;
 extern inthash NewLangList;
 
+extern httrackp *global_opt;
+
 /* Spaces: CR,LF,TAB,FF */
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
@@ -113,8 +115,7 @@ int htslang_uninit(void);
 static char* gethomedir(void);
 static int linput_cpp(FILE* fp,char* s,int max);
 static int linput_trim(FILE* fp,char* s,int max);
-static char* concat(const char* a,const char* b);
-static int fexist(char* s);
+static int fexist(const char* s);
 static int linput(FILE* fp,char* s,int max);
 
 static int linputsoc(T_SOC soc, char* s, int max) {
@@ -186,23 +187,8 @@ static int linput_cpp(FILE* fp,char* s,int max) {
   } while((s[max(rlen-1,0)]=='\\') && (rlen<max));
   return rlen;
 }
-// copy of concat
-typedef struct concat_strc {
-  char buff[16][HTS_URLMAXSIZE*2*2];
-  int rol;
-} concat_strc;
-static char* concat(const char* a,const char* b) {
-  static concat_strc* strc = NULL;
-  if (strc == NULL) {
-    strc = (concat_strc*) calloc(16, sizeof(concat_strc));
-  }
-  strc->rol=((strc->rol+1)%16);    // roving pointer
-  strcpybuff(strc->buff[strc->rol],a);
-  if (b) strcatbuff(strc->buff[strc->rol],b);
-  return strc->buff[strc->rol];
-}
 
-static int fexist(char* s) {
+static int fexist(const char* s) {
   struct stat st;
   memset(&st, 0, sizeof(st));
   if (stat(s, &st) == 0) {
@@ -258,6 +244,38 @@ static int linput_trim(FILE* fp,char* s,int max) {
   return rlen;
 }
 
+static int ehexh(char c) {
+  if ((c>='0') && (c<='9')) return c-'0';
+  if ((c>='a') && (c<='f')) c-=('a'-'A');
+  if ((c>='A') && (c<='F')) return (c-'A'+10);
+  return 0;
+}
+
+static int ehex(char* s) {
+  return 16*ehexh(*s)+ehexh(*(s+1));
+}
+
+static void unescapehttp(char* s, String* tempo) {
+  int i;
+  for (i=0;i<(int) strlen(s);i++) {
+    if (s[i]=='%' && s[i+1]=='%') {
+      i++;
+      StringAddchar(*tempo, '%');
+    } else if (s[i]=='%') {
+      char hc;
+      i++;
+      hc = (char) ehex(s+i);
+      StringAddchar(*tempo, (char) hc);
+      i++;    // sauter 2 caractères finalement
+    }
+    else if (s[i]=='+') {
+      StringAddchar(*tempo, ' ');
+    }
+    else
+      StringAddchar(*tempo, s[i]);
+  }
+}
+
 static void unescapeini(char* s, String* tempo) {
   int i;
   char lastc=0;
@@ -279,28 +297,5 @@ static void unescapeini(char* s, String* tempo) {
   }
 }
 
-#ifndef _WIN32
-#define fconv(a) (a)
-#define fconcat(a,b) concat(a,b)
 #endif
-
-#ifdef _WIN32
-static char* __fconv(char* a) {
-  int i;
-  for(i=0;i<(int) strlen(a);i++)
-    if (a[i]=='/')  // convertir
-      a[i]='\\';
-  return a;
-}
-static char* fconcat(char* a,char* b) {
-  return __fconv(concat(a,b));
-}
-static char* fconv(char* a) {
-  return __fconv(concat(a,""));
-}
-#endif
-
-#endif
-
-
 

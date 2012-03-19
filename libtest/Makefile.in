@@ -163,25 +163,34 @@ AM_LDFLAGS = -L../src
 libbaselinks_la_SOURCES = callbacks-example-baselinks.c
 libbaselinks_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 libbaselinks_la_LDFLAGS = -version-info 1:0:0
+libchangecontent_la_SOURCES = callbacks-example-changecontent.c
+libchangecontent_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libchangecontent_la_LDFLAGS = -version-info 1:0:0
 libcontentfilter_la_SOURCES = callbacks-example-contentfilter.c
 libcontentfilter_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 libcontentfilter_la_LDFLAGS = -version-info 1:0:0
 libdisplayheader_la_SOURCES = callbacks-example-displayheader.c
 libdisplayheader_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 libdisplayheader_la_LDFLAGS = -version-info 1:0:0
-libfilename_la_SOURCES = callbacks-example-filename.c
-libfilename_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
-libfilename_la_LDFLAGS = -version-info 1:0:0
 libfilename2_la_SOURCES = callbacks-example-filename2.c
 libfilename2_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 libfilename2_la_LDFLAGS = -version-info 1:0:0
+libfilename_la_SOURCES = callbacks-example-filename.c
+libfilename_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libfilename_la_LDFLAGS = -version-info 1:0:0
 libfilenameiisbug_la_SOURCES = callbacks-example-filenameiisbug.c
 libfilenameiisbug_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 libfilenameiisbug_la_LDFLAGS = -version-info 1:0:0
 liblistlinks_la_SOURCES = callbacks-example-listlinks.c
 liblistlinks_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
 liblistlinks_la_LDFLAGS = -version-info 1:0:0
-pkglib_LTLIBRARIES = libbaselinks.la libcontentfilter.la libdisplayheader.la libfilename.la libfilename2.la libfilenameiisbug.la liblistlinks.la
+liblog_la_SOURCES = callbacks-example-log.c
+liblog_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+liblog_la_LDFLAGS = -version-info 1:0:0
+libsimple_la_SOURCES = callbacks-example-simple.c
+libsimple_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+libsimple_la_LDFLAGS = -version-info 1:0:0
+pkglib_LTLIBRARIES = libbaselinks.la libchangecontent.la libcontentfilter.la libdisplayheader.la libfilename2.la libfilename.la libfilenameiisbug.la liblistlinks.la liblog.la libsimple.la
 subdir = libtest
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
@@ -192,6 +201,9 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 libbaselinks_la_DEPENDENCIES =
 am_libbaselinks_la_OBJECTS = callbacks-example-baselinks.lo
 libbaselinks_la_OBJECTS = $(am_libbaselinks_la_OBJECTS)
+libchangecontent_la_DEPENDENCIES =
+am_libchangecontent_la_OBJECTS = callbacks-example-changecontent.lo
+libchangecontent_la_OBJECTS = $(am_libchangecontent_la_OBJECTS)
 libcontentfilter_la_DEPENDENCIES =
 am_libcontentfilter_la_OBJECTS = callbacks-example-contentfilter.lo
 libcontentfilter_la_OBJECTS = $(am_libcontentfilter_la_OBJECTS)
@@ -210,17 +222,26 @@ libfilenameiisbug_la_OBJECTS = $(am_libfilenameiisbug_la_OBJECTS)
 liblistlinks_la_DEPENDENCIES =
 am_liblistlinks_la_OBJECTS = callbacks-example-listlinks.lo
 liblistlinks_la_OBJECTS = $(am_liblistlinks_la_OBJECTS)
+liblog_la_DEPENDENCIES =
+am_liblog_la_OBJECTS = callbacks-example-log.lo
+liblog_la_OBJECTS = $(am_liblog_la_OBJECTS)
+libsimple_la_DEPENDENCIES =
+am_libsimple_la_OBJECTS = callbacks-example-simple.lo
+libsimple_la_OBJECTS = $(am_libsimple_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/callbacks-example-baselinks.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-changecontent.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-contentfilter.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-displayheader.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filename.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filename2.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-filenameiisbug.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-listlinks.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-listlinks.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-log.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/callbacks-example-simple.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -228,14 +249,15 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(libbaselinks_la_SOURCES) $(libcontentfilter_la_SOURCES) \
-	$(libdisplayheader_la_SOURCES) $(libfilename_la_SOURCES) \
-	$(libfilename2_la_SOURCES) $(libfilenameiisbug_la_SOURCES) \
-	$(liblistlinks_la_SOURCES)
+DIST_SOURCES = $(libbaselinks_la_SOURCES) $(libchangecontent_la_SOURCES) \
+	$(libcontentfilter_la_SOURCES) $(libdisplayheader_la_SOURCES) \
+	$(libfilename_la_SOURCES) $(libfilename2_la_SOURCES) \
+	$(libfilenameiisbug_la_SOURCES) $(liblistlinks_la_SOURCES) \
+	$(liblog_la_SOURCES) $(libsimple_la_SOURCES)
 DATA = $(exemples_DATA)
 
 DIST_COMMON = $(srcdir)/Makefile.in Makefile.am
-SOURCES = $(libbaselinks_la_SOURCES) $(libcontentfilter_la_SOURCES) $(libdisplayheader_la_SOURCES) $(libfilename_la_SOURCES) $(libfilename2_la_SOURCES) $(libfilenameiisbug_la_SOURCES) $(liblistlinks_la_SOURCES)
+SOURCES = $(libbaselinks_la_SOURCES) $(libchangecontent_la_SOURCES) $(libcontentfilter_la_SOURCES) $(libdisplayheader_la_SOURCES) $(libfilename_la_SOURCES) $(libfilename2_la_SOURCES) $(libfilenameiisbug_la_SOURCES) $(liblistlinks_la_SOURCES) $(liblog_la_SOURCES) $(libsimple_la_SOURCES)
 
 all: all-am
 
@@ -276,6 +298,8 @@ clean-pkglibLTLIBRARIES:
 	done
 libbaselinks.la: $(libbaselinks_la_OBJECTS) $(libbaselinks_la_DEPENDENCIES) 
 	$(LINK) -rpath $(pkglibdir) $(libbaselinks_la_LDFLAGS) $(libbaselinks_la_OBJECTS) $(libbaselinks_la_LIBADD) $(LIBS)
+libchangecontent.la: $(libchangecontent_la_OBJECTS) $(libchangecontent_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libchangecontent_la_LDFLAGS) $(libchangecontent_la_OBJECTS) $(libchangecontent_la_LIBADD) $(LIBS)
 libcontentfilter.la: $(libcontentfilter_la_OBJECTS) $(libcontentfilter_la_DEPENDENCIES) 
 	$(LINK) -rpath $(pkglibdir) $(libcontentfilter_la_LDFLAGS) $(libcontentfilter_la_OBJECTS) $(libcontentfilter_la_LIBADD) $(LIBS)
 libdisplayheader.la: $(libdisplayheader_la_OBJECTS) $(libdisplayheader_la_DEPENDENCIES) 
@@ -288,6 +312,10 @@ libfilenameiisbug.la: $(libfilenameiisbug_la_OBJECTS) $(libfilenameiisbug_la_DEP
 	$(LINK) -rpath $(pkglibdir) $(libfilenameiisbug_la_LDFLAGS) $(libfilenameiisbug_la_OBJECTS) $(libfilenameiisbug_la_LIBADD) $(LIBS)
 liblistlinks.la: $(liblistlinks_la_OBJECTS) $(liblistlinks_la_DEPENDENCIES) 
 	$(LINK) -rpath $(pkglibdir) $(liblistlinks_la_LDFLAGS) $(liblistlinks_la_OBJECTS) $(liblistlinks_la_LIBADD) $(LIBS)
+liblog.la: $(liblog_la_OBJECTS) $(liblog_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(liblog_la_LDFLAGS) $(liblog_la_OBJECTS) $(liblog_la_LIBADD) $(LIBS)
+libsimple.la: $(libsimple_la_OBJECTS) $(libsimple_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pkglibdir) $(libsimple_la_LDFLAGS) $(libsimple_la_OBJECTS) $(libsimple_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT) core *.core
@@ -296,12 +324,15 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-baselinks.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-changecontent.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-contentfilter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-displayheader.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filename.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filename2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-filenameiisbug.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-listlinks.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-log.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/callbacks-example-simple.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" \

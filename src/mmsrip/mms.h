@@ -28,6 +28,8 @@
 #ifndef __MMS_H__
 #define __MMS_H__
 
+#include "common.h"
+
 #ifdef _WIN32
 typedef signed long int ssize_t;
 #define bcopy(s, d, l) memcpy(d, s, l)
@@ -46,7 +48,7 @@ typedef unsigned int uint32_t;
 #endif
 typedef unsigned long long int uint64_t;
 #else
-#if defined(SOLARIS) || defined(sun)
+#if defined(SOLARIS) || defined(sun)|| defined (__FreeBSD__) || defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #else
 #include <stdint.h>

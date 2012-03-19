@@ -2,35 +2,35 @@
     HTTrack external callbacks example
     .c file
 
+    How to build: (callback.so or callback.dll)
+      With GNU-GCC:
+        gcc -O -g3 -Wall -D_REENTRANT -shared -o mycallback.so callbacks-example.c -lhttrack1
+      With MS-Visual C++:
+        cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"mycallback.dll" callbacks-example.c libhttrack1.lib
+
+      Note: the httrack library linker option is only necessary when using libhttrack's functions inside the callback
+
     How to use:
-    - compile this file as a module (callback.so or callback.dll)
-      example:
-      (with gcc)
-      gcc -O -g3 -Wall -D_REENTRANT -DINET6 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -shared -o callback.so callbacks-example.c
-      or (with visual c++)
-      cl -LD -nologo -W3 -Zi -Zp4 -DWIN32 -Fe"callback.dll" callbacks-example.c
-    - use the --wrapper option in httrack:
-      httrack --wrapper check-html=callback:process_file
-              --wrapper link-detected=callback:check_detectedlink
-              --wrapper loop=callback:check_loop
+      httrack --wrapper mycallback ..
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* "External" */
-#ifdef _WIN32
-#define EXTERNAL_FUNCTION __declspec(dllexport)
-#else
-#define EXTERNAL_FUNCTION 
-#endif
+/* Standard httrack module includes */
+#include "httrack-library.h"
+#include "htsopt.h"
+#include "htsdefines.h"
 
 /* Function definitions */
-EXTERNAL_FUNCTION int process_file(char* html, int len, char* url_adresse, char* url_fichier);
-EXTERNAL_FUNCTION int check_detectedlink(char* link);
-EXTERNAL_FUNCTION int check_loop(void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats);
-EXTERNAL_FUNCTION int check_void(void);
+static int process_file(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* url_address, const char* url_file);
+static int check_detectedlink(t_hts_callbackarg *carg, httrackp *opt, char* link);
+static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats);
+static int end(t_hts_callbackarg *carg, httrackp *opt);
+
+/* external functions */
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
 
 /*
   This sample just lists all links in documents with the parent link:
@@ -38,42 +38,96 @@ EXTERNAL_FUNCTION int check_void(void);
   This sample can be improved, for example, to make a map of a website.
 */
 
-static char currentURLBeingParsed[2048];
+typedef struct t_my_userdef {
+  char currentURLBeingParsed[2048];
+} t_my_userdef;
 
-/*
-"check-html" callback
-typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url_fichier);
+/* 
+module entry point 
 */
-EXTERNAL_FUNCTION int process_file(char* html, int len, char* url_adresse, char* url_fichier) {
-  printf("now parsing %s%s..\n", url_adresse, url_fichier);
-  strcpy(currentURLBeingParsed, url_adresse);
-  strcat(currentURLBeingParsed, url_fichier);
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+  t_my_userdef *userdef;
+  /* */
+  const char *arg = strchr(argv, ',');
+  if (arg != NULL)
+    arg++;
+
+  /* Create user-defined structure */
+  userdef = (t_my_userdef*) malloc(sizeof(t_my_userdef));    /* userdef */
+  userdef->currentURLBeingParsed[0] = '\0';
+
+  /* Plug callback functions */
+  CHAIN_FUNCTION(opt, check_html, process_file, userdef);
+  CHAIN_FUNCTION(opt, end, end, userdef);
+  CHAIN_FUNCTION(opt, linkdetected, check_detectedlink, userdef);
+  CHAIN_FUNCTION(opt, loop, check_loop, userdef);
+
   return 1;  /* success */
 }
 
-/*
-"link-detected" callback
-typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
-*/
-EXTERNAL_FUNCTION int check_detectedlink(char* link) {
+static int process_file(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* url_address, const char* url_file) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+  char * const currentURLBeingParsed = userdef->currentURLBeingParsed;
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
+      return 0;  /* Abort */
+    }
+  }
+
+  /* Process */
+  printf("now parsing %s%s..\n", url_address, url_file);
+  strcpy(currentURLBeingParsed, url_address);
+  strcat(currentURLBeingParsed, url_file);
+
+  return 1;  /* success */
+}
+
+static int check_detectedlink(t_hts_callbackarg *carg, httrackp *opt, char* link) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+  char * const currentURLBeingParsed = userdef->currentURLBeingParsed;
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, linkdetected) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, linkdetected)(CALLBACKARG_PREV_CARG(carg), opt, link)) {
+      return 0;  /* Abort */
+    }
+  }
+
+  /* Process */
   printf("[%s] -> [%s]\n", currentURLBeingParsed, link);
+
   return 1;  /* success */
 }
 
-/*
-"loop" callback
-typedef int   (* t_hts_htmlcheck_loop)(void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats);
-*/
-EXTERNAL_FUNCTION int check_loop(void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats) {
+static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats) {
   static int fun_animation=0;
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, loop) != NULL) {
+    if (!CALLBACKARG_PREV_FUN(carg, loop)(CALLBACKARG_PREV_CARG(carg), opt, back, back_max, back_index, lien_tot, lien_ntot, stat_time, stats)) {
+      return 0;  /* Abort */
+    }
+  }
+
+  /* Process */
   printf("%c\r", "/-\\|"[(fun_animation++)%4]);
   return 1;
 }
 
-/*
-a default callback for testing purpose
-*/
-EXTERNAL_FUNCTION int check_void(void) {
-  printf("\n* * * default callback function called! * * *\n\n");
-  return 1;
+static int end(t_hts_callbackarg *carg, httrackp *opt) {
+  t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
+  fprintf(stderr, "** info: wrapper_exit() called!\n");
+  if (userdef != NULL) {
+    free(userdef);
+    userdef = NULL;
+  }
+
+  /* Call parent functions if multiple callbacks are chained. */
+  if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
+    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+  }
+
+  return 1;  /* success */
 }

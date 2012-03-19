@@ -42,20 +42,37 @@ Please visit our Website: http://www.httrack.com
 #include "htsbasenet.h"
 #include "htsthread.h"
 
-// lien_back
-#include "htscore.h"
+/* Forward definitions */
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+
+/* Download structure */
+#ifndef HTS_DEF_FWSTRUCT_FTPDownloadStruct
+#define HTS_DEF_FWSTRUCT_FTPDownloadStruct
+typedef struct FTPDownloadStruct FTPDownloadStruct;
+#endif
+struct FTPDownloadStruct {
+	lien_back *pBack;
+	httrackp *pOpt;
+};
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 #if USE_BEGINTHREAD
-void launch_ftp(lien_back* back);
-PTHREAD_TYPE PTHREAD_TYPE_FNC back_launch_ftp( void* pP );
+void launch_ftp(FTPDownloadStruct *params);
+void back_launch_ftp( void* pP );
 #else
-void launch_ftp(lien_back* back,char* path,char* exec);
-int back_launch_ftp(lien_back* back);
+void launch_ftp(FTPDownloadStruct *params,char* path,char* exec);
+int back_launch_ftp(FTPDownloadStruct *params);
 #endif
 
-int run_launch_ftp(lien_back* back);
+int run_launch_ftp(FTPDownloadStruct *params);
 int send_line(T_SOC soc,char* data);
 int get_ftp_line(T_SOC soc,char* line,int timeout);
 T_SOC get_datasocket(char* to_send);

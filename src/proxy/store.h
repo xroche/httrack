@@ -28,6 +28,13 @@ Please visit our Website: http://www.httrack.com
 #ifndef WEBHTTRACK_PROXYTRACK_STORE
 #define WEBHTTRACK_PROXYTRACK_STORE
 
+/* Includes */
+#ifndef _WIN32
+#include <pthread.h>
+#else
+#include "windows.h"
+#endif
+
 /* Proxy */
 
 typedef struct _PT_Index _PT_Index;
@@ -43,12 +50,12 @@ typedef struct _PT_CacheItem _PT_CacheItem;
 typedef struct _PT_CacheItem *PT_CacheItem;
 
 typedef struct _PT_Element {
-	int indexId;					 // index identifier, if suitable (!= -1)
+	int indexId;           // index identifier, if suitable (!= -1)
 	//
   int statuscode;        // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
   char* adr;             // adresse du bloc de mémoire, NULL=vide
-  char* headers;         // adresse des en têtes si présents
-  unsigned long int size;	// taille fichier
+  char* headers;         // adresse des en têtes si présents (RFC822 format)
+  size_t size;	         // taille fichier
   char msg[1024];        // error message ("\0"=undefined)
   char contenttype[64];  // content-type ("text/html" par exemple)
   char charset[64];      // charset ("iso-8859-1" par exemple)
@@ -85,11 +92,14 @@ int PT_AddIndex(PT_Indexes index, const char *path);
 int PT_RemoveIndex(PT_Indexes index, int indexId);
 int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex);
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId);
+time_t PT_GetTimeIndex(PT_Indexes indexes);
 
 /* Indexes list */
 PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes);
 char ** PT_Enumerate(PT_Indexes indexes, const char *url, int subtree);
 void PT_Enumerate_Delete(char ***plist);
+int PT_EnumCache(PT_Indexes indexes, int (*callback)(void *, const char *url, PT_Element), void *arg);
+int PT_SaveCache(PT_Indexes indexes, const char *filename);
 
 /* Index */
 PT_Index PT_LoadCache(const char *filename);

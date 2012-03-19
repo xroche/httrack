@@ -28,77 +28,11 @@ Please visit our Website: http://www.httrack.com
 
 // Strings a bit safer than static buffers
 
-#ifndef HTS_STRINGS_DEFSTATIC
-#define HTS_STRINGS_DEFSTATIC 
+#ifndef HTS_PROXYSTRINGS_DEFSTATIC
+#define HTS_PROXYSTRINGS_DEFSTATIC 
 
-typedef struct String {
-  char* buff;
-  int len;
-  int capa;
-} String;
+#include "htsstrings.h"
 
-#define STRING_EMPTY {NULL, 0, 0}
-#define STRING_BLK_SIZE 256
-#define StringBuff(blk) ((blk).buff)
-#define StringLength(blk) ((blk).len)
-#define StringCapacity(blk) ((blk).capa)
-#define StringRoom(blk, size) do { \
-  if ((blk).len + (int)(size) + 1 > (blk).capa) { \
-    (blk).capa = ((blk).len + (size) + 1) * 2; \
-    (blk).buff = (char*) realloc((blk).buff, (blk).capa); \
-  } \
-} while(0)
-#define StringBuffN(blk, size) StringBuffN_(&(blk), size) 
-static char* StringBuffN_(String* blk, int size) {
-  StringRoom(*blk, (blk->len) + size);
-  return StringBuff(*blk);
-}
-#define StringClear(blk) do { \
-  StringRoom(blk, 0); \
-  (blk).buff[0] = '\0'; \
-  (blk).len = 0; \
-} while(0)
-#define StringFree(blk) do { \
-  if ((blk).buff != NULL) { \
-    free((blk).buff); \
-    (blk).buff = NULL; \
-  } \
-  (blk).capa = 0; \
-  (blk).len = 0; \
-} while(0)
-#define StringMemcat(blk, str, size) do { \
-  StringRoom(blk, size); \
-  if ((int)(size) > 0) { \
-    memcpy((blk).buff + (blk).len, (str), (size)); \
-    (blk).len += (size); \
-  } \
-  *((blk).buff + (blk).len) = '\0'; \
-} while(0)
-#define StringAddchar(blk, c) do { \
-  char __c = (c); \
-  StringMemcat(blk, &__c, 1); \
-} while(0)
-static void* StringAcquire(String* blk) {
-  void* buff = blk->buff;
-  blk->buff = NULL;
-  blk->capa = 0;
-  blk->len = 0;
-  return buff;
-}
-static StringAttach(String* blk, char** str) {
-	StringFree(*blk);
-	if (str != NULL && *str != NULL) {
-		blk->buff = *str;
-		blk->capa = (int)strlen(blk->buff);
-		blk->len = blk->capa;
-		*str = NULL;
-	}
-}
-#define StringStrcat(blk, str) StringMemcat(blk, str, ((str) != NULL) ? (int)strlen(str) : 0)
-#define StringStrcpy(blk, str) do { \
-  StringClear(blk); \
-  StringStrcat(blk, str); \
-} while(0)
 
 /* Tools */
 
@@ -138,16 +72,46 @@ static void escapexml(const char* s, String* tempo) {
   int i;
   for (i=0 ; s[i] != '\0' ; i++) {
     if (s[i] == '&')
-      StringStrcat(*tempo, "&amp;");
+      StringCat(*tempo, "&amp;");
 		else if (s[i] == '<')
-      StringStrcat(*tempo, "&lt;");
+      StringCat(*tempo, "&lt;");
 		else if (s[i] == '>')
-      StringStrcat(*tempo, "&gt;");
+      StringCat(*tempo, "&gt;");
 		else if (s[i] == '\"')
-      StringStrcat(*tempo, "&quot;");
+      StringCat(*tempo, "&quot;");
     else
       StringAddchar(*tempo, s[i]);
   }
+}
+
+static char* concat(char *catbuff,const char* a,const char* b) {
+	if (a != NULL && a[0] != '\0') {
+		strcpy(catbuff, a);
+	} else {
+		catbuff[0] = '\0';
+	}
+	if (b != NULL && b[0] != '\0') {
+		strcat(catbuff, b);
+	}
+  return catbuff;
+}
+
+static char* __fconv(char* a) {
+#ifdef WIN32
+  int i;
+  for(i = 0 ; a[i] != 0 ; i++)
+    if (a[i] == '/')  // Unix-to-DOS style
+      a[i] = '\\';
+#endif
+  return a;
+}
+
+static char* fconcat(char *catbuff, const char* a, const char* b) {
+  return __fconv(concat(catbuff,a,b));
+}
+
+static char* fconv(char *catbuff, const char* a) {
+  return __fconv(concat(catbuff,a,""));
 }
 
 #endif

@@ -39,10 +39,11 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSKINDEX_DEFH
 #define HTSKINDEX_DEFH
 
-#include "htsglobal.h"
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+#include "htsglobal.h"
+
 int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath);
 void index_init(const char* indexpath);
 void index_finish(const char* indexpath,int mode);

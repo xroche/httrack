@@ -47,7 +47,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef  _WIN32_WCE
 #include <fcntl.h>
 #endif
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #include <arpa/inet.h>
 #endif
@@ -102,7 +102,7 @@ HTSEXT_API T_SOC catch_url_init(int* port,char* adr) {
       // copie adresse
       SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0], hp_loc->h_length);
 
-      if ( (soc=socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) != INVALID_SOCKET) {
+      if ( (soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) != INVALID_SOCKET) {
         SOCaddr_initport(server, *port);
         if ( bind(soc,(struct sockaddr*) &server,server_size) == 0 ) {
           SOCaddr server2;
@@ -162,7 +162,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
     T_SOC soc2;
     struct sockaddr dummyaddr;
     int dummylen = sizeof(struct sockaddr);  
-    while ( (soc2=accept(soc,&dummyaddr,&dummylen)) == INVALID_SOCKET);
+    while ( (soc2 = (T_SOC) accept(soc,&dummyaddr,&dummylen)) == INVALID_SOCKET);
   /*
 #ifdef _WIN32
     closesocket(soc);
@@ -224,7 +224,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
             //strcatbuff(data,"\r\n");
             if (blkretour.totalsize>0) {
               int len=(int)min(blkretour.totalsize,32000);
-              int pos=strlen(data);
+              int pos = (int) strlen(data);
               // Copier le reste (post éventuel)
               while((len>0) && ((r=recv(soc,(char*) data+pos,len,0))>0) ) {
                 pos+=r;
@@ -234,7 +234,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
             }
             // Envoyer page
             sprintf(line,CATCH_RESPONSE);
-            send(soc,line,strlen(line),0);
+            send(soc,line,(int)strlen(line),0);
             // OK!
             retour=1;
           }

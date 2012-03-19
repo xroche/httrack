@@ -52,7 +52,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 extern int gz_is_available;
 extern int hts_zunpack(char* filename,char* newfile);
-extern int hts_extract_meta(char* path);
+extern int hts_extract_meta(const char* path);
 #endif
 
 #endif
