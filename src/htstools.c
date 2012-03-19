@@ -608,7 +608,7 @@ HTS_INLINE int rech_endtoken(const char* adr, const char** start) {
   }
   return length;
 }
-// same, but check begining of adr wirh s (for <object src="bar.mov" .. hotspot123="foo.html">)
+// same, but check beginning of adr with s (for <object src="bar.mov" .. hotspot123="foo.html">)
 HTS_INLINE int __rech_tageqbegdigits(const char* adr,const char* s) { 
   int p;
   p=strfield(adr,s);

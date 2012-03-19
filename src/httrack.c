@@ -772,11 +772,22 @@ static void sig_doback(int blind) {       // mettre en backing
 }
 #endif
 
+static void sig_leave( int code ) {
+  signal(code, sig_term);  // quitter si encore
+  printf("\n** Finishing pending transfers.. press again ^C to quit.\n");
+  if (global_opt != NULL) {
+    // ask for stop
+    global_opt->state.stop=1;
+  }
+}
+
 static void signal_handlers(void) {
 #ifdef _WIN32
 #ifndef  _WIN32_WCE
 #if 0	/* BUG366763 */
 	signal( SIGINT  , sig_ask    );   // ^C
+#else
+	signal( SIGINT  , sig_leave  );   // ^C
 #endif
 	signal( SIGTERM , sig_finish );   // kill <process>
 #endif
@@ -788,6 +799,8 @@ static void signal_handlers(void) {
 	signal( SIGTERM , sig_finish );   // kill <process>
 #if 0	/* BUG366763 */
 	signal( SIGINT  , sig_ask    );   // ^C
+#else
+	signal( SIGINT  , sig_leave  );   // ^C
 #endif
 	signal( SIGPIPE , sig_brpipe );   // broken pipe (write into non-opened socket)
 	signal( SIGCHLD , sig_ignore );   // child change status

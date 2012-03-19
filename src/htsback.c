@@ -458,6 +458,10 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 
 		/* Don't store broken files */
 		if (back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
+      if (opt->log!=NULL) {
+        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (broken size): %s%s"LF,back[p].url_adr,back[p].url_fil);
+      }
+      test_flush;
 			return -1;
 		}
 
@@ -1391,7 +1395,8 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
       back[p].head_request=2;       // test en get
 
     /* Stop requested - abort backing */
-    if (opt->state.stop) {
+    /* For update mode: second check after cache lookup not to lose all previous cache data ! */
+    if (opt->state.stop && !opt->is_update) {
       back[p].r.statuscode=STATUSCODE_INVALID;        // fatal
       strcpybuff(back[p].r.msg,"mirror stopped by user");
       back[p].status=STATUS_READY;  // terminé
@@ -1539,8 +1544,9 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
 #else
       if (a!=NULL) {  // OK existe en cache (et données aussi)!
 #endif
-        if (cache->type==1) {   // cache prioritaire (pas de test if-modified..)
-                               // dans ce cas on peut également lire des réponses cachées comme 404,302...
+        const int cache_is_prioritary = cache->type == 1 || opt->state.stop != 0;
+        if (cache_is_prioritary) {   // cache prioritaire (pas de test if-modified..)
+                                     // dans ce cas on peut également lire des réponses cachées comme 404,302...
           // lire dans le cache
           if (!test)
             back[p].r = cache_read(opt,cache,adr,fil,save, back[p].location_buffer);
@@ -1756,6 +1762,17 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
       }
     }
 
+    /* Stop requested - abort backing */
+    if (opt->state.stop) {
+      back[p].r.statuscode=STATUSCODE_INVALID;        // fatal
+      strcpybuff(back[p].r.msg,"mirror stopped by user");
+      back[p].status=STATUS_READY;  // terminé
+      back_set_finished(sback, p);
+      if ((opt->debug>0) && (opt->log!=NULL)) {
+        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File not added due to mirror cancel: %s%s"LF,adr,fil); test_flush;
+      }            
+      return 0;
+    }
 
     {
       ///htsblk r;   non directement dans la structure-réponse!
@@ -3314,7 +3331,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                             }
                           } else {
                             if (opt->log!=NULL) {
-                              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File seems complete (same size), but there was a cache read error: %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
+                              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File seems complete (same size), but there was a cache read error (%u): %s%s"LF, r.statuscode, back[i].url_adr, back[i].url_fil); test_flush;
                             }
                           }
                           if (r.adr) {

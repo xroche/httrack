@@ -1,4 +1,3 @@
-/* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) Xavier Roche and other contributors
@@ -246,7 +245,7 @@ int cookie_load(t_cookie* cookie, const char* fpath, const char* name) {
             if (line[0]!='#') {
               char domain[256];           // domaine cookie (.netscape.com)
               char path[256];             // chemin (/)
-              char cook_name[256];        // nom cookie (MYCOOK)
+              char cook_name[1024];       // nom cookie (MYCOOK)
               char BIGSTK cook_value[8192];      // valeur (ID=toto,S=1234)
               strcpybuff(domain,cookie_get(buffer,line,0));       // host
               strcpybuff(path,cookie_get(buffer,line,2));         // path

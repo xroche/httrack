@@ -115,17 +115,27 @@ struct String {
   StringBuffRW(BLK)[--StringLength(BLK)] = '\0'; \
 } while(0)
 
-/** Ensure the string is large enough **/
-#define StringRoom(BLK, SIZE) do { \
-  if ((BLK).length_ + (int)(SIZE) + 1 > (BLK).capacity_) { \
-    (BLK).capacity_ = ((BLK).length_ + (SIZE) + 1) * 2; \
-    (BLK).buffer_ = (char*) STRING_REALLOC((BLK).buffer_, (BLK).capacity_); \
+/** Ensure the string is large enough for exactly CAPACITY bytes overall (including \0). **/
+#define StringRoomTotal(BLK, CAPACITY) do { \
+  const size_t capacity_ = (size_t) (CAPACITY); \
+  while ((BLK).capacity_ < capacity_) { \
+    if ((BLK).capacity_ < 16) { \
+      (BLK).capacity_ = 16; \
+    } else { \
+      (BLK).capacity_ *= 2; \
+    } \
+    (BLK).buffer_ = STRING_REALLOC((BLK).buffer_, (BLK).capacity_); \
     STRING_ASSERT((BLK).buffer_ != NULL); \
   } \
 } while(0)
+
+/** Ensure the string is large enough for exactly SIZE more characters (not including \0). **/
+#define StringRoom(BLK, SIZE) StringRoomTotal(BLK, StringLength(BLK) + (SIZE) + 1)
+
+/** Return the RW buffer for a strcat() operation of at most SIZE characters. **/
 #define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE) 
 HTS_STATIC char* StringBuffN_(String* blk, int size) {
-  StringRoom(*blk, StringLength(*blk) + size);
+  StringRoom(*blk, size);
   return StringBuffRW(*blk);
 }
 
@@ -138,9 +148,9 @@ HTS_STATIC char* StringBuffN_(String* blk, int size) {
 
 /** Clear a string (set its length to 0) **/
 #define StringClear(BLK) do { \
+  (BLK).length_ = 0; \
   StringRoom(BLK, 0); \
   (BLK).buffer_[0] = '\0'; \
-  (BLK).length_ = 0; \
 } while(0)
 
 /** Set the length of a string to 'SIZE'. If SIZE is negative, check the size using strlen(). **/
@@ -174,10 +184,12 @@ The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
 
 /** Append a memory block to a string **/
 #define StringMemcat(BLK, STR, SIZE) do { \
-  StringRoom(BLK, SIZE); \
-  if ((int)(SIZE) > 0) { \
-    memcpy((BLK).buffer_ + (BLK).length_, (STR), (SIZE)); \
-    (BLK).length_ += (int)(SIZE); \
+  const char* str_mc_ = (STR); \
+  const size_t size_mc_ = (size_t) (SIZE); \
+  StringRoom(BLK, size_mc_); \
+  if (size_mc_ > 0) { \
+    memcpy((BLK).buffer_ + (BLK).length_, str_mc_, size_mc_); \
+    (BLK).length_ += size_mc_; \
   } \
   *((BLK).buffer_ + (BLK).length_) = '\0'; \
 } while(0)
@@ -225,9 +237,9 @@ HTS_STATIC void StringAttach(String* blk, char** str) {
 
 /** Append a string to another one. **/
 #define StringCat(BLK, STR) do { \
-  const char *str__ = ( STR ); \
+  const char *const str__ = ( STR ); \
   if (str__ != NULL) { \
-    size_t size__ = strlen(str__); \
+    const size_t size__ = strlen(str__); \
     StringMemcat(BLK, str__, size__); \
   } \
 } while(0)

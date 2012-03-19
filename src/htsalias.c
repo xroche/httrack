@@ -134,6 +134,7 @@ const char* hts_optalias[][4] = {
   {"disable-passwords","-%x","single",""},{"disable-password","-%x","single",""},
   {"include-query-string","-%q","single",""},
   {"generate-errors","-o","single",""},
+  {"do-not-generate-errors","-o0","single",""},
   {"purge-old","-X","param",""},
   {"cookies","-b","param",""},
   {"check-type","-u","param",""},
