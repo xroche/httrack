@@ -67,7 +67,7 @@ Please visit our Website: http://www.httrack.com
 // 0- Init the URL catcher with standard port
 
 // catch_url_init(&port,&return_host);
-T_SOC catch_url_init_std(int* port_prox,char* adr_prox) {
+HTSEXT_API T_SOC catch_url_init_std(int* port_prox,char* adr_prox) {
   T_SOC soc;
   int try_to_listen_to[]={8080,3128,80,81,82,8081,3129,31337,0,-1};
   int i=0;
@@ -83,27 +83,9 @@ T_SOC catch_url_init_std(int* port_prox,char* adr_prox) {
 // 1- Init the URL catcher
 
 // catch_url_init(&port,&return_host);
-T_SOC catch_url_init(int* port,char* adr) {
+HTSEXT_API T_SOC catch_url_init(int* port,char* adr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256+2];
-
-  /*
-#ifdef _WIN32
-  {
-    WORD   wVersionRequested;
-    WSADATA wsadata;
-    int stat;
-    wVersionRequested = 0x0101;
-    stat = WSAStartup( wVersionRequested, &wsadata );
-    if (stat != 0) {
-      return INVALID_SOCKET;
-    } else if (LOBYTE(wsadata.wVersion) != 1  && HIBYTE(wsadata.wVersion) != 1) {
-      WSACleanup();
-      return INVALID_SOCKET;
-    }
-  }
-#endif
-  */
 
   if (gethostname(h_loc,256)==0) {    // host name
     SOCaddr server;
@@ -132,7 +114,7 @@ T_SOC catch_url_init(int* port,char* adr) {
             if (listen(soc,10)>=0) {    // au pif le 10
               SOCaddr_inetntoa(adr, 128, server2, len);
             } else {
-#if _WIN32
+#ifdef _WIN32
               closesocket(soc);
 #else
               close(soc);
@@ -142,7 +124,7 @@ T_SOC catch_url_init(int* port,char* adr) {
             
             
           } else {
-#if _WIN32
+#ifdef _WIN32
             closesocket(soc);
 #else
             close(soc);
@@ -152,7 +134,7 @@ T_SOC catch_url_init(int* port,char* adr) {
           
           
         } else {
-#if _WIN32
+#ifdef _WIN32
           closesocket(soc);
 #else
           close(soc);
@@ -171,7 +153,7 @@ T_SOC catch_url_init(int* port,char* adr) {
 // returns 0 if error
 // url: buffer where URL must be stored - or ip:port in case of failure
 // data: 32Kb
-int catch_url(T_SOC soc,char* url,char* method,char* data) {
+HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
   int retour=0;
 
   // connexion (accept)
@@ -234,11 +216,11 @@ int catch_url(T_SOC soc,char* url,char* method,char* data) {
             while(strnotempty(line)) {
               socinput(soc,line,1000);
               treathead(NULL,NULL,NULL,&blkretour,line);  // traiter
-              strcat(data,line);
-              strcat(data,"\r\n");
+              strcatbuff(data,line);
+              strcatbuff(data,"\r\n");
             }
             // CR/LF final de l'en tête inutile car déja placé via la ligne vide juste au dessus
-            //strcat(data,"\r\n");
+            //strcatbuff(data,"\r\n");
             if (blkretour.totalsize>0) {
               int len=(int)min(blkretour.totalsize,32000);
               int pos=strlen(data);

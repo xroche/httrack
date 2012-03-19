@@ -38,8 +38,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSJAVA_DEFH
 #define HTSJAVA_DEFH 
 
-/* LLint fsize(char* s);    */
-int fsize(char* s);    
+#include <stdio.h>
+#include "htsmodules.h"
 
 typedef struct  {
   unsigned long  int magic;
@@ -57,10 +57,11 @@ typedef struct {
 } RESP_STRUCT;
 
 
-int hts_parse_java(char *file,char* err_msg);
+int hts_detect_java(htsmoduleStruct* str);
+int hts_parse_java(htsmoduleStruct* str);
 RESP_STRUCT affecte(int i1,int i2,RESP_STRUCT *i3,RESP_STRUCT *i4,int i5);
 //unsigned int swap(long int nomber,int digit);
-RESP_STRUCT readtable(FILE *fp,RESP_STRUCT,int*,char*);
+RESP_STRUCT readtable(htsmoduleStruct* str,FILE *fp,RESP_STRUCT,int*);
 unsigned short int readshort(FILE *fp);
 int tris(char*);
 char * printname(char [1024]);

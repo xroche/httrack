@@ -44,6 +44,7 @@ Please visit our Website: http://www.httrack.com
 
 #if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
+#include "htsinthash.h"
 
 
 /* Keyword Indexer Parameters */
@@ -92,7 +93,7 @@ Please visit our Website: http://www.httrack.com
 // Words begining with these (accepted) characters will be ignored
 #define KEYW_NOT_BEG         "0123456789"
 // Treat these characters as space characters - MUST NOT BE EMPTY!!!
-#define KEYW_SPACE           " ',;:!?\"\x0d\x0a\x09\x0c"
+#define KEYW_SPACE           " ',;:!?\"\x0d\x0a\x09\x0b\x0c"
 // Common words (the,for..) detector
 // If a word represents more than KEYW_USELESS1K (%1000) of total words, then ignore it
 // 5 (0.5%)
@@ -184,6 +185,8 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
     || (strfield2(mime,"text/css"))
     ) {
     inscript=1;
+  //} else if (strfield2(mime, "text/vnd.wap.wml")) {   // humm won't work in many cases
+  //  inscript=0;
   } else
     return 0;
 
@@ -299,9 +302,9 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
             e++;          /* 0 means "once" */
             
             if (strncmp((const char*)fslash((char*)indexpath),filename,strlen(indexpath))==0)  // couper
-              strcpy(savelst,filename+strlen(indexpath));
+              strcpybuff(savelst,filename+strlen(indexpath));
             else
-              strcpy(savelst,filename);
+              strcpybuff(savelst,filename);
             
             // Add entry for this file and word
             fprintf(fp_tmpproject,"%s %d %s\n",line,(int) (KEYW_SORT_MAXCOUNT - e),savelst);
@@ -331,7 +334,7 @@ void index_finish(const char* indexpath,int mode) {
 #if HTS_MAKE_KEYWORD_INDEX
   char** tab;
   char* blk;
-  int size;
+  INTsys size;
   
   size=fpsize(fp_tmpproject);
   if (size>0) {
@@ -342,7 +345,7 @@ void index_finish(const char* indexpath,int mode) {
         blk = malloct(size+4);
         if (blk) {
           fseek(fp_tmpproject,0,SEEK_SET);
-          if ((int)fread(blk,1,size,fp_tmpproject) == size) {
+          if ((INTsys)fread(blk,1,size,fp_tmpproject) == size) {
             char *a=blk,*b;
             int index=0;
             int i;
@@ -430,7 +433,7 @@ void index_finish(const char* indexpath,int mode) {
                         fprintf(fp,"<tr>\r\n<td>%s</td>\r\n<td>\r\n",word);
                       }
                       fflush(fp); last_pos=ftell(fp);
-                      strcpy(current_word,word);
+                      strcpybuff(current_word,word);
                       total_hit=total_line=0;
                     }
                     total_hit+=hit;

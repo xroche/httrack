@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 #include "htshash.h"
+#include "htsinthash.h"
 
 typedef struct {
   /*
@@ -156,7 +157,7 @@ int hts_freevar() {
   return 1;
 }
 
-int hts_resetvar() {
+HTSEXT_API int hts_resetvar() {
   int r;
   hts_lockvar();
   {

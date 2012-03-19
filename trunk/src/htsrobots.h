@@ -41,8 +41,8 @@ Please visit our Website: http://www.httrack.com
 
 // robots wizard
 typedef struct robots_wizard {
-  char adr[1024];
-  char token[1024];
+  char adr[128];
+  char token[4096];
   struct robots_wizard* next;
 } robots_wizard;
 

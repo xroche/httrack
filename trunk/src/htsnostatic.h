@@ -88,7 +88,9 @@ Please visit our Website: http://www.httrack.com
 */
 int hts_initvar(void);
 int hts_freevar(void);
-int hts_resetvar(void);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_resetvar(void);
+#endif
 int hts_maylockvar(void);
 int hts_lockvar(void);
 int hts_unlockvar(void);
@@ -183,6 +185,7 @@ if ( cKey.localInit ) { \
 } \
 if ( ( ! cKey.localInit ) || ( name == NULL ) ) { \
   if (!hts_maylockvar()) { \
+    abortLog("unable to lock mutex (not initialized?!)"); \
     abort(); \
   } \
   hts_lockvar(); \
@@ -190,6 +193,7 @@ if ( ( ! cKey.localInit ) || ( name == NULL ) ) { \
     { \
       name = (type *) calloc((nelt), sizeof(type)); \
       if (name == NULL) { \
+        abortLog("unable to allocate memory for variable!"); \
         abort(); \
       } \
       { \
@@ -202,6 +206,7 @@ if ( ( ! cKey.localInit ) || ( name == NULL ) ) { \
       name = NULL; \
       PTHREAD_KEY_GET(cKey.localKey, &name, type*); \
       if (name == NULL) { \
+        abortLog("unable to load thread key!"); \
         abort(); \
       } \
       if ( ! cKey.localInit ) { \
@@ -214,6 +219,7 @@ if ( ( ! cKey.localInit ) || ( name == NULL ) ) { \
 else { \
   PTHREAD_KEY_GET(cKey.localKey, &name, type*); \
   if (name == NULL) { \
+    abortLog("unable to load thread key! (2)"); \
     abort(); \
   } \
 } \

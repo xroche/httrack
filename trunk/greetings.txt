@@ -3,7 +3,7 @@ Informations on this project:
 This project has been developed by:
 Xavier Roche (xroche@httrack.com)
   for the main engine and Windows interface
-  and maintener for v2.0 and v3.0
+  and maintainer for v2.0 and v3.0
 Yann Philippot (yphilippot@lemel.fr)
   for the java binary .class parser
 David Lawrie (dalawrie@lineone.net)
@@ -25,7 +25,7 @@ Pedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago@mail.iupi.pt)
   for Portuguese translations
 Andrei Iliev (iliev@vitaplus.ru)
   for Russian translations
-Witold Krakowski (wkrakowski@libero.it)
+Witold Krakowski (wtkrak@netscape.net )
   for Italian translations
 Jozsef Tamas Herczeg (hdodi@freemail.hu)
   for Hungarian translation
@@ -33,6 +33,7 @@ Paulo Neto (company@layout.com.br)
   for Brazilian translation
 Brook Qin (brookqwr@sina.com) 
    for simplified Chinese translation
+David Hing Cheong Hung (DAVEHUNG@mtr.com.hk)
 Addy Lin (addy1975@pchome.com.tw)
    for traditional Chinese translation
 Jesper Bramm (bramm@get2net.dk)
@@ -41,6 +42,7 @@ Tõnu Virma
    for Estonian translation
 Staffan Ström (staffan@fam-strom.org)
    for Swedish translation
+Arman (Armish) Aksoy (armish@linux-sevenler.de)
 Mehmet Akif Köeoðlu (mak@ttnet.net.tr)
   for Turkish translation
 Aleksandar Savic (aleks@macedonia.eu.org)
@@ -51,9 +53,19 @@ Martin Sereday (sereday@slovanet.sk)
   for Slovak translation
 Antonín Matìjèík (matejcik@volny.cz)
   for Czech translation
+Andrij Shevchuk (http://programy.com.ua)
+  for Ukrainian translation
+Tobias "Spug" Langhoff (spug_enigma@hotmail.com)
+  for Norwegian translation
+Jadran Rudeciur (jrudec@email.si)
+  for Slovenian translation
+Alin Gheorghe Miron (miron.alin@personal.ro)
+  for Romanian translation
+Michael Papadakis (mikepap@freemail.gr)
+  for Greek translation
 
 Thanks to:
-Kauler Leto (letok@optusnet.com.au)
+Leto Kauler (molotov@tasmail.com)
   for the site/logos design
 
 Special Thanks to:
@@ -63,6 +75,8 @@ Fred Cohen (fc@all.net)
   for HTTrack user's guide
 
 Greetings to:
+Christian Marillat (marillat.christian@wanadoo.fr)
+  for autoconf compliance and .deb package
 Jean-loup Gailly from gzip.org
   for the help provided with Zlib
 Eric A. Young (eay@cryptsoft.com)

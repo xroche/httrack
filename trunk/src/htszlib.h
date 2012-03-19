@@ -43,6 +43,27 @@ Please visit our Website: http://www.httrack.com
 
 int hts_zunpack(char* filename,char* newfile);
 
+#define gzopen hts_ptrfunc_gzopen
+#define gzread hts_ptrfunc_gzread
+#define gzclose hts_ptrfunc_gzclose
+
+#ifdef _WIN32
+#define ZEXPORT WINAPI
+#else
+#define ZEXPORT 
+#endif
+
+typedef void* voidp;
+typedef voidp gzFile;
+typedef gzFile (ZEXPORT *t_gzopen)(const char *path, const char *mode);
+typedef int (ZEXPORT *t_gzread)(gzFile file, voidp buf, unsigned len);
+typedef int (ZEXPORT *t_gzclose)(gzFile file);
+
+extern int gz_is_available;
+extern t_gzopen gzopen;
+extern t_gzread gzread;
+extern t_gzclose gzclose;
+
 #endif 
 
 #endif

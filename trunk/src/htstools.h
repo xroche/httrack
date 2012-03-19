@@ -45,10 +45,12 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htscore.h"
 
-#if HTS_WIN
+#ifdef _WIN32
 #else
 #include <dirent.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <sys/stat.h>
 #endif
 
@@ -83,56 +85,47 @@ HTS_INLINE int __rech_tageqbegdigits(const char* adr,const char* s);
 //HTS_INLINE int rech_tageq(const char* adr,const char* s);
 HTS_INLINE int rech_sampletag(const char* adr,const char* s);
 HTS_INLINE int check_tag(char* from,const char* tag);
-int verif_backblue(char* base);
+int verif_backblue(httrackp* opt,char* base);
 int verif_external(int nb,int test);
 
 int istoobig(LLint size,LLint maxhtml,LLint maxnhtml,char* type);
 
-int hts_buildtopindex(char* path,char* binpath);
-
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_buildtopindex(httrackp* opt,char* path,char* binpath);
+#endif
 
 
 // Portable directory find functions
 
-#if HTS_WIN
-
+#ifndef HTTRACK_DEFLIB
+#ifdef _WIN32
 typedef struct {
   WIN32_FIND_DATA hdata;
   HANDLE handle;
 } find_handle_struct;
-
-
 #else
-
 typedef struct {
   DIR * hdir;
   struct dirent* dirp;
   struct stat filestat;
   char path[2048];
 } find_handle_struct;
-
 #endif
-
 typedef find_handle_struct* find_handle;
-
 typedef struct topindex_chain {
   char name[2048];                    /* path */
   struct topindex_chain* next;        /* next element */
 } topindex_chain  ;
-
-
 // Directory find functions
-find_handle hts_findfirst(char* path);
-int hts_findnext(find_handle find);
-int hts_findclose(find_handle find);
+HTSEXT_API find_handle hts_findfirst(char* path);
+HTSEXT_API int hts_findnext(find_handle find);
+HTSEXT_API int hts_findclose(find_handle find);
 //
-char* hts_findgetname(find_handle find);
-int hts_findgetsize(find_handle find);
-int hts_findisdir(find_handle find);
-int hts_findisfile(find_handle find);
-int hts_findissystem(find_handle find);
-
-
-
+HTSEXT_API char* hts_findgetname(find_handle find);
+HTSEXT_API int hts_findgetsize(find_handle find);
+HTSEXT_API int hts_findisdir(find_handle find);
+HTSEXT_API int hts_findisfile(find_handle find);
+HTSEXT_API int hts_findissystem(find_handle find);
+#endif
 
 #endif

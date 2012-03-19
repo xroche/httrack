@@ -68,7 +68,7 @@ unsigned long _beginthread( void* ( *start_address )( void * ), unsigned stack_s
   [-1 check if locked (always return 0 with mutex)]
   -999 initialize
 */
-int htsSetLock(PTHREAD_LOCK_TYPE* hMutex,int lock) {
+HTSEXT_API int htsSetLock(PTHREAD_LOCK_TYPE* hMutex,int lock) {
 #if HTS_WIN
   /* lock */
   if (lock==1)

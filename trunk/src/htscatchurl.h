@@ -43,9 +43,11 @@ Please visit our Website: http://www.httrack.com
 
 // Fonctions
 void socinput(T_SOC soc,char* s,int max);
-T_SOC catch_url_init_std(int* port_prox,char* adr_prox);
-T_SOC catch_url_init(int* port,char* adr);
-int catch_url(T_SOC soc,char* url,char* method,char* data);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API T_SOC catch_url_init_std(int* port_prox,char* adr_prox);
+HTSEXT_API T_SOC catch_url_init(int* port,char* adr);
+HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data);
+#endif
 
 #define CATCH_RESPONSE \
   "HTTP/1.0 200 OK\r\n"\

@@ -1,0 +1,173 @@
+AC_INIT(src/httrack.c)
+AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(httrack, 3.30.01)
+VERSION_INFO="1:330:0"
+AM_MAINTAINER_MODE
+
+AC_PREREQ(2.50)
+
+AC_PROG_CC
+AC_PROG_CXX
+AC_STDC_HEADERS
+AM_PROG_LIBTOOL
+
+### Default CFLAGS
+DEFAULT_CFLAGS=""
+DEFAULT_CFLAGS="-O -g3 -Wall -Wcast-align -Wstrict-prototypes \
+-Wmissing-prototypes -Wmissing-declarations -Wpointer-arith \
+-Wnested-externs -D_REENTRANT"
+AC_SUBST(DEFAULT_CFLAGS)
+AC_SUBST(VERSION_INFO)
+
+### Check for platform
+case $host in
+AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
+*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
+*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
+esac
+
+### Check size of long and long long.
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+
+### Check LLint format
+if test x"$ac_cv_sizeof_long" = x"8"
+then
+AC_MSG_CHECKING(long printf format)
+AC_TRY_RUN([#include <stdio.h>
+main() { long int c = -1, d = -1; char* f = "%ld"; sscanf("1234", f, &c, &d); 
+         exit (c != 1234 || d != -1); }
+],
+	[AC_MSG_RESULT(found)
+	AC_DEFINE(LLINT_FORMAT,"%ld",[LLint format])
+	AC_DEFINE(LLINT_TYPE,long int,[LLint type])
+],
+[
+AC_TRY_RUN([#include <stdio.h>
+main() { long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d); 
+         exit (c != 1234 || d != -1); }
+],
+[
+	AC_MSG_RESULT(found)
+	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
+	AC_DEFINE(LLINT_TYPE,long int,[LLint type])
+],
+[
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(assuming not on target machine)
+	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
+	AC_DEFINE(LLINT_TYPE,int,[LLint type])
+])
+])
+elif test x"$ac_cv_sizeof_long_long" = x"8"
+then
+AC_MSG_CHECKING(long long printf format)
+AC_TRY_RUN([#include <stdio.h>
+main() { long long int c = -1, d = -1; char* f = "%lld"; sscanf("1234", f, &c, &d); 
+         exit (c != 1234 || d != -1); }
+],
+	[AC_MSG_RESULT(found) 
+	AC_DEFINE(LLINT_FORMAT,"%lld",[LLint format])
+	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
+],
+[	
+AC_TRY_RUN([#include <stdio.h>
+main() { long long int c = -1, d = -1; char* f = "%ld"; sscanf("1234", f, &c, &d); 
+         exit (c != 1234 || d != -1); }
+],
+[
+	AC_MSG_RESULT(found)
+	AC_DEFINE(LLINT_FORMAT,"%ld",[LLint format])
+	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
+],
+[
+AC_TRY_RUN([#include <stdio.h>
+main() { long long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d); 
+         exit (c != 1234 || d != -1); }
+],
+[
+	AC_MSG_RESULT(found)
+	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
+	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
+],
+[
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(assuming not on target machine)
+	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
+	AC_DEFINE(LLINT_TYPE,int,[LLint type])
+])
+])
+])
+else
+AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
+AC_DEFINE(LLINT_TYPE,int,[LLint type])
+fi
+
+### check for in_addr_t
+AC_CHECK_TYPE(in_addr_t,
+AC_DEFINE(HTS_DO_NOT_REDEFINE_in_addr_t,,[Check for in_addr_t]),
+AC_MSG_WARN([*** in_addr_t not found]),
+[#include <sys/types.h>
+#include <netinet/in.h>])
+
+### Support IPv6
+AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
+AC_DEFINE(HTS_INET6, 1,[Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
+AC_SUBST(V6_FLAG)
+
+### Check for LFS
+AC_CHECK_LIB(c, fopen64, [LFS_FLAG="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE"
+AC_DEFINE(HTS_LFS, 1,[Check for large files support])], AC_MSG_RESULT([not found]))
+AC_SUBST(LFS_FLAG)
+
+### Check for pthread
+AC_CHECK_LIB(pthread, pthread_create, [THREADS_LIBS=-lpthread
+AC_DEFINE(THREADS, 1,[Check for pthread])], AC_MSG_RESULT([not found]))
+AC_SUBST(THREADS_LIBS)
+if test x$THREADS_LIBS = x
+then
+AC_CHECK_LIB(c, pthread_create, [THREADS_LIBS=
+AC_DEFINE(THREADS, 1,[Check for pthread in c])], AC_MSG_RESULT([not found]))
+AC_SUBST(THREADS_LIBS)
+if test x$THREADS_LIBS = x
+then
+AC_CHECK_LIB(pthreads, pthread_create, [THREADS_LIBS=
+AC_DEFINE(THREADS, 1,[Check for pthread in pthreads])], AC_MSG_WARN([*** not found]))
+AC_SUBST(THREADS_LIBS)
+fi
+fi
+THREADS_CFLAGS=
+AC_SUBST(THREADS_CFLAGS)
+
+### Check for socket/nsl (solaris)
+AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
+AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
+AC_SUBST(SOCKET_LIBS)
+
+### Check for dlsym
+AC_CHECK_LIB(dl, dlopen, [DL_LIBS=-ldl
+AC_DEFINE(DLLIB, 1,[Check for dl])], AC_MSG_RESULT([not found]))
+AC_SUBST(DL_LIBS)
+if test x$DL_LIBS = x
+then
+AC_CHECK_LIB(c, dlopen, [DL_LIBS=
+AC_DEFINE(DLLIB, 1,[Check for dlopen in c])], AC_MSG_WARN([*** not found * this is bad]))
+AC_SUBST(DL_LIBS)
+fi
+
+### Check for ftime
+AC_CHECK_LIB(c, ftime, [
+AC_DEFINE(FTIME, 1,[Check for ftime])], AC_MSG_RESULT([not found]))
+
+### Check for setuid
+AC_CHECK_LIB(c, setuid, [
+AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
+
+AC_OUTPUT([ Makefile
+src/Makefile
+man/Makefile
+libtest/Makefile
+templates/Makefile
+lang/Makefile
+html/Makefile
+])

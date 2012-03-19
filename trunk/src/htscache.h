@@ -45,8 +45,10 @@ Please visit our Website: http://www.httrack.com
 // cache
 void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,char* url_adr,char* url_fil,char* url_save);
 void cache_add(htsblk r,char* url_adr,char* url_fil,char* url_save,FILE* cache_ndx,FILE* cache_dat,int all_in_cache);
-htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save);
-htsblk* cache_header(httrackp* opt,cache_back* cache,char* adr,char* fil);
+htsblk cache_read(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
+htsblk cache_read_ro(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location);
+htsblk cache_readex(httrackp* opt,cache_back* cache,char* adr,char* fil,char* save,char* location,char* return_save,int readonly);
+htsblk* cache_header(httrackp* opt,cache_back* cache,char* adr,char* fil,htsblk* r);
 void cache_init(cache_back* cache,httrackp* opt);
 
 int cache_writedata(FILE* cache_ndx,FILE* cache_dat,char* str1,char* str2,char* outbuff,int len);

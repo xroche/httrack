@@ -38,13 +38,14 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "htsbase.h"
 #include "htsalias.h"
 #include "htsglobal.h"
 void linput(FILE* fp,char* s,int max);
 void hts_lowcase(char* s);
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
-#define is_realspace(c) (strchr(" \x0d\x0a\x09\x0c",(c))!=NULL)
+#define is_realspace(c) (strchr(" \x0d\x0a\x09\x0b\x0c",(c))!=NULL)
 
 // COPY OF cmdl_ins in htsmain.c
 // Insert a command in the argc/argv
@@ -55,7 +56,7 @@ void hts_lowcase(char* s);
   argv[i]=argv[i-1];\
   } \
   argv[0]=(buff+ptr); \
-  strcpy(argv[0],token); \
+  strcpybuff(argv[0],token); \
   ptr += (strlen(argv[0])+1); \
   argc++
 // END OF COPY OF cmdl_ins in htsmain.c
@@ -80,7 +81,7 @@ void hts_lowcase(char* s);
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
 */
-const char hts_optalias[][4][64] = {
+const char* hts_optalias[][4] = {
   /*   {"","","",""}, */
   {"path","-O","param1","output path"},
   {"chroot","-%O","param1","default top path"},
@@ -90,6 +91,7 @@ const char hts_optalias[][4][64] = {
   {"quiet","-q","single",""},
   {"mirrorlinks","-Y","single",""},
   {"proxy","-P","param1","proxy name:port"},
+  {"bind","-%b","param1","hostname to bind"},
   {"httpproxy-ftp","-%f","param",""},
   {"depth","-r","param",""},{"recurse-levels","-r","param",""},
   {"ext-depth","-%e","param",""},
@@ -108,12 +110,14 @@ const char hts_optalias[][4][64] = {
   {"near","-n","single",""},
   {"test","-t","single",""},
   {"list","-%L","param1",""},
+  {"urllist","-%S","param1",""},
   {"language","-%l","param1",""}, {"lang","-%l","param1",""},
   {"structure","-N","param",""}, {"user-structure","-N","param1",""},
   {"long-names","-L","param",""},
   {"keep-links","-K","param",""},
+  {"mime-html","-%M","param",""}, {"mht","-%M","param",""},
   {"replace-external","-x","single",""},
-  {"no-passwords","-%x","single",""},{"no-password","-%x","single",""},
+  {"disable-passwords","-%x","single",""},{"disable-password","-%x","single",""},
   {"include-query-string","-%q","single",""},
   {"generate-errors","-o","single",""},
   {"purge-old","-X","param",""},
@@ -124,9 +128,12 @@ const char hts_optalias[][4][64] = {
   {"protocol","-@i","param",""},
   {"robots","-s","param",""},
   {"http-10","-%h","single",""},{"http-1.0","-%h","single",""},
-  {"no-compression","-%z","single",""},
+  {"keep-alive","-%k","single",""},
+  {"build-top-index","-%i","single",""},
+  {"disable-compression","-%z","single",""},
   {"tolerant","-%B","single",""},
   {"updatehack","-%s","single",""}, {"sizehack","-%s","single",""},
+  {"urlhack","-%u","single",""},
   {"user-agent","-F","param1","user-agent identity"},
   {"footer","-%F","param1",""},
   {"cache","-C","param","number of retries for non-fatal errors"},
@@ -143,6 +150,7 @@ const char hts_optalias[][4][64] = {
   {"priority","-p","param",""},
   {"debug-headers","-%H","single",""},
   {"userdef-cmd","-V","param1",""},
+  {"callback","-%W","param1",""}, {"wrapper","-%W","param1",""},
   {"structure","-N","param1","user-defined structure"},
   {"usercommand","-V","param1","user-defined command"},
   {"display","-%v","single","show files transfered and other funny realtime information"},
@@ -167,13 +175,16 @@ const char hts_optalias[][4][64] = {
   {"version","-#h","single",""},
   {"debug-scanstdin","-#K","single",""},
   {"advanced-maxlinks","-#L","single",""},
-  {"advanced-progressinfo","-#p","single",""},
+  {"advanced-progressinfo","-#p","single","deprecated"},
   {"catch-url","-#P","single","catch complex URL through proxy"},
   {"debug-oldftp","-#R","single",""},
   {"debug-xfrstats","-#T","single",""},
   {"advanced-wait","-#u","single",""},
   {"debug-ratestats","-#Z","single",""},
   {"exec","-#!","param1",""},
+  {"fast-engine","-#X","single","Enable fast routines"},
+  {"debug-overflows","-#X0","single","Attempt to detect buffer overflows"},
+  {"debug-cache","-#C","param1","List files in the cache"},
   
   /* STANDARD ALIASES */
   {"spider","-p0C0I0t","single",""},
@@ -194,6 +205,7 @@ const char hts_optalias[][4][64] = {
   {"ultrawide","-c48","single",""},
   {"http10","-%h","single",""},
   {"filelist","-%L","single",""}, {"list","-%L","single",""},
+  {"filterlist","-%S","single",""},
   /* END OF ALIASES */
 
   /* Filters */
@@ -249,25 +261,25 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
     /* --sockets=8 */
     if ( (position=strchr(argv[n_arg],'=')) ) {
       /* Copy command */
-      strncat(command,argv[n_arg]+2,(int) (position - (argv[n_arg]+2)) );
+      strncatbuff(command,argv[n_arg]+2,(int) (position - (argv[n_arg]+2)) );
       /* Copy parameter */
-      strcpy(param,position+1);
+      strcpybuff(param,position+1);
     }
     /* --nocache */
     else if (strncmp(argv[n_arg]+2,"no",2)==0) {
-      strcpy(command,argv[n_arg]+4);
-      strcpy(param,"0");
+      strcpybuff(command,argv[n_arg]+4);
+      strcpybuff(param,"0");
     }
     /* --sockets 8 */
     else {
       if (strncmp(argv[n_arg]+2,"wide-",5)==0) {
-        strcpy(addcommand,"c32");
-        strcpy(command,strchr(argv[n_arg]+2,'-')+1);
+        strcpybuff(addcommand,"c32");
+        strcpybuff(command,strchr(argv[n_arg]+2,'-')+1);
       } else if (strncmp(argv[n_arg]+2,"tiny-",5)==0) {
-        strcpy(addcommand,"c1");
-        strcpy(command,strchr(argv[n_arg]+2,'-')+1);
+        strcpybuff(addcommand,"c1");
+        strcpybuff(command,strchr(argv[n_arg]+2,'-')+1);
       } else
-        strcpy(command,argv[n_arg]+2);
+        strcpybuff(command,argv[n_arg]+2);
       need_param=2;
     }
 
@@ -275,7 +287,7 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
     pos=optalias_find(command);
     if (pos>=0) {
       /* Copy real name */
-      strcpy(command,hts_optalias[pos][1]);
+      strcpybuff(command,hts_optalias[pos][1]);
       /* With parameters? */
       if (strncmp(hts_optalias[pos][2],"param",5)==0) {
         /* Copy parameters? */
@@ -286,7 +298,7 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
               command,command,_NOT_NULL(optalias_help(command)));
             return 0;
           }
-          strcpy(param,argv[n_arg+1]);
+          strcpybuff(param,argv[n_arg+1]);
           need_param=2;
         }
       } else
@@ -296,30 +308,30 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
 
       /* Must be alone (-P /tmp) */
       if (strcmp(hts_optalias[pos][2],"param1")==0) {
-        strcpy(return_argv[0],command);
-        strcpy(return_argv[1],param);
+        strcpybuff(return_argv[0],command);
+        strcpybuff(return_argv[1],param);
         *return_argc=2;     /* 2 parameters returned */
       } 
       /* Alone with parameter (+*.gif) */
       else if (strcmp(hts_optalias[pos][2],"param0")==0) {
         /* Command */
-        strcpy(return_argv[0],command);
-        strcat(return_argv[0],param);
+        strcpybuff(return_argv[0],command);
+        strcatbuff(return_argv[0],param);
       }
       /* Together (-c8) */
       else {
         /* Command */
-        strcpy(return_argv[0],command);
+        strcpybuff(return_argv[0],command);
         /* Parameters accepted */
         if (strncmp(hts_optalias[pos][2],"param",5)==0) {
           /* --cache=off or --index=on */
           if (strcmp(param,"off")==0)
-            strcat(return_argv[0],"0");
+            strcatbuff(return_argv[0],"0");
           else if (strcmp(param,"on")==0) {
             // on is the default
-            // strcat(return_argv[0],"1");
+            // strcatbuff(return_argv[0],"1");
           } else
-            strcat(return_argv[0],param);
+            strcatbuff(return_argv[0],param);
         }
         *return_argc=1;     /* 1 parameter returned */
       }
@@ -342,8 +354,8 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
           return 0;
         }
         /* Copy parameters */
-        strcpy(return_argv[0],argv[n_arg]);
-        strcpy(return_argv[1],argv[n_arg+1]);
+        strcpybuff(return_argv[0],argv[n_arg]);
+        strcpybuff(return_argv[1],argv[n_arg+1]);
         /* And return */
         *return_argc=2;     /* 2 parameters returned */
         return 2;           /* 2 parameters used */
@@ -352,7 +364,7 @@ int optalias_check(int argc,const char * const * argv,int n_arg,
   }
   
   /* Copy and return other unknown option */
-  strcpy(return_argv[0],argv[n_arg]);
+  strcpybuff(return_argv[0],argv[n_arg]);
   return 1;
 }
 
@@ -461,9 +473,9 @@ int optinclude_file(const char* name,
             char  _tmp_argv[4][HTS_CDLMAXSIZE];
             char*  tmp_argv[4];
             tmp_argv[0]=_tmp_argv[0]; tmp_argv[1]=_tmp_argv[1]; tmp_argv[2]=_tmp_argv[2]; tmp_argv[3]=_tmp_argv[3];
-            strcpy(tmp_argv[0],"--");
-            strcat(tmp_argv[0],a);
-            strcpy(tmp_argv[1],b);
+            strcpybuff(tmp_argv[0],"--");
+            strcatbuff(tmp_argv[0],a);
+            strcpybuff(tmp_argv[1],b);
             
             result=optalias_check(2,(const char * const *)tmp_argv,0,
               &return_argc,(tmp_argv+2),
@@ -513,8 +525,8 @@ char* hts_gethome(void) {
 void expand_home(char* str) {
   if (str[0] == '~') {
     char tempo[HTS_URLMAXSIZE*2];
-    strcpy(tempo,hts_gethome());
-    strcat(tempo,str+1);
-    strcpy(str,tempo);
+    strcpybuff(tempo,hts_gethome());
+    strcatbuff(tempo,str+1);
+    strcpybuff(str,tempo);
   }
 }

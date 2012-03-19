@@ -1,0 +1,101 @@
+#!/bin/bash
+#
+# WebHTTrack launcher script
+# Initializes the htsserver GUI frontend and launch the default browser
+BROWSEREXE=
+SRCHBROWSEREXE="x-www-browser www-browser mozilla galeon konqueror opera netscape"
+if test -n "${BROWSER}"; then
+# sensible-browser will f up if BROWSER is not set
+SRCHBROWSEREXE="sensible-browser ${SRCHBROWSEREXE}"
+fi
+SRCHPATH="/usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack ${HOME}/usr/bin ${HOME}/bin"
+SRCHDISTPATH="/usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share ${HOME}/usr/local ${HOME}/usr/share"
+
+###
+# And now some famous cuisine
+
+function log {
+echo "$0($$): $@" >&2
+return 0
+}
+
+# First ensure that we can launch the server
+BINPATH=
+for i in ${SRCHPATH}; do
+	! test -n "${BINPATH}" && test -x ${i}/htsserver && BINPATH=${i}
+done
+for i in ${SRCHDISTPATH}; do
+	! test -n "${DISTPATH}" && test -f "${i}/httrack/lang.def" && DISTPATH="${i}/httrack"
+done
+test -n "${BINPATH}" || ! log "could not find htsserver" || exit 1
+test -n "${DISTPATH}" || ! log "could not find httrack directory" || exit 1
+test -f ${DISTPATH}/lang.def || ! log "could not find ${DISTPATH}/lang.def" || exit 1
+test -f ${DISTPATH}/lang.indexes || ! log "could not find ${DISTPATH}/lang.indexes" || exit 1
+test -d ${DISTPATH}/lang || ! log "could not find ${DISTPATH}/lang" || exit 1
+test -d ${DISTPATH}/html || ! log "could not find ${DISTPATH}/html" || exit 1
+
+# Locale
+HTSLANG="${LC_MESSAGES}"
+! test -n "${HTSLANG}" && HTSLANG="${LC_ALL}"
+! test -n "${HTSLANG}" && HTSLANG="${LANG}"
+test -n "${HTSLANG}" && HTSLANG="`echo ${HTSLANG} | cut -c1-2` | tr 'A-Z' 'a-z'"
+LANGN=`grep "${HTSLANG}:" ${DISTPATH}/lang.indexes | cut -f2 -d':'`
+! test -n "${LANGN}" && LANGN=1
+
+# Find the browser
+# note: not all systems have sensible-browser or www-browser alternative
+# thefeore, we have to find a bit more if sensible-browser could not be found
+for i in ${SRCHBROWSEREXE}; do
+for j in ${SRCHPATH}; do
+if test -x ${j}/${i}; then
+BROWSEREXE=${j}/${i}
+fi
+test -n "$BROWSEREXE" && break
+done
+test -n "$BROWSEREXE" && break
+done
+test -n "$BROWSEREXE" || ! log "cound not find any suitable browser" || exit 1
+
+# "browse" command
+if test "$1" = "browse"; then
+${BROWSEREXE} "file://${HOME}/websites/index.html"
+exit $?
+fi
+
+# Create a temporary filename
+TMPSRVFILE="/tmp/.webhttrack.$$.`/usr/bin/head -c16 /dev/random | /usr/bin/md5sum | /usr/bin/cut -f1 -d' '`"
+>${TMPSRVFILE} || ! log "cound not create the temporary file ${TMPSRVFILE}" || exit 1
+# Launch htsserver binary and setup the server
+(${BINPATH}/htsserver "${DISTPATH}/" path "${HOME}/websites" lang "${LANGN}" $@; echo SRVURL=error) > ${TMPSRVFILE}&
+# Find the generated SRVURL
+SRVURL=
+MAXCOUNT=60
+while ! test -n "$SRVURL"; do
+MAXCOUNT=$[$MAXCOUNT - 1]
+test $MAXCOUNT -gt 0 || exit 1
+test $MAXCOUNT -lt 50 && echo "waiting for server to reply.."
+SRVURL=`/bin/grep -E URL= ${TMPSRVFILE} | /usr/bin/cut -f2- -d=`
+test ! "$SRVURL" = "error" || ! log "could not spawn htsserver" || exit 1
+test -n "$SRVURL" || /bin/sleep 1
+done
+
+# Cleanup function
+function cleanup {
+test -n "$1" && log "nasty signal caught, cleaning up.."
+test -f ${TMPSRVFILE} && SRVPID=`/bin/grep -E PID= ${TMPSRVFILE} | /usr/bin/cut -f2- -d=`
+test -n "${SRVPID}" && kill -9 ${SRVPID}
+test -f ${TMPSRVFILE} && rm ${TMPSRVFILE}
+test -n "$1" && log "..done"
+return 0
+}
+
+# Cleanup in case of emergency
+trap "cleanup now; exit" 1 2 3 4 5 6 7 8 9 11 13 14 15 16 19 24 25
+
+# Got SRVURL, launch browser
+${BROWSEREXE} "${SRVURL}"
+
+# That's all, folks!
+trap "" 1 2 3 4 5 6 7 8 9 11 13 14 15 16 19 24 25
+cleanup
+exit 0

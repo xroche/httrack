@@ -54,6 +54,8 @@ typedef void  (* t_hts_htmlcheck_filesave)(char* file);
 typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
 typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
 typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
+typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
+typedef int   (* t_hts_htmlcheck_receivehead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
 
 // demande d'interaction avec le shell
 #if HTS_ANALYSTE
@@ -74,17 +76,19 @@ extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
 extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
 extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
 extern t_hts_htmlcheck_savename   hts_htmlcheck_savename;
+extern t_hts_htmlcheck_sendhead   hts_htmlcheck_sendhead;
+extern t_hts_htmlcheck_receivehead hts_htmlcheck_receivehead;
 #endif
 
-#if HTS_ANALYSTE==2
-#define HT_PRINT(A) strcat(HTbuff,A);
+#if HTS_ANALYSTE
+#define HT_PRINT(A) strcatbuff(HTbuff,A);
 #define HT_REQUEST_START HTbuff[0]='\0';
 #define HT_REQUEST_END 
 #define HTT_REQUEST_START HTbuff[0]='\0';
 #define HTT_REQUEST_END 
 #define HTS_REQUEST_START HTbuff[0]='\0';
 #define HTS_REQUEST_END 
-#define HTS_PANIC_PRINTF(S) strcpy(_hts_errmsg,S);
+#define HTS_PANIC_PRINTF(S) strcpybuff(_hts_errmsg,S);
 #else
 #define HT_PRINT(A) printf("%s",A);
 #define HT_REQUEST_START /*printf("§\n");*/

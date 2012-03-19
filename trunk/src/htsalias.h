@@ -39,7 +39,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSALIAS_DEFH
 #define HTSALIAS_DEFH
 
-extern const char hts_optalias[][4][64];
+extern const char* hts_optalias[][4];
 int optalias_check(int argc,const char * const * argv,int n_arg,
                    int* return_argc,char** return_argv,
                    char* return_error);

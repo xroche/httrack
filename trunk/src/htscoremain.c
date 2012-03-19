@@ -42,13 +42,17 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htsalias.h"
 #include "htswrap.h"
+#include "htsmodules.h"
+
 #include <ctype.h>
 #if HTS_WIN
 #else
 #ifndef HTS_DO_NOT_USE_UID
 /* setuid */
 #include <pwd.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 #endif
 
@@ -61,7 +65,7 @@ extern int IPV6_resolver;
 // Add a command in the argc/argv
 #define cmdl_add(token,argc,argv,buff,ptr) \
   argv[argc]=(buff+ptr); \
-  strcpy(argv[argc],token); \
+  strcpybuff(argv[argc],token); \
   ptr += (strlen(argv[argc])+2); \
   argc++
 
@@ -73,55 +77,30 @@ extern int IPV6_resolver;
   argv[i]=argv[i-1];\
   } \
   argv[0]=(buff+ptr); \
-  strcpy(argv[0],token); \
+  strcpybuff(argv[0],token); \
   ptr += (strlen(argv[0])+2); \
   argc++
 
 #define htsmain_free() do { if (url != NULL) { free(url); } } while(0)
 
-// Main, récupère les paramètres et appelle le robot
-#if HTS_ANALYSTE
-int hts_main(int argc, char **argv) {
-#else
-int main(int argc, char **argv) {
-#endif
-  char* x_argv[999];      // Patch pour argv et argc: en cas de récupération de ligne de commande
-  char* x_argvblk=NULL;   // (reprise ou update)
-  int   x_ptr=0;          // offset
-  /*
-  char* x_argv2[999];     // Patch pour config
-  char* x_argvblk2=NULL;
-  */
-  //
-  int argv_url=-1;           // ==0 : utiliser cache et doit.log
-  char* argv_firsturl=NULL;  // utilisé pour nommage par défaut
-  char* url = NULL;          // URLS séparées par un espace
-  //char url[65536];         // URLS séparées par un espace
-  // the parametres
-  httrackp httrack;
-  int httrack_logmode=3;   // ONE log file
-  int recuperer=0;       // récupérer un plantage (n'arrive jamais, à supprimer)
-#if HTS_WIN
-#if HTS_ANALYSTE!=2
-  WORD   wVersionRequested; /* requested version WinSock API */ 
-  WSADATA wsadata;        /* Windows Sockets API data */
-#endif
-#else
-#ifndef HTS_DO_NOT_USE_UID
-  int switch_uid=-1,switch_gid=-1;      /* setuid/setgid */
-#endif
-  int switch_chroot=0;                  /* chroot ? */
-#endif
-  //
-  url = malloc(65536);
-  if (url == NULL) {
-    HTS_PANIC_PRINTF("* memory exhausted");
-    htsmain_free();
-    return -1;
-  }
-  url[0]='\0';
-  //
+#define ensureUrlCapacity(url, urlsize, size) do { \
+  if (urlsize < size || url == NULL) { \
+    urlsize = size; \
+    if (url == NULL) { \
+      url = (char*) malloct(urlsize); \
+      if (url != NULL) url[0]='\0'; \
+    } else { \
+      url = (char*) realloct(url, urlsize); \
+    } \
+    if (url == NULL) { \
+      HTS_PANIC_PRINTF("* memory exhausted"); \
+      htsmain_free(); \
+      return -1; \
+    } \
+  } \
+} while(0)
 
+static void set_wrappers(void) {
 #if HTS_ANALYSTE
   // custom wrappers
   hts_htmlcheck_init         = (t_hts_htmlcheck_init)           htswrap_read("init");
@@ -140,6 +119,52 @@ int main(int argc, char **argv) {
   hts_htmlcheck_linkdetected = (t_hts_htmlcheck_linkdetected)   htswrap_read("link-detected");
   hts_htmlcheck_xfrstatus    = (t_hts_htmlcheck_xfrstatus)      htswrap_read("transfer-status");
   hts_htmlcheck_savename     = (t_hts_htmlcheck_savename)       htswrap_read("save-name");
+  hts_htmlcheck_sendhead     = (t_hts_htmlcheck_sendhead)       htswrap_read("send-header");
+  hts_htmlcheck_receivehead  = (t_hts_htmlcheck_receivehead)    htswrap_read("receive-header");
+#endif
+}
+
+// Main, récupère les paramètres et appelle le robot
+#if HTS_ANALYSTE
+HTSEXT_API int hts_main(int argc, char **argv) {
+#else
+int main(int argc, char **argv) {
+#endif
+  char* x_argv[999];      // Patch pour argv et argc: en cas de récupération de ligne de commande
+  char* x_argvblk=NULL;   // (reprise ou update)
+  int   x_ptr=0;          // offset
+  /*
+  char* x_argv2[999];     // Patch pour config
+  char* x_argvblk2=NULL;
+  */
+  //
+  int argv_url=-1;           // ==0 : utiliser cache et doit.log
+  char* argv_firsturl=NULL;  // utilisé pour nommage par défaut
+  char* url = NULL;          // URLS séparées par un espace
+  int   url_sz = 65535;
+  //char url[65536];         // URLS séparées par un espace
+  // the parametres
+  httrackp httrack;
+  int httrack_logmode=3;   // ONE log file
+  int recuperer=0;       // récupérer un plantage (n'arrive jamais, à supprimer)
+#if HTS_WIN
+#if HTS_ANALYSTE!=2
+  WORD   wVersionRequested; /* requested version WinSock API */ 
+  WSADATA wsadata;        /* Windows Sockets API data */
+#endif
+#else
+#ifndef HTS_DO_NOT_USE_UID
+  int switch_uid=-1,switch_gid=-1;      /* setuid/setgid */
+#endif
+  int switch_chroot=0;                  /* chroot ? */
+#endif
+  //
+  ensureUrlCapacity(url, url_sz, 65536);
+  //
+
+#if HTS_ANALYSTE
+  // custom wrappers
+  set_wrappers();
 #endif
 
   // options par défaut
@@ -157,7 +182,7 @@ int main(int argc, char **argv) {
   httrack.maxsite=-1; // taille max site (aucune)
   httrack.maxfile_nonhtml=-1; // taille max fichier non html
   httrack.maxfile_html=-1;    // idem pour html
-  httrack.maxsoc=8;     // nbre socket max
+  httrack.maxsoc=4;     // nbre socket max
   httrack.fragment=-1;  // pas de fragmentation
   httrack.nearlink=0;   // ne pas prendre les liens non-html "adjacents"
   httrack.makeindex=1;  // faire un index
@@ -169,10 +194,12 @@ int main(int argc, char **argv) {
   httrack.cache=1;     // cache prioritaire
   httrack.shell=0;     // pas de shell par defaut
   httrack.proxy.active=0;    // pas de proxy
+  strcpybuff(httrack.proxy.bindhost, "");  // bind default host
   httrack.user_agent_send=1; // envoyer un user-agent
-  strcpy(httrack.user_agent,"Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
+  strcpybuff(httrack.user_agent,"Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
   httrack.savename_83=0;     // noms longs par défaut
   httrack.savename_type=0;   // avec structure originale
+  httrack.mimehtml=0;        // pas MIME-html
   httrack.parsejava=1;       // parser classes
   httrack.hostcontrol=0;     // PAS de control host pour timeout et traffic jammer
   httrack.retry=2;           // 2 retry par défaut
@@ -187,26 +214,29 @@ int main(int argc, char **argv) {
   httrack.accept_cookie=1;   // gérer les cookies
   httrack.cookie=NULL;
   httrack.http10=0;          // laisser http/1.1
+  httrack.nokeepalive = 0;   // pas keep-alive
   httrack.nocompression=0;   // pas de compression
   httrack.tolerant=0;        // ne pas accepter content-length incorrect
   httrack.parseall=1;        // tout parser (tags inconnus, par exemple)
   httrack.norecatch=0;       // ne pas reprendre les fichiers effacés par l'utilisateur
   httrack.verbosedisplay=0;  // pas d'animation texte
-  strcpy(httrack.footer,HTS_DEFAULT_FOOTER);
+  httrack.sizehack=0;        // size hack
+  httrack.urlhack=1;         // url hack (normalizer)
+  strcpybuff(httrack.footer,HTS_DEFAULT_FOOTER);
   httrack.ftp_proxy=1;       // proxy http pour ftp
-  strcpy(httrack.filelist,"");
-  strcpy(httrack.lang_iso,"en, *");
-  strcpy(httrack.mimedefs,"\n"); // aucun filtre mime (\n IMPORTANT)
+  strcpybuff(httrack.filelist,"");
+  strcpybuff(httrack.lang_iso,"en, *");
+  strcpybuff(httrack.mimedefs,"\n"); // aucun filtre mime (\n IMPORTANT)
   //
   httrack.log=stdout;
   httrack.errlog=stderr;
   httrack.flush=1;           // flush sur les fichiers log
-  httrack.aff_progress=0;
+  //httrack.aff_progress=0;
   httrack.keyboard=0;
   //
-  strcpy(httrack.path_html,"");
-  strcpy(httrack.path_log,"");
-  strcpy(httrack.path_bin,"");
+  strcpybuff(httrack.path_html,"");
+  strcpybuff(httrack.path_log,"");
+  strcpybuff(httrack.path_bin,"");
   //
   httrack.maxlink=100000;    // 100,000 liens max par défaut (400Kb)
   httrack.maxfilter=200;     // 200 filtres max par défaut
@@ -222,8 +252,10 @@ int main(int argc, char **argv) {
   httrack.dir_topindex=0;   // do not built top index (yet)
   //
   httrack.state.stop=0;     // stopper
+  httrack.state.exit_xh=0;  // abort
   //
   _DEBUG_HEAD=0;            // pas de debuggage en têtes
+
   
 #if HTS_WIN
 #if HTS_ANALYSTE!=2
@@ -269,9 +301,9 @@ int main(int argc, char **argv) {
         lien_back r;
         char* path;
         FILE* fp;
-        strcpy(r.url_adr,argv[2]);
-        strcpy(r.url_fil,argv[3]);
-        strcpy(r.url_sav,argv[4]);
+        strcpybuff(r.url_adr,argv[2]);
+        strcpybuff(r.url_fil,argv[3]);
+        strcpybuff(r.url_sav,argv[4]);
         path=argv[5];
         r.status=1000;
         run_launch_ftp(&r);
@@ -298,11 +330,11 @@ int main(int argc, char **argv) {
     char* a;
     if ((a=strrchr(path,'/'))) {
       httrack.path_bin[0]='\0';
-      strncat(httrack.path_bin,argv[0],(int) a - (int) path);
+      strncatbuff(httrack.path_bin,argv[0],(int) a - (int) path);
     }
   }
 #else
-  strcpy(httrack.path_bin,HTS_HTTRACKDIR);
+  strcpybuff(httrack.path_bin, HTS_HTTRACKDIR);
 #endif
 
 
@@ -316,7 +348,7 @@ int main(int argc, char **argv) {
       while( (a=strchr(argv[na],9)) )      *a=' ';
       /* equivalent to "empty parameter" */
       if ((strcmp(argv[na],HTS_NOPARAM)==0) || (strcmp(argv[na],HTS_NOPARAM2)==0))        // (none)
-        strcpy(argv[na],"\"\"");
+        strcpybuff(argv[na],"\"\"");
       if (strncmp(argv[na],"-&",2)==0)
         argv[na][1]='%';
     }
@@ -402,6 +434,11 @@ int main(int argc, char **argv) {
                   argv_url=-1;        /* forcer */
                   httrack.quiet=1;
                 }
+              } else if (strcmp(tmp_argv[0] + 2,"quiet") == 0) {
+                httrack.quiet=1;    // ne pas poser de questions! (nohup par exemple)
+              } else if (strcmp(tmp_argv[0] + 2,"continue") == 0) {
+                argv_url=-1;        /* forcer */
+                httrack.quiet=1;
               }
             }
           }
@@ -436,7 +473,7 @@ int main(int argc, char **argv) {
       FILE* fp;
       int x_argc2;
           
-      //strcpy(x_argvblk2,"httrack ");
+      //strcpybuff(x_argvblk2,"httrack ");
       fp=fopen("config","rb");
       if (fp) {
         linput(fp,x_argvblk2+strlen(x_argvblk2),32000);
@@ -482,7 +519,7 @@ int main(int argc, char **argv) {
         
         if (argv[na][0]=='"') {
           char tempo[HTS_CDLMAXSIZE];
-          strcpy(tempo,argv[na]+1);
+          strcpybuff(tempo,argv[na]+1);
           if (tempo[strlen(tempo)-1]!='"') {
             char s[HTS_CDLMAXSIZE];
             sprintf(s,"Missing quote in %s",argv[na]);
@@ -491,7 +528,7 @@ int main(int argc, char **argv) {
             return -1;
           }
           tempo[strlen(tempo)-1]='\0';
-          strcpy(argv[na],tempo);
+          strcpybuff(argv[na],tempo);
         }
         
         if (cmdl_opt(argv[na])) { // option
@@ -509,34 +546,34 @@ int main(int argc, char **argv) {
               } else {
                 char* a;
                 na++;
-                strcpy(httrack.path_html,"");
-                strcpy(httrack.path_log,"");
+                strcpybuff(httrack.path_html,"");
+                strcpybuff(httrack.path_log,"");
                 a=strstr(argv[na],"\",\"");  // rechercher en premier, au cas ou -O "c:\pipo,test","c:\test"
                 if (!a)
                   a=strchr(argv[na],',');  // 2 path
                 else
                   a++;  // position ,
                 if (a) {
-                  strncat(httrack.path_html,argv[na],(int) (a-argv[na]));
-                  strcat(httrack.path_log,a+1);
+                  strncatbuff(httrack.path_html,argv[na],(int) (a-argv[na]));
+                  strcatbuff(httrack.path_log,a+1);
                 } else {
-                  strcpy(httrack.path_log,argv[na]);
-                  strcpy(httrack.path_html,argv[na]);
+                  strcpybuff(httrack.path_log,argv[na]);
+                  strcpybuff(httrack.path_html,argv[na]);
                 }
                 // Eliminer les cas comme -O "C:\mirror\"
                 if (httrack.path_log[0]=='"') {  // Guillemets
                   char tmp[256];
-                  strcpy(tmp,httrack.path_log+1);
+                  strcpybuff(tmp,httrack.path_log+1);
                   if (tmp[strlen(tmp)-1]=='"')
                     tmp[strlen(tmp)-1]='\0';
-                  strcpy(httrack.path_log,tmp);
+                  strcpybuff(httrack.path_log,tmp);
                 }
                 if (httrack.path_html[0]=='"') {
                   char tmp[256];
-                  strcpy(tmp,httrack.path_html+1);
+                  strcpybuff(tmp,httrack.path_html+1);
                   if (tmp[strlen(tmp)-1]=='"')
                     tmp[strlen(tmp)-1]='\0';
-                  strcpy(httrack.path_html,tmp);
+                  strcpybuff(httrack.path_html,tmp);
                 }
                 check_path(httrack.path_log,argv_firsturl);
                 if (check_path(httrack.path_html,argv_firsturl)) {
@@ -583,8 +620,6 @@ int main(int argc, char **argv) {
 
   }  // traiter -O
 
-
-  
   /* load doit.log and insert in current command line */
   if ( fexist(fconcat(httrack.path_log,"hts-cache/doit.log")) && (argv_url<=0) ) {
     FILE* fp=fopen(fconcat(httrack.path_log,"hts-cache/doit.log"),"rb");
@@ -611,8 +646,21 @@ int main(int argc, char **argv) {
         /* Insert parameters BUT so that they can be in the same order */
         if (lastp) {
           if (strnotempty(lastp)) {
+            //char* argv0;
+            //int len;
             insert_after_argc=argc-insert_after;
+            //argv0 = (argv+insert_after)[0];
             cmdl_ins(lastp,insert_after_argc,(argv+insert_after),x_argvblk,x_ptr);
+            /*
+            DONE IN 'next_token'
+            len = strlen(argv0);
+            if (len >= 2 && argv0[0]=='\"' && argv0[len-1]=='\"') {   // "foo"
+              char tempo[1024];
+              tempo[0] = '\0';
+              strncatbuff(tempo, argv0+1, len-2);
+              strcpybuff(argv0, tempo);
+            }
+            */
             argc=insert_after_argc+insert_after;
             insert_after++;
           }
@@ -668,7 +716,7 @@ int main(int argc, char **argv) {
       if (argv[i][0]=='-') {
         if (argv[i][1]=='-') {  // --xxx
           if ((strfield2(argv[i]+2,"clean")) || (strfield2(argv[i]+2,"tide"))) {  // nettoyer
-            strcpy(argv[i]+1,"");
+            strcpybuff(argv[i]+1,"");
             if (fexist(fconcat(httrack.path_log,"hts-log.txt")))
               remove(fconcat(httrack.path_log,"hts-log.txt"));
             if (fexist(fconcat(httrack.path_log,"hts-err.txt")))
@@ -699,7 +747,7 @@ int main(int argc, char **argv) {
             //
           } else if (strfield2(argv[i]+2,"catchurl")) {      // capture d'URL via proxy temporaire!
             argv_url=1;     // forcer a passer les parametres
-            strcpy(argv[i]+1,"#P");
+            strcpybuff(argv[i]+1,"#P");
             //
           } else if (strfield2(argv[i]+2,"updatehttrack")) {
 #ifdef _WIN32
@@ -714,10 +762,10 @@ int main(int argc, char **argv) {
             char *args[8];
             
             printf("Cheking for updates...\n");
-            strcpy(_args[0],argv[0]);
-            strcpy(_args[1],"--get");
+            strcpybuff(_args[0],argv[0]);
+            strcpybuff(_args[1],"--get");
             sprintf(_args[2],HTS_UPDATE_WEBSITE,HTS_PLATFORM,"");
-            strcpy(_args[3],"--quickinfo");
+            strcpybuff(_args[3],"--quickinfo");
             args[0]=_args[0];
             args[1]=_args[1];
             args[2]=_args[2];
@@ -781,7 +829,7 @@ int main(int argc, char **argv) {
         FILE* fp;
         int x_argc;
         
-        //strcpy(x_argvblk,"httrack ");
+        //strcpybuff(x_argvblk,"httrack ");
         fp=fopen(fconcat(httrack.path_log,"hts-cache/doit.log"),"rb");
         if (fp) {
           linput(fp,x_argvblk+strlen(x_argvblk),8192);
@@ -892,6 +940,10 @@ int main(int argc, char **argv) {
       }
       
     } else {    // aucune URL définie et pas de cache
+      if (argc > 1 && strcmp(argv[0], "-#h") == 0) {
+        printf("HTTrack version "HTTRACK_VERSION"%s\n", WHAT_is_available);
+        exit(0);
+      }
 #if HTS_ANALYSTE!=2
       if (httrack.quiet) {
 #endif
@@ -976,7 +1028,7 @@ int main(int argc, char **argv) {
 
       if (argv[na][0]=='"') {
         char tempo[HTS_CDLMAXSIZE];
-        strcpy(tempo,argv[na]+1);
+        strcpybuff(tempo,argv[na]+1);
         if (tempo[strlen(tempo)-1]!='"') {
           char s[HTS_CDLMAXSIZE];
           sprintf(s,"Missing quote in %s",argv[na]);
@@ -985,7 +1037,7 @@ int main(int argc, char **argv) {
           return -1;
         }
         tempo[strlen(tempo)-1]='\0';
-        strcpy(argv[na],tempo);
+        strcpybuff(argv[na],tempo);
       }
 
       if (cmdl_opt(argv[na])) { // option
@@ -1009,6 +1061,7 @@ int main(int argc, char **argv) {
             httrack.savename_type=1003;   // mettre dans le répertoire courant
             httrack.depth=0;              // ne pas explorer la page
             httrack.accept_cookie=0;      // pas de cookies
+            httrack.robots=0;             // pas de robots
             break;
           case 'w': httrack.wizard=2;    // wizard 'soft' (ne pose pas de questions)
             httrack.travel=0;
@@ -1078,7 +1131,7 @@ int main(int argc, char **argv) {
               sscanf(com+1,"%d",&httrack.maxsoc);
               while(isdigit((unsigned char)*(com+1))) com++;
               httrack.maxsoc=max(httrack.maxsoc,1);     // FORCER A 1
-            } else httrack.maxsoc=8;
+            } else httrack.maxsoc=4;
             
             break;
             //
@@ -1122,7 +1175,7 @@ int main(int argc, char **argv) {
                   htsmain_free();
                   return -1;
                 }
-                strcpy(httrack.savename_userdef,argv[na]);
+                strcpybuff(httrack.savename_userdef,argv[na]);
                 if (strnotempty(httrack.savename_userdef))
                   httrack.savename_type = -1;    // userdef!
                 else
@@ -1175,6 +1228,8 @@ int main(int argc, char **argv) {
           case '&': case '%': {    // deuxième jeu d'options
             com++;
             switch(*com) {
+            case 'M': httrack.mimehtml = 1; if (*(com+1)=='0') { httrack.mimehtml=0; com++; } break;
+            case 'k': httrack.nokeepalive = 0; if (*(com+1)=='0') { httrack.nokeepalive = 1; com++; } break;
             case 'x': httrack.passprivacy=1; if (*(com+1)=='0') { httrack.passprivacy=0; com++; } break;   // No passwords in html files
             case 'q': httrack.includequery=1; if (*(com+1)=='0') { httrack.includequery=0; com++; } break;   // No passwords in html files
             case 'I': httrack.kindex=1; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.kindex); while(isdigit((unsigned char)*(com+1))) com++; }
@@ -1188,7 +1243,9 @@ int main(int argc, char **argv) {
             case 'P': httrack.parseall=1; if (*(com+1)=='0') { httrack.parseall=0; com++; } break;   // tout parser
             case 'n': httrack.norecatch=1; if (*(com+1)=='0') { httrack.norecatch=0; com++; } break;   // ne pas reprendre fichiers effacés localement
             case 's': httrack.sizehack=1; if (*(com+1)=='0') { httrack.sizehack=0; com++; } break;   // hack sur content-length
+            case 'u': httrack.urlhack=1; if (*(com+1)=='0') { httrack.urlhack=0; com++; } break;   // url hack
             case 'v': httrack.verbosedisplay=2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&httrack.verbosedisplay); while(isdigit((unsigned char)*(com+1))) com++; } break;
+            case 'i': httrack.dir_topindex = 1; if (*(com+1)=='0') { httrack.dir_topindex=0; com++; } break;
 
             // preserve: no footer, original links
             case 'p':
@@ -1208,7 +1265,53 @@ int main(int argc, char **argv) {
                   htsmain_free();
                   return -1;
                 }
-                strcpy(httrack.filelist,argv[na]);
+                strcpybuff(httrack.filelist,argv[na]);
+              }
+              break;
+            case 'b':  // bind
+              if ((na+1>=argc) || (argv[na+1][0]=='-')) {
+                HTS_PANIC_PRINTF("Option %b needs to be followed by a blank space, and a local hostname");
+                printf("Example: -%%b \"ip4.localhost\"\n");
+                htsmain_free();
+                return -1;
+              } else{
+                na++;
+                if (strlen(argv[na])>=254) {
+                  HTS_PANIC_PRINTF("Hostname string too long");
+                  htsmain_free();
+                  return -1;
+                }
+                strcpybuff(httrack.proxy.bindhost,argv[na]);
+              }
+              break;
+            case 'S':    // Scan Rules list
+              if ((na+1>=argc) || (argv[na+1][0]=='-')) {
+                HTS_PANIC_PRINTF("Option %S needs to be followed by a blank space, and a text filename");
+                printf("Example: -%%S \"myfilterlist.txt\"\n");
+                htsmain_free();
+                return -1;
+              } else{
+                INTsys fz;
+                na++;
+                fz = fsize(argv[na]);
+                if (fz < 0) {
+                  HTS_PANIC_PRINTF("File url list could not be opened");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  FILE* fp = fopen(argv[na], "rb");
+                  if (fp != NULL) {
+                    int cl = (int) strlen(url);
+                    ensureUrlCapacity(url, url_sz, cl + fz + 8192);
+                    if ((INTsys)fread(url + cl, 1, fz, fp) != fz) {
+                      HTS_PANIC_PRINTF("File url list could not be read");
+                      htsmain_free();
+                      return -1;
+                    }
+                    fclose(fp);
+                    *(url + cl + fz) = '\0';
+                  }
+                }
               }
               break;
             case 'A':    // assume
@@ -1227,12 +1330,12 @@ int main(int argc, char **argv) {
                 }
                 // --assume standard
                 if (strcmp(argv[na],"standard") == 0) {
-                  strcpy(httrack.mimedefs,"\n");
-                  strcat(httrack.mimedefs,HTS_ASSUME_STANDARD);
-                  strcat(httrack.mimedefs,"\n");
+                  strcpybuff(httrack.mimedefs,"\n");
+                  strcatbuff(httrack.mimedefs,HTS_ASSUME_STANDARD);
+                  strcatbuff(httrack.mimedefs,"\n");
                 } else {
-                  strcat(httrack.mimedefs,argv[na]);
-                  strcat(httrack.mimedefs,"\n");
+                  strcatbuff(httrack.mimedefs,argv[na]);
+                  strcatbuff(httrack.mimedefs,"\n");
                 }
                 a=httrack.mimedefs;
                 while(*a) {
@@ -1259,7 +1362,7 @@ int main(int argc, char **argv) {
                   htsmain_free();
                   return -1;
                 }
-                strcpy(httrack.lang_iso,argv[na]);
+                strcpybuff(httrack.lang_iso,argv[na]);
               }
               break;
               //
@@ -1276,7 +1379,7 @@ int main(int argc, char **argv) {
                   htsmain_free();
                   return -1;
                 }
-                strcpy(httrack.footer,argv[na]);
+                strcpybuff(httrack.footer,argv[na]);
               }
               break;
             case 'H':                 // debug headers
@@ -1313,6 +1416,81 @@ int main(int argc, char **argv) {
                 printf("Warning option -%%U has no effect with this compiled version (setuid)\n");
 #endif
 #endif
+              }
+              break;
+              
+            case 'W':       // Wrapper callback
+              // --wrapper check-link=obj.so:check_link
+              if ((na+1>=argc) || (argv[na+1][0]=='-')) {
+                HTS_PANIC_PRINTF("Option %W needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field");
+                printf("Example: -%%W check-link=checklink.so:check\n");
+                htsmain_free();
+                return -1;
+              } else {
+                char callbackname[128];
+                char* a = argv[na + 1];
+                char* pos = strchr(a, '=');
+                na++;
+                if (pos != NULL && (pos - a) > 0 && (pos - a + 2) < sizeof(callbackname)) {
+                  char* posf = strchr(pos + 1, ':');
+                  char filename[1024];
+                  callbackname[0] = '\0';
+                  strncatbuff(callbackname, a, pos - a);
+                  pos++;
+                  if (posf != NULL && (posf - pos) > 0 && (posf - pos + 2) < sizeof(filename)) {
+                    void* userfunction;
+                    filename[0] = '\0';
+                    strncatbuff(filename, pos, posf - pos);
+                    posf++;
+                    userfunction = getFunctionPtr(filename, posf);
+                    if (userfunction != NULL) {
+                      if ((void*)htswrap_read(callbackname) != NULL) {
+                        if (htswrap_add(callbackname, userfunction)) {
+                          if (!httrack.quiet) {
+                            set_wrappers();
+                            if ((void*)htswrap_read(callbackname) == userfunction) {
+                              printf("successfully plugged [%s -> %s:%s]\n", callbackname, posf, filename);
+                            } else {
+                              char tmp[1024 * 2];
+                              sprintf(tmp, "option %%W : unable to (re)plug the function %s from the file %s for the callback %s", posf, filename, callbackname);
+                              HTS_PANIC_PRINTF(tmp);
+                              htsmain_free();
+                              return -1;
+                            }
+                          }
+                        } else {
+                          char tmp[1024 * 2];
+                          sprintf(tmp, "option %%W : unable to plug the function %s from the file %s for the callback %s", posf, filename, callbackname);
+                          HTS_PANIC_PRINTF(tmp);
+                          htsmain_free();
+                          return -1;
+                        }
+                      } else {
+                        char tmp[1024 * 2];
+                        sprintf(tmp, "option %%W : unknown or undefined callback %s", callbackname);
+                        HTS_PANIC_PRINTF(tmp);
+                        htsmain_free();
+                        return -1;
+                      }
+                    } else {
+                      char tmp[1024 * 2];
+                      sprintf(tmp, "option %%W : unable to load the function %s in the file %s for the callback %s", posf, filename, callbackname);
+                      HTS_PANIC_PRINTF(tmp);
+                      htsmain_free();
+                      return -1;
+                    }
+                  } else {
+                    HTS_PANIC_PRINTF("Syntax error in option %W : filename error : this function needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field");
+                    printf("Example: -%%W check-link=checklink.so:check\n");
+                    htsmain_free();
+                    return -1;
+                  }
+                } else {
+                  HTS_PANIC_PRINTF("Syntax error in option %W : this function needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field");
+                  printf("Example: -%%W check-link=checklink.so:check\n");
+                  htsmain_free();
+                  return -1;
+                }
               }
               break;
               
@@ -1376,17 +1554,185 @@ int main(int argc, char **argv) {
             }
                     }
             break;
-
+            
             //
-          case '#':  { // non documenté (appel de l'interface)
+          case '#':  { // non documenté
             com++;
             switch(*com) {
+            case 'C':   // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
+              {
+                int hasFilter = 0;
+                int found = 0;
+                char* filter=NULL;
+                cache_back cache;
+                inthash cache_hashtable=inthash_new(HTS_HASH_SIZE);
+                int backupXFR = htsMemoryFastXfr;
+                int sendb = 0;
+                if (isdigit((unsigned char)*(com+1))) {
+                  sscanf(com+1,"%d",&sendb);
+                  while(isdigit((unsigned char)*(com+1))) com++;
+                } else sendb=0;
+                if (!((na+1>=argc) || (argv[na+1][0]=='-'))) {
+                  na++;
+                  hasFilter = 1;
+                  filter=argv[na];
+                }
+                htsMemoryFastXfr = 1;               /* fast load */
+
+                memset(&cache, 0, sizeof(cache_back));
+                cache.type=1;       // cache?
+                cache.log=stdout;     // log?
+                cache.errlog=stderr;  // err log?
+                cache.ptr_ant=cache.ptr_last=0;   // pointeur pour anticiper
+                cache.hashtable=(void*)cache_hashtable;      /* copy backcache hash */
+                cache.ro = 1;          /* read only */
+                if (cache.hashtable) {
+                  char adr[HTS_URLMAXSIZE*2];
+                  char fil[HTS_URLMAXSIZE*2];
+                  char url[HTS_URLMAXSIZE*2];
+                  char linepos[256];
+                  int  pos;
+                  char* cacheNdx = readfile(fconcat(httrack.path_log,"hts-cache/new.ndx"));
+                  cache_init(&cache,&httrack);            /* load cache */
+                  if (cacheNdx != NULL) {
+                    char firstline[256];
+                    char* a = cacheNdx;
+                    a+=cache_brstr(a, firstline);
+                    a+=cache_brstr(a, firstline);
+                    while ( a != NULL ) {
+                      a=strchr(a+1,'\n');     /* start of line */
+                      if (a) {
+                        htsblk r;
+                        /* */
+                        a++;
+                        /* read "host/file" */
+                        a+=binput(a,adr,HTS_URLMAXSIZE);
+                        a+=binput(a,fil,HTS_URLMAXSIZE);
+                        url[0]='\0';
+                        if (!link_has_authority(adr))
+                          strcatbuff(url, "http://");
+                        strcatbuff(url, adr);
+                        strcatbuff(url, fil);
+                        /* read position */
+                        a+=binput(a,linepos,200);
+                        sscanf(linepos,"%d",&pos);
+                        if (!hasFilter
+                          ||
+                          (strjoker(url, filter, NULL, NULL) != NULL)
+                          ) {
+                          r = cache_read(&httrack, &cache, adr, fil, "", NULL);    // lire entrée cache + data
+                          if (r.statuscode != -1) {    // No errors
+                            found++;
+                            if (!hasFilter) {
+                              fprintf(stdout, "%s%s%s\r\n", 
+                                (link_has_authority(adr)) ? "" : "http://", 
+                                adr, fil);
+                            } else {
+                              char msg[256], cdate[256];
+                              char sav[HTS_URLMAXSIZE*2];
+                              infostatuscode(msg, r.statuscode);
+                              time_gmt_rfc822(cdate);
+
+                              fprintf(stdout, "HTTP/1.1 %d %s\r\n",
+                                r.statuscode,
+                                r.msg[0] ? r.msg : msg
+                                );
+                              fprintf(stdout, "X-Host: %s\r\n", adr);
+                              fprintf(stdout, "X-File: %s\r\n", fil);
+                              fprintf(stdout, "X-URL: %s%s%s\r\n", 
+                                (link_has_authority(adr)) ? "" : "http://", 
+                                adr, fil);
+                              if (url_savename(adr, fil, sav, NULL, NULL, NULL, NULL,
+                                &httrack, NULL, 0, NULL, 0, &cache, NULL, 0, 0)!=-1) {
+                                if (fexist(sav)) {
+                                  fprintf(stdout, "Content-location: %s\r\n", sav);
+                                }
+                              }
+                              fprintf(stdout, "Date: %s\r\n", cdate);
+                              fprintf(stdout, "Server: HTTrack Website Copier/"HTTRACK_VERSION"\r\n");
+                              if (r.lastmodified[0]) {
+                                fprintf(stdout, "Last-Modified: %s\r\n", r.lastmodified);
+                              }
+                              if (r.etag[0]) {
+                                fprintf(stdout, "Etag: %s\r\n", r.etag);
+                              }
+                              if (r.totalsize >= 0) {
+                                fprintf(stdout, "Content-Length: "LLintP"\r\n", r.totalsize);
+                              }
+                              fprintf(stdout, "X-Content-Length: "LLintP"\r\n", (r.size >= 0) ? r.size : (-r.size) );
+                              if (r.contenttype >= 0) {
+                                fprintf(stdout, "Content-Type: %s\r\n", r.contenttype);
+                              }
+                              if (r.cdispo[0]) {
+                                fprintf(stdout, "Content-Disposition: %s\r\n", r.cdispo);
+                              }
+                              if (r.contentencoding[0]) {
+                                fprintf(stdout, "Content-Encoding: %s\r\n", r.contentencoding);
+                              }
+                              if (r.is_chunk) {
+                                fprintf(stdout, "Transfer-Encoding: chunked\r\n");
+                              }
+#if HTS_USEOPENSSL
+                              if (r.ssl) {
+                                fprintf(stdout, "X-SSL: yes\r\n");
+                              }
+#endif
+                              if (r.is_write) {
+                                fprintf(stdout, "X-Direct-To-Disk: yes\r\n");
+                              }
+                              if (r.compressed) {
+                                fprintf(stdout, "X-Compressed: yes\r\n");
+                              }
+                              if (r.notmodified) {
+                                fprintf(stdout, "X-Not-Modified: yes\r\n");
+                              }
+                              if (r.is_chunk) {
+                                fprintf(stdout, "X-Chunked: yes\r\n");
+                              }
+                              fprintf(stdout, "\r\n");
+                              /* Send the body */
+                              if (sendb && r.adr) {
+                                fprintf(stdout, "%s\r\n", r.adr);
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    freet(cacheNdx);
+                  }
+                }
+                if (!found) {
+                  fprintf(stderr, "No cache entry found%s%s%s\r\n",
+                    (hasFilter)?" for '":"",
+                    (hasFilter)?filter:"",
+                    (hasFilter)?"'":""
+                    );
+                }
+                htsMemoryFastXfr = backupXFR;
+                return 0;
+              }
+              break;
+            case 'X': 
+#ifndef STRDEBUG
+              fprintf(stderr, "warning: no string debugging support built, option has no effect\n");
+#endif
+              htsMemoryFastXfr=1; 
+              if (*(com+1)=='0') { htsMemoryFastXfr=0; com++; } 
+              break;
+            case '~': /* internal lib test */
+              {
+                char thisIsATestYouShouldSeeAnError[12];
+                strcpybuff(thisIsATestYouShouldSeeAnError, "0123456789012345678901234567890123456789");
+                return 0;
+              }
+              break;
             case 'f': httrack.flush=1; break;
             case 'h':
-              printf("HTTrack version "HTTRACK_VERSION"\n");
-              exit(1);
+              printf("HTTrack version "HTTRACK_VERSION"%s\n", WHAT_is_available);
+              return 0;
               break;
-            case 'p': httrack.aff_progress=1; break;
+            case 'p': /* httrack.aff_progress=1; deprecated */ break;
             case 'S': httrack.shell=1; break;  // stdin sur un shell
             case 'K': httrack.keyboard=1; break;  // vérifier stdin
               //
@@ -1458,10 +1804,10 @@ int main(int argc, char **argv) {
               if (*a == ':') {  // un port est présent, <proxy>:port
                 sscanf(a+1,"%d",&httrack.proxy.port);
                 httrack.proxy.name[0]='\0';
-                strncat(httrack.proxy.name,argv[na],(int) (a - argv[na]));
+                strncatbuff(httrack.proxy.name,argv[na],(int) (a - argv[na]));
               } else {  // <proxy>
                 httrack.proxy.port=8080;
-                strcpy(httrack.proxy.name,argv[na]);
+                strcpybuff(httrack.proxy.name,argv[na]);
               }
             }
             break;
@@ -1478,7 +1824,7 @@ int main(int argc, char **argv) {
                 htsmain_free();
                 return -1;
               }
-              strcpy(httrack.user_agent,argv[na]);
+              strcpybuff(httrack.user_agent,argv[na]);
               if (strnotempty(httrack.user_agent))
                 httrack.user_agent_send=1;
               else
@@ -1499,7 +1845,7 @@ int main(int argc, char **argv) {
                 htsmain_free();
                 return -1;
               }
-              strcpy(httrack.sys_com,argv[na]);
+              strcpybuff(httrack.sys_com,argv[na]);
               if (strnotempty(httrack.sys_com))
                 httrack.sys_com_exec=1;
               else
@@ -1521,10 +1867,10 @@ int main(int argc, char **argv) {
         
       }  else {  // URL/filters
         char tempo[1024];       
-        if (strnotempty(url)) strcat(url," ");  // espace de séparation
-        strcpy(tempo,unescape_http_unharm(argv[na],1));
+        if (strnotempty(url)) strcatbuff(url," ");  // espace de séparation
+        strcpybuff(tempo,unescape_http_unharm(argv[na],1));
         escape_spc_url(tempo);
-        strcat(url,tempo);
+        strcatbuff(url,tempo);
       }  // if argv=- etc. 
       
     }  // for
@@ -1563,28 +1909,28 @@ int main(int argc, char **argv) {
         rpath[0]='\0';
         if (c != httrack.path_html) {
           if (httrack.path_html[0]!='/')
-            strcat(rpath,"./");
-          strncat(rpath,httrack.path_html,(int) (c - httrack.path_html));
+            strcatbuff(rpath,"./");
+          strncatbuff(rpath,httrack.path_html,(int) (c - httrack.path_html));
         }
         {
           char tmp[1024];
-          strcpy(tmp,c); strcpy(httrack.path_html,tmp);
-          strcpy(tmp,d); strcpy(httrack.path_log,tmp);
+          strcpybuff(tmp,c); strcpybuff(httrack.path_html,tmp);
+          strcpybuff(tmp,d); strcpybuff(httrack.path_log,tmp);
         }
       } else {
-        strcpy(rpath,"./");
-        strcpy(httrack.path_html,"/");
-        strcpy(httrack.path_log,"/");
+        strcpybuff(rpath,"./");
+        strcpybuff(httrack.path_html,"/");
+        strcpybuff(httrack.path_log,"/");
       }
       if (rpath[0]) {
         printf("[changing root path to %s (path_data=%s,path_log=%s)]\n",rpath,httrack.path_html,httrack.path_log);
         if (chroot(rpath)) {
           printf("ERROR! Can not chroot to %s!\n",rpath);
-          exit(0);
+          return -1;
         }
         if (chdir("/")) {     /* new root */
           printf("ERROR! Can not chdir to %s!\n",rpath);
-          exit(0);
+          return -1;
         }
       } else
         printf("WARNING: chroot not possible with these paths\n");
@@ -1668,6 +2014,9 @@ int main(int argc, char **argv) {
       if (fexist(fconcat(httrack.path_log,"hts-err.txt")))
         remove(fconcat(httrack.path_log,"hts-err.txt"));
 
+      /* Check FS directory structure created */
+      structcheck(httrack.path_log);
+
       httrack.log=fopen(fconcat(httrack.path_log,"hts-log.txt"),"w");
       if (httrack_logmode==2)
         httrack.errlog=fopen(fconcat(httrack.path_log,"hts-err.txt"),"w");
@@ -1705,7 +2054,7 @@ int main(int argc, char **argv) {
         if (fp) {
           fprintf(fp,"What's in this folder?"LF);
           fprintf(fp,""LF);
-          fprintf(fp,"This folder (hts-cache) has been generated by WinHTTrack "HTTRACK_VERSION""LF);
+          fprintf(fp,"This folder (hts-cache) has been generated by WinHTTrack "HTTRACK_VERSION"%s"LF, WHAT_is_available);
           fprintf(fp,"and is used for updating this website."LF);
           fprintf(fp,"(The HTML website structure is stored here to allow fast updates)"LF""LF);
           fprintf(fp,"DO NOT delete this folder unless you do not want to update the mirror in the future!!"LF);
@@ -1732,8 +2081,8 @@ int main(int argc, char **argv) {
       }*/
 
       // vérifier existence de la structure
-      structcheck(httrack.path_html);
-      structcheck(httrack.path_log);
+      structcheck(fconcat(httrack.path_html, "/"));
+      structcheck(fconcat(httrack.path_log, "/"));
      
       // reprise/update
       if (httrack.cache) {
@@ -1799,7 +2148,9 @@ int main(int argc, char **argv) {
       // fichier log        
       if (httrack.log)     {
         int i;
-        fprintf(httrack.log,"HTTrack"HTTRACK_VERSION" launched on %s at %s"LF,t,url);
+        fprintf(httrack.log,"HTTrack"HTTRACK_VERSION"%s launched on %s at %s"LF, 
+          WHAT_is_available,
+          t, url);
         fprintf(httrack.log,"(");
         for(i=0;i<argc;i++) {
           if ((strchr(argv[i],' ')==NULL) || (strchr(argv[i],'\"')))
@@ -1814,8 +2165,8 @@ int main(int argc, char **argv) {
         fprintf(httrack.log,LF);
       }
 
-      if (httrack_logmode)     {
-        printf("Mirror launched on %s by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS""LF,t);
+      if (httrack_logmode) {
+        printf("Mirror launched on %s by HTTrack Website Copier/"HTTRACK_VERSION"%s "HTTRACK_AFF_AUTHORS""LF,t,WHAT_is_available);
         if (httrack.wizard==0) {
           printf("mirroring %s with %d levels, %d sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",url,httrack.depth,httrack.maxsoc,httrack.travel,httrack.seeker,httrack_logmode,httrack.urlmode,httrack.getmode);
         } else {    // the magic wizard
@@ -1877,7 +2228,7 @@ deprecated - see SIGCHLD
     if (httrack.dir_topindex) {
       char rpath[1024*2];
       char* a;
-      strcpy(rpath,httrack.path_html);
+      strcpybuff(rpath,httrack.path_html);
       if (rpath[0]) {
         if (rpath[strlen(rpath)-1]=='/')
           rpath[strlen(rpath)-1]='\0';
@@ -1885,7 +2236,7 @@ deprecated - see SIGCHLD
       a=strrchr(rpath,'/');
       if (a) {
         *a='\0';
-        hts_buildtopindex(rpath,httrack.path_bin);
+        hts_buildtopindex(&httrack,rpath,httrack.path_bin);
         if (httrack.log) {
           fspc(httrack.log,"info"); fprintf(httrack.log,"Top index rebuilt (done)"LF);
         }
@@ -1931,7 +2282,7 @@ deprecated - see SIGCHLD
 //  WSACleanup();    // ** non en cas de thread tjs présent!..
 #endif
 #endif
-#if HTS_TRACE_MALLOC
+#ifdef HTS_TRACE_MALLOC
   hts_freeall();
 #endif
 
@@ -1968,9 +2319,9 @@ int check_path(char* s,char* defaultname) {
         char* a=strchr(defaultname,'#');      // we never know..
         if (a) *a='\0';
         tempo[0]='\0';
-        strncat(tempo,s,i-1);
-        strcat(tempo,defaultname);
-        strcpy(s,tempo);
+        strncatbuff(tempo,s,i-1);
+        strcatbuff(tempo,defaultname);
+        strcpybuff(s,tempo);
       } else
         s[0]='\0';            // Clear path (no name/default url given)
       return_value=1;     // expanded
@@ -1980,7 +2331,7 @@ int check_path(char* s,char* defaultname) {
   // ending /
   if (strnotempty(s))
   if (s[strlen(s)-1]!='/')    // ajouter slash à la fin
-    strcat(s,"/");
+    strcatbuff(s,"/");
 
   return return_value;
 }

@@ -55,7 +55,9 @@ Please visit our Website: http://www.httrack.com
 #include <direct.h>
 #else
 #include <signal.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 /* END specific definitions */
 
@@ -69,13 +71,13 @@ Please visit our Website: http://www.httrack.com
 typedef struct {
   char firstblock;      // flag 1=premier malloc 
   char link_import;     // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
-  short int depth;      // profondeur autorisée lien ; >0 forte 0=faible
-  short int pass2;      // traiter après les autres, seconde passe. si == -1, lien traité en background
+  int depth;            // profondeur autorisée lien ; >0 forte 0=faible
+  int pass2;            // traiter après les autres, seconde passe. si == -1, lien traité en background
   int premier;          // pointeur sur le premier lien qui a donné lieu aux autres liens du domaine
   int precedent;        // pointeur sur le lien qui a donné lieu à ce lien précis
-  //int moved;            // pointeur sur moved
-  short int retry;      // nombre de retry restants
-  short int testmode;   // mode test uniquement, envoyer juste un head!
+  //int moved;          // pointeur sur moved
+  int retry;            // nombre de retry restants
+  int testmode;         // mode test uniquement, envoyer juste un head!
   char* adr;            // adresse
   char* fil;            // nom du fichier distant
   char* sav;            // nom à sauver sur disque (avec chemin éventuel)
@@ -101,10 +103,11 @@ typedef struct {
   char referer_adr[HTS_URLMAXSIZE*2]; // adresse host page referer
   char referer_fil[HTS_URLMAXSIZE*2]; // fichier page referer
   char location_buffer[HTS_URLMAXSIZE*2];  // "location" en cas de "moved" (302,..)
-  char tmpfile[HTS_URLMAXSIZE*2];     // nom à sauver temporairement (compressé)
+  char* tmpfile;                           // nom à sauver temporairement (compressé)
+  char tmpfile_buffer[HTS_URLMAXSIZE*2];   // buffer pour le nom à sauver temporairement
   char send_too[1024];    // données à envoyer en même temps que le header
-  int status;           // status (-1=non utilisé, 0: prêt, >0: opération en cours)
-  int testmode;         // mode de test
+  int status;             // status (-1=non utilisé, 0: prêt, >0: opération en cours)
+  int testmode;           // mode de test
   int timeout;            // gérer des timeouts? (!=0  : nombre de secondes)
   TStamp timeout_refresh; // si oui, time refresh
   int rateout;            // timeout refresh? (!=0 : taux minimum toléré en octets/s)
@@ -112,20 +115,23 @@ typedef struct {
   LLint maxfile_nonhtml;  // taille max d'un fichier non html
   LLint maxfile_html;     // idem pour un ficheir html
   htsblk r;               // structure htsblk de chaque objet en background 
-  short int is_update;    // mode update
+  int is_update;          // mode update
   int head_request;       // requète HEAD?
   LLint range_req_size;   // range utilisé
+  TStamp ka_time_start;   // refresh time for KA 
   //
   int http11;             // L'en tête doit être signé HTTP/1.1 et non HTTP/1.0
   int is_chunk;           // chunk?
   char* chunk_adr;        // adresse chunk en cours de chargement
   LLint chunk_size;       // taille chunk en cours de chargement
+  LLint chunk_blocksize;  // taille data declaree par le chunk
   LLint compressed_size;  // taille compressés (stats uniquement)
   //
-  short int* pass2_ptr;   // pointeur sur liens[ptr]->pass2
+  int* pass2_ptr;         // pointeur sur liens[ptr]->pass2
   //
-  char info[256];       // éventuel status pour le ftp
-  int stop_ftp;         // flag stop pour ftp
+  char info[256];         // éventuel status pour le ftp
+  int stop_ftp;           // flag stop pour ftp
+  int finalized;          // finalized (optim memory)
 #if DEBUG_CHECKINT
   char magic2;
 #endif
@@ -136,6 +142,7 @@ typedef struct {
   int version;        // 0 ou 1
   /* */
   int type;
+  int ro;
   FILE *dat,*ndx,*olddat;
   char *use;      // liste des adr+fil
   FILE *lst;      // liste des fichiers pour la "purge"
@@ -209,6 +216,7 @@ typedef struct {
 
 // gestion hashage
 #include "htshash.h"
+#include "htsinthash.h"
 
 // gestion réentrance
 #include "htsnostatic.h"
@@ -236,42 +244,57 @@ typedef int   (* t_hts_htmlcheck)(char* html,int len,char* url_adresse,char* url
 typedef char* (* t_hts_htmlcheck_query)(char* question);
 typedef char* (* t_hts_htmlcheck_query2)(char* question);
 typedef char* (* t_hts_htmlcheck_query3)(char* question);
-typedef int   (* t_hts_htmlcheck_loop)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,LLint stat_bytes,LLint stat_bytes_recv,int stat_time,int stat_nsocket, LLint stat_written, int stat_updated, int stat_errors, int irate, int nbk );
+typedef int   (* t_hts_htmlcheck_loop)(lien_back* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
 typedef int   (* t_hts_htmlcheck_check)(char* adr,char* fil,int status);
 typedef void  (* t_hts_htmlcheck_pause)(char* lockfile);
+typedef void  (* t_hts_htmlcheck_filesave)(char* file);
+typedef int   (* t_hts_htmlcheck_linkdetected)(char* link);
+typedef int   (* t_hts_htmlcheck_xfrstatus)(lien_back* back);
+typedef int   (* t_hts_htmlcheck_savename)(char* adr_complete,char* fil_complete,char* referer_adr,char* referer_fil,char* save);
+typedef int   (* t_hts_htmlcheck_sendhead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* outgoing);
+typedef int   (* t_hts_htmlcheck_receivehead)(char* buff, char* adr, char* fil, char* referer_adr, char* referer_fil, htsblk* incoming);
 */
 
 // demande d'interaction avec le shell
 #if HTS_ANALYSTE
 //char HTbuff[1024];
 /*
-extern t_hts_htmlcheck_init    hts_htmlcheck_init;
-extern t_hts_htmlcheck_uninit  hts_htmlcheck_uninit;
-extern t_hts_htmlcheck_start   hts_htmlcheck_start;
-extern t_hts_htmlcheck_end     hts_htmlcheck_end;
-extern t_hts_htmlcheck_chopt   hts_htmlcheck_chopt;
-extern t_hts_htmlcheck         hts_htmlcheck;
-extern t_hts_htmlcheck_query   hts_htmlcheck_query;
-extern t_hts_htmlcheck_query2  hts_htmlcheck_query2;
-extern t_hts_htmlcheck_query3  hts_htmlcheck_query3;
-extern t_hts_htmlcheck_loop    hts_htmlcheck_loop;
-extern t_hts_htmlcheck_check   hts_htmlcheck_check;
-extern t_hts_htmlcheck_pause   hts_htmlcheck_pause;
+extern t_hts_htmlcheck_init       hts_htmlcheck_init;
+extern t_hts_htmlcheck_uninit     hts_htmlcheck_uninit;
+extern t_hts_htmlcheck_start      hts_htmlcheck_start;
+extern t_hts_htmlcheck_end        hts_htmlcheck_end;
+extern t_hts_htmlcheck_chopt      hts_htmlcheck_chopt;
+extern t_hts_htmlcheck            hts_htmlcheck;
+extern t_hts_htmlcheck_query      hts_htmlcheck_query;
+extern t_hts_htmlcheck_query2     hts_htmlcheck_query2;
+extern t_hts_htmlcheck_query3     hts_htmlcheck_query3;
+extern t_hts_htmlcheck_loop       hts_htmlcheck_loop;
+extern t_hts_htmlcheck_check      hts_htmlcheck_check;
+extern t_hts_htmlcheck_pause      hts_htmlcheck_pause;
+extern t_hts_htmlcheck_filesave   hts_htmlcheck_filesave;
+extern t_hts_htmlcheck_linkdetected hts_htmlcheck_linkdetected;
+extern t_hts_htmlcheck_xfrstatus  hts_htmlcheck_xfrstatus;
+extern t_hts_htmlcheck_savename   hts_htmlcheck_savename;
+extern t_hts_htmlcheck_sendhead   hts_htmlcheck_sendhead;
+extern t_hts_htmlcheck_receivehead hts_htmlcheck_receivehead;
 */
 //
-int hts_is_parsing(int flag);
-int hts_is_testing(void);
-int hts_setopt(httrackp* opt);
-int hts_addurl(char** url);
-int hts_resetaddurl(void);
-int copy_htsopt(httrackp* from,httrackp* to);
-char* hts_errmsg(void);
-int hts_setpause(int);      // pause transfer
-int hts_request_stop(int force);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_is_parsing(int flag);
+HTSEXT_API int hts_is_testing(void);
+HTSEXT_API int hts_is_exiting(void);
+HTSEXT_API int hts_setopt(httrackp* opt);
+HTSEXT_API int hts_addurl(char** url);
+HTSEXT_API int hts_resetaddurl(void);
+HTSEXT_API int copy_htsopt(httrackp* from,httrackp* to);
+HTSEXT_API char* hts_errmsg(void);
+HTSEXT_API int hts_setpause(int);      // pause transfer
+HTSEXT_API int hts_request_stop(int force);
 //
-char* hts_cancel_file(char * s);
-void hts_cancel_test(void);
-void hts_cancel_parsing(void);
+HTSEXT_API char* hts_cancel_file(char * s);
+HTSEXT_API void hts_cancel_test(void);
+HTSEXT_API void hts_cancel_parsing(void);
+#endif
 //
 // Variables globales
 extern int _hts_in_html_parsing;
@@ -291,17 +314,20 @@ extern int _hts_cancel;
 
 //int httpmirror(char* url,int level,httrackp opt);
 int httpmirror(char* url1,httrackp* opt);
-int filesave(char* adr,int len,char* s);
+int filesave(httrackp* opt,char* adr,int len,char* s,char* url_adr /* = NULL */,char* url_fil /* = NULL */);
+int check_fatal_io_errno(void);
 int engine_stats(void);
-void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,lien_back* back,int back_max,char** filters,int filter_max,int* filptr,char* host);
+void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,lien_back* back,int back_max,char* host);
 FILE* filecreate(char* s);
 int filecreateempty(char* filename);
 int filenote(char* s,filecreate_params* params);
-HTS_INLINE void usercommand(int exe,char* cmd,char* file);
+HTS_INLINE void usercommand(httrackp* opt,int exe,char* cmd,char* file,char* adr,char* fil);
 void usercommand_exe(char* cmd,char* file);
-char* structcheck_init(int init);
+//void* structcheck_init(int init);
 int filters_init(char*** ptrfilters, int maxfilter, int filterinc);
-int structcheck(char* s);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int structcheck(char* s);
+#endif
 HTS_INLINE int fspc(FILE* fp,char* type);
 char* next_token(char* p,int flag);
 //
@@ -322,16 +348,20 @@ int back_fillmax(lien_back* back,int back_max,httrackp* opt,cache_back* cache,li
 
 // cancel file
 #if HTS_ANALYSTE
-char* hts_cancel_file(char * s);
-void hts_cancel_test(void);
-void hts_cancel_parsing(void);
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char* hts_cancel_file(char * s);
+HTSEXT_API void hts_cancel_test(void);
+HTSEXT_API void hts_cancel_parsing(void);
+#endif
 #endif
 
 int ask_continue(void);
 int nombre_digit(int n);
 
 // Java
+#if 0
 int hts_add_file(char* file,int file_position);
+#endif
 
 // Polling
 #if HTS_POLL
@@ -339,6 +369,8 @@ HTS_INLINE int check_flot(T_SOC s);
 HTS_INLINE int check_stdin(void);
 int read_stdin(char* s,int max);
 #endif
+HTS_INLINE int check_sockerror(T_SOC s);
+HTS_INLINE int check_sockdata(T_SOC s);
 
 httrackp* hts_declareoptbuffer(httrackp* optdecl);
 void sig_finish( int code );     // finir et quitter
@@ -352,6 +384,9 @@ void sig_ignore( int code );     // ignorer signal
 void sig_brpipe( int code );     // treat if necessary
 void sig_doback(int);            // mettre en arrière plan
 #endif
+
+/* external modules */
+int htsAddLink(htsmoduleStruct* str, char* link);
 
 // Void
 void voidf(void);

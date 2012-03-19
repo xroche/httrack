@@ -301,7 +301,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
 }
 
 // recherche multiple
-// exemple: find dans un texte de strcpy(*[A-Z,a-z],"*[0-9]"); va rechercher la première occurence
+// exemple: find dans un texte de strcpybuff(*[A-Z,a-z],"*[0-9]"); va rechercher la première occurence
 // d'un strcpy sur une variable ayant un nom en lettres et copiant une chaine de chiffres
 // ATTENTION!! Eviter les jokers en début, où gare au temps machine!
 char* strjokerfind(char* chaine,char* joker) {

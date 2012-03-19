@@ -41,8 +41,9 @@ Please visit our Website: http://www.httrack.com
 // htsjava.c - Parseur de classes java
 
 #include "stdio.h"
-#include "htssystem.h"
+#include "htsglobal.h"
 #include "htscore.h"
+
 #include "htsjava.h"
 
 #include <stdio.h>
@@ -53,11 +54,10 @@ Please visit our Website: http://www.httrack.com
 
 //#include <math.h>
 
-#ifndef HTS_LITTLE_ENDIAN
-#define REVERSE_ENDIAN 1
-#else
-#define REVERSE_ENDIAN 0
-#endif
+static int reverse_endian(void) {
+	int endian = 1;
+	return ( * ( (char*) &endian) == 1);
+}
 
 /* big/little endian swap */
 #define hts_swap16(A) ( (((A) & 0xFF)<<8) | (((A) & 0xFF00)>>8) )
@@ -80,19 +80,33 @@ Please visit our Website: http://www.httrack.com
 
 #define JAVADEBUG 0
 
-int hts_parse_java(char *file,char* err_msg)
+int hts_detect_java(htsmoduleStruct* str) {
+  char* savename = str->filename;
+  if (savename) {
+    int len = (int) strlen(savename);
+    if (len > 6 && strfield(savename + len - 6,".class")) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int hts_parse_java(htsmoduleStruct* str)
 {
   FILE *fpout;
   JAVA_HEADER header;
   RESP_STRUCT *tab;
+  char* file = str->filename;
   
+  str->relativeToHtmlLink = 1;
+
 #if JAVADEBUG
   printf("fopen\n");
 #endif
   if ((fpout = fopen(fconv(file), "r+b")) == NULL)
   {
     //fprintf(stderr, "Cannot open input file.\n");
-    sprintf(err_msg,"Unable to open file %s",file);
+    sprintf(str->err_msg,"Unable to open file %s",file);
     return 0;   // une erreur..
   }
     
@@ -102,7 +116,7 @@ int hts_parse_java(char *file,char* err_msg)
   //if (fread(&header,1,sizeof(JAVA_HEADER),fpout) != sizeof(JAVA_HEADER)) {   // pas complet..
   if (fread(&header,1,10,fpout) != 10) {   // pas complet..
     fclose(fpout);
-    sprintf(err_msg,"File header too small (file len = "LLintP")",(LLint)fsize(file));
+    sprintf(str->err_msg,"File header too small (file len = "LLintP")",(LLint)fsize(file));
     return 0;
   }
 
@@ -110,19 +124,19 @@ int hts_parse_java(char *file,char* err_msg)
   printf("header\n");
 #endif
   // tester en tête
-#if REVERSE_ENDIAN
-  header.magic = hts_swap32(header.magic);
-  header.count = hts_swap16(header.count); 
-#endif        
+  if (reverse_endian()) {
+    header.magic = hts_swap32(header.magic);
+    header.count = hts_swap16(header.count); 
+  }
   if(header.magic!=0xCAFEBABE) {
-    sprintf(err_msg,"non java file");
+    sprintf(str->err_msg,"non java file");
     if (fpout) { fclose(fpout); fpout=NULL; }
     return 0;
   }
 
   tab =(RESP_STRUCT*)calloct(header.count,sizeof(RESP_STRUCT));
   if (!tab) {
-    sprintf(err_msg,"Unable to alloc %d bytes",(int)sizeof(RESP_STRUCT));
+    sprintf(str->err_msg,"Unable to alloc %d bytes",(int)sizeof(RESP_STRUCT));
     if (fpout) { fclose(fpout); fpout=NULL; }
     return 0;    // erreur..
   }
@@ -135,12 +149,12 @@ int hts_parse_java(char *file,char* err_msg)
     
     for (i = 1; i < header.count; i++) {
       int err=0;  // ++    
-      tab[i]=readtable(fpout,tab[i],&err,err_msg);
+      tab[i]=readtable(str,fpout,tab[i],&err);
       if (!err) {
         if ((tab[i].type == HTS_LONG) ||(tab[i].type == HTS_DOUBLE)) i++;  //2 element si double ou float
       } else {    // ++ une erreur est survenue!
-        if (strnotempty(err_msg)==0)
-          strcpy(err_msg,"Internal readtable error");
+        if (strnotempty(str->err_msg)==0)
+          strcpybuff(str->err_msg,"Internal readtable error");
         freet(tab);
         if (fpout) { fclose(fpout); fpout=NULL; }
         return 0;
@@ -180,7 +194,7 @@ int hts_parse_java(char *file,char* err_msg)
               printf("add %s\n",tempo);
 #endif
               if (tab[tab[i].index1].file_position >= 0)
-                hts_add_file(tempo,tab[tab[i].index1].file_position);
+                str->addLink(str,tempo);  /* tab[tab[i].index1].file_position */
             }
             
           }
@@ -205,7 +219,8 @@ int hts_parse_java(char *file,char* err_msg)
 
 
 // error: !=0 si erreur fatale
-RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
+RESP_STRUCT readtable(htsmoduleStruct* str, 
+                      FILE *fp, RESP_STRUCT trans, int* error)
 {
   unsigned short int length;
   int j;
@@ -214,54 +229,54 @@ RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
   trans.type = (int)(unsigned char)fgetc(fp);
   switch (trans.type) {
   case HTS_CLASS:
-    strcpy(trans.name,"Class");
+    strcpybuff(trans.name,"Class");
     trans.index1 = readshort(fp);
     break;
     
   case HTS_FIELDREF:
-    strcpy(trans.name,"Field Reference");
+    strcpybuff(trans.name,"Field Reference");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_METHODREF:
-    strcpy(trans.name,"Method Reference");
+    strcpybuff(trans.name,"Method Reference");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_INTERFACE:
-    strcpy(trans.name,"Interface Method Reference");
+    strcpybuff(trans.name,"Interface Method Reference");
     trans.index1 =readshort(fp);
     readshort(fp);
     break;
   case HTS_NAMEANDTYPE:
-    strcpy(trans.name,"Name and Type");
+    strcpybuff(trans.name,"Name and Type");
     trans.index1 = readshort(fp);
     readshort(fp);
     break;
     
   case HTS_STRING:                // CONSTANT_String
-    strcpy(trans.name,"String");
+    strcpybuff(trans.name,"String");
     trans.index1 = readshort(fp);
     break;
     
   case HTS_INTEGER:
-    strcpy(trans.name,"Integer");
+    strcpybuff(trans.name,"Integer");
     for(j=0;j<4;j++) fgetc(fp);
     break;
     
   case HTS_FLOAT:
-    strcpy(trans.name,"Float");
+    strcpybuff(trans.name,"Float");
     for(j=0;j<4;j++) fgetc(fp);
     break;
     
   case HTS_LONG:
-    strcpy(trans.name,"Long");
+    strcpybuff(trans.name,"Long");
     for(j=0;j<8;j++) fgetc(fp);
     break;
   case HTS_DOUBLE:
-    strcpy(trans.name,"Double");
+    strcpybuff(trans.name,"Double");
     for(j=0;j<8;j++) fgetc(fp);
     break;
     
@@ -269,9 +284,9 @@ RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
   case HTS_UNICODE:
     
     if (trans.type == HTS_ASCIZ)
-      strcpy(trans.name,"HTS_ASCIZ");
+      strcpybuff(trans.name,"HTS_ASCIZ");
     else
-      strcpy(trans.name,"HTS_UNICODE");
+      strcpybuff(trans.name,"HTS_UNICODE");
     
     {
       char buffer[1024]; 
@@ -295,10 +310,10 @@ RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
         //      if(tris(buffer)==1) printf("%s\n ",buffer);
         //      if(tris(buffer)==2)  printf("%s\n ",printname(buffer));
         //#endif
-        if(tris(buffer)==1)  hts_add_file(buffer,trans.file_position);       
-        else if(tris(buffer)==2)  hts_add_file(printname(buffer),trans.file_position);
+        if(tris(buffer)==1)  str->addLink(str, buffer);       /* trans.file_position */
+        else if(tris(buffer)==2)  str->addLink(str, printname(buffer));
 
-        strcpy(trans.name,buffer);
+        strcpybuff(trans.name,buffer);
       } else {    // gros pb
         while ( (length > 0) && (!feof(fp))) {
           fgetc(fp);
@@ -307,7 +322,7 @@ RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
         if (!feof(fp)) {
           trans.type=-1;
         } else {
-          sprintf(err_msg,"Internal stucture error (ASCII)");
+          sprintf(str->err_msg,"Internal stucture error (ASCII)");
           *error = 1;
         }
         return(trans);
@@ -317,7 +332,7 @@ RESP_STRUCT readtable(FILE *fp,RESP_STRUCT trans,int* error,char* err_msg)
   default:
     // printf("Type inconnue\n");
     // on arrête tout 
-    sprintf(err_msg,"Internal structure unknown (type %d)",trans.type);
+    sprintf(str->err_msg,"Internal structure unknown (type %d)",trans.type);
     *error = 1;
     return(trans);
     break;
@@ -331,11 +346,10 @@ unsigned short int readshort(FILE *fp)
   unsigned short int valint;
   fread(&valint,sizeof(valint),1,fp);
 
-#if REVERSE_ENDIAN
-  return hts_swap16(valint);
-#else
-  return valint;
-#endif
+  if (reverse_endian())
+    return hts_swap16(valint);
+  else
+    return valint;
   
 }
 
@@ -383,7 +397,7 @@ char * printname(char  name[1024])
   for (j = 0; j < (int) strlen(name); j++,p++) {
     if (*p == '/') *p1='.'; 
     if (*p==';'){*p1='\0';
-    strcat(rname,".class");
+    strcatbuff(rname,".class");
     return (rname);}
     else *p1=*p;
     p1++;

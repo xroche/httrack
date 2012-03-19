@@ -6,7 +6,7 @@ Welcome to HTTrack Website Copier!
 
 Information:
 
-The folder HelpHtml contains the documentation
+The folder html/ contains the documentation
 You might want to read these files, especially for installing HTTrack:
   - See INSTALL file for installation information (NO WARRANTY)
   - See license.txt file for license information
@@ -31,12 +31,12 @@ http://www.fsf.org/help/donate.html
 
 Engine limits:
 
-These are the principals limits of HTTrack for that moment. Note that most of them are generally shared among all offline browsers, due to technological limits.
+These are the principals limits of HTTrack for that moment. Note that we did not heard about any other utility
+that would have solved them.
 
 - Several scripts generating complex filenames may not find them (ex: img.src='image'+a+Mobj.dst+'.gif')
 - Some java classes may not find some files on them (class included)
 - Cgi-bin links may not work properly in some cases (parameters needed). To avoid them: use filters like -*cgi-bin*
-- Flash files are not yet parsed
 
 
 Advanced options:

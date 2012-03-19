@@ -85,7 +85,7 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-int htsSetLock(PTHREAD_LOCK_TYPE * hMutex,int lock);
+HTSEXT_API int htsSetLock(PTHREAD_LOCK_TYPE * hMutex,int lock);
 
 #if USE_PTHREAD
 unsigned long _beginthread( void* ( *start_address )( void * ), unsigned stack_size, void *arglist );

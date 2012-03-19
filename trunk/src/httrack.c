@@ -35,8 +35,7 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#if HTS_WIN
-#else
+#ifndef _WIN32
 #ifndef Sleep
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
@@ -51,13 +50,22 @@ Please visit our Website: http://www.httrack.com
 #if HTS_ANALYSTE_CONSOLE
 
 /* specific definitions */
-#include "htsbase.h"
+//#include "htsbase.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #include <ctype.h>
 #ifdef _WIN32
-#include "Winsock.h"
+//#include "Winsock.h"
 #endif
 /* END specific definitions */
 
@@ -118,8 +126,8 @@ void vt_home(void) {
 
 static int use_show;
 
-
 int main(int argc, char **argv) {
+  int ret = 0;
   hts_init();
 
   /*
@@ -183,7 +191,11 @@ Log:
   htswrap_add("transfer-status",htsshow_xfrstatus);
   htswrap_add("save-name",htsshow_savename);
 
-  return hts_main(argc,argv);
+  ret = hts_main(argc,argv);
+  if (ret) {
+    fprintf(stderr, "* %s\n", hts_errmsg());
+  }
+  return ret;
 }
 
 
@@ -224,7 +236,7 @@ int __cdecl htsshow_start(httrackp* opt) {
   return 1; 
 }
 int __cdecl htsshow_chopt(httrackp* opt) {
-  return __cdecl htsshow_start(opt);
+  return htsshow_start(opt);
 }
 int  __cdecl htsshow_end(void) { 
   return 1; 
@@ -283,7 +295,7 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
   if (rate>0)  SInfo.rate=rate;                // rate
   if (irate>=0) SInfo.irate=irate;             // irate
   if (SInfo.irate<0) SInfo.irate=SInfo.rate;
-  if (SInfo.stat_back>=0) SInfo.stat_back=nbk;
+  if (nbk>=0) SInfo.stat_back=nbk;
   if (stat_written>=0) SInfo.stat_written=stat_written;
   if (stat_updated>=0) SInfo.stat_updated=stat_updated;
   if (stat_errors>=0)  SInfo.stat_errors=stat_errors;
@@ -369,10 +381,10 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
       {
         int i;
         for(i=0;i<NStatsBuffer;i++) {
-          strcpy(StatsBuffer[i].state,"");
-          strcpy(StatsBuffer[i].name,"");
-          strcpy(StatsBuffer[i].file,"");
-          strcpy(StatsBuffer[i].url_sav,"");
+          strcpybuff(StatsBuffer[i].state,"");
+          strcpybuff(StatsBuffer[i].name,"");
+          strcpybuff(StatsBuffer[i].file,"");
+          strcpybuff(StatsBuffer[i].url_sav,"");
           StatsBuffer[i].back=0;
           StatsBuffer[i].size=0;
           StatsBuffer[i].sizetot=0;
@@ -389,18 +401,18 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
               switch(j) {
               case 0:     // prioritaire
                 if ((back[i].status>0) && (back[i].status<99)) {
-                  strcpy(StatsBuffer[index].state,"receive"); ok=1;
+                  strcpybuff(StatsBuffer[index].state,"receive"); ok=1;
                 }
                 break;
               case 1:
                 if (back[i].status==99) {
-                  strcpy(StatsBuffer[index].state,"request"); ok=1;
+                  strcpybuff(StatsBuffer[index].state,"request"); ok=1;
                 }
                 else if (back[i].status==100) {
-                  strcpy(StatsBuffer[index].state,"connect"); ok=1;
+                  strcpybuff(StatsBuffer[index].state,"connect"); ok=1;
                 }
                 else if (back[i].status==101) {
-                  strcpy(StatsBuffer[index].state,"search"); ok=1;
+                  strcpybuff(StatsBuffer[index].state,"search"); ok=1;
                 }
                 else if (back[i].status==1000) {    // ohh le beau ftp
                   sprintf(StatsBuffer[index].state,"ftp: %s",back[i].info); ok=1;
@@ -409,15 +421,15 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
               default:
                 if (back[i].status==0) {  // prêt
                   if ((back[i].r.statuscode==200)) {
-                    strcpy(StatsBuffer[index].state,"ready"); ok=1;
+                    strcpybuff(StatsBuffer[index].state,"ready"); ok=1;
                   }
                   else if ((back[i].r.statuscode>=100) && (back[i].r.statuscode<=599)) {
                     char tempo[256]; tempo[0]='\0';
                     infostatuscode(tempo,back[i].r.statuscode);
-                    strcpy(StatsBuffer[index].state,tempo); ok=1;
+                    strcpybuff(StatsBuffer[index].state,tempo); ok=1;
                   }
                   else {
-                    strcpy(StatsBuffer[index].state,"error"); ok=1;
+                    strcpybuff(StatsBuffer[index].state,"error"); ok=1;
                   }
                 }
                 break;
@@ -429,32 +441,32 @@ int __cdecl htsshow_loop(lien_back* back,int back_max,int back_index,int lien_n,
                 StatsBuffer[index].back=i;        // index pour + d'infos
                 //
                 s[0]='\0';
-                strcpy(StatsBuffer[index].url_sav,back[i].url_sav);   // pour cancel
+                strcpybuff(StatsBuffer[index].url_sav,back[i].url_sav);   // pour cancel
                 if (strcmp(back[i].url_adr,"file://"))
-                  strcat(s,back[i].url_adr);
+                  strcatbuff(s,back[i].url_adr);
                 else
-                  strcat(s,"localhost");
+                  strcatbuff(s,"localhost");
                 if (back[i].url_fil[0]!='/')
-                  strcat(s,"/");
-                strcat(s,back[i].url_fil);
+                  strcatbuff(s,"/");
+                strcatbuff(s,back[i].url_fil);
                 
                 StatsBuffer[index].file[0]='\0';
                 {
                   char* a=strrchr(s,'/');
                   if (a) {
-                    strncat(StatsBuffer[index].file,a,200);
+                    strncatbuff(StatsBuffer[index].file,a,200);
                     *a='\0';
                   }
                 }
                 
                 if ((l=strlen(s))<MAX_LEN_INPROGRESS)
-                  strcpy(StatsBuffer[index].name,s);
+                  strcpybuff(StatsBuffer[index].name,s);
                 else {
                   // couper
                   StatsBuffer[index].name[0]='\0';
-                  strncat(StatsBuffer[index].name,s,MAX_LEN_INPROGRESS/2-2);
-                  strcat(StatsBuffer[index].name,"...");
-                  strcat(StatsBuffer[index].name,s+l-MAX_LEN_INPROGRESS/2+2);
+                  strncatbuff(StatsBuffer[index].name,s,MAX_LEN_INPROGRESS/2-2);
+                  strcatbuff(StatsBuffer[index].name,"...");
+                  strcatbuff(StatsBuffer[index].name,s+l-MAX_LEN_INPROGRESS/2+2);
                 }
                                
                 if (back[i].r.totalsize>0) {  // taille prédéfinie
@@ -567,5 +579,37 @@ int __cdecl htsshow_savename(char* adr_complete,char* fil_complete,char* referer
   return 1;
 }
 
+
+/* *** Various functions *** */
+
+
+int fexist(char* s) {
+  struct stat st;
+  memset(&st, 0, sizeof(st));
+  if (stat(s, &st) == 0) {
+    if (S_ISREG(st.st_mode)) {
+      return 1;
+    }
+  }
+  return 0;
+} 
+
+int linput(FILE* fp,char* s,int max) {
+  int c;
+  int j=0;
+  do {
+    c=fgetc(fp);
+    if (c!=EOF) {
+      switch(c) {
+        case 13: break;  // sauter CR
+        case 10: c=-1; break;
+        case 9: case 12: break;  // sauter ces caractères
+        default: s[j++]=(char) c; break;
+      }
+    }
+  }  while((c!=-1) && (c!=EOF) && (j<(max-1)));
+  s[j]='\0';
+  return j;
+}
 
 #endif

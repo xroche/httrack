@@ -37,30 +37,31 @@ Please visit our Website: http://www.httrack.com
 
 #include "htswrap.h"
 #include "htshash.h"
+#include "htsinthash.h"
 
 // typedef long (__stdcall * XSHBFF_WndProc_type)(HWND ,UINT ,WPARAM ,LPARAM);
 
 inthash wrappers=NULL;
 
-int htswrap_init(void) {
+HTSEXT_API int htswrap_init(void) {
   if (!wrappers)
     wrappers=inthash_new(42);
   return inthash_created(wrappers);
 }
 
-int htswrap_free(void) {
+HTSEXT_API int htswrap_free(void) {
   inthash_delete(&wrappers);
   return 1;
 }
 
-int htswrap_add(char* name,void* fct) {
+HTSEXT_API int htswrap_add(char* name,void* fct) {
   if (!wrappers)
     htswrap_init();
   inthash_write(wrappers,name,(unsigned long int)fct);
   return 1;
 }
 
-unsigned long int htswrap_read(char* name) {
+HTSEXT_API unsigned long int htswrap_read(char* name) {
   unsigned long int fct=0;
   if (!wrappers)
     htswrap_init();
