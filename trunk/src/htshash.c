@@ -63,7 +63,7 @@ Please visit our Website: http://www.httrack.com
 // type: numero enregistrement - 0 est case insensitive (sav) 1 (adr+fil) 2 (former_adr+former_fil)
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 // retour: position ou -1 si non trouvé
-int hash_read(hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
+int hash_read(const hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE*2];
 	char catbuff[CATBUFF_SIZE];
   char* normfil;

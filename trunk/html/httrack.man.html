@@ -1,14 +1,25 @@
-<!-- Creator     : groff version 1.18.1 -->
-<!-- CreationDate: Tue Dec 21 11:30:04 2010 -->
+<!-- Creator     : groff version 1.20.1 -->
+<!-- CreationDate: Mon Feb 28 15:48:53 2011 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
 <meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
 <meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
 <title>httrack</title>
+
 </head>
 <body>
 
-<h1 align=center>httrack</h1>
+<h1 align="center">httrack</h1>
+
 <a href="#NAME">NAME</a><br>
 <a href="#SYNOPSIS">SYNOPSIS</a><br>
 <a href="#DESCRIPTION">DESCRIPTION</a><br>
@@ -25,28 +36,24 @@
 <a href="#SEE ALSO">SEE ALSO</a><br>
 
 <hr>
+
+
+<h2>NAME
 <a name="NAME"></a>
-<h2>NAME</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>httrack &minus; offline browser : copy websites to a
-local directory</p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">httrack &minus;
+offline browser : copy websites to a local directory</p>
+
+<h2>SYNOPSIS
 <a name="SYNOPSIS"></a>
-<h2>SYNOPSIS</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack [ url ]... [ &minus;filter ]... [ +filter ]...
-[ &minus;O, &minus;&minus;path</b> ] [ <b>&minus;%O,
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>httrack [
+url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
+&minus;&minus;path</b> ] [ <b>&minus;%O,
 &minus;&minus;chroot</b> ] [ <b>&minus;w,
 &minus;&minus;mirror</b> ] [ <b>&minus;W,
 &minus;&minus;mirror&minus;wizard</b> ] [ <b>&minus;g,
@@ -140,2562 +147,2191 @@ local directory</p>
 <b>&minus;%U, &minus;&minus;user</b> ] [ <b>&minus;%W,
 &minus;&minus;callback</b> ] [ <b>&minus;K,
 &minus;&minus;keep&minus;links[=N]</b> ] [</p>
-</td>
-</table>
+
+<h2>DESCRIPTION
 <a name="DESCRIPTION"></a>
-<h2>DESCRIPTION</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack</b> allows you to download a World Wide Web
-site from the Internet to a local directory, building
-recursively all directories, getting HTML, images, and other
-files from the server to your computer. HTTrack arranges the
-original site&rsquo;s relative link-structure. Simply open a
-page of the &quot;mirrored&quot; website in your browser,
-and you can browse the site from link to link, as if you
-were viewing it online. HTTrack can also update an existing
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>httrack</b>
+allows you to download a World Wide Web site from the
+Internet to a local directory, building recursively all
+directories, getting HTML, images, and other files from the
+server to your computer. HTTrack arranges the original
+site&rsquo;s relative link-structure. Simply open a page of
+the &quot;mirrored&quot; website in your browser, and you
+can browse the site from link to link, as if you were
+viewing it online. HTTrack can also update an existing
 mirrored site, and resume interrupted downloads.</p>
-</td>
-</table>
+
+<h2>EXAMPLES
 <a name="EXAMPLES"></a>
-<h2>EXAMPLES</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack www.someweb.com/bob/</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>mirror site www.someweb.com/bob/ and only this site</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack www.someweb.com/bob/ www.anothertest.com/mike/
-+*.com/*.jpg &minus;mime:application/*</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>mirror the two sites together (with shared links) and
-accept any .jpg files on .com sites</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack www.someweb.com/bob/bobby.html +*
-&minus;r6</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>means get all files starting from bobby.html, with 6
-link&minus;depth, and possibility of going everywhere on the
-web</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack www.someweb.com/bob/bobby.html
-&minus;&minus;spider &minus;P
-proxy.myhost.com:8080</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>runs the spider on www.someweb.com/bob/bobby.html using a
-proxy</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack &minus;&minus;update</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>updates a mirror in the current folder</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>will bring you to the interactive mode</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><b>httrack &minus;&minus;continue</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>continues a mirror in the current folder</p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>httrack
+www.someweb.com/bob/</b></p>
+
+<p style="margin-left:22%;">mirror site
+www.someweb.com/bob/ and only this site</p>
+
+<p style="margin-left:11%;"><b>httrack www.someweb.com/bob/
+www.anothertest.com/mike/ +*.com/*.jpg <br>
+&minus;mime:application/*</b></p>
+
+<p style="margin-left:22%;">mirror the two sites together
+(with shared links) and accept any .jpg files on .com
+sites</p>
+
+<p style="margin-left:11%;"><b>httrack
+www.someweb.com/bob/bobby.html +* &minus;r6</b></p>
+
+<p style="margin-left:22%;">means get all files starting
+from bobby.html, with 6 link&minus;depth, and possibility of
+going everywhere on the web</p>
+
+<p style="margin-left:11%;"><b>httrack
+www.someweb.com/bob/bobby.html &minus;&minus;spider &minus;P
+<br>
+proxy.myhost.com:8080</b></p>
+
+<p style="margin-left:22%;">runs the spider on
+www.someweb.com/bob/bobby.html using a proxy</p>
+
+<p style="margin-left:11%;"><b>httrack
+&minus;&minus;update</b></p>
+
+<p style="margin-left:22%;">updates a mirror in the current
+folder</p>
+
+<p style="margin-left:11%;"><b>httrack</b></p>
+
+<p style="margin-left:22%;">will bring you to the
+interactive mode</p>
+
+<p style="margin-left:11%;"><b>httrack
+&minus;&minus;continue</b></p>
+
+<p style="margin-left:22%;">continues a mirror in the
+current folder</p>
+
+<h2>OPTIONS
 <a name="OPTIONS"></a>
-<h2>OPTIONS</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>General options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>General
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;O</p>
-</td>
-<td width="5%"></td>
-<td width="77%">
+
+<p>&minus;O</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>path for mirror/logfiles+cache (&minus;O path
 mirror[,path cache and logfiles]) (&minus;&minus;path
-&lt;param&gt;)</p>
-</td>
+&lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;%O</p>
-</td>
-<td width="5%"></td>
-<td width="77%">
+
+<p>&minus;%O</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>chroot path to, must be r00t (&minus;%O root path)
-(&minus;&minus;chroot &lt;param&gt;)</p>
-</td>
+(&minus;&minus;chroot &lt;param&gt;)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Action options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Action
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="3%">
 
-<p>&minus;w</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>*mirror web sites (&minus;&minus;mirror)</p>
-</td>
+<p style="margin-top: 1em">&minus;w</p></td>
+<td width="8%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">*mirror web sites
+(&minus;&minus;mirror)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="3%">
 
-<p>&minus;W</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;W</p></td>
+<td width="8%"></td>
+<td width="78%">
+
 
 <p>mirror web sites, semi&minus;automatic (asks questions)
-(&minus;&minus;mirror&minus;wizard)</p>
-</td>
+(&minus;&minus;mirror&minus;wizard)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="3%">
 
-<p>&minus;g</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;g</p></td>
+<td width="8%"></td>
+<td width="78%">
+
 
 <p>just get files (saved in the current directory)
-(&minus;&minus;get&minus;files)</p>
-</td>
+(&minus;&minus;get&minus;files)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="3%">
 
-<p>&minus;i</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;i</p></td>
+<td width="8%"></td>
+<td width="78%">
+
 
 <p>continue an interrupted mirror using the cache
-(&minus;&minus;continue)</p>
-</td>
+(&minus;&minus;continue)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="3%">
 
-<p>&minus;Y</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;Y</p></td>
+<td width="8%"></td>
+<td width="78%">
+
 
 <p>mirror ALL links located in the first level pages
-(mirror links) (&minus;&minus;mirrorlinks)</p>
-</td>
+(mirror links) (&minus;&minus;mirrorlinks)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Proxy options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Proxy
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;P</p>
-</td>
-<td width="5%"></td>
-<td width="77%">
 
-<p>proxy use (&minus;P proxy:port or &minus;P
-user:pass@proxy:port) (&minus;&minus;proxy
-&lt;param&gt;)</p>
-</td>
+<p style="margin-top: 1em">&minus;P</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">proxy use (&minus;P proxy:port
+or &minus;P user:pass@proxy:port) (&minus;&minus;proxy
+&lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;%f</p>
-</td>
-<td width="5%"></td>
-<td width="77%">
+
+<p>&minus;%f</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>*use proxy for ftp (f0 don t use)
-(&minus;&minus;httpproxy&minus;ftp[=N])</p>
-</td>
+(&minus;&minus;httpproxy&minus;ftp[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;%b</p>
-</td>
-<td width="5%"></td>
-<td width="77%">
+
+<p>&minus;%b</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>use this local hostname to make/send requests (&minus;%b
-hostname) (&minus;&minus;bind &lt;param&gt;)</p>
-</td>
+hostname) (&minus;&minus;bind &lt;param&gt;)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Limits options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Limits
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;rN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
 
-<p>set the mirror depth to N (* r9999)
-(&minus;&minus;depth[=N])</p>
-</td>
+<p style="margin-top: 1em">&minus;rN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">set the mirror depth to N (*
+r9999) (&minus;&minus;depth[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;%eN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%eN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>set the external links depth to N (* %e0)
-(&minus;&minus;ext&minus;depth[=N])</p>
-</td>
+(&minus;&minus;ext&minus;depth[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;mN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;mN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum file length for a non&minus;html file
-(&minus;&minus;max&minus;files[=N])</p>
-</td>
+(&minus;&minus;max&minus;files[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;mN,N2</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
 
-<p>maximum file length for non html (N) and html (N2)</p>
-</td>
+<p>&minus;mN,N2</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>maximum file length for non html (N) and html (N2)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;MN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;MN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum overall size that can be uploaded/scanned
-(&minus;&minus;max&minus;size[=N])</p>
-</td>
+(&minus;&minus;max&minus;size[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;EN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;EN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum mirror time in seconds (60=1 minute, 3600=1
-hour) (&minus;&minus;max&minus;time[=N])</p>
-</td>
+hour) (&minus;&minus;max&minus;time[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;AN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;AN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum transfer rate in bytes/seconds (1000=1KB/s max)
-(&minus;&minus;max&minus;rate[=N])</p>
-</td>
+(&minus;&minus;max&minus;rate[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;%cN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%cN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum number of connections/seconds (*%c10)
-(&minus;&minus;connection&minus;per&minus;second[=N])</p>
-</td>
+(&minus;&minus;connection&minus;per&minus;second[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;GN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;GN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>pause transfer if N bytes reached, and wait until lock
-file is deleted (&minus;&minus;max&minus;pause[=N])</p>
-</td>
+file is deleted (&minus;&minus;max&minus;pause[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;%mN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%mN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>maximum mms stream download time in seconds (60=1
 minute, 3600=1 hour)
-(&minus;&minus;max&minus;mms&minus;time[=N])</p>
-</td>
+(&minus;&minus;max&minus;mms&minus;time[=N])</p> </td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Flow control:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Flow
+control:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="7%">
+<td width="4%">
 
-<p>&minus;cN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
 
-<p>number of multiple connections (*c8)
-(&minus;&minus;sockets[=N])</p>
-</td>
+<p style="margin-top: 1em">&minus;cN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">number of multiple connections
+(*c8) (&minus;&minus;sockets[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="7%">
+<td width="4%">
 
-<p>&minus;TN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
+
+<p>&minus;TN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>timeout, number of seconds after a non&minus;responding
-link is shutdown (&minus;&minus;timeout)</p>
-</td>
+link is shutdown (&minus;&minus;timeout)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="7%">
+<td width="4%">
 
-<p>&minus;RN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
+
+<p>&minus;RN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>number of retries, in case of timeout or non&minus;fatal
-errors (*R1) (&minus;&minus;retries[=N])</p>
-</td>
+errors (*R1) (&minus;&minus;retries[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="7%">
+<td width="4%">
 
-<p>&minus;JN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
+
+<p>&minus;JN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>traffic jam control, minimum transfert rate
 (bytes/seconds) tolerated for a link
-(&minus;&minus;min&minus;rate[=N])</p>
-</td>
+(&minus;&minus;min&minus;rate[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="7%">
+<td width="4%">
 
-<p>&minus;HN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
+
+<p>&minus;HN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>host is abandonned if: 0=never, 1=timeout, 2=slow,
-3=timeout or slow (&minus;&minus;host&minus;control[=N])</p>
-</td>
+3=timeout or slow (&minus;&minus;host&minus;control[=N])</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Links options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Links
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%P</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>*extended parsing, attempt to parse all links, even in
-unknown tags or Javascript (%P0 don t use)
-(&minus;&minus;extended&minus;parsing[=N])</p>
-</td>
+<p style="margin-top: 1em">&minus;%P</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">*extended parsing, attempt to
+parse all links, even in unknown tags or Javascript (%P0 don
+t use) (&minus;&minus;extended&minus;parsing[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;n</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;n</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>get non&minus;html files near an html file (ex: an image
-located outside) (&minus;&minus;near)</p>
-</td>
+located outside) (&minus;&minus;near)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;t</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;t</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>test all URLs (even forbidden ones)
-(&minus;&minus;test)</p>
-</td>
+(&minus;&minus;test)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%L</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%L</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>&lt;file&gt; add all URL located in this text file (one
-URL per line) (&minus;&minus;list &lt;param&gt;)</p>
-</td>
+URL per line) (&minus;&minus;list &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%S</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%S</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>&lt;file&gt; add all scan rules located in this text
 file (one scan rule per line) (&minus;&minus;urllist
-&lt;param&gt;)</p>
-</td>
+&lt;param&gt;)</p> </td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Build options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Build
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;NN</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>structure type (0 *original structure, 1+: see below)
-(&minus;&minus;structure[=N])</p>
-</td>
+<p style="margin-top: 1em">&minus;NN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">structure type (0 *original
+structure, 1+: see below) (&minus;&minus;structure[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;or</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;or</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>user defined structure (&minus;N
-&quot;%h%p/%n%q.%t&quot;)</p>
-</td>
+&quot;%h%p/%n%q.%t&quot;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%N</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%N</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>delayed type check, don t make any link test but wait
 for files download to start instead (experimental) (%N0 don
-t use, %N1 use for unknown extensions, * %N2 always use)</p>
-</td>
+t use, %N1 use for unknown extensions, * %N2 always use)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%D</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%D</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>cached delayed type check, don t wait for remote type
 during updates, to speedup them (%D0 wait, * %D1 don t wait)
-(&minus;&minus;cached&minus;delayed&minus;type&minus;check)</p>
-</td>
+(&minus;&minus;cached&minus;delayed&minus;type&minus;check)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%M</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%M</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>generate a RFC MIME&minus;encapsulated
 full&minus;archive (.mht)
-(&minus;&minus;mime&minus;html)</p>
-</td>
+(&minus;&minus;mime&minus;html)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;LN</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;LN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>long names (L1 *long names / L0 8&minus;3 conversion /
 L2 ISO9660 compatible)
-(&minus;&minus;long&minus;names[=N])</p>
-</td>
+(&minus;&minus;long&minus;names[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;KN</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;KN</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>keep original links (e.g. http://www.adr/link) (K0
 *relative link, K absolute links, K4 original links, K3
-absolute URI links) (&minus;&minus;keep&minus;links[=N])</p>
-</td>
+absolute URI links) (&minus;&minus;keep&minus;links[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;x</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;x</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>replace external html links by error pages
-(&minus;&minus;replace&minus;external)</p>
-</td>
+(&minus;&minus;replace&minus;external)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%x</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%x</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>do not include any password for external password
 protected websites (%x0 include)
-(&minus;&minus;disable&minus;passwords)</p>
-</td>
+(&minus;&minus;disable&minus;passwords)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%q</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%q</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>*include query string for local files (useless, for
 information purpose only) (%q0 don t include)
-(&minus;&minus;include&minus;query&minus;string)</p>
-</td>
+(&minus;&minus;include&minus;query&minus;string)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;o</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;o</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>*generate output html file in case of error (404..) (o0
-don t generate) (&minus;&minus;generate&minus;errors)</p>
-</td>
+don t generate) (&minus;&minus;generate&minus;errors)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;X</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;X</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>*purge old files after update (X0 keep delete)
-(&minus;&minus;purge&minus;old[=N])</p>
-</td>
+(&minus;&minus;purge&minus;old[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%p</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%p</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>preserve html files as is (identical to &minus;K4
-&minus;%F &quot;&quot; ) (&minus;&minus;preserve)</p>
-</td>
+&minus;%F &quot;&quot; ) (&minus;&minus;preserve)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Spider options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Spider
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;bN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
 
-<p>accept cookies in cookies.txt (0=do not accept,*
-1=accept) (&minus;&minus;cookies[=N])</p>
-</td>
+<p style="margin-top: 1em">&minus;bN</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">accept cookies in cookies.txt
+(0=do not accept,* 1=accept) (&minus;&minus;cookies[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;u</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;u</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>check document type if unknown (cgi,asp..) (u0 don t
 check, * u1 check but /, u2 check always)
-(&minus;&minus;check&minus;type[=N])</p>
-</td>
+(&minus;&minus;check&minus;type[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;j</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;j</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>*parse Java Classes (j0 don t parse, bitmask: |1 parse
 default, |2 don t parse .class |4 don t parse .js |8 don t
-be aggressive) (&minus;&minus;parse&minus;java[=N])</p>
-</td>
+be aggressive) (&minus;&minus;parse&minus;java[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;sN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;sN</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>follow robots.txt and meta robots tags
 (0=never,1=sometimes,* 2=always, 3=always (even strict
-rules)) (&minus;&minus;robots[=N])</p>
-</td>
+rules)) (&minus;&minus;robots[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%h</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%h</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>force HTTP/1.0 requests (reduce update features, only
 for old servers or proxies)
-(&minus;&minus;http&minus;10)</p>
-</td>
+(&minus;&minus;http&minus;10)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%k</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%k</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>use keep&minus;alive if possible, greately reducing
 latency for small files and test requests (%k0 don t use)
-(&minus;&minus;keep&minus;alive)</p>
-</td>
+(&minus;&minus;keep&minus;alive)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%B</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%B</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>tolerant requests (accept bogus responses on some
-servers, but not standard!) (&minus;&minus;tolerant)</p>
-</td>
+servers, but not standard!) (&minus;&minus;tolerant)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%s</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%s</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>update hacks: various hacks to limit re&minus;transfers
 when updating (identical size, bogus response..)
-(&minus;&minus;updatehack)</p>
-</td>
+(&minus;&minus;updatehack)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%u</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%u</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>url hacks: various hacks to limit duplicate URLs (strip
-//, www.foo.com==foo.com..) (&minus;&minus;urlhack)</p>
-</td>
+//, www.foo.com==foo.com..) (&minus;&minus;urlhack)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%A</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%A</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>assume that a type (cgi,asp..) is always linked with a
 mime type (&minus;%A
 php3,cgi=text/html;dat,bin=application/x&minus;zip)
-(&minus;&minus;assume &lt;param&gt;)</p>
-</td>
+(&minus;&minus;assume &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;can</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;can</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>also be used to force a specific file type:
-&minus;&minus;assume foo.cgi=text/html</p>
-</td>
+&minus;&minus;assume foo.cgi=text/html</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;@iN</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;@iN</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6
-only) (&minus;&minus;protocol[=N])</p>
-</td>
+only) (&minus;&minus;protocol[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="6%">
 
-<p>&minus;%w</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;%w</p></td>
+<td width="5%"></td>
+<td width="78%">
+
 
 <p>disable a specific external mime module (&minus;%w
 htsswf &minus;%w htsjava)
-(&minus;&minus;disable&minus;module &lt;param&gt;)</p>
-</td>
+(&minus;&minus;disable&minus;module &lt;param&gt;)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Browser ID:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
 
-<p>&minus;F</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+<p style="margin-left:11%; margin-top: 1em"><b>Browser
+ID:</b></p>
 
-<p>user&minus;agent field sent in HTTP headers (&minus;F
-&quot;user&minus;agent name&quot;)
-(&minus;&minus;user&minus;agent &lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%R</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>default referer field sent in HTTP headers
-(&minus;&minus;referer &lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%E</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>from email address sent in HTTP headers
-(&minus;&minus;from &lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%F</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>footer string in Html code (&minus;%F &quot;Mirrored
-[from host %s [file %s [at %s]]]&quot; (&minus;&minus;footer
-&lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%l</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>preffered language (&minus;%l &quot;fr, en, jp, *&quot;
-(&minus;&minus;language &lt;param&gt;)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Log, index, cache</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;C</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>create/use a cache for updates and retries (C0 no
-cache,C1 cache is prioritary,* C2 test update before)
-(&minus;&minus;cache[=N])</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;k</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>store all files in cache (not useful if files on disk)
-(&minus;&minus;store&minus;all&minus;in&minus;cache)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%n</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>do not re&minus;download locally erased files
-(&minus;&minus;do&minus;not&minus;recatch)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%v</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>display on screen filenames downloaded (in realtime)
-&minus; * %v1 short version &minus; %v2 full animation
-(&minus;&minus;display)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;Q</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>no log &minus; quiet mode
-(&minus;&minus;do&minus;not&minus;log)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;q</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>no questions &minus; quiet mode
-(&minus;&minus;quiet)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;z</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>log &minus; extra infos
-(&minus;&minus;extra&minus;log)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;Z</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>log &minus; debug (&minus;&minus;debug&minus;log)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;v</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>log on screen (&minus;&minus;verbose)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;f</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>*log in files (&minus;&minus;file&minus;log)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;f2</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>one single log file (&minus;&minus;single&minus;log)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;I</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>*make an index (I0 don t make) (&minus;&minus;index)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%i</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>make a top index for a project folder (* %i0 don t make)
-(&minus;&minus;build&minus;top&minus;index)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%I</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>make an searchable index for this mirror (* %I0 don t
-make) (&minus;&minus;search&minus;index)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Expert options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;pN</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>priority mode: (* p3) (&minus;&minus;priority[=N])</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;p0</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>just scan, don t save anything (for checking links)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;p1</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>save only html files</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;p2</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>save only non html files</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;*p3</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>save all files</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;p7</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>get html files before, then treat other files</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;S</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>stay on the same directory
-(&minus;&minus;stay&minus;on&minus;same&minus;dir)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;D</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>*can only go down into subdirs
-(&minus;&minus;can&minus;go&minus;down)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;U</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>can only go to upper directories
-(&minus;&minus;can&minus;go&minus;up)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;B</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>can both go up&amp;down into the directory structure
-(&minus;&minus;can&minus;go&minus;up&minus;and&minus;down)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;a</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>*stay on the same address
-(&minus;&minus;stay&minus;on&minus;same&minus;address)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;d</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>stay on the same principal domain
-(&minus;&minus;stay&minus;on&minus;same&minus;domain)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;l</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>stay on the same TLD (eg: .com)
-(&minus;&minus;stay&minus;on&minus;same&minus;tld)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;e</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>go everywhere on the web
-(&minus;&minus;go&minus;everywhere)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="5%">
-
-<p>&minus;%H</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
-
-<p>debug HTTP headers in logfile
-(&minus;&minus;debug&minus;headers)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Guru options: (do NOT use if possible)</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#X</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>*use optimized engine (limited memory boundary checks)
-(&minus;&minus;fast&minus;engine)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#0</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>filter test (&minus;#0 *.gif www.bar.com/foo.gif )
-(&minus;&minus;debug&minus;testfilters &lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#1</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>simplify test (&minus;#1 ./foo/bar/../foobar)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#2</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>type test (&minus;#2 /foo/bar.php)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#C</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>cache list (&minus;#C *.com/spider*.gif
-(&minus;&minus;debug&minus;cache &lt;param&gt;)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#R</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>cache repair (damaged cache)
-(&minus;&minus;repair&minus;cache)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#d</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>debug parser (&minus;&minus;debug&minus;parsing)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#E</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>extract new.zip cache meta&minus;data in meta.zip</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#f</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>always flush log files
-(&minus;&minus;advanced&minus;flushlogs)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#FN</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>maximum number of filters
-(&minus;&minus;advanced&minus;maxfilters[=N])</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#h</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>version info (&minus;&minus;version)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#K</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>scan stdin (debug)
-(&minus;&minus;debug&minus;scanstdin)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="7%">
-
-<p>&minus;#L</p>
-</td>
-<td width="2%"></td>
-<td width="77%">
-
-<p>maximum number of links (&minus;#L1000000)
-(&minus;&minus;advanced&minus;maxlinks)</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#p</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>display ugly progress information
-(&minus;&minus;advanced&minus;progressinfo)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#P</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>catch URL (&minus;&minus;catch&minus;url)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#R</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>old FTP routines (debug)
-(&minus;&minus;repair&minus;cache)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#T</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>generate transfer ops. log every minutes
-(&minus;&minus;debug&minus;xfrstats)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#u</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>wait time (&minus;&minus;advanced&minus;wait)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#Z</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>generate transfer rate statictics every minutes
-(&minus;&minus;debug&minus;ratestats)</p>
-</td>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="8%">
-
-<p>&minus;#!</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
-
-<p>execute a shell command (&minus;#! &quot;echo
-hello&quot;) (&minus;&minus;exec &lt;param&gt;)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Dangerous options: (do NOT use unless you exactly know
-what you are doing)</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
-<p>&minus;%!</p>
-</td>
+
+<p style="margin-top: 1em">&minus;F</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">user&minus;agent field sent in
+HTTP headers (&minus;F &quot;user&minus;agent name&quot;)
+(&minus;&minus;user&minus;agent &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%R</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>default referer field sent in HTTP headers
+(&minus;&minus;referer &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%E</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>from email address sent in HTTP headers
+(&minus;&minus;from &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%F</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>footer string in Html code (&minus;%F &quot;Mirrored
+[from host %s [file %s [at %s]]]&quot; (&minus;&minus;footer
+&lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%l</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>preffered language (&minus;%l &quot;fr, en, jp, *&quot;
+(&minus;&minus;language &lt;param&gt;)</p></td></tr>
+</table>
+
+<p style="margin-left:11%; margin-top: 1em"><b>Log, index,
+cache</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p style="margin-top: 1em">&minus;C</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">create/use a cache for updates
+and retries (C0 no cache,C1 cache is prioritary,* C2 test
+update before) (&minus;&minus;cache[=N])</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;k</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>store all files in cache (not useful if files on disk)
+(&minus;&minus;store&minus;all&minus;in&minus;cache)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%n</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>do not re&minus;download locally erased files
+(&minus;&minus;do&minus;not&minus;recatch)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%v</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>display on screen filenames downloaded (in realtime)
+&minus; * %v1 short version &minus; %v2 full animation
+(&minus;&minus;display)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;Q</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>no log &minus; quiet mode
+(&minus;&minus;do&minus;not&minus;log)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;q</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>no questions &minus; quiet mode
+(&minus;&minus;quiet)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;z</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>log &minus; extra infos
+(&minus;&minus;extra&minus;log)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;Z</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>log &minus; debug (&minus;&minus;debug&minus;log)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;v</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>log on screen (&minus;&minus;verbose)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;f</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>*log in files (&minus;&minus;file&minus;log)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;f2</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>one single log file (&minus;&minus;single&minus;log)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;I</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>*make an index (I0 don t make) (&minus;&minus;index)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%i</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>make a top index for a project folder (* %i0 don t make)
+(&minus;&minus;build&minus;top&minus;index)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%I</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>make an searchable index for this mirror (* %I0 don t
+make) (&minus;&minus;search&minus;index)</p></td></tr>
+</table>
+
+<p style="margin-left:11%; margin-top: 1em"><b>Expert
+options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p style="margin-top: 1em">&minus;pN</p></td>
 <td width="5%"></td>
-<td width="77%">
+<td width="78%">
 
-<p>bypass built&minus;in security limits aimed to avoid
-bandwith abuses (bandwidth, simultaneous connections)
-(&minus;&minus;disable&minus;security&minus;limits)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;IMPORTANT</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>NOTE: DANGEROUS OPTION, ONLY SUITABLE FOR EXPERTS</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="5" cellspacing="0" cellpadding="0">
+
+<p style="margin-top: 1em">priority mode: (* p3)
+(&minus;&minus;priority[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="6%">
 
-<p>&minus;USE</p>
-</td>
-<td width="13%"></td>
-<td width="29%">
 
-<p>IT WITH EXTREME CARE</p>
-</td>
-<td width="39%">
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Command&minus;line specific options:</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+<p>&minus;p0</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>just scan, don t save anything (for checking links)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="6%">
 
-<p>&minus;V</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>execute system command after each files ($0 is the
-filename: &minus;V &quot;rm &quot;)
-(&minus;&minus;userdef&minus;cmd &lt;param&gt;)</p>
-</td>
+<p>&minus;p1</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>save only html files</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="6%">
 
-<p>&minus;%U</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;p2</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>save only non html files</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;*p3</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>save all files</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;p7</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>get html files before, then treat other files</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;S</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>stay on the same directory
+(&minus;&minus;stay&minus;on&minus;same&minus;dir)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;D</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>*can only go down into subdirs
+(&minus;&minus;can&minus;go&minus;down)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;U</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>can only go to upper directories
+(&minus;&minus;can&minus;go&minus;up)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;B</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>can both go up&amp;down into the directory structure
+(&minus;&minus;can&minus;go&minus;up&minus;and&minus;down)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;a</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>*stay on the same address
+(&minus;&minus;stay&minus;on&minus;same&minus;address)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;d</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>stay on the same principal domain
+(&minus;&minus;stay&minus;on&minus;same&minus;domain)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;l</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>stay on the same TLD (eg: .com)
+(&minus;&minus;stay&minus;on&minus;same&minus;tld)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;e</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>go everywhere on the web
+(&minus;&minus;go&minus;everywhere)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;%H</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>debug HTTP headers in logfile
+(&minus;&minus;debug&minus;headers)</p> </td></tr>
+</table>
+
+<p style="margin-left:11%; margin-top: 1em"><b>Guru
+options: (do NOT use if possible)</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p style="margin-top: 1em">&minus;#X</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">*use optimized engine (limited
+memory boundary checks)
+(&minus;&minus;fast&minus;engine)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#0</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>filter test (&minus;#0 *.gif www.bar.com/foo.gif )
+(&minus;&minus;debug&minus;testfilters &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#1</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>simplify test (&minus;#1 ./foo/bar/../foobar)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#2</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>type test (&minus;#2 /foo/bar.php)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#C</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>cache list (&minus;#C *.com/spider*.gif
+(&minus;&minus;debug&minus;cache &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#R</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>cache repair (damaged cache)
+(&minus;&minus;repair&minus;cache)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#d</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>debug parser (&minus;&minus;debug&minus;parsing)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#E</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>extract new.zip cache meta&minus;data in meta.zip</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#f</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>always flush log files
+(&minus;&minus;advanced&minus;flushlogs)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#FN</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>maximum number of filters
+(&minus;&minus;advanced&minus;maxfilters[=N])</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#h</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>version info (&minus;&minus;version)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#K</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>scan stdin (debug)
+(&minus;&minus;debug&minus;scanstdin)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#L</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>maximum number of links (&minus;#L1000000)
+(&minus;&minus;advanced&minus;maxlinks)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#p</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>display ugly progress information
+(&minus;&minus;advanced&minus;progressinfo)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#P</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>catch URL (&minus;&minus;catch&minus;url)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#R</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>old FTP routines (debug)
+(&minus;&minus;repair&minus;cache)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#T</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>generate transfer ops. log every minutes
+(&minus;&minus;debug&minus;xfrstats)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#u</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>wait time (&minus;&minus;advanced&minus;wait)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#Z</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>generate transfer rate statictics every minutes
+(&minus;&minus;debug&minus;ratestats)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#!</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>execute a shell command (&minus;#! &quot;echo
+hello&quot;) (&minus;&minus;exec &lt;param&gt;)</p></td></tr>
+</table>
+
+<p style="margin-left:11%; margin-top: 1em"><b>Dangerous
+options: (do NOT use unless you exactly know what you are
+doing)</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p style="margin-top: 1em">&minus;%!</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">bypass built&minus;in security
+limits aimed to avoid bandwith abuses (bandwidth,
+simultaneous connections)
+(&minus;&minus;disable&minus;security&minus;limits)</p> </td></tr>
+</table>
+
+<p style="margin-left:11%;">&minus;IMPORTANT</p>
+
+<p style="margin-left:22%;">NOTE: DANGEROUS OPTION, ONLY
+SUITABLE FOR EXPERTS</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;USE</p></td>
+<td width="5%"></td>
+<td width="30%">
+
+
+<p>IT WITH EXTREME CARE</p></td>
+<td width="48%">
+</td></tr>
+</table>
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>Command&minus;line
+specific options:</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p style="margin-top: 1em">&minus;V</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">execute system command after
+each files ($0 is the filename: &minus;V &quot;rm &quot;)
+(&minus;&minus;userdef&minus;cmd &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%U</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>run the engine with another id when called as root
-(&minus;%U smith) (&minus;&minus;user &lt;param&gt;)</p>
-</td>
+(&minus;%U smith) (&minus;&minus;user &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;%W</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;%W</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>use an external library function as a wrapper (&minus;%W
 myfoo.so[,myparameters]) (&minus;&minus;callback
-&lt;param&gt;)</p>
-</td>
+&lt;param&gt;)</p> </td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Details: Option N</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="3" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Details:
+Option N</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N0</p>
-</td>
-<td width="77%">
 
-<p>Site&minus;structure (default)</p>
-</td>
+<p style="margin-top: 1em">&minus;N0</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">Site&minus;structure
+(default)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1</p>
-</td>
-<td width="77%">
 
-<p>HTML in web/, images/other files in web/images/</p>
-</td>
+<p>&minus;N1</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>HTML in web/, images/other files in web/images/</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N2</p>
-</td>
-<td width="77%">
 
-<p>HTML in web/HTML, images/other in web/images</p>
-</td>
+<p>&minus;N2</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>HTML in web/HTML, images/other in web/images</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N3</p>
-</td>
-<td width="77%">
 
-<p>HTML in web/, images/other in web/</p>
-</td>
+<p>&minus;N3</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>HTML in web/, images/other in web/</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N4</p>
-</td>
-<td width="77%">
+
+<p>&minus;N4</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>HTML in web/, images/other in web/xxx, where xxx is the
 file extension (all gif will be placed onto web/gif, for
-example)</p>
-</td>
+example)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N5</p>
-</td>
-<td width="77%">
 
-<p>Images/other in web/xxx and HTML in web/HTML</p>
-</td>
+<p>&minus;N5</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>Images/other in web/xxx and HTML in web/HTML</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N99</p>
-</td>
-<td width="77%">
 
-<p>All files in web/, with random names (gadget !)</p>
-</td>
+<p>&minus;N99</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>All files in web/, with random names (gadget !)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N100</p>
-</td>
-<td width="77%">
 
-<p>Site&minus;structure, without www.domain.xxx/</p>
-</td>
+<p>&minus;N100</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>Site&minus;structure, without www.domain.xxx/</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N101</p>
-</td>
-<td width="77%">
+
+<p>&minus;N101</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N1 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N102</p>
-</td>
-<td width="77%">
+
+<p>&minus;N102</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N2 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N103</p>
-</td>
-<td width="77%">
+
+<p>&minus;N103</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N3 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N104</p>
-</td>
-<td width="77%">
+
+<p>&minus;N104</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N4 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N105</p>
-</td>
-<td width="77%">
+
+<p>&minus;N105</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N5 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N199</p>
-</td>
-<td width="77%">
+
+<p>&minus;N199</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N99 exept that &quot;web&quot; is replaced
-by the site s name</p>
-</td>
+by the site s name</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1001</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1001</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N1 exept that there is no &quot;web&quot;
-directory</p>
-</td>
+directory</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1002</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1002</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N2 exept that there is no &quot;web&quot;
-directory</p>
-</td>
+directory</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1003</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1003</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N3 exept that there is no &quot;web&quot;
-directory (option set for g option)</p>
-</td>
+directory (option set for g option)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1004</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1004</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N4 exept that there is no &quot;web&quot;
-directory</p>
-</td>
+directory</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1005</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1005</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N5 exept that there is no &quot;web&quot;
-directory</p>
-</td>
+directory</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;N1099</p>
-</td>
-<td width="77%">
+
+<p>&minus;N1099</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>Identical to N99 exept that there is no &quot;web&quot;
-directory</p>
-</td>
+directory</p> </td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Details: User&minus;defined option N</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>%n Name of file without file type (ex: image) %N Name of
-file, including file type (ex: image.gif) %t File type (ex:
-gif) %p Path [without ending /] (ex: /someimages) %h Host
-name (ex: www.someweb.com) %M URL MD5 (128 bits, 32 ascii
-bytes) %Q query string MD5 (128 bits, 32 ascii bytes) %r
-protocol name (ex: http) %q small query string MD5 (16 bits,
-4 ascii bytes) %s? Short name version (ex: %sN) %[param]
-param variable in query string
+
+<p style="margin-left:11%; margin-top: 1em"><b>Details:
+User&minus;defined option N</b> <br>
+%n Name of file without file type (ex: image) <br>
+%N Name of file, including file type (ex: image.gif) <br>
+%t File type (ex: gif) <br>
+%p Path [without ending /] (ex: /someimages) <br>
+%h Host name (ex: www.someweb.com) <br>
+%M URL MD5 (128 bits, 32 ascii bytes) <br>
+%Q query string MD5 (128 bits, 32 ascii bytes) <br>
+%r protocol name (ex: http) <br>
+%q small query string MD5 (16 bits, 4 ascii bytes) <br>
+%s? Short name version (ex: %sN) <br>
+%[param] param variable in query string <br>
 %[param:before:after:empty:notfound] advanced variable
 extraction</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Details: User&minus;defined option N and advanced
-variable extraction</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>%[param:before:after:empty:notfound]</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="5" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Details:
+User&minus;defined option N and advanced variable
+extraction</b> <br>
+%[param:before:after:empty:notfound]</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;param</p>
-</td>
-<td width="13%"></td>
-<td width="23%">
 
-<p>: parameter name</p>
-</td>
-<td width="42%">
-</td>
+<p style="margin-top: 1em">&minus;param</p></td>
+<td width="2%"></td>
+<td width="24%">
+
+
+<p style="margin-top: 1em">: parameter name</p></td>
+<td width="54%">
+</td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;before</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>: string to prepend if the parameter was found</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="5" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%;">&minus;before</p>
+
+<p style="margin-left:22%;">: string to prepend if the
+parameter was found</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;after</p>
-</td>
-<td width="13%"></td>
-<td width="66%">
 
-<p>: string to append if the parameter was found</p>
-</td>
-<td width="0%">
-</td>
+<p>&minus;after</p></td>
+<td width="2%"></td>
+<td width="69%">
+
+
+<p>: string to append if the parameter was found</p></td>
+<td width="9%">
+</td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;notfound</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>: string replacement if the parameter could not be
-found</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%;">&minus;notfound</p>
+
+<p style="margin-left:22%;">: string replacement if the
+parameter could not be found</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;empty</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
 
-<p>: string replacement if the parameter was empty</p>
-</td>
+<p>&minus;empty</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>: string replacement if the parameter was empty</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="8%">
+<td width="9%">
 
-<p>&minus;all</p>
-</td>
-<td width="1%"></td>
-<td width="77%">
+
+<p>&minus;all</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>fields, except the first one (the parameter name), can
-be empty</p>
-</td>
+be empty</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Details: Option K</b></p></td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+
+<p style="margin-left:11%; margin-top: 1em"><b>Details:
+Option K</b></p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;K0</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>foo.cgi?q=45 &minus;&gt; foo4B54.html?q=45 (relative
-URI, default)</p>
-</td>
+<p style="margin-top: 1em">&minus;K0</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">foo.cgi?q=45 &minus;&gt;
+foo4B54.html?q=45 (relative URI, default)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;K</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
+
+<p>&minus;K</p></td>
+<td width="7%"></td>
+<td width="78%">
+
 
 <p>&minus;&gt; http://www.foobar.com/folder/foo.cgi?q=45
-(absolute URL) (&minus;&minus;keep&minus;links[=N])</p>
-</td>
+(absolute URL) (&minus;&minus;keep&minus;links[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;K4</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>&minus;&gt; foo.cgi?q=45 (original URL)</p>
-</td>
+<p>&minus;K4</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>&minus;&gt; foo.cgi?q=45 (original URL)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="4%">
 
-<p>&minus;K3</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>&minus;&gt; /folder/foo.cgi?q=45 (absolute URI)</p>
-</td>
+<p>&minus;K3</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>&minus;&gt; /folder/foo.cgi?q=45 (absolute URI)</p></td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Shortcuts:</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;mirror</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; *make a mirror of site(s) (default)</p>
-</td>
-</table>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="3" cellspacing="0" cellpadding="0">
+
+
+<p style="margin-left:11%; margin-top: 1em"><b>Shortcuts:</b>
+<br>
+&minus;&minus;mirror</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; *make a mirror of
+site(s) (default)</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;&minus;get</p>
-</td>
-<td width="77%">
+
+<p>&minus;&minus;get</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>&lt;URLs&gt; get the files indicated, do not seek other
-URLs (&minus;qg)</p>
-</td>
+URLs (&minus;qg)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="10%">
+<td width="9%">
 
-<p>&minus;&minus;list</p>
-</td>
-<td width="77%">
+
+<p>&minus;&minus;list</p></td>
+<td width="2%"></td>
+<td width="78%">
+
 
 <p>&lt;text file&gt; add all URL located in this text file
-(&minus;%L)</p>
-</td>
+(&minus;%L)</p> </td></tr>
 </table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;mirrorlinks</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; mirror all links in 1st level pages
-(&minus;Y)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;testlinks</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; test links in pages (&minus;r1p0C0I0t)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;spider</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; spider site(s), to test links: reports
-Errors &amp; Warnings (&minus;p0C0I0t)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;testsite</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; identical to &minus;&minus;spider</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;skeleton</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>&lt;URLs&gt; make a mirror, but gets only html files
-(&minus;p1)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;update</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>update a mirror, without confirmation (&minus;iC2)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;continue</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>continue a mirror, without confirmation (&minus;iC1)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;catchurl</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>create a temporary proxy to capture an URL or a form post
-URL</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;clean</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>erase cache &amp; log files</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>&minus;&minus;http10</p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="21%"></td>
-<td width="77%">
-<p>force http/1.0 requests (&minus;%h)</p>
-</td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>Details: Option %W: External callbacks
-prototypes</b></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="4%"></td>
-<td width="95%">
-<p><b>see htsdefines.h</b></p></td>
-</table>
+
+<p style="margin-left:11%;">&minus;&minus;mirrorlinks</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; mirror all links
+in 1st level pages (&minus;Y)</p>
+
+<p style="margin-left:11%;">&minus;&minus;testlinks</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; test links in
+pages (&minus;r1p0C0I0t)</p>
+
+<p style="margin-left:11%;">&minus;&minus;spider</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; spider site(s), to
+test links: reports Errors &amp; Warnings
+(&minus;p0C0I0t)</p>
+
+<p style="margin-left:11%;">&minus;&minus;testsite</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; identical to
+&minus;&minus;spider</p>
+
+<p style="margin-left:11%;">&minus;&minus;skeleton</p>
+
+<p style="margin-left:22%;">&lt;URLs&gt; make a mirror, but
+gets only html files (&minus;p1)</p>
+
+<p style="margin-left:11%;">&minus;&minus;update</p>
+
+<p style="margin-left:22%;">update a mirror, without
+confirmation (&minus;iC2)</p>
+
+<p style="margin-left:11%;">&minus;&minus;continue</p>
+
+<p style="margin-left:22%;">continue a mirror, without
+confirmation (&minus;iC1)</p>
+
+<p style="margin-left:11%;">&minus;&minus;catchurl</p>
+
+<p style="margin-left:22%;">create a temporary proxy to
+capture an URL or a form post URL</p>
+
+<p style="margin-left:11%;">&minus;&minus;clean</p>
+
+<p style="margin-left:22%;">erase cache &amp; log files</p>
+
+<p style="margin-left:11%;">&minus;&minus;http10</p>
+
+<p style="margin-left:22%;">force http/1.0 requests
+(&minus;%h)</p>
+
+<p style="margin-left:11%; margin-top: 1em"><b>Details:
+Option %W: External callbacks prototypes <br>
+see htsdefines.h</b></p>
+
+<h2>FILES
 <a name="FILES"></a>
-<h2>FILES</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p><i>/etc/httrack.conf</i></p></td>
-</table>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="20%"></td>
-<td width="79%">
-<p>The system wide configuration file.</p>
-</td>
-</table>
+</h2>
+
+
+
+<p style="margin-left:11%;"><b><i>/etc/httrack.conf</i></b></p>
+
+<p style="margin-left:22%;">The system wide configuration
+file.</p>
+
+<h2>ENVIRONMENT
 <a name="ENVIRONMENT"></a>
-<h2>ENVIRONMENT</h2>
-<!-- TABS -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="4" cellspacing="0" cellpadding="0">
+</h2>
+
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="5%">
+<td width="6%">
 
-<p>HOME</p>
-</td>
-<td width="4%"></td>
-<td width="77%">
 
-<p>Is being used if you defined in /etc/httrack.conf the
-line <i>path ~/websites/#</i></p>
-</td>
+<p style="margin-top: 1em">HOME</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p style="margin-top: 1em">Is being used if you defined in
+/etc/httrack.conf the line <i>path ~/websites/#</i></p></td></tr>
 </table>
+
+<h2>DIAGNOSTICS
 <a name="DIAGNOSTICS"></a>
-<h2>DIAGNOSTICS</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>Errors/Warnings are reported to <i>hts&minus;log.txt</i>
-by default, or to stderr if the <i>-v</i> option was
-specified.</p>
-</td>
-</table>
+</h2>
+
+
+
+<p style="margin-left:11%; margin-top: 1em">Errors/Warnings
+are reported to <i>hts&minus;log.txt</i> by default, or to
+stderr if the <i>-v</i> option was specified.</p>
+
+<h2>LIMITS
 <a name="LIMITS"></a>
-<h2>LIMITS</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>These are the principals limits of HTTrack for that
-moment. Note that we did not heard about any other utility
-that would have solved them.</p>
-<!-- INDENTATION -->
-<p><small>- Several scripts generating complex filenames may
-not find them (ex:
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">These are the
+principals limits of HTTrack for that moment. Note that we
+did not heard about any other utility that would have solved
+them.</p>
+
+<p style="margin-left:11%; margin-top: 1em"><small>-
+Several scripts generating complex filenames may not find
+them (ex:
 img.src=&rsquo;image&rsquo;+a+Mobj.dst+&rsquo;.gif&rsquo;)</small></p>
-<!-- INDENTATION -->
-<p><small>- Some java classes may not find some files on
-them (class included)</small></p>
-<!-- INDENTATION -->
-<p><small>- Cgi-bin links may not work properly in some
-cases (parameters needed). To avoid them: use filters like
+
+<p style="margin-left:11%; margin-top: 1em"><small>- Some
+java classes may not find some files on them (class
+included)</small></p>
+
+<p style="margin-left:11%; margin-top: 1em"><small>-
+Cgi-bin links may not work properly in some cases
+(parameters needed). To avoid them: use filters like
 -*cgi-bin*</small></p>
-</td>
-</table>
+
+<h2>BUGS
 <a name="BUGS"></a>
-<h2>BUGS</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>Please reports bugs to <b>&lt;bugs@httrack.com&gt;.</b>
-Include a complete, self-contained example that will allow
-the bug to be reproduced, and say which version of httrack
-you are using. Do not forget to detail options used, OS
-version, and any other information you deem necessary.</p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Please reports
+bugs to <b>&lt;bugs@httrack.com&gt;.</b> Include a complete,
+self-contained example that will allow the bug to be
+reproduced, and say which version of httrack you are using.
+Do not forget to detail options used, OS version, and any
+other information you deem necessary.</p>
+
+<h2>COPYRIGHT
 <a name="COPYRIGHT"></a>
-<h2>COPYRIGHT</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>Copyright (C) Xavier Roche and other contributors</p>
-<!-- INDENTATION -->
-<p>This program is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation; either
-version 2 of the License, or any later version.</p>
-<!-- INDENTATION -->
-<p>This program is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE. See the GNU General Public License for more
-details.</p>
-<!-- INDENTATION -->
-<p>You should have received a copy of the GNU General Public
-License along with this program; if not, write to the Free
-Software Foundation, Inc., 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.</p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Copyright (C)
+Xavier Roche and other contributors</p>
+
+<p style="margin-left:11%; margin-top: 1em">This program is
+free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2
+of the License, or any later version.</p>
+
+<p style="margin-left:11%; margin-top: 1em">This program is
+distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.</p>
+
+<p style="margin-left:11%; margin-top: 1em">You should have
+received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation,
+Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+USA.</p>
+
+<h2>AVAILABILITY
 <a name="AVAILABILITY"></a>
-<h2>AVAILABILITY</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>The most recent released version of httrack can be found
-at: <b>http://www.httrack.com</b></p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">The most recent
+released version of httrack can be found at:
+<b>http://www.httrack.com</b></p>
+
+<h2>AUTHOR
 <a name="AUTHOR"></a>
-<h2>AUTHOR</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>Xavier Roche &lt;roche@httrack.com&gt;</p>
-</td>
-</table>
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">Xavier Roche
+&lt;roche@httrack.com&gt;</p>
+
+<h2>SEE ALSO
 <a name="SEE ALSO"></a>
-<h2>SEE ALSO</h2>
-<!-- INDENTATION -->
-<table width="100%" border=0 rules="none" frame="void"
-       cols="2" cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="10%"></td>
-<td width="89%">
-<p>The <b>HTML</b> documentation (available online at
+</h2>
+
+
+<p style="margin-left:11%; margin-top: 1em">The <b>HTML</b>
+documentation (available online at
 <b>http://www.httrack.com/html/</b> ) contains more detailed
 information. Please also refer to the <b>httrack FAQ</b>
 (available online at
 <b>http://www.httrack.com/html/faq.html</b> )</p>
-</td>
-</table>
 <hr>
 </body>
 </html>
