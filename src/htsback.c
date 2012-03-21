@@ -3823,12 +3823,14 @@ int back_checkmirror(httrackp* opt) {
   }
   // Check max time
   if ((opt->maxtime>0) && ((time_local()-HTS_STAT.stat_timestart)>opt->maxtime)) {            
-    if (opt->log) {
-      fprintf(opt->log,"More than %d seconds passed.. giving up"LF,opt->maxtime);
-      test_flush;
-    }
-	  /* cancel mirror smoothly */
+    if (!opt->state.stop) {  /* not yet stopped */
+      if (opt->log) {
+        fprintf(opt->log,"More than %d seconds passed.. giving up"LF,opt->maxtime);
+        test_flush;
+      }
+      /* cancel mirror smoothly */
       hts_request_stop(opt, 0);
+    }
   }
   return 1;   /* Ok, go on */
 }
