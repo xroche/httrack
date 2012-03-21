@@ -1453,7 +1453,8 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
         
         // Ok, noté en cache->. mais bien présent dans le cache ou sur disque?
 #if HTS_FAST_CACHE
-        if (hash_pos_return) {
+        // negative values when data is not in cache
+        if (hash_pos_return < 0) {
 #else
         if (a) {
 #endif
@@ -1514,12 +1515,12 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
                       FILE* fp=fopen(fconv(catbuff,save),"wb");
                       if (fp) fclose(fp);
                       if (opt->log!=NULL) {
-                        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file not found (erased by user ?), ignoring: %s%s"LF,back[p].url_adr,back[p].url_fil); test_flush;
+                        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file '%s' not found (erased by user ?), ignoring: %s%s"LF,save,back[p].url_adr,back[p].url_fil); test_flush;
                       }
                     }
                   } else {
                     if (opt->log!=NULL) {
-                      HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file not found (erased by user ?), recatching: %s%s"LF,back[p].url_adr,back[p].url_fil); test_flush;
+                      HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file '%s' not found (erased by user ?), recatching: %s%s"LF,save,back[p].url_adr,back[p].url_fil); test_flush;
                     }
                   }
                 }
