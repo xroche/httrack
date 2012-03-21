@@ -618,7 +618,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
 #endif
   }
 
-  if (hash_pos_return) {
+  if (hash_pos_return != 0) {
     uLong posInZip;
     if (hash_pos > 0) {
       posInZip = (uLong) hash_pos;
@@ -914,7 +914,7 @@ static htsblk cache_readex_old(httrackp* opt,cache_back* cache,const char* adr,c
 
   // en cas de succès
 #if HTS_FAST_CACHE
-  if (hash_pos_return) {
+  if (hash_pos_return != 0) {
 #else
   if (a!=NULL) {  // OK existe en cache!
 #endif
