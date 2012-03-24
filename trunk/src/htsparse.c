@@ -90,7 +90,7 @@ Please visit our Website: http://www.httrack.com
   printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
   XH_uninit; \
   abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct(%d) failed" _ ht_size); \
-  exit(1); \
+  abort(); \
   } \
 } \
   ht_len+=A;
@@ -143,7 +143,7 @@ Please visit our Website: http://www.httrack.com
   printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
   XH_uninit; \
   abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct(%d) failed" _ (int) ht_size); \
-  exit(1); \
+  abort(); \
   } \
   ht_buff[0]='\0'; \
   }

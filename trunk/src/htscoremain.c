@@ -489,7 +489,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           fprintf(opt->log,"An aborted mirror has been detected!\nThe current temporary cache is required for any update operation and only contains data downloaded during the last aborted session.\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\nThis can easily be done here by erasing the hts-cache/new.* files\n");
           fprintf(opt->log,"Please restart HTTrack with --continue (-iC1) option to override this message!\n");
         }
-        exit(0);
+        return 0;
       }
     }
   }
@@ -742,10 +742,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       }
       
     } else {    // aucune URL définie et pas de cache
-      //if (argc > 1 && strcmp(argv[1], "-#h") == 0) {
-      //  printf("HTTrack version "HTTRACK_VERSION"%s\n", hts_get_version_info(opt));
-      //  exit(0);
-      //}
       if (opt->quiet) {
         help(argv[0],!opt->quiet);
         htsmain_free();
@@ -1714,7 +1710,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             /* autotest */
             case 't':     /* not yet implemented */
               fprintf(stderr, "** AUTOCHECK OK\n");
-              exit(0);
+              return 0;
               break;
 
             default: printf("Internal option %c not recognized\n",*com); break;
