@@ -8,7 +8,6 @@ Homepage: http://www.httrack.com
 
 Package: httrack
 Architecture: any
-Section: web
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Suggests: webhttrack, httrack-doc
 Description: Copy websites to your computer (Offline browser)
@@ -26,7 +25,6 @@ Description: Copy websites to your computer (Offline browser)
 
 Package: webhttrack
 Architecture: any
-Section: web
 Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
 Suggests: httrack, httrack-doc
 Replaces: webhttrack-common (<< 3.43.9-2)
@@ -48,7 +46,6 @@ Description: Copy websites to your computer, httrack with a Web interface
 
 Package: webhttrack-common
 Architecture: all
-Section: web
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: webhttrack common files
  This package is the common files of webhttrack, website copier and
@@ -84,7 +81,6 @@ Description: Httrack website copier additional documentation
 
 Package: proxytrack
 Architecture: any
-Section: web
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Suggests: squid, httrack
 Description: Build HTTP Caches using archived websites copied by HTTrack
