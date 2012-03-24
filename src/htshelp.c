@@ -262,7 +262,7 @@ void help_wizard(httrackp* opt) {
       linput(stdin,str,250);
       if (strnotempty(str)) {
         if (!((str[0]=='y') || (str[0]=='Y')))
-          exit(0);
+          return 0;
       }
       printf("\n");
 

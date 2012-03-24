@@ -263,7 +263,7 @@ void hash_write(hash_struct* hash,int lpos,int normalized) {
   else {
     printf("* hash_write=0!!\n");
     abortLogFmt("unexpected error in hash_write (pos=%d)" _ pos);
-    exit(1);
+    abort();
   }
 #endif
   //

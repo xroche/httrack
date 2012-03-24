@@ -84,7 +84,7 @@ int nsocDEBUG=0;
 #define _GOTOXY(X,Y) printf("\33[" X ";" Y "f");
 
 #if DEBUG_CHECKINT
- #define _CHECKINT_FAIL(a) printf("\n%s\n",a); fflush(stdout); exit(1);
+ #define _CHECKINT_FAIL(a) printf("\n%s\n",a); fflush(stdout); abort();
  #define _CHECKINT(obj_ptr,message) \
    if (obj_ptr) {\
      if (( * ((char*) (obj_ptr)) != 0) || ( * ((char*) (((char*) (obj_ptr)) + sizeof(*(obj_ptr))-1)) != 0)) {\
