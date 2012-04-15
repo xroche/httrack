@@ -161,8 +161,7 @@ exit $?
 fi
 
 # Create a temporary filename
-TMPSRVFILE="/tmp/.webhttrack.$$.`head -c16 /dev/random | md5sum | cut -f1 -d' '`"
->${TMPSRVFILE} || ! log "cound not create the temporary file ${TMPSRVFILE}" || exit 1
+TMPSRVFILE="$(mktemp ${TMPDIR:-/tmp}/.webhttrack.XXXXXXXX)" || ! log "cound not create the temporary file ${TMPSRVFILE}" || exit 1
 # Launch htsserver binary and setup the server
 (${BINPATH}/htsserver "${DISTPATH}/" path "${HOME}/websites" lang "${LANGN}" $@; echo SRVURL=error) > ${TMPSRVFILE}&
 # Find the generated SRVURL
