@@ -587,6 +587,7 @@ void help(char* app,int more) {
   infomsg("  '%h' Host name (ex: www.someweb.com)");
   infomsg("  '%M' URL MD5 (128 bits, 32 ascii bytes)");
   infomsg("  '%Q' query string MD5 (128 bits, 32 ascii bytes)");
+  infomsg("  '%k' full query string");
   infomsg("  '%r' protocol name (ex: http)");
   infomsg("  '%q' small query string MD5 (16 bits, 4 ascii bytes)");
   infomsg("     '%s?' Short name version (ex: %sN)");
