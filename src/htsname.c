@@ -102,6 +102,23 @@ static const char *hts_tbdev[] =
   opt->state._hts_in_html_parsing = prev; \
 } while(0)
 
+/* Strip all // */
+static void cleanDoubleSlash(char *s) {
+  int i, j;
+  for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
+    if (s[i] == '/' && i != 0 && s[i - 1] == '/') {
+      continue;
+    }
+    if (i != j) {
+      s[j] = s[i];
+    }
+    j++;
+  }
+  if (i != j) {
+    s[j] = s[i];
+  }
+}
+
 
 // forme le nom du fichier à sauver (save) à partir de fil et adr
 // système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
@@ -1197,8 +1214,9 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
   }
   //
   { // éliminer les // (comme ftp://)
-    char* a;
-    while( (a=strstr(save,"//")) ) *a='_';
+    //char* a;
+    //while( (a=strstr(save,"//")) ) *a='_';
+    cleanDoubleSlash(save);
     // Eliminer chars spéciaux
     a=save -1 ;
     while(*(++a))
