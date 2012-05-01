@@ -461,7 +461,7 @@ void help(char* app,int more) {
   infomsg(" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
   infomsg("  LN long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible)");
-  infomsg("  KN keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links)");
+  infomsg("  KN keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links, K5 transparent proxy link)");
   infomsg("  x  replace external html links by error pages");
   infomsg(" %x  do not include any password for external password protected websites (%x0 include)");
   infomsg(" %q *include query string for local files (useless, for information purpose only) (%q0 don't include)");
@@ -605,8 +605,9 @@ void help(char* app,int more) {
   infomsg("Details: Option K");
   infomsg("  K0  foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)");
   infomsg("  K                 ->  http://www.foobar.com/folder/foo.cgi?q=45 (absolute URL)");
-  infomsg("  K4                ->  foo.cgi?q=45 (original URL)");
   infomsg("  K3                ->  /folder/foo.cgi?q=45 (absolute URI)");
+  infomsg("  K4                ->  foo.cgi?q=45 (original URL)");
+  infomsg("  K5                ->  http://www.foobar.com/folder/foo4B54.html?q=45 (transparent proxy URL)");
   infomsg("");
   infomsg("Shortcuts:");
   infomsg("--mirror      <URLs> *make a mirror of site(s) (default)");
