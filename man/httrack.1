@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "Mar 2012" "httrack website copier"
+.TH httrack 1 "HTTrack version 3.45-3 (compiled May  1 2012)" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -296,7 +296,7 @@ generate a RFC MIME\-encapsulated full\-archive (.mht) (\-\-mime\-html)
 .IP \-LN
 long names (L1 *long names / L0 8\-3 conversion / L2 ISO9660 compatible) (\-\-long\-names[=N])
 .IP \-KN
-keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links) (\-\-keep\-links[=N])
+keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links, K5 transparent proxy link) (\-\-keep\-links[=N])
 .IP \-x
 replace external html links by error pages (\-\-replace\-external)
 .IP \-%x
@@ -519,6 +519,7 @@ Identical to N99 exept that there is no "web" directory
    %h  Host name (ex: www.someweb.com)
    %M  URL MD5 (128 bits, 32 ascii bytes)
    %Q  query string MD5 (128 bits, 32 ascii bytes)
+   %k  full query string
    %r  protocol name (ex: http)
    %q  small query string MD5 (16 bits, 4 ascii bytes)
       %s?  Short name version (ex: %sN)
@@ -544,10 +545,12 @@ fields, except the first one (the parameter name), can be empty
 foo.cgi?q=45  \->  foo4B54.html?q=45 (relative URI, default)
 .IP \-K
 \->  http://www.foobar.com/folder/foo.cgi?q=45 (absolute URL) (\-\-keep\-links[=N])
-.IP \-K4
-\->  foo.cgi?q=45 (original URL)
 .IP \-K3
 \->  /folder/foo.cgi?q=45 (absolute URI)
+.IP \-K4
+\->  foo.cgi?q=45 (original URL)
+.IP \-K5
+\->  http://www.foobar.com/folder/foo4B54.html?q=45 (transparent proxy URL)
 
 .SS Shortcuts:
 .IP \-\-mirror
