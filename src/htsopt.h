@@ -358,6 +358,7 @@ struct httrackp {
   int quiet;            // poser des questions autres que wizard?
   int keyboard;         // vérifier stdin
   int bypass_limits;    // bypass built-in limits
+  int background_on_suspend;	// background process on suspend signal
   //
   int is_update;        // c'est une update (afficher "File updated...")
   int dir_topindex;     // reconstruire top index par la suite
@@ -368,8 +369,6 @@ struct httrackp {
   htslibhandles libHandles;
   //
   htsoptstate state;    // state
-  //
-  int background_on_suspend;	// Background process on suspend signal.
 };
 
 // stats for httrack
