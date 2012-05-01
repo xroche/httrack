@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.20.1 -->
-<!-- CreationDate: Tue May  1 20:25:29 2012 -->
+<!-- CreationDate: Tue May  1 20:50:56 2012 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -720,7 +720,8 @@ L2 ISO9660 compatible)
 
 <p>keep original links (e.g. http://www.adr/link) (K0
 *relative link, K absolute links, K4 original links, K3
-absolute URI links) (&minus;&minus;keep&minus;links[=N])</p></td></tr>
+absolute URI links, K5 transparent proxy link)
+(&minus;&minus;keep&minus;links[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
@@ -1974,6 +1975,7 @@ User&minus;defined option N</b> <br>
 %h Host name (ex: www.someweb.com) <br>
 %M URL MD5 (128 bits, 32 ascii bytes) <br>
 %Q query string MD5 (128 bits, 32 ascii bytes) <br>
+%k full query string <br>
 %r protocol name (ex: http) <br>
 %q small query string MD5 (16 bits, 4 ascii bytes) <br>
 %s? Short name version (ex: %sN) <br>
@@ -2091,6 +2093,17 @@ foo4B54.html?q=45 (relative URI, default)</p></td></tr>
 <td width="4%">
 
 
+<p>&minus;K3</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>&minus;&gt; /folder/foo.cgi?q=45 (absolute URI)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
 <p>&minus;K4</p></td>
 <td width="7%"></td>
 <td width="78%">
@@ -2102,12 +2115,14 @@ foo4B54.html?q=45 (relative URI, default)</p></td></tr>
 <td width="4%">
 
 
-<p>&minus;K3</p></td>
+<p>&minus;K5</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>&minus;&gt; /folder/foo.cgi?q=45 (absolute URI)</p></td></tr>
+<p>&minus;&gt;
+http://www.foobar.com/folder/foo4B54.html?q=45 (transparent
+proxy URL)</p></td></tr>
 </table>
 
 
