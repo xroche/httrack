@@ -1214,7 +1214,7 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
   }
   //
   { // éliminer les // (comme ftp://)
-    //char* a;
+    char* a;
     //while( (a=strstr(save,"//")) ) *a='_';
     cleanDoubleSlash(save);
     // Eliminer chars spéciaux
