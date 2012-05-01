@@ -191,11 +191,6 @@ int main(int argc, char **argv) {
   hts_init();
   opt = global_opt = hts_create_opt();
 
-  // Julian H. Stacey: ability to have a real ^Z
-  if (!opt->background_on_suspend) {
-    signal_restore_ctl_z();
-  }
-
   CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
   CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);
   CHAIN_FUNCTION(opt, start, htsshow_start, NULL);
@@ -712,9 +707,15 @@ static void sig_ask( int code ) {        // demander
 #else
 static void sig_doback(int blind);
 static void sig_back( int code ) {       // ignorer et mettre en backing 
-  // Background the process.
-  signal(code, sig_ignore);
-  sig_doback(0);
+  if (global_opt != NULL && !global_opt->background_on_suspend) {
+    signal( SIGTSTP , SIG_DFL); // ^Z
+    printf("\nInterrupting the program.\n"); fflush(stdout);
+    kill(getpid(), SIGTSTP);
+  } else {
+    // Background the process.
+    signal(code, sig_ignore);
+    sig_doback(0);
+  }
 }
 static void sig_ask( int code ) {        // demander
   char s[256];
