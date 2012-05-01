@@ -4,6 +4,15 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.45-4
+* New: source license is now GPLv3
+* New: added a "K5" feature to handle transparent proxies (Brent Palmer)
+* New: option -y to control ^Z behavior (Julian H. Stacey)
+* Fixed: replace // by / when saving rather than _/ (Brent Palmer)
+* Fixed: do not interpret ^C before mirror is finished, or after
+* Fixed: webhttrack: do not use md5sum to produce a temporary filename, but mktemp (Ryan Schmidt)
+* Fixed: document %k for custom structure (full query string)
+
 3.45-3
 * Fixed: spurious "Previous file not found (erased by user ?)" messages leading to retransfer existing files in cache (Alain Desilets)
 * Fixed: --max-time now stops the mirror smoothly (Alain Desilets)
