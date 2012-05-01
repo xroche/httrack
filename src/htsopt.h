@@ -222,6 +222,7 @@ struct htsoptstate {
 	int _hts_in_html_done;
 	int _hts_in_html_poll;
 	int _hts_setpause;
+	int _hts_in_mirror;
 	char** _hts_addurl;
   int _hts_cancel;
   htsoptstatecancel *cancel;            /* 3.41 */

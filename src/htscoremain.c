@@ -2177,6 +2177,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
     // Lancement du miroir
     // ------------------------------------------------------------
+    opt->state._hts_in_mirror = 1;
     if (httpmirror(url, opt)==0) {
       printf("Error during operation (see log file), site has not been successfully mirrored\n");
     } else {
@@ -2188,6 +2189,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         printf("Done.\n");
       }
     }
+    opt->state._hts_in_mirror = 0;
     // ------------------------------------------------------------
 
     //

@@ -752,11 +752,9 @@ static void sig_doback(int blind) {       // mettre en backing
     out = open("hts-nohup.out",O_CREAT|O_WRONLY,S_IRUSR|S_IWUSR);
   if (out == -1)
     out = open("/dev/null",O_WRONLY,S_IRUSR|S_IWUSR);
-  close(0);
-  close(1);
-  dup(out);
-  close(2);
-  dup(out);
+  dup2(out, 0);
+  dup2(out, 1);
+  dup2(out, 2);
   //
   switch (fork()) {
   case 0: 
@@ -765,7 +763,6 @@ static void sig_doback(int blind) {       // mettre en backing
     fprintf(stderr,"Error: can not fork process\n");
     break;
   default:            // pere
-    usleep(100000);   // pause 1/10s "A  microsecond  is  .000001s"
     _exit(0);
     break;  
 	}
@@ -773,11 +770,15 @@ static void sig_doback(int blind) {       // mettre en backing
 #endif
 
 static void sig_leave( int code ) {
-  signal(code, sig_term);  // quitter si encore
-  printf("\n** Finishing pending transfers.. press again ^C to quit.\n");
-  if (global_opt != NULL) {
-    // ask for stop
-    global_opt->state.stop=1;
+  if (global_opt != NULL && global_opt->state._hts_in_mirror) {
+    signal(code, sig_term);  // quitter si encore
+    printf("\n** Finishing pending transfers.. press again ^C to quit.\n");
+    if (global_opt != NULL) {
+      // ask for stop
+      global_opt->state.stop=1;
+    }
+  } else {
+    sig_term(code);
   }
 }
 
