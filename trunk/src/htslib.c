@@ -5255,6 +5255,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->makeindex=1;  // faire un index
   opt->kindex=0;     // index 'keyword'
   opt->delete_old=1; // effacer anciens fichiers
+  opt->background_on_suspend=1; // Background the process if Control Z calls signal suspend.
   opt->makestat=0;  // pas de fichier de stats
   opt->maketrack=0; // ni de tracking
   opt->timeout=120; // timeout par défaut (2 minutes)

@@ -967,6 +967,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             //
           case 'X': opt->delete_old=1; if (*(com+1)=='0') { opt->delete_old=0; com++; } break;
             //
+          case 'y': opt->background_on_suspend=1; if (*(com+1)=='0') { opt->background_on_suspend=0; com++; } break;
+            //
           case 'b': sscanf(com+1,"%d",&opt->accept_cookie); while(isdigit((unsigned char)*(com+1))) com++; break;
             //
           case 'N':

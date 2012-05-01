@@ -174,6 +174,8 @@ const char* hts_optalias[][4] = {
   {"dos83","-L0","single",""},
   {"iso9660","-L2","single",""},
   {"disable-module","-%w","param1",""},
+  {"no-background-on-suspend","-y0","single",""},
+  {"background-on-suspend","-y","single",""},
   /* */
 
   /* DEPRECATED */

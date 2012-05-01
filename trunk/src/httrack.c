@@ -31,7 +31,7 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* File: htsshow.c console progress info                        */
-/* Only used on Linux version                                   */
+/* Only used on Linux & FreeBSD versions                        */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -163,6 +163,26 @@ static int use_show;
 static httrackp *global_opt = NULL;
 
 static void signal_handlers(void);
+static void signal_handlers2(void);
+
+int background_on_suspend = 0 ;
+      /*
+       * Leave at 0, if you want Normal Unix behaviour
+       * of Suspend signal suspending a process.
+       * Set to 1, if you want the old httrack behaviour
+       * (at 3.45.3)
+       * of dropping process into background.		*******************
+         * Dropping to background may pain, eg jhs@@berklix.com noted:
+       *   Httrack sucked the performance out of my (jhs@@berklix.com)
+       *   DSL coms link even with httrack rate limiting enabled.
+       *   Browsers timed out, I could not temporarily suspend long
+       *   runnning httrack processes, to let browsers recover &
+       *   humans to get some urgent work done. (There were also
+       *   sometimes eg 2 httracks, 1 on each of 2 internal hosts,
+       *   both sucking different parts of the net, through 1 common
+       *   busy gateway, & although both rate limited, browsers still
+       *   timed out.
+       */
 
 int main(int argc, char **argv) {
   int ret = 0;
@@ -187,6 +207,7 @@ int main(int argc, char **argv) {
 #endif
 
 	signal_handlers();
+	// signal_handlers2();	// This must move to somewhere later after parameters get parsed.
   hts_init();
   opt = global_opt = hts_create_opt();
 
@@ -213,6 +234,8 @@ int main(int argc, char **argv) {
   CHAIN_FUNCTION(opt, savename, htsshow_savename, NULL);
   CHAIN_FUNCTION(opt, sendhead, htsshow_sendheader, NULL);
   CHAIN_FUNCTION(opt, receivehead, htsshow_receiveheader, NULL);
+
+  signal_handlers2();	// JJLATER guess around here maybe good ?
 
 	ret = hts_main2(argc, argv, opt);
   if (ret) {
@@ -706,6 +729,7 @@ static void sig_ask( int code ) {        // demander
 #else
 static void sig_doback(int blind);
 static void sig_back( int code ) {       // ignorer et mettre en backing 
+					 // Background the process.
   signal(code,sig_ignore);
   sig_doback(0);
 }
@@ -796,7 +820,7 @@ static void signal_handlers(void) {
 #if 0	/* BUG366763 */
 	signal( SIGHUP  , sig_back   );   // close window
 #endif
-	signal( SIGTSTP , sig_back   );   // ^Z
+	// if (background_on_suspend) signal( SIGTSTP , sig_back );   // ^Z	Moved to signal_handlers2()
 	signal( SIGTERM , sig_finish );   // kill <process>
 #if 0	/* BUG366763 */
 	signal( SIGINT  , sig_ask    );   // ^C
@@ -805,6 +829,13 @@ static void signal_handlers(void) {
 #endif
 	signal( SIGPIPE , sig_brpipe );   // broken pipe (write into non-opened socket)
 	signal( SIGCHLD , sig_ignore );   // child change status
+#endif
+}
+
+static void signal_handlers2(void) {
+#ifdef _WIN32
+#else
+      if (background_on_suspend) signal( SIGTSTP , sig_back );   // ^Z
 #endif
 }
 

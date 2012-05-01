@@ -368,6 +368,8 @@ struct httrackp {
   htslibhandles libHandles;
   //
   htsoptstate state;    // state
+  //
+  int background_on_suspend;	// Background process on suspend signal.
 };
 
 // stats for httrack
