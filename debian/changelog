@@ -1,3 +1,10 @@
+httrack (3.45.4-1) unstable; urgency=low
+
+  * Updated to 3.45.4 (3.45-4)
+    Lintian fixes
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 01 May 2012 20:53:48 +0200
+
 httrack (3.45.3-1) unstable; urgency=low
 
   * Updated to 3.45.3 (3.45-3)
