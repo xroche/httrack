@@ -2494,7 +2494,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                         }
                         lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                         /* */
-                      } else if (opt->urlmode >= 4) {    // ne rien faire dans tous les cas!
+                      } else if (opt->urlmode == 4) {    // ne rien faire!
                         /* */
                         /* leave the link 'as is' */
                         /* Sinon, dépend de interne/externe */
@@ -2742,6 +2742,54 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                       else if (opt->urlmode==3) {    // URI absolue /
                         if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
                           HT_ADD_HTMLESCAPED(fil);
+                        }
+                        lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                      }
+                      else if (opt->urlmode==5) {    // transparent proxy URL
+                        char BIGSTK tempo[HTS_URLMAXSIZE*2];
+                        const char *uri;
+                        int i;
+                        char *pos;
+
+                        if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
+                          if (!link_has_authority(adr)) {
+                            HT_ADD("http://");
+                          } else {
+                            char* aut = strstr(adr, "//");
+                            if (aut) {
+                              char tmp[256];
+                              tmp[0]='\0';
+                              strncatbuff(tmp, adr, (int) (aut - adr));   // scheme
+                              HT_ADD(tmp);          // Protocol
+                              HT_ADD("//");
+                            }
+                          }
+
+                          // filename is taken as URI (ex: "C:\My Website\www.example.com\foo4242.html)
+                          uri = save;
+
+                          // .. after stripping the path prefix (ex: "www.example.com\foo4242.html)
+                          if (strnotempty(StringBuff(opt->path_html))) {
+                            uri += StringLength(opt->path_html);
+                            for( ; uri[0] == '/' || uri[0] == '\\' ; uri++) ;
+                          }
+
+                          // and replacing all \ by / (ex: "www.example.com/foo4242.html)
+                          strcpybuff(tempo, uri);
+                          for(i = 0 ; tempo[i] != '\0' ; i++) {
+                            if (tempo[i] == '\\') {
+                              tempo[i] = '/';
+                            }
+                          }
+
+                          // put original query string if any (ex: "www.example.com/foo4242.html?q=45)
+                          pos = strchr(fil, '?');
+                          if (pos != NULL) {
+                            strcatbuff(tempo, pos);
+                          }
+
+                          // write it
+                          HT_ADD_HTMLESCAPED(tempo);
                         }
                         lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                       }
