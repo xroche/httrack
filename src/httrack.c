@@ -816,7 +816,7 @@ static void signal_handlers(void) {
 }
 
 static void signal_restore_ctl_z(void) {
-#ifdef _WIN32
+#ifndef _WIN32
   signal( SIGTSTP , SIG_DFL); // ^Z
 #endif
 }
