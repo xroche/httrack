@@ -3805,7 +3805,7 @@ HTSEXT_API void x_escape_http(char* s,int mode) {
   while(*s) {
     int test=0;
     if (mode == 0)
-      test=(strchr("\" ",*s)!=0);
+      test=(strchr("\" ",*s)!=0 || CHAR_SPECIAL(*s));
     else if (mode==1) {
       test = (  CHAR_RESERVED(*s)
              || CHAR_DELIM(*s)
