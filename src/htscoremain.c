@@ -1713,6 +1713,21 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 return 0;
               }
               break;
+            case '3':   // charset tests: httrack #3 "iso-8859-1" "café"
+              if (argc == 3) {
+                char *s = hts_convertStringToUTF8(argv[2], strlen(argv[2]), argv[1]);
+                if (s != NULL) {
+                  printf("%s\n", s);
+                  free(s);
+                } else {
+                  fprintf(stderr, "invalid string for charset %s\n", argv[1]);
+                }
+              } else {
+                HTS_PANIC_PRINTF("Option #3 needs to be followed by a charset and a string");
+              }
+              htsmain_free();
+              return 0;
+              break;
             case '!':
               if (na+1>=argc) {
                 HTS_PANIC_PRINTF("Option #! needs to be followed by a commandline");
