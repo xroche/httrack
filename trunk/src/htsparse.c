@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 #include "htsmd5.h"
 #include "htsindex.h"
+#include "htscharset.h"
 
 /* external modules */
 #include "htsmodules.h"
@@ -2783,6 +2784,21 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                             }
                           }
 
+                          // convert to local codepage
+                          if (str->page_charset_ != NULL && *str->page_charset_ != '\0') {
+                            char *const local_save = hts_convertStringFromUTF8(tempo, strlen(tempo), str->page_charset_);
+                            if (local_save != NULL) {
+                              strcpybuff(tempo, local_save);
+                              free(local_save);
+                            } else {
+                              if ((opt->debug>1) && (opt->log!=NULL)) {
+                                HTS_LOG(opt,LOG_DEBUG); 
+                                fprintf(opt->log, "Warning: could not build local charset representation of '%s' in '%s'"LF, tempo, str->page_charset_);
+                                test_flush;
+                              }
+                            }
+                          }
+
                           // put original query string if any (ex: "www.example.com/foo4242.html?q=45)
                           pos = strchr(fil, '?');
                           if (pos != NULL) {
@@ -2872,6 +2888,21 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           }                              
 
                           if ((opt->getmode & 1) && (ptr>0)) {
+                            // convert to local codepage - NOT, already converted into %NN, and passed to the remote server so we do not have anything to do
+                            //if (str->page_charset_ != NULL && *str->page_charset_ != '\0') {
+                            //  char *const local_save = hts_convertStringFromUTF8(tempo, strlen(tempo), str->page_charset_);
+                            //  if (local_save != NULL) {
+                            //    strcpybuff(tempo, local_save);
+                            //    free(local_save);
+                            //  } else {
+                            //    if ((opt->debug>1) && (opt->log!=NULL)) {
+                            //      HTS_LOG(opt,LOG_DEBUG); 
+                            //      fprintf(opt->log, "Warning: could not build local charset representation of '%s' in '%s'"LF, tempo, str->page_charset_);
+                            //      test_flush;
+                            //    }
+                            //  }
+                            //}
+
                             // écrire le lien modifié, relatif
                             // Note: escape all chars, even >127 (no UTF)
                             HT_ADD_HTMLESCAPED_FULL(tempo);
