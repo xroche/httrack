@@ -142,6 +142,7 @@ void index_init(const char* indexpath) {
    But should be okay on most cases
    Tags and javascript handled (ignored)
 */
+/* Note: utf-8 */
 int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
 	char catbuff[CATBUFF_SIZE];
@@ -166,8 +167,8 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 
   // Init ?
   if (hts_index_init) {
-    remove(concat(catbuff,indexpath,"index.txt"));
-    remove(concat(catbuff,indexpath,"sindex.html"));
+    UNLINK(concat(catbuff,indexpath,"index.txt"));
+    UNLINK(concat(catbuff,indexpath,"sindex.html"));
     hts_index_init=0;
   }
 
@@ -338,6 +339,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 /*
   Sort index!
 */
+/* Note: NOT utf-8 */
 void index_finish(const char* indexpath,int mode) {
 #if HTS_MAKE_KEYWORD_INDEX
 	char catbuff[CATBUFF_SIZE];

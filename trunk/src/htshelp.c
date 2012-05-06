@@ -262,7 +262,7 @@ void help_wizard(httrackp* opt) {
       linput(stdin,str,250);
       if (strnotempty(str)) {
         if (!((str[0]=='y') || (str[0]=='Y')))
-          return 0;
+          return ;
       }
       printf("\n");
 
@@ -468,6 +468,7 @@ void help(char* app,int more) {
   infomsg("  o *generate output html file in case of error (404..) (o0 don't generate)");
   infomsg("  X *purge old files after update (X0 keep delete)");
   infomsg(" %p  preserve html files 'as is' (identical to '-K4 -%F \"\"')");
+  infomsg(" %T  links conversion to UTF-8");
   infomsg("");
   infomsg("Spider options:");
   infomsg("  bN accept cookies in cookies.txt (0=do not accept,* 1=accept)");

@@ -119,6 +119,7 @@ struct htsmoduleStruct {
   int* ptr_;
   size_t* lien_size_;
   char** lien_buffer_;
+  const char *page_charset_;
   /* Internal use - please don't touch */
 
 };

@@ -239,7 +239,7 @@ Please visit our Website: http://www.httrack.com
   fflush(makeindex_fp); \
   fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
   makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.html"),"primary","primary");  \
+  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html"),"primary","primary");  \
   } \
   } \
   makeindex_done=1;    /* ok c'est fait */  \
@@ -429,7 +429,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
     // Indexing!
 #if HTS_MAKE_KEYWORD_INDEX
     if (opt->kindex) {
-      if (index_keyword(r->adr,r->size,r->contenttype,savename,StringBuff(opt->path_html))) {
+      if (index_keyword(r->adr,r->size,r->contenttype,savename,StringBuff(opt->path_html_utf8))) {
         if ( (opt->debug>1) && (opt->log!=NULL) ) {
           HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"indexing file..done"LF); test_flush;
         }
@@ -656,9 +656,9 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 
                   if (p) {    // ok center                            
                     if (makeindex_fp==NULL) {
-                      file_notify(opt,"", "", fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.html"), 1, 1, 0);
-                      verif_backblue(opt,StringBuff(opt->path_html));    // générer gif
-                      makeindex_fp=filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.html"));
+                      file_notify(opt,"", "", fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html"), 1, 1, 0);
+                      verif_backblue(opt,StringBuff(opt->path_html_utf8));    // générer gif
+                      makeindex_fp=filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html"));
                       if (makeindex_fp!=NULL) {
 
                         // Header
@@ -683,7 +683,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           b=strchr(a,'<');   // prochain tag
                         }
                       }
-                      if (lienrelatif(tempo,liens[ptr]->sav,concat(OPT_GET_BUFF(opt),StringBuff(opt->path_html),"index.html"))==0) {
+                      if (lienrelatif(tempo,liens[ptr]->sav,concat(OPT_GET_BUFF(opt),StringBuff(opt->path_html_utf8),"index.html"))==0) {
                         detect_title=1;      // ok détecté pour cette page!
                         makeindex_links++;   // un de plus
                         strcpybuff(makeindex_firstlink,tempo);
@@ -753,6 +753,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 								if (len > 0) {
 									if (strfield(token, "content-type")) {
 										intag_ctype=1;
+                    //NOPE-we do not convert the whole page actually
+                    //intag_start[1] = 'X';
 									}
 									else if (strfield(token, "refresh")) {
 										intag_ctype=2;
@@ -1104,7 +1106,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                               ) {
                                 chpos++;
                                 while(is_space(*chpos)) chpod++;
-                                chpos
+                                //chpos
                               }
                           }
 #endif
@@ -2381,7 +2383,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                         //char last_fil[HTS_URLMAXSIZE*2]="";
                         strcpybuff(last_adr,adr);    // ancienne adresse
                         //strcpybuff(last_fil,fil);    // ancien chemin
-                        r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL);
+                        r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL,str->page_charset_);
                         if (strcmp(jump_identification(last_adr),jump_identification(adr)) != 0) {  // a changé
 
                           // 2e test si moved
@@ -2578,7 +2580,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                               if (patch_it) {
                                 char BIGSTK save[HTS_URLMAXSIZE*2];
                                 char BIGSTK tempo[HTS_URLMAXSIZE*2];
-                                strcpybuff(save,StringBuff(opt->path_html));
+                                strcpybuff(save,StringBuff(opt->path_html_utf8));
                                 strcatbuff(save,cat_name);
                                 if (lienrelatif(tempo,save, relativesavename)==0) {
 																	/* Never escape high-chars (we don't know the encoding!!) */
@@ -2626,17 +2628,16 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 
                                 // écrire fichier?
                                 if (verif_external(opt,cat_nb,1)) {
-                                  //if (!fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),cat_name))) {
-                                  FILE* fp = filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),cat_name));
+                                  FILE* fp = filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),cat_name));
                                   if (fp) {
                                     if (cat_data_len==0) {   // texte
-                                      verif_backblue(opt,StringBuff(opt->path_html));
+                                      verif_backblue(opt,StringBuff(opt->path_html_utf8));
                                       fprintf(fp,"%s%s","<!-- Created by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"LF,cat_data);
                                     } else {                    // data
                                       fwrite(cat_data,cat_data_len,1,fp);
                                     }
                                     fclose(fp);
-                                    usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),cat_name),"","");
+                                    usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),cat_name),"","");
                                   }
                                 }
                               }  else {    // écrire normalement le nom de fichier
@@ -2769,8 +2770,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           uri = save;
 
                           // .. after stripping the path prefix (ex: "www.example.com\foo4242.html)
-                          if (strnotempty(StringBuff(opt->path_html))) {
-                            uri += StringLength(opt->path_html);
+                          if (strnotempty(StringBuff(opt->path_html_utf8))) {
+                            uri += StringLength(opt->path_html_utf8);
                             for( ; uri[0] == '/' || uri[0] == '\\' ; uri++) ;
                           }
 
@@ -3383,7 +3384,7 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
               {
                 char BIGSTK mov_sav[HTS_URLMAXSIZE*2];
                 // calculer lien et éventuellement modifier addresse/fichier
-                if (url_savename(mov_adr,mov_fil,mov_sav,NULL,NULL,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL)!=-1) { 
+                if (url_savename2(mov_adr,mov_fil,mov_sav,NULL,NULL,liens[liens[ptr]->precedent]->adr,liens[liens[ptr]->precedent]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL,str->page_charset_)!=-1) { 
                   if (hash_read(hash,mov_sav,"",0,0)<0) {      // n'existe pas déja
                     // enregistrer lien (MACRO) avec SAV IDENTIQUE
                     liens_record(mov_adr,mov_fil,liens[ptr]->sav,"","");
@@ -3480,9 +3481,9 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
         (r->statuscode==HTTP_PRECONDITION_FAILED)
         || (r->statuscode==HTTP_REQUESTED_RANGE_NOT_SATISFIABLE)
         ) {    // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
-          if (fexist(liens[ptr]->sav)) {
+          if (fexist_utf8(liens[ptr]->sav)) {
             remove(liens[ptr]->sav);    // Eliminer
-            if (!fexist(liens[ptr]->sav)) {  // Bien éliminé? (sinon on boucle..)
+            if (!fexist_utf8(liens[ptr]->sav)) {  // Bien éliminé? (sinon on boucle..)
 #if HDEBUG
               printf("Partial content NOT up-to-date, reget all file for %s\n",liens[ptr]->sav);
 #endif
@@ -3800,7 +3801,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct* str, htsmoduleStructEx
         // noter NOUVEAU lien
         char BIGSTK add_sav[HTS_URLMAXSIZE*2];
         // calculer lien et éventuellement modifier addresse/fichier
-        if (url_savename(add_adr,add_fil,add_sav,NULL,NULL,NULL,NULL,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL)!=-1) { 
+        if (url_savename2(add_adr,add_fil,add_sav,NULL,NULL,NULL,NULL,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,NULL,str->page_charset_)!=-1) { 
           if (hash_read(hash,add_sav,"",0,0)<0) {      // n'existe pas déja
             // enregistrer lien (MACRO)
             liens_record(add_adr,add_fil,add_sav,"","");
@@ -4296,7 +4297,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&back);
+          r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&back,str->page_charset_);
 
           /* Recompute authorization with MIME type */
           {
@@ -4364,7 +4365,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back);
+          r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
 
           /* Recompute authorization with MIME type */
           {
@@ -4482,7 +4483,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
             strcpybuff(mov_url, back[b].r.location);    // copier URL
 
             /* Remove (temporarily created) file if it was created */
-            unlink(fconv(OPT_GET_BUFF(opt),back[b].url_sav));
+            UNLINK(fconv(OPT_GET_BUFF(opt),back[b].url_sav));
 
             /* Remove slot! */
             if (back[b].status == STATUS_READY) {
@@ -4553,7 +4554,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
                   /* Recompute filename for hash lookup */
                   save[0] = '\0';
-                  r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back);
+                  r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
                 } else {
                   if ( opt->log!=NULL ) {
                     HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unable to test %s%s (loop to same filename)"LF,adr,fil);

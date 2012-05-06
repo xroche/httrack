@@ -147,7 +147,7 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,const char* url_adr,
           // stocker fichiers (et robots.txt)
           if ( url_save == NULL || (strnotempty(url_save)) || (strcmp(url_fil,"/robots.txt")==0)) {
             // ajouter le fichier au cache
-						cache_add(opt,cache,r,url_adr,url_fil,url_save,opt->all_in_cache,StringBuff(opt->path_html));
+						cache_add(opt,cache,r,url_adr,url_fil,url_save,opt->all_in_cache,StringBuff(opt->path_html_utf8));
             //
             // store a reference NOT to redo the same test zillions of times!
             // (problem reported by Lars Clausen)
@@ -367,9 +367,9 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_a
     } else {
       FILE* fp;
       // On recopie le fichier->.
-      off_t file_size=fsize(fconv(catbuff, url_save));
+      off_t file_size=fsize_utf8(fconv(catbuff, url_save));
       if (file_size>=0) {
-        fp=fopen(fconv(catbuff, url_save),"rb");
+        fp=FOPEN(fconv(catbuff, url_save),"rb");
         if (fp!=NULL) {
           char BIGSTK buff[32768];
           size_t nl;
@@ -498,10 +498,10 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,char* url_adr,cha
       } else {  // recopier fichier dans cache
         FILE* fp;
         // On recopie le fichier->.
-        off_t file_size=fsize(fconv(catbuff, url_save));
+        off_t file_size=fsize_utf8(fconv(catbuff, url_save));
         if (file_size>=0) {
           if (cache_wLLint(cache_dat,file_size)!=-1) {
-            fp=fopen(fconv(catbuff, url_save),"rb");
+            fp=FOPEN(fconv(catbuff, url_save),"rb");
             if (fp!=NULL) {
               char BIGSTK buff[32768];
               ssize_t nl;
@@ -678,9 +678,9 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
 
 					/* Previous entry */
 					if (previous_save_[0] != '\0') {
-						int pathLen = (int) strlen(StringBuff(opt->path_html));
-						if (pathLen != 0 && strncmp(previous_save_, StringBuff(opt->path_html), pathLen) != 0) {			// old (<3.40) buggy format
-							sprintf(previous_save, "%s%s", StringBuff(opt->path_html), previous_save_);
+						int pathLen = (int) strlen(StringBuff(opt->path_html_utf8));
+						if (pathLen != 0 && strncmp(previous_save_, StringBuff(opt->path_html_utf8), pathLen) != 0) {			// old (<3.40) buggy format
+							sprintf(previous_save, "%s%s", StringBuff(opt->path_html_utf8), previous_save_);
 						} else {
 							strcpy(previous_save, previous_save_);
 						}
@@ -710,8 +710,8 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
               r.is_write=1;    // écrire
 
               if (!dataincache) {
-								if (fexist(fconv(catbuff, save))) {  // un fichier existe déja
-									//if (fsize(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
+								if (fexist_utf8(fconv(catbuff, save))) {  // un fichier existe déja
+									//if (fsize_utf8(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
 									ok=1;    // plus rien à faire
 									filenote(&opt->state.strc,save,NULL);        // noter comme connu
 									file_notify(opt,adr, fil, save, 0, 0, 1);        // data in cache
@@ -797,8 +797,8 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                     strcpybuff(r.msg,"Previous cache file not found (2)");
                   }
                 } else {                 /* Read in memory from cache */
-                  if (strnotempty(previous_save) && fexist(previous_save)) {
-                    FILE* fp = fopen(fconv(catbuff, previous_save), "rb");
+                  if (strnotempty(previous_save) && fexist_utf8(previous_save)) {
+                    FILE* fp = FOPEN(fconv(catbuff, previous_save), "rb");
                     if (fp != NULL) {
                       r.adr = (char*) malloct((int) r.size + 4);
                       if (r.adr != NULL) {
@@ -1016,8 +1016,8 @@ static htsblk cache_readex_old(httrackp* opt,cache_back* cache,const char* adr,c
               int ok=0;
               
               r.is_write=1;    // écrire
-              if (fexist(fconv(catbuff, save))) {  // un fichier existe déja
-                //if (fsize(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
+              if (fexist_utf8(fconv(catbuff, save))) {  // un fichier existe déja
+                //if (fsize_utf8(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
                 ok=1;    // plus rien à faire
                 filenote(&opt->state.strc,save,NULL);        // noter comme connu
                 file_notify(opt,adr, fil, save, 0, 0, 0);
@@ -1082,8 +1082,8 @@ static htsblk cache_readex_old(httrackp* opt,cache_back* cache,const char* adr,c
                   r.statuscode=STATUSCODE_INVALID;
                   strcpybuff(r.msg,"Previous cache file not found (2)");
                 } else {                 /* Read in memory from cache */
-                  if (strnotempty(return_save) && fexist(return_save)) {
-                    FILE* fp = fopen(fconv(catbuff, return_save), "rb");
+                  if (strnotempty(return_save) && fexist_utf8(return_save)) {
+                    FILE* fp = FOPEN(fconv(catbuff, return_save), "rb");
                     if (fp != NULL) {
                       r.adr = (char*) malloct((size_t)r.size + 4);
                       if (r.adr != NULL) {
@@ -1685,10 +1685,12 @@ void cache_init(cache_back* cache,httrackp* opt) {
 
 
 // lire un fichier.. (compatible \0)
+/* Note: NOT utf-8 */
 char* readfile(char* fil) {
   return readfile2(fil, NULL);
 }
 
+/* Note: NOT utf-8 */
 char* readfile2(char* fil, LLint* size) {
   char* adr=NULL;
 	char catbuff[CATBUFF_SIZE];
@@ -1714,6 +1716,7 @@ char* readfile2(char* fil, LLint* size) {
   return adr;
 }
 
+/* Note: NOT utf-8 */
 char* readfile_or(char* fil,char* defaultdata) {
   char* realfile=fil;
   char* ret;

@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswrap.h"
 #include "htsmodules.h"
 #include "htszlib.h"
+#include "htscharset.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
@@ -394,6 +395,22 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         
       }  // for
      
+      // Convert path to UTF-8
+#ifdef _WIN32
+      {
+        char *const path = hts_convertStringSystemToUTF8(StringBuff(opt->path_html), (int) StringLength(opt->path_html));
+        if (path != NULL) {
+          StringCopy(opt->path_html_utf8, path);
+          free(path);
+        } else {
+          StringCopyN(opt->path_html_utf8, StringBuff(opt->path_html), StringLength(opt->path_html));
+        }
+      }
+#else
+      // Assume UTF-8 filesystem.
+      StringCopyN(opt->path_html_utf8, StringBuff(opt->path_html), StringLength(opt->path_html));
+#endif
+
          /* if doit.log exists, or if new URL(s) defined, 
       then DO NOT load standard config files */
       /* (config files are added in doit.log) */
@@ -1058,6 +1075,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             case 'i': opt->dir_topindex = 1; if (*(com+1)=='0') { opt->dir_topindex=0; com++; } break;
             case 'N': opt->savename_delayed = 2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&opt->savename_delayed); while(isdigit((unsigned char)*(com+1))) com++; } break;
             case 'D': opt->delayed_cached=1; if (*(com+1)=='0') { opt->delayed_cached=0; com++; } break;   // url hack
+            case 'T': opt->convert_utf8=1; if (*(com+1)=='0') { opt->convert_utf8=0; com++; } break;   // convert to utf-8
             case '!': opt->bypass_limits = 1; if (*(com+1)=='0') { opt->bypass_limits=0; com++; } break;
 #if HTS_USEMMS
 						case 'm': sscanf(com+1,"%d",&opt->mms_maxtime); while(isdigit((unsigned char)*(com+1))) com++; break;
@@ -2114,10 +2132,20 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           t, url);
         fprintf(opt->log,"(");
         for(i=0;i<argc;i++) {
-          if (strchr(argv[i],' ') == NULL || strchr(argv[i],'\"') != NULL)
-            fprintf(opt->log,"%s ",argv[i]);
+#ifdef _WIN32
+          char *carg = hts_convertStringSystemToUTF8(argv[i], (int) strlen(argv[i]));
+          char *arg = carg != NULL ? carg : argv[i];
+#else
+          const char *arg = argv[i];
+#endif
+          if (strchr(arg, ' ') == NULL || strchr(arg, '\"') != NULL)
+            fprintf(opt->log,"%s ", arg);
           else    // entre "" (si espace(s) et pas déja de ")
-            fprintf(opt->log,"\"%s\" ",argv[i]);
+            fprintf(opt->log,"\"%s\" ", arg);
+#ifdef _WIN32
+          if (carg != NULL)
+            free(carg);
+#endif
         }
         fprintf(opt->log,")"LF);
         fprintf(opt->log,LF);

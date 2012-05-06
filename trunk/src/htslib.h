@@ -411,9 +411,11 @@ int sig_ignore_flag( int setflag );     // flag ignore
 
 void cut_path(char* fullpath,char* path,char* pname);
 int fexist(const char* s);
+int fexist_utf8(const char* s);
 /*LLint fsize(const char* s);    */
 off_t fpsize(FILE* fp);
 off_t fsize(const char* s);    
+off_t fsize_utf8(const char* s);
 /* root dir */
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API char* hts_rootdir(char* file);
@@ -487,6 +489,29 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name);
   ) \
 )
 */
+
+/* UTF-8 aware FILE operations */
+#ifdef _WIN32
+#define FOPEN hts_fopen_utf8
+extern FILE* hts_fopen_utf8(const char *path, const char *mode);
+#define STAT hts_stat_utf8
+typedef struct _stat STRUCT_STAT;
+extern int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
+#define UNLINK hts_unlink_utf8
+extern int hts_unlink_utf8(const char *pathname);
+#define RENAME hts_rename_utf8
+extern int hts_rename_utf8(const char *oldpath, const char *newpath);
+#define MKDIR(F) hts_mkdir_utf8(F)
+extern int hts_mkdir_utf8(const char *pathname);
+#else
+/* The underlying filesystem charset is supposed to be UTF-8 */
+#define FOPEN fopen
+#define STAT stat
+typedef struct stat STRUCT_STAT;
+#define UNLINK unlink
+#define RENAME rename
+#define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+#endif
 
 #endif    // internals
 

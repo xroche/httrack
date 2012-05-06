@@ -340,6 +340,7 @@ void usercommand_exe(const char* cmd,const char* file);
 int filters_init(char*** ptrfilters, int maxfilter, int filterinc);
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int structcheck(const char* path);
+HTSEXT_API int structcheck_utf8(const char* path);
 HTSEXT_API int dir_exists(const char* path);
 #endif
 HTS_INLINE int fspc(httrackp *opt,FILE* fp,const char* type);
