@@ -313,7 +313,7 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
   /* Empty string ? */
   if (size == 0) {
-    return strndup(s, size);
+    return strdup("");
   }
   /* Already UTF-8 ? */
   if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0) {
@@ -328,29 +328,48 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
       size_t outbufCapa = 0;
       char *outbuf = NULL;
       size_t outbytesleft = 0;
-      while(inbytesleft != 0) {
-        const size_t ret = iconv(cp, &inbuf, &inbytesleft, &outbuf, &outbytesleft);
+      size_t finalSize;
+
+      /* Initial size to around the string size */
+      for(outbufCapa = 16 ; outbufCapa < size + 1 ; outbufCapa *= 2) ;
+      outbuf = malloc(outbufCapa);
+
+      /* Convert */
+      while(outbuf != NULL && inbytesleft != 0) {
+        const size_t offset = outbufCapa - outbytesleft;
+        char *outbufCurrent = outbuf + offset;
+        const size_t ret = iconv(cp, &inbuf, &inbytesleft, &outbufCurrent, &outbytesleft);
         if (ret == (size_t) -1) {
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
-            if (outbufCapa == 0) {
-              outbufCapa = 16;
-            } else {
-              outbufCapa *= 2;
-            }
+            outbufCapa *= 2;
             outbuf = realloc(outbuf, outbufCapa);
             if (outbuf == NULL) {
               break;
             }
             outbytesleft = outbufCapa - used;
+          } else {
+            free(outbuf);
+            outbuf = NULL;
+            break;
           }
         }
       }
 
+      /* Final size ? */
+      finalSize = outbufCapa - outbytesleft;
+
+      /* Terminating \0 */
+      if (outbuf != NULL && finalSize + 1 >= outbufCapa) {
+        outbuf = realloc(outbuf, finalSize + 1);
+      }
+      if (outbuf != NULL)
+        outbuf[finalSize] = '\0';
+
       /* Close codepage */
       iconv_close(cp);
 
-      /* Return resulr (may be NULL) */
+      /* Return result (may be NULL) */
       return outbuf;
     }
   }
