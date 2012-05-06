@@ -307,6 +307,7 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 #else
 
 #include <string.h>
+#include <errno.h>
 #include <iconv.h>
 
 char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
