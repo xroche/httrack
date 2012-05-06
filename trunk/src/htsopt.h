@@ -350,7 +350,7 @@ struct httrackp {
   String lang_iso;      // en, fr ..
   String mimedefs;      // ext1=mimetype1\next2=mimetype2..
   String mod_blacklist; // (3.41)
-  int convert_utf8;     // UTF-8 conversion ; 3.46
+  int convert_utf8;     // filenames UTF-8 conversion (3.46)
   //
   int maxlink;          // nombre max de liens
   int maxfilter;        // nombre max de filtres
