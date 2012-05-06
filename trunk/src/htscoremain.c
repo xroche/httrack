@@ -1687,7 +1687,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               break;
             case '2':   // mimedefs
               if (na+1>=argc) {
-                HTS_PANIC_PRINTF("Option #1 needs to be followed by an URL");
+                HTS_PANIC_PRINTF("Option #2 needs to be followed by an URL");
                 printf("Example: '-#2' /foo/bar.php\n");
                 htsmain_free();
                 return -1;
@@ -1717,7 +1717,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               if (argc == 3) {
                 char *s = hts_convertStringToUTF8(argv[2], strlen(argv[2]), argv[1]);
                 if (s != NULL) {
-                  printf("%s\n", s);
+                  printf(">> %s\n", s);
                   free(s);
                 } else {
                   fprintf(stderr, "invalid string for charset %s\n", argv[1]);
