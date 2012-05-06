@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "HTTrack version 3.45-4 (compiled May  1 2012)" "httrack website copier"
+.TH httrack 1 "HTTrack version 3.46-1 (compiled May  6 2012)" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -85,6 +85,8 @@ httrack \- offline browser : copy websites to a local directory
 .B \-X, \-\-purge\-old[=N] 
 ] [ 
 .B \-%p, \-\-preserve 
+] [ 
+.B \-%T, \-\-utf8\-conversion 
 ] [ 
 .B \-bN, \-\-cookies[=N] 
 ] [ 
@@ -309,6 +311,8 @@ do not include any password for external password protected websites (%x0 includ
 *purge old files after update (X0 keep delete) (\-\-purge\-old[=N])
 .IP \-%p
 preserve html files  as is  (identical to  \-K4 \-%F "" ) (\-\-preserve)
+.IP \-%T
+links conversion to UTF\-8 (\-\-utf8\-conversion)
 
 .SS Spider options:
 .IP \-bN
