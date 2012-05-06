@@ -128,7 +128,7 @@ void back_delete_all(httrackp* opt, cache_back* cache, struct_back* sback) {
 #ifndef HTS_NO_BACK_ON_DISK
 				char *filename = (char*) item->value.ptr;
 				if (filename != NULL) {
-					(void) unlink(filename);
+					(void) UNLINK(filename);
 				}
 #else
 				/* clear entry content (but not yet the entry) */
@@ -196,7 +196,7 @@ static int back_index_ready(httrackp* opt, struct_back* sback, char* adr, char* 
       FILE *fp;
       char* fileback = (char*) ptr;
     	char catbuff[CATBUFF_SIZE];
-      if (( fp = fopen(fconv(catbuff, fileback), "rb") ) != NULL ) {
+      if (( fp = FOPEN(fconv(catbuff, fileback), "rb") ) != NULL ) {
         if (back_unserialize(fp, &itemback) != 0) {
           if (itemback != NULL) {
             back_clear_entry(itemback);
@@ -217,7 +217,7 @@ static int back_index_ready(httrackp* opt, struct_back* sback, char* adr, char* 
           test_flush;
         }
       }
-      (void) unlink(fileback);
+      (void) UNLINK(fileback);
 #else
       itemback = (lien_back*) ptr;
 #endif
@@ -293,10 +293,10 @@ int back_cleanup_background(httrackp* opt,cache_back* cache,struct_back* sback) 
           if (opt->getmode != 0) {
             sprintf(filename, "%s.tmp", back[i].url_sav);
           } else {
-            sprintf(filename, "%stmpfile%d.tmp", StringBuff(opt->path_html), opt->state.tmpnameid++);
+            sprintf(filename, "%stmpfile%d.tmp", StringBuff(opt->path_html_utf8), opt->state.tmpnameid++);
           }
           /* Security check */
-          if (fexist(filename)) {
+          if (fexist_utf8(filename)) {
             if (opt->log != NULL) {
               HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: warning: temporary file %s already exists"LF, filename);
               test_flush;
@@ -323,7 +323,7 @@ int back_cleanup_background(httrackp* opt,cache_back* cache,struct_back* sback) 
           } else {
             if (opt->log != NULL) {
               int last_errno = errno;
-              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: warning: serialize error for %s%s to %s: open error: %s (%s, %s)"LF, back[i].url_adr, back[i].url_fil, filename, strerror(last_errno), dir_exists(filename) ? "directory exists" : "directory does NOT exist!", fexist(filename) ? "file already exists!" : "file does not exist");
+              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: warning: serialize error for %s%s to %s: open error: %s (%s, %s)"LF, back[i].url_adr, back[i].url_fil, filename, strerror(last_errno), dir_exists(filename) ? "directory exists" : "directory does NOT exist!", fexist_utf8(filename) ? "file already exists!" : "file does not exist");
               test_flush;
             }
           }
@@ -501,7 +501,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
               back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
 #endif
 							if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
-								back[p].r.out=fopen(back[p].tmpfile,"wb");
+								back[p].r.out=FOPEN(back[p].tmpfile,"wb");
 								if (back[p].r.out) {
 									if ((back[p].r.adr) && (back[p].r.size>0)) {
 										if (fwrite(back[p].r.adr,1,(size_t)back[p].r.size,back[p].r.out) != back[p].r.size) {
@@ -541,12 +541,12 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 											back[p].r.statuscode=STATUSCODE_INVALID;
 											strcpybuff(back[p].r.msg,"Read error when decompressing");
 										}
-										unlink(back[p].url_sav);
+										UNLINK(back[p].url_sav);
 									}
 								}
 							}
 							/* encore that no remaining temporary file exists */
-							unlink(back[p].tmpfile);
+							UNLINK(back[p].tmpfile);
 							back[p].tmpfile = NULL;
 						}
 						// stats
@@ -578,10 +578,10 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					if (back[p].r.is_write) {    // Written file
 						if (may_be_hypertext_mime(opt,back[p].r.contenttype, back[p].url_fil)) {   // to parse!
 							off_t sz;
-							sz=fsize(back[p].url_sav);
+							sz=fsize_utf8(back[p].url_sav);
 							if (sz>0) {   // ok, exists!
 								if (sz < 8192) {   // ok, small file --> to parse!
-									FILE* fp=fopen(back[p].url_sav,"rb");
+									FILE* fp=FOPEN(back[p].url_sav,"rb");
 									if (fp) {
 										back[p].r.adr=malloct((int)sz + 2);
 										if (back[p].r.adr) {
@@ -599,7 +599,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 											fclose(fp);
 											fp=NULL;
 											// remove (temporary) file!
-											unlink(fconv(catbuff,back[p].url_sav));
+											UNLINK(fconv(catbuff,back[p].url_sav));
 										}
 										if (fp)
 											fclose(fp);
@@ -909,6 +909,7 @@ int back_unserialize(FILE *fp, lien_back** dst) {
 }
 
 /* serialize a reference ; used to store references of files being downloaded in case of broken download */
+/* Note: NOT utf-8 */
 int back_serialize_ref(httrackp* opt, const lien_back* src) {
   char *filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
   FILE *fp = fopen(filename, "wb");
@@ -934,7 +935,7 @@ int back_serialize_ref(httrackp* opt, const lien_back* src) {
 /* unserialize a reference ; used to store references of files being downloaded in case of broken download */
 int back_unserialize_ref(httrackp* opt, const char *adr, const char *fil, lien_back** dst) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
-  FILE *fp = fopen(filename, "rb");
+  FILE *fp = FOPEN(filename, "rb");
   if (fp != NULL) {
     int ser = back_unserialize(fp, dst);
     fclose(fp);
@@ -1174,7 +1175,7 @@ int back_flush_output(httrackp* opt, cache_back* cache, struct_back* sback, int 
       /* écrire date "remote" */
       if (strnotempty(back[p].url_sav)
 				&& strnotempty(back[p].r.lastmodified)
-				&& fexist(back[p].url_sav))          // normalement existe si on a un fichier de sortie
+				&& fexist_utf8(back[p].url_sav))          // normalement existe si on a un fichier de sortie
 			{
         set_filetime_rfc822(back[p].url_sav,back[p].r.lastmodified);
 			}
@@ -1268,7 +1269,7 @@ int back_clear_entry(lien_back* back) {
 
 		// only for security
 		if (back->tmpfile && back->tmpfile[0] != '\0') {
-			(void) unlink(back->tmpfile);
+			(void) UNLINK(back->tmpfile);
 			back->tmpfile = NULL;
 		}
 
@@ -1471,7 +1472,7 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
             if (pos<0) {    // pas de mise en cache data, vérifier existence
 #endif
               /* note: no check with IS_DELAYED_EXT() enabled - postcheck by client please! */
-              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize(fconv(catbuff,save)) <= 0) {  // fichier final n'existe pas ou est vide!
+              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize_utf8(fconv(catbuff,save)) <= 0) {  // fichier final n'existe pas ou est vide!
                 int found=0;
 
                 /* It is possible that the file has been moved due to changes in build structure */
@@ -1483,9 +1484,9 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
                   /* Is supposed to be on disk only */
                   if (r.is_write && previous_save[0] != '\0') {
                     /* Exists, but with another (old) filename: rename (almost) silently */
-                    if (strcmp(previous_save, save) != 0 && fexist(fconv(catbuff, previous_save))) {
+                    if (strcmp(previous_save, save) != 0 && fexist_utf8(fconv(catbuff, previous_save))) {
                       rename(fconv(catbuff, previous_save), fconv(catbuff2,save));
-                      if (fexist(fconv(catbuff,save))) {
+                      if (fexist_utf8(fconv(catbuff,save))) {
                         found = 1;
                         if ((opt->debug>1) && (opt->log!=NULL)) {
                           HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File '%s' has been renamed since last mirror to '%s' ; applying changes"LF, previous_save, save); test_flush;
@@ -1511,8 +1512,8 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
                   // sinon, le fichier est ok à priori, mais on renverra un if-modified-since pour
                   // en être sûr
                   if (opt->norecatch) {              // tester norecatch
-                    if (!fexist(fconv(catbuff,save))) {  // fichier existe pas mais déclaré: on l'a effacé
-                      FILE* fp=fopen(fconv(catbuff,save),"wb");
+                    if (!fexist_utf8(fconv(catbuff,save))) {  // fichier existe pas mais déclaré: on l'a effacé
+                      FILE* fp=FOPEN(fconv(catbuff,save),"wb");
                       if (fp) fclose(fp);
                       if (opt->log!=NULL) {
                         HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Previous file '%s' not found (erased by user ?), ignoring: %s%s"LF,save,back[p].url_adr,back[p].url_fil); test_flush;
@@ -1655,7 +1656,7 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
       } 
       /* Not in cache ; maybe in temporary cache ? Warning: non-movable "url_sav" */
       else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
-        const long file_size = fsize(itemback->url_sav);
+        const long file_size = fsize_utf8(itemback->url_sav);
         /* Found file on disk */
         if (file_size > 0) {
           char *send_too = back[p].send_too;
@@ -1686,8 +1687,8 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
         itemback = NULL;
       }
       /* Not in cache or temporary cache ; found on disk ? (hack) */
-      else if (fexist(save)) {
-        off_t sz=fsize(save);
+      else if (fexist_utf8(save)) {
+        off_t sz=fsize_utf8(save);
         // Bon, là il est possible que le fichier ait été partiellement transféré
         // (s'il l'avait été en totalité il aurait été inscrit dans le cache ET existerait sur disque)
         // PAS de If-Modified-Since, on a pas connaissance des données à la date du cache
@@ -2668,7 +2669,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
       else if (back[i].status==STATUS_FTP_TRANSFER) {  // en réception ftp
         if (!fexist(back[i].location_buffer)) {    // terminé
           FILE* fp;
-          fp=fopen(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer,".ok"),"rb");
+          fp=FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer,".ok"),"rb");
           if (fp) {
             int j=0;
             fscanf(fp,"%d ",&(back[i].r.statuscode));
@@ -2679,7 +2680,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
             }
             back[i].r.msg[j++]='\0';
             fclose(fp);
-            unlink(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer,".ok"));
+            UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer,".ok"));
             strcpybuff(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer,".ok"),"");
           } else {
             strcpybuff(back[i].r.msg,"Unknown ftp result, check if file is ok");
@@ -2772,7 +2773,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                 back[i].tmpfile=tmpnam(back[p].tmpfile_buffer);
 #endif
                                 if (back[i].tmpfile != NULL && back[i].tmpfile[0]) {
-                                  if ((back[i].r.out=fopen(back[i].tmpfile,"wb")) == NULL) {
+                                  if ((back[i].r.out=FOPEN(back[i].tmpfile,"wb")) == NULL) {
                                     last_errno = errno;
                                   }
                                 }
@@ -3292,7 +3293,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
 										// with an error : consider a 304 error
 										if (!opt->delete_old) {
 											if (HTTP_IS_ERROR(back[i].r.statuscode) && back[i].is_update && !back[i].testmode) {
-												if (back[i].url_sav[0] && fexist(back[i].url_sav)) {
+												if (back[i].url_sav[0] && fexist_utf8(back[i].url_sav)) {
 													if ((opt->debug>1) && (opt->log!=NULL)) {
 														HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Error ignored %d (%s) because of 'no purge' option for %s%s"LF,back[i].r.statuscode,back[i].r.msg,back[i].url_adr,back[i].url_fil); test_flush;
 													}
@@ -3350,7 +3351,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                         if (back[i].r.statuscode==HTTP_OK && !back[i].testmode) {  // 'OK'
                           if (!is_hypertext_mime(opt,back[i].r.contenttype, back[i].url_fil)) {    // not HTML
                             if (strnotempty(back[i].url_sav)) {  // target found
-                              int size = fsize(back[i].url_sav);  // target size
+                              int size = fsize_utf8(back[i].url_sav);  // target size
                               if (size >= 0) {
                                 if (back[i].r.totalsize == size) {  // same size!
                                   deletehttp(&back[i].r); back[i].r.soc=INVALID_SOCKET;
@@ -3473,11 +3474,11 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                       // In case of 'if-unmodified-since' hack, a 304 status can be sent
                       // then, force 'ok' status
                       if (back[i].r.statuscode == STATUSCODE_INVALID) {
-                        if (fexist(back[i].url_sav)) {
+                        if (fexist_utf8(back[i].url_sav)) {
                           back[i].r.statuscode=HTTP_OK;     // OK
                           strcpybuff(back[i].r.msg, "OK (cached)");
                           back[i].r.is_file=1;
-                          back[i].r.totalsize = back[i].r.size = fsize(back[i].url_sav);
+                          back[i].r.totalsize = back[i].r.size = fsize_utf8(back[i].url_sav);
                           get_httptype(opt,back[i].r.contenttype, back[i].url_sav, 1);
                           if ((opt->debug>0) && (opt->log!=NULL)) {
                             HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Not-modified status without cache guessed: %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
@@ -3544,7 +3545,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                       // traiter 206 (partial content)
                       // xxc SI CHUNK VERIFIER QUE CA MARCHE??
                       if (back[i].r.statuscode==206) {  // on nous envoie un morceau (la fin) coz une partie sur disque!
-                        off_t sz=fsize(back[i].url_sav);
+                        off_t sz=fsize_utf8(back[i].url_sav);
 #if HDEBUG
                         printf("partial content: "LLintP" on disk..\n",(LLint)sz);
 #endif
@@ -3553,7 +3554,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                             if (opt->getmode&2) {    // on peut ecrire des non html  **sinon ben euhh sera intercepté plus loin, donc rap sur ce qui va sortir**
                               filenote(&opt->state.strc,back[i].url_sav,NULL);    // noter fichier comme connu
                               file_notify(opt,back[i].url_adr, back[i].url_fil, back[i].url_sav, 0, 1, back[i].r.notmodified);
-                              back[i].r.out=fopen(fconv(catbuff,back[i].url_sav),"ab");  // append
+                              back[i].r.out=FOPEN(fconv(catbuff,back[i].url_sav),"ab");  // append
                               if (back[i].r.out) {
                                 back[i].r.is_write=1;    // écrire
                                 back[i].r.size=sz;    // déja écrit
@@ -3577,7 +3578,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                               }
                             }
                           } else {    // mémoire
-                            FILE* fp=fopen(fconv(catbuff,back[i].url_sav),"rb");
+                            FILE* fp=FOPEN(fconv(catbuff,back[i].url_sav),"rb");
                             if (fp) {
                               LLint alloc_mem=sz + 1;
                               if (back[i].r.totalsize>0)
@@ -3703,7 +3704,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
 #if HTS_REMOVE_BAD_FILES
           if (back[i].status<0) {
             if (!back[i].testmode) {    // pas en test
-              unlink(back[i].url_sav);    // éliminer fichier (endommagé)
+              UNLINK(back[i].url_sav);    // éliminer fichier (endommagé)
               //printf("&& %s\n",back[i].url_sav);
             }
           }

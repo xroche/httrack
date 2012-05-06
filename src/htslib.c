@@ -56,6 +56,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswrap.h"
 #include "htsmd5.h"
 #include "htsmodules.h"
+#include "htscharset.h"
 
 #ifdef _WIN32
 #ifndef  _WIN32_WCE
@@ -745,7 +746,7 @@ int http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,cha
       else {
         // Note: On passe par un FILE* (plus propre)
         //soc=open(fil,O_RDONLY,0);    // en lecture seule!
-        retour->fp=fopen(fconv(OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt),fil)),"rb");  // ouvrir
+        retour->fp=FOPEN(fconv(OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt),fil)),"rb");  // ouvrir
         if (retour->fp==NULL)
           soc=INVALID_SOCKET;
         else
@@ -861,7 +862,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
     search_tag=strstr(fil,POSTTOK"file:");
     if (search_tag) {     // postfile
       if (mode==0) {      // GET!
-        FILE* fp=fopen(unescape_http(OPT_GET_BUFF(opt),search_tag+strlen(POSTTOK)+5),"rb");
+        FILE* fp=FOPEN(unescape_http(OPT_GET_BUFF(opt),search_tag+strlen(POSTTOK)+5),"rb");
         if (fp) {
           char BIGSTK line[1100];
           char BIGSTK protocol[256],url[HTS_URLMAXSIZE*2],method[256];
@@ -2710,9 +2711,9 @@ int set_filetime_rfc822(const char* file, const char* date) {
 }
 
 int get_filetime_rfc822(const char* file, char* date) {
-  struct stat buf;
+  STRUCT_STAT buf;
   date[0] = '\0';
-  if (stat(file, &buf) == 0) {
+  if (STAT(file, &buf) == 0) {
     struct tm* A;
     time_t tt = buf.st_mtime;
     A=gmtime(&tt);
@@ -4306,6 +4307,7 @@ void fprintfio(FILE* fp,char* buff,char* prefix) {
 }
 
 /* Le fichier existe-t-il? (ou est-il accessible?) */
+/* Note: NOT utf-8 */
 int fexist(const char* s) {
 	char catbuff[CATBUFF_SIZE];
   struct stat st;
@@ -4318,27 +4320,44 @@ int fexist(const char* s) {
   return 0;
 } 
 
-/* Taille d'un fichier, -1 si n'existe pas */
-/* fp->_cnt ne fonctionne pas sur toute les plate-formes :-(( */
-/* Note: NOT YET READY FOR 64-bit */
-off_t fsize(const char* s) {
+/* Le fichier existe-t-il? (ou est-il accessible?) */
+/* Note: utf-8 */
+int fexist_utf8(const char* s) {
 	char catbuff[CATBUFF_SIZE];
-	FILE* fp;
-  if (strnotempty(s)==0)     // nom vide: erreur
+  STRUCT_STAT st;
+  memset(&st, 0, sizeof(st));
+  if (STAT(fconv(catbuff,s), &st) == 0) {
+    if (S_ISREG(st.st_mode)) {
+      return 1;
+    }
+  }
+  return 0;
+} 
+
+/* Taille d'un fichier, -1 si n'existe pas */
+/* Note: NOT utf-8 */
+off_t fsize(const char* s) {
+  struct stat st;
+  if (!strnotempty(s))     // nom vide: erreur
     return -1;
-  fp=fopen(fconv(catbuff,s),"rb");
-  if (fp!=NULL) {
-    off_t i;
-    fseek(fp,0,SEEK_END);
-#ifdef HTS_FSEEKO
-    i=ftello(fp);
-#else
-    i=ftell(fp);
-#endif
-    fclose(fp);
-    return i;
-  } else
+  if (stat(s, &st) == 0) {
+    return st.st_size;
+  } else {
     return -1;
+  }
+}
+
+/* Taille d'un fichier, -1 si n'existe pas */
+/* Note: utf-8 */
+off_t fsize_utf8(const char* s) {
+  STRUCT_STAT st;
+  if (!strnotempty(s))     // nom vide: erreur
+    return -1;
+  if (STAT(s, &st) == 0) {
+    return st.st_size;
+  } else {
+    return -1;
+  }
 }
 
 off_t fpsize(FILE* fp) {
@@ -5029,7 +5048,7 @@ FILE *hts_dgb_(void) {
 #ifdef _WIN32_WCE
       hts_dgb_init_fp = fopen("\\Temp\\hts-debug.txt", "wb");
 #else
-      hts_dgb_init_fp = fopen("hts-debug.txt", "wb");
+      hts_dgb_init_fp = FOPEN("hts-debug.txt", "wb");
 #endif
       if (hts_dgb_init_fp != NULL) {
         fprintf(hts_dgb_init_fp, "* Creating file\r\n");
@@ -5296,6 +5315,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->urlhack=1;         // url hack (normalizer)
   StringCopy(opt->footer,HTS_DEFAULT_FOOTER);
   opt->ftp_proxy=1;       // proxy http pour ftp
+  opt->convert_utf8 = 1;  // convert html to UTF-8
   StringCopy(opt->filelist,"");
   StringCopy(opt->lang_iso,"en, *");
   StringCopy(opt->mimedefs,"\n"); // aucun filtre mime (\n IMPORTANT)
@@ -5308,6 +5328,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->keyboard=0;
   //
   StringCopy(opt->path_html,"");
+  StringCopy(opt->path_html_utf8,"");
   StringCopy(opt->path_log,"");
   StringCopy(opt->path_bin,"");
   //
@@ -5420,6 +5441,7 @@ HTSEXT_API void hts_free_opt(httrackp *opt) {
     StringFree(opt->mod_blacklist);
 
     StringFree(opt->path_html);
+    StringFree(opt->path_html_utf8);
     StringFree(opt->path_log);
     StringFree(opt->path_bin);
 
@@ -5690,6 +5712,86 @@ int closedir(DIR *dir) {
   errno = EBADF;
   return -1;
 }
+
+// UTF-8 aware FILE API
+
+static void copyWchar(LPWSTR dest, const char *src) {
+  int i;
+  for(i = 0 ; src[i] ; i++) {
+    dest[i] = src[i];
+  }
+  dest[i] = '\0';
+}
+
+FILE* hts_fopen_utf8(const char *path, const char *mode) {
+  WCHAR wmode[32];
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  assertf(strlen(mode) < sizeof(wmode) / sizeof(WCHAR));
+  copyWchar(wmode, mode);
+  if (wpath != NULL) {
+    FILE *const fp = _wfopen(wpath, wmode);
+    free(wpath);
+    return fp;
+  } else {
+    // Fallback on conversion error.
+    return fopen(path, mode);
+  }
+}
+
+int hts_stat_utf8(const char *path, STRUCT_STAT *buf) {
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  if (wpath != NULL) {
+    const int result = _wstat(wpath, buf);
+    free(wpath);
+    return result;
+  } else {
+    // Fallback on conversion error.
+    return stat(path, buf);
+  }
+}
+
+int hts_unlink_utf8(const char *path) {
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  if (wpath != NULL) {
+    const int result = _wunlink(wpath);
+    free(wpath);
+    return result;
+  } else {
+    // Fallback on conversion error.
+    return unlink(path);
+  }
+}
+
+int hts_rename_utf8(const char *oldpath, const char *newpath) {
+  LPWSTR woldpath = hts_convertUTF8StringToUCS2(oldpath, strlen(oldpath), NULL);
+  LPWSTR wnewpath = hts_convertUTF8StringToUCS2(newpath, strlen(newpath), NULL);
+  if (woldpath != NULL && wnewpath != NULL) {
+    const int result = _wrename(woldpath, wnewpath);
+    free(woldpath);
+    free(wnewpath);
+    return result;
+  } else {
+    if (woldpath != NULL)
+      free(woldpath);
+    if (wnewpath != NULL)
+      free(wnewpath);
+    // Fallback on conversion error.
+    return rename(oldpath, newpath);
+  }
+}
+
+int hts_mkdir_utf8(const char *path) {
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  if (wpath != NULL) {
+    const int result = _wmkdir(wpath);
+    free(wpath);
+    return result;
+  } else {
+    // Fallback on conversion error.
+    return mkdir(path);
+  }
+}
+
 #endif
 
 // Fin

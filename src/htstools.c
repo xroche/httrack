@@ -67,7 +67,7 @@ struct find_handle_struct {
 struct find_handle_struct {
   DIR * hdir;
   struct dirent* dirp;
-  struct stat filestat;
+  STRUCT_STAT filestat;
   char path[2048];
 };
 #endif
@@ -481,6 +481,7 @@ void longfile_to_83(int mode,char* n83,char* save) {
 }
 
 // écrire backblue.gif
+/* Note: utf-8 */
 int verif_backblue(httrackp* opt, const char* base) {
   int* done = &opt->state.verif_backblue_done;
   int ret=0;
@@ -490,7 +491,7 @@ int verif_backblue(httrackp* opt, const char* base) {
     return 0;
   }
   if ( (!*done)
-    || (fsize(fconcat(OPT_GET_BUFF(opt), base,"backblue.gif")) != HTS_DATA_BACK_GIF_LEN)) {
+    || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), base,"backblue.gif")) != HTS_DATA_BACK_GIF_LEN)) {
     FILE* fp = filecreate(&opt->state.strc, fconcat(OPT_GET_BUFF(opt), base,"backblue.gif"));
     *done=1;
     if (fp) {
@@ -683,6 +684,7 @@ static int sortTopIndexFnc(const void * a_, const void * b_) {
 
 HTSEXT_API char* hts_getcategory(const char* filename);
 
+/* Note: NOT utf-8 */
 HTSEXT_API int hts_buildtopindex(httrackp* opt,const char* path,const char* binpath) {
   FILE* fpo;
   int retval=0;
@@ -1006,7 +1008,7 @@ HTSEXT_API int hts_findnext(find_handle find) {
     memset(&(find->filestat), 0, sizeof(find->filestat));
     if ((find->dirp=readdir(find->hdir)))
       if (find->dirp->d_name)
-        if (!stat(concat(catbuff, find->path,find->dirp->d_name),&find->filestat))
+        if (!STAT(concat(catbuff, find->path,find->dirp->d_name),&find->filestat))
           return 1;
 #endif
   }

@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "md5.h"
 #include "htsmd5.h"
 #include "htstools.h"
+#include "htscharset.h"
 #include <ctype.h>
 
 #undef test_flush
@@ -119,16 +120,28 @@ static void cleanDoubleSlash(char *s) {
   }
 }
 
+// legacy version, without page charset
+int url_savename(char* adr_complete, char* fil_complete, char* save, 
+                 char* former_adr, char* former_fil, 
+                 char* referer_adr, char* referer_fil, 
+                 httrackp* opt, 
+                 lien_url** liens, int lien_tot, 
+                 struct_back* sback, cache_back* cache, hash_struct* hash, 
+                 int ptr, int numero_passe, const lien_back* headers) {
+  return url_savename2(adr_complete, fil_complete, save, former_adr, former_fil, 
+    referer_adr, referer_fil, opt, 
+    liens, lien_tot, sback, cache, hash, ptr, numero_passe, headers, /* unknown */ NULL);
+}
 
 // forme le nom du fichier à sauver (save) à partir de fil et adr
 // système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
-int url_savename(char* adr_complete, char* fil_complete, char* save, 
-								 char* former_adr, char* former_fil, 
-								 char* referer_adr, char* referer_fil, 
-								 httrackp* opt, 
-								 lien_url** liens, int lien_tot, 
-								 struct_back* sback, cache_back* cache, hash_struct* hash, 
-								 int ptr, int numero_passe, const lien_back* headers) {
+int url_savename2(char* adr_complete, char* fil_complete, char* save, 
+								  char* former_adr, char* former_fil, 
+								  char* referer_adr, char* referer_fil, 
+								  httrackp* opt, 
+								  lien_url** liens, int lien_tot, 
+								  struct_back* sback, cache_back* cache, hash_struct* hash, 
+								  int ptr, int numero_passe, const lien_back* headers, const char *charset) {
 	char catbuff[CATBUFF_SIZE];
   const char* mime_type = ( headers && !HTTP_IS_REDIRECT(headers->r.statuscode) ) ? headers->r.contenttype : NULL;
   /*const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ? headers->r.contenttype : NULL;*/
@@ -1306,6 +1319,15 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
   /* ensure that there is no ../ (potential vulnerability) */
   fil_simplifie(save);
 
+  /* convert name to UTF-8 ? */
+  if (charset != NULL && charset[0] != '\0') {
+    char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
+    if (s != NULL) {
+      strcpy(save, s);
+      free(s);
+    }
+  }
+
 	/* callback */
   RUN_CALLBACK5(opt, savename, adr_complete,fil_complete,referer_adr,referer_fil,save);
 
@@ -1333,9 +1355,9 @@ int url_savename(char* adr_complete, char* fil_complete, char* save,
 	}
 
   // chemin primaire éventuel A METTRE AVANT
-  if (strnotempty(StringBuff(opt->path_html))) {
+  if (strnotempty(StringBuff(opt->path_html_utf8))) {
     char BIGSTK tempo[HTS_URLMAXSIZE*2];
-    strcpybuff(tempo,StringBuff(opt->path_html));
+    strcpybuff(tempo,StringBuff(opt->path_html_utf8));
     strcatbuff(tempo,save);
     strcpybuff(save,tempo);
   }
@@ -1531,7 +1553,7 @@ char *url_savename_refname_fullpath(httrackp* opt, const char *adr, const char *
 /* remove refname if any */
 void url_savename_refname_remove(httrackp* opt, const char *adr, const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
-  (void) unlink(filename);
+  (void) UNLINK(filename);
 }
 
 #undef test_flush

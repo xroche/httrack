@@ -64,6 +64,9 @@ Please visit our Website: http://www.httrack.com
 /* Cache */
 #include "htszlib.h"
 
+/* Charset handling */
+#include "htscharset.h"
+
 
 /* END specific definitions */
 
@@ -256,7 +259,7 @@ if (makeindex_fp) { \
   fflush(makeindex_fp); \
   fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
   makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt),StringBuff(opt->path_html),"index.html"),"","");  \
+  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt),StringBuff(opt->path_html_utf8),"index.html"),"","");  \
 } \
 } \
 makeindex_done=1;    /* ok c'est fait */  \
@@ -601,7 +604,7 @@ int httpmirror(char* url1, httrackp* opt) {
 
 
     // lien primaire
-    liens_record("primary","/primary",fslash(OPT_GET_BUFF(opt),fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.html")),"","",opt->urlhack);
+    liens_record("primary","/primary",fslash(OPT_GET_BUFF(opt),fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html")),"","",opt->urlhack);
     if (liens[lien_tot]==NULL) {  // erreur, pas de place réservée
       printf("PANIC! : Not enough memory [%d]\n",__LINE__);
       if (opt->log) {
@@ -890,6 +893,8 @@ int httpmirror(char* url1, httrackp* opt) {
             str.lien_size_ = &lien_size;
             str.lien_buffer_ = &lien_buffer;
             /* */
+            str.page_charset_ = NULL;
+            /* */
             /* */
             stre.r_ = &r;
             /* */
@@ -1048,6 +1053,33 @@ int httpmirror(char* url1, httrackp* opt) {
           (is_hypertext_mime(opt,r.contenttype, urlfil)   /* Is HTML or Js, .. */
           || may_be_hypertext_mime(opt,r.contenttype, urlfil))  /* Is real media, .. */
           ) {
+
+          /* Convert charset to UTF-8 - NOT! (what about links ? remote server side will have troubles with converted names) */
+          //if (r.adr != NULL && r.size != 0 && opt->convert_utf8) {
+          //  char *charset;
+          //  char *pos;
+          //  if (r.charset[0] != '\0') {
+          //    charset = strdup(r.charset);
+          //  } else {
+          //    charset = hts_getCharsetFromMeta(r.adr, r.size);
+          //  }
+          //  if (charset != NULL) {
+          //    char *const utf8 = hts_convertStringToUTF8(r.adr, r.size, charset);
+          //    /* Use new buffer */
+          //    if (utf8 != NULL) {
+          //      freet(r.adr);
+          //      r.size = strlen(utf8);
+          //      r.adr = utf8;
+          //      /* New UTF-8 charset */
+          //      r.charset[0] = '\0';
+          //      strcpy(r.charset, "utf-8");
+          //    }
+          //    /* Free charset */
+          //    free(charset);
+          //  }
+          //}
+
+          /* Check bogus chars */
           if ((r.adr) && (r.size)) {
             unsigned int map[256];
             int i;
@@ -1199,10 +1231,10 @@ int httpmirror(char* url1, httrackp* opt) {
       //    if (r.adr==NULL) {    // Written file
       //      if (may_be_hypertext_mime(r.contenttype, urlfil)) {   // to parse!
       //        LLint sz;
-      //        sz=fsize(savename);
+      //        sz=fsize_utf8(savename);
       //        if (sz>0) {   // ok, exists!
       //          if (sz < 8192) {   // ok, small file --> to parse!
-      //            FILE* fp=fopen(savename,"rb");
+      //            FILE* fp=FOPEN(savename,"rb");
       //            if (fp) {
       //              r.adr=malloct((int)sz + 2);
       //              if (r.adr) {
@@ -1284,6 +1316,8 @@ int httpmirror(char* url1, httrackp* opt) {
         str.ptr_ = &ptr;
         str.lien_size_ = &lien_size;
         str.lien_buffer_ = &lien_buffer;
+        /* */
+        str.page_charset_ = NULL;
         /* */
         /* */
         stre.r_ = &r;
@@ -1401,11 +1435,29 @@ int httpmirror(char* url1, httrackp* opt) {
         // -- -- -- --
         // Parsing HTML
         if (!error) {
+          char page_charset[32];
 
           /* Remove file if being processed */
           if (is_loaded_from_file) {
             (void) unlink(fconv(OPT_GET_BUFF(opt),savename));
             is_loaded_from_file = 0;
+          }
+
+          /* Detect charset to convert links into proper UTF8 filenames */
+          page_charset[0] = '\0';
+          if (opt->convert_utf8) {
+            if (r.charset[0] != '\0') {
+              if (strlen(r.charset) < sizeof(page_charset)) {
+                strcpy(page_charset, r.charset);
+              }
+            } else if (is_html_mime_type(r.contenttype)) {
+              char *const charset = hts_getCharsetFromMeta(r.adr, r.size);
+              if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
+                strcpy(page_charset, charset);
+              }
+              if (charset != NULL)
+                free(charset);
+            }
           }
 
           /* Info for wrappers */
@@ -1441,6 +1493,8 @@ int httpmirror(char* url1, httrackp* opt) {
             str.ptr_ = &ptr;
             str.lien_size_ = &lien_size;
             str.lien_buffer_ = &lien_buffer;
+            /* */
+            str.page_charset_ = page_charset[0] != '\0' ? page_charset : NULL;
             /* */
             /* */
             stre.r_ = &r;
@@ -1750,7 +1804,7 @@ int httpmirror(char* url1, httrackp* opt) {
             HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(Real Media): parsing %s"LF,savename); test_flush;
           }
           if (fexist(savename)) {   // ok, existe bien!
-            FILE* fp=fopen(savename,"r+b");
+            FILE* fp=FOPEN(savename,"r+b");
             if (fp) {
               if (!fseek(fp,0,SEEK_SET)) {
                 char BIGSTK line[HTS_URLMAXSIZE*2];
@@ -2328,7 +2382,7 @@ static int mkdir_compat(const char *pathname) {
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
 HTSEXT_API int dir_exists(const char* path) {
-  struct stat st;
+  STRUCT_STAT st;
   char BIGSTK file[HTS_URLMAXSIZE*2];
   int i = 0;
   if (strnotempty(path) == 0) {
@@ -2356,7 +2410,7 @@ HTSEXT_API int dir_exists(const char* path) {
   file[i + 1] = '\0';
 
   /* Check the final dir */
-  if (stat(file, &st) == 0 && S_ISDIR(st.st_mode)) {
+  if (STAT(file, &st) == 0 && S_ISDIR(st.st_mode)) {
     errno = 0;
     return 1;   /* EXISTS */
   }
@@ -2365,6 +2419,7 @@ HTSEXT_API int dir_exists(const char* path) {
 }
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
+/* Note: *not* UTF-8 */
 HTSEXT_API int structcheck(const char* path) {
   struct stat st;
   char BIGSTK tmpbuf[HTS_URLMAXSIZE*2];
@@ -2459,6 +2514,102 @@ HTSEXT_API int structcheck(const char* path) {
   return 0;
 }
 
+/* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
+/* Note: UTF-8 */
+HTSEXT_API int structcheck_utf8(const char* path) {
+  STRUCT_STAT st;
+  char BIGSTK tmpbuf[HTS_URLMAXSIZE*2];
+  char BIGSTK file[HTS_URLMAXSIZE*2];
+  int i = 0;
+  int npaths;
+  if (strnotempty(path) == 0)
+		return 0;
+  if (strlen(path) > HTS_URLMAXSIZE) {
+    errno = EINVAL;
+		return -1;
+  }
+
+  /* Get a copy */
+  strcpybuff(file, path);
+#ifdef _WIN32
+  /* To system name */
+  for(i = 0 ; file[i] != 0 ; i++) {
+    if (file[i] == '/') {
+      file[i] = PATH_SEPARATOR;
+    }
+  }
+#endif
+  /* Get prefix (note: file can not be empty here) */
+  for(i = (int) strlen(file) - 1 ; i > 0 && file[i] != PATH_SEPARATOR ; i--);
+  for( ; i > 0 && file[i] == PATH_SEPARATOR ; i--);
+  file[i + 1] = '\0';
+
+  /* First check the final dir */
+  if (STAT(file, &st) == 0 && S_ISDIR(st.st_mode)) {
+    return 0;   /* OK */
+  }
+
+  /* Start from the beginning */
+  i = 0;
+
+  /* Skip irrelevant part (the root slash, or the drive path) */
+#ifdef _WIN32
+  if (file[0] != 0 && file[1] == ':') {  /* f:\ */
+    i+= 2;
+    if (file[i] == PATH_SEPARATOR) {  /* f:\ */
+      i++;
+    }
+  } else if (file[0] == PATH_SEPARATOR && file[1] == PATH_SEPARATOR) {    /* \\mch */
+    i+= 2;
+  }
+#endif
+
+  /* Check paths */
+  for(npaths = 1 ; ; npaths++) {
+    char end_char;
+
+    /* Go to next path */
+
+    /* Skip separator(s) */
+    for( ; file[i] == PATH_SEPARATOR ; i++);
+    /* Next separator */
+    for( ; file[i] != 0 && file[i] != PATH_SEPARATOR ; i++);
+
+    /* Check */
+    end_char = file[i];
+    if (end_char != 0) {
+      file[i] = '\0';
+    }
+    if (STAT(file, &st) == 0) {   /* Something exists */
+      if (!S_ISDIR(st.st_mode)) {
+#if HTS_REMOVE_ANNOYING_INDEX
+        if (S_ISREG(st.st_mode)) {   /* Regular file in place ; move it and create directory */
+          sprintf(tmpbuf, "%s.txt", file);
+          if (RENAME(file, tmpbuf) != 0) {    /* Can't rename regular file */
+            return -1;
+          }
+          if (MKDIR(file) != 0) {      /* Can't create directory */
+            return -1;
+          }
+        }
+#else
+#error Not implemented
+#endif
+      }
+    } else {      /* Nothing exists ; create directory */
+      if (MKDIR(file) != 0) {      /* Can't create directory */
+        return -1;
+      }
+    }
+    if (end_char == 0) {       /* End */
+      break;
+    } else {
+      file[i] = end_char;      /* Restore / */
+    }
+  }
+  return 0;
+}
+
 // sauver un fichier
 int filesave(httrackp* opt,const char* adr,int len,const char* s,const char* url_adr,const char* url_fil) {
   FILE* fp;
@@ -2497,6 +2648,7 @@ int check_fatal_io_errno(void) {
 
 
 // ouvrir un fichier (avec chemin Un*x)
+/* Note: utf-8 */
 FILE* filecreate(filenote_strc *strc, const char* s) {
   char BIGSTK fname[HTS_URLMAXSIZE*2];
   FILE* fp;
@@ -2523,17 +2675,17 @@ FILE* filecreate(filenote_strc *strc, const char* s) {
 #endif
   
   /* Try to open the file */
-  fp = fopen(fname, "wb");
+  fp = FOPEN(fname, "wb");
 
   /* Error ? Check the directory structure and retry. */
   if (fp == NULL) {
     last_errno = errno;
-    if (structcheck(s) != 0) {
+    if (structcheck_utf8(s) != 0) {
       last_errno = errno;
     } else {
       last_errno = 0;
     }
-    fp = fopen(fname, "wb");
+    fp = FOPEN(fname, "wb");
   }
   if (fp == NULL && last_errno != 0) {
     errno = last_errno;
@@ -2571,7 +2723,7 @@ FILE* fileappend(filenote_strc *strc,const char* s) {
 #endif
   
   // ouvrir
-  fp=fopen(fname,"ab");
+  fp=FOPEN(fname,"ab");
   
 #ifndef _WIN32
   if (fp!=NULL) chmod(fname,HTS_ACCESS_FILE);
@@ -2616,6 +2768,7 @@ int filenote(filenote_strc *strc, const char* s, filecreate_params* params) {
   return 1;
 }
 
+/* Note: utf-8 */
 void file_notify(httrackp* opt,const char* adr,const char* fil,const char* save,int create,int modify,int not_updated) {
   RUN_CALLBACK6(opt, filesave2, adr, fil, save, create, modify, not_updated);
 }
@@ -2681,7 +2834,7 @@ static void postprocess_file(httrackp* opt,const char* save, const char* adr, co
       int n;
       if (rsc_fil == NULL)
         rsc_fil = fil;
-      if (strncmp(fslash(OPT_GET_BUFF(opt),save), fslash(OPT_GET_BUFF(opt),StringBuff(opt->path_html)), (n = (int)strlen(StringBuff(opt->path_html)))) == 0) {
+      if (strncmp(fslash(OPT_GET_BUFF(opt),save), fslash(OPT_GET_BUFF(opt),StringBuff(opt->path_html_utf8)), (n = (int)strlen(StringBuff(opt->path_html_utf8)))) == 0) {
         rsc_save += n;
       }
 
@@ -2716,7 +2869,7 @@ static void postprocess_file(httrackp* opt,const char* save, const char* adr, co
         }
       }
       if (opt->state.mimehtml_created == 1 && opt->state.mimefp != NULL) {
-        FILE* fp = fopen(save, "rb");
+        FILE* fp = FOPEN(save, "rb");
         if (fp != NULL) {
           char buff[60*100 + 2];
           char mimebuff[256];

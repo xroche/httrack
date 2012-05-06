@@ -176,6 +176,8 @@ const char* hts_optalias[][4] = {
   {"disable-module","-%w","param1",""},
   {"no-background-on-suspend","-y0","single",""},
   {"background-on-suspend","-y","single",""},
+  {"utf8-conversion","-%T","single",""},
+  {"no-utf8-conversion","-%T0","single",""},
   /* */
 
   /* DEPRECATED */
