@@ -44,6 +44,12 @@ Please visit our Website: http://www.httrack.com
 extern char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset);
 
 /**
+ * Convert the string "s" from UTF-8 to charset "charset".
+ * Return NULL upon error.
+ **/
+extern char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset);
+
+/**
  * Extract the charset from the HTML buffer "html"
  **/
 extern char* hts_getCharsetFromMeta(const char *html, size_t size);

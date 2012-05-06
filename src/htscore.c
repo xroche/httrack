@@ -1446,17 +1446,28 @@ int httpmirror(char* url1, httrackp* opt) {
           /* Detect charset to convert links into proper UTF8 filenames */
           page_charset[0] = '\0';
           if (opt->convert_utf8) {
+            /* HTTP charset is prioritary over meta */
             if (r.charset[0] != '\0') {
               if (strlen(r.charset) < sizeof(page_charset)) {
                 strcpy(page_charset, r.charset);
               }
-            } else if (is_html_mime_type(r.contenttype)) {
+            }
+            /* Attempt to find a meta charset */
+            else if (is_html_mime_type(r.contenttype)) {
               char *const charset = hts_getCharsetFromMeta(r.adr, r.size);
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);
               }
               if (charset != NULL)
                 free(charset);
+            }
+            /* Could not detect charset */
+            if (page_charset[0] == '\0') {
+              if ( (opt->debug>0) && (opt->log!=NULL) ) {
+                HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Warning: could not detect encoding for: %s%s"LF,urladr,urlfil);
+              }
+              /* Fallback to ISO-8859-1 (~== identity) ; accents will look weird */
+              strcpy(page_charset, "iso-8859-1");
             }
           }
 

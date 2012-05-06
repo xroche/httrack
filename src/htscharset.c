@@ -34,6 +34,17 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+int hts_isStringAscii(const char *s, size_t size) {
+  size_t i;
+  for(i = 0 ; i < size ; i++) {
+    const unsigned char c = (const unsigned char) s[i];
+    if (c >= 0x80) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 #ifdef _WIN32
 
 #include <windows.h>
@@ -255,12 +266,12 @@ LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int* pwsize) {
   return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
 }
 
-char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
-  const int usize = WideCharToMultiByte(CP_UTF8, 0, woutput, wsize, NULL, 0, NULL, FALSE);
+char *hts_convertUCS2StringToCP(LPWSTR woutput, int wsize, UINT cp) {
+  const int usize = WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, FALSE);
   if (usize > 0) {
     char *const uoutput = malloc((usize + 1)*sizeof(char));
     if (uoutput != NULL) {
-      if (WideCharToMultiByte(CP_UTF8, 0, woutput, wsize, uoutput, usize, NULL, FALSE) == usize) {
+      if (WideCharToMultiByte(cp, 0, woutput, wsize, uoutput, usize, NULL, FALSE) == usize) {
         uoutput[usize] = '\0';
         return uoutput;
       } else {
@@ -271,13 +282,17 @@ char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
   return NULL;
 }
 
+char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
+  return hts_convertUCS2StringToCP(woutput, wsize, CP_UTF8);
+}
+
 char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
   /* Empty string ? */
   if (size == 0) {
     return strndup(s, size);
   }
   /* Already UTF-8 ? */
-  if (cp == CP_UTF8) {
+  if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
     return strndup(s, size);
   }
   /* Other (valid) charset */
@@ -291,6 +306,32 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
       return uoutput;
     }
   }
+
+  /* Error, charset not found! */
+  return NULL;
+}
+
+char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
+  /* Empty string ? */
+  if (size == 0) {
+    return strndup(s, size);
+  }
+  /* Already UTF-8 ? */
+  if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
+    return strndup(s, size);
+  }
+  /* Other (valid) charset */
+  else if (cp != 0) {
+    /* Size in wide chars of the output */
+    int wsize;
+    LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, CP_UTF8, &wsize);
+    if (woutput != NULL) {
+      char *const uoutput = hts_convertUCS2StringToCP(woutput, wsize, cp);
+      free(woutput);
+      return uoutput;
+    }
+  }
+
   /* Error, charset not found! */
   return NULL;
 }
@@ -298,6 +339,11 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
 char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
   const UINT cp = hts_getCodepage(charset);
   return hts_convertStringCPToUTF8(s, size, cp);
+}
+
+char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
+  const UINT cp = hts_getCodepage(charset);
+  return hts_convertStringCPFromUTF8(s, size, cp);
 }
 
 char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
@@ -310,18 +356,18 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 #include <errno.h>
 #include <iconv.h>
 
-char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
+char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
     return strdup("");
   }
-  /* Already UTF-8 ? */
-  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0) {
+  /* Already on correct charset ? */
+  if (strcasecmp(from, to) == 0) {
     return strndup(s, size);
   }
   /* Find codepage */
   else {
-    const iconv_t cp = iconv_open("utf-8", charset);
+    const iconv_t cp = iconv_open(to, from);
     if (cp != (iconv_t) -1) {
       char *inbuf = (char*) s;
       size_t inbytesleft = size;
@@ -373,8 +419,39 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
       return outbuf;
     }
   }
+
   /* Error, charset not found! */
   return NULL;
+}
+
+char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
+  /* Empty string ? */
+  if (size == 0) {
+    return strdup("");
+  }
+  /* Already UTF-8 ? */
+  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0 || hts_isStringAscii(s, size)) {
+    return strndup(s, size);
+  }
+  /* Find codepage */
+  else {
+    return hts_convertStringToUTF8_(s, size, "utf-8", charset);
+  }
+}
+
+char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
+  /* Empty string ? */
+  if (size == 0) {
+    return strdup("");
+  }
+  /* Already UTF-8 ? */
+  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0 || hts_isStringAscii(s, size)) {
+    return strndup(s, size);
+  }
+  /* Find codepage */
+  else {
+    return hts_convertStringToUTF8_(s, size, charset, "utf-8");
+  }
 }
 
 #endif
