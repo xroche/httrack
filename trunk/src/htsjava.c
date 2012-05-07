@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #if ( defined(_WIN32) ||defined(HAVE_SYS_TYPES_H) )
 #include <sys/types.h>
 #endif
@@ -136,16 +137,12 @@ static int hts_detect_java(t_hts_callbackarg *carg, httrackp *opt,
 }
 
 static off_t fsize(const char* s) {
-  FILE* fp;
-  fp=fopen(s,"rb");
-  if (fp!=NULL) {
-    off_t i;
-    fseek(fp,0,SEEK_END);
-    i = ftell(fp);
-    fclose(fp);
-    return i;
-  } else 
+  STRUCT_STAT st;
+  if (STAT(s, &st) == 0 && S_ISREG(st.st_mode)) {
+    return st.st_size;
+  } else {
     return -1;
+  }
 }
 
 static int hts_parse_java(t_hts_callbackarg *carg, httrackp *opt,
@@ -174,7 +171,7 @@ static int hts_parse_java(t_hts_callbackarg *carg, httrackp *opt,
 #if JAVADEBUG
       printf("fopen\n");
 #endif
-      if ((fpout = fopen(fconv(catbuff, file), "r+b")) == NULL)
+      if ((fpout = FOPEN(fconv(catbuff, file), "r+b")) == NULL)
       {
         //fprintf(stderr, "Cannot open input file.\n");
         sprintf(str->err_msg,"Unable to open file %s",file);

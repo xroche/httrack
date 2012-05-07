@@ -348,6 +348,7 @@ char* next_token(char* p,int flag);
 //
 char* readfile(char* fil);
 char* readfile2(char* fil, LLint* size);
+char* readfile_utf8(char* fil);
 char* readfile_or(char* fil,char* defaultdata);
 #if 0
 void check_rate(TStamp stat_timestart,int maxrate);

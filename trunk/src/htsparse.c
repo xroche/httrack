@@ -230,7 +230,10 @@ Please visit our Website: http://www.httrack.com
   if (makeindex_fp) { \
   char BIGSTK tempo[1024]; \
   if (makeindex_links == 1) { \
-  sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,makeindex_firstlink); \
+  char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
+  strcpybuff(link_escaped, makeindex_firstlink); \
+  escape_check_url(link_escaped); \
+  sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,link_escaped); \
   } else \
   tempo[0]='\0'; \
   fprintf(makeindex_fp,template_footer, \

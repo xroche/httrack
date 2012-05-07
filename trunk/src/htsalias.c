@@ -451,6 +451,7 @@ const char* optalias_help(const char* token) {
   allow *.gif
   deny ad.*
 */
+/* Note: NOT utf-8 */
 int optinclude_file(const char* name,
                     int* argc,char** argv,char* x_argvblk,int* x_ptr) {
   FILE* fp;

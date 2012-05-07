@@ -1716,6 +1716,29 @@ char* readfile2(char* fil, LLint* size) {
   return adr;
 }
 
+/* Note: utf-8 */
+char* readfile_utf8(char* fil) {
+  char* adr=NULL;
+	char catbuff[CATBUFF_SIZE];
+  const off_t len = fsize_utf8(fil);
+  if (len >= 0) {  // exists
+    FILE*const fp = FOPEN(fconv(catbuff, fil),"rb");
+    if (fp!=NULL) {  // n'existe pas (!)
+      adr = (char*) malloct(len+1);
+      if (adr!=NULL) {
+        if (len > 0 && fread(adr,1,len,fp) != len) {    // fichier endommagé ?
+          freet(adr);
+          adr=NULL;
+        } else {
+          adr[len] = '\0';
+        }
+      }
+      fclose(fp);
+    }
+  }
+  return adr;
+}
+
 /* Note: NOT utf-8 */
 char* readfile_or(char* fil,char* defaultdata) {
   char* realfile=fil;

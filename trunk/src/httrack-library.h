@@ -5,7 +5,7 @@ Copyright (C) Xavier Roche and other contributors
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 3
+as published by the Free Software Foundation; either version 2
 of the License, or any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -213,5 +213,30 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 HTSEXT_API int hts_findisdir(find_handle find);
 HTSEXT_API int hts_findisfile(find_handle find);
 HTSEXT_API int hts_findissystem(find_handle find);
+
+/* UTF-8 aware FILE API */
+#ifndef HTS_DEF_FILEAPI
+#ifdef _WIN32
+#define FOPEN hts_fopen_utf8
+HTSEXT_API FILE* hts_fopen_utf8(const char *path, const char *mode);
+#define STAT hts_stat_utf8
+typedef struct _stat STRUCT_STAT;
+HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
+#define UNLINK hts_unlink_utf8
+HTSEXT_API int hts_unlink_utf8(const char *pathname);
+#define RENAME hts_rename_utf8
+HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
+#define MKDIR(F) hts_mkdir_utf8(F)
+HTSEXT_API int hts_mkdir_utf8(const char *pathname);
+#else
+#define FOPEN fopen
+#define STAT stat
+typedef struct stat STRUCT_STAT;
+#define UNLINK unlink
+#define RENAME rename
+#define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+#endif
+#define HTS_DEF_FILEAPI
+#endif
 
 #endif
