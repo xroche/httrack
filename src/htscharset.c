@@ -34,6 +34,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include "htscharset.h"
+
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
   for(i = 0 ; i < size ; i++) {
@@ -46,9 +48,6 @@ int hts_isStringAscii(const char *s, size_t size) {
 }
 
 #ifdef _WIN32
-
-#include <windows.h>
-#include <string.h>
 
 typedef struct wincodepage_t wincodepage_t;
 struct wincodepage_t {
@@ -352,7 +351,6 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 
 #else
 
-#include <string.h>
 #include <errno.h>
 #include <iconv.h>
 
