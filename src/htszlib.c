@@ -54,13 +54,16 @@ Please visit our Website: http://www.httrack.com
   Unpack file into a new file
   Return value: size of the new file, or -1 if an error occured
 */
+/* Note: utf-8 */
 int hts_zunpack(char* filename,char* newfile) {
+  int ret = -1;
 	char catbuff[CATBUFF_SIZE];
   if (gz_is_available && filename && newfile) {
     if (filename[0] && newfile[0]) {
-      gzFile gz = gzopen (filename, "rb");
+      // not: NOT an UTF-8 filename
+      gzFile gz = gzopen(filename, "rb");
       if (gz) {
-        FILE* fpout=fopen(fconv(catbuff, newfile),"wb");
+        FILE*const fpout = FOPEN(fconv(catbuff, newfile), "wb");
         int size=0;
         if (fpout) {
           int nr;
@@ -77,11 +80,11 @@ int hts_zunpack(char* filename,char* newfile) {
         } else
           size=-1;
         gzclose(gz);
-        return (int) size;
+        ret = (int) size;
       }
     }
   }
-  return -1;
+  return ret;
 }
 
 int hts_extract_meta(const char* path) {

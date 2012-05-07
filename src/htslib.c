@@ -3032,13 +3032,13 @@ typedef struct {
 // 0 : no
 // 1 : yes
 // -1: don't know
-int is_unicode_utf8(unsigned char* buffer, unsigned int size) {
+int is_unicode_utf8(const unsigned char* buffer, size_t size) {
   t_auto_seq seq;
-  unsigned int i;
-  int is_utf=-1;
+  size_t i;
+  int is_utf = -1;
 
   seq.pos=0;
-  for(i=0 ; i < size ; i++) {
+  for(i = 0 ; i < size ; i++) {
     unsigned int ok=0;
     unsigned int inseq=0;
     unsigned int err=0;

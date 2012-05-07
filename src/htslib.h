@@ -337,7 +337,7 @@ void rawlinput(FILE* fp,char* s,int max);
 char* strstrcase(char *s,char *o);
 int ident_url_absolute(const char* url,char* adr,char* fil);
 void fil_simplifie(char* f);
-int is_unicode_utf8(unsigned char* buffer, unsigned int size);
+int is_unicode_utf8(const unsigned char* buffer, size_t size);
 void map_characters(unsigned char* buffer, unsigned int size, unsigned int* map);
 int ishtml(httrackp *opt,const char* urlfil);
 int ishtml_ext(const char* a);
@@ -490,19 +490,20 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name);
 )
 */
 
-/* UTF-8 aware FILE operations */
+/* UTF-8 aware FILE API */
+#ifndef HTS_DEF_FILEAPI
 #ifdef _WIN32
 #define FOPEN hts_fopen_utf8
-extern FILE* hts_fopen_utf8(const char *path, const char *mode);
+HTSEXT_API FILE* hts_fopen_utf8(const char *path, const char *mode);
 #define STAT hts_stat_utf8
 typedef struct _stat STRUCT_STAT;
-extern int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
+HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
 #define UNLINK hts_unlink_utf8
-extern int hts_unlink_utf8(const char *pathname);
+HTSEXT_API int hts_unlink_utf8(const char *pathname);
 #define RENAME hts_rename_utf8
-extern int hts_rename_utf8(const char *oldpath, const char *newpath);
+HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
 #define MKDIR(F) hts_mkdir_utf8(F)
-extern int hts_mkdir_utf8(const char *pathname);
+HTSEXT_API int hts_mkdir_utf8(const char *pathname);
 #else
 /* The underlying filesystem charset is supposed to be UTF-8 */
 #define FOPEN fopen
@@ -511,6 +512,8 @@ typedef struct stat STRUCT_STAT;
 #define UNLINK unlink
 #define RENAME rename
 #define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+#endif
+#define HTS_DEF_FILEAPI
 #endif
 
 #endif    // internals

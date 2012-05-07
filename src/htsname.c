@@ -1544,6 +1544,7 @@ void url_savename_refname(const char *adr, const char *fil, char *filename) {
     bindigest[12], bindigest[13], bindigest[14], bindigest[15]);
 }
 
+/* note: return a local filename */
 char *url_savename_refname_fullpath(httrackp* opt, const char *adr, const char *fil) {
   char digest_filename[64];
   url_savename_refname(adr, fil, digest_filename);

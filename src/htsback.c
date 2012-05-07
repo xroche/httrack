@@ -501,7 +501,8 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
               back[p].tmpfile=tmpnam(back[p].tmpfile_buffer);
 #endif
 							if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
-								back[p].r.out=FOPEN(back[p].tmpfile,"wb");
+                /* note: tmpfile is a local system filename */
+								back[p].r.out=fopen(back[p].tmpfile, "wb");
 								if (back[p].r.out) {
 									if ((back[p].r.adr) && (back[p].r.size>0)) {
 										if (fwrite(back[p].r.adr,1,(size_t)back[p].r.size,back[p].r.out) != back[p].r.size) {
@@ -531,22 +532,25 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 								LLint size;
 								file_notify(opt,back[p].url_adr, back[p].url_fil, back[p].url_sav, 1, 1, back[p].r.notmodified);
 								filecreateempty(&opt->state.strc, back[p].url_sav);      // filenote & co
-								if ((size = hts_zunpack(back[p].tmpfile,back[p].url_sav))>=0) {
+								if ((size = hts_zunpack(back[p].tmpfile, back[p].url_sav))>=0) {
 									back[p].r.size=back[p].r.totalsize=size;
 									// fichier -> mémoire
 									if (!back[p].r.is_write) {
 										deleteaddr(&back[p].r);
-										back[p].r.adr=readfile(back[p].url_sav);
+										back[p].r.adr = readfile_utf8(back[p].url_sav);
 										if (!back[p].r.adr) {
 											back[p].r.statuscode=STATUSCODE_INVALID;
 											strcpybuff(back[p].r.msg,"Read error when decompressing");
 										}
 										UNLINK(back[p].url_sav);
 									}
-								}
+                } else {
+                  back[p].r.statuscode = STATUSCODE_INVALID;
+                  strcpybuff(back[p].r.msg, "Error when decompressing");
+                }
 							}
-							/* encore that no remaining temporary file exists */
-							UNLINK(back[p].tmpfile);
+							/* ensure that no remaining temporary file exists */
+							unlink(back[p].tmpfile);
 							back[p].tmpfile = NULL;
 						}
 						// stats
@@ -920,6 +924,7 @@ int back_serialize_ref(httrackp* opt, const lien_back* src) {
     if (mkdir(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME), S_IRWXU | S_IRWXG | S_IRWXO) == 0)
 #endif
     {
+      /* note: local filename */
       filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
       fp = fopen(filename, "wb");
     }
@@ -1269,7 +1274,7 @@ int back_clear_entry(lien_back* back) {
 
 		// only for security
 		if (back->tmpfile && back->tmpfile[0] != '\0') {
-			(void) UNLINK(back->tmpfile);
+			(void) unlink(back->tmpfile);
 			back->tmpfile = NULL;
 		}
 
