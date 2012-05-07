@@ -1409,6 +1409,29 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                                       i++;
                                     }
                                   }
+                                  // Check for bogus links (Vasiliy)
+                                  if (a != NULL) {
+                                    const size_t size = c - a + 1;
+                                    int i;
+                                    int first = 1;
+                                    for(i = 0 ; i < size ; i++) {
+                                      // Suspicious (in code ?), abort.
+                                      if (a[i] == ',' || a[i] == ';') {
+                                        if (first) {
+                                          a = NULL;
+                                          break;
+                                        }
+                                      }
+                                      // Suspicious, abort.
+                                      else if (a[i] == '"' || a[i] == '\'' || a[i] != '\t' || a[i] != '\r' || a[i] != '\n') {
+                                        a = NULL;
+                                        break;
+                                      }
+                                      else if (a[i] != ' ') {
+                                        first = 0;
+                                      }
+                                    }
+                                  }
                                   if (a != NULL) {
                                     if ((opt->debug>1) && (opt->log!=NULL)) {
                                       char str[512];
