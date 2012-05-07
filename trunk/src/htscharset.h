@@ -37,6 +37,13 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_CHARSET_DEFH
 #define HTS_CHARSET_DEFH
 
+/** Standard includes. **/
+#include <stdlib.h>
+#include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /**
  * Convert the string "s" from charset "charset" to UTF-8.
  * Return NULL upon error.
