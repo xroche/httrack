@@ -645,7 +645,7 @@ htsblk httpget(httrackp *opt,char* url) {
 
 // ouvre une liaison http, envoie une requète GET et réceptionne le header
 // retour: socket
-int http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour) {
+T_SOC http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour) {
   //                / GET, traiter en-tête
   return http_xfopen(opt,0,1,1,NULL,adr,fil,retour);
 }
@@ -655,7 +655,7 @@ int http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour) {
 // treat: traiter header?
 // waitconnect: attendre le connect()
 // note: dans retour, on met les params du proxy
-int http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,char* adr,char* fil,htsblk* retour) {
+T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,char* adr,char* fil,htsblk* retour) {
   //htsblk retour;
   //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
   T_SOC soc=INVALID_SOCKET;
@@ -1699,12 +1699,14 @@ int check_readinput(htsblk* r) {
   if (r->soc != INVALID_SOCKET) {
     fd_set fds;           // poll structures
     struct timeval tv;          // structure for select
+    const int soc = (int) r->soc;
+    assertf(soc == r->soc);
     FD_ZERO(&fds);
-    FD_SET(r->soc,&fds);           
+    FD_SET(soc,&fds);           
     tv.tv_sec=0;
     tv.tv_usec=0;
-    select(r->soc + 1,&fds,NULL,NULL,&tv);
-    if (FD_ISSET(r->soc,&fds))
+    select(soc + 1,&fds,NULL,NULL,&tv);
+    if (FD_ISSET(soc,&fds))
       return 1;
     else
       return 0;
@@ -1717,12 +1719,14 @@ int check_readinput_t(T_SOC soc, int timeout) {
   if (soc != INVALID_SOCKET) {
     fd_set fds;           // poll structures
     struct timeval tv;          // structure for select
+    const int isoc = (int) soc;
+    assertf(isoc == soc);
     FD_ZERO(&fds);
-    FD_SET(soc,&fds);           
+    FD_SET(isoc,&fds);           
     tv.tv_sec=timeout;
     tv.tv_usec=0;
-    select(soc + 1,&fds,NULL,NULL,&tv);
-    if (FD_ISSET(soc,&fds))
+    select(isoc + 1,&fds,NULL,NULL,&tv);
+    if (FD_ISSET(isoc,&fds))
       return 1;
     else
       return 0;
@@ -2049,7 +2053,7 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
 // Crée un lien (http) vers une adresse internet iadr
 // retour: structure (adresse, taille, message si erreur (si !adr))
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
-int newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitconnect) {  
+T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitconnect) {  
   t_fullhostent fullhostent_buffer;    // buffer pour resolver
   T_SOC soc;                           // descipteur de la socket
   char* iadr;
@@ -2690,6 +2694,7 @@ static time_t getGMT(struct tm *tm) {		/* hey, time_t is local! */
 }
 
 /* sets file time. -1 if error */
+/* Note: utf-8 */
 int set_filetime(const char* file, struct tm* tm_time) {
 	time_t t = getGMT(tm_time);
 	if (t != (time_t) -1) {
@@ -2710,6 +2715,7 @@ int set_filetime_rfc822(const char* file, const char* date) {
   } else return -1;
 }
 
+/* Note: utf-8 */
 int get_filetime_rfc822(const char* file, char* date) {
   STRUCT_STAT buf;
   date[0] = '\0';
@@ -5725,7 +5731,7 @@ static void copyWchar(LPWSTR dest, const char *src) {
 
 FILE* hts_fopen_utf8(const char *path, const char *mode) {
   WCHAR wmode[32];
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
   assertf(strlen(mode) < sizeof(wmode) / sizeof(WCHAR));
   copyWchar(wmode, mode);
   if (wpath != NULL) {
@@ -5739,32 +5745,32 @@ FILE* hts_fopen_utf8(const char *path, const char *mode) {
 }
 
 int hts_stat_utf8(const char *path, STRUCT_STAT *buf) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
   if (wpath != NULL) {
     const int result = _wstat(wpath, buf);
     free(wpath);
     return result;
   } else {
     // Fallback on conversion error.
-    return stat(path, buf);
+    return _stat(path, buf);
   }
 }
 
 int hts_unlink_utf8(const char *path) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
   if (wpath != NULL) {
     const int result = _wunlink(wpath);
     free(wpath);
     return result;
   } else {
     // Fallback on conversion error.
-    return unlink(path);
+    return _unlink(path);
   }
 }
 
 int hts_rename_utf8(const char *oldpath, const char *newpath) {
-  LPWSTR woldpath = hts_convertUTF8StringToUCS2(oldpath, strlen(oldpath), NULL);
-  LPWSTR wnewpath = hts_convertUTF8StringToUCS2(newpath, strlen(newpath), NULL);
+  LPWSTR woldpath = hts_convertUTF8StringToUCS2(oldpath, (int) strlen(oldpath), NULL);
+  LPWSTR wnewpath = hts_convertUTF8StringToUCS2(newpath, (int) strlen(newpath), NULL);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
     free(woldpath);
@@ -5781,14 +5787,27 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
 }
 
 int hts_mkdir_utf8(const char *path) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, strlen(path), NULL);
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
   if (wpath != NULL) {
     const int result = _wmkdir(wpath);
     free(wpath);
     return result;
   } else {
     // Fallback on conversion error.
-    return mkdir(path);
+    return _mkdir(path);
+  }
+}
+
+HTSEXT_API int hts_utime_utf8(const char *path, const STRUCT_UTIMBUF *times) {
+  STRUCT_UTIMBUF mtimes = *times;
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  if (wpath != NULL) {
+    const int result = _wutime(wpath, &mtimes);
+    free(wpath);
+    return result;
+  } else {
+    // Fallback on conversion error.
+    return _utime(path, &mtimes);
   }
 }
 
