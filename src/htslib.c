@@ -2698,15 +2698,16 @@ static time_t getGMT(struct tm *tm) {		/* hey, time_t is local! */
 int set_filetime(const char* file, struct tm* tm_time) {
 	time_t t = getGMT(tm_time);
 	if (t != (time_t) -1) {
-	  struct utimbuf tim;
+	  STRUCT_UTIMBUF tim;
 		memset(&tim, 0, sizeof(tim));
 	  tim.actime = tim.modtime = t; 
-		return utime(file, &tim);
+		return UTIME(file, &tim);
 	}
 	return -1;
 }
 
 /* sets file time from RFC822 date+time, -1 if error*/
+/* Note: utf-8 */
 int set_filetime_rfc822(const char* file, const char* date) {
 	struct tm buffer;
   struct tm* tm_s = convert_time_rfc822(&buffer, date);
