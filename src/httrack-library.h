@@ -228,6 +228,9 @@ HTSEXT_API int hts_unlink_utf8(const char *pathname);
 HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
 #define MKDIR(F) hts_mkdir_utf8(F)
 HTSEXT_API int hts_mkdir_utf8(const char *pathname);
+#define UTIME(A,B) hts_utime_utf8(A,B)
+typedef struct _utimbuf STRUCT_UTIMBUF;
+HTSEXT_API int hts_utime_utf8(const char *filename, const STRUCT_UTIMBUF *times);
 #else
 #define FOPEN fopen
 #define STAT stat
@@ -235,6 +238,8 @@ typedef struct stat STRUCT_STAT;
 #define UNLINK unlink
 #define RENAME rename
 #define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+typedef struct utimbuf STRUCT_UTIMBUF;
+#define UTIME(A,B) utime(A,B)
 #endif
 #define HTS_DEF_FILEAPI
 #endif
