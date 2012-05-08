@@ -3737,8 +3737,9 @@ int hts_mirror_check_moved(htsmoduleStruct* str, htsmoduleStructExtended* stre) 
               freet(r->adr); 
               r->adr=NULL; 
             }
+            error=1;  // erreur!
           }
-          error=1;  // erreur!
+          // otherwise, consider this is not an error
         }
         // FIN rattrapage des 301,302,307..
         // ------------------------------------------------------------
