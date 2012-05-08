@@ -264,12 +264,12 @@ extern FILE* hts_dgb_(void);
 } while(0)
 
 // fonctions principales
-int http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour);
-int http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,char* adr,char* fil,htsblk* retour);
+T_SOC http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour);
+T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,char* adr,char* fil,htsblk* retour);
 int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,char* fil,char* referer_adr,char* referer_fil,htsblk* retour);
 htsblk httpget(httrackp *opt,char* url);
 //int newhttp(char* iadr,char* err=NULL);
-int newhttp(httrackp *opt,const char* iadr,htsblk* retour,int port,int waitconnect);
+T_SOC newhttp(httrackp *opt,const char* iadr,htsblk* retour,int port,int waitconnect);
 HTS_INLINE void deletehttp(htsblk* r);
 HTS_INLINE int  deleteaddr(htsblk* r);
 HTS_INLINE void deletesoc(T_SOC soc);
@@ -504,6 +504,9 @@ HTSEXT_API int hts_unlink_utf8(const char *pathname);
 HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
 #define MKDIR(F) hts_mkdir_utf8(F)
 HTSEXT_API int hts_mkdir_utf8(const char *pathname);
+#define UTIME(A,B) hts_utime_utf8(A,B)
+typedef struct _utimbuf STRUCT_UTIMBUF;
+HTSEXT_API int hts_utime_utf8(const char *filename, const STRUCT_UTIMBUF *times);
 #else
 /* The underlying filesystem charset is supposed to be UTF-8 */
 #define FOPEN fopen
@@ -512,6 +515,8 @@ typedef struct stat STRUCT_STAT;
 #define UNLINK unlink
 #define RENAME rename
 #define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+typedef struct utimbuf STRUCT_UTIMBUF;
+#define UTIME(A,B) utime(A,B)
 #endif
 #define HTS_DEF_FILEAPI
 #endif
