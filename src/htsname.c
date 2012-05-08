@@ -416,7 +416,8 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
           }
         }
         // note: if savename_delayed is enabled, the naming will be temporary (and slightly invalid!)
-        else if (opt->savename_delayed != 0) {
+        // note: if we are about to stop (opt->state.stop), back_add() will fail later
+        else if (opt->savename_delayed != 0 && !opt->state.stop) {
           if (mime_type != NULL)  {
             ext[0] = '\0';
             if (*mime_type) {
