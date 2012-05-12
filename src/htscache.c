@@ -586,7 +586,7 @@ htsblk cache_readex(httrackp* opt,cache_back* cache,const char* adr,const char* 
 
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
-static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* save,char* location,
+static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,const char* fil,const char* target_save,char* location,
                                char* return_save, int readonly) {
   char BIGSTK location_default[HTS_URLMAXSIZE*2];
   char BIGSTK buff[HTS_URLMAXSIZE*2];
@@ -694,49 +694,111 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
           r.adr=NULL;
           r.out=NULL;
           r.fp=NULL;
-          
-          if (save != NULL) {     /* ne pas lire uniquement header */
-            int ok = 0;
-                       
-#if HTS_DIRECTDISK
-            // Court-circuit:
-            // Peut-on stocker le fichier directement sur disque?
-            if (ok) {
-              if (r.msg[0] == '\0') {
-                strcpybuff(r.msg,"Cache Read Error : Unexpected error");
-              }
-            }
-            else if (!readonly && r.statuscode==HTTP_OK && !is_hypertext_mime(opt,r.contenttype, fil) && strnotempty(save)) {    // pas HTML, écrire sur disk directement
-              r.is_write=1;    // écrire
 
-              if (!dataincache) {
-								if (fexist_utf8(fconv(catbuff, save))) {  // un fichier existe déja
-									//if (fsize_utf8(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
-									ok=1;    // plus rien à faire
-									filenote(&opt->state.strc,save,NULL);        // noter comme connu
-									file_notify(opt,adr, fil, save, 0, 0, 1);        // data in cache
-								}
-							}
-              
-              if (!dataincache && !ok) { // Pas de donnée en cache et fichier introuvable : erreur!
-                if (opt->norecatch) {
-                  file_notify(opt,adr, fil, save, 1, 0, 0);
-                  filecreateempty(&opt->state.strc, save);
-                  //
+          /* Do not get data ? Do some final tests. */
+          if (target_save == NULL) {
+            // si save==null, ne rien charger (juste en tête)
+            if (r.statuscode==HTTP_OK && !is_hypertext_mime(opt, r.contenttype, fil)) {    // pas HTML, écrire sur disk directement
+              r.is_write = 1;  /* supposed to be on disk (informational) */
+            }
+
+            /* Ensure the file is present, because returning a reference to a missing file is useless! */
+            if (!dataincache) {   /* Data are supposed to be on disk */
+              if (!fexist_utf8(fconv(catbuff, previous_save))) {  // un fichier existe déja
+                if (!opt->norecatch) {
+                  if ((opt->debug>0) && (opt->log!=NULL)) {
+                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: could not find %s"LF, previous_save);
+                  }
                   r.statuscode=STATUSCODE_INVALID;
-                  strcpybuff(r.msg,"File deleted by user not recaught");
-                  ok=1;     // ne pas récupérer (et pas d'erreur)
-                } else {
-                  // ????? file_notify(opt,adr, fil, save, 1, 1, 0);
-                  r.statuscode=STATUSCODE_INVALID;
-                  strcpybuff(r.msg,"Previous cache file not found");
-                  ok=1;    // ne pas récupérer
+                  strcpybuff(r.msg, "Previous cache file not found");
                 }
               }
-              
-              if (!ok) {        // load from cache
-                file_notify(opt,adr, fil, save, 1, 1, 1);        // data in cache
-                r.out=filecreate(&opt->state.strc, save);
+            } // otherwise, the ZIP file is supposed to be consistent with data.
+          }
+          /* Read data ? */
+          else {     /* ne pas lire uniquement header */
+            int ok = 0;
+
+#if HTS_DIRECTDISK
+            // Not ro, and pure data (not HTML and friends) to be saved now.
+            if (!readonly && r.statuscode==HTTP_OK && !is_hypertext_mime(opt,r.contenttype, fil) && strnotempty(target_save)) {    // pas HTML, écrire sur disk directement
+              r.is_write=1;    // écrire
+
+              // Data is supposed to be on disk
+              if (!dataincache) {
+                r.msg[0] = '\0';
+
+                // File exists on disk with declared cache name (this is expected!)
+                if (fexist_utf8(fconv(catbuff, previous_save))) {  // un fichier existe déja
+                  // Expected size ?
+                  const size_t fsize = fsize_utf8(fconv(catbuff, previous_save));
+                  if (fsize == r.size) {
+                    // Target name is the previous name, and the file looks good: nothing to do!
+                    if (strcmp(previous_save, target_save) == 0) {
+                      // So far so good
+                      ok=1;    // plus rien à faire
+                    }
+                    // Different filenames: rename now!
+                    else {
+                      char catbuff2[CATBUFF_SIZE];
+                      if (RENAME(fconv(catbuff, previous_save), fconv(catbuff2, target_save)) == 0) {
+                        // So far so good
+                        ok=1;    // plus rien à faire
+
+                        if ((opt->debug>1) && (opt->log!=NULL)) {
+                          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "File '%s' has been renamed since last mirror to '%s' ; applying changes"LF, previous_save, target_save); test_flush;
+                        }
+                      } else {
+                        r.statuscode=STATUSCODE_INVALID;
+                        strcpybuff(r.msg, "Unable to rename file on disk");
+                      }
+                    }
+                  } else {
+                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "warning: file size on disk ("LLintP") does not have the expected size ("LLintP"))"LF, (LLint) fsize, (LLint) r.size);
+                  }
+                }
+                // File exists with the target name and not previous one ?
+                // Suppose a broken mirror, with a file being renamed: OK
+                else if (fexist_utf8(fconv(catbuff, target_save))) {
+                  // Expected size ?
+                  const size_t fsize = fsize_utf8(fconv(catbuff, target_save));
+                  if (fsize == r.size) {
+                    // So far so good
+                    ok=1;    // plus rien à faire
+                  } else {
+                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "warning: renamed file size on disk ("LLintP") does not have the expected size ("LLintP"))"LF, (LLint) fsize, (LLint) r.size);
+                  }
+                }
+
+                // File is present and sane ?
+                if (ok) {
+                  // Register file not to wipe it later
+                  filenote(&opt->state.strc,target_save,NULL);        // noter comme connu
+                  file_notify(opt,adr, fil, target_save, 0, 0, 1);        // data in cache
+                }
+                // Nope
+                else {
+                  // Default behavior
+                  if (!opt->norecatch) {
+                    r.statuscode=STATUSCODE_INVALID;
+                    if (r.msg[0] == '\0') {
+                      strcpybuff(r.msg, "Previous cache file not found");
+                    }
+                  }
+                  // Do not recatch broken/erased files
+                  else {
+                    file_notify(opt,adr, fil, target_save, 1, 0, 0);
+                    filecreateempty(&opt->state.strc, target_save);
+                    //
+                    r.statuscode=STATUSCODE_INVALID;
+                    strcpybuff(r.msg, "File deleted by user not recaught");
+                  }
+                }
+              }
+              // Load data from cache (not from a disk file)
+              else {
+                file_notify(opt,adr, fil, target_save, 1, 1, 1);        // data in cache
+                r.out=filecreate(&opt->state.strc, target_save);
 #if HDEBUG
                 printf("direct-disk: %s\n",save);
 #endif
@@ -773,9 +835,11 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
             } else
 #endif
             { // lire en mémoire
-              
+            
+              // We need to get bytes on memory, but the previous version is (supposed to be) on disk.
               if (!dataincache) {
-                if (strnotempty(save)) { // Pas de donnée en cache, bizarre car html!!!
+                // Empty previous save name, or file does not exist ?
+                if (!strnotempty(previous_save) || !fexist_utf8(previous_save)) { // Pas de donnée en cache, bizarre car html!!!
                   // Hack: if error page data is missing (pre-3.45 releases), create one. We won't use it anyway.
                   if (!HTTP_IS_OK(r.statuscode)) {
                     const int size = 512;
@@ -794,31 +858,31 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                   // Otherwise, this is a real error.
                   else {
                     r.statuscode=STATUSCODE_INVALID;
-                    strcpybuff(r.msg,"Previous cache file not found (2)");
+                    strcpybuff(r.msg,"Previous cache file not found (empty filename)");
                   }
-                } else {                 /* Read in memory from cache */
-                  if (strnotempty(previous_save) && fexist_utf8(previous_save)) {
-                    FILE* fp = FOPEN(fconv(catbuff, previous_save), "rb");
-                    if (fp != NULL) {
-                      r.adr = (char*) malloct((int) r.size + 4);
-                      if (r.adr != NULL) {
-                        if (r.size > 0 && fread(r.adr, 1, (int) r.size, fp) != r.size) {
-                          int last_errno = errno;
-                          r.statuscode=STATUSCODE_INVALID;
-                          sprintf(r.msg,"Read error in cache disk data: %s", strerror(last_errno));
-                        }
-                      } else {
+                } else {                 /* Read in memory from disk */
+                  FILE*const fp = FOPEN(fconv(catbuff, previous_save), "rb");
+                  if (fp != NULL) {
+                    r.adr = (char*) malloct((int) r.size + 4);
+                    if (r.adr != NULL) {
+                      if (r.size > 0 && fread(r.adr, 1, (int) r.size, fp) != r.size) {
+                        int last_errno = errno;
                         r.statuscode=STATUSCODE_INVALID;
-                        strcpybuff(r.msg,"Read error (memory exhausted) from cache");
+                        sprintf(r.msg,"Read error in cache disk data: %s", strerror(last_errno));
                       }
-                      fclose(fp);
+                    } else {
+                      r.statuscode=STATUSCODE_INVALID;
+                      strcpybuff(r.msg,"Read error (memory exhausted) from cache");
                     }
+                    fclose(fp);
                   } else {
                     r.statuscode=STATUSCODE_INVALID;
-                    strcpybuff(r.msg,"Cache file not found on disk");
+                    strcpybuff(r.msg,"Read error (unable to open disk file) from cache");
                   }
                 }
-              } else {
+              }
+              // Data in cache.
+              else {
                 // lire fichier (d'un coup)
                 r.adr = (char*) malloct((int) r.size+4);
                 if (r.adr!=NULL) {
@@ -836,10 +900,6 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                 }
               }
             }
-          }
-          // si save==null, ne rien charger (juste en tête)
-          else if (r.statuscode==HTTP_OK && !is_hypertext_mime(opt,r.contenttype, fil)) {    // pas HTML, écrire sur disk directement
-            r.is_write = 1;  /* supposed to be on disk (informational) */
           }
 
         } else {
