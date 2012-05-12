@@ -823,7 +823,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                   fclose(r.out);
                   r.out=NULL;
 #ifndef _WIN32
-                  chmod(save,HTS_ACCESS_FILE);      
+                  chmod(target_save, HTS_ACCESS_FILE);      
 #endif          
                 } else {
                   r.statuscode=STATUSCODE_INVALID;
