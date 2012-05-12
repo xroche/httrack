@@ -460,6 +460,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
       int intag=0;         // on est dans un tag
       int incomment=0;     // dans un <!--
       int inscript=0;      // dans un scipt pour applets javascript)
+      int inscript_locked=0;  // in locked script (ie. js file)
       signed char inscript_state[10][257];
       typedef enum { 
         INSCRIPT_START=0,
@@ -522,8 +523,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
       inscript_state[INSCRIPT_COMMENT2][INSCRIPT_DEFAULT]=INSCRIPT_COMMENT;
       inscript_state[INSCRIPT_COMMENT2]['/']=INSCRIPT_START;
       inscript_state[INSCRIPT_COMMENT2]['*']=INSCRIPT_COMMENT2;
-      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE;    /* #8: escape in "" */
-      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE2;  /* #9: escape in '' */
+      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE;    /* #8: escape in '' */
+      inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT]=INSCRIPT_INQUOTE2;  /* #9: escape in "" */
 
       /* Primary list or URLs */
       if (ptr == 0) {
@@ -537,6 +538,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
         || (compare_mime(opt,r->contenttype, str->url_file, "text/css")!=0)
         ) {      /* JavaScript js file */
           inscript=1;
+          inscript_locked=1;  /* Don't exit js space upon </script> */
           if (opt->parsedebug) { HT_ADD("<@@ inscript @@>"); }
           inscript_name="script";
           intag=1;     // because après <script> on y est .. - pas utile
@@ -1308,6 +1310,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                     ||
                     (strfield(adr,"/style")  && strfield(inscript_name, "style"))
                     )
+                    && inscript_locked == 0
                     ) {
                       char* a=adr;
                       //while(is_realspace(*(--a)));
