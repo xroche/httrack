@@ -4,12 +4,13 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.46-1
+3.46-1-beta*
 * New: UTF-8 filenames handling
 * Fixed: fixed bug in handling of update/continue with erased files or renamed files, leading to "Unexpected 412/416 error (Requested Range Not Satisfiable)" and/or "Previous cache file not found" (-1)" errors
 * Fixed: escape characters >= 128 when sending GET/HEAD requests to avoid server errors
 * Fixed: do not use "delayed" extensions when the mirror is aborting
 * Fixed: generate error pages when needed (Brent Palmer)
+* Fixed: parsing issue with js files due to "script" tags (Vasiliy)
 
 3.45-4
 * New: source license is now GPLv3
