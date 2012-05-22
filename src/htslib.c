@@ -1072,15 +1072,6 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
         if (strnotempty(retour->req.lang_iso)) {
           strcatbuff(buff,"Accept-Language: "); strcatbuff(buff,retour->req.lang_iso); strcatbuff(buff,H_CRLF);
         }
-        strcatbuff(buff,"Accept-Charset: "
-                        "iso-8859-1"       /* we prefer ISO-8859-1 */
-                        ", "
-                        "iso-8859-*;q=0.9" /* or ISO-8859-* */
-                        ", "
-                        "utf-8;q=0.66"     /* UTF8 is also accepted */
-                        ", "
-                        "*;q=0.33"         /* and any other charset */
-                        H_CRLF);   
         if (retour->req.http11) {
 #if HTS_USEZLIB
           //strcatbuff(buff,"Accept-Encoding: gzip, deflate, compress, identity"H_CRLF);
