@@ -329,11 +329,13 @@ int run_launch_ftp(FTPDownloadStruct *pStruct) {
         _CHECK_HALT_FTP;	  
         if ((line[0]=='3') || (line[0]=='2')) {
           // --PASS--
-          strcpybuff(back->info,"login: pass");
-          sprintf(line,"PASS %s",pass);
-          send_line(soc_ctl,line);
-          get_ftp_line(soc_ctl,line,timeout);
-          _CHECK_HALT_FTP;	  
+          if (line[0] == '3') {
+            strcpybuff(back->info,"login: pass");
+            sprintf(line,"PASS %s",pass);
+            send_line(soc_ctl,line);
+            get_ftp_line(soc_ctl,line,timeout);
+            _CHECK_HALT_FTP;
+          }
           if (line[0]=='2') {  // ok
             send_line(soc_ctl,"TYPE I");
             get_ftp_line(soc_ctl,line,timeout);
