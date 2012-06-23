@@ -25,8 +25,8 @@ INCLUDES = \
 
 bin_PROGRAMS = proxytrack httrack htsserver
 
-httrack_LDADD = $(THREADS_LIBS) -lhttrack
-htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) -lhttrack
+httrack_LDADD = $(THREADS_LIBS) libhttrack.la
+htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT
 
@@ -69,7 +69,7 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(DL_LIBS) $(SOCKET_LIBS)
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
-libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) -lhttrack
+libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \
