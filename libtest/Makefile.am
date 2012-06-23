@@ -1,6 +1,6 @@
 
 exemplesdir = $(datadir)/httrack/libtest
-exemples_DATA = example.* *.c *.h *.txt
+exemples_DATA = *.c *.h *.txt
 EXTRA_DIST = $(exemples_DATA)
 
 INCLUDES = \
