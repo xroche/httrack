@@ -5,7 +5,7 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack.
 
 3.46-1
-* New: UTF-8 filenames handling
+* New: Unicode filenames handling
 * Fixed: fixed bug in handling of update/continue with erased files or renamed files, leading to "Unexpected 412/416 error (Requested Range Not Satisfiable)" and/or "Previous cache file not found" (-1)" errors
 * Fixed: escape characters >= 128 when sending GET/HEAD requests to avoid server errors
 * Fixed: do not use "delayed" extensions when the mirror is aborting
@@ -13,7 +13,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 * Fixed: parsing issue with js files due to "script" tags (Vasiliy)
 * Fixed: anonymous FTP without password (Luiz)
 * Fixed: Makefile issues regarding parrallel build and examples (Sebastian Pipping)
-* Fixed: removed deprecated and annoying "Accept-Charset" header in requests (Piotr Engelking )
+* Fixed: removed deprecated and annoying "Accept-Charset" header in requests (Piotr Engelking) (closes:#674053)
 
 3.45-4
 * New: source license is now GPLv3
@@ -41,10 +41,10 @@ This file lists all changes and fixes that have been made for HTTrack.
 * Fixed: typo in logs (Pascal Boulerie)
 
 3.44-4
-* Fixed: random crash when interrupting the mirror (spotted by -fstack-protector) in htscoremain.c
+* Fixed: random crash when interrupting the mirror (spotted by -fstack-protector) in htscoremain.c (closes:#657878)
 
 3.44-3
-+ Fixed: Linux build
++ Fixed: Linux build (closes:#657334)
 
 3.44-2
 + Fixed: malformed format htslib.c (Moritz Muehlenhoff)
