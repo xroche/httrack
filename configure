@@ -15284,7 +15284,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_iconv_iconv" >&5
 $as_echo "$ac_cv_lib_iconv_iconv" >&6; }
 if test "x$ac_cv_lib_iconv_iconv" = x""yes; then :
-  SOCKET_LIBS="-liconv"
+  ICONV_LIBS="-liconv"
 
 $as_echo "#define LIBICONV 1" >>confdefs.h
 
