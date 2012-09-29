@@ -148,7 +148,7 @@ AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
 ### Check for iconv
-AC_CHECK_LIB(iconv, iconv, [SOCKET_LIBS="-liconv"
+AC_CHECK_LIB(iconv, iconv, [ICONV_LIBS="-liconv"
 AC_DEFINE(LIBICONV, 1,[Check for libiconv])], AC_MSG_RESULT([not necessary]))
 AC_SUBST(ICONV_LIBS)
 
