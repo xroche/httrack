@@ -560,7 +560,6 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 						// unflag
 					}
 				}
-				back[p].r.compressed=0;
 #endif
 
 				/* Write mode to disk */
@@ -664,6 +663,11 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					fprintf(cache->txt,LLintP,(LLint)back[p].r.totalsize);
 					fprintf(cache->txt,"\t%s\t",flags);
 				}
+
+#if HTS_USEZLIB
+				back[p].r.compressed=0;
+#endif
+
 				if (back[p].r.statuscode == HTTP_OK) {
 					if (back[p].r.size>=0) {
 						if (strcmp(back[p].url_fil,"/robots.txt") !=0 ) {
