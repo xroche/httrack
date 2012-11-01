@@ -2183,14 +2183,14 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
     /* Enforce limits to avoid bandwith abuse. The bypass_limits should only be used by administrators and experts. */
     if (!opt->bypass_limits) {
-      if (opt->maxsoc <= 0 || opt->maxsoc > 4) {
-        opt->maxsoc = 4;
+      if (opt->maxsoc <= 0 || opt->maxsoc > 8) {
+        opt->maxsoc = 8;
         if (opt->log != NULL) {
           HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: maximum number of simultaneous connections limited to %d to avoid server overload"LF, (int)opt->maxsoc);
         }
       }
-      if (opt->maxrate <= 0 || opt->maxrate > 100000) {
-        opt->maxrate = 100000;
+      if (opt->maxrate <= 0 || opt->maxrate > 250000) {
+        opt->maxrate = 250000;
         if (opt->log != NULL) {
           HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: maximum bandwidth limited to %d to avoid server overload"LF, (int)opt->maxrate);
         }
