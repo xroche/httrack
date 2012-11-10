@@ -1288,9 +1288,18 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 	StringFree(headers);
 	StringFree(output);
 	StringFree(host);
+	StringFree(localhost);
+#ifndef NO_WEBDAV
+	StringFree(davHeaders);
+	StringFree(davRequest);
+#endif
 
 	if (buffer)
 		free(buffer);
+	if (line)
+		free(line);
+	if (line1)
+		free(line1);
 }
 
 /* Generic threaded function start */
