@@ -133,6 +133,7 @@ const char* hts_detect[] = {
   "usemap",
   "longdesc",     // accessibility
   "xlink:href",   // xml/svg tag
+  "poster",       // HTML5
   ""
 };
 
