@@ -1,4 +1,5 @@
 AC_INIT(src/httrack.c)
+AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER(config.h)
 AM_INIT_AUTOMAKE(httrack, 3.46.1)
 VERSION_INFO="2:46:0"

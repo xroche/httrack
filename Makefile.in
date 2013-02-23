@@ -196,6 +196,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 SUBDIRS = src man m4 libtest templates lang html
+ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL INSTALL.FreeBSD INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def
@@ -488,7 +489,7 @@ distcheck: dist
 	*.zip*) \
 	  unzip $(distdir).zip ;;\
 	esac
-	chmod -R a-w $(distdir); chmod a+w $(distdir)
+	chmod -R a-w $(distdir); chmod u+w $(distdir)
 	mkdir $(distdir)/_build
 	mkdir $(distdir)/_inst
 	chmod a-w $(distdir)
