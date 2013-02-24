@@ -1,0 +1,45 @@
+SWF Flash format (Macromedia)
+
+Okay, the stupid license (http://www.macromedia.com/software/flash/download/search_engine/license2.html) 
+of the Macromedia Flash SDK contains the following statements:
+
+"(..)
+Pursuant to the terms and conditions of this License, you are granted a nonexclusive license to use, 
+modify and create derivative works ("Derivative Works") of the sample code included in the SDK for 
+the sole purpose of developing Products that extract text and link information from a SWF file, 
+and to distribute compiled version of such Derivative Works in object code format solely as incorporated 
+in the object code format of such Products (the "Bundled Products").  
+
+By using the licenses above, you agree to the following restrictions: 
+You will not make or distribute copies of the SDK, or electronically transfer the SDK outside your company.  
+(..)"
+
+Therefore, I can't redistribute the three stupid sources that allow to extract links inside flash files.
+This is stupid, and if you're not happy, please send some feedback to Macromedia, thanks!
+
+You must therefore compile a module (libhtsswf.so), which will be automatically detected 
+by httrack once installed  in the regular system library directory (/usr/lib).
+
+Download the flash SDK (and accept the terms of the license) at:
+http://www.macromedia.com/software/flash/download/search_engine/index.html
+
+Then, copy the three files from this sdk into this swf/ directory:
+swf2html.cpp
+swf2html.h
+swf2htmlstags.h
+
+Two of these files have to be modified using the patch (swf2html.patch) given in this directory.
+This is only a patch, and therefore this isn't violating the license (not a "derivative work")
+
+Apply the patch 'swf2html.patch' using:
+patch -p0 < swf2html.patch
+
+Then build the module:
+make
+
+and copy it in the /usr/lib directory, and reprobe modules:
+cp libhtsswf.so /usr/lib
+ldconfig
+
+That's all. Next time you'll run httrack engine, flash support will be available.
+

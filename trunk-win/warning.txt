@@ -1,0 +1,34 @@
+Hello,
+
+Here are the sources of the shell interface of WinHTTrack Website Copier III, for Visual C++ 2008
+
+The shell interface code was started at the very begining of HTTrack, and is very, *VERY* ditry, not documented, and therefore not easy to (re)use.
+
+These sources can be useful if you want to understand how to make another version, or a version for another OS.
+
+Use this code at your own risks!!
+
+
+Have fun,
+Xavier Roche (Author)
+
+---
+
+WinHTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) Xavier Roche and other contributors
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+---

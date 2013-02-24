@@ -1,0 +1,2555 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\Shell.ico"
+IDR_WINHTTTYPE          ICON                    "res\\Shell.ico"
+IDI_BACK                ICON                    "res\\icon1.ico"
+IDI_FORWARD             ICON                    "res\\icon2.ico"
+IDI_STOP                ICON                    "res\\icon3.ico"
+IDI_RELOAD              ICON                    "res\\icon4.ico"
+IDI_HOME                ICON                    "res\\icon5.ico"
+IDI_PRINT               ICON                    "res\\icon6.ico"
+IDR_HELPFRM             ICON                    "res\\idr_main.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDR_MAINFRAME           BITMAP                  "res\\Toolbar.bmp"
+IDR_HELPFRM             BITMAP                  "res\\mainfram.bmp"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Toolbar
+//
+
+IDR_MAINFRAME TOOLBAR  16, 15
+BEGIN
+    BUTTON      ID_FILE_NEW
+    BUTTON      ID_FILE_OPEN
+    BUTTON      ID_FILE_SAVE
+    SEPARATOR
+    BUTTON      ID_FILE_PRINT
+    BUTTON      ID_APP_ABOUT
+END
+
+IDR_HELPFRM TOOLBAR  16, 15
+BEGIN
+    BUTTON      ID_FILE_NEW
+    BUTTON      ID_FILE_OPEN
+    BUTTON      ID_FILE_SAVE
+    SEPARATOR
+    BUTTON      ID_FILE_PRINT
+    BUTTON      ID_APP_ABOUT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MAINFRAME MENU 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New project\tCtrl+N",        ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
+        MENUITEM "&Delete...",                  ID_FILE_DELETE_PROJ
+        MENUITEM SEPARATOR
+        MENUITEM "&Browse sites...",            ID_FILE_BROWSE_SIT
+        MENUITEM SEPARATOR
+        MENUITEM "Recent File",                 ID_FILE_MRU_FILE1, GRAYED
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_APP_EXIT
+    END
+    POPUP "&Preferences"
+    BEGIN
+        MENUITEM "Load default options",        ID_LoadDefaultOptions
+        MENUITEM "Save default options",        ID_SaveDefaultOptions
+        MENUITEM "Reset to default options",    ID_ClearDefaultOptions
+        MENUITEM SEPARATOR
+        MENUITEM "Load options...",             ID_LOAD_OPTIONS
+        MENUITEM "Save options as...",          ID_FILE_SAVE_OPTIONS_AS
+        MENUITEM SEPARATOR
+        MENUITEM "Language preference...",      IDC_langprefs
+    END
+    POPUP "&Mirror"
+    BEGIN
+        MENUITEM "&Modify options",             ID_OPTIONS_MODIFY
+        MENUITEM SEPARATOR
+        MENUITEM "Pause transfer",              ID_FILE_PAUSE
+    END
+    POPUP "&Log"
+    BEGIN
+        MENUITEM "&View log",                   ID_LOG_VIEWLOG
+        MENUITEM "View error log",              ID_LOG_VIEWERRORLOG
+        MENUITEM SEPARATOR
+        MENUITEM "View file transfers",         ID_LOG_VIEWTRANSFERS
+    END
+    POPUP "&Window"
+    BEGIN
+        MENUITEM "Hide",                        ID_WINDOW_HIDE
+        MENUITEM SEPARATOR
+        MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
+        MENUITEM "S&plit",                      ID_WINDOW_SPLIT
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About WinHTTrack Website Copier...", ID_ABOUT
+        MENUITEM "&Check program updates...",   ID_UPDATE
+        MENUITEM SEPARATOR
+        MENUITEM "Contents...",                 ID_HELP
+    END
+END
+
+IDR_POPUP MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Open",                        ID_WINDOW_HIDE
+        MENUITEM SEPARATOR
+        MENUITEM "Modify options",              ID_OPTIONS_MODIFY
+        MENUITEM "View log",                    ID_LOG_VIEWLOG
+        MENUITEM "View error log",              ID_LOG_VIEWERRORLOG
+        MENUITEM SEPARATOR
+        MENUITEM "About..",                     ID_ABOUT
+        MENUITEM "Pause",                       ID_FILE_PAUSE
+        MENUITEM "Exit",                        ID_FILE_EXIT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_MAINFRAME ACCELERATORS 
+BEGIN
+    "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL, NOINVERT
+    "L",            ID_LoadDefaultOptions,  VIRTKEY, CONTROL, NOINVERT
+    "M",            ID_OPTIONS_MODIFY,      VIRTKEY, CONTROL, NOINVERT
+    "N",            ID_FILE_NEW,            VIRTKEY, CONTROL, NOINVERT
+    "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL, NOINVERT
+    "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL, NOINVERT
+    "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL, NOINVERT
+    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT, NOINVERT
+    VK_DELETE,      ID_EDIT_CUT,            VIRTKEY, SHIFT, NOINVERT
+    VK_F6,          ID_NEXT_PANE,           VIRTKEY, NOINVERT
+    VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT, NOINVERT
+    VK_INSERT,      ID_EDIT_COPY,           VIRTKEY, CONTROL, NOINVERT
+    VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY, SHIFT, NOINVERT
+    "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL, NOINVERT
+    "Z",            ID_EDIT_UNDO,           VIRTKEY, CONTROL, NOINVERT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_WIZ1 DIALOGEX 0, 0, 326, 199
+STYLE DS_SETFONT | DS_CONTEXTHELP | WS_CHILD
+EXSTYLE WS_EX_CONTEXTHELP
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_URL,16,95,281,49,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+    LTEXT           "",IDC_INFOMAIN,16,7,300,43
+    LTEXT           "Action:",IDC_STATIC_action,16,56,38,9
+    COMBOBOX        IDC_todo,125,56,172,85,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Web Addresses: (URL)",IDC_STATIC_webaddr,16,82,152,8
+    PUSHBUTTON      "Add URL...",IDC_login2,175,76,122,14,0,WS_EX_STATICEDGE
+    LTEXT           "URL list (.txt):",IDC_STATIC_filelist,16,156,85,9
+    EDITTEXT        IDC_filelist,165,153,120,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "..",IDC_br,287,153,10,12
+    LTEXT           "Preferences and mirror options:",IDC_STATIC_filters2,16,175,140,9
+    PUSHBUTTON      "Set options...",ID_setopt,175,175,122,14,0,WS_EX_CLIENTEDGE
+END
+
+IDD_Debut DIALOGEX 0, 0, 256, 205
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif", 0, 0, 0x0
+BEGIN
+    GROUPBOX        "",IDC_STATIC,7,6,242,158
+    CONTROL         "Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.",IDC_select_start,
+                    "Button",BS_AUTORADIOBUTTON | BS_MULTILINE,12,16,233,23
+    GROUPBOX        "Remote connect",IDC_STATIC_ras,20,42,225,70
+    LTEXT           "Connect to this provider",IDC_cnx,25,51,215,8,WS_DISABLED
+    COMBOBOX        IDC_rasid,25,63,215,64,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Disconnect when finished",IDC_rasdisc,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,25,79,215,10
+    CONTROL         "Shutdown PC when finished",IDC_rasshut,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,25,93,215,10
+    GROUPBOX        "On hold",IDC_STATIC_delay,20,122,225,37
+    LTEXT           "Transfer scheduled for: (hh/mm/ss)",IDC_wait,25,132,215,8,WS_DISABLED
+    EDITTEXT        IDC_hh,25,143,16,12,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_mm,42,143,16,12,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_ss,60,143,16,12,ES_AUTOHSCROLL | ES_NUMBER
+    GROUPBOX        "",IDC_STATIC,7,167,242,31
+    CONTROL         "Save settings only, do not launch download now.",IDC_select_save,
+                    "Button",BS_AUTORADIOBUTTON | BS_MULTILINE,12,174,233,20
+END
+
+IDD_wizard DIALOG  0, 0, 190, 98
+STYLE DS_SETFONT | WS_CAPTION | WS_SYSMENU
+CAPTION "Wizard query"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_reponse,106,58,77,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,133,77,50,14
+    LTEXT           "Your answer:",IDC_STATIC_answer,15,62,87,8
+    LTEXT           "",IDC_question,7,7,176,47
+END
+
+IDD_inprogress DIALOG  0, 0, 361, 267
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "In progress:",IDC_STATIC_inprog,15,7,70,8
+    LTEXT           "",IDC_inforun,85,7,265,8
+    GROUPBOX        "Information",IDC_STATIC_informations,7,26,343,59
+    LTEXT           "Bytes saved:",IDC_STATIC_bytes,15,40,65,8
+    LTEXT           "",IDC_i0,85,40,110,8
+    LTEXT           "Links scanned:",IDC_STATIC_scanned,199,40,66,8
+    LTEXT           "",IDC_i2,274,40,72,8
+    LTEXT           "Time:",IDC_STATIC_time,15,50,65,8
+    LTEXT           "",IDC_i1,85,50,110,8
+    LTEXT           "Files written:",IDC_STATIC_written,199,50,66,8
+    LTEXT           "",IDC_i6,274,50,72,8
+    LTEXT           "Transfer rate:",IDC_STATIC_trate,15,60,65,8
+    LTEXT           "",IDC_i4,85,60,110,8
+    LTEXT           "Files updated:",IDC_STATIC_updated,199,60,66,8
+    LTEXT           "",IDC_i7,274,60,72,8
+    LTEXT           "Active connections:",IDC_STATIC_sockets,15,70,65,8
+    LTEXT           "",IDC_i3,85,70,110,8
+    LTEXT           "Errors:",IDC_STATIC_errors,199,70,66,8
+    LTEXT           "",IDC_i5,274,70,72,8
+    CONTROL         "Actions:",IDC_inphide,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,95,148,10
+    GROUPBOX        "",IDC_STATIC_actions,7,105,343,153
+    CONTROL         "",IDC_st0,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,117,40,8
+    RTEXT           "",IDC_nm0,60,117,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl0,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,117,50,8
+    PUSHBUTTON      "SKIP",IDC_sk0,295,117,45,8
+    CONTROL         "",IDC_st1,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,127,40,8
+    RTEXT           "",IDC_nm1,60,127,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl1,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,127,50,8
+    PUSHBUTTON      "SKIP",IDC_sk1,295,127,45,8
+    CONTROL         "",IDC_st2,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,137,40,8
+    RTEXT           "",IDC_nm2,60,137,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl2,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,137,50,8
+    PUSHBUTTON      "SKIP",IDC_sk2,295,137,45,8
+    CONTROL         "",IDC_st3,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,147,40,8
+    RTEXT           "",IDC_nm3,60,147,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl3,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,147,50,8
+    PUSHBUTTON      "SKIP",IDC_sk3,295,147,45,8
+    CONTROL         "",IDC_st4,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,157,40,8
+    RTEXT           "",IDC_nm4,60,157,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl4,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,157,50,8
+    PUSHBUTTON      "SKIP",IDC_sk4,295,157,45,8
+    CONTROL         "",IDC_st5,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,167,40,8
+    RTEXT           "",IDC_nm5,60,167,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl5,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,167,50,8
+    PUSHBUTTON      "SKIP",IDC_sk5,295,167,45,8
+    CONTROL         "",IDC_st6,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,177,40,8
+    RTEXT           "",IDC_nm6,60,177,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl6,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,177,50,8
+    PUSHBUTTON      "SKIP",IDC_sk6,295,177,45,8
+    CONTROL         "",IDC_st7,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,187,40,8
+    RTEXT           "",IDC_nm7,60,187,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl7,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,187,50,8
+    PUSHBUTTON      "SKIP",IDC_sk7,295,187,45,8
+    CONTROL         "",IDC_st8,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,197,40,8
+    RTEXT           "",IDC_nm8,60,197,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl8,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,197,50,8
+    PUSHBUTTON      "SKIP",IDC_sk8,295,197,45,8
+    CONTROL         "",IDC_st9,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,207,40,8
+    RTEXT           "",IDC_nm9,60,207,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl9,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,207,50,8
+    PUSHBUTTON      "SKIP",IDC_sk9,295,207,45,8
+    CONTROL         "",IDC_st10,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,217,40,8
+    RTEXT           "",IDC_nm10,60,217,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl10,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,217,50,8
+    PUSHBUTTON      "SKIP",IDC_sk10,295,217,45,8
+    CONTROL         "",IDC_st11,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,227,40,8
+    RTEXT           "",IDC_nm11,60,227,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl11,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,227,50,8
+    PUSHBUTTON      "SKIP",IDC_sk11,295,227,45,8
+    CONTROL         "",IDC_st12,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,237,40,8
+    RTEXT           "",IDC_nm12,60,237,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl12,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,237,50,8
+    PUSHBUTTON      "SKIP",IDC_sk12,295,237,45,8
+    CONTROL         "",IDC_st13,"Static",SS_LEFTNOWORDWRAP | SS_NOTIFY | WS_GROUP,15,247,40,8
+    RTEXT           "",IDC_nm13,60,247,95,8,SS_NOTIFY
+    CONTROL         "Progress1",IDC_sl13,"msctls_progress32",PBS_SMOOTH | WS_BORDER,240,247,50,8
+    PUSHBUTTON      "SKIP",IDC_sk13,295,247,45,8
+    LTEXT           "",IDC_nn0,155,117,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn1,155,127,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn2,155,137,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn3,155,147,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn4,155,157,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn5,155,167,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn6,155,177,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn7,155,187,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn8,155,197,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn9,155,207,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn10,155,217,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn11,155,227,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn12,155,237,80,8,SS_NOTIFY
+    LTEXT           "",IDC_nn13,155,247,80,8,SS_NOTIFY
+END
+
+IDD_wizard_yn DIALOG  0, 0, 197, 106
+STYLE DS_SETFONT | WS_CAPTION | WS_SYSMENU
+CAPTION "Wizard query"
+FONT 8, "MS Sans Serif"
+BEGIN
+    PUSHBUTTON      "No",IDCANCEL,7,85,50,14
+    DEFPUSHBUTTON   "Ok",IDOK,140,85,50,14
+    LTEXT           "",IDC_question,7,7,183,72
+END
+
+IDD_wizard_lnk DIALOG  0, 0, 218, 118
+STYLE DS_SETFONT | WS_CAPTION | WS_SYSMENU
+CAPTION "Link detected.."
+FONT 8, "MS Sans Serif"
+BEGIN
+    CONTROL         "Ignore this link",IDC_ch1,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,40,90,10
+    CONTROL         "Ignore links in this subdir",IDC_ch2,"Button",BS_AUTORADIOBUTTON,20,50,95,10
+    CONTROL         "Ignore all domain",IDC_ch3,"Button",BS_AUTORADIOBUTTON,20,60,91,10
+    CONTROL         "Get this page only",IDC_ch4,"Button",BS_AUTORADIOBUTTON,116,40,87,10
+    CONTROL         "Mirror this link",IDC_ch5,"Button",BS_AUTORADIOBUTTON,116,50,88,10
+    CONTROL         "Mirror the whole domain",IDC_ch6,"Button",BS_AUTORADIOBUTTON,116,60,87,10
+    PUSHBUTTON      "Skip All",IDskipall,7,96,50,14
+    DEFPUSHBUTTON   "Ok",IDOK,160,96,50,14
+    GROUPBOX        "Link:",IDC_STATIC,14,30,190,56
+    LTEXT           "",IDC_URL,20,7,190,17
+END
+
+IDD_ABOUT DIALOG  0, 0, 235, 204
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About WinHTTrack Website Copier"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_INFOVER,7,7,221,127,ES_MULTILINE | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    ICON            IDI_SPLASH,IDC_SPLASH,7,133,20,20,SS_CENTERIMAGE | SS_REALSIZEIMAGE
+    LTEXT           "Language preference:",IDC_STATIC,7,188,71,8
+    COMBOBOX        IDC_lang,84,184,91,192,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,178,182,50,14,WS_GROUP
+END
+
+IDD_AddFilter DIALOG  0, 0, 230, 150
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Scan Rule"
+FONT 8, "MS Sans Serif"
+BEGIN
+    COMBOBOX        IDC_AFtype,85,33,138,64,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_AFext,85,48,138,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Add",IDOK,173,129,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,7,129,50,14
+    LTEXT           "",IDC_EDIT1,7,7,216,18
+    LTEXT           "Criterion:",IDC_STATIC_rule,7,37,72,8
+    LTEXT           "String:",IDC_affkeyword,7,52,72,8
+    LTEXT           "",IDC_EDIT2,7,71,216,46
+END
+
+IDD_iplog DIALOG  0, 0, 426, 178
+STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Log files"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_log,10,27,410,143,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL | NOT WS_TABSTOP
+    PUSHBUTTON      "log",IDC_changelog,10,7,104,14
+    COMBOBOX        IDC_HIDEINFO,129,7,118,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_FINDSTR,266,7,102,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Find",IDC_FIND,371,7,49,14
+END
+
+IDD_NewFolder DIALOG  0, 0, 237, 46
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Create New Folder"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_Folder,7,7,167,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,180,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,180,24,50,14
+END
+
+IDD_fin DIALOG  0, 0, 321, 195
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    PUSHBUTTON      "View log file",IDlog,7,144,90,14
+    PUSHBUTTON      "Browse Mirrored Website",IDbrowse,7,165,90,14
+    LTEXT           "",IDC_infoend,7,7,307,130
+END
+
+IDD_BuildOptions DIALOG  0, 0, 246, 183
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "User-defined structure"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_BuildString,7,7,232,15,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,7,163,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,189,163,50,14
+    LTEXT           "Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif",IDC_STATIC_bo2,7,131,232,30
+    LTEXT           "Options:",IDC_STATIC_options,7,28,232,8
+    EDITTEXT        IDC_STATIC_bo1,7,43,232,84,ES_MULTILINE | ES_READONLY | NOT WS_BORDER
+END
+
+IDD_ProxyId DIALOG  0, 0, 266, 129
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Proxy settings"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_proxadr,104,8,141,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_proxport,104,24,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_proxlogin,104,56,56,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_proxpass,104,72,56,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,208,104,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,8,104,50,14
+    LTEXT           "Proxy address:",IDC_STATIC_adr,8,8,83,10
+    LTEXT           "Proxy port:",IDC_STATIC_port,8,24,83,10
+    LTEXT           "Login:",IDC_STATIC_login,16,56,83,10
+    LTEXT           "Password:",IDC_STATIC_pass,16,72,83,10
+    GROUPBOX        "Authentication (only if needed)",IDC_STATIC_auth,8,40,248,48
+END
+
+IDD_NewProj DIALOG  0, 0, 322, 181
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Project name:",IDC_STATIC_projname,7,7,118,13
+    COMBOBOX        IDC_projname,130,7,185,113,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Project category:",IDC_STATIC_projcateg,7,30,118,13
+    COMBOBOX        IDC_projcateg,130,30,102,113,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Info",IDC_STATIC,7,45,308,85
+    LTEXT           "",IDC_STATIC_comments,16,60,234,41
+    LTEXT           "Base path:",IDC_STATIC_basepath,7,140,118,13,WS_DISABLED
+    EDITTEXT        IDC_projpath,125,140,173,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "..",IDC_br,305,140,10,12
+    LTEXT           "Launch multiple updates",IDC_STATIC_mupdate,7,166,73,8,NOT WS_VISIBLE
+    PUSHBUTTON      "Batch update...",IDC_mupdate,232,160,83,14,NOT WS_VISIBLE
+END
+
+IDD_InsertUrl DIALOG  0, 0, 266, 142
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Insert URL"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_urladr,105,8,141,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_urllogin,106,43,56,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_urlpass,106,59,56,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Capture URL...",ID_capt,164,85,95,14
+    PUSHBUTTON      "Cancel",IDCANCEL,7,121,50,14
+    DEFPUSHBUTTON   "OK",IDOK,209,121,50,14
+    LTEXT           "URL:",IDC_STATIC_adr,8,8,72,10
+    LTEXT           "Login:",IDC_STATIC_login,19,43,83,10
+    LTEXT           "Password:",IDC_STATIC_pass,19,59,83,10
+    GROUPBOX        "Authentication (only if needed)",IDC_STATIC_auth,7,29,248,48
+    RTEXT           "http://",IDC_STATIC_adr2,80,7,22,10,SS_CENTERIMAGE
+    LTEXT           "Forms or complex links:",IDC_STATIC_capt,7,85,153,10
+END
+
+IDD_OPTION3 DIALOG  0, 0, 324, 141
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Experts Only"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "These options should be modified only exceptionally",IDC_STATIC_warning,16,8,247,8
+    CONTROL         "Use a cache for updates",IDC_Cache,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,21,242,9
+    LTEXT           "Primary Scan Rule (scan mode)",IDC_STATIC_primf,16,42,129,8
+    COMBOBOX        IDC_filter,16,50,139,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Travel mode",IDC_STATIC_travel,16,67,129,8
+    LTEXT           "Global travel mode",IDC_STATIC_travel2,165,67,150,8
+    COMBOBOX        IDC_travel,16,75,139,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_travel2,165,75,130,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Rewrite links: internal / external",IDC_STATIC_travel3,16,92,129,8
+    COMBOBOX        IDC_travel3,16,100,139,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Activate Debugging Mode (winhttrack.log)",IDC_windebug,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,120,242,10
+END
+
+IDD_OPTION4 DIALOGEX 0, 0, 324, 137
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Flow Control"
+FONT 8, "MS Sans Serif", 0, 0, 0x0
+BEGIN
+    LTEXT           "Number of connections",IDC_STATIC_mc,16,15,104,8
+    COMBOBOX        IDC_connexion,130,15,32,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Persistent connections (Keep-Alive)",IDC_ka,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,130,30,129,10
+    LTEXT           "TimeOut (s)",IDC_STATIC_timeout,16,49,104,8
+    COMBOBOX        IDC_timeout,130,49,32,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "s",IDC_STATIC,170,49,8,8
+    CONTROL         "Remove host if timeout",IDC_remt,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,130,64,183,9
+    LTEXT           "Retries",IDC_STATIC_retr,16,80,104,8
+    COMBOBOX        IDC_retry,130,80,32,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Min Transfer Rate (B/s)",IDC_STATIC_mintr,16,95,104,8
+    EDITTEXT        IDC_rate,130,95,32,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B/s",IDC_STATIC,170,95,17,8
+    CONTROL         "Remove host if low",IDC_rems,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,130,109,183,10
+END
+
+IDD_OPTION5 DIALOGEX 0, 0, 220, 198
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Limits"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    LTEXT           "Maximum mirroring depth:",IDC_infodepth,16,15,129,11
+    COMBOBOX        IDC_depth,151,15,41,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Maximum external depth:",IDC_infodepth2,16,30,129,11
+    COMBOBOX        IDC_depth2,151,30,41,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Max size of any HTML file (B)",IDC_STATIC_autre,16,45,129,8
+    EDITTEXT        IDC_maxhtml,151,45,41,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,200,45,8,8
+    LTEXT           "Max size of any non-HTML file",IDC_STATIC_autre2,16,60,129,8
+    EDITTEXT        IDC_othermax,151,60,41,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,200,60,8,8
+    LTEXT           "Site size limit (B)",IDC_STATIC_sitesize,16,75,129,8,0,WS_EX_TRANSPARENT
+    EDITTEXT        IDC_sizemax,151,75,41,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,200,75,8,8
+    LTEXT           "Pause after downloading..",IDC_STATIC_pausebytes,16,90,126,8,0,WS_EX_TRANSPARENT
+    EDITTEXT        IDC_pausebytes,151,90,41,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,200,90,8,8
+    LTEXT           "Max time overall (s)",IDC_STATIC_tempmax,16,115,129,8
+    COMBOBOX        IDC_maxtime,151,115,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "s",IDC_STATIC,200,115,8,8
+    LTEXT           "Max transfer rate (B/s)",IDC_STATIC_ratemax,16,130,129,8
+    COMBOBOX        IDC_maxrate,151,130,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "B/s",IDC_STATIC,200,130,17,8
+    LTEXT           "Max connections / seconds",IDC_STATIC_maxconn,16,155,129,8
+    COMBOBOX        IDC_maxconn,151,155,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "cnx/s",IDC_STATIC,200,155,17,8
+    LTEXT           "Maximum number of links",IDC_STATIC_maxlinks,16,180,129,8
+    COMBOBOX        IDC_maxlinks,151,179,64,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_OPTION6 DIALOG  0, 0, 309, 114
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Browser ID"
+FONT 8, "MS Sans Serif"
+BEGIN
+    COMBOBOX        IDC_user,115,16,180,89,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Browser ""Identity""",IDC_STATIC_browsid,16,16,94,8
+    LTEXT           "HTML footer",IDC_STATIC_footer,16,35,94,8
+    COMBOBOX        IDC_footer,115,35,180,89,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_OPTION1 DIALOG  0, 0, 325, 105
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Links"
+FONT 8, "MS Sans Serif"
+BEGIN
+    CONTROL         "Attempt to detect all links (even in unknown tags/javascript code)",IDC_parseall,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,16,309,10
+    CONTROL         "Get non-HTML files related to a link, eg external .ZIP or pictures",IDC_link,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,32,309,10
+    CONTROL         "Test validity of all links (even external ones)",IDC_testall,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,64,309,10
+    CONTROL         "Get HTML files first!",IDC_htmlfirst,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,85,309,10
+END
+
+IDD_OPTION2 DIALOG  0, 0, 296, 150
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Build"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Local Structure Type (how links are saved)",IDC_STATIC_buildopt,16,16,243,8
+    COMBOBOX        IDC_build,16,24,264,96,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Options",IDC_buildopt,202,45,78,10
+    CONTROL         "DOS Names (8+3)",IDC_dos,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,60,112,9
+    CONTROL         "ISO9660 Names",IDC_iso9660,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,136,60,112,9
+    CONTROL         "No error pages",IDC_errpage,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,75,269,9
+    CONTROL         "No external pages",IDC_external,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,269,9
+    CONTROL         "Hide passwords",IDC_hidepwd,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,105,269,9
+    CONTROL         "Hide query strings",IDC_hidequery,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,120,269,9
+    CONTROL         "Do not purge old files",IDC_nopurge,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,135,269,9
+END
+
+IDD_OPTION7 DIALOG  0, 0, 315, 197
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Scan Rules"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi",IDC_STATIC_finfo,16,7,289,53
+    CONTROL         "gif, jpg, png, tif, bmp",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,65,74,10
+    CONTROL         "zip, tar, tgz, gz, rar..",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,95,65,71,10
+    CONTROL         "mov, mpg, mpeg, avi, asf, mp3..",IDC_CHECK3,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,175,65,109,10
+    EDITTEXT        IDC_URL2,104,80,205,65,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+    PUSHBUTTON      "Exclude link(s)..",IDC_ADD1,16,111,79,14
+    PUSHBUTTON      "Include link(s)..",IDC_ADD2,16,131,79,14
+    LTEXT           "Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)",IDC_STATIC_tip,16,150,289,36
+END
+
+IDD_OPTION8 DIALOGEX 0, 0, 272, 161
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Spider"
+FONT 8, "MS Sans Serif", 0, 0, 0x0
+BEGIN
+    CONTROL         "Accept cookies",IDC_cookies,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,16,244,9
+    LTEXT           "Check document type",IDC_STATIC_checktype,16,32,117,8
+    COMBOBOX        IDC_checktype,144,32,116,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Parse java files",IDC_parsejava,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,48,235,9
+    LTEXT           "Spider:",IDC_STATIC_spider,16,64,106,8
+    COMBOBOX        IDC_robots,144,64,116,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Update hack (limit re-transfers)",IDC_updhack,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,80,237,9
+    CONTROL         "URL hacks (join similar URLs)",IDC_urlhack,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,95,237,9
+    CONTROL         "Tolerant requests (for servers)",IDC_toler,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,110,244,9
+    CONTROL         "Force old HTTP/1.0 requests (no 1.1)",IDC_http10,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,125,237,9
+END
+
+IDD_OPTION9 DIALOG  0, 0, 325, 112
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Log, Index, Cache"
+FONT 8, "MS Sans Serif"
+BEGIN
+    CONTROL         "Store ALL files in cache",IDC_Cache2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,16,305,9
+    CONTROL         "Do not re-download locally erased files",IDC_norecatch,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,32,304,9
+    CONTROL         "Create Log files",IDC_logf,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,64,159,9
+    COMBOBOX        IDC_logtype,175,64,105,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Make an index",IDC_index,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,80,304,9
+    CONTROL         "Make a word database",IDC_index2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,96,304,9
+END
+
+IDD_OPTION10 DIALOG  0, 0, 309, 61
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "Proxy"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Proxy:",IDC_proxtitle,16,16,39,10
+    COMBOBOX        IDC_prox,58,16,157,89,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CTEXT           ":",IDC_STATIC,215,16,10,11
+    EDITTEXT        IDC_portprox,225,16,25,12,ES_AUTOHSCROLL | ES_NUMBER
+    PUSHBUTTON      "Configure",IDC_proxyconfigure,256,16,49,11
+    CONTROL         "Use proxy for ftp transfers",IDC_ftpprox,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,35,157,10
+    CONTROL         "Hide password",IDC_PWDHIDE,"Button",BS_AUTOCHECKBOX | BS_LEFTTEXT | BS_RIGHT | WS_TABSTOP,177,35,128,10
+END
+
+IDD_HtmlHelp DIALOGEX 0, 0, 381, 282
+STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "WinHTTrack Website Copier Help"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_HTMLVIEW,0,25,381,257
+    ICON            IDI_BACK,IDC_BACK,0,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+    ICON            IDI_FORWARD,IDC_FORWARD,20,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+    ICON            IDI_STOP,IDC_STOP,40,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+    ICON            IDI_RELOAD,IDC_RELOAD,60,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+    ICON            IDI_HOME,IDC_HOME,80,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+    ICON            IDI_PRINT,ID_FILE_PRINT,100,0,20,20,SS_NOTIFY | SS_CENTERIMAGE | SS_REALSIZEIMAGE,WS_EX_DLGMODALFRAME
+END
+
+IDD_InfoUrl DIALOG  0, 0, 347, 261
+STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "File download information"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "CLOSE",IDOK,290,240,50,14
+    COMBOBOX        IDC_backlist,7,7,333,85,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Freeze Window",IDC_Freeze,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,20,138,10
+    LTEXT           "",IDC_InfoUrl,7,35,333,40
+    EDITTEXT        IDC_MoreInfoUrl,7,90,333,148,ES_MULTILINE | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    CONTROL         "Progress1",IDC_slider,"msctls_progress32",PBS_SMOOTH | WS_BORDER,7,243,138,11
+    LTEXT           "100%",IDC_Info100,148,243,18,11
+    LTEXT           "More information:",IDC_STATIC_moreinfos,7,82,138,8
+END
+
+IDD_CatchUrl DIALOG  0, 0, 313, 164
+STYLE DS_SETFONT | DS_MODALFRAME | WS_CAPTION
+CAPTION "Catch URL!"
+FONT 8, "MS Sans Serif"
+BEGIN
+    EDITTEXT        IDC_info,7,45,299,63,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "ABORT",IDCANCEL,256,143,50,14
+    LTEXT           "Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.",IDC_STATIC_info,7,7,299,36
+    LTEXT           "This will send the desired link from your browser to WinHTTrack.",IDC_STATIC_info2,7,113,299,25
+END
+
+IDD_OPTION11 DIALOG  0, 0, 303, 178
+STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
+CAPTION "MIME types"
+FONT 8, "MS Sans Serif"
+BEGIN
+    GROUPBOX        "MIME associations",IDC_STATIC_asso,15,15,275,150
+    LTEXT           "File types:",IDC_STATIC_filetype,25,27,60,8
+    LTEXT           "MIME identity:",IDC_STATIC_mime,120,27,85,8
+    COMBOBOX        IDC_ext1,25,38,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime1,120,38,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext2,25,53,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime2,120,53,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext3,25,68,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime3,120,68,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext4,25,83,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime4,120,83,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext5,25,98,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime5,120,98,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext6,25,113,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime6,120,113,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext7,25,128,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime7,120,128,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_ext8,25,143,60,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_mime8,120,143,85,118,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "-",IDC_up,210,36,15,14,NOT WS_VISIBLE | WS_DISABLED
+    PUSHBUTTON      "+",IDC_down,210,141,15,14,NOT WS_VISIBLE | WS_DISABLED
+    CTEXT           "<-------->",IDC_STATIC,85,35,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,50,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,65,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,80,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,95,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,110,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,125,35,15,SS_CENTERIMAGE
+    CTEXT           "<-------->",IDC_STATIC,85,140,35,15,SS_CENTERIMAGE
+END
+
+IDD_FirstInfo DIALOG  0, 0, 348, 130
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download",IDC_STATIC_welcome,7,7,153,116
+    ICON            IDI_SPLASH,IDC_SPLASH,161,7,20,20,SS_CENTERIMAGE | SS_REALSIZEIMAGE
+END
+
+IDD_BatchUpdate DIALOG  0, 0, 322, 177
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 3,46,1,0
+ PRODUCTVERSION 3,46,1,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "Website Copier [Offline Browser]"
+            VALUE "CompanyName", "HTTrack"
+            VALUE "FileDescription", "WinHTTrack Website Copier, Web Site mirroring for professional and private purposes"
+            VALUE "FileVersion", "3.46.1"
+            VALUE "InternalName", "WinHTTrack"
+            VALUE "LegalCopyright", "Copyright (C) Xavier Roche and other contributors"
+            VALUE "LegalTrademarks", "This software is covered by the GNU General Public License"
+            VALUE "OriginalFilename", "WinHTTrack.exe"
+            VALUE "ProductName", "WinHTTrack Website Copier"
+            VALUE "ProductVersion", "3.46-1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_WIZ1, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 316
+        VERTGUIDE, 16
+        VERTGUIDE, 40
+        VERTGUIDE, 54
+        VERTGUIDE, 60
+        VERTGUIDE, 75
+        VERTGUIDE, 175
+        VERTGUIDE, 200
+        VERTGUIDE, 235
+        VERTGUIDE, 248
+        VERTGUIDE, 260
+        VERTGUIDE, 297
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 192
+        HORZGUIDE, 50
+        HORZGUIDE, 56
+        HORZGUIDE, 90
+        HORZGUIDE, 95
+        HORZGUIDE, 144
+        HORZGUIDE, 165
+        HORZGUIDE, 175
+    END
+
+    IDD_Debut, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 249
+        VERTGUIDE, 12
+        VERTGUIDE, 20
+        VERTGUIDE, 25
+        VERTGUIDE, 105
+        VERTGUIDE, 240
+        VERTGUIDE, 245
+        TOPMARGIN, 6
+        BOTTOMMARGIN, 198
+        HORZGUIDE, 140
+    END
+
+    IDD_wizard, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 183
+        VERTGUIDE, 15
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 91
+        HORZGUIDE, 70
+    END
+
+    IDD_inprogress, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 354
+        VERTGUIDE, 15
+        VERTGUIDE, 55
+        VERTGUIDE, 60
+        VERTGUIDE, 70
+        VERTGUIDE, 80
+        VERTGUIDE, 85
+        VERTGUIDE, 155
+        VERTGUIDE, 195
+        VERTGUIDE, 199
+        VERTGUIDE, 235
+        VERTGUIDE, 240
+        VERTGUIDE, 265
+        VERTGUIDE, 290
+        VERTGUIDE, 295
+        VERTGUIDE, 345
+        VERTGUIDE, 346
+        VERTGUIDE, 350
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 260
+        HORZGUIDE, 15
+        HORZGUIDE, 30
+        HORZGUIDE, 40
+        HORZGUIDE, 50
+        HORZGUIDE, 60
+        HORZGUIDE, 70
+        HORZGUIDE, 80
+        HORZGUIDE, 85
+        HORZGUIDE, 95
+        HORZGUIDE, 105
+        HORZGUIDE, 115
+        HORZGUIDE, 125
+        HORZGUIDE, 135
+        HORZGUIDE, 145
+        HORZGUIDE, 155
+        HORZGUIDE, 165
+        HORZGUIDE, 175
+        HORZGUIDE, 185
+        HORZGUIDE, 195
+        HORZGUIDE, 205
+        HORZGUIDE, 215
+        HORZGUIDE, 225
+        HORZGUIDE, 235
+        HORZGUIDE, 245
+        HORZGUIDE, 255
+    END
+
+    IDD_wizard_yn, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 190
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 99
+    END
+
+    IDD_wizard_lnk, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 210
+        VERTGUIDE, 20
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 110
+        HORZGUIDE, 30
+        HORZGUIDE, 40
+        HORZGUIDE, 50
+        HORZGUIDE, 60
+    END
+
+    IDD_ABOUT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 228
+        VERTGUIDE, 160
+        VERTGUIDE, 165
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 196
+        HORZGUIDE, 90
+        HORZGUIDE, 175
+    END
+
+    IDD_AddFilter, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 223
+        VERTGUIDE, 85
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 143
+        HORZGUIDE, 45
+        HORZGUIDE, 60
+    END
+
+    IDD_iplog, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 420
+        VERTGUIDE, 10
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+    END
+
+    IDD_NewFolder, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 230
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 39
+    END
+
+    IDD_fin, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 314
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 188
+        HORZGUIDE, 179
+    END
+
+    IDD_BuildOptions, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 239
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 177
+    END
+
+    IDD_ProxyId, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 259
+        VERTGUIDE, 90
+        VERTGUIDE, 95
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 122
+    END
+
+    IDD_NewProj, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 315
+        VERTGUIDE, 16
+        VERTGUIDE, 125
+        VERTGUIDE, 130
+        VERTGUIDE, 232
+        VERTGUIDE, 250
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 174
+        HORZGUIDE, 30
+        HORZGUIDE, 45
+        HORZGUIDE, 60
+        HORZGUIDE, 140
+    END
+
+    IDD_InsertUrl, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 259
+        VERTGUIDE, 80
+        VERTGUIDE, 90
+        VERTGUIDE, 95
+        VERTGUIDE, 102
+        VERTGUIDE, 105
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 135
+        HORZGUIDE, 85
+    END
+
+    IDD_OPTION3, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 145
+        VERTGUIDE, 155
+        VERTGUIDE, 165
+        VERTGUIDE, 295
+        HORZGUIDE, 16
+        HORZGUIDE, 30
+        HORZGUIDE, 50
+        HORZGUIDE, 75
+        HORZGUIDE, 100
+        HORZGUIDE, 115
+        HORZGUIDE, 130
+    END
+
+    IDD_OPTION4, DIALOG
+    BEGIN
+        RIGHTMARGIN, 313
+        VERTGUIDE, 16
+        VERTGUIDE, 120
+        VERTGUIDE, 130
+        VERTGUIDE, 162
+        VERTGUIDE, 170
+        HORZGUIDE, 15
+        HORZGUIDE, 30
+        HORZGUIDE, 49
+        HORZGUIDE, 64
+        HORZGUIDE, 80
+        HORZGUIDE, 95
+        HORZGUIDE, 109
+    END
+
+    IDD_OPTION5, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 145
+        VERTGUIDE, 151
+        VERTGUIDE, 192
+        VERTGUIDE, 200
+        VERTGUIDE, 215
+        HORZGUIDE, 15
+        HORZGUIDE, 30
+        HORZGUIDE, 45
+        HORZGUIDE, 60
+        HORZGUIDE, 75
+        HORZGUIDE, 90
+        HORZGUIDE, 105
+        HORZGUIDE, 115
+        HORZGUIDE, 130
+        HORZGUIDE, 145
+        HORZGUIDE, 155
+        HORZGUIDE, 170
+        HORZGUIDE, 180
+    END
+
+    IDD_OPTION6, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 110
+        VERTGUIDE, 115
+        VERTGUIDE, 295
+        HORZGUIDE, 16
+        HORZGUIDE, 35
+    END
+
+    IDD_OPTION1, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        HORZGUIDE, 16
+        HORZGUIDE, 32
+        HORZGUIDE, 48
+        HORZGUIDE, 64
+        HORZGUIDE, 85
+    END
+
+    IDD_OPTION2, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 128
+        VERTGUIDE, 136
+        VERTGUIDE, 280
+        VERTGUIDE, 285
+        HORZGUIDE, 16
+        HORZGUIDE, 36
+        HORZGUIDE, 55
+        HORZGUIDE, 60
+        HORZGUIDE, 75
+        HORZGUIDE, 90
+        HORZGUIDE, 105
+        HORZGUIDE, 120
+        HORZGUIDE, 135
+    END
+
+    IDD_OPTION7, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 95
+        VERTGUIDE, 175
+        VERTGUIDE, 305
+        BOTTOMMARGIN, 186
+        HORZGUIDE, 16
+        HORZGUIDE, 60
+        HORZGUIDE, 65
+        HORZGUIDE, 80
+        HORZGUIDE, 95
+        HORZGUIDE, 125
+        HORZGUIDE, 145
+    END
+
+    IDD_OPTION8, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 128
+        VERTGUIDE, 144
+        VERTGUIDE, 260
+        HORZGUIDE, 16
+        HORZGUIDE, 32
+        HORZGUIDE, 48
+        HORZGUIDE, 64
+        HORZGUIDE, 80
+        HORZGUIDE, 95
+        HORZGUIDE, 110
+        HORZGUIDE, 125
+        HORZGUIDE, 144
+    END
+
+    IDD_OPTION9, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 175
+        VERTGUIDE, 280
+        HORZGUIDE, 16
+        HORZGUIDE, 32
+        HORZGUIDE, 48
+        HORZGUIDE, 64
+        HORZGUIDE, 80
+        HORZGUIDE, 96
+    END
+
+    IDD_OPTION10, DIALOG
+    BEGIN
+        VERTGUIDE, 16
+        VERTGUIDE, 215
+        VERTGUIDE, 225
+        VERTGUIDE, 250
+        VERTGUIDE, 305
+        HORZGUIDE, 16
+        HORZGUIDE, 45
+    END
+
+    IDD_InfoUrl, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 340
+        VERTGUIDE, 145
+        VERTGUIDE, 166
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 254
+        HORZGUIDE, 20
+        HORZGUIDE, 35
+        HORZGUIDE, 75
+        HORZGUIDE, 90
+        HORZGUIDE, 150
+    END
+
+    IDD_CatchUrl, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 306
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 157
+    END
+
+    IDD_OPTION11, DIALOG
+    BEGIN
+        VERTGUIDE, 15
+        VERTGUIDE, 25
+        VERTGUIDE, 85
+        VERTGUIDE, 120
+        VERTGUIDE, 205
+        VERTGUIDE, 210
+        VERTGUIDE, 225
+        VERTGUIDE, 290
+        BOTTOMMARGIN, 167
+        HORZGUIDE, 15
+        HORZGUIDE, 35
+        HORZGUIDE, 50
+        HORZGUIDE, 65
+        HORZGUIDE, 80
+        HORZGUIDE, 95
+        HORZGUIDE, 110
+        HORZGUIDE, 125
+        HORZGUIDE, 140
+        HORZGUIDE, 155
+        HORZGUIDE, 165
+    END
+
+    IDD_FirstInfo, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 341
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 123
+    END
+
+    IDD_BatchUpdate, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 315
+        VERTGUIDE, 20
+        VERTGUIDE, 25
+        VERTGUIDE, 220
+        VERTGUIDE, 225
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+        HORZGUIDE, 15
+        HORZGUIDE, 30
+        HORZGUIDE, 100
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog Info
+//
+
+IDD_WIZ1 DLGINIT
+BEGIN
+    IDC_todo, 0x403, 21, 0
+0x6f44, 0x6e77, 0x6f6c, 0x6461, 0x7720, 0x6265, 0x7320, 0x7469, 0x2865, 
+0x2973, "\000" 
+    IDC_todo, 0x403, 33, 0
+0x6f44, 0x6e77, 0x6f6c, 0x6461, 0x7720, 0x6265, 0x7320, 0x7469, 0x2865, 
+0x2973, 0x2b20, 0x7120, 0x6575, 0x7473, 0x6f69, 0x736e, "\000" 
+    IDC_todo, 0x403, 20, 0
+0x6547, 0x2074, 0x6573, 0x6170, 0x6172, 0x6574, 0x2064, 0x6966, 0x656c, 
+0x0073, 
+    IDC_todo, 0x403, 46, 0
+0x6f44, 0x6e77, 0x6f6c, 0x6461, 0x6120, 0x6c6c, 0x7320, 0x7469, 0x7365, 
+0x6920, 0x206e, 0x6170, 0x6567, 0x2073, 0x6d28, 0x6c75, 0x6974, 0x6c70, 
+0x2065, 0x696d, 0x7272, 0x726f, 0x0029, 
+    IDC_todo, 0x403, 36, 0
+0x6554, 0x7473, 0x6c20, 0x6e69, 0x736b, 0x6920, 0x206e, 0x6170, 0x6567, 
+0x2073, 0x6228, 0x6f6f, 0x6d6b, 0x7261, 0x206b, 0x6574, 0x7473, 0x0029, 
+
+    IDC_todo, 0x403, 32, 0
+0x202a, 0x6f43, 0x746e, 0x6e69, 0x6575, 0x6920, 0x746e, 0x7265, 0x7572, 
+0x7470, 0x6465, 0x6420, 0x776f, 0x6c6e, 0x616f, 0x0064, 
+    IDC_todo, 0x403, 27, 0
+0x202a, 0x7055, 0x6164, 0x6574, 0x6520, 0x6978, 0x7473, 0x6e69, 0x2067, 
+0x6f64, 0x6e77, 0x6f6c, 0x6461, "\000" 
+    0
+END
+
+IDD_AddFilter DLGINIT
+BEGIN
+    IDC_AFtype, 0x403, 27, 0
+0x6946, 0x656c, 0x6e20, 0x6d61, 0x7365, 0x7720, 0x7469, 0x2068, 0x7865, 
+0x6574, 0x736e, 0x6f69, 0x3a6e, "\000" 
+    IDC_AFtype, 0x403, 23, 0
+0x6946, 0x656c, 0x6e20, 0x6d61, 0x7365, 0x6320, 0x6e6f, 0x6174, 0x6e69, 
+0x6e69, 0x3a67, "\000" 
+    IDC_AFtype, 0x403, 16, 0
+0x6854, 0x7369, 0x6620, 0x6c69, 0x2065, 0x616e, 0x656d, 0x003a, 
+    IDC_AFtype, 0x403, 25, 0
+0x6f46, 0x646c, 0x7265, 0x6e20, 0x6d61, 0x7365, 0x6320, 0x6e6f, 0x6174, 
+0x6e69, 0x6e69, 0x3a67, "\000" 
+    IDC_AFtype, 0x403, 18, 0
+0x6854, 0x7369, 0x6620, 0x6c6f, 0x6564, 0x2072, 0x616e, 0x656d, 0x003a, 
+
+    IDC_AFtype, 0x403, 22, 0
+0x694c, 0x6b6e, 0x2073, 0x6e6f, 0x7420, 0x6968, 0x2073, 0x6f64, 0x616d, 
+0x6e69, 0x003a, 
+    IDC_AFtype, 0x403, 29, 0
+0x694c, 0x6b6e, 0x2073, 0x6e6f, 0x6420, 0x6d6f, 0x6961, 0x736e, 0x6320, 
+0x6e6f, 0x6174, 0x6e69, 0x6e69, 0x3a67, "\000" 
+    IDC_AFtype, 0x403, 22, 0
+0x694c, 0x6b6e, 0x2073, 0x7266, 0x6d6f, 0x7420, 0x6968, 0x2073, 0x6f68, 
+0x7473, 0x003a, 
+    IDC_AFtype, 0x403, 18, 0
+0x694c, 0x6b6e, 0x2073, 0x6f63, 0x746e, 0x6961, 0x696e, 0x676e, 0x003a, 
+
+    IDC_AFtype, 0x403, 11, 0
+0x6854, 0x7369, 0x6c20, 0x6e69, 0x3a6b, "\000" 
+    IDC_AFtype, 0x403, 10, 0
+0x4c41, 0x204c, 0x494c, 0x4b4e, 0x0053, 
+    0
+END
+
+IDD_ABOUT DLGINIT
+BEGIN
+    IDC_lang, 0x403, 8, 0
+0x6e45, 0x6c67, 0x7369, 0x0068, 
+    IDC_lang, 0x403, 9, 0
+0x7246, 0x6e61, 0x61e7, 0x7369, "\000" 
+    IDC_lang, 0x403, 11, 0
+0x6143, 0x7473, 0x6c65, 0x616c, 0x6f6e, "\000" 
+    IDC_lang, 0x403, 8, 0
+0x6544, 0x7475, 0x6373, 0x0068, 
+    IDC_lang, 0x403, 11, 0
+0x654e, 0x6564, 0x6c72, 0x6e61, 0x7364, "\000" 
+    IDC_lang, 0x403, 7, 0
+0x6f50, 0x736c, 0x696b, "\000" 
+    IDC_lang, 0x403, 10, 0
+0x6f50, 0x7472, 0x6775, 0xea75, 0x0073, 
+    IDC_lang, 0x403, 8, 0
+0x7552, 0x7373, 0x6169, 0x006e, 
+    IDC_lang, 0x403, 9, 0
+0x7449, 0x6c61, 0x6169, 0x6f6e, "\000" 
+    IDC_lang, 0x403, 15, 0
+0x724b, 0x79e9, 0x6cf2, 0x4d20, 0x7461, 0x6e69, 0x6b69, "\000" 
+    IDC_lang, 0x403, 7, 0
+0x614d, 0x7967, 0x7261, "\000" 
+    IDC_lang, 0x403, 17, 0
+0x6f50, 0x7472, 0x6775, 0xea75, 0x2d73, 0x7242, 0x7361, 0x6c69, "\000" 
+    0
+END
+
+IDD_Debut DLGINIT
+BEGIN
+    IDC_rasid, 0x403, 7, 0
+0x6e28, 0x6e6f, 0x2965, "\000" 
+    0
+END
+
+IDD_OPTION3 DLGINIT
+BEGIN
+    IDC_filter, 0x403, 10, 0
+0x754a, 0x7473, 0x7320, 0x6163, 0x006e, 
+    IDC_filter, 0x403, 17, 0
+0x7453, 0x726f, 0x2065, 0x7468, 0x6c6d, 0x6620, 0x6c69, 0x7365, "\000" 
+    IDC_filter, 0x403, 21, 0
+0x7453, 0x726f, 0x2065, 0x6f6e, 0x206e, 0x7468, 0x6c6d, 0x6620, 0x6c69, 
+0x7365, "\000" 
+    IDC_filter, 0x403, 26, 0
+0x7453, 0x726f, 0x2065, 0x6c61, 0x206c, 0x6966, 0x656c, 0x2073, 0x6428, 
+0x6665, 0x7561, 0x746c, 0x0029, 
+    IDC_filter, 0x403, 23, 0
+0x7453, 0x726f, 0x2065, 0x7468, 0x6c6d, 0x6620, 0x6c69, 0x7365, 0x6620, 
+0x7269, 0x7473, "\000" 
+    IDC_travel, 0x403, 27, 0
+0x7453, 0x7961, 0x6920, 0x206e, 0x6874, 0x2065, 0x6173, 0x656d, 0x6420, 
+0x7269, 0x6365, 0x6f74, 0x7972, "\000" 
+    IDC_travel, 0x403, 22, 0
+0x6143, 0x206e, 0x6f67, 0x6420, 0x776f, 0x206e, 0x6428, 0x6665, 0x7561, 
+0x746c, 0x0029, 
+    IDC_travel, 0x403, 10, 0
+0x6143, 0x206e, 0x6f67, 0x7520, 0x0070, 
+    IDC_travel, 0x403, 22, 0
+0x6143, 0x206e, 0x6f62, 0x6874, 0x6720, 0x206f, 0x7075, 0x2620, 0x6420, 
+0x776f, 0x006e, 
+    IDC_travel2, 0x403, 36, 0
+0x7453, 0x7961, 0x6f20, 0x206e, 0x6874, 0x2065, 0x6173, 0x656d, 0x6120, 
+0x6464, 0x6572, 0x7373, 0x2020, 0x6428, 0x6665, 0x7561, 0x746c, 0x0029, 
+
+    IDC_travel2, 0x403, 24, 0
+0x7453, 0x7961, 0x6f20, 0x206e, 0x6874, 0x2065, 0x6173, 0x656d, 0x6420, 
+0x6d6f, 0x6961, 0x006e, 
+    IDC_travel2, 0x403, 34, 0
+0x7453, 0x7961, 0x6f20, 0x206e, 0x6874, 0x2065, 0x6173, 0x656d, 0x7420, 
+0x706f, 0x6c20, 0x7665, 0x6c65, 0x6420, 0x6d6f, 0x6961, 0x006e, 
+    IDC_travel2, 0x403, 25, 0
+0x6f47, 0x6520, 0x6576, 0x7972, 0x6877, 0x7265, 0x2065, 0x6e6f, 0x7420, 
+0x6568, 0x7720, 0x6265, "\000" 
+    IDC_travel3, 0x403, 38, 0
+0x6552, 0x616c, 0x6974, 0x6576, 0x5520, 0x4952, 0x2f20, 0x4120, 0x7362, 
+0x6c6f, 0x7475, 0x2065, 0x5255, 0x204c, 0x6428, 0x6665, 0x7561, 0x746c, 
+0x0029, 
+    IDC_travel3, 0x403, 28, 0
+0x6241, 0x6f73, 0x756c, 0x6574, 0x5520, 0x4c52, 0x2f20, 0x4120, 0x7362, 
+0x6c6f, 0x7475, 0x2065, 0x5255, 0x004c, 
+    IDC_travel3, 0x403, 28, 0
+0x6241, 0x6f73, 0x756c, 0x6574, 0x5520, 0x4952, 0x2f20, 0x4120, 0x7362, 
+0x6c6f, 0x7475, 0x2065, 0x5255, 0x004c, 
+    IDC_travel3, 0x403, 28, 0
+0x724f, 0x6769, 0x6e69, 0x6c61, 0x5520, 0x4c52, 0x2f20, 0x4f20, 0x6972, 
+0x6967, 0x616e, 0x206c, 0x5255, 0x004c, 
+    0
+END
+
+IDD_OPTION4 DLGINIT
+BEGIN
+    IDC_connexion, 0x403, 1, 0
+"\000" 
+    IDC_connexion, 0x403, 2, 0
+0x0031, 
+    IDC_connexion, 0x403, 2, 0
+0x0032, 
+    IDC_connexion, 0x403, 2, 0
+0x0033, 
+    IDC_connexion, 0x403, 2, 0
+0x0034, 
+    IDC_connexion, 0x403, 2, 0
+0x0035, 
+    IDC_connexion, 0x403, 2, 0
+0x0036, 
+    IDC_connexion, 0x403, 2, 0
+0x0037, 
+    IDC_connexion, 0x403, 2, 0
+0x0038, 
+    IDC_timeout, 0x403, 1, 0
+"\000" 
+    IDC_timeout, 0x403, 2, 0
+0x0031, 
+    IDC_timeout, 0x403, 2, 0
+0x0033, 
+    IDC_timeout, 0x403, 2, 0
+0x0036, 
+    IDC_timeout, 0x403, 3, 0
+0x3033, "\000" 
+    IDC_timeout, 0x403, 3, 0
+0x3036, "\000" 
+    IDC_timeout, 0x403, 4, 0
+0x3033, 0x0030, 
+    IDC_timeout, 0x403, 4, 0
+0x3036, 0x0030, 
+    IDC_timeout, 0x403, 5, 0
+0x3231, 0x3030, "\000" 
+    IDC_retry, 0x403, 1, 0
+"\000" 
+    IDC_retry, 0x403, 2, 0
+0x0030, 
+    IDC_retry, 0x403, 2, 0
+0x0031, 
+    IDC_retry, 0x403, 2, 0
+0x0032, 
+    IDC_retry, 0x403, 2, 0
+0x0033, 
+    0
+END
+
+IDD_OPTION5 DLGINIT
+BEGIN
+    IDC_depth, 0x403, 1, 0
+"\000" 
+    IDC_depth, 0x403, 2, 0
+0x0030, 
+    IDC_depth, 0x403, 2, 0
+0x0031, 
+    IDC_depth, 0x403, 2, 0
+0x0032, 
+    IDC_depth, 0x403, 2, 0
+0x0033, 
+    IDC_depth, 0x403, 2, 0
+0x0034, 
+    IDC_depth, 0x403, 2, 0
+0x0035, 
+    IDC_depth, 0x403, 3, 0
+0x3031, "\000" 
+    IDC_depth, 0x403, 3, 0
+0x3032, "\000" 
+    IDC_depth2, 0x403, 1, 0
+"\000" 
+    IDC_depth2, 0x403, 2, 0
+0x0030, 
+    IDC_depth2, 0x403, 2, 0
+0x0031, 
+    IDC_depth2, 0x403, 2, 0
+0x0032, 
+    IDC_depth2, 0x403, 2, 0
+0x0033, 
+    IDC_maxtime, 0x403, 1, 0
+"\000" 
+    IDC_maxtime, 0x403, 4, 0
+0x3831, 0x0030, 
+    IDC_maxtime, 0x403, 4, 0
+0x3633, 0x0030, 
+    IDC_maxtime, 0x403, 4, 0
+0x3237, 0x0030, 
+    IDC_maxtime, 0x403, 5, 0
+0x3831, 0x3030, "\000" 
+    IDC_maxtime, 0x403, 5, 0
+0x3633, 0x3030, "\000" 
+    IDC_maxtime, 0x403, 5, 0
+0x3237, 0x3030, "\000" 
+    IDC_maxrate, 0x403, 1, 0
+"\000" 
+    IDC_maxrate, 0x403, 3, 0
+0x3031, "\000" 
+    IDC_maxrate, 0x403, 3, 0
+0x3035, "\000" 
+    IDC_maxrate, 0x403, 4, 0
+0x3032, 0x0030, 
+    IDC_maxrate, 0x403, 4, 0
+0x3035, 0x0030, 
+    IDC_maxrate, 0x403, 5, 0
+0x3032, 0x3030, "\000" 
+    IDC_maxrate, 0x403, 5, 0
+0x3035, 0x3030, "\000" 
+    IDC_maxrate, 0x403, 6, 0
+0x3032, 0x3030, 0x0030, 
+    IDC_maxrate, 0x403, 6, 0
+0x3035, 0x3030, 0x0030, 
+    IDC_maxconn, 0x403, 1, 0
+"\000" 
+    IDC_maxconn, 0x403, 6, 0
+0x2e30, 0x3130, 0x0037, 
+    IDC_maxconn, 0x403, 4, 0
+0x2e30, 0x0031, 
+    IDC_maxconn, 0x403, 2, 0
+0x0031, 
+    IDC_maxconn, 0x403, 2, 0
+0x0032, 
+    IDC_maxconn, 0x403, 2, 0
+0x0035, 
+    IDC_maxconn, 0x403, 3, 0
+0x3031, "\000" 
+    IDC_maxlinks, 0x403, 7, 0
+0x3031, 0x3030, 0x3030, "\000" 
+    IDC_maxlinks, 0x403, 7, 0
+0x3032, 0x3030, 0x3030, "\000" 
+    IDC_maxlinks, 0x403, 7, 0
+0x3035, 0x3030, 0x3030, "\000" 
+    IDC_maxlinks, 0x403, 8, 0
+0x3031, 0x3030, 0x3030, 0x0030, 
+    IDC_maxlinks, 0x403, 8, 0
+0x3035, 0x3030, 0x3030, 0x0030, 
+    IDC_maxlinks, 0x403, 9, 0
+0x3031, 0x3030, 0x3030, 0x3030, "\000" 
+    0
+END
+
+IDD_OPTION6 DLGINIT
+BEGIN
+    IDC_user, 0x403, 1, 0
+"\000" 
+    IDC_user, 0x403, 51, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e36, 0x3b30, 0x5720, 
+0x6e69, 0x6f64, 0x7377, 0x4e20, 0x2054, 0x2e35, 0x2930, "\000" 
+    IDC_user, 0x403, 51, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e35, 0x3b35, 0x5720, 
+0x6e69, 0x6f64, 0x7377, 0x4e20, 0x2054, 0x2e35, 0x2930, "\000" 
+    IDC_user, 0x403, 52, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e35, 0x3130, 0x203b, 
+0x6957, 0x646e, 0x776f, 0x2073, 0x544e, 0x3520, 0x302e, 0x0029, 
+    IDC_user, 0x403, 42, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e35, 0x3b30, 0x5720, 
+0x6e69, 0x3233, 0x0029, 
+    IDC_user, 0x403, 48, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e34, 0x3130, 0x203b, 
+0x6957, 0x646e, 0x776f, 0x2073, 0x3839, 0x0029, 
+    IDC_user, 0x403, 48, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e34, 0x3130, 0x203b, 
+0x6957, 0x646e, 0x776f, 0x2073, 0x3539, 0x0029, 
+    IDC_user, 0x403, 48, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e34, 0x3130, 0x203b, 
+0x6957, 0x646e, 0x776f, 0x2073, 0x544e, 0x0029, 
+    IDC_user, 0x403, 38, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x3837, 0x5b20, 0x6e65, 0x205d, 
+0x5728, 0x6e69, 0x6f64, 0x7377, 0x4e20, 0x2054, 0x2e35, 0x3b30, 0x5520, 
+0x0029, 
+    IDC_user, 0x403, 29, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x3136, 0x5b20, 0x6e65, 0x205d, 
+0x5728, 0x6e69, 0x3839, 0x203b, 0x2949, "\000" 
+    IDC_user, 0x403, 71, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e35, 0x2030, 0x5728, 0x6e69, 0x6f64, 
+0x7377, 0x203b, 0x3b55, 0x5720, 0x6e69, 0x6f64, 0x7377, 0x4e20, 0x2054, 
+0x2e35, 0x3b30, 0x6520, 0x2d6e, 0x5355, 0x203b, 0x7672, 0x313a, 0x312e, 
+0x2029, 0x6547, 0x6b63, 0x2f6f, 0x3032, 0x3230, 0x3830, 0x3632, "\000" 
+    IDC_user, 0x403, 23, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e33, 0x2030, 0x5728, 0x6e69, 0x3539, 
+0x203b, 0x2949, "\000" 
+    IDC_user, 0x403, 48, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e32, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x4953, 0x2045, 0x2e33, 0x3130, 0x203b, 
+0x6957, 0x646e, 0x776f, 0x2073, 0x3539, 0x0029, 
+    IDC_user, 0x403, 45, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x655b, 0x5d6e, 0x2820, 
+0x3158, 0x3b31, 0x4920, 0x203b, 0x694c, 0x756e, 0x2078, 0x2e32, 0x2e30, 
+0x3433, 0x6920, 0x3836, 0x2936, "\000" 
+    IDC_user, 0x403, 55, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x3630, 0x2d43, 0x4d45, 0x2d53, 
+0x2e31, 0x2034, 0x655b, 0x5d6e, 0x2820, 0x3158, 0x3b31, 0x5520, 0x203b, 
+0x7553, 0x4f6e, 0x2053, 0x2e35, 0x2e35, 0x2031, 0x7573, 0x346e, 0x296d, 
+"\000" 
+    IDC_user, 0x403, 32, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x4d28, 0x6361, 0x6e69, 
+0x6f74, 0x6873, 0x203b, 0x3b49, 0x5020, 0x4350, 0x0029, 
+    IDC_user, 0x403, 42, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e33, 0x3130, 0x432d, 0x4d2d, 0x4341, 
+0x534f, 0x2038, 0x4d28, 0x6361, 0x6e69, 0x6f74, 0x6873, 0x203b, 0x3b49, 
+0x5020, 0x4350, 0x0029, 
+    IDC_user, 0x403, 22, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e32, 0x2030, 0x4f28, 0x2f53, 0x3b32, 
+0x4920, 0x0029, 
+    IDC_user, 0x403, 43, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x655b, 0x5d6e, 0x2820, 
+0x3158, 0x3b31, 0x5520, 0x203b, 0x7553, 0x4f6e, 0x2053, 0x2e35, 0x2036, 
+0x7573, 0x346e, 0x2975, "\000" 
+    IDC_user, 0x403, 35, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x655b, 0x5d6e, 0x2820, 
+0x3158, 0x3b31, 0x4920, 0x203b, 0x4941, 0x2058, 0x2e34, 0x2931, "\000" 
+    IDC_user, 0x403, 54, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x655b, 0x5d6e, 0x2820, 
+0x3158, 0x3b31, 0x4920, 0x203b, 0x7246, 0x6565, 0x5342, 0x2044, 0x2e32, 
+0x2e32, 0x2d36, 0x4552, 0x454c, 0x5341, 0x2045, 0x3369, 0x3638, 0x0029, 
+
+    IDC_user, 0x403, 47, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e33, 0x3130, 0x4753, 0x6c6f, 0x4364, 
+0x532d, 0x4947, 0x2820, 0x3158, 0x3b31, 0x4920, 0x203b, 0x5249, 0x5849, 
+0x3620, 0x332e, 0x4920, 0x3350, 0x2932, "\000" 
+    IDC_user, 0x403, 45, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e33, 0x2030, 0x6557, 0x5462, 0x2f56, 
+0x2e31, 0x2032, 0x6328, 0x6d6f, 0x6170, 0x6974, 0x6c62, 0x3b65, 0x4d20, 
+0x4953, 0x2045, 0x2e32, 0x2930, "\000" 
+    IDC_user, 0x403, 51, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e32, 0x2030, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4d20, 0x2053, 0x7246, 0x6e6f, 0x5074, 0x6761, 
+0x2065, 0x7845, 0x7270, 0x7365, 0x2073, 0x2e32, 0x2930, "\000" 
+    IDC_user, 0x403, 29, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x3530, 0x5b20, 0x7266, 0x205d, 
+0x5728, 0x6e69, 0x3839, 0x203b, 0x2949, "\000" 
+    IDC_user, 0x403, 29, 0
+0x794c, 0x786e, 0x322f, 0x382e, 0x6572, 0x2e6c, 0x2033, 0x696c, 0x7762, 
+0x7777, 0x462d, 0x2f4d, 0x2e32, 0x3431, "\000" 
+    IDC_user, 0x403, 10, 0
+0x614a, 0x6176, 0x2e31, 0x2e31, 0x0034, 
+    IDC_user, 0x403, 51, 0
+0x6f4d, 0x697a, 0x6c6c, 0x2f61, 0x2e34, 0x2035, 0x6328, 0x6d6f, 0x6170, 
+0x6974, 0x6c62, 0x3b65, 0x4820, 0x5454, 0x6172, 0x6b63, 0x3320, 0x302e, 
+0x3b78, 0x5720, 0x6e69, 0x6f64, 0x7377, 0x3920, 0x2938, "\000" 
+    IDC_user, 0x403, 48, 0
+0x7948, 0x6570, 0x4272, 0x6f72, 0x7377, 0x7265, 0x2820, 0x7243, 0x7961, 
+0x203b, 0x3b49, 0x4f20, 0x6772, 0x6e61, 0x6369, 0x534f, 0x3920, 0x372e, 
+0x342e, 0x6232, 0x7465, 0x2d61, 0x3732, 0x0029, 
+    IDC_user, 0x403, 13, 0
+0x5448, 0x7254, 0x6361, 0x2f6b, 0x2e33, 0x7830, "\000" 
+    IDC_user, 0x403, 66, 0
+0x5448, 0x7254, 0x6361, 0x206b, 0x6557, 0x7362, 0x7469, 0x2065, 0x6f43, 
+0x6970, 0x7265, 0x332f, 0x302e, 0x2078, 0x6f28, 0x6666, 0x696c, 0x656e, 
+0x6220, 0x6f72, 0x7377, 0x7265, 0x203b, 0x6577, 0x2062, 0x696d, 0x7272, 
+0x726f, 0x7520, 0x6974, 0x696c, 0x7974, 0x0029, 
+    IDC_user, 0x403, 7, 0
+0x6e28, 0x6e6f, 0x2965, "\000" 
+    IDC_footer, 0x403, 1, 0
+"\000" 
+    IDC_footer, 0x403, 61, 0
+0x213c, 0x2d2d, 0x4d20, 0x7269, 0x6f72, 0x6572, 0x2064, 0x7962, 0x4820, 
+0x5454, 0x6172, 0x6b63, 0x5720, 0x6265, 0x6973, 0x6574, 0x4320, 0x706f, 
+0x6569, 0x2f72, 0x2e33, 0x2078, 0x585b, 0x2f52, 0x5059, 0x3227, 0x3030, 
+0x5d30, 0x2d20, 0x3e2d, "\000" 
+    IDC_footer, 0x403, 69, 0
+0x213c, 0x2d2d, 0x4d20, 0x7269, 0x6f72, 0x6572, 0x2064, 0x7266, 0x6d6f, 
+0x2520, 0x2073, 0x7962, 0x4820, 0x5454, 0x6172, 0x6b63, 0x5720, 0x6265, 
+0x6973, 0x6574, 0x4320, 0x706f, 0x6569, 0x2f72, 0x2e33, 0x2078, 0x585b, 
+0x2f52, 0x5059, 0x3227, 0x3030, 0x5d30, 0x2d20, 0x3e2d, "\000" 
+    IDC_footer, 0x403, 71, 0
+0x213c, 0x2d2d, 0x4d20, 0x7269, 0x6f72, 0x6572, 0x2064, 0x7266, 0x6d6f, 
+0x2520, 0x2573, 0x2073, 0x7962, 0x4820, 0x5454, 0x6172, 0x6b63, 0x5720, 
+0x6265, 0x6973, 0x6574, 0x4320, 0x706f, 0x6569, 0x2f72, 0x2e33, 0x2078, 
+0x585b, 0x2f52, 0x5059, 0x3227, 0x3030, 0x5d30, 0x2d20, 0x3e2d, "\000" 
+    IDC_footer, 0x403, 75, 0
+0x213c, 0x2d2d, 0x4d20, 0x7269, 0x6f72, 0x6572, 0x2064, 0x7266, 0x6d6f, 
+0x2520, 0x2573, 0x2c73, 0x2520, 0x2073, 0x7962, 0x4820, 0x5454, 0x6172, 
+0x6b63, 0x5720, 0x6265, 0x6973, 0x6574, 0x4320, 0x706f, 0x6569, 0x2f72, 
+0x2e33, 0x2078, 0x585b, 0x2f52, 0x5059, 0x3227, 0x3030, 0x5d30, 0x2d20, 
+0x3e2d, "\000" 
+    IDC_footer, 0x403, 79, 0
+0x213c, 0x2d2d, 0x4d20, 0x7269, 0x6f72, 0x6572, 0x2064, 0x7962, 0x203a, 
+0x5448, 0x7254, 0x6361, 0x206b, 0x6557, 0x7362, 0x7469, 0x2065, 0x6f43, 
+0x6970, 0x7265, 0x332f, 0x782e, 0x202e, 0x6953, 0x6574, 0x203a, 0x7325, 
+0x202e, 0x6946, 0x656c, 0x203a, 0x7325, 0x202e, 0x6144, 0x6574, 0x203a, 
+0x7325, 0x2d20, 0x3e2d, "\000" 
+    IDC_footer, 0x403, 7, 0
+0x6e28, 0x6e6f, 0x2965, "\000" 
+    0
+END
+
+IDD_OPTION2 DLGINIT
+BEGIN
+    IDC_build, 0x403, 25, 0
+0x6953, 0x6574, 0x732d, 0x7274, 0x6375, 0x7574, 0x6572, 0x2820, 0x6564, 
+0x6166, 0x6c75, 0x2974, "\000" 
+    IDC_build, 0x403, 54, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6577, 0x2f62, 0x202c, 0x2020, 0x2020, 
+0x2020, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6620, 0x6c69, 
+0x7365, 0x6920, 0x206e, 0x6577, 0x2f62, 0x6d69, 0x6761, 0x7365, 0x002f, 
+
+    IDC_build, 0x403, 47, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6577, 0x2f62, 0x7468, 0x6c6d, 0x202c, 
+0x2020, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6577, 0x2f62, 0x6d69, 0x6761, 0x7365, "\000" 
+    IDC_build, 0x403, 41, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6577, 0x2f62, 0x202c, 0x2020, 0x2020, 
+0x2020, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6577, 0x2f62, "\000" 
+    IDC_build, 0x403, 77, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6577, 0x2f62, 0x202c, 0x2020, 0x2020, 
+0x2020, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6577, 0x2f62, 0x7878, 0x2c78, 0x7720, 0x6568, 0x6572, 0x7820, 0x7878, 
+0x6920, 0x2073, 0x6874, 0x2065, 0x6966, 0x656c, 0x6520, 0x7478, 0x6e65, 
+0x6973, 0x6e6f, "\000" 
+    IDC_build, 0x403, 44, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6577, 0x2f62, 0x7468, 0x6c6d, 0x202c, 
+0x2020, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6577, 0x2f62, 0x7878, 0x0078, 
+    IDC_build, 0x403, 40, 0
+0x6953, 0x6574, 0x732d, 0x7274, 0x6375, 0x7574, 0x6572, 0x202c, 0x6977, 
+0x6874, 0x756f, 0x2074, 0x7777, 0x2e77, 0x6f64, 0x616d, 0x6e69, 0x782e, 
+0x7878, 0x002f, 
+    IDC_build, 0x403, 60, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 
+0x202c, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6620, 0x6c69, 
+0x7365, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 0x6d69, 
+0x6761, 0x7365, 0x002f, 
+    IDC_build, 0x403, 57, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 
+0x7468, 0x6c6d, 0x202c, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 
+0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 0x6d69, 0x6761, 
+0x7365, "\000" 
+    IDC_build, 0x403, 47, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 
+0x202c, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, "\000" 
+    IDC_build, 0x403, 50, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 
+0x202c, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 0x6920, 0x206e, 
+0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 0x7878, 0x0078, 
+    IDC_build, 0x403, 54, 0
+0x7448, 0x6c6d, 0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 
+0x7468, 0x6c6d, 0x202c, 0x6d69, 0x6761, 0x7365, 0x6f2f, 0x6874, 0x7265, 
+0x6920, 0x206e, 0x6973, 0x6574, 0x6e5f, 0x6d61, 0x2f65, 0x7878, 0x0078, 
+
+    IDC_build, 0x403, 48, 0
+0x6c41, 0x206c, 0x6966, 0x656c, 0x2073, 0x6e69, 0x7720, 0x6265, 0x2c2f, 
+0x7720, 0x7469, 0x2068, 0x6172, 0x646e, 0x6d6f, 0x6e20, 0x6d61, 0x7365, 
+0x2820, 0x6167, 0x6764, 0x7465, 0x2120, 0x0029, 
+    IDC_build, 0x403, 54, 0
+0x6c41, 0x206c, 0x6966, 0x656c, 0x2073, 0x6e69, 0x7320, 0x7469, 0x5f65, 
+0x616e, 0x656d, 0x2c2f, 0x7720, 0x7469, 0x2068, 0x6172, 0x646e, 0x6d6f, 
+0x6e20, 0x6d61, 0x7365, 0x2820, 0x6167, 0x6764, 0x7465, 0x2120, 0x0029, 
+
+    IDC_build, 0x403, 25, 0
+0x7355, 0x7265, 0x642d, 0x6665, 0x6e69, 0x6465, 0x7320, 0x7274, 0x6375, 
+0x7574, 0x6572, 0x2e2e, "\000" 
+    0
+END
+
+IDD_OPTION8 DLGINIT
+BEGIN
+    IDC_checktype, 0x403, 6, 0
+0x654e, 0x6576, 0x0072, 
+    IDC_checktype, 0x403, 22, 0
+0x6649, 0x7520, 0x6b6e, 0x6f6e, 0x6e77, 0x2820, 0x7865, 0x6563, 0x7470, 
+0x2f20, 0x0029, 
+    IDC_checktype, 0x403, 11, 0
+0x6649, 0x7520, 0x6b6e, 0x6f6e, 0x6e77, "\000" 
+    IDC_robots, 0x403, 20, 0
+0x6f6e, 0x7220, 0x626f, 0x746f, 0x2e73, 0x7874, 0x2074, 0x7572, 0x656c, 
+0x0073, 
+    IDC_robots, 0x403, 25, 0
+0x6f72, 0x6f62, 0x7374, 0x742e, 0x7478, 0x6520, 0x6378, 0x7065, 0x2074, 
+0x6977, 0x617a, 0x6472, "\000" 
+    IDC_robots, 0x403, 24, 0
+0x6f66, 0x6c6c, 0x776f, 0x7220, 0x626f, 0x746f, 0x2e73, 0x7874, 0x2074, 
+0x7572, 0x656c, 0x0073, 
+    0
+END
+
+IDD_OPTION9 DLGINIT
+BEGIN
+    IDC_logtype, 0x403, 7, 0
+0x6f6e, 0x6d72, 0x6c61, "\000" 
+    IDC_logtype, 0x403, 9, 0
+0x7865, 0x6574, 0x646e, 0x6465, "\000" 
+    IDC_logtype, 0x403, 6, 0
+0x6564, 0x7562, 0x0067, 
+    0
+END
+
+IDD_iplog DLGINIT
+BEGIN
+    IDC_HIDEINFO, 0x403, 9, 0
+0x6853, 0x776f, 0x6120, 0x6c6c, "\000" 
+    IDC_HIDEINFO, 0x403, 11, 0
+0x6948, 0x6564, 0x6420, 0x6265, 0x6775, "\000" 
+    IDC_HIDEINFO, 0x403, 11, 0
+0x6948, 0x6564, 0x6920, 0x666e, 0x736f, "\000" 
+    IDC_HIDEINFO, 0x403, 21, 0
+0x6948, 0x6564, 0x6420, 0x6265, 0x6775, 0x6120, 0x646e, 0x6920, 0x666e, 
+0x736f, "\000" 
+    0
+END
+
+IDD_OPTION10 DLGINIT
+BEGIN
+    IDC_prox, 0x403, 1, 0
+"\000" 
+    IDC_prox, 0x403, 11, 0
+0x7270, 0x786f, 0x3a79, 0x3038, 0x3038, "\000" 
+    0
+END
+
+IDD_OPTION11 DLGINIT
+BEGIN
+    IDC_ext1, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext1, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext1, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext1, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext1, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext1, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext1, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext1, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext1, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext1, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext1, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext1, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext1, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime1, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime1, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime1, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime1, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime1, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime1, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime1, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime1, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime1, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime1, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime1, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext2, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext2, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext2, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext2, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext2, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext2, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext2, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext2, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext2, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext2, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext2, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext2, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext2, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime2, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime2, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime2, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime2, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime2, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime2, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime2, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime2, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime2, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime2, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime2, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext3, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext3, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext3, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext3, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext3, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext3, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext3, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext3, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext3, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext3, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext3, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext3, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext3, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime3, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime3, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime3, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime3, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime3, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime3, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime3, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime3, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime3, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime3, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime3, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext4, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext4, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext4, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext4, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext4, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext4, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext4, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext4, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext4, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext4, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext4, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext4, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext4, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime4, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime4, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime4, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime4, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime4, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime4, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime4, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime4, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime4, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime4, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime4, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext5, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext5, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext5, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext5, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext5, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext5, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext5, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext5, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext5, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext5, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext5, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext5, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext5, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime5, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime5, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime5, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime5, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime5, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime5, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime5, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime5, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime5, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime5, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime5, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext6, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext6, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext6, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext6, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext6, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext6, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext6, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext6, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext6, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext6, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext6, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext6, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext6, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime6, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime6, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime6, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime6, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime6, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime6, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime6, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime6, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime6, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime6, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime6, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext7, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext7, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext7, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext7, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext7, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext7, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext7, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext7, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext7, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext7, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext7, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext7, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext7, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime7, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime7, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime7, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime7, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime7, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime7, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime7, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime7, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime7, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime7, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime7, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    IDC_ext8, 0x403, 4, 0
+0x6870, 0x0070, 
+    IDC_ext8, 0x403, 4, 0
+0x6763, 0x0069, 
+    IDC_ext8, 0x403, 4, 0
+0x7361, 0x0070, 
+    IDC_ext8, 0x403, 5, 0
+0x6870, 0x3370, "\000" 
+    IDC_ext8, 0x403, 5, 0
+0x6870, 0x3470, "\000" 
+    IDC_ext8, 0x403, 5, 0
+0x6870, 0x3270, "\000" 
+    IDC_ext8, 0x403, 4, 0
+0x736a, 0x0070, 
+    IDC_ext8, 0x403, 3, 0
+0x6c70, "\000" 
+    IDC_ext8, 0x403, 4, 0
+0x6663, 0x006d, 
+    IDC_ext8, 0x403, 13, 0
+0x6870, 0x2c70, 0x6870, 0x3370, 0x612c, 0x7073, "\000" 
+    IDC_ext8, 0x403, 8, 0
+0x7361, 0x2c70, 0x7865, 0x0065, 
+    IDC_ext8, 0x403, 7, 0
+0x6c70, 0x632c, 0x6967, "\000" 
+    IDC_ext8, 0x403, 38, 0
+0x6870, 0x3370, 0x702c, 0x7068, 0x702c, 0x7068, 0x2c34, 0x6870, 0x3270, 
+0x632c, 0x6967, 0x612c, 0x7073, 0x6a2c, 0x7073, 0x702c, 0x2c6c, 0x6663, 
+0x006d, 
+    IDC_mime8, 0x403, 10, 0
+0x6574, 0x7478, 0x682f, 0x6d74, 0x006c, 
+    IDC_mime8, 0x403, 10, 0
+0x6574, 0x7478, 0x742f, 0x7865, 0x0074, 
+    IDC_mime8, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6967, 0x0066, 
+    IDC_mime8, 0x403, 11, 0
+0x6d69, 0x6761, 0x2f65, 0x706a, 0x6765, "\000" 
+    IDC_mime8, 0x403, 10, 0
+0x6d69, 0x6761, 0x2f65, 0x6e70, 0x0067, 
+    IDC_mime8, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x697a, 0x0070, 
+
+    IDC_mime8, 0x403, 21, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6174, 0x2e72, 
+0x7a67, "\000" 
+    IDC_mime8, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6172, 0x0072, 
+
+    IDC_mime8, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x706d, 0x0033, 
+
+    IDC_mime8, 0x403, 18, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x2d78, 0x6f6d, 0x0076, 
+
+    IDC_mime8, 0x403, 25, 0
+0x7061, 0x6c70, 0x6369, 0x7461, 0x6f69, 0x2f6e, 0x636f, 0x6574, 0x2d74, 
+0x7473, 0x6572, 0x6d61, "\000" 
+    0
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDR_MAINFRAME           "WinHTTrack Website Copier\nNew Project \n\nWinHTTrack Website Copier Projects (*.whtt)\n.whtt\nWinHTTrackProject\nWinHTTrack Project"
+END
+
+STRINGTABLE 
+BEGIN
+    AFX_IDS_APP_TITLE       "WinHTTrack Website Copier"
+    AFX_IDS_IDLEMESSAGE     "Ready"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_INDICATOR_EXT        "EXT"
+    ID_INDICATOR_CAPS       "CAP"
+    ID_INDICATOR_NUM        "NUM"
+    ID_INDICATOR_SCRL       "SCRL"
+    ID_INDICATOR_OVR        "OVR"
+    ID_INDICATOR_REC        "REC"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_FILE_NEW             "Create new project\nNew"
+    ID_FILE_OPEN            "Open existing project\nOpen"
+    ID_FILE_CLOSE           "Close active document\nClose"
+    ID_FILE_SAVE            "Save active project\nSave"
+    ID_FILE_SAVE_AS         "Save active project under a different name\nSave As"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_APP_ABOUT            "Display of program information, version number and copyright\nAbout"
+    ID_APP_EXIT             "Quit WinHTTrack Website Copier\nExit"
+    ID_HELP                 "Help contents\nHelp contents"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_FILE_MRU_FILE1       "Open this document"
+    ID_FILE_MRU_FILE2       "Open this document"
+    ID_FILE_MRU_FILE3       "Open this document"
+    ID_FILE_MRU_FILE4       "Open this document"
+    ID_FILE_MRU_FILE5       "Open this document"
+    ID_FILE_MRU_FILE6       "Open this document"
+    ID_FILE_MRU_FILE7       "Open this document"
+    ID_FILE_MRU_FILE8       "Open this document"
+    ID_FILE_MRU_FILE9       "Open this document"
+    ID_FILE_MRU_FILE10      "Open this document"
+    ID_FILE_MRU_FILE11      "Open this document"
+    ID_FILE_MRU_FILE12      "Open this document"
+    ID_FILE_MRU_FILE13      "Open this document"
+    ID_FILE_MRU_FILE14      "Open this document"
+    ID_FILE_MRU_FILE15      "Open this document"
+    ID_FILE_MRU_FILE16      "Open this document"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
+    ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_EDIT_CLEAR           "Erase the selection\nErase"
+    ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
+    ID_EDIT_COPY            "Copy the selection and put it on the Clipboard\nCopy"
+    ID_EDIT_CUT             "Cut the selection and put it on the Clipboard\nCut"
+    ID_EDIT_FIND            "Find the specified text\nFind"
+    ID_EDIT_PASTE           "Insert Clipboard contents\nPaste"
+    ID_EDIT_REPEAT          "Repeat the last action\nRepeat"
+    ID_EDIT_REPLACE         "Replace specific text with different text\nReplace"
+    ID_EDIT_SELECT_ALL      "Select the entire document\nSelect All"
+    ID_EDIT_UNDO            "Undo the last action\nUndo"
+    ID_EDIT_REDO            "Redo the previously undone action\nRedo"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_VIEW_TOOLBAR         "Show or hide the toolbar\nToggle ToolBar"
+    ID_VIEW_STATUS_BAR      "Show or hide the status bar\nToggle StatusBar"
+END
+
+STRINGTABLE 
+BEGIN
+    AFX_IDS_SCSIZE          "Change the window size"
+    AFX_IDS_SCMOVE          "Change the window position"
+    AFX_IDS_SCMINIMIZE      "Reduce the window to an icon"
+    AFX_IDS_SCMAXIMIZE      "Enlarge the window to full size"
+    AFX_IDS_SCNEXTWINDOW    "Switch to the next document window"
+    AFX_IDS_SCPREVWINDOW    "Switch to the previous document window"
+    AFX_IDS_SCCLOSE         "Close the active window and prompts to save the documents"
+END
+
+STRINGTABLE 
+BEGIN
+    AFX_IDS_SCRESTORE       "Restore the window to normal size"
+    AFX_IDS_SCTASKLIST      "Activate Task List"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_ClearDefaultOptions  "Reset to default options and preferences\nClear default options"
+    ID_LOG_VIEWTRANSFERS    "View current mirroring transfers\nView transfers"
+    ID_FILE_WIZARD          "Starts the Wizard\n"
+    ID_FILE_DELETE          "Delete a project\nDelete"
+    ID_FILE_DELETE_PROJ     "Delete a project\nDelete"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_LOG_VIEWLOG          "View mirroring report (general information, errors..)\nView log"
+    ID_LOG_VIEWERRORLOG     "View mirroring report (general information, errors..)\nView log"
+    ID_WINDOW_HIDE          "Minimize window to system tray\nHide window"
+    ID_FILE_PAUSE           "Pause mirroring transfers\nPause transfers"
+    ID_OPTIONS_MODIFY       "Modify mirroring options\nChange mirroring options"
+    ID_LOAD_OPTIONS         "Load options and preferences\nLoad options"
+    ID_FILE_SAVE_OPTIONS_AS "Save options and preferences\nSave options"
+    ID_LoadDefaultOptions   "Load default options and preferences\nLoad default options"
+    ID_SaveDefaultOptions   "Save default options and preferences\nSave default options"
+    IDC_langprefs           "Select language according to preference\nLanguage preference"
+END
+
+STRINGTABLE 
+BEGIN
+    IDC_ipabout             "Displays information about WinHTTrack Website Copier"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_ABOUT                "About WinHTTrack Website Copier\nAbout"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_UPDATE               "Check WinHTTrack Website Copier Updates\nUpdate"
+    ID_FILE_BROWSE_SIT      "Browse Websites\nBrowse"
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// French (France) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_FRA)
+#ifdef _WIN32
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_SPLASH              ICON                    "res\\ico00001.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_HELPFRM MENU 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT
+        MENUITEM "Print Pre&view",              ID_FILE_PRINT_PREVIEW
+        MENUITEM "P&rint Setup...",             ID_FILE_PRINT_SETUP
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_CLOSE
+    END
+    POPUP "Help"
+    BEGIN
+        MENUITEM "About WinHTTrack Website Copier...", ID_ABOUT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DIALOGCONTAINER_FORM DIALOG  0, 0, 173, 96
+STYLE DS_SETFONT | WS_CHILD
+FONT 8, "MS Sans Serif"
+BEGIN
+END
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
+    "#ifdef _WIN32\r\n"
+    "LANGUAGE 9, 1\r\n"
+    "#pragma code_page(1252)\r\n"
+    "#endif //_WIN32\r\n"
+    "#include ""res\\WinHTTrack.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""afxres.rc""         // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Cursor
+//
+
+IDC_CURSWWW             CURSOR                  "res\\www.cur"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// RT_MANIFEST
+//
+
+1                       RT_MANIFEST             "res\\manifest.xml"
+#endif    // French (France) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE 9, 1
+#pragma code_page(1252)
+#endif //_WIN32
+#include "res\WinHTTrack.rc2"  // non-Microsoft Visual C++ edited resources
+#include "afxres.rc"         // Standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

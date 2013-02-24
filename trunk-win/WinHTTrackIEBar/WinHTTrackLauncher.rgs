@@ -1,0 +1,49 @@
+HKCR
+{
+	WinHTTrackIEBar.WinHTTrackLauncher.1 = s 'WinHTTrackLauncher Class'
+	{
+		CLSID = s '{86529161-034E-4F8A-88D2-3C625E612E04}'
+	}
+	WinHTTrackIEBar.WinHTTrackLauncher = s 'WinHTTrackLauncher Class'
+	{
+		CLSID = s '{86529161-034E-4F8A-88D2-3C625E612E04}'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {86529161-034E-4F8A-88D2-3C625E612E04} = s 'WinHTTrackLauncher Class'
+		{
+			ProgID = s 'WinHTTrackIEBar.WinHTTrackLauncher.1'
+			VersionIndependentProgID = s 'WinHTTrackIEBar.WinHTTrackLauncher'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'both'
+			}
+		}
+	}
+}
+HKLM
+{
+	Software
+	{
+		Microsoft
+		{
+			'Internet Explorer'
+			{
+				Extensions
+				{
+					{36ECAF82-3300-8F84-092E-AFF36D6C7040}
+					{
+						val 'CLSID' = s '{1FBA04EE-3024-11d2-8F1F-0000F87ABD16}'
+						val 'MenuText' = s 'Launch WinHTTrack'
+						val 'MenuStatusBar' = s 'Mirror Websites with WinHTTrack'
+						val 'ClsidExtension' = s '{86529161-034E-4F8A-88D2-3C625E612E04}'
+						val 'Default Visible' = s 'yes'
+						val 'Icon' = s '%MODULE%,201'
+						val 'HotIcon' = s '%MODULE%,201'
+						val 'ButtonText' = s 'Run WinHTTrack'
+					}
+				}
+			}
+		}
+	}
+}

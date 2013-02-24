@@ -1,0 +1,40 @@
+// WinHTTrackIEBar.idl : IDL source for WinHTTrackIEBar.dll
+//
+
+// This file will be processed by the MIDL tool to
+// produce the type library (WinHTTrackIEBar.tlb) and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+	
+	[
+		object,
+		uuid(67ADF06B-7E1A-4743-B221-E7AA6E4D1FA8),
+		dual,
+		helpstring("IWinHTTrackLauncher Interface"),
+		pointer_default(unique)
+	]
+	interface IWinHTTrackLauncher : IDispatch
+	{
+	};
+
+[
+	uuid(81F786D8-A189-40A1-AB3C-D86A9203F431),
+	version(1.0),
+	helpstring("WinHTTrackIEBar 1.0 Type Library")
+]
+library WINHTTRACKIEBARLib
+{
+	importlib("stdole32.tlb");
+	importlib("stdole2.tlb");
+
+	
+	[
+		uuid(86529161-034E-4F8A-88D2-3C625E612E04),
+		helpstring("WinHTTrackLauncher Class")
+	]
+	coclass WinHTTrackLauncher
+	{
+		[default] interface IWinHTTrackLauncher;
+	};
+};

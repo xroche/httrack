@@ -1,0 +1,235 @@
+<HTML>
+<HEAD>
+<TITLE>Microsoft IPv6 Technology Preview for Windows&nbsp;2000</TITLE>
+</HEAD>
+<BODY bgcolor="#FFFFFF">
+
+<H1>Microsoft IPv6 Technology Preview for Windows&nbsp;2000</H1>
+
+<font size="+1"><B>September 25, 2000</B></font>
+<font size="-1">(Check
+<a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/ReadMe.asp">here</a>
+for the latest version.)</font>
+
+<H2>Introduction to the Microsoft IPv6 Technology Preview for Windows&nbsp;2000</H2>
+
+<P>
+The Microsoft IPv6 Technology Preview for Windows&nbsp;2000 is intended for application software developers who are developing network applications using the Windows Sockets (Winsock) application programming interface.
+</P>
+
+<P>
+The eventual migration from Internet Protocol version 4 (IPv4), the current version used on organization intranets and the Internet, to IP version 6 (IPv6), the next generation of IP, will be a gradual one involving the upgrading of client and server computers, networking infrastructure, and network applications. The IPv6 Technology Preview for Windows&nbsp;2000 is designed to give Winsock developers on the Windows platform the opportunity to begin learning IPv6 and using an implementation of it on Windows&nbsp;2000.
+</P>
+
+
+<H2>System Requirements</H2>
+
+<P>
+The Microsoft IPv6 Technology Preview for Windows&nbsp;2000 requires:
+</P>
+
+<UL>
+<LI>
+Windows&nbsp;2000&nbsp;SP1
+</LI>
+<P>
+The retail versions of Windows&nbsp;2000 Professional, Windows&nbsp;2000 Server, and Windows&nbsp;2000 Advanced Server with Service Pack 1 installed are all supported. Windows&nbsp;2000 beta versions are not supported.
+</P>
+<LI>
+Ethernet network adapter
+</LI>
+<P>
+Any Ethernet adapter supported by Windows&nbsp;2000 <i>should</i> work with the IPv6 Technology Preview. However, only a limited number of Ethernet adapters have been tested by Microsoft.
+</P>
+<LI>
+IPv4 protocol
+</LI>
+<P>
+The <b>Internet Protocol (TCP/IP)</b> supplied with Windows&nbsp;2000 must be installed.
+</P>
+</UL>
+
+<P><b>Note</b></P>
+<UL>
+    <LI>
+    The IPv6 Technology Preview is not available for Windows&nbsp;NT&nbsp;4.0, Windows&nbsp;95, Windows&nbsp;98, Windows Millennium, or Windows&nbsp;CE.
+    </LI>
+</UL>
+
+
+<a name="Installation"></a>
+<H2>Installing the IPv6 Technology Preview for Windows&nbsp;2000</H2>
+
+<OL>
+<LI>
+Log on to the Windows&nbsp;2000 computer with a user account that has local administrator privileges.
+</LI>
+<LI>
+Using Windows Explorer, run the Setup.exe program from the location where you extracted the IPv6 Technology Preview files (for example, C:\IPv6Kit).
+</LI>
+<LI>
+From the Windows&nbsp;2000 desktop, click <b>Start</b>, point to <b>Settings</b>, and then click <b>Network and Dial-up Connections</b>. As an alternative, you can right-click <b>My Network Places</b>, and then click <b>Properties</b>.
+</LI>
+<LI>
+Right-click the Ethernet-based connection to which you want to add the IPv6 protocol, and then click <B>Properties</B>. Typically, this connection is named <b>Local Area Connection</b>.
+</LI>
+<LI>
+Click <b>Install</b>.
+</LI>
+<LI>
+In the <b>Select Network Component Type</b> dialog box, click <b>Protocol</b>, and then click <b>Add</b>.
+</LI>
+<LI>
+In the <b>Select Network Protocol</b> dialog box, click <b>Microsoft IPv6 Protocol</b> and then click <b>OK</b>.
+</LI>
+<LI>
+Click <b>Close</b> to close the <b>Local Area Connection Properties</b> dialog box.
+</LI>
+</OL>
+
+
+<P>
+The Microsoft IPv6 Protocol is automatically added to all Ethernet interfaces on your computer.
+</P>
+
+<P>
+The setup program copies the protocol files from the location where you extracted the IPv6 Technology Preview files into the appropriate Windows&nbsp;2000 directories and modifies setup information files so that the <b>Microsoft IPv6 Protocol</b> is in the list of available protocols. The IPv6 protocol driver (<CODE>tcpip6.sys</CODE>) is installed in the <CODE><NOBR>%systemroot%</NOBR>\system32\drivers</CODE> directory. The Winsock helper dynamically linked library for the INET6 address family (<CODE>wship6.dll</CODE>) and all applications and tools (<CODE>ipv6.exe</CODE>, <CODE>ping6.exe</CODE>, <CODE>tracert6.exe</CODE>,
+<CODE>ttcp.exe</CODE>, and so on) are installed in the <CODE><NOBR>systemroot%</NOBR>\system32</CODE> directory.
+</P>
+<P>
+The setup program also replaces the following Windows 2000 files:
+</P>
+<UL>
+<LI>Wininet.dll</LI>
+<LI>Ftp.exe</LI>
+<LI>Telnet.exe</LI>
+<LI>Tlntsvr.exe</LI>
+</UL>
+<P>
+For information on how to restore the original versions of these files, see FAQ.
+</P>
+
+<H2>Upgrading</H2>
+<P>
+If you currently have a different IPv6 protocol installed, such as the Microsoft Research IPv6 protocol, you must uninstall it before installing the IPv6 Technology Preview for Windows&nbsp;2000.
+</P>
+<P>However, you do not have to uninstall a previous version of the IPv6 Technology Preview for Windows 2000. In that case, just run Setup.exe to update the files.
+</P>
+<P>
+To uninstall the Microsoft Research IPv6 protocol on Windows&nbsp;2000, perform the following procedure:
+</P>
+
+<OL>
+<LI>
+Log on to the Windows&nbsp;2000 computer with a user account that has local administrator privileges.
+</LI>
+<LI>
+From the Windows&nbsp;2000 desktop, click <b>Start</b>, point to <b>Settings</b>, and then click <b>Network and Dial-up Connections</b>. As an alternative, you can right-click <b>My Network Places</b>, and then click <b>Properties</b>.
+</LI>
+<LI>
+Right-click the connection to which you want to remove the Microsoft Research IPv6 protocol, and then click <B>Properties</B>. Typically, this connection is named <b>Local Area Connection</b>.
+</LI>
+<LI>
+Click <b>MSR IPv6 Protocol</b> and then click <b>Uninstall</b>.
+</LI>
+<LI>
+In the <b>Uninstall MSR IPv6 Protocol</b> dialog box, click <b>Yes</b>.
+</LI>
+<LI>
+In the <b>Local Network</b> dialog box, click <b>Yes</b> to restart your computer.
+</LI>
+</OL>
+
+<P>To uninstall another IPv6 protocol, please consult the appropriate documentation.</P>
+
+<H2>Configuration</H2>
+
+<P>
+The IPv6 Technology Preview supports stateless address autoconfiguration. Therefore, you typically do not need to perform any manual configuration of IPv6 addresses. By default, a link-local address is always assigned to each Ethernet network interface upon startup.
+</P>
+
+<P>
+Non-link-local addresses such as site-local addresses or global addresses are automatically assigned based on the receipt of IPv6 router advertisements. You must have a properly configured IPv6-capable router on your network segment to receive additional addresses through IPv6 router advertisements.
+</P>
+
+<P>
+Some manual configuration is required for more advanced features and scenarios. Additional information on common IPv6 scenarios can be found in <a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/start.asp">Getting Started</a>. Additional information on the IPv6 Technology Preview can be found in <a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/faq.asp">FAQ</a>.
+</P>
+
+
+<H2>Tools</H2>
+
+<P>
+Included in the IPv6 Technology Preview are the following tools:
+</P>
+
+<UL>
+<LI>
+ipv6.exe
+</LI>
+<P>
+This tool retrieves and displays information from the IPv6 protocol. You can use this to view the state of interfaces, the neighbor caches, the binding cache, the destination cache (called the route cache in this implementation), and the route table. This utility can also be used to manually configure interfaces, addresses, and route table entries.
+</P>
+<LI>
+ping6.exe
+</LI>
+<P>
+This tool is equivalent to the current IPv4 ping.exe tool. It sends ICMPv6 Echo Request messages, waiting for the corresponding ICMPv6 Echo Reply messages and then displaying information on round trip times.
+</P>
+<LI>
+tracert6.exe
+</LI>
+<P>
+This tool is equivalent to the current IPv4 tracert.exe tool. It sends ICMPv6 Echo Request messages with monotonically increasing values of the Hop Limit field to discover the path traveled by IPv6 packets between a source and destination.
+</P>
+<LI>
+ttcp.exe
+</LI>
+<P>
+This tool is used to send TCP segment data or UDP messages between two nodes. Ttcp.exe supports both IPv4 and IPv6.
+</P>
+<LI>
+6to4cfg.exe
+</LI>
+<P>
+This tool is used to configure IPv6 connectivity over an IPv4 network. For more information on how 6to4cfg.exe is used, see <a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/start.asp">Getting Started</a>.
+</P>
+<LI>
+ipsec6.exe
+</LI>
+<P>
+This tool is used to configure IPv6 security policies and security associations. For more information on how ipsec6.exe is used, see <a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/start.asp">Getting Started</a>.
+</P>
+</UL>
+
+<H2>Applications</H2>
+<P>
+The IPv6 Technology Preview for Windows 2000 contains a set of sample applications that you can use to experiment with IPv6-based traffic beyond the use of standard connection diagnostic tools such as ping6 and tracert6. The following applications are provided:
+</P>
+<UL>
+<LI>HTTP client - The new Internet extensions dynamic link library (DLL), Wininet.dll, provides IPv6 capability so that Windows-based Internet browsers, such as Microsoft Internet Explorer, can make connections to both IPv4 and IPv6 Web servers.</LI>
+<LI>FTP client - The new File Transfer Protocol (FTP) client, Ftp.exe is capable of establishing FTP sessions with IPv4 and IPv6 FTP servers.</LI>
+<LI>Telnet client - The new Telnet client, Telnet.exe, is capable of establishing Telnet sessions with IPv4 and IPv6 Telnet servers.</LI>
+<LI>Telnet server- The new Telnet server, Tlntsvr.exe, is capable of establishing Telnet sessions with IPv4 and IPv6 Telnet clients.</LI>
+</UL>
+<P>
+For examples of more applications that use IPv6 in Windows 2000, see <a href="http://research.microsoft.com/msripv6/">Microsoft Research IPv6 Site</a>.
+</P>
+
+<H2>Bug Reporting, Support, and Feedback</H2>
+
+<P>
+The software supplied in this Technology Preview is not supported and Microsoft does not provide any level of technical support. Microsoft support personnel must be notified that you are using this software during any support calls involving a computer that has it installed. They might ask that this software be uninstalled prior to providing support. 
+</P>
+
+<P>
+While the IPv6 Technology Preview is not officially supported, we have created a public newsgroup for you to post questions and comments specific to this Web release. We welcome your discussion and feedback. <a href="news://msnews.microsoft.com/microsoft.public.platformsdk.networking.ipv6">Connect</a> to the microsoft.public.platformsdk.networking.ipv6 newsgroup found on msnews.microsoft.com.
+</P>
+
+<P>
+We have also created a Web form for you to post bugs specific to this Web release. Bugs submitted through this Web form will be monitored by IPv6 technical and development staff. Connect to <a href="http://msdn.microsoft.com/downloads/sdks/platform/tpipv6/feedback.asp">Web form</a>.
+</P>
+
+
+</BODY>
+</HTML>
