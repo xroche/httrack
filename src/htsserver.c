@@ -302,7 +302,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
     };
     initStrElt initStr[] = {
       { "user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)" },
-      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2008], %s -->" },
+      { "footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->" },
       { "url2", "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/*" },
       { NULL, NULL }
     };
