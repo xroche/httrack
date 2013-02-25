@@ -61,6 +61,8 @@ Please visit our Website: http://www.httrack.com
 // extension par défaut pour fichiers n'en ayant pas
 #define DEFAULT_EXT       ".html"
 #define DEFAULT_EXT_SHORT ".htm"
+//#define DEFAULT_BIN_EXT   ".bin"
+//#define DEFAULT_BIN_EXT_SHORT ".bin"
 //#define DEFAULT_EXT       ".txt"
 //#define DEFAULT_EXT_SHORT ".txt"
 

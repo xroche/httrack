@@ -383,7 +383,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
         // lire dans le cache
         htsblk r = cache_read_including_broken(opt,cache,adr,fil);              // test uniquement
         if (r.statuscode != -1) {  // pas d'erreur de lecture cache
-          char s[16]; s[0]='\0';
+          char s[32]; s[0]='\0';
           if ( (opt->debug>1) && (opt->log!=NULL) ) {
             HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Testing link type (from cache) %s%s"LF,adr_complete,fil_complete);
             test_flush;
@@ -392,13 +392,20 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
             ext_chg=2;      /* change filename */
             strcpybuff(ext,r.cdispo);
           }
-          else if (!may_unknown2(opt,r.contenttype,fil) || ishtest == -2) {  // on peut patcher à priori?
+          else if (!may_unknown2(opt,r.contenttype,fil)) {  // on peut patcher à priori?
             give_mimext(s,r.contenttype);  // obtenir extension
             if (strnotempty(s)>0) {        // on a reconnu l'extension
               ext_chg=1;
               strcpybuff(ext,s);
             }
           }
+#ifdef DEFAULT_BIN_EXT
+          // no extension and potentially bogus
+          else if (ishtest == -2) {
+            ext_chg=1;
+            strcpybuff(ext, DEFAULT_BIN_EXT + 1);
+          }
+#endif
           //
         } else if ( opt->savename_delayed != 2 && is_userknowntype(opt,fil)) {   /* PATCH BY BRIAN SCHRÖDER. 
                                                                             Lookup mimetype not only by extension, 
@@ -428,9 +435,17 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
               mime_from_file[0] = 0;
               get_httptype(opt, mime_from_file, fil, 1);
               if (!strnotempty(mime_from_file) || strcasecmp(mime_type, mime_from_file) != 0) {    /* different mime for this type */
+                /* type change not forbidden (or no extension at all) */
                 if (!may_unknown2(opt, mime_type, fil)) {
                   ext_chg = 1;
                 }
+#ifdef DEFAULT_BIN_EXT
+                // no extension and potentially bogus
+                else if (ishtml(opt,fil) == -2) {
+                  ext_chg = 1;
+                  strcpybuff(ext, DEFAULT_BIN_EXT + 1);
+                }
+#endif
               } else {
                 ext_chg = 0;
               }
@@ -632,13 +647,20 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
                     ext_chg=2;      /* change filename */
                     strcpybuff(ext,back[b].r.cdispo);
                   }
-                  else if (!may_unknown2(opt, back[b].r.contenttype, back[b].url_fil) || ishtest == -2 ) {  // on peut patcher à priori? (pas interdit ou pas de type)
+                  else if (!may_unknown2(opt, back[b].r.contenttype, back[b].url_fil)) {  // on peut patcher à priori? (pas interdit ou pas de type)
                     give_mimext(s,back[b].r.contenttype);  // obtenir extension
                     if (strnotempty(s)>0) {    // on a reconnu l'extension
                       ext_chg=1;
                       strcpybuff(ext,s);
                     }
                   }
+#ifdef DEFAULT_BIN_EXT
+                  // no extension and potentially bogus
+                  else if (ishtest == -2) {
+                    ext_chg=1;
+                    strcpybuff(ext, DEFAULT_BIN_EXT + 1);
+                  }
+#endif
                 }
               }
               // FIN Si non déplacé, forcer type?
@@ -1164,16 +1186,18 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
     strcatbuff(save,".");
     strcatbuff(save,ext);    // copier ext
   }*/
+
+  // Not used anymore unless non-delayed types.
   // de même en cas de manque d'extension on en place une de manière forcée..
   // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
-  if (opt->savename_type != -1) {
+  if (opt->savename_type != -1 && opt->savename_delayed != 2) {
     char* a=save+strlen(save)-1;
     while(( a > save) && (*a!='.') && (*a!='/')) a--;
     if (*a!='.') {   // agh pas de point
       //strcatbuff(save,".none");                 // a éviter
       strcatbuff(save,".html");                   // préférable!
       if ( (opt->debug>1) && (opt->log!=NULL) ) {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Default HTML type set for %s%s"LF,adr_complete,fil_complete);
+        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Default HTML type set for %s%s => %s"LF,adr_complete,fil_complete,save);
         test_flush;
       }
     }
@@ -1487,12 +1511,16 @@ void standard_name(char* b,char* dot_pos,char* nom_pos,char* fil_complete,int sh
       strcatbuff(b,dot_pos+1);
     else
       strncatbuff(b,dot_pos+1,3);
-  } else {
-    if (!short_ver)    // Noms longs
-      strcatbuff(b,DEFAULT_EXT + 1);    // pas de..
-    else
-      strcatbuff(b,DEFAULT_EXT_SHORT + 1);    // pas de..
   }
+  // Allow extensionless
+#ifdef DO_NOT_ALLOW_EXTENSIONLESS
+  else {
+    if (!short_ver)    // Noms longs
+      strcatbuff(b,DEFAULT_EXT);
+    else
+      strcatbuff(b,DEFAULT_EXT_SHORT);
+  }
+#endif
 }
 
 
