@@ -495,6 +495,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
       int intag_start_valid=0;
       int intag_ctype=0;
       //
+      int emited_footer = 0;  // emitted footer comment tag(s) count
+      //
       int   parent_relative=0;    // the parent is the base path (.js, .css..)
       HT_ADD_START;    // débuter
       lastsaved=adr;
@@ -766,15 +768,42 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 										intag_ctype=2;
 									}
 								}
-							}
-						}
+              }
+            }
 
             if (opt->getmode & 1) {  // sauver html
-              p=strfield(adr,"</html");
-              if (p==0) p=strfield(adr,"<head>");
-              // if (p==0) p=strfield(adr,"<doctype");
-              if (p) {
-                char* eol="\n";
+              p = 0;
+              switch(emited_footer) {
+                case 0:
+                  // We are looking for the first head so that we can declare the HTTP-headers charset early
+                  // Emit as soon as we see the first <head>, <meta>, or <body> tag.
+                  // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
+                  if ((p=strfield(adr,"<head>")) != 0
+                    || ( (p=strfield(adr,"<head")) != 0 && isspace(adr[p]) )
+                    || (p=strfield(adr,"<body>")) != 0
+                    || ( (p=strfield(adr,"<body")) != 0 && isspace(adr[p]) )
+                    || ( (p=strfield(adr,"<meta")) != 0 && isspace(adr[p]) )
+                    ) {
+                      emited_footer++;
+                  } else {
+                    p = 0;
+                  }
+                  break;
+                case 1:
+                  // And the closing comment info tag
+                  if ((p=strfield(adr,"</html") != 0)) {
+                    emited_footer++;
+                  } else {
+                    p = 0;
+                  }
+                  break;
+                default:
+                  p = 0;
+                  break;
+              }
+
+              if (p != 0) {
+                const char* eol="\n";
                 if (strchr(r->adr,'\r'))
                   eol="\r\n";
                 if (StringNotEmpty(opt->footer) || opt->urlmode != 4) {  /* != preserve */
@@ -789,7 +818,8 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
 										//fwrite(tempo,1,strlen(tempo),fp);
 										HT_ADD(tempo);
 									}
-                  if (strnotempty(r->charset)) {
+                  // Emit charset ?
+                  if (emited_footer == 1 && strnotempty(r->charset)) {
                     HT_ADD("<!-- Added by HTTrack --><meta http-equiv=\"content-type\" content=\"text/html;charset=");
                     HT_ADD(r->charset);
                     HT_ADD("\" /><!-- /Added by HTTrack -->");
