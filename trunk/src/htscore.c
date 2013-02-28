@@ -2484,7 +2484,17 @@ HTSEXT_API int structcheck(const char* path) {
       i++;
     }
   } else if (file[0] == PATH_SEPARATOR && file[1] == PATH_SEPARATOR) {    /* \\mch */
+    int j;
     i+= 2;
+    // skip machine and first dir (share) or we'll have troubles (TomZ)
+    for(j = 0 ; j < 2 ; j++) {
+      // skip segment
+      for( ; file[i] != '\0' && file[i] != PATH_SEPARATOR ; i++) ;
+      // skip final separator
+      if (file[i] == PATH_SEPARATOR) {  /* f:\ */
+        i++;
+      }
+    }
   }
 #endif
 
@@ -2580,7 +2590,17 @@ HTSEXT_API int structcheck_utf8(const char* path) {
       i++;
     }
   } else if (file[0] == PATH_SEPARATOR && file[1] == PATH_SEPARATOR) {    /* \\mch */
+    int j;
     i+= 2;
+    // skip machine and first dir (share) or we'll have troubles (TomZ)
+    for(j = 0 ; j < 2 ; j++) {
+      // skip segment
+      for( ; file[i] != '\0' && file[i] != PATH_SEPARATOR ; i++) ;
+      // skip final separator
+      if (file[i] == PATH_SEPARATOR) {  /* f:\ */
+        i++;
+      }
+    }
   }
 #endif
 
