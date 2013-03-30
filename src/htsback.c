@@ -2436,12 +2436,6 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
               HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unexpected socket error during pre-loop"LF); test_flush;
             }            
           }
-#if WIDE_DEBUG
-          else {
-            DEBUG_W("PANIC!!! Socket is invalid in a poll test!\n");
-          }
-#endif
-          
         }
         
       }
