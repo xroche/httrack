@@ -264,6 +264,9 @@ void htspe_init(void) {
 #else
       /* We are compatible with 0.9.6/7/8/8b and potentially above */
       static const char *const libs[] = {
+#ifdef __APPLE__
+        "libssl.dylib",
+#endif
         "libssl.so.1.0",
         "libssl.so.1",
         "libssl.so.1.0.0",
