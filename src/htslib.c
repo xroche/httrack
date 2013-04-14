@@ -1353,10 +1353,25 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
     }
   }
   else if ((p=strfield(rcvd,"Content-Range:"))!=0) {
-    char* a=strstr(rcvd+p,"*/");
-    if (a) {
-      if (sscanf(a+2,LLintP,&retour->crange) != 1) {
-        retour->crange=0;
+    // Content-Range: bytes 0-70870/70871
+    char* a;
+    for(a = rcvd+p ; is_space(*a) ; a++) ;
+    if (strncasecmp(a, "bytes ", 6) == 0) {
+      for(a += 6 ; is_space(*a) ; a++) ;
+      if (sscanf(a, LLintP "-" LLintP "/" LLintP, &retour->crange_start, &retour->crange_end, &retour->crange) != 3) {
+        retour->crange_start = 0;
+        retour->crange_end = 0;
+        retour->crange = 0;
+        a = strchr(rcvd+p, '/');
+        if (a != NULL) {
+          a++;
+          if (sscanf(a,LLintP,&retour->crange) == 1) {
+            retour->crange_start = 0;
+            retour->crange_end = retour->crange - 1;
+          } else {
+            retour->crange=0;
+          }
+        }
       }
     }
   }

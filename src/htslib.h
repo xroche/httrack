@@ -167,6 +167,8 @@ struct htsblk {
   char etag[64];         // Etag
   char cdispo[256];      // Content-Disposition coupé
   LLint  crange;         // Content-Range
+  LLint  crange_start;   // Content-Range
+  LLint  crange_end;     // Content-Range
   int debugid;           // debug connection
   /* */
   htsrequest req;        // paramètres pour la requête

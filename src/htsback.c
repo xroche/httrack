@@ -459,7 +459,8 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
     /* Don't store broken files. Note: check is done before compression.
        If the file is partial, the next run will attempt to continue it with compression too.
     */
-    if (back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
+    if (back[p].r.totalsize > 0 && back[p].r.statuscode > 0 
+      && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
       if (back[p].status == STATUS_READY) {
         if (opt->log!=NULL) {
           HTS_LOG(opt,LOG_WARNING);
@@ -3218,8 +3219,12 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                         
                         // parfois les serveurs buggés renvoient un content-range avec un 200
                         if (back[i].r.statuscode==HTTP_OK)  // 'OK'
-                          if (strfield(rcvd,"content-range:"))  // Avec un content-range: relisez les RFC..
-                            back[i].r.statuscode=206;    // FORCER A 206 !!!!!
+                          if (strfield(rcvd, "content-range:")) {  // Avec un content-range: relisez les RFC..
+                            // Fake range (the file is complete)
+                            if (!(back[i].r.crange_start == 0 && back[i].r.crange_end == back[i].r.crange - 1)) {
+                              back[i].r.statuscode=HTTP_PARTIAL_CONTENT;    // FORCER A 206 !!!!!
+                            }
+                          }
                           
                       } while(strnotempty(rcvd));
                       // ----------------------------------------                    
