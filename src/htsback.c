@@ -456,12 +456,22 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 	if (!back[p].finalized) {
 		back[p].finalized = 1;
 
-    /* Don't store broken files */
-    if (back[p].status == STATUS_READY && back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
-      if (opt->log!=NULL) {
-        HTS_LOG(opt,LOG_WARNING);
-        fprintf(opt->log, "file not stored in cache due to bogus state (broken size, expected %d got %d): %s%s"LF,
-          back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
+    /* Don't store broken files. Note: check is done before compression.
+       If the file is partial, the next run will attempt to continue it with compression too.
+    */
+    if (back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
+      if (back[p].status == STATUS_READY) {
+        if (opt->log!=NULL) {
+          HTS_LOG(opt,LOG_WARNING);
+          fprintf(opt->log, "file not stored in cache due to bogus state (broken size, expected %d got %d): %s%s"LF,
+            back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
+        }
+      } else {
+        if (opt->log!=NULL) {
+          HTS_LOG(opt,LOG_INFO);
+          fprintf(opt->log, "incomplete file not yet stored in cache (expected %d got %d): %s%s"LF,
+            back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
+        }
       }
       test_flush;
       return -1;
