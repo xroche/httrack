@@ -2994,7 +2994,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=httrack
- VERSION=3.46.1
+ VERSION=3.47.1
 
 
 cat >>confdefs.h <<_ACEOF
@@ -3136,7 +3136,7 @@ am__tar='${AMTAR} chof - "$$tardir"'; am__untar='${AMTAR} xf -'
 
 
 
-VERSION_INFO="2:46:0"
+VERSION_INFO="2:47:0"
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable maintainer-specific portions of Makefiles" >&5
 $as_echo_n "checking whether to enable maintainer-specific portions of Makefiles... " >&6; }
     # Check whether --enable-maintainer-mode was given.
