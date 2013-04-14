@@ -456,14 +456,16 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 	if (!back[p].finalized) {
 		back[p].finalized = 1;
 
-		/* Don't store broken files */
-		if (back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
+    /* Don't store broken files */
+    if (back[p].status == STATUS_READY && back[p].r.totalsize > 0 && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
       if (opt->log!=NULL) {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (broken size): %s%s"LF,back[p].url_adr,back[p].url_fil);
+        HTS_LOG(opt,LOG_WARNING);
+        fprintf(opt->log, "file not stored in cache due to bogus state (broken size, expected %d got %d): %s%s"LF,
+          back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
       }
       test_flush;
-			return -1;
-		}
+      return -1;
+    }
 
 		if (
 			(back[p].status == STATUS_READY)      // ready
@@ -561,7 +563,6 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					}
 				}
 #endif
-
 				/* Write mode to disk */
 				if (back[p].r.is_write && back[p].r.adr != NULL) {
 					freet(back[p].r.adr);
