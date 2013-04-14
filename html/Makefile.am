@@ -8,8 +8,9 @@ HelpHtmlTxtdir = $(datadir)/doc/httrack/html
 WebHtmldir = $(datadir)/doc/httrack/html/server
 WebHtmlimagesdir = $(datadir)/doc/httrack/html/server/images
 WebHtmlsfxdir = $(datadir)/doc/httrack/html/server/sfx
-WebPixmapdir = $(datadir)/pixmaps
-WebGPixmapdir = $(datadir)/httrack/icons
+WebPixmap16x16dir = $(datadir)/pixmaps
+WebPixmap32x32dir = $(datadir)/pixmaps
+WebPixmap48x48dir = $(datadir)/pixmaps
 VFolderEntrydir = $(prefix)/share/applications
 
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt
@@ -24,8 +25,9 @@ WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
-WebPixmap_DATA = server/div/httrack.xpm
-WebGPixmap_DATA = server/div/webhttrack.xpm
+WebPixmap16x16_DATA = server/div/webhttrack16x16.xpm
+WebPixmap32x32_DATA = server/div/webhttrack32x32.xpm
+WebPixmap48x48_DATA = server/div/webhttrack48x48.xpm
 VFolderEntry_DATA = server/div/*.desktop
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \

@@ -6,4 +6,4 @@ Terminal=false
 Name=WebHTTrack Website Copier
 Comment=Copy websites to your computer
 Exec=webhttrack
-Icon=/usr/share/httrack/icons/webhttrack.xpm
+Icon=/usr/share/httrack/icons/webhttrack32x32.xpm
