@@ -4,6 +4,17 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
+3.47-1
++ Fixed: random closing of files/sockets, leading to "zip_zipWriteInFileInZip_failed" assertion, "bogus state" messages, or random garbage in downloaded files
++ Fixed: libssl.dylib is now in the search list for libssl on OSX (Nils Breunese)
++ Fixed: bogus charset because the meta http-equiv tag is placed too far in the html page
++ Fixed: incorrect \\machine\dir structure build on Windows (TomZ)
++ Fixed: do not force a file to have an extension unless it has a known type (such as html), or a possibly known type (if delayed checks are disabled)
++ Fixed: HTML 5 addition regarding "poster" attribute for the "video" tag (Jason Ronallo)
++ Fixed: memory leaks in proxytrack.c (Eric Searcy)
++ Fixed: correctly set the Z flag in hts-cache/new.txt file (Peter)
++ Fixed: parallel patch, typo regarding ICONV_LIBS (Sebastian Pipping)
+
 3.46-1
 * New: Unicode filenames handling
 * Fixed: fixed bug in handling of update/continue with erased files or renamed files, leading to "Unexpected 412/416 error (Requested Range Not Satisfiable)" and/or "Previous cache file not found" (-1)" errors
