@@ -2479,9 +2479,15 @@ HTS_INLINE void deletesoc(T_SOC soc) {
     DEBUG_W("close %d\n" _ (int) soc);
 #endif
 #ifdef _WIN32
-    closesocket(soc);
+    if (closesocket(soc) != 0) {
+      int err = WSAGetLastError();
+      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+    }
 #else
-    close(soc);
+    if (close(soc) != 0) {
+      const int err = errno;
+      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+    }
 #endif
 #if HTS_WIDE_DEBUG    
     DEBUG_W(".. done\n");
