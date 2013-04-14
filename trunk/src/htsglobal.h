@@ -416,7 +416,7 @@ typedef int T_SOC;
 #define HTS_DNSCACHE 1
 
 // ID d'une pseudo-socket locale pour les file://
-#define LOCAL_SOCKET_ID -500000
+#define LOCAL_SOCKET_ID -2
 
 // taille de chaque buffer (10 sockets 650 ko)
 #if HTS_SPARE_MEMORY==0
