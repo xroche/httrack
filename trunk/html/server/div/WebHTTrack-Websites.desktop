@@ -6,4 +6,4 @@ Terminal=false
 Name=Browse Mirrored Websites
 Comment=Browse Websites Mirrored by WebHTTrack
 Exec=webhttrack browse
-Icon=/usr/share/httrack/icons/webhttrack.xpm
+Icon=/usr/share/httrack/icons/webhttrack32x32.xpm
