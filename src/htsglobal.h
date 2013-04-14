@@ -40,8 +40,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version (also check external version information)
-#define HTTRACK_VERSION      "3.46"
-#define HTTRACK_VERSIONID    "3.46.1"
+#define HTTRACK_VERSION      "3.47"
+#define HTTRACK_VERSIONID    "3.47.1"
 #define HTTRACK_AFF_VERSION  "3.x"
 #define HTTRACK_LIB_VERSION  "2.0"
 
