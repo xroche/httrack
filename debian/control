@@ -48,6 +48,8 @@ Package: webhttrack-common
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: webhttrack common files
+Replaces: webhttrack (<< 3.46.1-1)
+Breaks: webhttrack (<< 3.46.1-1)
  This package is the common files of webhttrack, website copier and
  mirroring utility
 
