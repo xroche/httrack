@@ -906,6 +906,7 @@ int back_unserialize(FILE *fp, lien_back** dst) {
 		(*dst)->r.out = NULL;
 		(*dst)->r.location = (*dst)->location_buffer;
 		(*dst)->r.fp = NULL;
+		(*dst)->r.soc = INVALID_SOCKET;
 #if HTS_USEOPENSSL
 		(*dst)->r.ssl_con = NULL;
 #endif
