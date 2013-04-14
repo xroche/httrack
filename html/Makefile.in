@@ -57,9 +57,10 @@ am__installdirs = "$(DESTDIR)$(HelpHtmldir)" \
 	"$(DESTDIR)$(HelpHtmlTxtdir)" "$(DESTDIR)$(HelpHtmldivdir)" \
 	"$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" \
 	"$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" \
-	"$(DESTDIR)$(WebGPixmapdir)" "$(DESTDIR)$(WebHtmldir)" \
-	"$(DESTDIR)$(WebHtmlimagesdir)" "$(DESTDIR)$(WebHtmlsfxdir)" \
-	"$(DESTDIR)$(WebPixmapdir)"
+	"$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" \
+	"$(DESTDIR)$(WebHtmlsfxdir)" "$(DESTDIR)$(WebPixmap16x16dir)" \
+	"$(DESTDIR)$(WebPixmap32x32dir)" \
+	"$(DESTDIR)$(WebPixmap48x48dir)"
 HelpHtmlDATA_INSTALL = $(INSTALL_DATA)
 HelpHtmlTxtDATA_INSTALL = $(INSTALL_DATA)
 HelpHtmldivDATA_INSTALL = $(INSTALL_DATA)
@@ -67,16 +68,18 @@ HelpHtmlimagesDATA_INSTALL = $(INSTALL_DATA)
 HelpHtmlimgDATA_INSTALL = $(INSTALL_DATA)
 HelpHtmlrootDATA_INSTALL = $(INSTALL_DATA)
 VFolderEntryDATA_INSTALL = $(INSTALL_DATA)
-WebGPixmapDATA_INSTALL = $(INSTALL_DATA)
 WebHtmlDATA_INSTALL = $(INSTALL_DATA)
 WebHtmlimagesDATA_INSTALL = $(INSTALL_DATA)
 WebHtmlsfxDATA_INSTALL = $(INSTALL_DATA)
-WebPixmapDATA_INSTALL = $(INSTALL_DATA)
+WebPixmap16x16DATA_INSTALL = $(INSTALL_DATA)
+WebPixmap32x32DATA_INSTALL = $(INSTALL_DATA)
+WebPixmap48x48DATA_INSTALL = $(INSTALL_DATA)
 DATA = $(HelpHtml_DATA) $(HelpHtmlTxt_DATA) $(HelpHtmldiv_DATA) \
 	$(HelpHtmlimages_DATA) $(HelpHtmlimg_DATA) \
-	$(HelpHtmlroot_DATA) $(VFolderEntry_DATA) $(WebGPixmap_DATA) \
-	$(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
-	$(WebPixmap_DATA)
+	$(HelpHtmlroot_DATA) $(VFolderEntry_DATA) $(WebHtml_DATA) \
+	$(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
+	$(WebPixmap16x16_DATA) $(WebPixmap32x32_DATA) \
+	$(WebPixmap48x48_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
@@ -210,8 +213,9 @@ HelpHtmlTxtdir = $(datadir)/doc/httrack/html
 WebHtmldir = $(datadir)/doc/httrack/html/server
 WebHtmlimagesdir = $(datadir)/doc/httrack/html/server/images
 WebHtmlsfxdir = $(datadir)/doc/httrack/html/server/sfx
-WebPixmapdir = $(datadir)/pixmaps
-WebGPixmapdir = $(datadir)/httrack/icons
+WebPixmap16x16dir = $(datadir)/pixmaps
+WebPixmap32x32dir = $(datadir)/pixmaps
+WebPixmap48x48dir = $(datadir)/pixmaps
 VFolderEntrydir = $(prefix)/share/applications
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt
 HelpHtml_DATA = *.html
@@ -225,8 +229,9 @@ WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
-WebPixmap_DATA = server/div/httrack.xpm
-WebGPixmap_DATA = server/div/webhttrack.xpm
+WebPixmap16x16_DATA = server/div/webhttrack16x16.xpm
+WebPixmap32x32_DATA = server/div/webhttrack32x32.xpm
+WebPixmap48x48_DATA = server/div/webhttrack48x48.xpm
 VFolderEntry_DATA = server/div/*.desktop
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
@@ -394,23 +399,6 @@ uninstall-VFolderEntryDATA:
 	  echo " rm -f '$(DESTDIR)$(VFolderEntrydir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(VFolderEntrydir)/$$f"; \
 	done
-install-WebGPixmapDATA: $(WebGPixmap_DATA)
-	@$(NORMAL_INSTALL)
-	test -z "$(WebGPixmapdir)" || $(mkdir_p) "$(DESTDIR)$(WebGPixmapdir)"
-	@list='$(WebGPixmap_DATA)'; for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  f=$(am__strip_dir) \
-	  echo " $(WebGPixmapDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(WebGPixmapdir)/$$f'"; \
-	  $(WebGPixmapDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(WebGPixmapdir)/$$f"; \
-	done
-
-uninstall-WebGPixmapDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(WebGPixmap_DATA)'; for p in $$list; do \
-	  f=$(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(WebGPixmapdir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(WebGPixmapdir)/$$f"; \
-	done
 install-WebHtmlDATA: $(WebHtml_DATA)
 	@$(NORMAL_INSTALL)
 	test -z "$(WebHtmldir)" || $(mkdir_p) "$(DESTDIR)$(WebHtmldir)"
@@ -462,22 +450,56 @@ uninstall-WebHtmlsfxDATA:
 	  echo " rm -f '$(DESTDIR)$(WebHtmlsfxdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(WebHtmlsfxdir)/$$f"; \
 	done
-install-WebPixmapDATA: $(WebPixmap_DATA)
+install-WebPixmap16x16DATA: $(WebPixmap16x16_DATA)
 	@$(NORMAL_INSTALL)
-	test -z "$(WebPixmapdir)" || $(mkdir_p) "$(DESTDIR)$(WebPixmapdir)"
-	@list='$(WebPixmap_DATA)'; for p in $$list; do \
+	test -z "$(WebPixmap16x16dir)" || $(mkdir_p) "$(DESTDIR)$(WebPixmap16x16dir)"
+	@list='$(WebPixmap16x16_DATA)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " $(WebPixmapDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(WebPixmapdir)/$$f'"; \
-	  $(WebPixmapDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(WebPixmapdir)/$$f"; \
+	  echo " $(WebPixmap16x16DATA_INSTALL) '$$d$$p' '$(DESTDIR)$(WebPixmap16x16dir)/$$f'"; \
+	  $(WebPixmap16x16DATA_INSTALL) "$$d$$p" "$(DESTDIR)$(WebPixmap16x16dir)/$$f"; \
 	done
 
-uninstall-WebPixmapDATA:
+uninstall-WebPixmap16x16DATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(WebPixmap_DATA)'; for p in $$list; do \
+	@list='$(WebPixmap16x16_DATA)'; for p in $$list; do \
 	  f=$(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(WebPixmapdir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(WebPixmapdir)/$$f"; \
+	  echo " rm -f '$(DESTDIR)$(WebPixmap16x16dir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(WebPixmap16x16dir)/$$f"; \
+	done
+install-WebPixmap32x32DATA: $(WebPixmap32x32_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(WebPixmap32x32dir)" || $(mkdir_p) "$(DESTDIR)$(WebPixmap32x32dir)"
+	@list='$(WebPixmap32x32_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(WebPixmap32x32DATA_INSTALL) '$$d$$p' '$(DESTDIR)$(WebPixmap32x32dir)/$$f'"; \
+	  $(WebPixmap32x32DATA_INSTALL) "$$d$$p" "$(DESTDIR)$(WebPixmap32x32dir)/$$f"; \
+	done
+
+uninstall-WebPixmap32x32DATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(WebPixmap32x32_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(WebPixmap32x32dir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(WebPixmap32x32dir)/$$f"; \
+	done
+install-WebPixmap48x48DATA: $(WebPixmap48x48_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(WebPixmap48x48dir)" || $(mkdir_p) "$(DESTDIR)$(WebPixmap48x48dir)"
+	@list='$(WebPixmap48x48_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(WebPixmap48x48DATA_INSTALL) '$$d$$p' '$(DESTDIR)$(WebPixmap48x48dir)/$$f'"; \
+	  $(WebPixmap48x48DATA_INSTALL) "$$d$$p" "$(DESTDIR)$(WebPixmap48x48dir)/$$f"; \
+	done
+
+uninstall-WebPixmap48x48DATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(WebPixmap48x48_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(WebPixmap48x48dir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(WebPixmap48x48dir)/$$f"; \
 	done
 tags: TAGS
 TAGS:
@@ -518,7 +540,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(HelpHtmldir)" "$(DESTDIR)$(HelpHtmlTxtdir)" "$(DESTDIR)$(HelpHtmldivdir)" "$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" "$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" "$(DESTDIR)$(WebGPixmapdir)" "$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" "$(DESTDIR)$(WebHtmlsfxdir)" "$(DESTDIR)$(WebPixmapdir)"; do \
+	for dir in "$(DESTDIR)$(HelpHtmldir)" "$(DESTDIR)$(HelpHtmlTxtdir)" "$(DESTDIR)$(HelpHtmldivdir)" "$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" "$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" "$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" "$(DESTDIR)$(WebHtmlsfxdir)" "$(DESTDIR)$(WebPixmap16x16dir)" "$(DESTDIR)$(WebPixmap32x32dir)" "$(DESTDIR)$(WebPixmap48x48dir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-am
@@ -566,9 +588,10 @@ info-am:
 install-data-am: install-HelpHtmlDATA install-HelpHtmlTxtDATA \
 	install-HelpHtmldivDATA install-HelpHtmlimagesDATA \
 	install-HelpHtmlimgDATA install-HelpHtmlrootDATA \
-	install-VFolderEntryDATA install-WebGPixmapDATA \
-	install-WebHtmlDATA install-WebHtmlimagesDATA \
-	install-WebHtmlsfxDATA install-WebPixmapDATA
+	install-VFolderEntryDATA install-WebHtmlDATA \
+	install-WebHtmlimagesDATA install-WebHtmlsfxDATA \
+	install-WebPixmap16x16DATA install-WebPixmap32x32DATA \
+	install-WebPixmap48x48DATA
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
 
@@ -599,10 +622,10 @@ ps-am:
 uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	uninstall-HelpHtmldivDATA uninstall-HelpHtmlimagesDATA \
 	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
-	uninstall-VFolderEntryDATA uninstall-WebGPixmapDATA \
-	uninstall-WebHtmlDATA uninstall-WebHtmlimagesDATA \
-	uninstall-WebHtmlsfxDATA uninstall-WebPixmapDATA \
-	uninstall-info-am
+	uninstall-VFolderEntryDATA uninstall-WebHtmlDATA \
+	uninstall-WebHtmlimagesDATA uninstall-WebHtmlsfxDATA \
+	uninstall-WebPixmap16x16DATA uninstall-WebPixmap32x32DATA \
+	uninstall-WebPixmap48x48DATA uninstall-info-am
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	distclean distclean-generic distclean-libtool distdir dvi \
@@ -610,21 +633,22 @@ uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	install-HelpHtmlTxtDATA install-HelpHtmldivDATA \
 	install-HelpHtmlimagesDATA install-HelpHtmlimgDATA \
 	install-HelpHtmlrootDATA install-VFolderEntryDATA \
-	install-WebGPixmapDATA install-WebHtmlDATA \
-	install-WebHtmlimagesDATA install-WebHtmlsfxDATA \
-	install-WebPixmapDATA install-am install-data install-data-am \
-	install-data-hook install-exec install-exec-am install-info \
-	install-info-am install-man install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am uninstall \
-	uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
-	uninstall-HelpHtmldivDATA uninstall-HelpHtmlimagesDATA \
-	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
-	uninstall-VFolderEntryDATA uninstall-WebGPixmapDATA \
+	install-WebHtmlDATA install-WebHtmlimagesDATA \
+	install-WebHtmlsfxDATA install-WebPixmap16x16DATA \
+	install-WebPixmap32x32DATA install-WebPixmap48x48DATA \
+	install-am install-data install-data-am install-data-hook \
+	install-exec install-exec-am install-info install-info-am \
+	install-man install-strip installcheck installcheck-am \
+	installdirs maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
+	ps ps-am uninstall uninstall-HelpHtmlDATA \
+	uninstall-HelpHtmlTxtDATA uninstall-HelpHtmldivDATA \
+	uninstall-HelpHtmlimagesDATA uninstall-HelpHtmlimgDATA \
+	uninstall-HelpHtmlrootDATA uninstall-VFolderEntryDATA \
 	uninstall-WebHtmlDATA uninstall-WebHtmlimagesDATA \
-	uninstall-WebHtmlsfxDATA uninstall-WebPixmapDATA uninstall-am \
-	uninstall-info-am
+	uninstall-WebHtmlsfxDATA uninstall-WebPixmap16x16DATA \
+	uninstall-WebPixmap32x32DATA uninstall-WebPixmap48x48DATA \
+	uninstall-am uninstall-info-am
 
 
 install-data-hook:
