@@ -47,9 +47,9 @@ Description: Copy websites to your computer, httrack with a Web interface
 Package: webhttrack-common
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: webhttrack common files
 Replaces: webhttrack (<< 3.46.1-1)
 Breaks: webhttrack (<< 3.46.1-1)
+Description: webhttrack common files
  This package is the common files of webhttrack, website copier and
  mirroring utility
 
