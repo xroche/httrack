@@ -28,6 +28,7 @@ Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
 Suggests: httrack, httrack-doc
 Replaces: webhttrack-common (<< 3.43.9-2)
+Breaks: webhttrack-common (<< 3.43.9-2)
 Enhances: httrack
 Description: Copy websites to your computer, httrack with a Web interface
  WebHTTrack is an offline browser utility, allowing you to download a World
