@@ -1,8 +1,9 @@
-httrack (3.47.2-2) unstable; urgency=low
+httrack (3.47.3-1) unstable; urgency=low
 
-  * Attempt to solve conflicts due to moved files from webhttrack to webhttrack-common
+  * Fixing conflicts due to moved files from webhttrack to webhttrack-common
+    closes:#705532
 
- -- Xavier Roche <xavier@debian.org>  Sun, 14 Apr 2013 22:36:44 +0200
+ -- Xavier Roche <xavier@debian.org>  Tue, 16 Apr 2013 21:37:52 +0200
 
 httrack (3.47.2-1) unstable; urgency=low
 
