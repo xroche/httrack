@@ -1,3 +1,9 @@
+httrack (3.47.4-1) unstable; urgency=low
+
+  * Fixing previous conflicts due to moved files from webhttrack-common to webhttrack
+
+ -- Xavier Roche <roche@proliant.localnet>  Tue, 16 Apr 2013 22:07:37 +0200
+
 httrack (3.47.3-1) unstable; urgency=low
 
   * Fixing conflicts due to moved files from webhttrack to webhttrack-common
