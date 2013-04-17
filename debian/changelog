@@ -1,3 +1,9 @@
+httrack (3.47.5-1) unstable; urgency=low
+
+  * Revertes moving of desktop files to webhttrack-common because of desktop-command-not-in-package
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 17 Apr 2013 10:11:20 +0200
+
 httrack (3.47.4-1) unstable; urgency=low
 
   * Fixing previous conflicts due to moved files from webhttrack-common to webhttrack
