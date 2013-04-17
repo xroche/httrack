@@ -26,8 +26,8 @@ Description: Copy websites to your computer (Offline browser)
 Package: webhttrack
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
-Replaces: webhttrack-common (<< 3.43.9-1)
-Breaks: webhttrack-common (<< 3.43.9-1)
+Replaces: webhttrack-common (<< 3.43.9-2)
+Breaks: webhttrack-common (<< 3.43.9-2)
 Suggests: httrack, httrack-doc
 Enhances: httrack
 Description: Copy websites to your computer, httrack with a Web interface
