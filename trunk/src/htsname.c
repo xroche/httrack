@@ -1559,9 +1559,9 @@ void url_savename_refname(const char *adr, const char *fil, char *filename) {
   unsigned char bindigest[16];
   MD5_CTX ctx;
   MD5Init(&ctx, 0);
-  MD5Update(&ctx, adr, (unsigned int) strlen(adr));
-  MD5Update(&ctx, ",", 1);
-  MD5Update(&ctx, fil, (unsigned int) strlen(fil));
+  MD5Update(&ctx, (const unsigned char*) adr, strlen(adr));
+  MD5Update(&ctx, (const unsigned char*) ",", 1);
+  MD5Update(&ctx, (const unsigned char*) fil, strlen(fil));
   MD5Final(bindigest, &ctx);
   sprintf(filename, CACHE_REFNAME "/"
     "%02x%02x%02x%02x%02x%02x%02x%02x"

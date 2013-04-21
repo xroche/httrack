@@ -3052,7 +3052,8 @@ typedef struct {
 // 0 : no
 // 1 : yes
 // -1: don't know
-int is_unicode_utf8(const unsigned char* buffer, size_t size) {
+int is_unicode_utf8(const char* buffer_, size_t size) {
+  const unsigned char* buffer = (const unsigned char*) buffer_;
   t_auto_seq seq;
   size_t i;
   int is_utf = -1;
@@ -3794,8 +3795,8 @@ HTSEXT_API void escape_remove_control(char* s) {
   while(*ss) {
     if (*ss < 32) {    /* CONTROL characters go away! */
       char BIGSTK tmp[HTS_URLMAXSIZE*2];
-      strcpybuff(tmp, ss+1);
-      strcpybuff(ss, tmp);
+      strcpybuff(tmp, (char*) ss+1);
+      strcpybuff((char*) ss, tmp);
     } else {
       ss++;
     }
@@ -5113,7 +5114,7 @@ HTSEXT_API int hts_init(void) {
   /* MD5 Auto-test */
   {
     char digest[32 + 2];
-    const unsigned char* atest = (const unsigned char*)"MD5 Checksum Autotest";
+    const char* atest = "MD5 Checksum Autotest";
     digest[0] = '\0';
     domd5mem(atest, strlen(atest), digest, 1); /* a42ec44369da07ace5ec1d660ba4a69a */
     if (strcmp(digest, "a42ec44369da07ace5ec1d660ba4a69a") != 0) {

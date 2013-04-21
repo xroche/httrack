@@ -100,7 +100,6 @@ static int   __cdecl htsshow_savename(t_hts_callbackarg *carg, httrackp *opt, co
 static int   __cdecl htsshow_sendheader(t_hts_callbackarg *carg, httrackp *opt, char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* outgoing);
 static int   __cdecl htsshow_receiveheader(t_hts_callbackarg *carg, httrackp *opt, char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* incoming);
 
-static void vt_color(int text,int back);
 static void vt_clear(void);
 static void vt_home(void);
 
@@ -163,7 +162,6 @@ static int use_show;
 static httrackp *global_opt = NULL;
 
 static void signal_handlers(void);
-static void signal_restore_ctl_z(void);
 
 int main(int argc, char **argv) {
   int ret = 0;
@@ -687,7 +685,9 @@ static void sig_finish( int code ) {       // finir et quitter
 	}
   fprintf(stderr,"\nExit requested to engine (signal %d)\n",code);
 }
+
 #ifdef _WIN32
+#if 0
 static void sig_ask( int code ) {        // demander
   char s[256];
   signal(code,sig_term);  // quitter si encore
@@ -704,6 +704,7 @@ static void sig_ask( int code ) {        // demander
   }
   signal(code,sig_ask);  // remettre signal
 }
+#endif
 #else
 static void sig_doback(int blind);
 static void sig_back( int code ) {       // ignorer et mettre en backing 
@@ -717,6 +718,7 @@ static void sig_back( int code ) {       // ignorer et mettre en backing
     sig_doback(0);
   }
 }
+#if 0
 static void sig_ask( int code ) {        // demander
   char s[256];
   signal(code,sig_term);  // quitter si encore
@@ -742,6 +744,7 @@ static void sig_ask( int code ) {        // demander
     signal(code,sig_ask);  // remettre signal
   }
 }
+#endif
 static void sig_brpipe( int code ) {     // treat if necessary
   signal(code, sig_brpipe);
 }
@@ -813,12 +816,6 @@ static void signal_handlers(void) {
 #endif
 	signal( SIGPIPE , sig_brpipe );   // broken pipe (write into non-opened socket)
 	signal( SIGCHLD , sig_ignore );   // child change status
-#endif
-}
-
-static void signal_restore_ctl_z(void) {
-#ifndef _WIN32
-  signal( SIGTSTP , SIG_DFL); // ^Z
 #endif
 }
 

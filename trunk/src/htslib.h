@@ -90,7 +90,7 @@ typedef struct t_dnscache t_dnscache;
 #else
 #define MSVC2003INLINEBUG
 #endif
-MSVC2003INLINEBUG static char* getHtsOptBuff_(httrackp *opt) {
+MSVC2003INLINEBUG HTS_STATIC char* getHtsOptBuff_(httrackp *opt) {
 	opt->state.concat.index = ( opt->state.concat.index + 1 ) % 16;
 	return opt->state.concat.buff[opt->state.concat.index];
 }
@@ -339,7 +339,7 @@ void rawlinput(FILE* fp,char* s,int max);
 char* strstrcase(char *s,char *o);
 int ident_url_absolute(const char* url,char* adr,char* fil);
 void fil_simplifie(char* f);
-int is_unicode_utf8(const unsigned char* buffer, size_t size);
+int is_unicode_utf8(const char* buffer, size_t size);
 void map_characters(unsigned char* buffer, unsigned int size, unsigned int* map);
 int ishtml(httrackp *opt,const char* urlfil);
 int ishtml_ext(const char* a);

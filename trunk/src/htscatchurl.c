@@ -106,7 +106,7 @@ HTSEXT_API T_SOC catch_url_init(int* port,char* adr) {
         SOCaddr_initport(server, *port);
         if ( bind(soc,(struct sockaddr*) &server,server_size) == 0 ) {
           SOCaddr server2;
-          int len;
+          SOClen len;
           len=sizeof(server2);
           // effacer structure
           memset(&server2, 0, sizeof(server2));
@@ -172,8 +172,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
     /* INFOS */
     {
       SOCaddr server2;
-      int len;
-      len=sizeof(server2);
+      SOClen len = sizeof(server2);
       // effacer structure
       memset(&server2, 0, sizeof(server2));
       if (getpeername(soc,(struct sockaddr*) &server2,&len) == 0) {

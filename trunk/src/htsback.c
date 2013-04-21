@@ -464,13 +464,13 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
       if (back[p].status == STATUS_READY) {
         if (opt->log!=NULL) {
           HTS_LOG(opt,LOG_WARNING);
-          fprintf(opt->log, "file not stored in cache due to bogus state (broken size, expected %d got %d): %s%s"LF,
+          fprintf(opt->log, "file not stored in cache due to bogus state (broken size, expected "LLintP" got "LLintP"): %s%s"LF,
             back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
         }
       } else {
         if (opt->log!=NULL) {
           HTS_LOG(opt,LOG_INFO);
-          fprintf(opt->log, "incomplete file not yet stored in cache (expected %d got %d): %s%s"LF,
+          fprintf(opt->log, "incomplete file not yet stored in cache (expected "LLintP" got "LLintP"): %s%s"LF,
             back[p].r.totalsize, back[p].r.size, back[p].url_adr,back[p].url_fil);
         }
       }
@@ -1482,9 +1482,7 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
         if (a) {
 #endif
           if (!test) {      // non mode test
-#if HTS_FAST_CACHE
-            uintptr_t pos=hash_pos;
-#else
+#if HTS_FAST_CACHE==0
             int pos=-1;
             a+=strlen(buff);
             sscanf(a,"%d",&pos);    // lire position

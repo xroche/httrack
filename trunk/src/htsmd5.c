@@ -48,14 +48,13 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "md5.h"
 
-int domd5mem(const unsigned char * buf, size_t len, 
-                    unsigned char * digest, int asAscii) {
+int domd5mem(const char * buf, size_t len, char * digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
   MD5_CTX ctx;
 
   MD5Init(&ctx, * ( (char*) &endian));
-  MD5Update(&ctx, buf, (unsigned int) len);
+  MD5Update(&ctx, (const unsigned char*) buf, (unsigned int) len);
   MD5Final(bindigest, &ctx);
 
   if (!asAscii) {
@@ -73,7 +72,10 @@ int domd5mem(const unsigned char * buf, size_t len,
 }
 
 unsigned long int md5sum32(const char* buff) {
-  unsigned char md5digest[16];
-  domd5mem(buff,(int)strlen(buff),md5digest,0);
-  return *( (long int*)(char*)md5digest );
+  union {
+    char md5digest[16];
+    unsigned long int hash;
+  } u;
+  domd5mem(buff, strlen(buff), u.md5digest, 0);
+  return u.hash;
 }

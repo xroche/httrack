@@ -236,11 +236,11 @@ static int hts_parse_java(t_hts_callbackarg *carg, httrackp *opt,
       printf("addfiles\n");
 #endif
       {
-        unsigned int acess;
+        //unsigned int acess;
         unsigned int Class;
         unsigned int SClass;
         int i;
-        acess = readshort(fpout);
+        //acess = readshort(fpout);
         Class = readshort(fpout);
         SClass = readshort(fpout);
 
