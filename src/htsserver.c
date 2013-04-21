@@ -189,7 +189,7 @@ T_SOC smallserver_init(int* port,char* adr) {
       if ( (soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) != INVALID_SOCKET) {
         SOCaddr_initport(server, *port);
         if ( bind(soc,(struct sockaddr*) &server, server_size) == 0 ) {
-          /*int len;
+          /*SOClen len;
           SOCaddr server2;
           len=sizeof(server2);*/
           // effacer structure
@@ -438,13 +438,11 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
         strcatbuff(buffer, "&");
         while( s && (e = strchr(s, '=')) && (f = strchr(s, '&')) ) {
           char* ua;
-          int len;
           String sua = STRING_EMPTY;
           *e = *f = '\0';
           ua = e + 1;
           if (strfield2(ua, "on"))  /* hack : "on" == 1 */
             ua = "1";
-          len = (int) strlen(ua);
           unescapehttp(ua, &sua);
           inthash_write(NewLangList, s, (intptr_t)StringAcquire(&sua));
           s = f + 1;

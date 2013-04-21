@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscharset.h"
 
-int hts_isStringAscii(const char *s, size_t size) {
+static int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
   for(i = 0 ; i < size ; i++) {
     const unsigned char c = (const unsigned char) s[i];
@@ -354,7 +354,7 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 #include <errno.h>
 #include <iconv.h>
 
-char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to, const char *from) {
+static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
     return strdup("");
@@ -454,7 +454,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 
 #endif
 
-char* hts_getCharsetFromContentType(const char *mime) {
+static char* hts_getCharsetFromContentType(const char *mime) {
   /* text/html; charset=utf-8 */
   const char *const charset = "charset";
   char *pos = strstr(mime, charset);

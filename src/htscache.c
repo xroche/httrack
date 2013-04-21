@@ -231,8 +231,8 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_a
   int dataincache=0;    // put data in cache ?
   char BIGSTK headers[8192];
   int headersSize = 0;
-  int entryBodySize = 0;
-  int entryFilenameSize = 0;
+  //int entryBodySize = 0;
+  //int entryFilenameSize = 0;
   zip_fileinfo fi;
 	const char* url_save_suffix = url_save;
 	int zErr;
@@ -268,7 +268,7 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_a
   // data in cache
   if (dataincache) {
     assertf(((int) r->size) == r->size);
-    entryBodySize = (int) r->size;
+    //entryBodySize = (int) r->size;
   }
 
   /* Fields */
@@ -283,7 +283,7 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_a
       message = "(See X-StatusMessage)";
     }
     /* 64 characters MAX for first line */
-    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', r->statuscode, r->msg);
+    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', r->statuscode, message);
   }
   headersSize += (int) strlen(headers + headersSize);
 
@@ -309,7 +309,7 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,const char* url_a
   ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);            // Original URI filename
   ZIP_FIELD_STRING(headers, headersSize, "X-Save", url_save_suffix);           // Original save filename
   
-  entryFilenameSize = (int) ( strlen(url_adr) + strlen(url_fil));
+  //entryFilenameSize = (int) ( strlen(url_adr) + strlen(url_fil));
   
   /* Filename */
   if (!link_has_authority(url_adr)) {
@@ -630,7 +630,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
       if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
         char BIGSTK headerBuff[8192 + 2];
         int readSizeHeader;
-        int totalHeader = 0;
+        //int totalHeader = 0;
         int dataincache = 0;
         
         /* For BIG comments */
@@ -674,7 +674,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);           // Original save filename
             }
           } while(offset < readSizeHeader && !lineEof);
-          totalHeader = offset;
+          //totalHeader = offset;
 
 					/* Previous entry */
 					if (previous_save_[0] != '\0') {

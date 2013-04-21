@@ -844,7 +844,7 @@ T_SOC get_datasocket(char* to_send) {
 
         if ( bind(soc,(struct sockaddr*) &server, server_size) == 0 ) {
           SOCaddr server2;
-          int len;
+          SOClen len;
           len=sizeof(server2);
           // effacer structure
           memset(&server2, 0, sizeof(server2));

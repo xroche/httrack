@@ -314,11 +314,11 @@ int lienrelatif(char* s,const char* link,const char* curr_fil) {
   
   // sauter ce qui est commun aux 2 chemins
   {
-    const char *l,*c;
+    const char *l;
     if (*link=='/') link++;  // sauter slash
     if (*curr=='/') curr++;
     l=link;
-    c=curr;
+    //c=curr;
     // couper ce qui est commun
     while ((streql(*link,*curr)) && (*link!=0)) {link++; curr++; }
     // mais on veut un répertoirer entier!

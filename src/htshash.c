@@ -63,11 +63,11 @@ Please visit our Website: http://www.httrack.com
 // type: numero enregistrement - 0 est case insensitive (sav) 1 (adr+fil) 2 (former_adr+former_fil)
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 // retour: position ou -1 si non trouvé
-int hash_read(const hash_struct* hash,char* nom1,char* nom2,int type,int normalized) {
+int hash_read(const hash_struct* hash,const char* nom1,const char* nom2,int type,int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE*2];
 	char catbuff[CATBUFF_SIZE];
-  char* normfil;
-  char* normadr;
+  const char* normfil;
+  const char* normadr;
   unsigned int cle;
   int pos; 
   // calculer la clé de recherche, non modulée
@@ -203,7 +203,7 @@ int hash_read(const hash_struct* hash,char* nom1,char* nom2,int type,int normali
 void hash_write(hash_struct* hash,int lpos,int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE*2];
 	char catbuff[CATBUFF_SIZE];
-  char* normfil;
+  const char* normfil;
   unsigned int cle;
   int pos; 
   int* ptr;
@@ -271,7 +271,7 @@ void hash_write(hash_struct* hash,int lpos,int normalized) {
 
 // calcul clé
 // il n'y a pas de formule de hashage universelle, celle-ci semble acceptable..
-unsigned long int hash_cle(char* nom1,char* nom2) {
+unsigned long int hash_cle(const char* nom1, const char* nom2) {
   /*
   unsigned int sum=0;
   int i=0;

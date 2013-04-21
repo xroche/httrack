@@ -2862,7 +2862,7 @@ void usercommand_exe(const char* cmd,const char* file) {
 
 
 static void postprocess_file(httrackp* opt,const char* save, const char* adr, const char* fil) {
-  int first = 0;
+  //int first = 0;
   /* MIME-html archive to build */
   if (opt != NULL && opt->mimehtml) {
     if (adr != NULL && strcmp(adr, "primary") == 0) {
@@ -2879,7 +2879,7 @@ static void postprocess_file(httrackp* opt,const char* save, const char* adr, co
       }
 
       if (!opt->state.mimehtml_created) {
-        first = 1;
+        //first = 1;
         opt->state.mimefp = fopen(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.mht"), "wb");
         if (opt->state.mimefp != NULL) {
           char BIGSTK rndtmp[1024], currtime[256];
@@ -3744,7 +3744,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
 
 // message copyright interne
 void voidf(void) {
-  char* a;
+  static const char* a;
   a=""CRLF""CRLF;
   a="+-----------------------------------------------+"CRLF;
   a="|HyperTextTRACKer, Offline Browser Utility      |"CRLF;
@@ -3764,6 +3764,7 @@ void voidf(void) {
   a="|Use this program at your own risks!            |"CRLF;    
   a="+-----------------------------------------------+"CRLF;
   a=""CRLF;
+  (void) a;
 }
 
 

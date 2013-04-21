@@ -129,7 +129,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   //char url[65536];         // URLS séparées par un espace
   // the parametres
   int httrack_logmode=3;   // ONE log file
-  int recuperer=0;         // récupérer un plantage (n'arrive jamais, à supprimer)
 #ifndef _WIN32
 #ifndef HTS_DO_NOT_USE_UID
   int switch_uid=-1,switch_gid=-1;      /* setuid/setgid */
@@ -348,7 +347,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 htsmain_free();
                 return -1;
               } else {
-								int i, j;
+								int i /*, j*/;
 								int inQuote;
 								String *path;
 								int noDbl = 0;
@@ -359,7 +358,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 na++;
 								StringClear(opt->path_html);
                 StringClear(opt->path_log);
-								for(i = 0, j = 0, inQuote = 0, path = &opt->path_html ; argv[na][i] != 0 ; i++) {
+								for(i = 0/*, j = 0*/, inQuote = 0, path = &opt->path_html ; argv[na][i] != 0 ; i++) {
 									if (argv[na][i] == '"') {
 										if (inQuote)
 											inQuote = 0;
@@ -367,7 +366,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 											inQuote = 1;
 									} else if (!inQuote && !noDbl && argv[na][i] == ',') {
                     //StringAddchar(path, '\0');
-										j = 0;
+										//j = 0;
 										path = &opt->path_log;
 									} else {
                     StringAddchar(*path, argv[na][i]);
@@ -720,7 +719,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
           if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"))) {    // cache prioritaire
             m=1;
-            recuperer=1;
           } else {
             m=2;
           }

@@ -50,10 +50,10 @@ typedef struct hash_struct hash_struct;
 #endif
 
 // tables de hachage
-int hash_read(const hash_struct* hash,char* nom1,char* nom2,int type,int normalized);
+int hash_read(const hash_struct* hash,const char* nom1,const char* nom2,int type,int normalized);
 void hash_write(hash_struct* hash,int lpos,int normalized);
 int* hash_calc_chaine(hash_struct* hash,int type,int pos);
-unsigned long int hash_cle(char* nom1,char* nom2);
+unsigned long int hash_cle(const char* nom1,const char* nom2);
 #endif
 
 #endif

@@ -105,7 +105,7 @@ int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size
 // * = toute lettre
 // --?-- : spécifique à HTTrack et aux ?
 HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
-  int err=0;
+  //int err=0;
   if (strnotempty(joker)==0) {    // fin de chaine joker
     if (strnotempty(chaine)==0)   // fin aussi pour la chaine: ok
       return chaine;
@@ -214,7 +214,8 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
                 for(j=(int) (unsigned char) joker[i];j<=(int) (unsigned char) joker[i+2];j++)
                   pass[j]=1;
                 
-              } else err=1;
+              }
+              // else err=1;
               i+=3;
             } else {            // 1 car, ex: *[ ]
               if (joker[i+2]=='\\' && joker[i+3] != 0) {  // escaped char, such as *[\[] or *[\]]

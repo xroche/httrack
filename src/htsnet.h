@@ -247,6 +247,9 @@ getnameinfo((struct sockaddr *)&(ss), sslen, \
 
 #endif
 
+/* Socket length type */
+typedef socklen_t SOClen;
+
 /* Buffer structure to copy various hostent structures */
 #ifndef HTS_DEF_FWSTRUCT_t_fullhostent
 #define HTS_DEF_FWSTRUCT_t_fullhostent

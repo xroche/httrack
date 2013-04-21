@@ -496,7 +496,7 @@ static void proxytrack_add_DAV_Item(String *item, String *buff,
 }
 
 /* Convert a RFC822 time to time_t */
-time_t get_time_rfc822(const char* s) {
+static time_t get_time_rfc822(const char* s) {
   struct tm result;
   /* */
   char months[]="jan feb mar apr may jun jul aug sep oct nov dec";
@@ -1239,7 +1239,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 			/* */
 			String ip = STRING_EMPTY;
 			SOCaddr serverClient;
-			int lenServerClient = (int) sizeof(serverClient);
+			SOClen lenServerClient = (int) sizeof(serverClient);
 			memset(&serverClient, 0, sizeof(serverClient));
 			if (getsockname(soc_c, (struct sockaddr*) &serverClient, &lenServerClient) == 0) {
 				ip = getip(&serverClient, lenServerClient);
@@ -1461,7 +1461,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 	}
 	while(soc != INVALID_SOCKET) {
 		struct sockaddr clientAddr;
-		int clientAddrLen = sizeof(struct sockaddr);
+		SOClen clientAddrLen = sizeof(struct sockaddr);
 		int n;
 		memset(&clientAddr, 0, sizeof(clientAddr));
 		n = recvfrom(soc, (char*)buffer, bufferSize, 0, &clientAddr, &clientAddrLen);

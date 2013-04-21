@@ -88,9 +88,9 @@ Please visit our Website: http://www.httrack.com
   ht_size=(A)+ht_len+REALLOC_SIZE; \
   ht_buff=(char*) realloct(ht_buff,ht_size); \
   if (ht_buff==NULL) { \
-  printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
+  printf("PANIC! : Not enough memory [%d]\n", __LINE__); \
   XH_uninit; \
-  abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct(%d) failed" _ ht_size); \
+  abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct("LLintP") failed" _ ht_size); \
   abort(); \
   } \
 } \
@@ -143,7 +143,7 @@ Please visit our Website: http://www.httrack.com
   if (ht_buff==NULL) { \
   printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
   XH_uninit; \
-  abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct(%d) failed" _ (int) ht_size); \
+  abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct("LLintP") failed" _ ht_size); \
   abort(); \
   } \
   ht_buff[0]='\0'; \
@@ -329,7 +329,7 @@ Please visit our Website: http://www.httrack.com
   const char * const template_body HTS_UNUSED = stre->template_body_; \
   const char * const template_footer HTS_UNUSED = stre->template_footer_; \
   /* */ \
-  char* const makeindex_firstlink = stre->makeindex_firstlink_; \
+  HTS_UNUSED char* const makeindex_firstlink = stre->makeindex_firstlink_; \
   /* */ \
   /* */ \
   int error = * stre->error_; \
@@ -341,8 +341,8 @@ Please visit our Website: http://www.httrack.com
   int makeindex_links = *stre->makeindex_links_; \
   /* */ \
   LLint stat_fragment = *stre->stat_fragment_; \
-  TStamp makestat_time = stre->makestat_time; \
-  FILE* makestat_fp = stre->makestat_fp
+  HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
+  HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
 
 #define ENGINE_SET_CONTEXT() \
   ENGINE_SET_CONTEXT_BASE(); \
@@ -595,7 +595,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
       }
 
       // Detect UTF8 format
-      //if (is_unicode_utf8((unsigned char*) r->adr, (unsigned int) r->size) == 1) {
+      //if (is_unicode_utf8(r->adr, (unsigned int) r->size) == 1) {
       //  no_esc_utf=1;
       //} else {
       //  no_esc_utf=0;
@@ -1562,9 +1562,9 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                           // ok chaine terminée par " ou '
                           if ((*a == stop) && (count<HTS_URLMAXSIZE) && (count>0)) {
                             char c;
-                            char* aend;
+                            //char* aend;
                             //
-                            aend=a;     // sauver début
+                            //aend=a;     // sauver début
                             a++;
                             while(is_taborspace(*a)) a++;
                             c=*a;
@@ -1717,7 +1717,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
           if ((p>0) || (valid_p)) {    // on a repéré un lien
             //int lien_valide=0;
             char* eadr=NULL;          /* fin de l'URL */
-            char* quote_adr=NULL;     /* adresse du ? dans l'adresse */
+            //char* quote_adr=NULL;     /* adresse du ? dans l'adresse */
             int ok=1;
             char quote='\0';
             int quoteinscript=0;
@@ -1865,7 +1865,7 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                       break;
                       // case '?': non!
                     case '\\': if (inscript) ok=0; break;     // \" ou \' point d'arrêt
-                    case '?': quote_adr=adr; break;           // noter position query
+                    case '?': /*quote_adr=adr;*/ break;           // noter position query
                       }
                     }
                     //}
@@ -4347,7 +4347,6 @@ int hts_wait_delayed(htsmoduleStruct* str,
   ENGINE_LOAD_CONTEXT_BASE();
   hash_struct* const hash = hashptr;
 
-  int r_sv=0;
   int in_error = 0;
   LLint in_error_size = 0;
   char in_error_msg[32];
@@ -4388,7 +4387,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&back,str->page_charset_);
+          url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&back,str->page_charset_);
 
           /* Recompute authorization with MIME type */
           {
@@ -4456,7 +4455,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
+          url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
 
           /* Recompute authorization with MIME type */
           {
@@ -4645,7 +4644,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 
                   /* Recompute filename for hash lookup */
                   save[0] = '\0';
-                  r_sv=url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
+                  url_savename2(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back,str->page_charset_);
                 } else {
                   if ( opt->log!=NULL ) {
                     HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unable to test %s%s (loop to same filename)"LF,adr,fil);
@@ -4664,7 +4663,7 @@ int hts_wait_delayed(htsmoduleStruct* str,
 					if (!continue_loop) {
 						/* Recompute filename with MIME type */
 						save[0] = '\0';
-						r_sv=url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back);
+						url_savename(adr,fil,save,former_adr,former_fil,liens[ptr]->adr,liens[ptr]->fil,opt,liens,lien_tot,sback,cache,hash,ptr,numero_passe,&delayed_back);
 
 						/* Recompute authorization with MIME type */
 						{
