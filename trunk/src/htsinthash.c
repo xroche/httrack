@@ -344,7 +344,7 @@ void inthash_delete(inthash* hashtable) {
             free_handler=inthash_default_free_handler;
         }
         for(i=0;i<(*hashtable)->hash_size;i++) {
-          inthash_delchain((*hashtable)->hash[i],(*hashtable)->free_handler);
+          inthash_delchain((*hashtable)->hash[i], free_handler);
           (*hashtable)->hash[i]=NULL;
         }
         freet((*hashtable)->hash);
