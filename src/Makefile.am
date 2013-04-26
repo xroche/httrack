@@ -65,7 +65,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsmms.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
 	mmsrip/error.h mmsrip/mms.h
-libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(DL_LIBS) $(SOCKET_LIBS)
+libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
