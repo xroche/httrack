@@ -1,8 +1,8 @@
 ; HTTrack Website Copier - x64 edition
 
 [Setup]
-AppVerName=WinHTTrack Website Copier 3.46-1 (x64)
-AppVersion=3.46.1
+AppVerName=WinHTTrack Website Copier 3.47-6 (x64)
+AppVersion=3.47.6
 AppName=WinHTTrack Website Copier
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -80,17 +80,17 @@ Root: HKLM; Subkey: "Software\Classes\WinHTTrackProject"; Flags: uninsdeletekey 
 ; Launch and various things to remove
 Root: HKCR; Subkey: "Applications\WinHTTrack.exe"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKLM; Subkey: "SOFTWARE\Classes\Applications\WinHTTrack.exe"; Flags: uninsdeletekey noerror; Tasks: regfiles
-; Sound events
+; Sound events (disabled by default ; too noisy)
 Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack"; ValueType: string; ValueData: "WinHTTrack Website Copier"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack\MirrorStarted\.Current"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack\MirrorStarted\.Default"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
-Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Current"; ValueType: string; ValueData: "{app}\html\server\sfx\finished.wav"; Flags: uninsdeletekey noerror; Tasks: regfiles
+Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Current"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKCU; Subkey: "AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Default"; ValueType: string; ValueData: "{app}\html\server\sfx\finished.wav"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKCU; Subkey: "AppEvents\EventLabels\MirrorFinished"; ValueType: string; ValueData: "Mirror Finished"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack"; ValueType: string; ValueData: "WinHTTrack Website Copier"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack\MirrorStarted\.Current"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack\MirrorStarted\.Default"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
-Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Current"; ValueType: string; ValueData: "{app}\html\server\sfx\finished.wav"; Flags: uninsdeletekey noerror; Tasks: regfiles
+Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Current"; ValueType: string; ValueData: ""; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKU; Subkey: ".DEFAULT\AppEvents\Schemes\Apps\WinHTTrack\MirrorFinished\.Default"; ValueType: string; ValueData: "{app}\html\server\sfx\finished.wav"; Flags: uninsdeletekey noerror; Tasks: regfiles
 Root: HKU; Subkey: ".DEFAULT\AppEvents\EventLabels\MirrorFinished"; ValueType: string; ValueData: "Mirror Finished"; Flags: uninsdeletekey noerror; Tasks: regfiles
 
