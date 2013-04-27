@@ -1,3 +1,9 @@
+httrack (3.47.6-1) unstable; urgency=low
+
+  * Updated to 3.47.6 (3.47-6)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 27 Apr 2013 15:25:32 +0200
+
 httrack (3.47.5-1) unstable; urgency=low
 
   * Revertes moving of desktop files to webhttrack-common because of
