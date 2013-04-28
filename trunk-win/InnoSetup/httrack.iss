@@ -27,7 +27,7 @@ UninstallIconFile=C:\Dev\WinHTTrack\res\Shell.ico
 [Tasks]
 Name: "regfiles"; Description: "Register WinHTTrack file types and program setup"; GroupDescription: "Setup:"; MinVersion: 4,4
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; MinVersion: 4,4
-Name: "iebar"; Description: "Add a quick launch shortcut in Internet Explorer bar"; GroupDescription: "Additional icons:"; MinVersion: 4,4
+;Name: "iebar"; Description: "Add a quick launch shortcut in Internet Explorer bar"; GroupDescription: "Additional icons:"; MinVersion: 4,4
 Name: "quicklaunchicon"; Description: "Create a &quick launch icon"; GroupDescription: "Additional icons:"; MinVersion: 4,4; Flags: unchecked
 
 [Files]
@@ -41,7 +41,7 @@ Source: "O:\HTTrack\httrack\*.*"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 Source: "O:\HTTrack\file_id.diz"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 Source: "O:\HTTrackFiles\winhttrack.log"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 ;Source: "O:\HTTrack\httrack\dll\*.dll"; DestDir: "{sys}"; CopyMode: normal; Flags: uninsneveruninstall sharedfile restartreplace
-Source: "O:\HTTrack\httrack\WinHTTrackIEBar.dll"; DestDir: "{app}"; CopyMode: alwaysoverwrite; Flags: regserver; Tasks: iebar
+;Source: "O:\HTTrack\httrack\WinHTTrackIEBar.dll"; DestDir: "{app}"; CopyMode: alwaysoverwrite; Flags: regserver; Tasks: iebar
 
 [Icons]
 Name: "{group}\WinHTTrack Website Copier"; Filename: "{app}\WinHTTrack.exe"; Comment: "Launch WinHTTrack Website Copier"; WorkingDir: "{app}"
