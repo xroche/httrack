@@ -1,1 +1,2 @@
 dh_lintian
+dh_autoreconf
