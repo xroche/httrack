@@ -27,6 +27,8 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 
+	autoreconf -v -i
+
 	./configure \
 		--prefix=/usr \
 		--host=$(DEB_HOST_GNU_TYPE) \
