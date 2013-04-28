@@ -2,7 +2,7 @@ Source: httrack
 Section: web
 Priority: optional
 Maintainer: Xavier Roche <roche@httrack.com>
-Standards-Version: 3.9.3
+Standards-Version: 3.9.4
 Build-Depends: debhelper (>> 5.0.0), zlib1g-dev
 Homepage: http://www.httrack.com
 
