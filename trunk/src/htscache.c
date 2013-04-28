@@ -427,8 +427,10 @@ void cache_add(httrackp* opt,cache_back* cache,const htsblk *r,char* url_adr,cha
       return;   // erreur (sauf robots.txt)
   }
 
+  /*
   if (r->size <= 0)   // taille <= 0 
     return;          // refusé..
+  */
 
   // Mettre les *donées* en cache ?
   if (is_hypertext_mime(opt,r->contenttype, url_fil))    // html, mise en cache des données et 
