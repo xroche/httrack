@@ -377,6 +377,7 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to
       /* Initial size to around the string size */
       for(outbufCapa = 16 ; outbufCapa < size + 1 ; outbufCapa *= 2) ;
       outbuf = malloc(outbufCapa);
+      outbytesleft = outbufCapa;
 
       /* Convert */
       while(outbuf != NULL && inbytesleft != 0) {
