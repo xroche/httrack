@@ -766,7 +766,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					} else {
             /* Partial file, but marked as "ok" ? */
 						if (opt->log!=NULL) {
-							HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (incomplete type caused by %s (%d)): %s%s"LF,back[p].r.msg,back[p].url_adr,back[p].url_fil);
+							HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (incomplete type caused by %s (%d)): %s%s"LF,back[p].r.msg,back[p].r.statuscode,back[p].url_adr,back[p].url_fil);
 						}
 					}
 				}
