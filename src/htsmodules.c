@@ -251,7 +251,17 @@ void htspe_init(void) {
   static int initOk = 0;
   if (!initOk) {
     initOk = 1;
-    
+
+    /* See CVE-2010-5252 */
+#if (defined(_WIN32) && (!defined(_DEBUG)))
+    /* See KB 2389418
+     "If this parameter is an empty string (""), the call removes the 
+     current directory from the default DLL search order" */
+    if (!SetDllDirectory("")) {
+      assertf(! "SetDllDirectory failed");
+    }
+#endif
+ 
     /* Zlib is now statically linked */
     gz_is_available = 1;
 
