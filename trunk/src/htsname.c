@@ -1348,7 +1348,10 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
   if (charset != NULL && charset[0] != '\0') {
     char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
     if (s != NULL) {
-      strcpy(save, s);
+      if ( (opt->debug>1) && (opt->log!=NULL) ) {
+        HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: save-name: charset conversion from '%s' to '%s'"LF, save, s);
+      }
+      strcpybuff(save, s);
       free(s);
     }
   }
