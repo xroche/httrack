@@ -1,7 +1,8 @@
 httrack (3.47.7-1) unstable; urgency=low
 
   * Updated to 3.47.7 (3.47-7)
-    Windows Update mainly (CVE-2010-5252)
+    Windows Update (CVE-2010-5252)
+    Linux UTF-8 filename bugs
 
  -- Xavier Roche <xavier@debian.org>  Mon, 29 Apr 2013 18:36:00 +0200
 
