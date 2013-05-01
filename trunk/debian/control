@@ -3,7 +3,7 @@ Section: web
 Priority: optional
 Maintainer: Xavier Roche <roche@httrack.com>
 Standards-Version: 3.9.4
-Build-Depends: debhelper (>> 5.0.0), zlib1g-dev, autotools-dev, autoconf
+Build-Depends: debhelper (>> 5.0.0), zlib1g-dev, autotools-dev, autoconf, automake1.9
 Homepage: http://www.httrack.com
 
 Package: httrack
