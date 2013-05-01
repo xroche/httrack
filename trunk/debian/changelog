@@ -1,3 +1,10 @@
+httrack (3.47.10-1) unstable; urgency=low
+
+  * Updated to 3.47.10 (3.47-10)
+    Fixed KDE/Gnome icons.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 01 May 2013 22:44:30 +0200
+
 httrack (3.47.9-1) unstable; urgency=low
 
   * Updated to 3.47.9 (3.47-9)
