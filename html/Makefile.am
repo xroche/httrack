@@ -9,6 +9,9 @@ WebHtmldir = $(datadir)/doc/httrack/html/server
 WebHtmlimagesdir = $(datadir)/doc/httrack/html/server/images
 WebHtmlsfxdir = $(datadir)/doc/httrack/html/server/sfx
 WebPixmapdir = $(datadir)/pixmaps
+WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
+WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
+WebIcon48x48dir = $(datadir)/icons/hicolor/48x48/apps
 VFolderEntrydir = $(prefix)/share/applications
 
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt
@@ -24,11 +27,15 @@ WebHtmlsfx_DATA = server/sfx/*
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
 WebPixmap_DATA = server/div/*.xpm
+WebIcon16x16_DATA = server/div/16x16/*.png
+WebIcon32x32_DATA = server/div/32x32/*.png
+WebIcon48x48_DATA = server/div/48x48/*.png
 VFolderEntry_DATA = server/div/*.desktop
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
-	$(WebPixmap_DATA) $(VFolderEntry_DATA) \
+	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
+	$(VFolderEntry_DATA) \
 	httrack.css
 
 install-data-hook:
