@@ -207,7 +207,8 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
             // Traitement des en-têtes
             char BIGSTK loc[HTS_URLMAXSIZE*2];
             htsblk blkretour;
-            memset(&blkretour, 0, sizeof(htsblk));    // effacer
+            hts_init_htsblk(&blkretour);
+            //memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location=loc;    // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
             sprintf(data,"%s %s %s\r\n",method,url_fil,protocol);

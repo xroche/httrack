@@ -231,6 +231,9 @@ struct t_dnscache {
 
 extern htsmutex dns_lock;
 
+// initialize an htsblk structure
+void hts_init_htsblk(htsblk* r);
+
 // fonctions unix/winsock
 int hts_read(htsblk* r,char* buff,int size);
 //int HTS_TOTAL_RECV_CHECK(int var);

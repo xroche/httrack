@@ -598,7 +598,8 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
   intptr_t hash_pos;
   int hash_pos_return;
   htsblk r;
-  memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
+  hts_init_htsblk(&r);
+  //memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
 	location_default[0] = '\0';
 	previous_save[0] = previous_save_[0] = '\0';
 
@@ -947,7 +948,8 @@ static htsblk cache_readex_old(httrackp* opt,cache_back* cache,const char* adr,c
   int ok=0;
   int header_only=0;
 
-  memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
+  hts_init_htsblk(&r);
+  //memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
   if (location) {
     r.location = location;
   } else {

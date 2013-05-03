@@ -616,6 +616,15 @@ char* antislash(char *catbuff, const char* s) {
 char cwd[MAX_PATH+1] = "";
 #endif
 
+// Initialize a htsblk structure
+void hts_init_htsblk(htsblk* r) {
+  memset(r, 0, sizeof(htsblk));    // effacer
+  r->soc=INVALID_SOCKET;
+  r->msg[0]='\0';
+  r->statuscode=STATUSCODE_INVALID;    
+  r->totalsize=-1;
+}
+
 // Récupération d'un fichier http sur le net.
 // Renvoie une adresse sur le bloc de mémoire, ou bien
 // NULL si un retour.msgeur (buffer retour.msg) est survenue. 
@@ -631,7 +640,8 @@ htsblk httpget(httrackp *opt,char* url) {
   // séparer URL en adresse+chemin
   if (ident_url_absolute(url,adr,fil)==-1) {
     htsblk retour;
-    memset(&retour, 0, sizeof(htsblk));    // effacer
+    hts_init_htsblk(&retour);
+    //memset(&retour, 0, sizeof(htsblk));    // effacer
     // retour prédéfini: erreur
     retour.adr=NULL;
     retour.size=0;
@@ -1242,9 +1252,10 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
 #if HDEBUG
     printf("ok, Content-length: détecté\n");
 #endif
-    sscanf(rcvd+p,LLintP,&(retour->totalsize));
-    if (retour->totalsize == 0) {
-      retour->empty = 1;
+    if (sscanf(rcvd+p,LLintP,&(retour->totalsize)) == 1) {
+      if (retour->totalsize == 0) {
+        retour->empty = 1;
+      }
     }
   }
   else if ((p=strfield(rcvd,"Content-Disposition:"))!=0) {
@@ -1636,7 +1647,8 @@ htsblk xhttpget(httrackp *opt,char* adr,char* fil) {
   T_SOC soc;
   htsblk retour;
   
-  memset(&retour, 0, sizeof(htsblk));
+  hts_init_htsblk(&retour);
+  //memset(&retour, 0, sizeof(htsblk));
   soc=http_fopen(opt,adr,fil,&retour);
 
   if (soc!=INVALID_SOCKET) {
@@ -1657,7 +1669,8 @@ htsblk http_gethead(httrackp *opt,char* adr,char* fil) {
   T_SOC soc;
   htsblk retour;
 
-  memset(&retour, 0, sizeof(htsblk));
+  hts_init_htsblk(&retour);
+  //memset(&retour, 0, sizeof(htsblk));
   soc=http_xfopen(opt,1,0,1,NULL,adr,fil,&retour);  // HEAD, pas de traitement en-tête
 
   if (soc!=INVALID_SOCKET) {
@@ -1760,20 +1773,21 @@ LLint http_xfread1(htsblk* r,int bufl) {
   int nl=-1;
 
   // EOF
-  if (r->totalsize > 0 && r->size == r->totalsize) {
+  if (r->totalsize >= 0 && r->size == r->totalsize) {
     return READ_EOF;
   }
 
   if (bufl>0) {
     if (!r->is_write) {     // stocker en mémoire
-      if (r->totalsize>0) {    // totalsize déterminé ET ALLOUE
+      if (r->totalsize>=0) {    // totalsize déterminé ET ALLOUE
         if (r->adr==NULL) {
           r->adr = (char*) malloct((size_t) r->totalsize + 1);
           r->size = 0;
         }
         if (r->adr != NULL) {
           // lecture
-          nl = hts_read(r,r->adr + ((int) r->size),(int) (r->totalsize-r->size) );     /* NO 32 bit overlow possible here (no 4GB html!) */
+          const size_t req_size = r->totalsize-r->size;
+          nl = req_size > 0 ? hts_read(r,r->adr + ((int) r->size),(int) req_size ) : 0;     /* NO 32 bit overlow possible here (no 4GB html!) */
           // nouvelle taille
           if (nl >= 0) r->size+=nl;
 
@@ -1917,7 +1931,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
     }
   }
   // EOF
-  if (r->totalsize > 0 && r->size == r->totalsize) {
+  if (r->totalsize >= 0 && r->size == r->totalsize) {
     return READ_EOF;
   } else {
     return nl;
@@ -1973,7 +1987,8 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
   tl=time_local();
 
   loc[0]='\0';
-  memset(&retour, 0, sizeof(htsblk));    // effacer
+  hts_init_htsblk(&retour);
+  //memset(&retour, 0, sizeof(htsblk));    // effacer
   retour.location=loc;    // si non nul, contiendra l'adresse véritable en cas de moved xx
 
   //soc=http_fopen(adr,fil,&retour,NULL);  // ouvrir, + header
@@ -4498,7 +4513,7 @@ int HTS_TOTAL_RECV_CHECK(int var) {
 // >0 : data received
 // == 0 : not yet data
 // <0: error or no data: READ_ERROR, READ_EOF or READ_TIMEOUT
-HTS_INLINE int hts_read(htsblk* r,char* buff,int size) {
+int hts_read(htsblk* r,char* buff,int size) {
   int retour;
   //  return read(soc,buff,size);
   if (r->is_file) {

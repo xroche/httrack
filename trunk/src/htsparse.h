@@ -133,7 +133,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct* str, htsmoduleStructEx
 int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended* stre);
 
 /*
-  Wair for (adr, fil, save) to be started, that is, 
+  Wait for (adr, fil, save) to be started, that is, 
   to be ready for naming, having its header MIME type
   If the final URL is to be forbidden, sets 'forbidden_url' to the corresponding value
 */
@@ -142,7 +142,6 @@ int hts_wait_delayed(htsmoduleStruct* str,
                      char* parent_adr, char* parent_fil,
                      char* former_adr, char* former_fil, 
                      int* forbidden_url);
-
 
 /* Context state */
 

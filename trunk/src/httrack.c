@@ -486,7 +486,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
                   strcatbuff(StatsBuffer[index].name,s+l-MAX_LEN_INPROGRESS/2+2);
                 }
                                
-                if (back[i].r.totalsize>0) {  // taille prédéfinie
+                if (back[i].r.totalsize>=0) {  // taille prédéfinie
                   StatsBuffer[index].sizetot=back[i].r.totalsize;
                   StatsBuffer[index].size=back[i].r.size;
                 } else {  // pas de taille prédéfinie

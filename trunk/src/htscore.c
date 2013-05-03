@@ -793,7 +793,8 @@ int httpmirror(char* url1, httrackp* opt) {
     // Les HTMLs sont traités (si leur priorité est suffisante)
 
     // effacer r
-    memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
+    hts_init_htsblk(&r);
+    //memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
     r.location=loc;    // en cas d'erreur 3xx (moved)
     // recopier proxy
     if ((r.req.proxy.active = opt->proxy.active)) {
@@ -835,7 +836,7 @@ int httpmirror(char* url1, httrackp* opt) {
           ptr++;
         }
       }
-      if (liens[ptr]) {    // on a qq chose à récupérer?
+      if (liens[ptr] != NULL) {    // on a qq chose à récupérer?
 
         if ( (opt->debug>1) && (opt->log!=NULL) ) {
           HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Wait get: %s%s"LF,urladr,urlfil);
@@ -860,8 +861,6 @@ int httpmirror(char* url1, httrackp* opt) {
           //
         */
         } else {    // backing, multiples sockets
-          
-          
           /*
             **************************************
             Get the next link, waiting for other files, handling external callbacks
@@ -1788,7 +1787,7 @@ int httpmirror(char* url1, httrackp* opt) {
           //printf("extern=%s\n",r.contenttype);
 
           // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!          
-          if (r.adr) {
+          if (r.adr != NULL || r.size == 0) {
             file_notify(opt, urladr,urlfil, savename, 1, 1, r.notmodified);
             if (filesave(opt,r.adr,(int)r.size,savename,urladr,urlfil)!=0) {
               int fcheck;

@@ -446,7 +446,7 @@ int back_nsoc_overall(struct_back* sback) {
 //
 // fermer les paramètres de transfert,
 // et notamment vérifier les fichiers compressés (décompresser), callback etc.
-int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
+int back_finalize(httrackp* opt, cache_back* cache, struct_back* sback, const int p) {
 	char catbuff[CATBUFF_SIZE];
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
@@ -459,7 +459,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
     /* Don't store broken files. Note: check is done before compression.
        If the file is partial, the next run will attempt to continue it with compression too.
     */
-    if (back[p].r.totalsize > 0 && back[p].r.statuscode > 0 
+    if (back[p].r.totalsize >= 0 && back[p].r.statuscode > 0 
       && back[p].r.size != back[p].r.totalsize && ! opt->tolerant) {
       if (back[p].status == STATUS_READY) {
         if (opt->log!=NULL) {
@@ -626,7 +626,6 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 				}
 				/* EN OF REAL MEDIA HACK */
 
-
 				/* Stats */
 				if (cache->txt) {
 					char flags[32];
@@ -757,6 +756,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 				if (!IS_DELAYED_EXT(back[p].url_sav)) {
 					cache_mayadd(opt,cache,&back[p].r,back[p].url_adr,back[p].url_fil,back[p].url_sav);
 				} else {
+          /* error */
 					if (!HTTP_IS_OK(back[p].r.statuscode)) {
 						if ( (opt->debug>0) && (opt->log!=NULL) ) {
 							HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"redirect to %s%s"LF,back[p].url_adr,back[p].url_fil);
@@ -766,7 +766,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 					} else {
             /* Partial file, but marked as "ok" ? */
 						if (opt->log!=NULL) {
-							HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (incomplete type caused by %s (%d)): %s%s"LF,back[p].r.msg,back[p].r.statuscode,back[p].url_adr,back[p].url_fil);
+							HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"file not stored in cache due to bogus state (incomplete type with %s (%d), size "LLintP"): %s%s"LF,back[p].r.msg,back[p].r.statuscode,(LLint)back[p].r.size,back[p].url_adr,back[p].url_fil);
 						}
 					}
 				}
@@ -787,7 +787,7 @@ int back_finalize(httrackp* opt,cache_back* cache,struct_back* sback,int p) {
 }
 
 /* try to keep the connection alive */
-int back_letlive(httrackp* opt, cache_back* cache, struct_back* sback, int p) {
+int back_letlive(httrackp* opt, cache_back* cache, struct_back* sback, const int p) {
 	lien_back* const back = sback->lnk;
 	const int back_max = sback->count;
 	int checkerror;
@@ -972,7 +972,7 @@ int back_unserialize_ref(httrackp* opt, const char *adr, const char *fil, lien_b
 }
 
 // clear, or leave for keep-alive
-int back_maydelete(httrackp* opt,cache_back* cache,struct_back* sback, int p) {
+int back_maydelete(httrackp* opt,cache_back* cache,struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1010,7 +1010,7 @@ int back_maydelete(httrackp* opt,cache_back* cache,struct_back* sback, int p) {
 }
 
 // clear, or leave for keep-alive
-void back_maydeletehttp(httrackp* opt, cache_back* cache, struct_back* sback, int p) {
+void back_maydeletehttp(httrackp* opt, cache_back* cache, struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   TStamp lt = 0;
@@ -1062,7 +1062,7 @@ void back_maydeletehttp(httrackp* opt, cache_back* cache, struct_back* sback, in
 
 
 /* attempt to attach a live connection to this slot */
-int back_trylive(httrackp* opt,cache_back* cache,struct_back* sback, int p) {
+int back_trylive(httrackp* opt,cache_back* cache,struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1138,7 +1138,7 @@ int back_search(httrackp* opt,struct_back* sback) {
   return -1;
 }
 
-void back_set_finished(struct_back* sback, int p) {
+void back_set_finished(struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1157,7 +1157,7 @@ void back_set_finished(struct_back* sback, int p) {
   }
 }
 
-void back_set_locked(struct_back* sback, int p) {
+void back_set_locked(struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1167,7 +1167,7 @@ void back_set_locked(struct_back* sback, int p) {
   }
 }
 
-void back_set_unlocked(struct_back* sback, int p) {
+void back_set_unlocked(struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1177,7 +1177,7 @@ void back_set_unlocked(struct_back* sback, int p) {
   }
 }
 
-int back_flush_output(httrackp* opt, cache_back* cache, struct_back* sback, int p) {
+int back_flush_output(httrackp* opt, cache_back* cache, struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1211,7 +1211,7 @@ int back_flush_output(httrackp* opt, cache_back* cache, struct_back* sback, int 
 }
 
 // effacer entrée
-int back_delete(httrackp* opt, cache_back* cache, struct_back* sback, int p) {
+int back_delete(httrackp* opt, cache_back* cache, struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   const int back_max = sback->count;
   assertf(p >= 0 && p < back_max);
@@ -1252,7 +1252,7 @@ int back_delete(httrackp* opt, cache_back* cache, struct_back* sback, int p) {
 }
 
 /* ensure that the entry is not locked */
-void back_index_unlock(struct_back* sback, int p) {
+void back_index_unlock(struct_back* sback, const int p) {
   lien_back* const back = sback->lnk;
   if (back[p].locked) {
     back[p].locked = 0;   /* not locked anymore */
@@ -1378,8 +1378,8 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
     if (back[p].r.soc!=INVALID_SOCKET) {  /* we never know */
       deletehttp(&back[p].r);
     }
-    memset(&(back[p].r), 0, sizeof(htsblk)); 
-    back[p].r.soc=INVALID_SOCKET; 
+    //memset(&(back[p].r), 0, sizeof(htsblk)); 
+    hts_init_htsblk(&back[p].r);
     back[p].r.location=back[p].location_buffer;
 
     // créer entrée
@@ -1615,7 +1615,9 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
             return 0;
           } else {  // erreur
             // effacer r
-            memset(&(back[p].r), 0, sizeof(htsblk)); back[p].r.soc=INVALID_SOCKET; back[p].r.location=back[p].location_buffer;
+            hts_init_htsblk(&back[p].r);
+            //memset(&(back[p].r), 0, sizeof(htsblk)); 
+            back[p].r.location=back[p].location_buffer;
             // et continuer (chercher le fichier)
           }
           
@@ -1802,7 +1804,9 @@ int back_add(struct_back* sback,httrackp* opt,cache_back* cache,char* adr,char* 
       
       // ouvrir liaison, envoyer requète
       // ne pas traiter ou recevoir l'en tête immédiatement
-      memset(&(back[p].r), 0, sizeof(htsblk)); back[p].r.soc=INVALID_SOCKET; back[p].r.location=back[p].location_buffer;
+      hts_init_htsblk(&back[p].r);
+      //memset(&(back[p].r), 0, sizeof(htsblk)); 
+      back[p].r.location=back[p].location_buffer;
       // recopier proxy
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
         if (StringBuff(opt->proxy.bindhost) != NULL)
@@ -2961,8 +2965,8 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                 back_finalize(opt,cache,sback,i);
               }
 
-              if (back[i].r.totalsize>0) {    // tester totalsize
-              //if ((back[i].r.totalsize>0) && (back[i].status==STATUS_WAIT_HEADERS)) {    // tester totalsize
+              if (back[i].r.totalsize>=0) {    // tester totalsize
+              //if ((back[i].r.totalsize>=0) && (back[i].status==STATUS_WAIT_HEADERS)) {    // tester totalsize
                 if (back[i].r.totalsize!=back[i].r.size) {  // pas la même!
                   if (!opt->tolerant) {
                     //#if HTS_CL_IS_FATAL
@@ -3008,7 +3012,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                     printf("[%d] chunk received and read: %s\n",(int)back[i].r.soc,chunk_data);
 #endif
                     if (back[i].r.totalsize<0)
-                      back[i].r.totalsize=0;        // initialiser à 0
+                      back[i].r.totalsize=0;        // initialiser à 0 (-1 == unknown)
                     if (back[i].status==STATUS_CHUNK_WAIT) {   // "real" chunk
                       if (sscanf(chunk_data,"%x",&chunk_size) == 1) {
                         if (chunk_size > 0)
@@ -3115,7 +3119,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
 #endif
                           
                         /* Tester totalsize en fin de chunk */
-                        if ((back[i].r.totalsize>0)) {    // tester totalsize
+                        if ((back[i].r.totalsize>=0)) {    // tester totalsize
                           if (back[i].r.totalsize!=back[i].r.size) {  // pas la même!
                             if (!opt->tolerant) {
                               deleteaddr(&back[i].r);
@@ -3269,7 +3273,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                     } else if (back[i].r.statuscode == HTTP_CONTINUE) {
                       back[i].status=STATUS_WAIT_HEADERS;
                       back[i].r.size=0;
-                      back[i].r.totalsize=0;
+                      back[i].r.totalsize=-1;
                       back[i].chunk_size=0;
                       back[i].r.statuscode=STATUSCODE_INVALID;
                       back[i].r.msg[0]='\0';
@@ -3340,7 +3344,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                             len2=back[i].r.totalsize;
                             if (r.size>0)
                               len1=r.size;
-                            if (len1>0) {
+                            if (len1>=0) {
                               if (len1 == len2) {             // tailles identiques
                                 back[i].r.statuscode=HTTP_NOT_MODIFIED;     // forcer NOT MODIFIED
                                 deletehttp(&back[i].r); back[i].r.soc=INVALID_SOCKET;
@@ -3577,7 +3581,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                                 back[i].r.is_write=1;    // écrire
                                 back[i].r.size=sz;    // déja écrit
                                 back[i].r.statuscode=HTTP_OK;  // Forcer 'OK'
-                                if (back[i].r.totalsize>0)
+                                if (back[i].r.totalsize>=0)
                                   back[i].r.totalsize+=sz;    // plus en fait
                                 fseek(back[i].r.out,0,SEEK_END);  // à la fin
                                 /* create a temporary reference file in case of broken mirror */
@@ -3599,11 +3603,11 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                             FILE* fp=FOPEN(fconv(catbuff,back[i].url_sav),"rb");
                             if (fp) {
                               LLint alloc_mem=sz + 1;
-                              if (back[i].r.totalsize>0)
+                              if (back[i].r.totalsize>=0)
                                 alloc_mem+=back[i].r.totalsize;            // AJOUTER RESTANT!
                               if ( deleteaddr(&back[i].r) && (back[i].r.adr=(char*) malloct((size_t)alloc_mem)) ) {
                                 back[i].r.size=sz;
-                                if (back[i].r.totalsize>0)
+                                if (back[i].r.totalsize>=0)
                                   back[i].r.totalsize+=sz;    // plus en fait
                                 if (( fread(back[i].r.adr,1,sz,fp)) != sz) {
                                   back[i].status=STATUS_READY;  // terminé (voir plus loin)
@@ -3675,7 +3679,7 @@ void back_wait(struct_back* sback,httrackp* opt,cache_back* cache,TStamp stat_ti
                             back[i].chunk_size=0;
                             back[i].chunk_blocksize=0;
                             back[i].status=STATUS_CHUNK_WAIT;    // start body wait chunk
-                            back[i].r.totalsize=0;   /* devalidate size! (rfc) */
+                            back[i].r.totalsize=-1;   /* devalidate size! (rfc) */
                           }
                           if (back[i].rateout>0) {
                             back[i].rateout_time=time_local();  // refresh pour transfer rate
