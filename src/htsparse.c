@@ -3988,12 +3988,26 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct* str, htsmoduleStructExtended*
   int b;
   int n;
 
+  /* This is not supposed to hapen. */
+  if (liens[ptr]->pass2 == -1) {
+    HTS_LOG(opt, LOG_WARNING); fprintf(opt->log, "Link is already ready %s%s"LF, urladr, urlfil);
+  }
+
   /* User interaction */
   ENGINE_SAVE_CONTEXT();
   {
     hts_mirror_process_user_interaction(str, stre);
   }
   ENGINE_SET_CONTEXT();
+
+  /* Done while processing user interactions ? */
+  if (liens[ptr]->pass2 == -1) {
+    if ( (opt->debug>0) && (opt->log!=NULL) ) {
+      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "Link is now ready %s%s"LF, urladr, urlfil);
+    }
+    // We are ready
+    return 2; // goto jump_if_done;
+  }
 
   // si le fichier n'est pas en backing, le mettre..
   if (!back_exist(str->sback,str->opt,urladr,urlfil,savename)) {
