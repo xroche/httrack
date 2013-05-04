@@ -2891,7 +2891,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=httrack
- VERSION=3.47.10
+ VERSION=3.47.11
 
 
 cat >>confdefs.h <<_ACEOF
