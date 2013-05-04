@@ -103,7 +103,7 @@ extern FILE* ioinfo;
 /* protected strcat, strncat and strcpy - definitely useful */
 #define strcatbuff(A, B) do { \
   assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
+  assertf( (B) != NULL ); \
   if (htsMemoryFastXfr) { \
     if (sizeof(A) != sizeof(char*)) { \
       (A)[sizeof(A) - 1] = '\0'; \
@@ -129,7 +129,7 @@ extern FILE* ioinfo;
 } while(0)
 #define strncatbuff(A, B, N) do { \
   assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
+  assertf( (B) != NULL ); \
   if (htsMemoryFastXfr) { \
     if (sizeof(A) != sizeof(char*)) { \
       (A)[sizeof(A) - 1] = '\0'; \
@@ -158,7 +158,7 @@ extern FILE* ioinfo;
 } while(0)
 #define strcpybuff(A, B) do { \
   assertf( (A) != NULL ); \
-  if ( ! (B) ) { assertf( 0 ); } \
+  assertf( (const char*) (B) != NULL ); \
   if (htsMemoryFastXfr) { \
     if (sizeof(A) != sizeof(char*)) { \
       (A)[sizeof(A) - 1] = '\0'; \
