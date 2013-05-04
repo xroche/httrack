@@ -4,7 +4,7 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.47-7
+3.47-11
 + Fixed: random closing of files/sockets, leading to "zip_zipWriteInFileInZip_failed" assertion, "bogus state" messages, or random garbage in downloaded files
 + Fixed: libssl.dylib is now in the search list for libssl on OSX (Nils Breunese)
 + Fixed: bogus charset because the meta http-equiv tag is placed too far in the html page
@@ -17,6 +17,8 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: memory leak in hashtable, that may lead to excessive memory consumption
 + Fixed: on Windows, fixed possible DLL local injection (CVE-2010-5252)
 + Fixed: UTF-8 conversion bug on Linux that may lead to buggy filenames
++ Fixed: zero-length files not being properly handled (not saved on disk, not updated) (lugusto)
++ Fixed: serious bug that may lead to download several times the same file, and "Unexpected 412/416 error" errors
 
 3.46-1
 * New: Unicode filenames handling
@@ -124,7 +126,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: minor argument size validation error for "-O" option (Joan CALVET)
 
 3.42-3
-+ Fixed: Bad URL length validation in the commandline (Joan CALVET)
++ Fixed: Bad URL length validation in the commandline (CVE-2008-3429) (Joan CALVET)
 
 3.42-2
 + Fixed: Random crashes at the end of the mirror due to a dangling file pointer (Carlos, angus at quovadis.com.ar)
