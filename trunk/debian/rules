@@ -119,10 +119,10 @@ binary-arch: build install
 	dh_strip -a
 	dh_compress -a
 	dh_fixperms -a
-	dh_makeshlibs -a -X/usr/lib/httrack/libtest
+	dh_makeshlibs -a -X/usr/lib/httrack/libtest --version-info
 	dh_installdeb -a
 	# we depend on the current version (ABI may change)
-	dh_shlibdeps -a -ldebian/libhttrack2/usr/lib --version-info
+	dh_shlibdeps -a -ldebian/libhttrack2/usr/lib
 	dh_gencontrol -a
 	dh_md5sums -a
 	dh_builddeb -a
