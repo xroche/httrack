@@ -885,7 +885,9 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
             else
               sprintf(buff,"%s %s %s\r\n",method,url,protocol);
             // lire le reste en brut
-            fread(buff+strlen(buff),8000-strlen(buff),1,fp);
+            if (fread(buff+strlen(buff),8000-strlen(buff),1,fp) < 0) {
+              return -1;
+            }
           }
           fclose(fp);
         }

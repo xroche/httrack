@@ -1733,7 +1733,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 htsmain_free();
                 return -1;
               } else {
-                system(argv[na+1]);
+                int code;
+                if ((code = system(argv[na+1])) != 0) {
+                  fprintf(stderr, "process returned error code %d\n", code);
+                }
               }
               break;
             case 'd':

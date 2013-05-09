@@ -33,6 +33,8 @@ static int process_file(t_hts_callbackarg *carg, httrackp *opt,
   void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
   char *fmt;
 
+  (void) ourDummyArg;
+
   /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
   if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
     if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt,
