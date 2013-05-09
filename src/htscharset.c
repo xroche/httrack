@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htscharset.h"
+#include "htsbase.h"
 
 static int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
@@ -455,7 +456,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 
 #endif
 
-static char* hts_getCharsetFromContentType(const char *mime) {
+HTS_STATIC char* hts_getCharsetFromContentType(const char *mime) {
   /* text/html; charset=utf-8 */
   const char *const charset = "charset";
   char *pos = strstr(mime, charset);

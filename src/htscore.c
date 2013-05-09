@@ -2856,7 +2856,9 @@ void usercommand_exe(const char* cmd,const char* file) {
       strcatbuff(temp,c);
     }
   }
-  system(temp);
+  if (system(temp) == -1) {
+    assertf(! "can not spawn process");												\
+  }
 }
 
 

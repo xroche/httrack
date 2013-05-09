@@ -26,7 +26,7 @@
 /* Function definitions */
 static int process_file(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* url_address, const char* url_file);
 static int check_detectedlink(t_hts_callbackarg *carg, httrackp *opt, char* link);
-static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats);
+static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats);
 static int end(t_hts_callbackarg *carg, httrackp *opt);
 
 /* external functions */
@@ -101,7 +101,7 @@ static int check_detectedlink(t_hts_callbackarg *carg, httrackp *opt, char* link
   return 1;  /* success */
 }
 
-static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,void* stats) {
+static int check_loop(t_hts_callbackarg *carg, httrackp *opt, void* back,int back_max,int back_index,int lien_tot,int lien_ntot,int stat_time,hts_stat_struct* stats) {
   static int fun_animation=0;
 
   /* Call parent functions if multiple callbacks are chained. */

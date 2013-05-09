@@ -503,7 +503,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
         
         /* path : <path>/<project> */
         if (!commandRunning) {
-          intptr_t adrw = 0, adrpath = 0, adrprojname = 0;
+          intptr_t adrpath = 0, adrprojname = 0;
           if (inthash_readptr(NewLangList, "path", &adrpath)
             && inthash_readptr(NewLangList, "projname", &adrprojname)) {
             StringClear(fspath);
@@ -599,7 +599,7 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
             if (!commandRunning) {
               intptr_t adrcd = 0;
               if (inthash_readptr(NewLangList, "command_do", &adrcd)) {
-                intptr_t adrw = 0, adrpath = 0, adrprojname = 0;
+                intptr_t adrw = 0, adrpath = 0;
                 if (inthash_readptr(NewLangList, "winprofile", &adrw)) {
 
                   /* User general profile */
@@ -1281,7 +1281,6 @@ int smallserver(T_SOC soc,char* url,char* method,char* data, char* path) {
 
 int htslang_init(void) {
   if (NewLangList==NULL) {
-    int i = 0;
     NewLangList=inthash_new(NewLangListSz);
     if (NewLangList==NULL) {
       abortLog("Error in lang.h: not enough memory");
@@ -1528,7 +1527,7 @@ static void LANG_DELETE(void) {
 static void LANG_INIT(char* path) {
   //CWinApp* pApp = AfxGetApp();
   //if (pApp) {
-    int test = 0; /* pApp->GetProfileInt("Language","IntId",0); */
+    /* pApp->GetProfileInt("Language","IntId",0); */
     LANG_T(path, 0 /*pApp->GetProfileInt("Language","IntId",0)*/ );
   //}
 }
@@ -1563,7 +1562,6 @@ static int LANG_LIST(char* path, char* buffer) {
   char lang_str[1024];
   int i = 0;
   int curr_lng=LANG_T(path, -1);
-  int found = 0;
   buffer[0] = '\0';
   do {
     QLANG_T(i);

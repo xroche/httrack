@@ -92,7 +92,7 @@ EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
 
 static int process(t_hts_callbackarg *carg, httrackp *opt, char* html, int len, const char* address, const char* filename) {
   t_my_userdef *userdef = (t_my_userdef*) CALLBACKARG_USERDEF(carg);
-  char * const stringfilter = userdef->stringfilter;
+  /*char * const stringfilter = userdef->stringfilter;*/
   char** const stringfilters = userdef->stringfilters;
   /* */
   int i = 0;

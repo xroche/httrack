@@ -33,6 +33,8 @@ static int process_file(t_hts_callbackarg /*the carg structure, holding various 
                         char* html, int len, const char* url_address, const char* url_file) {
   void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
 
+  (void) ourDummyArg;
+
   /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
   if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
     if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt,
@@ -48,6 +50,8 @@ static int process_file(t_hts_callbackarg /*the carg structure, holding various 
 /* local function called as "end" callback */
 static int end_of_mirror(t_hts_callbackarg /*the carg structure, holding various information*/*carg, /*the option settings*/httrackp *opt) {
   void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
+
+  (void) ourDummyArg;
 
   /* processing */
   fprintf(stderr, "That's all, folks!\n");
