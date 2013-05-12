@@ -19,7 +19,7 @@ fi
 CWD=`dirname "$0"`
 SRCHPATH="/usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin ${HOME}/usr/bin ${HOME}/bin"
 SRCHPATH="$SRCHPATH "`echo $PATH | tr ":" " "`
-SRCHDISTPATH="/usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share /opt/local/share /sw ${HOME}/usr/local ${HOME}/usr/share $CWD/../share"
+SRCHDISTPATH="/usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share /opt/local/share /sw ${HOME}/usr/local ${HOME}/usr/share $CWD/../share $CWD/.."
 
 ###
 # And now some famous cuisine
