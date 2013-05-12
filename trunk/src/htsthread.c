@@ -142,9 +142,13 @@ HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg)
   }
 #else
   {
+    const size_t stackSize = 1024*1024*8;
+    pthread_attr_t attr;
     pthread_t handle = 0;
-    int retcode = pthread_create(&handle, NULL, hts_entry_point, s_args);
-    if (retcode != 0) {   /* error */
+    int retcode;
+    if (pthread_attr_init(&attr) != 0
+      || pthread_attr_setstacksize(&attr, stackSize) != 0
+      || (retcode = pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
       free(s_args);
       return -1;
     } else {
