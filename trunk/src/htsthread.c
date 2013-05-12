@@ -154,6 +154,7 @@ HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg)
     } else {
       /* detach the thread from the main process so that is can be independent */
       pthread_detach(handle);
+      pthread_attr_destroy(&attr);
     }
   }
 #endif
