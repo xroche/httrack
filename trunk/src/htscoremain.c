@@ -2201,7 +2201,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     }
 
   /* Info for wrappers */
-  hts_log_print(opt, LOG_INFO, "engine: init");
+  hts_log_print(opt, LOG_DEBUG, "engine: init");
 
   /* Init external */
   RUN_CALLBACK_NOARG(opt, init);
@@ -2274,7 +2274,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     }
 
     /* Info for wrappers */
-    hts_log_print(opt, LOG_INFO, "engine: free");
+    hts_log_print(opt, LOG_DEBUG, "engine: free");
 
     /* UnInit */
     RUN_CALLBACK_NOARG(opt, uninit);
