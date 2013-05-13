@@ -502,6 +502,18 @@ static int is_space_or_equal_or_quote(char c) {
   return is_space_or_equal(c) || c == '"' || c == '\'';
 }
 
+size_t hts_stringLengthUTF8(const char *s) {
+  const unsigned char *const bytes = (const unsigned char*) s;
+  size_t i, len;
+  for(i = 0, len = 0 ; bytes[i] != '\0' ; i++) {
+    const unsigned char c = bytes[i];
+    if (HTS_IS_LEADING_UTF8(c)) {  // ASCII or leading byte
+      len++;
+    }
+  }
+  return len;
+}
+
 char* hts_getCharsetFromMeta(const char *html, size_t size) {
   int i;
   // <META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8" >
