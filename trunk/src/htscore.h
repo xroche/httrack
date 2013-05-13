@@ -335,7 +335,7 @@ FILE* fileappend(filenote_strc *strct,const char* s);
 int filecreateempty(filenote_strc *strct, const char* filename);
 int filenote(filenote_strc *strct,const char* s,filecreate_params* params);
 void file_notify(httrackp* opt,const char* adr,const char* fil,const char* save,int create,int modify,int wasupdated);
-HTS_INLINE void usercommand(httrackp* opt,int exe,const char* cmd,const char* file,const char* adr,const char* fil);
+void usercommand(httrackp* opt,int exe,const char* cmd,const char* file,const char* adr,const char* fil);
 void usercommand_exe(const char* cmd,const char* file);
 int filters_init(char*** ptrfilters, int maxfilter, int filterinc);
 #ifndef HTTRACK_DEFLIB
@@ -343,7 +343,7 @@ HTSEXT_API int structcheck(const char* path);
 HTSEXT_API int structcheck_utf8(const char* path);
 HTSEXT_API int dir_exists(const char* path);
 #endif
-HTS_INLINE int fspc(httrackp *opt,FILE* fp,const char* type);
+int fspc(httrackp *opt,FILE* fp,const char* type);
 char* next_token(char* p,int flag);
 //
 char* readfile(char* fil);
@@ -382,12 +382,12 @@ int hts_add_file(char* file,int file_position);
 
 // Polling
 #if HTS_POLL
-HTS_INLINE int check_flot(T_SOC s);
-HTS_INLINE int check_stdin(void);
+int check_flot(T_SOC s);
+int check_stdin(void);
 int read_stdin(char* s,int max);
 #endif
-HTS_INLINE int check_sockerror(T_SOC s);
-HTS_INLINE int check_sockdata(T_SOC s);
+int check_sockerror(T_SOC s);
+int check_sockdata(T_SOC s);
 
 /* external modules */
 int htsAddLink(htsmoduleStruct* str, char* link);

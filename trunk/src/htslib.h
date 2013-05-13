@@ -399,6 +399,7 @@ HTSEXT_API char* fconv(char *catbuff, const char* a);
 char* fslash(char *catbuff, const char* a);
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_log(httrackp *opt, const char* prefix, const char *msg);
+HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...) HTS_PRINTF_FUN(3, 4);
 #endif
 
 char* convtolower(char *catbuff, const char* a);

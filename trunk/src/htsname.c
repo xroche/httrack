@@ -46,9 +46,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include <ctype.h>
 
-#undef test_flush
-#define test_flush if (opt->flush) { fflush(opt->log); fflush(opt->log); }
-
 #define ADD_STANDARD_PATH \
     {  /* ajout nom */\
       char BIGSTK buff[HTS_URLMAXSIZE*2];\
@@ -384,10 +381,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
         htsblk r = cache_read_including_broken(opt,cache,adr,fil);              // test uniquement
         if (r.statuscode != -1) {  // pas d'erreur de lecture cache
           char s[32]; s[0]='\0';
-          if ( (opt->debug>1) && (opt->log!=NULL) ) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Testing link type (from cache) %s%s"LF,adr_complete,fil_complete);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",adr_complete,fil_complete);
           if (strnotempty(r.cdispo)) {        /* filename given */
             ext_chg=2;      /* change filename */
             strcpybuff(ext,r.cdispo);
@@ -472,11 +466,8 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
 
           /* Rock'in */
           curr_adr[0]=curr_fil[0]='\0';
-         opt->state. _hts_in_html_parsing=2;  // test
-          if ( (opt->debug>1) && (opt->log!=NULL) ) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Testing link type %s%s"LF,adr_complete,fil_complete);
-            test_flush;
-          }
+          opt->state._hts_in_html_parsing=2;  // test
+          hts_log_print(opt, LOG_DEBUG, "Testing link type %s%s",adr_complete,fil_complete);
           strcpybuff(curr_adr,adr_complete);
           strcpybuff(curr_fil,fil_complete);
           // ajouter dans le backing le fichier en mode test
@@ -576,18 +567,12 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
                                 methode=BACK_ADD_TEST;      // tester avec HEAD
                               else {
                                 methode=BACK_ADD_TEST2;     // tester avec GET
-                                if ( opt->log!=NULL ) {
-                                  HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Loop with HEAD request (during prefetch) at %s%s"LF,curr_adr,curr_fil);
-                                  test_flush;
-                                }                    
+                                hts_log_print(opt, LOG_WARNING, "Loop with HEAD request (during prefetch) at %s%s",curr_adr,curr_fil);
                               }
                               // Ajouter
                               URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET();
                               if (back_add(sback,opt,cache,mov_adr,mov_fil,methode,referer_adr,referer_fil,1)!=-1) {    // OK
-                                if ( (opt->debug>1) && (opt->log!=NULL) ) {
-                                  HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"(during prefetch) %s (%d) to link %s at %s%s"LF,back[b].r.msg,back[b].r.statuscode,back[b].r.location,curr_adr,curr_fil);
-                                  test_flush;
-                                }
+                                hts_log_print(opt, LOG_DEBUG, "(during prefetch) %s (%d) to link %s at %s%s",back[b].r.msg,back[b].r.statuscode,back[b].r.location,curr_adr,curr_fil);
                                 
                                 // libérer emplacement backing actuel et attendre le prochain
                                 back_maydelete(opt,cache,sback,b);
@@ -599,26 +584,17 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
                                 petits_tours++;
                                 //
                               } else {// sinon on fait rien et on s'en va.. (ftp etc)
-                                if ( (opt->debug>1)  && (opt->log)) {
-                                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Warning: Savename redirect backing error at %s%s"LF,mov_adr,mov_fil);
-                                  test_flush;
-                                } 
+                                hts_log_print(opt, LOG_DEBUG, "Warning: Savename redirect backing error at %s%s",mov_adr,mov_fil);
                               }
                             }
                           } else {
-                            if ( opt->log!=NULL ) {
-                              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unable to test %s%s (loop to same filename)"LF,adr_complete,fil_complete);
-                              test_flush;
-                            }
+                            hts_log_print(opt, LOG_WARNING, "Unable to test %s%s (loop to same filename)",adr_complete,fil_complete);
                           }
                           
                         }
                       }
                     } else{  // arrêter les frais
-                      if ( opt->log!=NULL ) {
-                        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Unable to test %s%s (loop)"LF,adr_complete,fil_complete);
-                        test_flush;
-                      }
+                      hts_log_print(opt, LOG_WARNING, "Unable to test %s%s (loop)",adr_complete,fil_complete);
                     }
                   }  // ok, leaving
                 }
@@ -631,13 +607,6 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
                     strcpybuff(back[b].r.contenttype,"text/html");    // message d'erreur en html
                   // Finalement on, renvoie un erreur, pour ne toucher à rien dans le code
                   // libérer emplacement backing
-                  /*if (opt->log!=NULL) {
-                    fspc(opt->log,0); fprintf(opt->log,"Error: (during prefetch) %s (%d) to link %s at %s%s"LF,back[b].r.msg,back[b].r.statuscode,back[b].r.location,curr_adr,curr_fil);
-                    test_flush;
-                  }                    
-                  back_delete(opt,cache,sback,b);
-                  return -1;        // ERREUR (404 par exemple)
-                  */
                 } 
                 
                 {            // pas d'erreur, changer type?
@@ -687,10 +656,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
 #if BDEBUG==1
             printf("error while savename crash adding\n");
 #endif
-            if (opt->log) {
-              HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Unexpected savename backing error at %s%s"LF,adr,fil_complete);
-              test_flush;
-            } 
+            hts_log_print(opt, LOG_ERROR, "Unexpected savename backing error at %s%s",adr,fil_complete);
             
           }
           // restaurer
@@ -729,12 +695,10 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
   if (ext_chg) {  // changer ext
     char* a=fil+strlen(fil)-1;
     if ( (opt->debug>1) && (opt->log!=NULL) ) {
-      HTS_LOG(opt,LOG_DEBUG);
       if (ext_chg==1)
-        fprintf(opt->log,"Changing link extension %s%s to .%s"LF,adr_complete,fil_complete,ext);
+        hts_log_print(opt, LOG_DEBUG, "Changing link extension %s%s to .%s",adr_complete,fil_complete,ext);
       else
-        fprintf(opt->log,"Changing link name %s%s to %s"LF,adr_complete,fil_complete,ext);
-      test_flush;
+        hts_log_print(opt, LOG_DEBUG, "Changing link name %s%s to %s",adr_complete,fil_complete,ext);
     }
     if (ext_chg==1) {
       while((a > fil) && (*a!='.') && (*a!='/')) a--;
@@ -1196,10 +1160,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
     if (*a!='.') {   // agh pas de point
       //strcatbuff(save,".none");                 // a éviter
       strcatbuff(save,".html");                   // préférable!
-      if ( (opt->debug>1) && (opt->log!=NULL) ) {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Default HTML type set for %s%s => %s"LF,adr_complete,fil_complete,save);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",adr_complete,fil_complete,save);
     }
   }
 
@@ -1348,9 +1309,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
   if (charset != NULL && charset[0] != '\0') {
     char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
     if (s != NULL) {
-      if ( (opt->debug>1) && (opt->log!=NULL) ) {
-        HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: save-name: charset conversion from '%s' to '%s'"LF, save, s);
-      }
+      hts_log_print(opt, LOG_DEBUG, "engine: save-name: charset conversion from '%s' to '%s'", save, s);
       strcpybuff(save, s);
       free(s);
     }
@@ -1359,10 +1318,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
 	/* callback */
   RUN_CALLBACK5(opt, savename, adr_complete,fil_complete,referer_adr,referer_fil,save);
 
-  if ( (opt->debug>0) && (opt->log!=NULL) ) {
-		HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: save-name: local name: %s%s -> %s"LF,adr,fil,save);
-		test_flush;
-	}
+	hts_log_print(opt, LOG_INFO, "engine: save-name: local name: %s%s -> %s",adr,fil,save);
 
 	/* Ensure that the MANDATORY "temporary" extension is set */
 	if (ext_chg_delayed) {
@@ -1421,10 +1377,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
     // terminating \0
     save[sofar + j] = '\0';
     // log in debug
-    if ( (opt->debug>1) && (opt->log!=NULL) ) {
-      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "Too long filename shortened: %s%s => %s"LF, adr_complete, fil_complete, save);
-      test_flush;
-    }
+    hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s", adr_complete, fil_complete, save);
   }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
@@ -1635,5 +1588,3 @@ void url_savename_refname_remove(httrackp* opt, const char *adr, const char *fil
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
   (void) UNLINK(filename);
 }
-
-#undef test_flush

@@ -792,8 +792,6 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes, const char * 
 
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   int timeout=30;
-  int retour=0;
-	int willexit=0;
 	int buffer_size = 32768;
 	char * buffer = (char*)malloc(buffer_size);
 	int line1Size = 1024;

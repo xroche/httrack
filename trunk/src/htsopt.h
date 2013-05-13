@@ -167,6 +167,19 @@ struct fspc_strc {
   int info;
 };
 
+#ifndef HTS_DEF_DEFSTRUCT_hts_log_type
+#define HTS_DEF_DEFSTRUCT_hts_log_type
+typedef enum hts_log_type {
+	LOG_DEBUG,
+	LOG_INFO,
+	LOG_NOTICE,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_PANIC,
+	LOG_ERRNO = 1 << 8
+} hts_log_type;
+#endif
+
 /* Structure état du miroir */
 #ifndef HTS_DEF_FWSTRUCT_htsoptstatecancel
 #define HTS_DEF_FWSTRUCT_htsoptstatecancel

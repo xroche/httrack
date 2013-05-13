@@ -46,10 +46,6 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 /* END specific definitions */
 
-// version 1 pour httpmirror
-// flusher si on doit lire peu à peu le fichier
-#define test_flush if (opt->flush) { fflush(opt->log); fflush(opt->log); }
-
 // pour alléger la syntaxe, des raccourcis sont créés
 #define urladr   (liens[ptr]->adr)
 #define urlfil   (liens[ptr]->fil)
@@ -162,10 +158,7 @@ static int hts_acceptlink_(httrackp* opt,
   // -------------------- PHASE 0 --------------------
 
   /* Infos */
-  if ((opt->debug>1) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"wizard test begins: %s%s"LF,adr,fil);
-    test_flush;
-  }
+  hts_log_print(opt, LOG_DEBUG, "wizard test begins: %s%s",adr,fil);
   
   /* Already exists? Then, we know that we knew that this link had to be known */
   if (adr[0] != '\0'
@@ -200,10 +193,7 @@ static int hts_acceptlink_(httrackp* opt,
     if (!ishtml(opt,fil)) {  // non il ne faut pas
       //adr[0]='\0';    // ne pas traiter ce lien, pas traiter
       forbidden_url=1;    // interdire récupération du lien
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"non-html file ignored at %s : %s"LF,adr,fil);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "non-html file ignored at %s : %s",adr,fil);
       
     }
   }
@@ -212,10 +202,7 @@ static int hts_acceptlink_(httrackp* opt,
   if (ptr>0) {
     if ( ( liens[ptr]->depth <= 0 ) || ( liens[ptr]->depth <= 1 && !embedded_triggered ) ) {
       forbidden_url=1;    // interdire récupération du lien
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"file from too far level ignored at %s : %s"LF,adr,fil);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "file from too far level ignored at %s : %s",adr,fil);
     }
   }
 
@@ -229,14 +216,10 @@ static int hts_acceptlink_(httrackp* opt,
   // ------------------------------------------------------
   // doit-on traiter ce lien?.. vérifier droits de déplacement
   meme_adresse=strfield2(adr,urladr);
-  if ((opt->debug>1) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); 
-    if (meme_adresse) 
-      fprintf(opt->log,"Compare addresses: %s=%s"LF,adr,urladr);
-    else
-      fprintf(opt->log,"Compare addresses: %s!=%s"LF,adr,urladr);
-    test_flush;
-  }
+  if (meme_adresse) 
+    hts_log_print(opt, LOG_DEBUG, "Compare addresses: %s=%s",adr,urladr);
+  else
+    hts_log_print(opt, LOG_DEBUG, "Compare addresses: %s!=%s",adr,urladr);
   if (meme_adresse) {  // même adresse 
     {  // tester interdiction de descendre
       // MODIFIE : en cas de remontée puis de redescente, il se pouvait qu'on ne puisse pas atteindre certains fichiers
@@ -250,10 +233,7 @@ static int hts_acceptlink_(httrackp* opt,
       
       if (lienrelatif(tempo,fil,liens[liens[ptr]->premier]->fil)==0) {
         if (lienrelatif(tempo2,fil,liens[ptr]->fil)==0) {
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"build relative links to test: %s %s (with %s and %s)"LF,tempo,tempo2,liens[liens[ptr]->premier]->fil,liens[ptr]->fil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "build relative links to test: %s %s (with %s and %s)",tempo,tempo2,liens[liens[ptr]->premier]->fil,liens[ptr]->fil);
           
           // si vient de primary, ne pas tester lienrelatif avec (car host "différent")
           /*if (liens[liens[ptr]->premier] == 0) {   // vient de primary
@@ -272,10 +252,7 @@ static int hts_acceptlink_(httrackp* opt,
             ) {
             if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
               forbidden_url=0;
-              if ((opt->debug>1) && (opt->log!=NULL)) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"same level link authorized: %s%s"LF,adr,fil);
-                test_flush;
-             }
+              hts_log_print(opt, LOG_DEBUG, "same level link authorized: %s%s",adr,fil);
             }
           }
           
@@ -293,27 +270,18 @@ static int hts_acceptlink_(httrackp* opt,
             if ( (test1) && (test2) ) {   // on ne peut que descendre
               if ((opt->seeker & 1)==0) {  // interdiction de descendre
                 forbidden_url=1;
-                if ((opt->debug>1) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"lower link canceled: %s%s"LF,adr,fil);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_DEBUG, "lower link canceled: %s%s",adr,fil);
               } else {    // autorisé à priori - NEW
                 if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
                   forbidden_url=0;
-                  if ((opt->debug>1) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"lower link authorized: %s%s"LF,adr,fil);
-                    test_flush;
-                  }
+                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",adr,fil);
                 }
               }
             } else if ( (test1) || (test2) ) {   // on peut descendre pour accéder au lien
               if ((opt->seeker & 1)!=0) {  // on peut descendre - NEW
                 if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
                   forbidden_url=0;
-                  if ((opt->debug>1) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"lower link authorized: %s%s"LF,adr,fil);
-                    test_flush;
-                  }
+                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",adr,fil);
                 }
               }
             }
@@ -324,43 +292,28 @@ static int hts_acceptlink_(httrackp* opt,
           if ( (!strncmp(tempo,"../",3)) && (!strncmp(tempo2,"../",3)) ) {    // impossible sans monter
             if ((opt->seeker & 2)==0) {  // interdiction de monter
               forbidden_url=1;
-              if ((opt->debug>1) && (opt->log!=NULL)) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"upper link canceled: %s%s"LF,adr,fil);
-                test_flush;
-              }
+              hts_log_print(opt, LOG_DEBUG, "upper link canceled: %s%s",adr,fil);
             } else {       // autorisé à monter - NEW
               if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
                 forbidden_url=0;
-                if ((opt->debug>1) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"upper link authorized: %s%s"LF,adr,fil);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",adr,fil);
               }
             }
           } else if ( (!strncmp(tempo,"../",3)) || (!strncmp(tempo2,"../",3)) ) {    // Possible en montant
             if ((opt->seeker & 2)!=0) {  // autorisé à monter - NEW
               if (!liens[ptr]->link_import) {   // ne résulte pas d'un 'moved'
                 forbidden_url=0;
-                if ((opt->debug>1) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"upper link authorized: %s%s"LF,adr,fil);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",adr,fil);
               }
             }  // sinon autorisé en descente
           }
           
           
         } else {
-          if (opt->log) {
-            fprintf(opt->log,"Error building relative link %s and %s"LF,fil,liens[ptr]->fil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",fil,liens[ptr]->fil);
         }
       } else {
-        if (opt->log) {
-          fprintf(opt->log,"Error building relative link %s and %s"LF,fil,liens[liens[ptr]->premier]->fil);
-          test_flush;
-        }
+        hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",fil,liens[liens[ptr]->premier]->fil);
       }
       
     }  // tester interdiction de descendre?
@@ -371,17 +324,10 @@ static int hts_acceptlink_(httrackp* opt,
       if (lienrelatif(tempo,fil,liens[liens[ptr]->premier]->fil)==0) {
         if (lienrelatif(tempo2,fil,liens[ptr]->fil)==0) {
         } else {
-          if (opt->log) { 
-            fprintf(opt->log,"Error building relative link %s and %s"LF,fil,liens[ptr]->fil);
-            test_flush;
-          }
-          
+          hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",fil,liens[ptr]->fil);
         }
       } else {
-        if (opt->log) { 
-          fprintf(opt->log,"Error building relative link %s and %s"LF,fil,liens[liens[ptr]->premier]->fil);
-          test_flush;
-        }
+        hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",fil,liens[liens[ptr]->premier]->fil);
         
       }
     }   // fin tester interdiction de monter
@@ -412,19 +358,13 @@ static int hts_acceptlink_(httrackp* opt,
           if (!opt->wizard) {   // mode non wizard
             //printf("refused: %s\n",adr);
             forbidden_url=1;  // pas même domaine  
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"foreign domain link canceled: %s%s"LF,adr,fil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",adr,fil);
           }
           
         } else {
           if (opt->wizard) {   // mode wizard
             forbidden_url=0;  // même domaine  
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"same domain link authorized: %s%s"LF,adr,fil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",adr,fil);
           }
         }
         
@@ -442,18 +382,12 @@ static int hts_acceptlink_(httrackp* opt,
           if (!opt->wizard) {   // mode non wizard
             //printf("refused: %s\n",adr);
             forbidden_url=1;  // pas même .xx  
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"foreign location link canceled: %s%s"LF,adr,fil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "foreign location link canceled: %s%s",adr,fil);
           }
         } else {
           if (opt->wizard) {   // mode wizard
             forbidden_url=0;  // même domaine  
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"same location link authorized: %s%s"LF,adr,fil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "same location link authorized: %s%s",adr,fil);
           }
         }
       } else forbidden_url=1;     
@@ -478,10 +412,7 @@ static int hts_acceptlink_(httrackp* opt,
       //printf("ok %s%s\n",ad,fil);
       forbidden_url=0;    // autoriser
       may_set_prio_to=1+1; // set prio to 1 (parse but skip urls) if near is the winner
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"near link authorized: %s%s"LF,adr,fil);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "near link authorized: %s%s",adr,fil);
     }
   }
 
@@ -491,10 +422,7 @@ static int hts_acceptlink_(httrackp* opt,
 	if (forbidden_url != 0 && embedded_triggered) {
 		forbidden_url=0;    // autoriser
 		may_set_prio_to=1+1; // set prio to 1 (parse but skip urls) if near is the winner
-		if ((opt->debug>1) && (opt->log!=NULL)) {
-			HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"near link authorized (friendly tag): %s%s"LF,adr,fil);
-			test_flush;
-		}
+		hts_log_print(opt, LOG_DEBUG, "near link authorized (friendly tag): %s%s",adr,fil);
 	}
 
 
@@ -550,13 +478,10 @@ static int hts_acceptlink_(httrackp* opt,
             may_set_prio_to=0;  // clear may-set flag
             forbidden_url=0;    // autorisé
             question=0;         // résolution auto
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              if (question) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) ambiguous link accepted (external depth): link %s at %s%s"LF,l,urladr,urlfil);
-              } else {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) forced to accept link (external depth): link %s at %s%s"LF,l,urladr,urlfil);
-              }
-              test_flush;
+            if (question) {
+              hts_log_print(opt, LOG_DEBUG, "(wizard) ambiguous link accepted (external depth): link %s at %s%s",l,urladr,urlfil);
+            } else {
+              hts_log_print(opt, LOG_DEBUG, "(wizard) forced to accept link (external depth): link %s at %s%s",l,urladr,urlfil);
             }
             
           }
@@ -593,18 +518,12 @@ static int hts_acceptlink_(httrackp* opt,
           question=0;    // ne pas poser de question, autorisé
           forbidden_url=0;  // URL autorisée
           may_set_prio_to=0;    // clear may-set flag
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) explicit authorized (%s) link: link %s at %s%s"LF,mdepth,l,urladr,urlfil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "(wizard) explicit authorized (%s) link: link %s at %s%s",mdepth,l,urladr,urlfil);
         } else if (jok == -1) {  // forbidden
           filters_answer=1;  // décision prise par les filtres
           question=0;    // ne pas poser de question:
           forbidden_url=1;   // URL interdite
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) explicit forbidden (%s) link: link %s at %s%s"LF,mdepth,l,urladr,urlfil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "(wizard) explicit forbidden (%s) link: link %s at %s%s",mdepth,l,urladr,urlfil);
         }  // sinon on touche à rien
       }
     }
@@ -617,10 +536,7 @@ static int hts_acceptlink_(httrackp* opt,
           may_set_prio_to=0;    // clear may-set flag
           question=1;         // résolution auto
           force_mirror=5;     // mirror (5)
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) explicit mirror link: link %s at %s%s"LF,l,urladr,urlfil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "(wizard) explicit mirror link: link %s at %s%s",l,urladr,urlfil);
         }
       }
     }
@@ -631,10 +547,7 @@ static int hts_acceptlink_(httrackp* opt,
       if (opt->wizard==2) {    // éliminer tous les liens non répertoriés comme autorisés (ou inconnus)
         question=0;
         forbidden_url=1;
-        if ((opt->debug>1) && (opt->log!=NULL)) {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) ambiguous forbidden link: link %s at %s%s"LF,l,urladr,urlfil);
-          test_flush;
-        }
+        hts_log_print(opt, LOG_DEBUG, "(wizard) ambiguous forbidden link: link %s at %s%s",l,urladr,urlfil);
       }
     }
     
@@ -649,31 +562,22 @@ static int hts_acceptlink_(httrackp* opt,
         if ((!question) && (filters_answer) && (opt->robots == 1) && (forbidden_url!=1)) {
           r=0;    // annuler interdiction des robots
           if (!forbidden_url) {
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Warning link followed against robots.txt: link %s at %s%s"LF,l,adr,fil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "Warning link followed against robots.txt: link %s at %s%s",l,adr,fil);
           }
         }
         if (r == -1) {    // interdire
           forbidden_url=1;
           question=0;
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(robots.txt) forbidden link: link %s at %s%s"LF,l,adr,fil);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "(robots.txt) forbidden link: link %s at %s%s",l,adr,fil);
         }
       }
     }
     
     if (!question) {
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        if (!forbidden_url) {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) shared foreign domain link: link %s at %s%s"LF,l,urladr,urlfil);
-        } else {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) cancelled foreign domain link: link %s at %s%s"LF,l,urladr,urlfil);
-        }
-        test_flush;
+      if (!forbidden_url) {
+        hts_log_print(opt, LOG_DEBUG, "(wizard) shared foreign domain link: link %s at %s%s",l,urladr,urlfil);
+      } else {
+        hts_log_print(opt, LOG_DEBUG, "(wizard) cancelled foreign domain link: link %s at %s%s",l,urladr,urlfil);
       }
 #if BDEBUG==3
       printf("at %s in %s, wizard says: url %s ",urladr,urlfil,l);
@@ -736,11 +640,8 @@ static int hts_acceptlink_(httrackp* opt,
         if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
           printf("PANIC! : Too many filters : >%d [%d]\n", (*_FILTERS_PTR),__LINE__);
           fflush(stdout);
-          if (opt->log) {
-            fprintf(opt->log,LF"Too many filters, giving up..(>%d)"LF, (*_FILTERS_PTR) );
-            fprintf(opt->log,"To avoid that: use #F option for more filters (example: -#F5000)"LF);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)", (*_FILTERS_PTR) );
+          hts_log_print(opt, LOG_INFO, "To avoid that: use #F option for more filters (example: -#F5000)");
           assertf("too many filters - giving up" == NULL);    // wild..
         }
       }
@@ -881,9 +782,7 @@ static int hts_acceptlink_(httrackp* opt,
 					) {    // PAS ftp!
           forbidden_url=1;    // oui oui toujours interdit (note: sert à rien car ==1 mais c pour comprendre)
           *just_test_it=1;     // mais on teste
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Testing link %s%s"LF,adr,fil);
-          }
+          hts_log_print(opt, LOG_DEBUG, "Testing link %s%s",adr,fil);
         }
       }
     }
@@ -921,16 +820,10 @@ int hts_acceptmime(httrackp* opt,
     mdepth = _FILTERS[jokDepth];
     if (jok == 1) {   // autorisé
       forbidden_url=0;  // URL autorisée
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) explicit authorized (%s) link %s%s: mime '%s'"LF,mdepth,adr,fil,mime);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "(wizard) explicit authorized (%s) link %s%s: mime '%s'",mdepth,adr,fil,mime);
     } else if (jok == -1) {  // forbidden
       forbidden_url=1;   // URL interdite
-      if ((opt->debug>1) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(wizard) explicit forbidden (%s) link %s%s: mime '%s'"LF,mdepth,adr,fil,mime);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_DEBUG, "(wizard) explicit forbidden (%s) link %s%s: mime '%s'",mdepth,adr,fil,mime);
     }  // sinon on touche à rien
   }
   /* userdef test */
@@ -1001,14 +894,10 @@ int hts_testlinksize(httrackp* opt,
 
       // log
       if (jok==1) {
-        if ((opt->debug>1) && (opt->log!=NULL)) {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File confirmed (size test): %s%s ("LLintP")"LF,adr,fil,(LLint)(size));
-        }
+        hts_log_print(opt, LOG_DEBUG, "File confirmed (size test): %s%s ("LLintP")",adr,fil,(LLint)(size));
       } else if (jok==-1) {
         if (size_flag) {        /* interdit à cause de la taille */
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File cancelled due to its size: %s%s ("LLintP", limit: "LLintP")"LF,adr,fil,(LLint)(size),(LLint)(sz));
-          }
+          hts_log_print(opt, LOG_DEBUG, "File cancelled due to its size: %s%s ("LLintP", limit: "LLintP")",adr,fil,(LLint)(size),(LLint)(sz));
         } else {
           jok=1;
         }
@@ -1018,9 +907,6 @@ int hts_testlinksize(httrackp* opt,
   return jok;
 }
 
-
-
-#undef test_flush
 #undef urladr
 #undef urlfil
 

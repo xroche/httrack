@@ -362,10 +362,8 @@ void htspe_uninit(void) {
 static void htspe_log(htsmoduleStruct* str, const char* msg) {
   const char* savename = str->filename;
   httrackp* opt = (httrackp*) str->opt;
-  if ((opt->debug>1) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(External module): parsing %s using module %s"LF, 
-      savename, msg);
-  }
+  hts_log_print(opt, LOG_DEBUG, "(External module): parsing %s using module %s", 
+    savename, msg);
 }
 
 HTSEXT_API const char* hts_is_available(void) {
