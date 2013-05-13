@@ -125,8 +125,8 @@ test -d ${DISTPATH}/html || ! log "could not find ${DISTPATH}/html" || exit 1
 HTSLANG="${LC_MESSAGES}"
 ! test -n "${HTSLANG}" && HTSLANG="${LC_ALL}"
 ! test -n "${HTSLANG}" && HTSLANG="${LANG}"
-test -n "${HTSLANG}" && HTSLANG="`echo ${HTSLANG} | cut -c1-2` | tr 'A-Z' 'a-z'"
-LANGN=`grep "${HTSLANG}:" ${DISTPATH}/lang.indexes | cut -f2 -d':'`
+HTSLANG="`echo $LANG | cut -f1 -d'.' | cut -f1 -d'_'`"
+LANGN=`grep -E "^${HTSLANG}:" ${DISTPATH}/lang.indexes | cut -f2 -d':'`
 ! test -n "${LANGN}" && LANGN=1
 
 # Find the browser
