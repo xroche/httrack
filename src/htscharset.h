@@ -64,6 +64,11 @@ extern char *hts_convertStringFromUTF8(const char *s, size_t size, const char *c
  **/
 extern char* hts_getCharsetFromMeta(const char *html, size_t size);
 
+/**
+ * Get an UTF-8 string length in characters.
+ **/
+extern size_t hts_stringLengthUTF8(const char *s);
+
 #ifdef _WIN32
 
 /**
@@ -80,11 +85,6 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * Convert current system codepage to UTF-8.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
-
-/**
- * Get an UTF-8 string length in characters.
- **/
-extern size_t hts_stringLengthUTF8(const char *s);
 
 #endif
 
