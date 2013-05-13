@@ -786,7 +786,7 @@ static void sig_leave( int code ) {
     printf("\n** Finishing pending transfers.. press again ^C to quit.\n");
     if (global_opt != NULL) {
       // ask for stop
-      hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+      hts_log_print(global_opt, LOG_ERROR, "Exit requested by shell or user");
       global_opt->state.stop=1;
     }
   } else {
