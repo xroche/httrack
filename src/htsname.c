@@ -1318,7 +1318,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
 	/* callback */
   RUN_CALLBACK5(opt, savename, adr_complete,fil_complete,referer_adr,referer_fil,save);
 
-	hts_log_print(opt, LOG_INFO, "engine: save-name: local name: %s%s -> %s",adr,fil,save);
+	hts_log_print(opt, LOG_DEBUG, "engine: save-name: local name: %s%s -> %s",adr,fil,save);
 
 	/* Ensure that the MANDATORY "temporary" extension is set */
 	if (ext_chg_delayed) {
