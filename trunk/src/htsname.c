@@ -1422,7 +1422,7 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
     save[sofar + j] = '\0';
     // log in debug
     if ( (opt->debug>1) && (opt->log!=NULL) ) {
-      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Too long filename shortened: %s%s => %s"LF,adr_complete,fil_complete,sav);
+      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "Too long filename shortened: %s%s => %s"LF, adr_complete, fil_complete, save);
       test_flush;
     }
   }
