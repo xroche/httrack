@@ -47,9 +47,11 @@ Please visit our Website: http://www.httrack.com
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
 #define HTS_STATIC static __attribute__ ((unused))
+#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
+#define HTS_PRINTF_FUN(fmt, arg)
 #endif
 #endif
 

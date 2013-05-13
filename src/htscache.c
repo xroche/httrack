@@ -49,9 +49,6 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 /* END specific definitions */
 
-#undef test_flush
-#define test_flush if (opt->flush) { fflush(opt->log); fflush(opt->log); }
-
 // routines de mise en cache
 
 /*
@@ -111,18 +108,14 @@ with
 
 
 void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,const char* url_adr,const char* url_fil,const char* url_save) {
-  if ((opt->debug>0) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"File checked by cache: %s"LF,url_adr);
-  }            
+  hts_log_print(opt, LOG_DEBUG, "File checked by cache: %s",url_adr);
   // ---stockage en cache---
   // stocker dans le cache?
   if (opt->cache) {
     if (cache_writable(cache)) {
       // ensure not a temporary filename (should not happend ?!)
       if (IS_DELAYED_EXT(url_save)) {
-        if (opt->log!=NULL) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "aborted cache validation: %s%s still has temporary name %s"LF, url_adr, url_fil, url_save);
-        }
+        hts_log_print(opt, LOG_WARNING, "aborted cache validation: %s%s still has temporary name %s", url_adr, url_fil, url_save);
         return ;
       }
 
@@ -161,9 +154,7 @@ void cache_mayadd(httrackp* opt,cache_back* cache,htsblk* r,const char* url_adr,
                   strcatbuff(tempo, "\n");
                   strcatbuff(tempo, r->location);
                 }
-                if ((opt->debug>0) && (opt->log!=NULL)) {
-                  HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "Cached fast-header response: %s%s is %d"LF, url_adr, url_fil, (int)r->statuscode);
-                }
+                hts_log_print(opt, LOG_DEBUG, "Cached fast-header response: %s%s is %d", url_adr, url_fil, (int)r->statuscode);
                 inthash_add(cache->cached_tests, concat(OPT_GET_BUFF(opt), url_adr, url_fil), (intptr_t)strdupt(tempo));
               }
             }
@@ -709,9 +700,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
             if (!dataincache) {   /* Data are supposed to be on disk */
               if (!fexist_utf8(fconv(catbuff, previous_save))) {  // un fichier existe déja
                 if (!opt->norecatch) {
-                  if ((opt->debug>0) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: could not find %s"LF, previous_save);
-                  }
+                  hts_log_print(opt, LOG_DEBUG, "Cache: could not find %s", previous_save);
                   r.statuscode=STATUSCODE_INVALID;
                   strcpybuff(r.msg, "Previous cache file not found");
                 }
@@ -748,16 +737,14 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                         // So far so good
                         ok=1;    // plus rien à faire
 
-                        if ((opt->debug>1) && (opt->log!=NULL)) {
-                          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log, "File '%s' has been renamed since last mirror to '%s' ; applying changes"LF, previous_save, target_save); test_flush;
-                        }
+                        hts_log_print(opt, LOG_DEBUG, "File '%s' has been renamed since last mirror to '%s' ; applying changes", previous_save, target_save);
                       } else {
                         r.statuscode=STATUSCODE_INVALID;
                         strcpybuff(r.msg, "Unable to rename file on disk");
                       }
                     }
                   } else {
-                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "warning: file size on disk ("LLintP") does not have the expected size ("LLintP"))"LF, (LLint) fsize, (LLint) r.size);
+                    hts_log_print(opt, LOG_WARNING, "warning: file size on disk ("LLintP") does not have the expected size ("LLintP"))", (LLint) fsize, (LLint) r.size);
                   }
                 }
                 // File exists with the target name and not previous one ?
@@ -769,7 +756,7 @@ static htsblk cache_readex_new(httrackp* opt,cache_back* cache,const char* adr,c
                     // So far so good
                     ok=1;    // plus rien à faire
                   } else {
-                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log, "warning: renamed file size on disk ("LLintP") does not have the expected size ("LLintP"))"LF, (LLint) fsize, (LLint) r.size);
+                    hts_log_print(opt, LOG_WARNING, "warning: renamed file size on disk ("LLintP") does not have the expected size ("LLintP"))", (LLint) fsize, (LLint) r.size);
                   }
                 }
 
@@ -1278,9 +1265,7 @@ int cache_readdata(cache_back* cache,const char* str1,const char* str2,char** in
 }
 
 static int hts_rename(httrackp* opt, const char *a, const char *b) {
-  if ((opt->debug>0) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: rename %s -> %s (%p %p)"LF, a, b, a, b);
-  }
+  hts_log_print(opt, LOG_DEBUG, "Cache: rename %s -> %s (%p %p)", a, b, a, b);
   return rename(a, b);
 }
 
@@ -1299,9 +1284,7 @@ htsblk* cache_header(httrackp* opt,cache_back* cache,const char* adr,const char*
 void cache_init(cache_back* cache,httrackp* opt) {
   // ---
   // utilisation du cache: renommer ancien éventuel et charger index
-  if ((opt->debug>0) && (opt->log!=NULL)) {
-    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: enabled=%d, base=%s, ro=%d"LF, (int) opt->cache, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/"), (int) cache->ro);
-  }
+  hts_log_print(opt, LOG_DEBUG, "Cache: enabled=%d, base=%s, ro=%d", (int) opt->cache, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/"), (int) cache->ro);
   if (opt->cache) {
 #if DEBUGCA
     printf("cache init: ");
@@ -1330,23 +1313,15 @@ void cache_init(cache_back* cache,httrackp* opt) {
         /* Remove OLD cache */
         if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.zip"))) {
           if (remove(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.zip")) != 0) {
-            int last_errno = errno;
-            if (opt->log!=NULL) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: error while moving previous cache: %s"LF, strerror(last_errno));
-            }
+            hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cache: error while moving previous cache");
           }
         }
         
         /* Rename */
         if (hts_rename(opt, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.zip"), fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.zip")) != 0) {
-          int last_errno = errno;
-          if (opt->log!=NULL) {
-            HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: error while moving previous cache: %s"LF, strerror(last_errno));
-          }
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cache: error while moving previous cache");
         } else {
-          if ((opt->debug>0) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: successfully renamed"LF);
-          }
+          hts_log_print(opt, LOG_DEBUG, "Cache: successfully renamed");
         }
       }
       else if ((fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.dat"))) && (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
@@ -1370,13 +1345,9 @@ void cache_init(cache_back* cache,httrackp* opt) {
           remove(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.ndx"));
       }
     } else {
-      if ((opt->debug>0) && (opt->log!=NULL)) {
-        HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: no cache found"LF);
-      }
+      hts_log_print(opt, LOG_DEBUG, "Cache: no cache found");
     }
-    if ((opt->debug>0) && (opt->log!=NULL)) {
-      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: size %d"LF, (int)fsize(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.zip")));
-    }
+    hts_log_print(opt, LOG_DEBUG, "Cache: size %d", (int)fsize(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.zip")));
 
     // charger index cache précédent
     if (
@@ -1407,10 +1378,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
         } else {
           name = fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.zip");
         }
-        if (opt->log) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: damaged cache, trying to repair"LF);
-          fflush(opt->log);
-        }
+        hts_log_print(opt, LOG_WARNING, "Cache: damaged cache, trying to repair");
         if (unzRepair(name, 
           fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/repair.zip"),
           fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/repair.tmp"),
@@ -1419,16 +1387,10 @@ void cache_init(cache_back* cache,httrackp* opt) {
             unlink(name);
             rename(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/repair.zip"), name);
             cache->zipInput = unzOpen(name);
-            if (opt->log) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: %d bytes successfully recovered in %d entries"LF, 
-                (int) repairedBytes, (int) repaired);
-              fflush(opt->log);
-            }
+            hts_log_print(opt, LOG_WARNING, "Cache: %d bytes successfully recovered in %d entries", 
+              (int) repairedBytes, (int) repaired);
           } else {
-            if (opt->log) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: could not repair the cache"LF);
-              fflush(opt->log);
-            }
+            hts_log_print(opt, LOG_WARNING, "Cache: could not repair the cache");
           }
       }
       
@@ -1485,33 +1447,25 @@ void cache_init(cache_back* cache,httrackp* opt) {
                   else
                     inthash_add(cache->hashtable, filenameIndex, -pos);
                 } else {
-                  if (opt->log!=NULL) {
-                    HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Corrupted cache meta entry #%d"LF, (int)entries);
-                  }
+                  hts_log_print(opt, LOG_WARNING, "Corrupted cache meta entry #%d", (int)entries);
                 }
               } else {
-                if (opt->log!=NULL) {
-                  HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Corrupted cache entry #%d"LF, (int)entries);
-                }
+                hts_log_print(opt, LOG_WARNING, "Corrupted cache entry #%d", (int)entries);
               }
               unzCloseCurrentFile((unzFile) cache->zipInput);
             } else {
-              if (opt->log!=NULL) {
-                HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Corrupted cache entry #%d"LF, (int)entries);
-              }
+              hts_log_print(opt, LOG_WARNING, "Corrupted cache entry #%d", (int)entries);
             }
           } while( unzGoToNextFile((unzFile) cache->zipInput) == Z_OK );
-          if ((opt->debug>0) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache index loaded: %d entries loaded"LF, (int)entries);
-          }
+          hts_log_print(opt, LOG_DEBUG, "Cache index loaded: %d entries loaded", (int)entries);
           opt->is_update=1;        // signaler comme update
           
         } else {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: error trying to read the cache: %s"LF, hts_get_zerror(zErr));
+          hts_log_print(opt, LOG_WARNING, "Cache: error trying to read the cache: %s", hts_get_zerror(zErr));
         }    
         
       } else {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: error trying to open the cache"LF);
+        hts_log_print(opt, LOG_WARNING, "Cache: error trying to open the cache");
       }
       
     } else if (
@@ -1568,20 +1522,14 @@ void cache_init(cache_back* cache,httrackp* opt) {
                 a+=cache_brstr(a,firstline);
                 strcpybuff(cache->lastmodified,firstline);
               } else {
-                if (opt->log) {
-                  HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Cache: version 1.%d not supported, ignoring current cache"LF,cache->version);
-                  fflush(opt->log);
-                }
+                hts_log_print(opt, LOG_ERROR, "Cache: version 1.%d not supported, ignoring current cache",cache->version);
                 fclose(cache->olddat);
                 cache->olddat=NULL;
                 freet(cache->use);
                 cache->use=NULL;
               }
             } else {        // non supporté
-              if (opt->log) {
-                HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Cache: %s not supported, ignoring current cache"LF,firstline);
-                fflush(opt->log);
-              }
+              hts_log_print(opt, LOG_ERROR, "Cache: %s not supported, ignoring current cache",firstline);
               fclose(cache->olddat);
               cache->olddat=NULL;
               freet(cache->use);
@@ -1590,10 +1538,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
             /* */
           } else {              // Vieille version du cache
             /* */
-            if (opt->log) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: importing old cache format"LF);
-              fflush(opt->log);
-            }
+            hts_log_print(opt, LOG_WARNING, "Cache: importing old cache format");
             cache->version=0;        // cache 1.0
             strcpybuff(cache->lastmodified,firstline); 
           }
@@ -1626,9 +1571,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
         }
       }
       } else {
-        if ((opt->debug>0) && (opt->log!=NULL)) {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: no cache found in %s"LF, fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/"));
-        }
+        hts_log_print(opt, LOG_DEBUG, "Cache: no cache found in %s", fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/"));
       }
 
 #if DEBUGCA
@@ -1738,9 +1681,7 @@ void cache_init(cache_back* cache,httrackp* opt) {
       }
       
   } else {
-    if ((opt->debug>0) && (opt->log!=NULL)) {
-      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Cache: no cache enabled"LF);
-    }
+    hts_log_print(opt, LOG_DEBUG, "Cache: no cache enabled");
   }
   
 }

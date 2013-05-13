@@ -2141,7 +2141,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       }
       
       // fichier log        
-      if (opt->log)     {
+      if (opt->log) {
         int i;
         fprintf(opt->log,"HTTrack"HTTRACK_VERSION"%s launched on %s at %s"LF, 
           hts_get_version_info(opt),
@@ -2186,32 +2186,22 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     if (!opt->bypass_limits) {
       if (opt->maxsoc <= 0 || opt->maxsoc > 8) {
         opt->maxsoc = 8;
-        if (opt->log != NULL) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: maximum number of simultaneous connections limited to %d to avoid server overload"LF, (int)opt->maxsoc);
-        }
+        hts_log_print(opt, LOG_WARNING, "* security warning: maximum number of simultaneous connections limited to %d to avoid server overload", (int)opt->maxsoc);
       }
       if (opt->maxrate <= 0 || opt->maxrate > 250000) {
         opt->maxrate = 250000;
-        if (opt->log != NULL) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: maximum bandwidth limited to %d to avoid server overload"LF, (int)opt->maxrate);
-        }
+        hts_log_print(opt, LOG_WARNING, "* security warning: maximum bandwidth limited to %d to avoid server overload", (int)opt->maxrate);
       }
       if (opt->maxconn <= 0 || opt->maxconn > 5.0) {
         opt->maxconn = 5.0;
-        if (opt->log != NULL) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: maximum number of connections per second limited to %f to avoid server overload"LF, (float)opt->maxconn);
-        }
+        hts_log_print(opt, LOG_WARNING, "* security warning: maximum number of connections per second limited to %f to avoid server overload", (float)opt->maxconn);
       }
     } else {
-      if (opt->log != NULL) {
-        HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"* security warning: !!! BYPASSING SECURITY LIMITS - MONITOR THIS SESSION WITH EXTREME CARE !!!"LF);
-      }
+      hts_log_print(opt, LOG_WARNING, "* security warning: !!! BYPASSING SECURITY LIMITS - MONITOR THIS SESSION WITH EXTREME CARE !!!");
     }
 
   /* Info for wrappers */
-  if ( (opt->debug>0) && (opt->log!=NULL) ) {
-    HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: init"LF);
-  }
+  hts_log_print(opt, LOG_INFO, "engine: init");
 
   /* Init external */
   RUN_CALLBACK_NOARG(opt, init);
@@ -2252,9 +2242,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       if (a) {
         *a='\0';
         hts_buildtopindex(opt,rpath,StringBuff(opt->path_bin));
-        if (opt->log) {
-          HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Top index rebuilt (done)"LF);
-        }
+        hts_log_print(opt, LOG_INFO, "Top index rebuilt (done)");
       }
     }
 
@@ -2286,9 +2274,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     }
 
     /* Info for wrappers */
-    if ( (opt->debug>0) && (opt->log!=NULL) ) {
-      HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: free"LF);
-    }
+    hts_log_print(opt, LOG_INFO, "engine: free");
 
     /* UnInit */
     RUN_CALLBACK_NOARG(opt, uninit);

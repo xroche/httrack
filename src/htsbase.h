@@ -71,9 +71,11 @@ extern "C" {
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
 #define HTS_STATIC static __attribute__ ((unused))
+#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
+#define HTS_PRINTF_FUN(fmt, arg)
 #endif
 #endif
 
@@ -154,36 +156,6 @@ extern HTSEXT_API t_abortLog abortLog__;
       htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
     } \
   } \
-} while(0)
-
-/* logging */
-typedef enum {
-	LOG_DEBUG,
-	LOG_INFO,
-	LOG_WARNING,
-	LOG_ERROR,
-	LOG_PANIC
-} HTS_LogType;
-#define HTS_LOG(OPT,TYPE) do { \
-  int last_errno = errno; \
-	switch(TYPE) { \
-	case LOG_DEBUG: \
-		fspc(OPT,(OPT)->log, "debug"); \
-		break; \
-	case LOG_INFO: \
-		fspc(OPT,(OPT)->log, "info"); \
-		break; \
-	case LOG_WARNING: \
-		fspc(OPT,(OPT)->log, "warning"); \
-		break; \
-	case LOG_ERROR: \
-		fspc(OPT,(OPT)->log, "error"); \
-		break; \
-	case LOG_PANIC: \
-		fspc(OPT,(OPT)->log, "panic"); \
-		break; \
-	} \
-  errno = last_errno; \
 } while(0)
 
 /* regular malloc's() */

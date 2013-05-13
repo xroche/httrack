@@ -1413,7 +1413,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 					/* */
 				} else {              // Vieille version du cache
 					/* */
-					// HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Cache: importing old cache format"LF);
+					// hts_log_print(opt, LOG_WARNING, "Cache: importing old cache format");
 					cache->version=0;        // cache 1.0
 					strcpy(cache->lastmodified,firstline); 
 				}

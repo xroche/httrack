@@ -114,10 +114,6 @@ int nsocDEBUG=0;
 
 // Début de httpmirror, routines annexes
 
-// version 1 pour httpmirror
-// flusher si on doit lire peu à peu le fichier
-#define test_flush if (opt->flush) { fflush(opt->log); fflush(opt->log); }
-
 // pour alléger la syntaxe, des raccourcis sont créés
 #define urladr   (liens[ptr]->adr)
 #define urlfil   (liens[ptr]->fil)
@@ -128,9 +124,7 @@ int nsocDEBUG=0;
 // note: partir de liens_max.. vers 0.. sinon erreur de violation de mémoire: les liens suivants
 // ne sont plus à nous.. agh! [dur celui-là]
 #define HTMLCHECK_UNINIT { \
-if ( (opt->debug>0) && (opt->log!=NULL) ) { \
-HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: end"LF); \
-} \
+hts_log_print(opt, LOG_INFO, "engine: end"); \
 RUN_CALLBACK0(opt, end); \
 }
 
@@ -172,8 +166,7 @@ RUN_CALLBACK0(opt, end); \
   if (cache.olddat) { fclose(cache.olddat); cache.olddat=NULL; } \
   if (cache.lst) { fclose(cache.lst); cache.lst=opt->state.strc.lst=NULL; } \
   if (cache.txt) { fclose(cache.txt); cache.txt=NULL; } \
-  if (opt->log) fflush(opt->log); \
-  if (opt->log) fflush(opt->log);\
+  if (opt->log != NULL) fflush(opt->log); \
   if (makestat_fp) { fclose(makestat_fp); makestat_fp=NULL; } \
   if (maketrack_fp){ fclose(maketrack_fp); maketrack_fp=NULL; } \
   if (opt->accept_cookie) cookie_save(opt->cookie,fconcat(OPT_GET_BUFF(opt),StringBuff(opt->path_log),"cookies.txt")); \
@@ -520,11 +513,8 @@ int httpmirror(char* url1, httrackp* opt) {
             opt->maxfilter += HTS_FILTERSINC;
             if (filters_init(&filters, opt->maxfilter, HTS_FILTERSINC) == 0) {
               printf("PANIC! : Too many filters : >%d [%d]\n",filptr,__LINE__);
-              if (opt->log) {
-                fprintf(opt->log,LF"Too many filters, giving up..(>%d)"LF,filptr);
-                fprintf(opt->log,"To avoid that: use #F option for more filters (example: -#F5000)"LF);
-                test_flush;
-              }
+              hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",filptr);
+              hts_log_print(opt, LOG_INFO, "To avoid that: use #F option for more filters (example: -#F5000)");
               XH_extuninit;
               return 0;
             }
@@ -592,16 +582,12 @@ int httpmirror(char* url1, httrackp* opt) {
           }
         }
         // fclose(fp);
-        if (opt->log!=NULL) {
-          HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"%d links added from %s"LF,n,StringBuff(opt->filelist)); test_flush;
-        }
+        hts_log_print(opt, LOG_INFO, "%d links added from %s",n,StringBuff(opt->filelist));
 
         // Free buffer
         freet(filelist_buff);
       } else {
-        if (opt->log!=NULL) {
-          HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Could not include URL list: %s"LF,StringBuff(opt->filelist)); test_flush;
-        }
+        hts_log_print(opt, LOG_ERROR, "Could not include URL list: %s",StringBuff(opt->filelist));
       }
     }
 
@@ -610,10 +596,7 @@ int httpmirror(char* url1, httrackp* opt) {
     liens_record("primary","/primary",fslash(OPT_GET_BUFF(opt),fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html")),"","",opt->urlhack);
     if (liens[lien_tot]==NULL) {  // erreur, pas de place réservée
       printf("PANIC! : Not enough memory [%d]\n",__LINE__);
-      if (opt->log) {
-        fprintf(opt->log,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
-        test_flush;
-      }
+      hts_log_print(opt, LOG_PANIC, "Not enough memory, can not re-allocate %d bytes",(int)((add_tab_alloc+1)*sizeof(lien_url)));
       XH_extuninit;    // désallocation mémoire & buffers
       return 0;
     }    
@@ -665,15 +648,10 @@ int httpmirror(char* url1, httrackp* opt) {
     // --> 1024 entrées + 32 entrées par socket en supplément
     sback = back_new(opt->maxsoc*32+1024);   
     if (sback == NULL) {
-      if (opt->log)
-        fprintf(opt->log,"Not enough memory, can not allocate %d bytes"LF,(int)((opt->maxsoc+1)*sizeof(lien_back)));
+      hts_log_print(opt, LOG_PANIC, "Not enough memory, can not allocate %d bytes",(int)((opt->maxsoc+1)*sizeof(lien_back)));
       return 0;
     }
   }
-
-
-  // flush
-  test_flush;
 
   // statistiques
   if (opt->makestat) {
@@ -695,9 +673,7 @@ int httpmirror(char* url1, httrackp* opt) {
 
   // on n'a pas de liens!! (exemple: httrack www.* impossible sans départ..)
   if (lien_tot<=0) {
-    if (opt->log) {
-      fprintf(opt->log,"Error! You MUST specify at least one complete URL, and not only wildcards!"LF);
-    }
+    hts_log_print(opt, LOG_ERROR, "You MUST specify at least one complete URL, and not only wildcards!");
   }
 
   /* Send options to callback functions */
@@ -769,9 +745,7 @@ int httpmirror(char* url1, httrackp* opt) {
 
   }  
   /* Info for wrappers */
-  if ( (opt->debug>0) && (opt->log!=NULL) ) {
-    HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: start"LF);
-  }
+  hts_log_print(opt, LOG_INFO, "engine: start");
   if (!RUN_CALLBACK0(opt, start)) {
     XH_extuninit;
     return 1;
@@ -821,14 +795,11 @@ int httpmirror(char* url1, httrackp* opt) {
                     ( (liens[ptr]->pass2 == -1) )
                  )
                ) {  // sauter si lien annulé (ou fil vide)
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-						if (liens[ptr] != NULL && liens[ptr]->pass2 == -1) {
-	            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"link #%d is ready, skipping: %s%s.."LF,ptr,((urladr != NULL)?(urladr):(" ")),((urlfil != NULL)?(urlfil):(" ")));
-						} else {
-	            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"link #%d seems ready, skipping: %s%s.."LF,ptr,((urladr != NULL)?(urladr):(" ")),((urlfil != NULL)?(urlfil):(" ")));
-						}
-            test_flush;
-          }
+				if (liens[ptr] != NULL && liens[ptr]->pass2 == -1) {
+	          hts_log_print(opt, LOG_DEBUG, "link #%d is ready, skipping: %s%s..",ptr,((urladr != NULL)?(urladr):(" ")),((urlfil != NULL)?(urlfil):(" ")));
+				} else {
+	          hts_log_print(opt, LOG_DEBUG, "link #%d seems ready, skipping: %s%s..",ptr,((urladr != NULL)?(urladr):(" ")),((urlfil != NULL)?(urlfil):(" ")));
+				}
           // remove from stats
           if (liens[ptr]->pass2 == -1) {
             HTS_STAT.stat_background--;
@@ -838,15 +809,12 @@ int httpmirror(char* url1, httrackp* opt) {
       }
       if (liens[ptr] != NULL) {    // on a qq chose à récupérer?
 
-        if ( (opt->debug>1) && (opt->log!=NULL) ) {
-          HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Wait get: %s%s"LF,urladr,urlfil);
-          test_flush;
+        hts_log_print(opt, LOG_DEBUG, "Wait get: %s%s",urladr,urlfil);
 #if DEBUG_ROBOTS
-          if (strcmp(urlfil,"/robots.txt") == 0) {
-            printf("robots.txt detected\n");
-          }
+        if (strcmp(urlfil,"/robots.txt") == 0) {
+          printf("robots.txt detected\n");
+        }
 #endif
-        }    
         // ------------------------------------------------------------
         // DEBUT --RECUPERATION LIEN---
         if (ptr==0) {              // premier lien à parcourir: lien primaire construit avant
@@ -957,9 +925,7 @@ int httpmirror(char* url1, httrackp* opt) {
         
         
       } else {    // lien vide..
-        if (opt->log && opt->debug > 0) {
-          HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Warning, link #%d empty"LF,ptr); test_flush;
-        }         
+        hts_log_print(opt, LOG_WARNING, "Warning, link #%d empty",ptr);
         error=1;
         goto jump_if_done;
       }  // test si url existe (non vide!)
@@ -984,10 +950,7 @@ int httpmirror(char* url1, httrackp* opt) {
           if ((istoobig(opt,r.totalsize,opt->maxfile_html,opt->maxfile_nonhtml,r.contenttype))
            || (istoobig(opt,r.totalsize,opt->maxfile_html,opt->maxfile_nonhtml,r.contenttype))) {
             error=0;
-            if (opt->log) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Big file cancelled according to user's preferences: %s%s"LF,urladr,urlfil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_WARNING, "Big file cancelled according to user's preferences: %s%s",urladr,urlfil);
           }
           // // // error=1;    // ne pas traiter la suite -- euhh si finalement..
         }
@@ -1033,15 +996,9 @@ int httpmirror(char* url1, httrackp* opt) {
           is_loaded_from_file = 1; \
           r.adr = readfile2(savename, &r.size); \
           if (r.adr != NULL) { \
-            if ( (opt->debug>0) && (opt->log!=NULL) ) { \
-              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"File successfully loaded for parsing: %s%s (%d bytes)"LF,urladr,urlfil,(int)r.size); \
-              test_flush; \
-            } \
+            hts_log_print(opt, LOG_INFO, "File successfully loaded for parsing: %s%s (%d bytes)",urladr,urlfil,(int)r.size); \
           } else { \
-            if ( opt->log != NULL ) { \
-              HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"File could not be loaded for parsing: %s%s"LF,urladr,urlfil); \
-              test_flush; \
-            } \
+            hts_log_print(opt, LOG_ERROR, "File could not be loaded for parsing: %s%s",urladr,urlfil); \
           } \
         } \
 } while(0)
@@ -1187,10 +1144,7 @@ int httpmirror(char* url1, httrackp* opt) {
 									CH_ADD_RNG0( unic,                  0x80 );
 								}
 							}
-							if (opt->log) {
-								HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File %s%s converted from UCS2 to UTF-8 (old size: %d bytes, new size: %d bytes)"LF, urladr, urlfil, (int)r.size, new_offs);
-								test_flush;
-							}
+							hts_log_print(opt, LOG_WARNING, "File %s%s converted from UCS2 to UTF-8 (old size: %d bytes, new size: %d bytes)", urladr, urlfil, (int)r.size, new_offs);
 							freet(r.adr);
 							r.adr = NULL;
 							r.size = new_offs;
@@ -1203,10 +1157,7 @@ int httpmirror(char* url1, httrackp* opt) {
 						} else if ((nspec > r.size / 100) && (nspec > 10)) {    // too many special characters
               is_binary = 1;
 							strcpybuff(r.contenttype,"application/octet-stream");
-							if (opt->log) {
-								HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"File not parsed, looks like binary: %s%s"LF,urladr,urlfil);
-								test_flush;
-							}
+							hts_log_print(opt, LOG_WARNING, "File not parsed, looks like binary: %s%s",urladr,urlfil);
 						}
 
 						/* This hack allows to avoid problems with parsing '\0' characters  */
@@ -1400,18 +1351,12 @@ int httpmirror(char* url1, httrackp* opt) {
         if ((!r.notmodified) && (opt->is_update) && (!store_errpage)) {    // page modifiée
           if (strnotempty(savename)) {
             HTS_STAT.stat_updated_files++;
-            if (opt->log!=NULL) {
-              //if ((opt->debug>0) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"File updated: %s%s"LF,urladr,urlfil);
-              test_flush;
-            }
+            //if ((opt->debug>0) && (opt->log!=NULL)) {
+            hts_log_print(opt, LOG_INFO, "File updated: %s%s",urladr,urlfil);
           }
         } else {
           if (!store_errpage) {
-            if ( (opt->debug>0) && (opt->log!=NULL) ) {
-              HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"File recorded: %s%s"LF,urladr,urlfil);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_INFO, "File recorded: %s%s",urladr,urlfil);
           }
         }
       }
@@ -1471,18 +1416,14 @@ int httpmirror(char* url1, httrackp* opt) {
             }
             /* Could not detect charset */
             if (page_charset[0] == '\0') {
-              if ( (opt->debug>0) && (opt->log!=NULL) ) {
-                HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Warning: could not detect encoding for: %s%s"LF,urladr,urlfil);
-              }
+              hts_log_print(opt, LOG_INFO, "Warning: could not detect encoding for: %s%s",urladr,urlfil);
               /* Fallback to ISO-8859-1 (~== identity) ; accents will look weird */
               strcpy(page_charset, "iso-8859-1");
             }
           }
 
           /* Info for wrappers */
-          if ( (opt->debug>0) && (opt->log!=NULL) ) {
-            HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"engine: check-html: %s%s"LF,urladr,urlfil);
-          }
+          hts_log_print(opt, LOG_INFO, "engine: check-html: %s%s",urladr,urlfil);
           {
             char BIGSTK buff_err_msg[1024];
             htsmoduleStruct BIGSTK str;
@@ -1596,10 +1537,7 @@ int httpmirror(char* url1, httrackp* opt) {
               /* Créer message d'erreur ? */
               if (create_html_warning) {
                 char* adr=(char*)malloct(strlen(HTS_DATA_ERROR_HTML)+1100);
-                if ( (opt->debug>0) && (opt->log!=NULL) ) {
-                  HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Creating HTML warning file (%s)"LF,r.msg);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_INFO, "Creating HTML warning file (%s)",r.msg);
                 if (adr) {
                   if (r.adr) {
                     freet(r.adr);
@@ -1610,10 +1548,7 @@ int httpmirror(char* url1, httrackp* opt) {
                 }
               } else if (create_gif_warning) {
                 char* adr=(char*)malloct(HTS_DATA_UNKNOWN_GIF_LEN);
-                if ( (opt->debug>0) && (opt->log!=NULL) ) {
-                  HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Creating GIF dummy file (%s)"LF,r.msg);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_INFO, "Creating GIF dummy file (%s)",r.msg);
                 if (r.adr) {
                   freet(r.adr);
                   r.adr=NULL;
@@ -1690,10 +1625,7 @@ int httpmirror(char* url1, httrackp* opt) {
                       }
 #ifdef IGNORE_RESTRICTIVE_ROBOTS 
                       else {
-                        if (opt->log!=NULL) {
-                          HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Note: %s robots.txt rules are too restrictive, ignoring /"LF,urladr);
-                          test_flush;
-                        }
+                        hts_log_print(opt, LOG_INFO, "Note: %s robots.txt rules are too restrictive, ignoring /",urladr);
                       }
 #endif
                     }
@@ -1702,16 +1634,8 @@ int httpmirror(char* url1, httrackp* opt) {
               } while( (bptr<r.size) && (strlen(buff) < (sizeof(buff) - 32) ) );
               if (strnotempty(buff)) {
                 checkrobots_set(&robots,urladr,buff);
-                if (opt->log!=NULL) {
-                  if (opt->log != opt->log) {
-                    HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Note: robots.txt forbidden links for %s are: %s"LF,urladr,infobuff);
-                    test_flush;
-                  } 
-                }
-                if (opt->log!=NULL) {
-                  HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)"LF,urladr,infobuff);
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_INFO, "Note: robots.txt forbidden links for %s are: %s",urladr,infobuff);
+                hts_log_print(opt, LOG_INFO, "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",urladr,infobuff);
               }
             }
           }
@@ -1763,21 +1687,12 @@ int httpmirror(char* url1, httrackp* opt) {
             }
             
             
-            if ( (opt->debug>0) && (opt->log!=NULL) ) {
-              HTS_LOG(opt,LOG_WARNING); fprintf(opt->log,"Warning: store %s without scan: %s"LF,r.contenttype,savename);
-              test_flush;
-            }
+            hts_log_print(opt, LOG_WARNING, "Warning: store %s without scan: %s",r.contenttype,savename);
           } else {
             if ((opt->getmode & 2)!=0) {    // ok autorisé
-              if ( (opt->debug>1) && (opt->log!=NULL) ) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Store %s: %s"LF,r.contenttype,savename);
-                test_flush;
-              }
+              hts_log_print(opt, LOG_DEBUG, "Store %s: %s",r.contenttype,savename);
             } else {    // lien non autorisé! (ex: cgi-bin en html)
-              if ((opt->debug>1) && (opt->log!=NULL)) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"non-html file ignored after upload at %s : %s"LF,urladr,urlfil);
-                test_flush;
-              } 
+              hts_log_print(opt, LOG_DEBUG, "non-html file ignored after upload at %s : %s",urladr,urlfil);
               if (r.adr) {
                 freet(r.adr); r.adr=NULL;
               }
@@ -1792,18 +1707,10 @@ int httpmirror(char* url1, httrackp* opt) {
             if (filesave(opt,r.adr,(int)r.size,savename,urladr,urlfil)!=0) {
               int fcheck;
               if ((fcheck=check_fatal_io_errno())) {
-								HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Mirror aborted: disk full or filesystem problems"LF); test_flush;
+								hts_log_print(opt, LOG_ERROR, "Mirror aborted: disk full or filesystem problems");
                 opt->state.exit_xh=-1;   /* fatal error */
               }
-              if (opt->log) {   
-                int last_errno = errno;
-                HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Unable to save file %s : %s"LF, savename, strerror(last_errno));
-                if (fcheck) {
-                  HTS_LOG(opt,LOG_ERROR);
-                  fprintf(opt->log,"* * Fatal write error, giving up"LF);
-                }
-                test_flush;
-              }
+              hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", savename);
             } else {
               /*
               if (!ishttperror(r.statuscode))
@@ -1819,9 +1726,7 @@ int httpmirror(char* url1, httrackp* opt) {
         /* Parsing of other media types (java, ram..) */
         /*
         if (strfield2(r.contenttype,"audio/x-pn-realaudio")) {
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(Real Media): parsing %s"LF,savename); test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "(Real Media): parsing %s",savename);
           if (fexist(savename)) {   // ok, existe bien!
             FILE* fp=FOPEN(savename,"r+b");
             if (fp) {
@@ -1829,9 +1734,7 @@ int httpmirror(char* url1, httrackp* opt) {
                 char BIGSTK line[HTS_URLMAXSIZE*2];
                 linput(fp,line,HTS_URLMAXSIZE);
                 if (strnotempty(line)) {
-                  if ((opt->debug>1) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(Real Media): detected %s"LF,line); test_flush;
-                  }
+                  hts_log_print(opt, LOG_DEBUG, "(Real Media): detected %s",line);
                 }
               }
               fclose(fp);
@@ -1871,14 +1774,10 @@ int httpmirror(char* url1, httrackp* opt) {
           /* Parse if recognized */
           switch(hts_parse_externals(&str)) {
           case 1:
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(External module): parsed successfully %s"LF,savename); test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "(External module): parsed successfully %s",savename);
             break;
           case 0:
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(External module): couldn't parse successfully %s : %s"LF,savename, str.err_msg); test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "(External module): couldn't parse successfully %s : %s",savename, str.err_msg);
             break;
           }
         }
@@ -1914,10 +1813,7 @@ jump_if_done:
       }
       if (ptr>=lien_tot) {     // fin de boucle
         if (!numero_passe) { // première boucle
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            fprintf(opt->log,LF"Now getting non-html files..."LF);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "Now getting non-html files...");
           numero_passe=1;   // seconde boucle
           ptr=0;
           // prochain pass2
@@ -1937,15 +1833,11 @@ jump_if_done:
     if (!back_checkmirror(opt)) {
       ptr=lien_tot;
     } else if (opt->state.exit_xh) {  // sortir
-      if (opt->log) {
-        HTS_LOG(opt,LOG_INFO); 
-        if (opt->state.exit_xh==1) {
-          fprintf(opt->log,"Exit requested by shell or user"LF);
-        } else {
-          fprintf(opt->log,"Exit requested by engine"LF);
-        }
-        test_flush;
-      } 
+      if (opt->state.exit_xh==1) {
+        hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+      } else {
+        hts_log_print(opt, LOG_ERROR, "Exit requested by engine");
+      }
       ptr=lien_tot;
     }
   } while(ptr<lien_tot);
@@ -1970,10 +1862,7 @@ jump_if_done:
     && 
     (HTS_STAT.HTS_TOTAL_RECV < 32768)    /* should be fine */
     ) {
-    if (opt->log) {
-      HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"No data seems to have been transfered during this session! : restoring previous one!"LF);
-      test_flush;
-    } 
+    hts_log_print(opt, LOG_INFO, "No data seems to have been transfered during this session! : restoring previous one!");
     XH_uninit;
     if ( (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.dat"))) && (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.ndx"))) ) {
       remove(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.dat"));
@@ -2020,9 +1909,7 @@ jump_if_done:
                   strcatbuff(file,line+1);
                   file[strlen(file)-1]='\0';
                   if (fexist(file)) {       // toujours sur disque: virer
-                    if (opt->log) {
-                      HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Purging %s"LF,file);
-                    }
+                    hts_log_print(opt, LOG_INFO, "Purging %s",file);
                     remove(file); purge=1;
                   }
                 }
@@ -2044,7 +1931,7 @@ jump_if_done:
                       while ((strnotempty(file)) && (rmdir(file)==0)) {    // ok, éliminé (existait)
                         purge=1;
                         if (opt->log) {
-                          HTS_LOG(opt,LOG_INFO); fprintf(opt->log,"Purging directory %s/"LF,file);
+                          hts_log_print(opt, LOG_INFO, "Purging directory %s/",file);
                           while(strnotempty(file) && (file[strlen(file)-1]!='/') && (file[strlen(file)-1]!='\\')) {
                             file[strlen(file)-1]='\0';
                           }
@@ -2057,9 +1944,7 @@ jump_if_done:
               }
               //
               if (!purge) {
-                if (opt->log) {
-                  fprintf(opt->log,"No files purged"LF);
-                }
+                hts_log_print(opt, LOG_INFO, "No files purged");
               }
             }
             freet(adr);
@@ -2135,8 +2020,6 @@ jump_if_done:
       zipClose(cache.zipOutput, finalInfo);
       cache.zipOutput = NULL;
     }
-    
-    test_flush;
   }
 #if DEBUG_HASH
   // noter les collisions
@@ -2173,10 +2056,6 @@ jump_if_done:
   return 1;    // OK
 }
 // version 2 pour le reste
-// flusher si on doit lire peu à peu le fichier
-#undef test_flush
-#define test_flush if (opt->flush) { fflush(opt->log); fflush(opt->log); }
-
 
 // Estimate transfer rate
 // a little bit complex, but not too much
@@ -2263,11 +2142,8 @@ void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* s
     opt->maxfilter += HTS_FILTERSINC;
     if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
       printf("PANIC! : Too many filters : >%d [%d]\n",*_FILTERS_PTR,__LINE__);
-      if (opt->log) {
-        fprintf(opt->log,LF"Too many filters, giving up..(>%d)"LF,*_FILTERS_PTR);
-        fprintf(opt->log,"To avoid that: use #F option for more filters (example: -#F5000)"LF);
-        fflush(opt->log);
-      }
+      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",*_FILTERS_PTR);
+      hts_log_print(opt, LOG_INFO, "To avoid that: use #F option for more filters (example: -#F5000)");
       assertf("too many filters - giving up" == NULL);
     }
   }
@@ -2285,9 +2161,7 @@ void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* s
   if (strlen(host)<=1) {    // euhh?? longueur <= 1
     if (strcmp(host,"file://")) {
       //## if (host[0]!=lOCAL_CHAR) {  // pas local
-      if (opt->log!=NULL) {
-        fprintf(opt->log,"PANIC! HostCancel detected memory leaks [char %d]"LF,host[0]); test_flush;
-      }          
+      hts_log_print(opt, LOG_PANIC, "PANIC! HostCancel detected memory leaks [char %d]",host[0]);
       return;  // purée
     }
   }
@@ -2305,10 +2179,7 @@ void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* s
         back[i].r.soc=INVALID_SOCKET;
         back[i].r.statuscode=STATUSCODE_TIMEOUT;    // timeout (peu importe si c'est un traffic jam)
         strcpybuff(back[i].r.msg,"Link Cancelled by host control");
-        
-        if ((opt->debug>1) && (opt->log!=NULL)) {
-          fprintf(opt->log,"Shutdown: %s%s"LF,back[i].url_adr,back[i].url_fil); test_flush;
-        }          
+        hts_log_print(opt, LOG_DEBUG, "Shutdown: %s%s",back[i].url_adr,back[i].url_fil);
       }
   }
   
@@ -2323,9 +2194,7 @@ void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* s
         while((liens[i]->adr[l]) && (l<1020)) l++;
         if ((l > 0) && (l<1020)) {   // sécurité
           if (strfield2(jump_identification(liens[i]->adr),host)) {    // host
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              fprintf(opt->log,"Cancel: %s%s"LF,liens[i]->adr,liens[i]->fil); test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s",liens[i]->adr,liens[i]->fil);
             strcpybuff(liens[i]->adr,"!");    // cancel (invalide hash)
             // on efface pas le hash, because si on rencontre le lien, reverif sav..
           }
@@ -2334,19 +2203,15 @@ void host_ban(httrackp* opt,lien_url** liens,int ptr,int lien_tot,struct_back* s
             char dmp[1040];
             dmp[0]='\0';
             strncatbuff(dmp,liens[i]->adr,1024);
-            fprintf(opt->log,"WARNING! HostCancel detected memory leaks [len %d at %d]"LF,l,i); test_flush;
-            fprintf(opt->log,"dump 1024 bytes (address %p): "LF"%s"LF,liens[i]->adr,dmp); test_flush;
+            hts_log_print(opt, LOG_WARNING, "WARNING! HostCancel detected memory leaks [len %d at %d]",l,i);
+            hts_log_print(opt, LOG_WARNING, "dump 1024 bytes (address %p): "LF"%s",liens[i]->adr,dmp);
           }          
         }
       } else {
-        if (opt->log!=NULL) {
-          fprintf(opt->log,"WARNING! HostCancel detected memory leaks [adr at %d]"LF,i); test_flush;
-        }  
+        hts_log_print(opt, LOG_WARNING, "WARNING! HostCancel detected memory leaks [adr at %d]",i);
       }
     } else {
-      if (opt->log!=NULL) {
-        fprintf(opt->log,"WARNING! HostCancel detected memory leaks [null at %d]"LF,i); test_flush;
-      }  
+      hts_log_print(opt, LOG_WARNING, "WARNING! HostCancel detected memory leaks [null at %d]",i);
     }
     //}
   }
@@ -2400,16 +2265,16 @@ static int mkdir_compat(const char *pathname) {
 }
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
+/* Note: preserve errno */
 HTSEXT_API int dir_exists(const char* path) {
+  const int err = errno;
   STRUCT_STAT st;
   char BIGSTK file[HTS_URLMAXSIZE*2];
   int i = 0;
   if (strnotempty(path) == 0) {
-    errno = EINVAL;
 		return 0;
   }
   if (strlen(path) > HTS_URLMAXSIZE) {
-    errno = EINVAL;
 		return 0;
   }
 
@@ -2430,11 +2295,10 @@ HTSEXT_API int dir_exists(const char* path) {
 
   /* Check the final dir */
   if (STAT(file, &st) == 0 && S_ISDIR(st.st_mode)) {
-    errno = 0;
     return 1;   /* EXISTS */
   }
-  errno = 0;
-  return 0;   /* DOES NOT EXISTS */
+  errno = err;
+  return 0;   /* DOES NOT EXIST */
 }
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
@@ -2814,7 +2678,7 @@ void file_notify(httrackp* opt,const char* adr,const char* fil,const char* save,
 
 // executer commande utilisateur
 static void postprocess_file(httrackp* opt, const char* save, const char* adr, const char* fil);
-HTS_INLINE void usercommand(httrackp* opt,int _exe,const char* _cmd,const char* file,const char* adr,const char* fil) {
+void usercommand(httrackp* opt,int _exe,const char* _cmd,const char* file,const char* adr,const char* fil) {
 	usercommand_strc* strc = &opt->state.usercmd;
   
   /* Callback */
@@ -2904,9 +2768,7 @@ static void postprocess_file(httrackp* opt,const char* save, const char* adr, co
           opt->state.mimehtml_created = 1;
         } else {
           opt->state.mimehtml_created = -1;
-          if ( opt->log != NULL ) {
-            HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"unable to create index.mht"LF);
-          }
+          hts_log_print(opt, LOG_ERROR, "unable to create index.mht");
         }
       }
       if (opt->state.mimehtml_created == 1 && opt->state.mimefp != NULL) {
@@ -2967,7 +2829,7 @@ static void postprocess_file(httrackp* opt,const char* save, const char* adr, co
 }
 
 // écrire n espaces dans fp
-HTS_INLINE int fspc(httrackp *opt,FILE* fp,const char* type) {
+int fspc(httrackp *opt,FILE* fp,const char* type) {
   fspc_strc* const strc = ( opt != NULL ) ? &opt->state.fspc : NULL;
   if (fp != NULL) {
     char s[256];
@@ -3146,10 +3008,7 @@ int back_fill(struct_back* sback,httrackp* opt,cache_back* cache,lien_url** lien
       if (ok) {
         if (!back_exist(sback, opt, liens[p]->adr,liens[p]->fil,liens[p]->sav)) {
           if (back_add(sback,opt,cache,liens[p]->adr,liens[p]->fil,liens[p]->sav,liens[liens[p]->precedent]->adr,liens[liens[p]->precedent]->fil,liens[p]->testmode)==-1) {
-            if ( (opt->debug>1) && (opt->log!=NULL) ) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"error: unable to add more links through back_add for back_fill"LF);
-              test_flush;
-            }                    
+            hts_log_print(opt, LOG_DEBUG, "error: unable to add more links through back_add for back_fill");
 #if BDEBUG==1
             printf("error while adding\n");
 #endif                  
@@ -3200,7 +3059,7 @@ int read_stdin(char* s,int max) {
   return i;
 }
 #ifdef _WIN32
-HTS_INLINE int check_stdin(void) {
+int check_stdin(void) {
 #ifndef _WIN32_WCE
   return (_kbhit());
 #else
@@ -3208,7 +3067,7 @@ HTS_INLINE int check_stdin(void) {
 #endif
 }
 #else
-HTS_INLINE int check_flot(T_SOC s) {
+int check_flot(T_SOC s) {
   fd_set fds;
   struct timeval tv;
   FD_ZERO(&fds);
@@ -3218,7 +3077,7 @@ HTS_INLINE int check_flot(T_SOC s) {
   select(s+1,&fds,NULL,NULL,&tv);
   return FD_ISSET(s,&fds);
 }
-HTS_INLINE int check_stdin(void) {
+int check_stdin(void) {
   fflush(stdout); fflush(stdin);
   if (check_flot(0))
     return 1;
@@ -3227,7 +3086,7 @@ HTS_INLINE int check_stdin(void) {
 #endif
 #endif
 
-HTS_INLINE int check_sockerror(T_SOC s) {
+int check_sockerror(T_SOC s) {
   fd_set fds;
   struct timeval tv;
   FD_ZERO(&fds);
@@ -3239,7 +3098,7 @@ HTS_INLINE int check_sockerror(T_SOC s) {
 }
 
 /* check incoming data */
-HTS_INLINE int check_sockdata(T_SOC s) {
+int check_sockdata(T_SOC s) {
   fd_set fds;
   struct timeval tv;
   FD_ZERO(&fds);
@@ -3414,6 +3273,7 @@ HTSEXT_API int hts_setpause(httrackp *opt, int p) {
 // ask for termination
 HTSEXT_API int hts_request_stop(httrackp* opt, int force) {
   if (opt != NULL) {
+    hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     opt->state.stop = 1;
   }
   return 0;
@@ -3524,24 +3384,16 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
     
     codebase[0]='\0';
     
-    if ((opt->debug>1) && (opt->log!=NULL)) {
-      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(module): adding link : '%s'"LF, link); test_flush;
-    }
+    hts_log_print(opt, LOG_DEBUG, "(module): adding link : '%s'", link);
     // recopie de "creer le lien"
     //    
 
     if (!RUN_CALLBACK1(opt, linkdetected, link)) {
-      if (opt->log) {
-        HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Link %s refused by external wrapper"LF, link);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_ERROR, "Link %s refused by external wrapper", link);
       return 0;
     }
     if (!RUN_CALLBACK2(opt, linkdetected2, link, NULL)) {
-      if (opt->log) {
-        HTS_LOG(opt,LOG_ERROR); fprintf(opt->log,"Link %s refused by external wrapper(2)"LF, link);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_ERROR, "Link %s refused by external wrapper(2)", link);
       return 0;
     }
 
@@ -3569,19 +3421,13 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
           strcpybuff(tempo,a);
           strcpybuff(codebase,tempo);    // couper host
         } else {
-          if (opt->log) {   
-            fprintf(opt->log,"Unexpected strstr error in base %s"LF,codebase);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_ERROR, "Unexpected strstr error in base %s",codebase);
         }
       }
     }
     
     if (!((int) strlen(codebase)<HTS_URLMAXSIZE)) {    // trop long
-      if (opt->log) {   
-        fprintf(opt->log,"Codebase too long, parsing skipped (%s)"LF,codebase);
-        test_flush;
-      }
+      hts_log_print(opt, LOG_ERROR, "Codebase too long, parsing skipped (%s)",codebase);
     }
     
     {
@@ -3600,10 +3446,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
             NULL, NULL,
             &set_prio_to,
             &just_test_it);
-          if ((opt->debug>1) && (opt->log!=NULL)) {
-            HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"result for wizard external module link: %d"LF,forbidden_url);
-            test_flush;
-          }
+          hts_log_print(opt, LOG_DEBUG, "result for wizard external module link: %d",forbidden_url);
 
           /* Link accepted */
           if (!forbidden_url) {
@@ -3633,12 +3476,9 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
             if (r != -1 && !forbidden_url) {
               if (savename) {
                 if (lienrelatif(tempo,save,savename)==0) {
-                  if ((opt->debug>1) && (opt->log!=NULL)) {
-                    HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(module): relative link at %s build with %s and %s: %s"LF,adr,save,savename,tempo);
-                    test_flush;
-                    if (str->localLink && str->localLinkSize > (int) strlen(tempo) + 1) {
-                      strcpybuff(str->localLink, tempo);
-                    }
+                  hts_log_print(opt, LOG_DEBUG, "(module): relative link at %s build with %s and %s: %s",adr,save,savename,tempo);
+                  if (str->localLink && str->localLinkSize > (int) strlen(tempo) + 1) {
+                    strcpybuff(str->localLink, tempo);
                   }
                 }
               }
@@ -3646,9 +3486,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
           }
 
           if (forbidden_url) {
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(module): file not caught: %s"LF,lien); test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "(module): file not caught: %s",lien);
             if (str->localLink && str->localLinkSize > (int) ( strlen(adr) + strlen(fil) +  8 ) ) {
               str->localLink[0] = '\0';
               if (!link_has_authority(adr))
@@ -3661,9 +3499,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
 
           //
           if (r != -1) {
-            if ((opt->debug>1) && (opt->log!=NULL)) {
-              HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(module): %s%s -> %s (base %s)"LF,adr,fil,save,codebase); test_flush;
-            }
+            hts_log_print(opt, LOG_DEBUG, "(module): %s%s -> %s (base %s)",adr,fil,save,codebase);
             
             // modifié par rapport à l'autre version (cf prio_fix notamment et save2)
             
@@ -3688,10 +3524,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
               liens_record(adr,fil,save,"","",opt->urlhack);
               if (liens[lien_tot]==NULL) {  // erreur, pas de place réservée
                 printf("PANIC! : Not enough memory [%d]\n",__LINE__);
-                if (opt->log) { 
-                  fprintf(opt->log,"Not enough memory, can not re-allocate %d bytes"LF,(int)((add_tab_alloc+1)*sizeof(lien_url)));
-                  test_flush;
-                }
+                hts_log_print(opt, LOG_PANIC, "Not enough memory, can not re-allocate %d bytes",(int)((add_tab_alloc+1)*sizeof(lien_url)));
                 opt->state.exit_xh=-1;    /* fatal error -> exit */
                 return 0;
               }  
@@ -3719,10 +3552,7 @@ int htsAddLink(htsmoduleStruct* str, char* link) {
               //strcpybuff(liens[lien_tot]->adr,adr);
               //strcpybuff(liens[lien_tot]->fil,fil);
               //strcpybuff(liens[lien_tot]->sav,save); 
-              if ((opt->debug>1) && (opt->log!=NULL)) {
-                HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"(module): OK, NOTE: %s%s -> %s"LF,liens[lien_tot]->adr,liens[lien_tot]->fil,liens[lien_tot]->sav);
-                test_flush;
-              }
+              hts_log_print(opt, LOG_DEBUG, "(module): OK, NOTE: %s%s -> %s",liens[lien_tot]->adr,liens[lien_tot]->fil,liens[lien_tot]->sav);
               
               lien_tot++;  // UN LIEN DE PLUS
             }

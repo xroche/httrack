@@ -48,6 +48,18 @@ typedef struct httrackp httrackp;
 #define HTS_DEF_FWSTRUCT_strc_int2bytes2
 typedef struct strc_int2bytes2 strc_int2bytes2;
 #endif
+#ifndef HTS_DEF_DEFSTRUCT_hts_log_type
+#define HTS_DEF_DEFSTRUCT_hts_log_type
+typedef enum hts_log_type {
+	LOG_DEBUG,
+	LOG_INFO,
+	LOG_NOTICE,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_PANIC,
+	LOG_ERRNO = 1 << 8
+} hts_log_type;
+#endif
 
 /* Helpers for plugging callbacks
 requires: htsdefines.h */
@@ -96,6 +108,7 @@ HTSEXT_API int plug_wrapper(httrackp *opt, const char *moduleName, const char* a
 
 /* Logging */
 HTSEXT_API int hts_log(httrackp *opt, const char* prefix, const char *msg);
+HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...);
 
 /* Infos */
 HTSEXT_API const char* hts_get_version_info(httrackp *opt);

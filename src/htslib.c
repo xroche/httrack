@@ -76,6 +76,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 #include <time.h>
+#include <stdarg.h>
 
 #ifndef  _WIN32_WCE
 #include <sys/timeb.h>
@@ -4346,29 +4347,39 @@ void fprintfio(FILE* fp,char* buff,char* prefix) {
 
 /* Le fichier existe-t-il? (ou est-il accessible?) */
 /* Note: NOT utf-8 */
+/* Note: preserve errno */
 int fexist(const char* s) {
 	char catbuff[CATBUFF_SIZE];
+  const int err = errno;
   struct stat st;
   memset(&st, 0, sizeof(st));
   if (stat(fconv(catbuff,s), &st) == 0) {
     if (S_ISREG(st.st_mode)) {
       return 1;
+    } else {
+      return 0;
     }
   }
+  errno = err;
   return 0;
 } 
 
 /* Le fichier existe-t-il? (ou est-il accessible?) */
 /* Note: utf-8 */
+/* Note: preserve errno */
 int fexist_utf8(const char* s) {
 	char catbuff[CATBUFF_SIZE];
+  const int err = errno;
   STRUCT_STAT st;
   memset(&st, 0, sizeof(st));
   if (STAT(fconv(catbuff,s), &st) == 0) {
     if (S_ISREG(st.st_mode)) {
       return 1;
+    } else {
+      return 0;
     }
   }
+  errno = err;
   return 0;
 } 
 
@@ -5181,6 +5192,7 @@ HTSEXT_API int hts_uninit_module(void) {
   return 1;
 }
 
+// legacy. do not use
 HTSEXT_API int hts_log(httrackp *opt, const char* prefix, const char *msg) {
   if (opt->log != NULL) {
     fspc(opt, opt->log, prefix);
@@ -5188,6 +5200,58 @@ HTSEXT_API int hts_log(httrackp *opt, const char* prefix, const char *msg) {
     return 0;
   }
   return 1;   /* Error */
+}
+
+HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...) {
+  assertf(format != NULL);
+  if (opt != NULL && opt->log != NULL) {
+    va_list args;
+    const int save_errno = errno;
+    const char *s_type = "unknown";
+    switch(type & 0xff) {
+    case LOG_DEBUG:
+      // check verbosity
+      if (opt->debug < 2) {
+        return ;
+      }
+      s_type = "debug";
+      break;
+    case LOG_INFO:
+      // check verbosity
+      if (opt->debug < 1) {
+        return ;
+      }
+      s_type = "info";
+      break;
+    case LOG_NOTICE:
+      // check verbosity
+      if (opt->debug < 1) {
+        return ;
+      }
+      /* nobreak; */
+    case LOG_WARNING:
+      s_type = "warning";
+      break;
+    case LOG_ERROR:
+      s_type = "error";
+      break;
+    case LOG_PANIC:
+      s_type = "panic";
+      break;
+    }
+    fspc(opt, opt->log, s_type);
+    va_start(args, format);
+    (void) vfprintf(opt->log, format, args);
+    va_end(args);
+    if ((type & LOG_ERRNO) != 0) {
+      fprintf(opt->log, ": %s", strerror(save_errno));
+    }
+    fputs(LF, opt->log);
+    if (opt->flush) {
+      fflush(opt->log);
+    }
+    errno = save_errno;
+  }
 }
 
 HTSEXT_API void set_wrappers(httrackp *opt) {		// LEGACY
