@@ -1380,7 +1380,55 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
 		} else if (!IS_DELAYED_EXT(save)) {
 			strcatbuff(lastDot, "." DELAYED_EXT);
 		}
-	}
+  }
+
+  // enforce 256-character path limit before inserting destination path
+#define HTS_MAX_PATH_LEN 250
+#define MIN_LAST_SEG_RESERVE 30
+  if (hts_stringLengthUTF8(save) + hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >= HTS_MAX_PATH_LEN) {
+    char BIGSTK tempo[HTS_URLMAXSIZE*2];
+    const size_t parentLen = hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
+    // parent path length is not insane (otherwise, ignore and pick 200 as suffix length)
+    const size_t maxLen = parentLen < HTS_MAX_PATH_LEN/2 ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
+    size_t i, j, lastSeg, sofar;
+    // pick up last segment
+    for(i = 0, lastSeg = 0 ; save[i] != '\0' ; i++) {
+      if (save[i] == '/') {
+        lastSeg = i + 1;
+      }
+    }
+    // add as much pathes as we can
+    for(i = 0, sofar = 0 ; i < lastSeg && i + MIN_LAST_SEG_RESERVE < maxLen ; i++) {
+      tempo[i] = save[i];
+      if (save[i] == '/') {
+        // validate segment so far
+        sofar = i + 1;
+      }
+    }
+    // last segment
+#define MAX_UTF8_SEQ_CHARS 4
+    for(j = 0 ; save[j + i] != '\0' ; j++) {
+      // Stop here before next sequence
+      if (sofar + j + MAX_UTF8_SEQ_CHARS >= maxLen && HTS_IS_LEADING_UTF8(save[i + j])) {
+        break;
+      }
+      // Stop is overflowing
+      else if (sofar + j >= maxLen) {
+        break;
+      }
+      save[sofar + j] = save[i + j];
+    }
+    // terminating \0
+    save[sofar + j] = '\0';
+    // log in debug
+    if ( (opt->debug>1) && (opt->log!=NULL) ) {
+      HTS_LOG(opt,LOG_DEBUG); fprintf(opt->log,"Too long filename shortened: %s%s => %s"LF,adr_complete,fil_complete,sav);
+      test_flush;
+    }
+  }
+#undef MAX_UTF8_SEQ_CHARS
+#undef MIN_LAST_SEG_RESERVE
+#undef HTS_MAX_PATH_LEN
 
   // chemin primaire éventuel A METTRE AVANT
   if (strnotempty(StringBuff(opt->path_html_utf8))) {
@@ -1389,7 +1437,6 @@ int url_savename2(char* adr_complete, char* fil_complete, char* save,
     strcatbuff(tempo,save);
     strcpybuff(save,tempo);
   }
-
 
   // vérifier que le nom n'est pas déja pris...
   if (liens!=NULL) { 

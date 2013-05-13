@@ -44,6 +44,9 @@ Please visit our Website: http://www.httrack.com
 #include <windows.h>
 #endif
 
+/** Leading character (ASCII or leading UTF-8 sequence) **/
+#define HTS_IS_LEADING_UTF8(C) ((unsigned char)(C) < 0x80 || (unsigned char)(C) >= 0xc0)
+
 /**
  * Convert the string "s" from charset "charset" to UTF-8.
  * Return NULL upon error.
@@ -77,6 +80,11 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * Convert current system codepage to UTF-8.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+
+/**
+ * Get an UTF-8 string length in characters.
+ **/
+extern size_t hts_stringLengthUTF8(const char *s);
 
 #endif
 
