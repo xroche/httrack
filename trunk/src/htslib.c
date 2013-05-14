@@ -5079,17 +5079,19 @@ int ftp_available(void) {
 }
 #endif
 
+static void hts_debug(int level);
+static void hts_debug_log_print(const char *format, ...);
 
-int hts_dgb_init = 0;
-FILE* hts_dgb_init_fp = NULL;
+static int hts_dgb_init = 0;
+static FILE* hts_dgb_init_fp = NULL;
 HTSEXT_API void hts_debug(int level) {
   hts_dgb_init = level;
   if (hts_dgb_init > 0) {
-    HTS_DBG("hts_debug() called");
+    hts_debug_log_print("hts_debug() called");
   }
 }
 
-FILE *hts_dgb_(void) {
+static FILE *hts_dgb_(void) {
   if (hts_dgb_init_fp == NULL) {
     if ((hts_dgb_init & 0x80) == 0) {
       hts_dgb_init_fp = stderr;
@@ -5105,6 +5107,21 @@ FILE *hts_dgb_(void) {
     }
   }
   return hts_dgb_init_fp;
+}
+
+static void hts_debug_log_print(const char *format, ...) {
+  if (hts_dgb_init > 0) {
+    const int error = errno;
+    FILE *const fp = hts_dgb_();
+    va_list args;
+    assertf(format != NULL);
+    va_start(args, format);
+    (void) vfprintf(fp, format, args);
+    va_end(args);
+    fputs("\n", fp);
+    fflush(fp);
+    errno = error;
+  }
 }
 
 static int hts_init_ok = 0;
@@ -5124,7 +5141,7 @@ HTSEXT_API int hts_init(void) {
     }
   }
 
-  HTS_DBG("entering hts_init()");    /* debug */
+  hts_debug_log_print("entering hts_init()");    /* debug */
 
 #ifdef _WIN32_WCE
 #ifndef HTS_CECOMPAT
@@ -5136,7 +5153,7 @@ HTSEXT_API int hts_init(void) {
   htsthread_init();
 
   /* Ensure external modules are loaded */
-  HTS_DBG("calling htspe_init()");    /* debug */
+  hts_debug_log_print("calling htspe_init()");    /* debug */
   htspe_init();  /* module load (lazy) */
 
   /* MD5 Auto-test */
@@ -5151,7 +5168,7 @@ HTSEXT_API int hts_init(void) {
     }
   }
 
-  HTS_DBG("initializing SSL");    /* debug */
+  hts_debug_log_print("initializing SSL");    /* debug */
 #if HTS_USEOPENSSL
   /*
   Initialize the OpensSSL library
@@ -5172,7 +5189,7 @@ HTSEXT_API int hts_init(void) {
   }
 #endif
   
-  HTS_DBG("ending hts_init()");    /* debug */
+  hts_debug_log_print("ending hts_init()");    /* debug */
   return 1;
 }
 
@@ -5265,7 +5282,7 @@ HTSEXT_API int plug_wrapper(httrackp *opt, const char *moduleName, const char* a
     if (plug != NULL) {
       int ret = plug(opt, argv);
       if (hts_dgb_init > 0 && opt->log != NULL) {
-        HTS_DBG("plugged module '%s' (return code=%d)" _ moduleName _ ret);
+        hts_debug_log_print("plugged module '%s' (return code=%d)", moduleName, ret);
       }
       if (ret == 1) {   /* Success! */
         opt->libHandles.handles = (htslibhandle*) realloct(opt->libHandles.handles, ( opt->libHandles.count + 1 )*sizeof(htslibhandle));
@@ -5274,19 +5291,19 @@ HTSEXT_API int plug_wrapper(httrackp *opt, const char *moduleName, const char* a
         opt->libHandles.count++;
         return 1;
       } else {
-        HTS_DBG("* note: error while running entry point 'hts_plug' in %s"LF _ moduleName);
+        hts_debug_log_print("* note: error while running entry point 'hts_plug' in %s", moduleName);
         if (unplug)
           unplug(opt);
       }
     } else {
       int last_errno = errno;
-      HTS_DBG("* note: can't find entry point 'hts_plug' in %s: %s"LF _ moduleName _ strerror(last_errno));
+      hts_debug_log_print("* note: can't find entry point 'hts_plug' in %s: %s", moduleName, strerror(last_errno));
     }
     closeFunctionLib(handle);
     return 0;
   } else {
     int last_errno = errno;
-    HTS_DBG("* note: can't load %s: %s"LF _ moduleName _ strerror(last_errno));
+    hts_debug_log_print("* note: can't load %s: %s", moduleName, strerror(last_errno));
   }
   return -1;
 }

@@ -255,18 +255,6 @@ HTSEXT_API void* hts_malloc(size_t size);
 HTSEXT_API void* hts_realloc(void* data, size_t size);
 HTSEXT_API void hts_free(void* data);
 #endif
-extern int hts_dgb_init;
-extern FILE* hts_dgb_(void);
-#undef _
-#define _ ,
-#define HTS_DBG(FMT) do {     \
-  if (hts_dgb_init > 0) {     \
-    FILE *fp = hts_dgb_();    \
-    fprintf(fp, FMT);         \
-    fprintf(fp, "\n");        \
-    fflush(fp);               \
-  }                           \
-} while(0)
 
 // fonctions principales
 T_SOC http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour);
