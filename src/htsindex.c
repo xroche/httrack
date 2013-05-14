@@ -61,17 +61,17 @@ Please visit our Website: http://www.httrack.com
 // MUST HAVE SAME SIZES!!
 #define KEYW_TRANSCODE_FROM  (\
                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
-                               "‡‚‰" \
-                               "¿¬ƒ" \
-                               "ÈËÍÎ" \
-                               "»» À" \
-                               "ÏÓÔ" \
-                               "ÃŒœ" \
-                               "ÚÙˆ" \
-                               "“‘÷" \
-                               "˘˚¸" \
-                               "Ÿ€‹" \
-                               "ˇ" \
+                               "√†√¢√§" \
+                               "√Ä√Ç√Ñ" \
+                               "√©√®√™√´" \
+                               "√à√à√ä√ã" \
+                               "√¨√Æ√Ø" \
+                               "√å√é√è" \
+                               "√≤√¥√∂" \
+                               "√í√î√ñ" \
+                               "√π√ª√º" \
+                               "√ô√õ√ú" \
+                               "√ø" \
                              )
 #define KEYW_TRANSCODE_TO    ( \
                                "abcdefghijklmnopqrstuvwxyz" \

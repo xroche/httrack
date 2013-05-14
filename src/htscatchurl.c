@@ -53,7 +53,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
-/* définitions globales */
+/* dÃ©finitions globales */
 #include "htsglobal.h"
 
 /* htslib */
@@ -111,7 +111,7 @@ HTSEXT_API T_SOC catch_url_init(int* port,char* adr) {
           // effacer structure
           memset(&server2, 0, sizeof(server2));
           if (getsockname(soc,(struct sockaddr*) &server2,&len) == 0) {
-            *port=ntohs(SOCaddr_sinport(server));  // récupérer port
+            *port=ntohs(SOCaddr_sinport(server));  // rÃ©cupÃ©rer port
             if (listen(soc,10)>=0) {    // au pif le 10
               SOCaddr_inetntoa(adr, 128, server2, len);
             } else {
@@ -183,7 +183,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
     }
     /* INFOS */
 
-    // réception
+    // rÃ©ception
     if (soc != INVALID_SOCKET) {
       char line[1000];
       char protocol[256];
@@ -194,7 +194,7 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
         if (sscanf(line,"%s %s %s",method,url,protocol) == 3) {
           char BIGSTK url_adr[HTS_URLMAXSIZE*2];
           char BIGSTK url_fil[HTS_URLMAXSIZE*2];
-          // méthode en majuscule
+          // mÃ©thode en majuscule
           int i,r=0;
           url_adr[0]=url_fil[0]='\0';
           //
@@ -204,13 +204,13 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
           }
           // adresse du lien
           if (ident_url_absolute(url,url_adr,url_fil)>=0) {
-            // Traitement des en-têtes
+            // Traitement des en-tÃªtes
             char BIGSTK loc[HTS_URLMAXSIZE*2];
             htsblk blkretour;
             hts_init_htsblk(&blkretour);
             //memset(&blkretour, 0, sizeof(htsblk));    // effacer
-            blkretour.location=loc;    // si non nul, contiendra l'adresse véritable en cas de moved xx
-            // Lire en têtes restants
+            blkretour.location=loc;    // si non nul, contiendra l'adresse vÃ©ritable en cas de moved xx
+            // Lire en tÃªtes restants
             sprintf(data,"%s %s %s\r\n",method,url_fil,protocol);
             while(strnotempty(line)) {
               socinput(soc,line,1000);
@@ -218,12 +218,12 @@ HTSEXT_API int catch_url(T_SOC soc,char* url,char* method,char* data) {
               strcatbuff(data,line);
               strcatbuff(data,"\r\n");
             }
-            // CR/LF final de l'en tête inutile car déja placé via la ligne vide juste au dessus
+            // CR/LF final de l'en tÃªte inutile car dÃ©ja placÃ© via la ligne vide juste au dessus
             //strcatbuff(data,"\r\n");
             if (blkretour.totalsize>0) {
               int len=(int)min(blkretour.totalsize,32000);
               int pos = (int) strlen(data);
-              // Copier le reste (post éventuel)
+              // Copier le reste (post Ã©ventuel)
               while((len>0) && ((r=recv(soc,(char*) data+pos,len,0))>0) ) {
                 pos+=r;
                 len-=r;
@@ -266,7 +266,7 @@ void socinput(T_SOC soc,char* s,int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
+        case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     } else

@@ -55,9 +55,9 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 /* END specific definitions */
 
-// à partir d'un tableau de {"+*.toto","-*.zip","+*.tata"} définit si nom est autorisé
-// optionnel: taille à contrôller (ou numéro, etc) en pointeur
-//            (en de détection de *size, la taille limite est écrite par dessus *size)
+// Ã  partir d'un tableau de {"+*.toto","-*.zip","+*.tata"} dÃ©finit si nom est autorisÃ©
+// optionnel: taille Ã  contrÃ´ller (ou numÃ©ro, etc) en pointeur
+//            (en de dÃ©tection de *size, la taille limite est Ã©crite par dessus *size)
 // exemple: +-*.gif*[<5] == supprimer GIF si <5KB
 int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size_flag,int* depth) {
   int verdict = 0;  // on sait pas
@@ -83,7 +83,7 @@ int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size
       if (sz != *size)
         sizelimit=sz;
       if (filters[i][0]=='+')
-        verdict = 1;    // autorisé
+        verdict = 1;    // autorisÃ©
       else
         verdict = -1;   // interdit
       if (depth)
@@ -98,12 +98,12 @@ int fa_strjoker(int type,char** filters,int nfil,char* nom,LLint* size,int* size
 
 // supercomparateur joker (tm)
 // compare a et b (b=avec joker dedans), case insensitive [voir CI]
-// renvoi l'adresse de la première lettre de la chaine
-// (càd *[..]toto.. renvoi adresse de toto dans la chaine)
-// accepte les délires du genre www.*.*/ * / * truc*.*
-// cet algo est 'un peu' récursif mais ne consomme pas trop de tm
+// renvoi l'adresse de la premiÃ¨re lettre de la chaine
+// (cÃ d *[..]toto.. renvoi adresse de toto dans la chaine)
+// accepte les dÃ©lires du genre www.*.*/ * / * truc*.*
+// cet algo est 'un peu' rÃ©cursif mais ne consomme pas trop de tm
 // * = toute lettre
-// --?-- : spécifique à HTTrack et aux ?
+// --?-- : spÃ©cifique Ã  HTTrack et aux ?
 HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
   //int err=0;
   if (strnotempty(joker)==0) {    // fin de chaine joker
@@ -112,20 +112,20 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
     else if (chaine[0]=='?')
       return chaine;  // --?-- pour les index.html?Choix=2
     else
-      return NULL;    // non trouvé
+      return NULL;    // non trouvÃ©
   }
 
   // on va progresser en suivant les 'mots' contenus dans le joker
-  // un mot peut être un * ou bien toute autre séquence de lettres
+  // un mot peut Ãªtre un * ou bien toute autre sÃ©quence de lettres
   
-  if (strcmp(joker,"*")==0) {  // ok, rien après
+  if (strcmp(joker,"*")==0) {  // ok, rien aprÃ¨s
     return chaine;
   }
   
   // 1er cas: jokers * ou jokers multiples *[..]
   if (joker[0]=='*') {  // comparer joker+reste (*toto/..)
-    int jmp;    // nombre de caractères pour le prochain mot dans joker
-    int cut = 0;  // interdire tout caractère superflu
+    int jmp;    // nombre de caractÃ¨res pour le prochain mot dans joker
+    int cut = 0;  // interdire tout caractÃ¨re superflu
     char pass[256];
     char LEFT='[',RIGHT=']';
     int unique=0;
@@ -147,7 +147,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
       int i;
       for(i=0;i<256;i++) pass[i]=0;
 
-      // noms réservés
+      // noms rÃ©servÃ©s
       if ((strfield(joker+2,"file")) || (strfield(joker+2,"name"))) {
         for(i=0;i<256;i++) pass[i]=1;
         pass[(int) '?'] = 0;
@@ -166,7 +166,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
           while ((joker[i]!=RIGHT) && (joker[i]) && (i<len)) i++;
         }
       } else if (strfield(joker+2,"param")) {
-        if (chaine[0]=='?') {  // il y a un paramètre juste là
+        if (chaine[0]=='?') {  // il y a un paramÃ¨tre juste lÃ 
           for(i=0;i<256;i++) pass[i]=1;
         }  // sinon synonyme de 'rien'
         i=2;
@@ -174,10 +174,10 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
           while ((joker[i]!=RIGHT) && (joker[i]) && (i<len)) i++;
         }
       } else {
-        // décode les directives comme *[A-Z,âêîôû,0-9]
+        // dÃ©code les directives comme *[A-Z,Ã¢ÃªÃ®Ã´Ã»,0-9]
         i=2;
-        if (joker[i] == RIGHT) {    // *[] signifie "plus rien après"
-          cut = 1;    // caractère supplémentaire interdit
+        if (joker[i] == RIGHT) {    // *[] signifie "plus rien aprÃ¨s"
+          cut = 1;    // caractÃ¨re supplÃ©mentaire interdit
         } else {
           int len=(int) strlen(joker);
           while ((joker[i]!=RIGHT) && (joker[i]) && (i<len)) {
@@ -189,7 +189,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
                 if (size) {
                   if (*size>=0) {
                     if (size_flag)
-                      *size_flag=1;        /* a joué */
+                      *size_flag=1;        /* a jouÃ© */
                     if (joker[i-1]=='<')
                       lverdict=(*size<lsize);
                     else
@@ -228,7 +228,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
           }
         }
       }
-      // à sauter dans joker
+      // Ã  sauter dans joker
       jmp=i;
       if (joker[i]) jmp++; 
       
@@ -254,7 +254,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
       }
 
       // comparaison en boucle, c'est ca qui consomme huhu..
-      // le tableau pass[256] indique les caractères ASCII autorisés
+      // le tableau pass[256] indique les caractÃ¨res ASCII autorisÃ©s
 
       // tester sans le joker (pas ()+ mais ()*)
       if (!unique) {
@@ -270,7 +270,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
       else        /* *(a) only match a (not aaaaa) */
         max=1;
       while(i<(int) max) {
-        if (pass[(int) (unsigned char) chaine[i]]) {  // caractère autorisé
+        if (pass[(int) (unsigned char) chaine[i]]) {  // caractÃ¨re autorisÃ©
           if ( (adr=strjoker(chaine+i+1,joker+jmp,size,size_flag)) ) {
             return adr;
           }
@@ -278,7 +278,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
         } else i=max+2;  // sortir
       }
 
-      // tester chaîne vide
+      // tester chaÃ®ne vide
       if (i!=max+2)  // avant c'est ok
       if ( (adr=strjoker(chaine+max,joker+jmp,size,size_flag)) )
         return adr;
@@ -290,7 +290,7 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
     if (strnotempty(chaine)) {
       int jmp=0,ok=1;
       
-      // comparer début de joker et début de chaine
+      // comparer dÃ©but de joker et dÃ©but de chaine
       while((joker[jmp]!='*') && (joker[jmp]) && (ok)) {
         // CI : remplacer streql par une comparaison !=
         if (!streql(chaine[jmp],joker[jmp])) {
@@ -314,13 +314,13 @@ HTS_INLINE char* strjoker(char* chaine,char* joker,LLint* size,int* size_flag) {
 }
 
 // recherche multiple
-// exemple: find dans un texte de strcpybuff(*[A-Z,a-z],"*[0-9]"); va rechercher la première occurence
+// exemple: find dans un texte de strcpybuff(*[A-Z,a-z],"*[0-9]"); va rechercher la premiÃ¨re occurence
 // d'un strcpy sur une variable ayant un nom en lettres et copiant une chaine de chiffres
-// ATTENTION!! Eviter les jokers en début, où gare au temps machine!
+// ATTENTION!! Eviter les jokers en dÃ©but, oÃ¹ gare au temps machine!
 char* strjokerfind(char* chaine,char* joker) {
   char* adr;
   while(*chaine) {
-    if ( (adr=strjoker(chaine,joker,NULL,NULL)) ) {  // ok trouvé
+    if ( (adr=strjoker(chaine,joker,NULL,NULL)) ) {  // ok trouvÃ©
       return adr;
     }
     chaine++;

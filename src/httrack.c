@@ -260,7 +260,7 @@ static int __cdecl htsshow_postprocesshtml(t_hts_callbackarg *carg, httrackp *op
 static int __cdecl htsshow_checkhtml(t_hts_callbackarg *carg, httrackp *opt, char* html,int len,const char* url_address,const char* url_file) {
   return 1;
 }
-static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appelÈ ‡ chaque boucle de HTTrack
+static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appel√© √† chaque boucle de HTTrack
   static TStamp prev_mytime=0; /* ok */
   static t_InpInfo SInfo; /* ok */
   //
@@ -387,7 +387,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
 
     
     // parcourir registre des liens
-    if (back_index>=0) {  // seulement si index passÈ
+    if (back_index>=0) {  // seulement si index pass√©
       int j,k;
       int index=0;
       int ok=0;         // idem
@@ -408,7 +408,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
         }
       }
       for(k=0;k<2;k++) {    // 0: lien en cours 1: autres liens
-        for(j=0;(j<3) && (index<NStatsBuffer);j++) {  // passe de prioritÈ
+        for(j=0;(j<3) && (index<NStatsBuffer);j++) {  // passe de priorit√©
           int _i;
           for(_i=0+k;(_i< max(back_max*k,1) ) && (index<NStatsBuffer);_i++) {  // no lien
             int i=(back_index+_i)%back_max;    // commencer par le "premier" (l'actuel)
@@ -436,7 +436,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
                 }
                 break;
               default:
-                if (back[i].status==STATUS_READY) {  // prÍt
+                if (back[i].status==STATUS_READY) {  // pr√™t
                   if ((back[i].r.statuscode==200)) {
                     strcpybuff(StatsBuffer[index].state,"ready"); ok=1;
                   }
@@ -486,11 +486,11 @@ static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_bac
                   strcatbuff(StatsBuffer[index].name,s+l-MAX_LEN_INPROGRESS/2+2);
                 }
                                
-                if (back[i].r.totalsize>=0) {  // taille prÈdÈfinie
+                if (back[i].r.totalsize>=0) {  // taille pr√©d√©finie
                   StatsBuffer[index].sizetot=back[i].r.totalsize;
                   StatsBuffer[index].size=back[i].r.size;
-                } else {  // pas de taille prÈdÈfinie
-                  if (back[i].status==STATUS_READY) {  // prÍt
+                } else {  // pas de taille pr√©d√©finie
+                  if (back[i].status==STATUS_READY) {  // pr√™t
                     StatsBuffer[index].sizetot=back[i].r.size;
                     StatsBuffer[index].size=back[i].r.size;
                   } else {
@@ -660,7 +660,7 @@ static int linput(FILE* fp,char* s,int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractËres
+        case 9: case 12: break;  // sauter ces caract√®res
         default: s[j++]=(char) c; break;
       }
     }
@@ -670,7 +670,7 @@ static int linput(FILE* fp,char* s,int max) {
 }
 
 
-// routines de dÈtournement de SIGHUP & co (Unix)
+// routines de d√©tournement de SIGHUP & co (Unix)
 //
 static void sig_ignore( int code ) {     // ignorer signal
 }
@@ -728,9 +728,9 @@ static void sig_ask( int code ) {        // demander
   if ( (s[0]=='y') || (s[0]=='Y') || (s[0]=='o') || (s[0]=='O') || (s[0]=='q') || (s[0]=='Q'))
     exit(0);     // quitter
   else if ( (s[0]=='b') || (s[0]=='B') || (s[0]=='a') || (s[0]=='A') )
-    sig_doback(0);  // arriËre plan
+    sig_doback(0);  // arri√®re plan
   else if ( (s[0]=='l') || (s[0]=='L') )
-    sig_doback(1);  // arriËre plan
+    sig_doback(1);  // arri√®re plan
   else if ( (s[0]=='i') || (s[0]=='I') ) {
     if (global_opt != NULL) {
       // ask for stop
@@ -820,4 +820,4 @@ static void signal_handlers(void) {
 #endif
 }
 
-// fin routines de dÈtournement de SIGHUP & co
+// fin routines de d√©tournement de SIGHUP & co

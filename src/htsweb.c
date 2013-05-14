@@ -403,7 +403,7 @@ int __cdecl htsshow_postprocesshtml(t_hts_callbackarg *carg, httrackp *opt, char
 int __cdecl htsshow_checkhtml(t_hts_callbackarg *carg, httrackp *opt, char* html,int len,const char* url_address,const char* url_file) {
   return 1;
 }
-int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appelÈ ‡ chaque boucle de HTTrack
+int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time, hts_stat_struct* stats) {    // appel√© √† chaque boucle de HTTrack
   static TStamp prev_mytime=0; /* ok */
   static t_InpInfo SInfo; /* ok */
   //
@@ -493,7 +493,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back
     
     
     // parcourir registre des liens
-    if (back_index>=0 && back_max > 0) {  // seulement si index passÈ
+    if (back_index>=0 && back_max > 0) {  // seulement si index pass√©
       int j,k;
       int index=0;
       int ok=0;         // idem
@@ -514,7 +514,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back
         }
       }
       for(k=0;k<2;k++) {    // 0: lien en cours 1: autres liens
-        for(j=0;(j<3) && (index<NStatsBuffer);j++) {  // passe de prioritÈ
+        for(j=0;(j<3) && (index<NStatsBuffer);j++) {  // passe de priorit√©
           int _i;
           for(_i=0+k;(_i< max(back_max*k,1) ) && (index<NStatsBuffer);_i++) {  // no lien
             int i=(back_index+_i)%back_max;    // commencer par le "premier" (l'actuel)
@@ -552,7 +552,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back
 								}
 								break;
 							default:
-								if (back[i].status==STATUS_READY) {  // prÍt
+								if (back[i].status==STATUS_READY) {  // pr√™t
                   if ((back[i].r.statuscode==HTTP_OK)) {
                     strcpybuff(StatsBuffer[index].state,"ready"); ok=1;
                   }
@@ -602,11 +602,11 @@ int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back
                   strcatbuff(StatsBuffer[index].name,s+l-MAX_LEN_INPROGRESS/2+2);
                 }
                 
-                if (back[i].r.totalsize>0) {  // taille prÈdÈfinie
+                if (back[i].r.totalsize>0) {  // taille pr√©d√©finie
                   StatsBuffer[index].sizetot=back[i].r.totalsize;
                   StatsBuffer[index].size=back[i].r.size;
-                } else {  // pas de taille prÈdÈfinie
-                  if (back[i].status==STATUS_READY) {  // prÍt
+                } else {  // pas de taille pr√©d√©finie
+                  if (back[i].status==STATUS_READY) {  // pr√™t
                     StatsBuffer[index].sizetot=back[i].r.size;
                     StatsBuffer[index].size=back[i].r.size;
                   } else {

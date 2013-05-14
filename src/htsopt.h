@@ -94,7 +94,7 @@ struct t_proxy {
   String bindhost;   // bind this host
 }; 
 
-/* Structure utile pour copier en bloc les paramètres */
+/* Structure utile pour copier en bloc les paramÃ¨tres */
 #ifndef HTS_DEF_FWSTRUCT_htsfilters
 #define HTS_DEF_FWSTRUCT_htsfilters
 typedef struct htsfilters htsfilters;
@@ -180,7 +180,7 @@ typedef enum hts_log_type {
 } hts_log_type;
 #endif
 
-/* Structure état du miroir */
+/* Structure Ã©tat du miroir */
 #ifndef HTS_DEF_FWSTRUCT_htsoptstatecancel
 #define HTS_DEF_FWSTRUCT_htsoptstatecancel
 typedef struct htsoptstatecancel htsoptstatecancel;
@@ -202,7 +202,7 @@ typedef struct htsmutex_s htsmutex_s, *htsmutex;
 typedef struct struct_inthash struct_inthash, *inthash;
 #endif
 
-/* Structure état du miroir */
+/* Structure Ã©tat du miroir */
 #ifndef HTS_DEF_FWSTRUCT_htsoptstate
 #define HTS_DEF_FWSTRUCT_htsoptstate
 typedef struct htsoptstate htsoptstate;
@@ -271,7 +271,7 @@ typedef enum htsparsejava_flags {
   HTSPARSE_NO_AGGRESSIVE = 8   // don't aggressively parse .js or .java
 } htsparsejava_flags;
 
-// paramètres httrack (options)
+// paramÃ¨tres httrack (options)
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
 typedef struct httrackp httrackp;
@@ -281,12 +281,12 @@ struct httrackp {
   /* */
   int wizard;       // wizard aucun/grand/petit
   int flush;        // fflush sur les fichiers log
-  int travel;       // type de déplacements (same domain etc)
+  int travel;       // type de dÃ©placements (same domain etc)
   int seeker;       // up & down
-  int depth;        // nombre de niveaux de récursion
-  int extdepth;     // nombre de niveaux de récursion à l'éxtérieur
+  int depth;        // nombre de niveaux de rÃ©cursion
+  int extdepth;     // nombre de niveaux de rÃ©cursion Ã  l'Ã©xtÃ©rieur
   int urlmode;      // liens relatifs etc   
-  int debug;        // mode débug log
+  int debug;        // mode dÃ©bug log
   int getmode;      // sauver html, images..
   FILE* log;        // fichier log
   FILE* errlog;     // et erreur
@@ -295,7 +295,7 @@ struct httrackp {
   LLint maxfile_html;   // taille max html
   int maxsoc;           // nbre sockets
   LLint fragment;       // fragmentation d'un site
-  int nearlink;         // prendre les images/data proche d'une page mais à l'extérieur
+  int nearlink;         // prendre les images/data proche d'une page mais Ã  l'extÃ©rieur
   int makeindex;        // faire un index
   int kindex;           // et un index 'keyword'
   int delete_old;       // effacer anciens fichiers
@@ -305,8 +305,8 @@ struct httrackp {
   int maxrate;          // taux de transfert max
   int mms_maxtime;      // max duration of a mms file
   float maxconn;        // nombre max de connexions/s
-  int waittime;         // démarrage programmé
-  int cache;            // génération d'un cache
+  int waittime;         // dÃ©marrage programmÃ©
+  int cache;            // gÃ©nÃ©ration d'un cache
   //int aff_progress;     // barre de progression
   int shell;            // gestion d'un shell par pipe stdin/stdout
   t_proxy proxy;        // configuration du proxy
@@ -324,39 +324,39 @@ struct httrackp {
   String path_html;     // chemin pour miroir
   String path_html_utf8; // chemin pour miroir, UTF-8
   String path_bin;      // chemin pour templates
-  int retry;            // nombre d'essais supplémentaires en cas d'échec
-  int makestat;         // mettre à jour un fichier log de statistiques de transfert
-  int maketrack;        // mettre à jour un fichier log de statistiques d'opérations
-  int parsejava;        // parsing des classes java pour récupérer les class, gif & cie ; see htsparsejava_flags
+  int retry;            // nombre d'essais supplÃ©mentaires en cas d'Ã©chec
+  int makestat;         // mettre Ã  jour un fichier log de statistiques de transfert
+  int maketrack;        // mettre Ã  jour un fichier log de statistiques d'opÃ©rations
+  int parsejava;        // parsing des classes java pour rÃ©cupÃ©rer les class, gif & cie ; see htsparsejava_flags
   int hostcontrol;      // abandon d'un host trop lent etc.
-  int errpage;          // générer une page d'erreur en cas de 404 etc.
-  int check_type;       // si type inconnu (cgi,asp,/) alors tester lien (et gérer moved éventuellement)
+  int errpage;          // gÃ©nÃ©rer une page d'erreur en cas de 404 etc.
+  int check_type;       // si type inconnu (cgi,asp,/) alors tester lien (et gÃ©rer moved Ã©ventuellement)
   int all_in_cache;     // tout mettre en cache!
   int robots;           // traitement des robots
   int external;         // pages externes->pages d'erreur
   int passprivacy;      // pas de mot de pass dans les liens externes?
   int includequery;     // include la query-string
   int mirror_first_page; // miroir des liens
-  String sys_com;       // commande système
+  String sys_com;       // commande systÃ¨me
   int sys_com_exec;     // executer commande 
   int accept_cookie;    // gestion des cookies
   t_cookie* cookie;
   int http10;           // forcer http 1.0
   int nokeepalive;      // pas de keep-alive
   int nocompression;    // pas de compression
-  int sizehack;         // forcer réponse "mis à jour" si taille identique
+  int sizehack;         // forcer rÃ©ponse "mis Ã  jour" si taille identique
   int urlhack;          // force "url normalization" to avoid loops
   int tolerant;         // accepter content-length incorrect
   int parseall;         // essayer de tout parser (tags inconnus contenant des liens, par exemple)
-  int parsedebug;       // débugger parser (debug!)
-  int norecatch;        // ne pas reprendre les fichiers effacés localement par l'utilisateur
+  int parsedebug;       // dÃ©bugger parser (debug!)
+  int norecatch;        // ne pas reprendre les fichiers effacÃ©s localement par l'utilisateur
   int verbosedisplay;   // animation textuelle
   String footer;        // ligne d'infos
-  int maxcache;         // maximum en mémoire au niveau du cache (backing)
-  //int maxcache_anticipate; // maximum de liens à anticiper (majorant)
+  int maxcache;         // maximum en mÃ©moire au niveau du cache (backing)
+  //int maxcache_anticipate; // maximum de liens Ã  anticiper (majorant)
   int ftp_proxy;        // proxy http pour ftp
-  String filelist;      // fichier liste URL à inclure
-  String urllist;       // fichier liste de filtres à inclure
+  String filelist;      // fichier liste URL Ã  inclure
+  String urllist;       // fichier liste de filtres Ã  inclure
   htsfilters filters;   // contient les pointeurs pour les filtres
   hash_struct* hash;    // hash structure
   robots_wizard* robotsptr;         // robots ptr
@@ -368,10 +368,10 @@ struct httrackp {
   int maxlink;          // nombre max de liens
   int maxfilter;        // nombre max de filtres
   //
-  char* exec;           // adresse du nom de l'éxecutable
+  char* exec;           // adresse du nom de l'Ã©xecutable
   //
   int quiet;            // poser des questions autres que wizard?
-  int keyboard;         // vérifier stdin
+  int keyboard;         // vÃ©rifier stdin
   int bypass_limits;    // bypass built-in limits
   int background_on_suspend;	// background process on suspend signal
   //
@@ -392,33 +392,33 @@ struct httrackp {
 typedef struct hts_stat_struct hts_stat_struct;
 #endif
 struct hts_stat_struct {
-  LLint HTS_TOTAL_RECV;      // flux entrant reçu
-  LLint stat_bytes;          // octets écrits sur disque
+  LLint HTS_TOTAL_RECV;      // flux entrant reÃ§u
+  LLint stat_bytes;          // octets Ã©crits sur disque
   // int HTS_TOTAL_RECV_STATE;  // status: 0 tout va bien 1: ralentir un peu 2: ralentir 3: beaucoup
-  TStamp stat_timestart;     // départ
+  TStamp stat_timestart;     // dÃ©part
   //
-  LLint total_packed;        // flux entrant compressé reçu
-  LLint total_unpacked;      // flux entrant compressé reçu
-  int   total_packedfiles;   // fichiers compressés
+  LLint total_packed;        // flux entrant compressÃ© reÃ§u
+  LLint total_unpacked;      // flux entrant compressÃ© reÃ§u
+  int   total_packedfiles;   // fichiers compressÃ©s
   //
-  TStamp istat_timestart[2];   // départ pour calcul instantanné
-  LLint  istat_bytes[2];       // calcul pour instantanné
-  TStamp istat_reference01;    // top départ donné par #0 à #1
-  int    istat_idlasttimer;    // id du timer qui a récemment donné une stat
+  TStamp istat_timestart[2];   // dÃ©part pour calcul instantannÃ©
+  LLint  istat_bytes[2];       // calcul pour instantannÃ©
+  TStamp istat_reference01;    // top dÃ©part donnÃ© par #0 Ã  #1
+  int    istat_idlasttimer;    // id du timer qui a rÃ©cemment donnÃ© une stat
   //
-  int stat_files;            // nombre de fichiers écrits
-  int stat_updated_files;    // nombre de fichiers mis à jour
-  int stat_background;       // nombre de fichiers écrits en arrière plan
+  int stat_files;            // nombre de fichiers Ã©crits
+  int stat_updated_files;    // nombre de fichiers mis Ã  jour
+  int stat_background;       // nombre de fichiers Ã©crits en arriÃ¨re plan
   //
-  int stat_nrequests;        // nombre de requêtes sur socket
-  int stat_sockid;           // nombre de sockets allouées au total
+  int stat_nrequests;        // nombre de requÃªtes sur socket
+  int stat_sockid;           // nombre de sockets allouÃ©es au total
   int stat_nsocket;          // nombre de sockets
   int stat_errors;           // nombre d'erreurs
   int stat_errors_front;     // idem, mais au tout premier niveau
   int stat_warnings;         // '' warnings
   int stat_infos;            // '' infos
-  int nbk;                   // fichiers anticipés en arrière plan et terminés
-  LLint nb;                  // données transférées actuellement (estimation)
+  int nbk;                   // fichiers anticipÃ©s en arriÃ¨re plan et terminÃ©s
+  LLint nb;                  // donnÃ©es transfÃ©rÃ©es actuellement (estimation)
   //
   LLint rate;
   //

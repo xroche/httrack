@@ -142,7 +142,7 @@ static int linput(FILE* fp,char* s,int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 0: case 9: case 12: break;  // sauter ces caractères
+        case 0: case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -229,7 +229,7 @@ static int linput_trim(FILE* fp,char* s,int max) {
       // sauter espaces et tabs en fin
       while( (rlen>0) && is_realspace(ls[max(rlen-1,0)]) )
         ls[--rlen]='\0';
-      // sauter espaces en début
+      // sauter espaces en dÃ©but
       a=ls;
       while((rlen>0) && ((*a==' ') || (*a=='\t'))) {
         a++;
@@ -284,7 +284,7 @@ static struct tm* convert_time_rfc822(struct tm *result,const char* s) {
     return NULL;
   strcpy(str,s);
   set_lowcase(str);
-  /* éliminer :,- */
+  /* Ã©liminer :,- */
   while( (a=strchr(str,'-')) ) *a=' ';
   while( (a=strchr(str,':')) ) *a=' ';
   while( (a=strchr(str,',')) ) *a=' ';
@@ -293,7 +293,7 @@ static struct tm* convert_time_rfc822(struct tm *result,const char* s) {
   while(*a) {
     char *first, *last;
     char tok[256];
-    /* découper mot */
+    /* dÃ©couper mot */
     while(*a==' ') a++;   /* sauter espaces */
     first=a;
     while((*a) && (*a!=' ')) a++;

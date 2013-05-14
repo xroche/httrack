@@ -116,17 +116,17 @@ HTSEXT_API int hts_main(int argc, char **argv)
 	return ret;
 }
 
-// Main, récupère les paramètres et appelle le robot
+// Main, rÃ©cupÃ¨re les paramÃ¨tres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
-  char** x_argv=NULL;     // Patch pour argv et argc: en cas de récupération de ligne de commande
+  char** x_argv=NULL;     // Patch pour argv et argc: en cas de rÃ©cupÃ©ration de ligne de commande
   char* x_argvblk=NULL;   // (reprise ou update)
   int   x_ptr=0;          // offset
   //
   int argv_url=-1;           // ==0 : utiliser cache et doit.log
-  char* argv_firsturl=NULL;  // utilisé pour nommage par défaut
-  char* url = NULL;          // URLS séparées par un espace
+  char* argv_firsturl=NULL;  // utilisÃ© pour nommage par dÃ©faut
+  char* url = NULL;          // URLS sÃ©parÃ©es par un espace
   int   url_sz = 65535;
-  //char url[65536];         // URLS séparées par un espace
+  //char url[65536];         // URLS sÃ©parÃ©es par un espace
   // the parametres
   int httrack_logmode=3;   // ONE log file
 #ifndef _WIN32
@@ -139,7 +139,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   ensureUrlCapacity(url, url_sz, 65536);
 
 	// Create options
-	_DEBUG_HEAD=0;            // pas de debuggage en têtes
+	_DEBUG_HEAD=0;            // pas de debuggage en tÃªtes
 
   /* command max-size check (3.43 ; 3.42-4) */
   {
@@ -236,15 +236,15 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     argv_url=0;       /* pour comptage */
     //
     cmdl_add(argv[0],x_argc,x_argv,x_argvblk,x_ptr);
-    na=1;             /* commencer après nom_prg */
+    na=1;             /* commencer aprÃ¨s nom_prg */
     while(na<argc) {
       int result=1;
       tmp_argv[0][0]=tmp_argv[1][0]='\0';
 
-      /* Vérifier argv[] non vide */
+      /* VÃ©rifier argv[] non vide */
       if (strnotempty(argv[na])) {
         
-        /* Vérifier Commande (alias) */
+        /* VÃ©rifier Commande (alias) */
         result=optalias_check(argc,(const char * const *)argv,na,
           &tmp_argc,(char**)tmp_argv,tmp_error);
         if (!result) {
@@ -259,7 +259,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           cmdl_add(tmp_argv[1],x_argc,x_argv,x_argvblk,x_ptr);
         }
         
-        /* Compter URLs et détecter -i,-q.. */
+        /* Compter URLs et dÃ©tecter -i,-q.. */
         if (tmp_argc == 1) {           /* pas -P & co */
           if (!cmdl_opt(tmp_argv[0])) {   /* pas -c0 & co */
             if (argv_url<0) argv_url=0;   // -1==force -> 1=one url already detected, wipe all previous options
@@ -442,7 +442,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   if ( fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/doit.log")) && (argv_url<=0) ) {
     FILE* fp=fopen(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/doit.log"),"rb");
     if (fp) {
-      int insert_after=1;     /* insérer après nom au début */
+      int insert_after=1;     /* insÃ©rer aprÃ¨s nom au dÃ©but */
       //
       char BIGSTK buff[8192];
       char *p,*lastp;
@@ -511,7 +511,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   }
     
   // remplacer "macros" comme --spider
-  // permet de lancer httrack sans a avoir à se rappeler de syntaxes comme p0C0I0Qc32 ..
+  // permet de lancer httrack sans a avoir Ã  se rappeler de syntaxes comme p0C0I0Qc32 ..
 #if DEBUG_STEPS
   printf("Checking last macros\n");
 #endif
@@ -630,12 +630,12 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   }  
   */
 
-  // Ici on ajoute les arguments qui ont été appelés avant au cas où on récupère une session
-  // Exemple: httrack www.truc.fr -L0 puis ^C puis httrack sans URL : ajouter URL précédente
+  // Ici on ajoute les arguments qui ont Ã©tÃ© appelÃ©s avant au cas oÃ¹ on rÃ©cupÃ¨re une session
+  // Exemple: httrack www.truc.fr -L0 puis ^C puis httrack sans URL : ajouter URL prÃ©cÃ©dente
   /*
   if (argv_url==0) {
-    //if ((fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.dat"))) && (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
-    if (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/doit.log"))) {    // un cache est présent
+    //if ((fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.dat"))) && (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.ndx")))) {  // il existe dÃ©ja un cache prÃ©cÃ©dent.. renommer
+    if (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/doit.log"))) {    // un cache est prÃ©sent
       
       x_argvblk=(char*) calloct(32768,1);
       
@@ -686,7 +686,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   }
   */
   
-  // Vérifier quiet
+  // VÃ©rifier quiet
   /*
   { 
     int na;    
@@ -707,16 +707,16 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   printf("Checking URLs\n");
 #endif
   if (argv_url==0) {
-    // Présence d'un cache, que faire?..
+    // PrÃ©sence d'un cache, que faire?..
     if (
       ( fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.zip")) )
       ||
       ( fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.dat")) && fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.ndx")) )
-      ) {  // il existe déja un cache précédent.. renommer
-      if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/doit.log"))) {    // un cache est présent
+      ) {  // il existe dÃ©ja un cache prÃ©cÃ©dent.. renommer
+      if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/doit.log"))) {    // un cache est prÃ©sent
         if (x_argvblk!=NULL) {
           int m;        
-          // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
+          // Ã©tablir mode - mode cache: 1 (cache valide) 2 (cache Ã  vÃ©rifier)
           if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"))) {    // cache prioritaire
             m=1;
           } else {
@@ -756,7 +756,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         return -1;
       }
       
-    } else {    // aucune URL définie et pas de cache
+    } else {    // aucune URL dÃ©finie et pas de cache
       if (opt->quiet) {
         help(argv[0],!opt->quiet);
         htsmain_free();
@@ -769,7 +769,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       htsmain_free();
       return 0;
     }
-  } else {   // plus de 2 paramètres
+  } else {   // plus de 2 paramÃ¨tres
     // un fichier log existe?
     if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"))) {  // fichier lock?
       //char s[32];
@@ -796,7 +796,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       }
     } else if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),"index.html"))) {
       //char s[32];
-      opt->cache=2;  // cache vient après test de validité
+      opt->cache=2;  // cache vient aprÃ¨s test de validitÃ©
       if (opt->quiet==0) {
         if (
           ( fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.zip")) )
@@ -833,7 +833,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   
   
   // Treat parameters
-  // Traiter les paramètres
+  // Traiter les paramÃ¨tres
 #if DEBUG_STEPS
   printf("Analyze parameters\n");
 #endif
@@ -867,15 +867,15 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           case 'h': 
             help(argv[0],0); 
             htsmain_free();
-            return 0;   // déja fait normalement
+            return 0;   // dÃ©ja fait normalement
             //
-          case 'g':    // récupérer un (ou plusieurs) fichiers isolés
+          case 'g':    // rÃ©cupÃ©rer un (ou plusieurs) fichiers isolÃ©s
             opt->wizard=2;             // le wizard on peut plus s'en passer..
             //opt->wizard=0;             // pas de wizard
             opt->cache=0;              // ni de cache
             opt->makeindex=0;          // ni d'index
-            httrack_logmode=1;            // erreurs à l'écran
-            opt->savename_type=1003;   // mettre dans le répertoire courant
+            httrack_logmode=1;            // erreurs Ã  l'Ã©cran
+            opt->savename_type=1003;   // mettre dans le rÃ©pertoire courant
             opt->depth=0;              // ne pas explorer la page
             opt->accept_cookie=0;      // pas de cookies
             opt->robots=0;             // pas de robots
@@ -903,7 +903,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             break;
 */
             //
-            // note: les tests opt->depth sont pour éviter de faire
+            // note: les tests opt->depth sont pour Ã©viter de faire
             // un miroir du web (:-O) accidentelement ;-)
           case 'a': /*if (opt->depth==9999) opt->depth=3;*/
             opt->travel=0+(opt->travel&256); break;
@@ -1004,7 +1004,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 if (StringLength(opt->savename_userdef) > 0)
                   opt->savename_type = -1;    // userdef!
                 else
-                  opt->savename_type = 0;    // -N "" : par défaut
+                  opt->savename_type = 0;    // -N "" : par dÃ©faut
               }
             } else {
               sscanf(com+1,"%d",&opt->savename_type); while(isdigit((unsigned char)*(com+1))) com++;
@@ -1050,7 +1050,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
           case 'z': opt->debug=1; break;  // petit debug
           case 'Z': opt->debug=2; break;  // GROS debug
             //
-          case '&': case '%': {    // deuxième jeu d'options
+          case '&': case '%': {    // deuxiÃ¨me jeu d'options
             com++;
             switch(*com) {
             case 'M': opt->mimehtml = 1; if (*(com+1)=='0') { opt->mimehtml=0; com++; } break;
@@ -1066,7 +1066,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             case 'z': opt->nocompression=1; if (*(com+1)=='0') { opt->nocompression=0; com++; } break;   // pas de compression
             case 'f': opt->ftp_proxy=1; if (*(com+1)=='0') { opt->ftp_proxy=0; com++; } break;   // proxy http pour ftp
             case 'P': opt->parseall=1; if (*(com+1)=='0') { opt->parseall=0; com++; } break;   // tout parser
-            case 'n': opt->norecatch=1; if (*(com+1)=='0') { opt->norecatch=0; com++; } break;   // ne pas reprendre fichiers effacés localement
+            case 'n': opt->norecatch=1; if (*(com+1)=='0') { opt->norecatch=0; com++; } break;   // ne pas reprendre fichiers effacÃ©s localement
             case 's': opt->sizehack=1; if (*(com+1)=='0') { opt->sizehack=0; com++; } break;   // hack sur content-length
             case 'u': opt->urlhack=1; if (*(com+1)=='0') { opt->urlhack=0; com++; } break;   // url hack
             case 'v': opt->verbosedisplay=2; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&opt->verbosedisplay); while(isdigit((unsigned char)*(com+1))) com++; } break;
@@ -1369,7 +1369,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                     }
             break;
             //
-          case '@': {    // troisième jeu d'options
+          case '@': {    // troisiÃ¨me jeu d'options
             com++;
             switch(*com) {
             case 'i': 
@@ -1418,7 +1418,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
             break;
             
             //
-          case '#':  { // non documenté
+          case '#':  { // non documentÃ©
             com++;
             switch(*com) {
             case 'C':   // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
@@ -1482,7 +1482,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                           ||
                           (strjoker(url, filter, NULL, NULL) != NULL)
                           ) {
-                          r = cache_read_ro(opt, &cache, adr, fil, "", NULL);    // lire entrée cache + data
+                          r = cache_read_ro(opt, &cache, adr, fil, "", NULL);    // lire entrÃ©e cache + data
                           if (r.statuscode != -1) {    // No errors
                             found++;
                             if (!hasFilter) {
@@ -1634,7 +1634,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               break;
             case 'p': /* opt->aff_progress=1; deprecated */ break;
             case 'S': opt->shell=1; break;  // stdin sur un shell
-            case 'K': opt->keyboard=1; break;  // vérifier stdin
+            case 'K': opt->keyboard=1; break;  // vÃ©rifier stdin
               //
             case 'L': sscanf(com+1,"%d",&opt->maxlink); while(isdigit((unsigned char)*(com+1))) com++; break;
             case 'F': sscanf(com+1,"%d",&opt->maxfilter); while(isdigit((unsigned char)*(com+1))) com++; break;
@@ -1711,7 +1711,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
                 return 0;
               }
               break;
-            case '3':   // charset tests: httrack #3 "iso-8859-1" "café"
+            case '3':   // charset tests: httrack #3 "iso-8859-1" "cafÃ©"
               if (argc == 3) {
                 char *s = hts_convertStringToUTF8(argv[2], strlen(argv[2]), argv[1]);
                 if (s != NULL) {
@@ -1757,7 +1757,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 						while(isdigit(com[1])) {
 							com++;
 						}
-            na++;     // sauter, déja traité
+            na++;     // sauter, dÃ©ja traitÃ©
             break;
           case 'P':    // proxy
             if ((na+1>=argc) || (argv[na+1][0]=='-')) {
@@ -1769,11 +1769,11 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               char* a;
               na++;
               opt->proxy.active=1;
-              // Rechercher MAIS en partant de la fin à cause de user:pass@proxy:port
+              // Rechercher MAIS en partant de la fin Ã  cause de user:pass@proxy:port
               a = argv[na] + strlen(argv[na]) -1;
               // a=strstr(argv[na],":");  // port
               while( (a > argv[na]) && (*a != ':') && (*a != '@') ) a--;
-              if (*a == ':') {  // un port est présent, <proxy>:port
+              if (*a == ':') {  // un port est prÃ©sent, <proxy>:port
                 sscanf(a+1,"%d",&opt->proxy.port);
                 StringCopyN(opt->proxy.name,argv[na],(int) (a - argv[na]));
               } else {  // <proxy>
@@ -1799,7 +1799,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               if (StringNotEmpty(opt->user_agent))
                 opt->user_agent_send=1;
               else
-                opt->user_agent_send=0;    // -F "" désactive l'option
+                opt->user_agent_send=0;    // -F "" dÃ©sactive l'option
             }
             break;
             //
@@ -1820,7 +1820,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
               if (StringNotEmpty(opt->sys_com))
                 opt->sys_com_exec=1;
               else
-                opt->sys_com_exec=0;    // -V "" désactive l'option
+                opt->sys_com_exec=0;    // -V "" dÃ©sactive l'option
             }
             break;
             //
@@ -1844,7 +1844,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 		assertf(urlSize < HTS_URLMAXSIZE);
 		if (urlSize < HTS_URLMAXSIZE) {
 			ensureUrlCapacity(url, url_sz, capa);
-			if (strnotempty(url)) strcatbuff(url," ");  // espace de séparation
+			if (strnotempty(url)) strcatbuff(url," ");  // espace de sÃ©paration
 			strcpybuff(tempo,unescape_http_unharm(catbuff,argv[na],1));
 			escape_spc_url(tempo);
 			strcatbuff(url,tempo);
@@ -1942,7 +1942,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 #endif
   
   // on utilise le cache..
-  // en cas de présence des deux versions, garder la version la plus avancée,
+  // en cas de prÃ©sence des deux versions, garder la version la plus avancÃ©e,
   // cad la version contenant le plus de fichiers  
   if (opt->cache) {
     if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"))) {   // problemes..
@@ -1961,7 +1961,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       else if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.dat")) && fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.ndx"))) { 
         if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.dat")) && fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.ndx"))) {
           // switcher si new<32Ko et old>65Ko (tailles arbitraires) ?
-          // ce cas est peut être une erreur ou un crash d'un miroir ancien, prendre
+          // ce cas est peut Ãªtre une erreur ou un crash d'un miroir ancien, prendre
           // alors l'ancien cache
           if (fsize(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/new.dat"))<32768) {
             if (fsize(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-cache/old.dat"))>65536) {
@@ -1981,7 +1981,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
     }
   }
 
-  // Débuggage des en têtes
+  // DÃ©buggage des en tÃªtes
   if (_DEBUG_HEAD) {
     ioinfo=fopen(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-ioinfo.txt"),"wb");
   }
@@ -2028,7 +2028,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       opt->errlog=NULL;
     }
     
-    // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un éventuel fichier log
+    // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un Ã©ventuel fichier log
     {
       FILE* fp=NULL;
       //int n=0;
@@ -2067,7 +2067,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
         }
       }*/
 
-      // vérifier existence de la structure
+      // vÃ©rifier existence de la structure
       structcheck(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html), "/"));
       structcheck(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), "/"));
      
@@ -2156,7 +2156,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 #endif
           if (strchr(arg, ' ') == NULL || strchr(arg, '\"') != NULL)
             fprintf(opt->log,"%s ", arg);
-          else    // entre "" (si espace(s) et pas déja de ")
+          else    // entre "" (si espace(s) et pas dÃ©ja de ")
             fprintf(opt->log,"\"%s\" ", arg);
 #ifdef _WIN32
           if (carg != NULL)
@@ -2206,7 +2206,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
   /* Init external */
   RUN_CALLBACK_NOARG(opt, init);
 
-  // détourner SIGHUP etc.
+  // dÃ©tourner SIGHUP etc.
 #if DEBUG_STEPS
   printf("Launching the mirror\n");
 #endif
@@ -2285,7 +2285,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
       if (opt->errlog) { fclose(opt->errlog); opt->errlog=NULL; }
     }  
 
-    // Débuggage des en têtes
+    // DÃ©buggage des en tÃªtes
     if (_DEBUG_HEAD) {
       if (ioinfo) {
         fclose(ioinfo);
@@ -2316,7 +2316,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt) {
 
 // main() subroutines
 
-// vérifier chemin path
+// vÃ©rifier chemin path
 int check_path(String* s, char* defaultname) {
   int i;
   int return_value=0;
@@ -2348,15 +2348,15 @@ int check_path(String* s, char* defaultname) {
   }
 
   // ending /
-  if (StringNotEmpty(*s) && StringRight(*s, 1) != '/')    // ajouter slash à la fin
+  if (StringNotEmpty(*s) && StringRight(*s, 1) != '/')    // ajouter slash Ã  la fin
     StringCat(*s, "/");
 
   return return_value;
 }
 
-// détermine si l'argument est une option
+// dÃ©termine si l'argument est une option
 int cmdl_opt(char* s) {
-  if (s[0]=='-') {  // c'est peut être une option
+  if (s[0]=='-') {  // c'est peut Ãªtre une option
     if (strchr(s,'.')!=NULL && strchr(s,'%')==NULL)
       return 0;    // sans doute un -www.truc.fr (note: -www n'est pas compris)
     else if (strchr(s,'/')!=NULL)

@@ -184,7 +184,7 @@ void help_wizard(httrackp* opt) {
   if ((str[strlen(str)-1]!='/') && (str[strlen(str)-1]!='\\'))
     strcatbuff(str,"/");
   strcatbuff(stropt2,"-O \""); strcatbuff(stropt2,str); strcatbuff(stropt2,projname); strcatbuff(stropt2,"\" ");
-  // Créer si ce n'est fait un index.html 1er niveau
+  // CrÃ©er si ce n'est fait un index.html 1er niveau
   make_empty_index(str);
   //
   printf("\n");
@@ -376,7 +376,7 @@ void help_catchurl(const char* dest_path) {
     printf("Unable to create a temporary proxy (no remaining port)\n");
 }
 
-// Créer un index.html vide
+// CrÃ©er un index.html vide
 void make_empty_index(char* str) {
 #if 0
   if (!fexist(fconcat(str,"index.html"))) {

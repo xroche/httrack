@@ -1079,7 +1079,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
               if (r->msg[0] == '\0') {
                 strcpy(r->msg,"Cache Read Error : Unexpected error");
               }
-            } else { // lire en mémoire
+            } else { // lire en mÃ©moire
               
               if (!dataincache) {
 								/* Read in memory from cache */
@@ -1128,7 +1128,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char* url, int flag
 								}
 							}
             }
-          }    // si save==null, ne rien charger (juste en tête)
+          }    // si save==null, ne rien charger (juste en tÃªte)
         } else {
           r->statuscode=STATUSCODE_INVALID;
           strcpy(r->msg,"Cache Read Error : Read Header Data");
@@ -1403,7 +1403,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 							free(use);
 							use=NULL;
 						}
-					} else {        // non supporté
+					} else {        // non supportÃ©
 						// fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: %s not supported, ignoring current cache"LF,firstline);
 						fclose(cache->dat);
 						cache->dat=NULL;
@@ -1597,13 +1597,13 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char* url, int flag
         }
         //
         cache_rstr(cache->dat,check);
-        if (strcmp(check,"HTS")==0) {           /* intégrité OK */
+        if (strcmp(check,"HTS")==0) {           /* intÃ©gritÃ© OK */
           ok=1;
         }
-        cache_rLLint(cache->dat, &size_read);       /* lire size pour être sûr de la taille déclarée (réécrire) */
+        cache_rLLint(cache->dat, &size_read);       /* lire size pour Ãªtre sÃ»r de la taille dÃ©clarÃ©e (rÃ©Ã©crire) */
         if (size_read > 0) {                         /* si inscrite ici */
           r->size = size_read;
-        } else {                              /* pas de données directement dans le cache, fichier présent? */
+        } else {                              /* pas de donnÃ©es directement dans le cache, fichier prÃ©sent? */
 					r->size = 0;
         }
       }
@@ -1852,11 +1852,11 @@ static time_t getArcTimestamp(const char * const line) {
 			struct tm tm;
 			memset(&tm, 0, sizeof(tm));
 			tm.tm_year = getDigit4(pos + 0) - 1900;	/* current year minus 1900 */
-			tm.tm_mon =  getDigit2(pos + 4) - 1;		/* 0 – 11 */
-			tm.tm_mday = getDigit2(pos + 6);				/* 1 – 31 */
-			tm.tm_hour = getDigit2(pos + 8);				/* 0 – 23 */
-			tm.tm_min =  getDigit2(pos + 10);				/* 0 – 59 */
-			tm.tm_sec =  getDigit2(pos + 12);				/* 0 – 59 */
+			tm.tm_mon =  getDigit2(pos + 4) - 1;		/* 0 â€“ 11 */
+			tm.tm_mday = getDigit2(pos + 6);				/* 1 â€“ 31 */
+			tm.tm_hour = getDigit2(pos + 8);				/* 0 â€“ 23 */
+			tm.tm_min =  getDigit2(pos + 10);				/* 0 â€“ 59 */
+			tm.tm_sec =  getDigit2(pos + 12);				/* 0 â€“ 59 */
 			tm.tm_isdst = 0;
 			return getGMT(&tm);
 		}

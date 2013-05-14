@@ -91,11 +91,11 @@ extern "C" {
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
 
-// teste égalité de 2 chars, case insensitive
+// teste Ã©galitÃ© de 2 chars, case insensitive
 #define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
 #define streql(a,b) (hichar(a)==hichar(b))
 
-// caractère maj
+// caractÃ¨re maj
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
 
 

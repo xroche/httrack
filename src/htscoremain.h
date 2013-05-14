@@ -49,7 +49,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-// Main, récupère les paramètres et appelle le robot
+// Main, rÃ©cupÃ¨re les paramÃ¨tres et appelle le robot
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_main(int argc, char **argv);
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
