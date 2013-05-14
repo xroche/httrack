@@ -17,13 +17,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
-
 
 Please visit our Website: http://www.httrack.com
 */
@@ -34,10 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-
-
 #ifndef HTSROBOTS_DEFH
-#define HTSROBOTS_DEFH 
+#define HTSROBOTS_DEFH
 
 // robots wizard
 #ifndef HTS_DEF_FWSTRUCT_robots_wizard
@@ -47,15 +43,14 @@ typedef struct robots_wizard robots_wizard;
 struct robots_wizard {
   char adr[128];
   char token[4096];
-  struct robots_wizard* next;
+  struct robots_wizard *next;
 };
-
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int checkrobots(robots_wizard* robots,char* adr,char* fil);
-void checkrobots_free(robots_wizard* robots);
-int checkrobots_set(robots_wizard* robots,char* adr,char* data);
+int checkrobots(robots_wizard * robots, char *adr, char *fil);
+void checkrobots_free(robots_wizard * robots);
+int checkrobots_set(robots_wizard * robots, char *adr, char *data);
 #endif
 
 #endif

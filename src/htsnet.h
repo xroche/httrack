@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Net definitions                                        */
@@ -47,32 +44,32 @@ Please visit our Website: http://www.httrack.com
 #ifdef _WIN32
  // pour read
 #ifndef  _WIN32_WCE
- #include <io.h>
+#include <io.h>
 #endif
  // pour FindFirstFile
- #include <winbase.h>
+#include <winbase.h>
 #else
  //typedef int T_SOC;
- #define INVALID_SOCKET -1
- #include <netdb.h>
- #include <sys/types.h>
- #include <sys/socket.h>
- #include <netinet/in.h>
- #include <sys/time.h>
+#define INVALID_SOCKET -1
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/time.h>
  /* Force for sun env. */
- #ifndef BSD_COMP
- #define BSD_COMP
- #endif
- #include <sys/ioctl.h>
+#ifndef BSD_COMP
+#define BSD_COMP
+#endif
+#include <sys/ioctl.h>
  /* gethostname & co */
 #ifndef _WIN32
 #include <unistd.h>
 #endif
  /* inet_addr */
- #include <arpa/inet.h>
+#include <arpa/inet.h>
  // pas la peine normalement..
 #ifndef HTS_DO_NOT_REDEFINE_in_addr_t
- typedef unsigned long in_addr_t;
+typedef unsigned long in_addr_t;
 #endif
 #endif
 
@@ -83,6 +80,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Ipv4 structures */
 typedef struct in_addr INaddr;
+
 /* This should handle all cases */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
@@ -116,7 +114,6 @@ struct SOCaddr {
   memset(&SOCaddr_sinaddr(server), 0, sizeof(struct sockaddr_in)); \
   server_len=sizeof(struct sockaddr_in); \
 } while(0)
-
 
 /* Copy sockaddr to another one */
 #define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize) do { \
@@ -157,6 +154,7 @@ strcpy(namebuf, dot); \
 
 /* Ipv4 structures */
 typedef struct in6_addr INaddr;
+
 /* This should handle all cases */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
@@ -257,7 +255,7 @@ typedef struct t_fullhostent t_fullhostent;
 #endif
 struct t_fullhostent {
   t_hostent hp;
-  char* list[2];
+  char *list[2];
   char addr[HTS_MAXADDRLEN];    /* various struct sockaddr structures */
   unsigned int addr_maxlen;
 };
@@ -271,7 +269,4 @@ memset((h), 0, sizeof(t_fullhostent)); \
 (h)->addr_maxlen = HTS_MAXADDRLEN; \
 } while(0)
 
-
 #endif
-
-

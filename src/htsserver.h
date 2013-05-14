@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Mini-server                                            */
@@ -37,19 +34,18 @@ Please visit our Website: http://www.httrack.com
 // Fichier intercepteur d'URL .h
 
 #ifndef HTS_SERVER_DEFH
-#define HTS_SERVER_DEFH 
+#define HTS_SERVER_DEFH
 
 #include "htsnet.h"
 
 /* String */
 #include "htsstrings.h"
 
-
 // Fonctions
-void socinput(T_SOC soc,char* s,int max);
-T_SOC smallserver_init_std(int* port_prox,char* adr_prox,int defaultPort);
-T_SOC smallserver_init(int* port,char* adr);
-int smallserver(T_SOC soc,char* url,char* method,char* data, char* path);
+void socinput(T_SOC soc, char *s, int max);
+T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort);
+T_SOC smallserver_init(int *port, char *adr);
+int smallserver(T_SOC soc, char *url, char *method, char *data, char *path);
 
 #define CATCH_RESPONSE \
   "HTTP/1.0 200 OK\r\n"\
@@ -90,67 +86,76 @@ extern httrackp *global_opt;
 #define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 
-extern int smallserver_setkey(char* key, char* value);
-extern int smallserver_setkeyint(char* key, LLint value);
-extern int smallserver_setkeyarr(char* key, int id, char* key2, char* value);
-
+extern int smallserver_setkey(char *key, char *value);
+extern int smallserver_setkeyint(char *key, LLint value);
+extern int smallserver_setkeyarr(char *key, int id, char *key2, char *value);
 
 /* Language files */
-static int htslang_load(char* limit_to, char* apppath);
-static void conv_printf(char* from,char* to);
+static int htslang_load(char *limit_to, char *apppath);
+static void conv_printf(char *from, char *to);
 static void LANG_DELETE(void);
-static void LANG_INIT(char* path);
-static int LANG_T(char* path, int l);
+static void LANG_INIT(char *path);
+static int LANG_T(char *path, int l);
 static int QLANG_T(int l);
-static char* LANGSEL(char* name);
-static char* LANGINTKEY(char* name);
-static int LANG_SEARCH(char* path, char* iso);
-static int LANG_LIST(char* path, char* buffer);
+static char *LANGSEL(char *name);
+static char *LANGINTKEY(char *name);
+static int LANG_SEARCH(char *path, char *iso);
+static int LANG_LIST(char *path, char *buffer);
 
 int htslang_init(void);
 int htslang_uninit(void);
 
 /* Static definitions */
 
-static char* gethomedir(void);
-static int linput_cpp(FILE* fp,char* s,int max);
-static int linput_trim(FILE* fp,char* s,int max);
-static int fexist(const char* s);
-static int linput(FILE* fp,char* s,int max);
+static char *gethomedir(void);
+static int linput_cpp(FILE * fp, char *s, int max);
+static int linput_trim(FILE * fp, char *s, int max);
+static int fexist(const char *s);
+static int linput(FILE * fp, char *s, int max);
 
-static int linputsoc(T_SOC soc, char* s, int max) {
+static int linputsoc(T_SOC soc, char *s, int max) {
   int c;
-  int j=0;
+  int j = 0;
+
   do {
     unsigned char ch;
+
     if (recv(soc, &ch, 1, 0) == 1) {
       c = ch;
     } else {
       c = EOF;
     }
-    if (c!=EOF) {
-      switch(c) {
-        case 13: break;  // sauter CR
-        case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
-        default: s[j++]=(char) c; break;
+    if (c != EOF) {
+      switch (c) {
+      case 13:
+        break;                  // sauter CR
+      case 10:
+        c = -1;
+        break;
+      case 9:
+      case 12:
+        break;                  // sauter ces caractères
+      default:
+        s[j++] = (char) c;
+        break;
       }
     }
-  }  while((c!=-1) && (c!=EOF) && (j<(max-1)));
-  s[j]='\0';
+  } while((c != -1) && (c != EOF) && (j < (max - 1)));
+  s[j] = '\0';
   return j;
 }
 
 static int check_readinput_t(T_SOC soc, int timeout) {
   if (soc != INVALID_SOCKET) {
-    fd_set fds;           // poll structures
+    fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
+
     FD_ZERO(&fds);
-    FD_SET(soc,&fds);           
-    tv.tv_sec=timeout;
-    tv.tv_usec=0;
-    select(soc + 1,&fds,NULL,NULL,&tv);
-    if (FD_ISSET(soc,&fds))
+    FD_SET(soc, &fds);
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    select(soc + 1, &fds, NULL, NULL, &tv);
+    if (FD_ISSET(soc, &fds))
       return 1;
     else
       return 0;
@@ -158,38 +163,42 @@ static int check_readinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
-static int linputsoc_t(T_SOC soc, char* s, int max, int timeout) {
+static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   if (check_readinput_t(soc, timeout)) {
     return linputsoc(soc, s, max);
   }
   return -1;
 }
 
-static char* gethomedir(void) {
-  char* home = getenv( "HOME" );
+static char *gethomedir(void) {
+  char *home = getenv("HOME");
+
   if (home)
     return home;
   else
     return ".";
 }
-static int linput_cpp(FILE* fp,char* s,int max) {
-  int rlen=0;
-  s[0]='\0';
+static int linput_cpp(FILE * fp, char *s, int max) {
+  int rlen = 0;
+
+  s[0] = '\0';
   do {
     int ret;
-    if (rlen>0)
-    if (s[rlen-1]=='\\')
-      s[--rlen]='\0';      // couper \ final
+
+    if (rlen > 0)
+      if (s[rlen - 1] == '\\')
+        s[--rlen] = '\0';       // couper \ final
     // lire ligne
-    ret=linput_trim(fp,s+rlen,max-rlen);
-    if (ret>0)
-      rlen+=ret;
-  } while((s[max(rlen-1,0)]=='\\') && (rlen<max));
+    ret = linput_trim(fp, s + rlen, max - rlen);
+    if (ret > 0)
+      rlen += ret;
+  } while((s[max(rlen - 1, 0)] == '\\') && (rlen < max));
   return rlen;
 }
 
-static int fexist(const char* s) {
+static int fexist(const char *s) {
   struct stat st;
+
   memset(&st, 0, sizeof(st));
   if (stat(s, &st) == 0) {
     if (S_ISREG(st.st_mode)) {
@@ -197,45 +206,56 @@ static int fexist(const char* s) {
     }
   }
   return 0;
-} 
-static int linput(FILE* fp,char* s,int max) {
+}
+static int linput(FILE * fp, char *s, int max) {
   int c;
-  int j=0;
+  int j = 0;
+
   do {
-    c=fgetc(fp);
-    if (c!=EOF) {
-      switch(c) {
-        case 13: break;  // sauter CR
-        case 10: c=-1; break;
-        case 0: case 9: case 12: break;  // sauter ces caractères
-        default: s[j++]=(char) c; break;
+    c = fgetc(fp);
+    if (c != EOF) {
+      switch (c) {
+      case 13:
+        break;                  // sauter CR
+      case 10:
+        c = -1;
+        break;
+      case 0:
+      case 9:
+      case 12:
+        break;                  // sauter ces caractères
+      default:
+        s[j++] = (char) c;
+        break;
       }
     }
-  }  while((c!=-1) && (c!=EOF) && (j<(max-1)));
-  s[j]='\0';
+  } while((c != -1) && (c != EOF) && (j < (max - 1)));
+  s[j] = '\0';
   return j;
 }
-static int linput_trim(FILE* fp,char* s,int max) {
-  int rlen=0;
-  char* ls=(char*) malloct(max+2);
-  s[0]='\0';
+static int linput_trim(FILE * fp, char *s, int max) {
+  int rlen = 0;
+  char *ls = (char *) malloct(max + 2);
+
+  s[0] = '\0';
   if (ls) {
-    char* a;
+    char *a;
+
     // lire ligne
-    rlen=linput(fp,ls,max);
+    rlen = linput(fp, ls, max);
     if (rlen) {
       // sauter espaces et tabs en fin
-      while( (rlen>0) && is_realspace(ls[max(rlen-1,0)]) )
-        ls[--rlen]='\0';
+      while((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
+        ls[--rlen] = '\0';
       // sauter espaces en début
-      a=ls;
-      while((rlen>0) && ((*a==' ') || (*a=='\t'))) {
+      a = ls;
+      while((rlen > 0) && ((*a == ' ') || (*a == '\t'))) {
         a++;
         rlen--;
       }
-      if (rlen>0) {
-        memcpy(s,a,rlen);      // can copy \0 chars
-        s[rlen]='\0';
+      if (rlen > 0) {
+        memcpy(s, a, rlen);     // can copy \0 chars
+        s[rlen] = '\0';
       }
     }
     //
@@ -245,57 +265,60 @@ static int linput_trim(FILE* fp,char* s,int max) {
 }
 
 static int ehexh(char c) {
-  if ((c>='0') && (c<='9')) return c-'0';
-  if ((c>='a') && (c<='f')) c-=('a'-'A');
-  if ((c>='A') && (c<='F')) return (c-'A'+10);
+  if ((c >= '0') && (c <= '9'))
+    return c - '0';
+  if ((c >= 'a') && (c <= 'f'))
+    c -= ('a' - 'A');
+  if ((c >= 'A') && (c <= 'F'))
+    return (c - 'A' + 10);
   return 0;
 }
 
-static int ehex(char* s) {
-  return 16*ehexh(*s)+ehexh(*(s+1));
+static int ehex(char *s) {
+  return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-static void unescapehttp(char* s, String* tempo) {
+static void unescapehttp(char *s, String * tempo) {
   int i;
-  for (i=0;i<(int) strlen(s);i++) {
-    if (s[i]=='%' && s[i+1]=='%') {
+
+  for(i = 0; i < (int) strlen(s); i++) {
+    if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, '%');
-    } else if (s[i]=='%') {
+    } else if (s[i] == '%') {
       char hc;
+
       i++;
-      hc = (char) ehex(s+i);
+      hc = (char) ehex(s + i);
       StringAddchar(*tempo, (char) hc);
-      i++;    // sauter 2 caractères finalement
-    }
-    else if (s[i]=='+') {
+      i++;                      // sauter 2 caractères finalement
+    } else if (s[i] == '+') {
       StringAddchar(*tempo, ' ');
-    }
-    else
+    } else
       StringAddchar(*tempo, s[i]);
   }
 }
 
-static void unescapeini(char* s, String* tempo) {
+static void unescapeini(char *s, String * tempo) {
   int i;
-  char lastc=0;
-  for (i=0;i<(int) strlen(s);i++) {
-    if (s[i]=='%' && s[i+1]=='%') {
+  char lastc = 0;
+
+  for(i = 0; i < (int) strlen(s); i++) {
+    if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, lastc = '%');
-    } else if (s[i]=='%') {
+    } else if (s[i] == '%') {
       char hc;
+
       i++;
-      hc = (char) ehex(s+i);
+      hc = (char) ehex(s + i);
       if (!is_retorsep(hc) || !is_retorsep(lastc)) {
         StringAddchar(*tempo, lastc = (char) hc);
       }
-      i++;    // sauter 2 caractères finalement
-    }
-    else
+      i++;                      // sauter 2 caractères finalement
+    } else
       StringAddchar(*tempo, lastc = s[i]);
   }
 }
 
 #endif
-

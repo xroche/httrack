@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: htsindex.c                                             */
@@ -38,7 +35,6 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-
 #include "htsindex.h"
 #include "htsglobal.h"
 #include "htslib.h"
@@ -46,7 +42,6 @@ Please visit our Website: http://www.httrack.com
 #if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
 #include "htsinthash.h"
-
 
 /* Keyword Indexer Parameters */
 
@@ -109,32 +104,31 @@ Please visit our Website: http://www.httrack.com
 
 /* End of Keyword Indexer Parameters */
 
-int strcpos(char* adr,char c);
-int mystrcmp(const void* _e1,const void* _e2);
+int strcpos(char *adr, char c);
+int mystrcmp(const void *_e1, const void *_e2);
 
 // Global variables
-int hts_index_init=1;
-int hts_primindex_size=0;
-FILE* fp_tmpproject=NULL;
-int hts_primindex_words=0;
+int hts_index_init = 1;
+int hts_primindex_size = 0;
+FILE *fp_tmpproject = NULL;
+int hts_primindex_words = 0;
 
 #endif
 
 /* 
   Init index 
 */
-void index_init(const char* indexpath) {
+void index_init(const char *indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
 #ifndef _WIN32_WCE
   /* remove(concat(indexpath,"index.txt")); */
-  hts_index_init=1;
-  hts_primindex_size=0;
-  hts_primindex_words=0;
-  fp_tmpproject=tmpfile();
+  hts_index_init = 1;
+  hts_primindex_size = 0;
+  hts_primindex_words = 0;
+  fp_tmpproject = tmpfile();
 #endif
 #endif
 }
-
 
 /* 
    Indexing system
@@ -143,16 +137,19 @@ void index_init(const char* indexpath) {
    Tags and javascript handled (ignored)
 */
 /* Note: utf-8 */
-int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath) {
+int index_keyword(const char *html_data, LLint size, const char *mime,
+                  const char *filename, const char *indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
-	char catbuff[CATBUFF_SIZE];
-  int intag=0,inscript=0,incomment=0;
-  char keyword[KEYW_LEN+32];
-  int i=0;
+  char catbuff[CATBUFF_SIZE];
+  int intag = 0, inscript = 0, incomment = 0;
+  char keyword[KEYW_LEN + 32];
+  int i = 0;
+
   //
-  int WordIndexSize=1024;
-  inthash WordIndexHash=NULL;
-  FILE *tmpfp=NULL;
+  int WordIndexSize = 1024;
+  inthash WordIndexHash = NULL;
+  FILE *tmpfp = NULL;
+
   //
 
   // Check parameters
@@ -167,35 +164,29 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 
   // Init ?
   if (hts_index_init) {
-    UNLINK(concat(catbuff,indexpath,"index.txt"));
-    UNLINK(concat(catbuff,indexpath,"sindex.html"));
-    hts_index_init=0;
+    UNLINK(concat(catbuff, indexpath, "index.txt"));
+    UNLINK(concat(catbuff, indexpath, "sindex.html"));
+    hts_index_init = 0;
   }
-
   // Check MIME type
   if (is_html_mime_type(mime)) {
-    inscript=0;
-  } 
+    inscript = 0;
+  }
   // FIXME - temporary fix for image/svg+xml (svg)
   // "IN XML" (html like, in fact :) )
-  else if (
-    (strfield2(mime,"image/svg+xml"))
-    ||
-    (strfield2(mime,"image/svg-xml"))
+  else if ((strfield2(mime, "image/svg+xml"))
+           || (strfield2(mime, "image/svg-xml"))
 #if HTS_USEMMS
-		||
-		strfield2(mime,"video/x-ms-asf")
+           || strfield2(mime, "video/x-ms-asf")
 #endif
     ) {
-    inscript=0;
-  }
-  else if (
-    (strfield2(mime,"application/x-javascript"))
-    || (strfield2(mime,"text/css"))
+    inscript = 0;
+  } else if ((strfield2(mime, "application/x-javascript"))
+             || (strfield2(mime, "text/css"))
     ) {
-    inscript=1;
-  //} else if (strfield2(mime, "text/vnd.wap.wml")) {   // humm won't work in many cases
-  //  inscript=0;
+    inscript = 1;
+    //} else if (strfield2(mime, "text/vnd.wap.wml")) {   // humm won't work in many cases
+    //  inscript=0;
   } else
     return 0;
 
@@ -206,94 +197,88 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 
   // Create hash structure
   // Hash tables rulez da world!
-  WordIndexHash=inthash_new(WordIndexSize);
+  WordIndexHash = inthash_new(WordIndexSize);
   if (!WordIndexHash)
     return 0;
 
   // Start indexing this page
-  keyword[0]='\0';
-  while(i<size) {
-    if (strfield(html_data + i , "<script")) {
-      inscript=1;
-    } 
-    else if (strfield(html_data + i , "<!--")) {
-      incomment=1;
-    }
-    else if (strfield(html_data + i , "</script")) {
+  keyword[0] = '\0';
+  while(i < size) {
+    if (strfield(html_data + i, "<script")) {
+      inscript = 1;
+    } else if (strfield(html_data + i, "<!--")) {
+      incomment = 1;
+    } else if (strfield(html_data + i, "</script")) {
       if (!incomment)
-        inscript=0;
-    } 
-    else if (strfield(html_data + i , "-->")) {
-      incomment=0;
-    }
-    else if (html_data[i]=='<') {
+        inscript = 0;
+    } else if (strfield(html_data + i, "-->")) {
+      incomment = 0;
+    } else if (html_data[i] == '<') {
       if (!inscript)
-        intag=1;
-    }    
-    else if (html_data[i]=='>') {
-      intag=0;
-    }    
-    else {    
+        intag = 1;
+    } else if (html_data[i] == '>') {
+      intag = 0;
+    } else {
       // Okay, parse keywords
-      if ( (!inscript) && (!incomment) && (!intag) ) {
-        char cchar=html_data[i];
+      if ((!inscript) && (!incomment) && (!intag)) {
+        char cchar = html_data[i];
         int pos;
         int len = (int) strlen(keyword);
-        
-        // Replace (ignore case, and so on..)
-        if ((pos=strcpos(KEYW_TRANSCODE_FROM,cchar))>=0)
-          cchar=KEYW_TRANSCODE_TO[pos];
-        
-        if (strchr(KEYW_ACCEPT,cchar)) {
-          /* Ignore some characters at beginning */
-          if ((len>0) || (!strchr(KEYW_IGNORE_BEG,cchar))) {
-            keyword[len++]=cchar;
-            keyword[len]='\0';
-          }
-        } else if ( (strchr(KEYW_SPACE,cchar)) || (!cchar) ) {
 
+        // Replace (ignore case, and so on..)
+        if ((pos = strcpos(KEYW_TRANSCODE_FROM, cchar)) >= 0)
+          cchar = KEYW_TRANSCODE_TO[pos];
+
+        if (strchr(KEYW_ACCEPT, cchar)) {
+          /* Ignore some characters at beginning */
+          if ((len > 0) || (!strchr(KEYW_IGNORE_BEG, cchar))) {
+            keyword[len++] = cchar;
+            keyword[len] = '\0';
+          }
+        } else if ((strchr(KEYW_SPACE, cchar)) || (!cchar)) {
 
           /* Avoid these words */
-          if (len>0) {
-            if (strchr(KEYW_NOT_BEG,keyword[0])) {
-              keyword[(len=0)]='\0';
+          if (len > 0) {
+            if (strchr(KEYW_NOT_BEG, keyword[0])) {
+              keyword[(len = 0)] = '\0';
             }
           }
 
           /* Strip ending . and so */
           {
-            int ok=0;
-            while((len = (int) strlen(keyword)) && (!ok)) {
-              if (strchr(KEYW_STRIP_END,keyword[len-1])) {      /* strip it */
-                keyword[len-1]='\0';
-              } else
-                ok=1;
-            }
-          }
-          
-          /* Store it ? */
-          if (len >= KEYW_MIN_LEN ) {
-            hts_primindex_words++;
-            if (inthash_inc(WordIndexHash,keyword)) {   /* added new */
-              fprintf(tmpfp,"%s\n",keyword);
-            }
-          }
-          keyword[(len=0)]='\0';
-        } else      /* Invalid */
-          keyword[(len=0)]='\0';
+            int ok = 0;
 
-        if (len>KEYW_LEN) {
-          keyword[(len=0)]='\0';
+            while((len = (int) strlen(keyword)) && (!ok)) {
+              if (strchr(KEYW_STRIP_END, keyword[len - 1])) {   /* strip it */
+                keyword[len - 1] = '\0';
+              } else
+                ok = 1;
+            }
+          }
+
+          /* Store it ? */
+          if (len >= KEYW_MIN_LEN) {
+            hts_primindex_words++;
+            if (inthash_inc(WordIndexHash, keyword)) {  /* added new */
+              fprintf(tmpfp, "%s\n", keyword);
+            }
+          }
+          keyword[(len = 0)] = '\0';
+        } else                  /* Invalid */
+          keyword[(len = 0)] = '\0';
+
+        if (len > KEYW_LEN) {
+          keyword[(len = 0)] = '\0';
         }
       }
-      
+
     }
-    
+
     i++;
   }
 
   // Reset temp file
-  fseek(tmpfp,0,SEEK_SET);
+  fseek(tmpfp, 0, SEEK_SET);
 
   // Process indexing for this page
   {
@@ -302,21 +287,25 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
     if (fp_tmpproject) {
       while(!feof(tmpfp)) {
         char line[KEYW_LEN + 32];
-        linput(tmpfp,line,KEYW_LEN + 2);
+
+        linput(tmpfp, line, KEYW_LEN + 2);
         if (strnotempty(line)) {
-          intptr_t e=0;
-          if (inthash_read(WordIndexHash,line,&e)) {
+          intptr_t e = 0;
+
+          if (inthash_read(WordIndexHash, line, &e)) {
             //if (e) {
-            char BIGSTK savelst[HTS_URLMAXSIZE*2];
-            e++;          /* 0 means "once" */
-            
-            if (strncmp((const char*)fslash(catbuff,(char*)indexpath),filename,strlen(indexpath))==0)  // couper
-              strcpybuff(savelst,filename+strlen(indexpath));
+            char BIGSTK savelst[HTS_URLMAXSIZE * 2];
+
+            e++;                /* 0 means "once" */
+
+            if (strncmp((const char *) fslash(catbuff, (char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
+              strcpybuff(savelst, filename + strlen(indexpath));
             else
-              strcpybuff(savelst,filename);
-            
+              strcpybuff(savelst, filename);
+
             // Add entry for this file and word
-            fprintf(fp_tmpproject,"%s %d %s\n",line,(int) (KEYW_SORT_MAXCOUNT - e),savelst);
+            fprintf(fp_tmpproject, "%s %d %s\n", line,
+                    (int) (KEYW_SORT_MAXCOUNT - e), savelst);
             hts_primindex_size++;
             //}
           }
@@ -328,7 +317,7 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
 
   // Delete temp file
   fclose(tmpfp);
-  tmpfp=NULL;
+  tmpfp = NULL;
 
   // Clear hash table
   inthash_delete(&WordIndexHash);
@@ -340,125 +329,134 @@ int index_keyword(const char* html_data,LLint size,const char* mime,const char* 
   Sort index!
 */
 /* Note: NOT utf-8 */
-void index_finish(const char* indexpath,int mode) {
+void index_finish(const char *indexpath, int mode) {
 #if HTS_MAKE_KEYWORD_INDEX
-	char catbuff[CATBUFF_SIZE];
-  char** tab;
-  char* blk;
+  char catbuff[CATBUFF_SIZE];
+  char **tab;
+  char *blk;
   off_t size = fpsize(fp_tmpproject);
-  if (size>0) {
+
+  if (size > 0) {
     //FILE* fp=fopen(concat(indexpath,"index.txt"),"rb");
     if (fp_tmpproject) {
-      tab=(char**)malloct(sizeof(char*) * (hts_primindex_size+2) );
+      tab = (char **) malloct(sizeof(char *) * (hts_primindex_size + 2));
       if (tab) {
-        blk = malloct(size+4);
+        blk = malloct(size + 4);
         if (blk) {
-          fseek(fp_tmpproject,0,SEEK_SET);
-          if ((INTsys)fread(blk,1,size,fp_tmpproject) == size) {
-            char *a=blk,*b;
-            int index=0;
+          fseek(fp_tmpproject, 0, SEEK_SET);
+          if ((INTsys) fread(blk, 1, size, fp_tmpproject) == size) {
+            char *a = blk, *b;
+            int index = 0;
             int i;
-            FILE* fp;
+            FILE *fp;
 
-            while( (b=strchr(a,'\n')) && (index < hts_primindex_size) ) {
-              tab[index++]=a;
-              *b='\0';
-              a=b+1;
+            while((b = strchr(a, '\n')) && (index < hts_primindex_size)) {
+              tab[index++] = a;
+              *b = '\0';
+              a = b + 1;
             }
-            
+
             // Sort it!
-            qsort(tab,index,sizeof(char*),mystrcmp);
+            qsort(tab, index, sizeof(char *), mystrcmp);
 
             // Delete fp_tmpproject
             fclose(fp_tmpproject);
-            fp_tmpproject=NULL;
+            fp_tmpproject = NULL;
 
             // Write new file
             if (mode == 1)      // TEXT
-              fp=fopen(concat(catbuff,indexpath,"index.txt"),"wb");
+              fp = fopen(concat(catbuff, indexpath, "index.txt"), "wb");
             else                // HTML
-              fp=fopen(concat(catbuff,indexpath,"sindex.html"),"wb");
+              fp = fopen(concat(catbuff, indexpath, "sindex.html"), "wb");
             if (fp) {
               char current_word[KEYW_LEN + 32];
               char word[KEYW_LEN + 32];
               int hit;
-              int total_hit=0;
-              int total_line=0;
-              int last_pos=0;
-              char word0='\0';
-              current_word[0]='\0';
+              int total_hit = 0;
+              int total_line = 0;
+              int last_pos = 0;
+              char word0 = '\0';
 
-              if (mode == 2) {         // HTML
-                for(i=0;i<index;i++) {
+              current_word[0] = '\0';
+
+              if (mode == 2) {  // HTML
+                for(i = 0; i < index; i++) {
                   if (word0 != tab[i][0]) {
                     word0 = tab[i][0];
-                    fprintf(fp," <a href=\"#%c\">%c</a>\r\n",word0,word0);
+                    fprintf(fp, " <a href=\"#%c\">%c</a>\r\n", word0, word0);
                   }
                 }
-                word0='\0';
-                fprintf(fp,"<br><br>\r\n");
-                fprintf(fp,"<table width=\"100%%\" border=\"0\">\r\n<tr>\r\n<td>word</td>\r\n<td>location\r\n");
+                word0 = '\0';
+                fprintf(fp, "<br><br>\r\n");
+                fprintf(fp,
+                        "<table width=\"100%%\" border=\"0\">\r\n<tr>\r\n<td>word</td>\r\n<td>location\r\n");
               }
 
-              for(i=0;i<index;i++) {
-                if (sscanf(tab[i],"%s %d",word,&hit) == 2) {
-                  char*  a=strchr(tab[i],' ');
-                  if (a) a=strchr(a+1,' ');
-                  if (a++) {                            /* Yes, a++, not ++a :) */
-                    hit=KEYW_SORT_MAXCOUNT-hit;
-                    if (strcmp(word,current_word)) {    /* New word */
+              for(i = 0; i < index; i++) {
+                if (sscanf(tab[i], "%s %d", word, &hit) == 2) {
+                  char *a = strchr(tab[i], ' ');
+
+                  if (a)
+                    a = strchr(a + 1, ' ');
+                  if (a++) {    /* Yes, a++, not ++a :) */
+                    hit = KEYW_SORT_MAXCOUNT - hit;
+                    if (strcmp(word, current_word)) {   /* New word */
                       if (total_hit) {
-                        if (mode == 1)      // TEXT
-                          fprintf(fp,"\t=%d\r\n",total_hit);
+                        if (mode == 1)  // TEXT
+                          fprintf(fp, "\t=%d\r\n", total_hit);
                         //else                // HTML
                         //  fprintf(fp,"<br>(%d total hits)\r\n",total_hit);
-                        if ( 
-                              ( ((total_hit*1000 ) / hts_primindex_words) >= KEYW_USELESS1K   )
-                            ||
-                              ( ((total_line*1000) / index              ) >= KEYW_USELESS1KPG )
+                        if ((((total_hit * 1000) / hts_primindex_words) >=
+                             KEYW_USELESS1K)
+                            || (((total_line * 1000) / index) >=
+                                KEYW_USELESS1KPG)
                           ) {
-                          fseek(fp,last_pos,SEEK_SET);
-                          if (mode == 1)      // TEXT
-                            fprintf(fp,"\tignored (%d)\r\n",((total_hit*1000)/hts_primindex_words));
+                          fseek(fp, last_pos, SEEK_SET);
+                          if (mode == 1)        // TEXT
+                            fprintf(fp, "\tignored (%d)\r\n",
+                                    ((total_hit * 1000) / hts_primindex_words));
                           else
-                            fprintf(fp,"(ignored) [%d hits]<br>\r\n",total_hit);
-                        }
-                        else {
-                          if (mode == 1)      // TEXT
-                            fprintf(fp,"\t(%d)\r\n",((total_hit*1000)/hts_primindex_words));
+                            fprintf(fp, "(ignored) [%d hits]<br>\r\n",
+                                    total_hit);
+                        } else {
+                          if (mode == 1)        // TEXT
+                            fprintf(fp, "\t(%d)\r\n",
+                                    ((total_hit * 1000) / hts_primindex_words));
                           //else                // HTML
                           //  fprintf(fp,"(%d)\r\n",((total_hit*1000)/hts_primindex_words));
                         }
                       }
-                      if (mode == 1)      // TEXT
-                        fprintf(fp,"%s\r\n",word);
-                      else {              // HTML
-                        fprintf(fp,"</td></tr>\r\n");
+                      if (mode == 1)    // TEXT
+                        fprintf(fp, "%s\r\n", word);
+                      else {    // HTML
+                        fprintf(fp, "</td></tr>\r\n");
                         if (word0 != word[0]) {
                           word0 = word[0];
-                          fprintf(fp,"<th>%c</th>\r\n",word0);
-                          fprintf(fp,"<a name=\"%c\"></a>\r\n",word0);
+                          fprintf(fp, "<th>%c</th>\r\n", word0);
+                          fprintf(fp, "<a name=\"%c\"></a>\r\n", word0);
                         }
-                        fprintf(fp,"<tr>\r\n<td>%s</td>\r\n<td>\r\n",word);
+                        fprintf(fp, "<tr>\r\n<td>%s</td>\r\n<td>\r\n", word);
                       }
-                      fflush(fp); last_pos=ftell(fp);
-                      strcpybuff(current_word,word);
-                      total_hit=total_line=0;
+                      fflush(fp);
+                      last_pos = ftell(fp);
+                      strcpybuff(current_word, word);
+                      total_hit = total_line = 0;
                     }
-                    total_hit+=hit;
+                    total_hit += hit;
                     total_line++;
                     if (mode == 1)      // TEXT
-                      fprintf(fp,"\t%d %s\r\n",hit,a);
-                    else                // HTML
-                      fprintf(fp,"<a href=\"%s\">%s</a> [%d hits]<br>\r\n",a,a,hit);
+                      fprintf(fp, "\t%d %s\r\n", hit, a);
+                    else        // HTML
+                      fprintf(fp, "<a href=\"%s\">%s</a> [%d hits]<br>\r\n", a,
+                              a, hit);
                   }
                 }
               }
-              if (mode == 2)         // HTML
-                fprintf(fp,"</td></tr>\r\n</table>\r\n");
+              if (mode == 2)    // HTML
+                fprintf(fp, "</td></tr>\r\n</table>\r\n");
               fclose(fp);
             }
-            
+
           }
           freet(blk);
         }
@@ -470,26 +468,26 @@ void index_finish(const char* indexpath,int mode) {
   }
   if (fp_tmpproject)
     fclose(fp_tmpproject);
-  fp_tmpproject=NULL;
+  fp_tmpproject = NULL;
 #endif
 }
-
 
 /* Subroutines */
 
 #if HTS_MAKE_KEYWORD_INDEX
-int strcpos(char* adr,char c) {
-  char* apos=strchr(adr,c);
+int strcpos(char *adr, char c) {
+  char *apos = strchr(adr, c);
+
   if (apos)
-    return (int)(apos-adr);
+    return (int) (apos - adr);
   else
     return -1;
 }
 
-int mystrcmp(const void* _e1,const void* _e2) {
-  char** e1=(char**)_e1;
-  char** e2=(char**)_e2;
-  return strcmp(*e1,*e2);
+int mystrcmp(const void *_e1, const void *_e2) {
+  char **e1 = (char **) _e1;
+  char **e2 = (char **) _e2;
+
+  return strcmp(*e1, *e2);
 }
 #endif
-

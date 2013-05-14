@@ -25,18 +25,21 @@
 #include "htsdefines.h"
 
 /* Local function definitions */
-static int process_file(t_hts_callbackarg *carg, httrackp* opt, char* html, int len, const char* url_address, const char* url_file);
-static int check_detectedlink(t_hts_callbackarg *carg, httrackp* opt, char* link);
-static int check_detectedlink_end(t_hts_callbackarg *carg, httrackp *opt);
+static int process_file(t_hts_callbackarg * carg, httrackp * opt, char *html,
+                        int len, const char *url_address, const char *url_file);
+static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
+                              char *link);
+static int check_detectedlink_end(t_hts_callbackarg * carg, httrackp * opt);
 
 /* external functions */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv);
 
 /* 
 module entry point 
 */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   const char *arg = strchr(argv, ',');
+
   if (arg != NULL)
     arg++;
 
@@ -45,8 +48,9 @@ EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
   if (arg == NULL || *arg == '\0' || strlen(arg) >= HTS_URLMAXSIZE / 2) {
     fprintf(stderr, "** callback error: arguments expected or bad arguments\n");
     fprintf(stderr, "usage: httrack --wrapper modulename,base\n");
-    fprintf(stderr, "example: httrack --wrapper callback,http://www.example.com/\n");
-    return 0;  /* failed */
+    fprintf(stderr,
+            "example: httrack --wrapper callback,http://www.example.com/\n");
+    return 0;                   /* failed */
   } else {
     char *callbacks_userdef = strdup(arg);      /* userdef */
 
@@ -58,50 +62,56 @@ EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
     fprintf(stderr, "Using root '%s'\n", callbacks_userdef);
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
-static int process_file(t_hts_callbackarg *carg, httrackp* opt, char* html, int len, const char* url_address, const char* url_file) {
-  char* prevBase;
+static int process_file(t_hts_callbackarg * carg, httrackp * opt, char *html,
+                        int len, const char *url_address,
+                        const char *url_file) {
+  char *prevBase;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
-      return 0;  /* Abort */
+    if (!CALLBACKARG_PREV_FUN(carg, check_html)
+        (CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
+      return 0;                 /* Abort */
     }
   }
 
   /* Disable base href, if any */
-  if ( ( prevBase = strstr(html, "<BASE HREF=\"") ) != NULL) {
+  if ((prevBase = strstr(html, "<BASE HREF=\"")) != NULL) {
     prevBase[1] = 'X';
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
-static int check_detectedlink(t_hts_callbackarg *carg, httrackp* opt, char* link) {
-  const char *base = (char*) CALLBACKARG_USERDEF(carg);
+static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
+                              char *link) {
+  const char *base = (char *) CALLBACKARG_USERDEF(carg);
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, linkdetected) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, linkdetected)(CALLBACKARG_PREV_CARG(carg), opt, link)) {
-      return 0;  /* Abort */
+    if (!CALLBACKARG_PREV_FUN(carg, linkdetected)
+        (CALLBACKARG_PREV_CARG(carg), opt, link)) {
+      return 0;                 /* Abort */
     }
   }
 
   /* The incoming (read/write) buffer is at least HTS_URLMAXSIZE bytes long */
   if (strncmp(link, "http://", 7) == 0 || strncmp(link, "https://", 8) == 0) {
     char temp[HTS_URLMAXSIZE * 2];
+
     strcpy(temp, base);
     strcat(temp, link);
     strcpy(link, temp);
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
-static int check_detectedlink_end(t_hts_callbackarg *carg, httrackp *opt) {
-  char *base = (char*) CALLBACKARG_USERDEF(carg);
+static int check_detectedlink_end(t_hts_callbackarg * carg, httrackp * opt) {
+  char *base = (char *) CALLBACKARG_USERDEF(carg);
 
   fprintf(stderr, "Unplugged ..\n");
   if (base != NULL) {
@@ -111,8 +121,8 @@ static int check_detectedlink_end(t_hts_callbackarg *carg, httrackp *opt) {
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
-    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+    return CALLBACKARG_PREV_FUN(carg, end) (CALLBACKARG_PREV_CARG(carg), opt);
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }

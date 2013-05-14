@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: htsshow.c console progress info                        */
@@ -35,7 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #ifndef HTSTOOLS_DEFH
-#define HTSTOOLS_DEFH 
+#define HTSTOOLS_DEFH
 
 #include "htsglobal.h"
 #include "htscore.h"
@@ -48,16 +45,16 @@ struct t_StatsBuffer {
   char name[1024];
   char file[1024];
   char state[256];
-  char BIGSTK url_sav[HTS_URLMAXSIZE*2];    // pour cancel
-  char BIGSTK url_adr[HTS_URLMAXSIZE*2];
-  char BIGSTK url_fil[HTS_URLMAXSIZE*2];
+  char BIGSTK url_sav[HTS_URLMAXSIZE * 2];      // pour cancel
+  char BIGSTK url_adr[HTS_URLMAXSIZE * 2];
+  char BIGSTK url_fil[HTS_URLMAXSIZE * 2];
   LLint size;
   LLint sizetot;
   int offset;
   //
   int back;
   //
-  int actived;    // pour disabled
+  int actived;                  // pour disabled
 };
 
 #ifndef HTS_DEF_FWSTRUCT_t_InpInfo
@@ -90,13 +87,14 @@ int main(int argc, char **argv);
 /* */
 
 // Engine internal variables
-typedef void (* htsErrorCallback)(char* msg, char* file, int line);
+typedef void (*htsErrorCallback) (char *msg, char *file, int line);
 extern HTSEXT_API htsErrorCallback htsCallbackErr;
 extern HTSEXT_API int htsMemoryFastXfr;
+
 /* */
 extern HTSEXT_API hts_stat_struct HTS_STAT;
 extern int _DEBUG_HEAD;
-extern FILE* ioinfo;
+extern FILE *ioinfo;
 
 // from htsbase.h
 
@@ -187,8 +185,9 @@ extern FILE* ioinfo;
 } while(0)
 
 // emergency log
-typedef void (*t_abortLog)(char* msg, char* file, int line);
+typedef void (*t_abortLog) (char *msg, char *file, int line);
 extern HTSEXT_API t_abortLog abortLog__;
+
 #define abortLog(a) abortLog__(a, __FILE__, __LINE__)
 #define abortLogFmt(a) do { \
   FILE* fp = fopen("CRASH.TXT", "wb"); \

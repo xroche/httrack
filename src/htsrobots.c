@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: httrack.c subroutines:                                 */
@@ -49,53 +46,55 @@ Please visit our Website: http://www.httrack.com
 // -- robots --
 
 // fil="" : vérifier si règle déja enregistrée
-int checkrobots(robots_wizard* robots,char* adr,char* fil) {
+int checkrobots(robots_wizard * robots, char *adr, char *fil) {
   while(robots) {
-    if (strfield2(robots->adr,adr)) {
+    if (strfield2(robots->adr, adr)) {
       if (fil[0]) {
-        int ptr=0;
+        int ptr = 0;
         char line[250];
+
         if (strnotempty(robots->token)) {
           do {
-            ptr+=binput(robots->token+ptr,line,200);
-            if (line[0]=='/') {    // absolu
-              if (strfield(fil,line)) {                 // commence avec ligne
-                return -1;        // interdit
+            ptr += binput(robots->token + ptr, line, 200);
+            if (line[0] == '/') {       // absolu
+              if (strfield(fil, line)) {        // commence avec ligne
+                return -1;      // interdit
               }
-            } else {    // relatif
-              if (strstrcase(fil,line)) {
+            } else {            // relatif
+              if (strstrcase(fil, line)) {
                 return -1;
               }
             }
-          } while( (strnotempty(line)) && (ptr<(int) strlen(robots->token)) );
+          } while((strnotempty(line)) && (ptr < (int) strlen(robots->token)));
         }
       } else {
         return -1;
       }
     }
-    robots=robots->next;
+    robots = robots->next;
   }
   return 0;
 }
-int checkrobots_set(robots_wizard* robots,char* adr,char* data) {
-  if (((int) strlen(adr)) >= sizeof(robots->adr) - 2) return 0;
-  if (((int) strlen(data)) >= sizeof(robots->token) - 2) return 0;
+int checkrobots_set(robots_wizard * robots, char *adr, char *data) {
+  if (((int) strlen(adr)) >= sizeof(robots->adr) - 2)
+    return 0;
+  if (((int) strlen(data)) >= sizeof(robots->token) - 2)
+    return 0;
   while(robots) {
-    if (strfield2(robots->adr,adr)) {    // entrée existe
-      strcpybuff(robots->token,data);
+    if (strfield2(robots->adr, adr)) {  // entrée existe
+      strcpybuff(robots->token, data);
 #if DEBUG_ROBOTS
-        printf("robots.txt: set %s to %s\n",adr,data);
+      printf("robots.txt: set %s to %s\n", adr, data);
 #endif
       return -1;
-    }
-    else if (!robots->next) {
-      robots->next=(robots_wizard*) calloct(1,sizeof(robots_wizard));
+    } else if (!robots->next) {
+      robots->next = (robots_wizard *) calloct(1, sizeof(robots_wizard));
       if (robots->next) {
-        robots->next->next=NULL;
-        strcpybuff(robots->next->adr,adr);
-        strcpybuff(robots->next->token,data);
+        robots->next->next = NULL;
+        strcpybuff(robots->next->adr, adr);
+        strcpybuff(robots->next->token, data);
 #if DEBUG_ROBOTS
-        printf("robots.txt: new set %s to %s\n",adr,data);
+        printf("robots.txt: new set %s to %s\n", adr, data);
 #endif
       }
 #if DEBUG_ROBOTS
@@ -103,15 +102,15 @@ int checkrobots_set(robots_wizard* robots,char* adr,char* data) {
         printf("malloc error!!\n");
 #endif
     }
-    robots=robots->next;
+    robots = robots->next;
   }
   return 0;
 }
-void checkrobots_free(robots_wizard* robots) {
+void checkrobots_free(robots_wizard * robots) {
   if (robots->next) {
     checkrobots_free(robots->next);
     freet(robots->next);
-    robots->next=NULL;
+    robots->next = NULL;
   }
 }
 

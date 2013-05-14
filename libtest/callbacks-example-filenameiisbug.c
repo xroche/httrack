@@ -21,49 +21,61 @@
 #include "htsdefines.h"
 
 /* Function definitions */
-static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save);
+static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
+                      const char *adr_complete, const char *fil_complete,
+                      const char *referer_adr, const char *referer_fil,
+                      char *save);
 
 /* external functions */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv);
 
 /* 
 module entry point 
 */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   const char *arg = strchr(argv, ',');
+
   if (arg != NULL)
     arg++;
   CHAIN_FUNCTION(opt, savename, mysavename, NULL);
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
 /*
   Replaces all "offending" IIS extensions (exe, dll..) with "nice" ones
 */
-static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save) {
-  static const char* iisBogus[]        = { ".com", ".exe", ".dll", ".sh", NULL };
-  static const char* iisBogusReplace[] = { ".c0m", ".ex3", ".dl1", ".5h", NULL }; /* MUST be the same sizes */
-  char* a;
+static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
+                      const char *adr_complete, const char *fil_complete,
+                      const char *referer_adr, const char *referer_fil,
+                      char *save) {
+  static const char *iisBogus[] = { ".com", ".exe", ".dll", ".sh", NULL };
+  static const char *iisBogusReplace[] = { ".c0m", ".ex3", ".dl1", ".5h", NULL };       /* MUST be the same sizes */
+  char *a;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, savename) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, savename)(CALLBACKARG_PREV_CARG(carg), opt, adr_complete, fil_complete, referer_adr, referer_fil, save)) {
-      return 0;  /* Abort */
+    if (!CALLBACKARG_PREV_FUN(carg, savename)
+        (CALLBACKARG_PREV_CARG(carg), opt, adr_complete, fil_complete,
+         referer_adr, referer_fil, save)) {
+      return 0;                 /* Abort */
     }
   }
 
   /* Process */
-  for(a = save ; *a != '\0' ; a++) {
+  for(a = save; *a != '\0'; a++) {
     int i;
-    for(i = 0 ; iisBogus[i] != NULL ; i++) {
+
+    for(i = 0; iisBogus[i] != NULL; i++) {
       int j;
-      for(j = 0 ; iisBogus[i][j] == a[j] && iisBogus[i][j] != '\0' ; j++);
-      if (iisBogus[i][j] == '\0' && ( a[j] == '\0' || a[j] == '/' || a[j] == '\\' ) ) {
+
+      for(j = 0; iisBogus[i][j] == a[j] && iisBogus[i][j] != '\0'; j++) ;
+      if (iisBogus[i][j] == '\0'
+          && (a[j] == '\0' || a[j] == '/' || a[j] == '\\')) {
         strncpy(a, iisBogusReplace[i], strlen(iisBogusReplace[i]));
         break;
       }
     }
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }

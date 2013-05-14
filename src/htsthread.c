@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Threads                                                */
@@ -50,16 +47,17 @@ Please visit our Website: http://www.httrack.com
 static int process_chain = 0;
 static htsmutex process_chain_mutex = HTSMUTEX_INIT;
 
-HTSEXT_API void htsthread_wait(void ) {
+HTSEXT_API void htsthread_wait(void) {
   htsthread_wait_n(0);
 }
 
 HTSEXT_API void htsthread_wait_n(int n_wait) {
 #if USE_BEGINTHREAD
   int wait = 0;
+
   do {
     hts_mutexlock(&process_chain_mutex);
-    wait = (process_chain > n_wait );
+    wait = (process_chain > n_wait);
     hts_mutexrelease(&process_chain_mutex);
     if (wait)
       Sleep(100);
@@ -68,7 +66,7 @@ HTSEXT_API void htsthread_wait_n(int n_wait) {
 }
 
 /* ensure initialized */
-HTSEXT_API void htsthread_init(void ) {
+HTSEXT_API void htsthread_init(void) {
 #if USE_BEGINTHREAD
 #if (defined(_DEBUG) || defined(DEBUG))
   assertf(process_chain == 0);
@@ -79,7 +77,7 @@ HTSEXT_API void htsthread_init(void ) {
 #endif
 }
 
-HTSEXT_API void htsthread_uninit(void ) {
+HTSEXT_API void htsthread_uninit(void) {
   htsthread_wait();
 #if USE_BEGINTHREAD
   hts_mutexfree(&process_chain_mutex);
@@ -88,18 +86,19 @@ HTSEXT_API void htsthread_uninit(void ) {
 
 typedef struct hts_thread_s {
   void *arg;
-  void (*fun)(void *arg);
+  void (*fun) (void *arg);
 } hts_thread_s;
 
 #ifdef _WIN32
 static unsigned int __stdcall hts_entry_point(void *tharg)
 #else
-static void* hts_entry_point(void *tharg)
+static void *hts_entry_point(void *tharg)
 #endif
 {
-  hts_thread_s *s_args = (hts_thread_s*) tharg;
-  void * const arg = s_args->arg;
-  void (*fun)(void *arg) = s_args->fun;
+  hts_thread_s *s_args = (hts_thread_s *) tharg;
+  void *const arg = s_args->arg;
+  void (*fun) (void *arg) = s_args->fun;
+
   free(tharg);
 
   hts_mutexlock(&process_chain_mutex);
@@ -122,16 +121,17 @@ static void* hts_entry_point(void *tharg)
 }
 
 /* create a thread */
-HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg)
-{
+HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
   hts_thread_s *s_args = malloc(sizeof(hts_thread_s));
+
   assertf(s_args != NULL);
   s_args->arg = arg;
   s_args->fun = fun;
 #ifdef _WIN32
   {
     unsigned int idt;
-    HANDLE handle = (HANDLE) _beginthreadex(NULL, 0, hts_entry_point, s_args, 0, &idt);
+    HANDLE handle =
+      (HANDLE) _beginthreadex(NULL, 0, hts_entry_point, s_args, 0, &idt);
     if (handle == 0) {
       free(s_args);
       return -1;
@@ -142,13 +142,15 @@ HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg)
   }
 #else
   {
-    const size_t stackSize = 1024*1024*8;
+    const size_t stackSize = 1024 * 1024 * 8;
     pthread_attr_t attr;
     pthread_t handle = 0;
     int retcode;
+
     if (pthread_attr_init(&attr) != 0
-      || pthread_attr_setstacksize(&attr, stackSize) != 0
-      || (retcode = pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
+        || pthread_attr_setstacksize(&attr, stackSize) != 0
+        || (retcode =
+            pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
       free(s_args);
       return -1;
     } else {
@@ -165,8 +167,9 @@ HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg)
 
 /* Note: new 3.41 cleaned up functions. */
 
-HTSEXT_API void hts_mutexinit(htsmutex* mutex) {
-  htsmutex_s* smutex = malloct(sizeof(htsmutex_s));
+HTSEXT_API void hts_mutexinit(htsmutex * mutex) {
+  htsmutex_s *smutex = malloct(sizeof(htsmutex_s));
+
 #ifdef _WIN32
   smutex->handle = CreateMutex(NULL, FALSE, NULL);
 #else
@@ -175,21 +178,21 @@ HTSEXT_API void hts_mutexinit(htsmutex* mutex) {
   *mutex = smutex;
 }
 
-HTSEXT_API void hts_mutexfree(htsmutex* mutex) {
+HTSEXT_API void hts_mutexfree(htsmutex * mutex) {
   if (mutex != NULL && *mutex != NULL) {
 #ifdef _WIN32
     CloseHandle((*mutex)->handle);
 #else
-    pthread_mutex_destroy(& ( (*mutex)->handle ) );
+    pthread_mutex_destroy(&((*mutex)->handle));
 #endif
     freet(*mutex);
     *mutex = NULL;
   }
 }
 
-HTSEXT_API void hts_mutexlock(htsmutex* mutex) {
+HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
   assertf(mutex != NULL);
-  if (*mutex == HTSMUTEX_INIT) {   /* must be initialized */
+  if (*mutex == HTSMUTEX_INIT) {        /* must be initialized */
     hts_mutexinit(mutex);
   }
   assertf(*mutex != NULL);
@@ -201,7 +204,7 @@ HTSEXT_API void hts_mutexlock(htsmutex* mutex) {
 #endif
 }
 
-HTSEXT_API void hts_mutexrelease(htsmutex* mutex) {
+HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
   assertf(mutex != NULL && *mutex != NULL);
 #ifdef _WIN32
   assert((*mutex)->handle != NULL);
