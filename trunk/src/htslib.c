@@ -120,7 +120,7 @@ FILE* ioinfo;
 #endif
 int IPV6_resolver = 0;
 
-/* détection complémentaire */
+/* dÃ©tection complÃ©mentaire */
 const char* hts_detect[] = {
   "archive",
   "background",
@@ -138,13 +138,13 @@ const char* hts_detect[] = {
   ""
 };
 
-/* détecter début */
+/* dÃ©tecter dÃ©but */
 const char* hts_detectbeg[] = {
   "hotspot",      /* hotspot1=..,hotspot2=.. */
   ""
 };
 
-/* ne pas détcter de liens dedans */
+/* ne pas dÃ©tcter de liens dedans */
 const char* hts_nodetect[] = {
   "accept-charset",
   "accesskey",
@@ -185,7 +185,7 @@ const char* hts_nodetect[] = {
 };
 
 
-/* détection de mini-code javascript */
+/* dÃ©tection de mini-code javascript */
 /* ALSO USED: detection based on the name: onXXX="<tag>" where XXX starts with upper case letter */
 const char* hts_detect_js[] = {
   "onAbort",
@@ -226,19 +226,19 @@ const char* hts_main_mime[] = {
   ""
 };
 
-/* détection "...URL=<url>" */
+/* dÃ©tection "...URL=<url>" */
 const char* hts_detectURL[] = {
   "content",
   ""
 };
 
-/* tags où l'URL doit être réécrite mais non capturée */
+/* tags oÃ¹ l'URL doit Ãªtre rÃ©Ã©crite mais non capturÃ©e */
 const char* hts_detectandleave[] = {
   "action",
   ""
 };
 
-/* ne pas renommer les types renvoyés (souvent types inconnus) */
+/* ne pas renommer les types renvoyÃ©s (souvent types inconnus) */
 const char* hts_mime_keep[] = {
   "application/octet-stream",
   "text/plain",
@@ -603,7 +603,7 @@ const char* hts_mime[][2] = {
 
 
 
-// conversion éventuelle / vers antislash
+// conversion Ã©ventuelle / vers antislash
 #ifdef _WIN32
 char* antislash(char *catbuff, const char* s) {
   char* a;
@@ -626,24 +626,24 @@ void hts_init_htsblk(htsblk* r) {
   r->totalsize=-1;
 }
 
-// Récupération d'un fichier http sur le net.
-// Renvoie une adresse sur le bloc de mémoire, ou bien
+// RÃ©cupÃ©ration d'un fichier http sur le net.
+// Renvoie une adresse sur le bloc de mÃ©moire, ou bien
 // NULL si un retour.msgeur (buffer retour.msg) est survenue. 
 //
-// Une adresse de structure htsmsg peut être transmise pour
-// suivre l'évolution du chargement si le process a été lancé 
+// Une adresse de structure htsmsg peut Ãªtre transmise pour
+// suivre l'Ã©volution du chargement si le process a Ã©tÃ© lancÃ© 
 // en background
 
 htsblk httpget(httrackp *opt,char* url) {
   char BIGSTK adr[HTS_URLMAXSIZE*2];   // adresse
   char BIGSTK fil[HTS_URLMAXSIZE*2];   // chemin
   
-  // séparer URL en adresse+chemin
+  // sÃ©parer URL en adresse+chemin
   if (ident_url_absolute(url,adr,fil)==-1) {
     htsblk retour;
     hts_init_htsblk(&retour);
     //memset(&retour, 0, sizeof(htsblk));    // effacer
-    // retour prédéfini: erreur
+    // retour prÃ©dÃ©fini: erreur
     retour.adr=NULL;
     retour.size=0;
     retour.msg[0]='\0';
@@ -655,14 +655,14 @@ htsblk httpget(httrackp *opt,char* url) {
   return xhttpget(opt,adr,fil);
 }
 
-// ouvre une liaison http, envoie une requète GET et réceptionne le header
+// ouvre une liaison http, envoie une requÃ¨te GET et rÃ©ceptionne le header
 // retour: socket
 T_SOC http_fopen(httrackp *opt,char* adr,char* fil,htsblk* retour) {
-  //                / GET, traiter en-tête
+  //                / GET, traiter en-tÃªte
   return http_xfopen(opt,0,1,1,NULL,adr,fil,retour);
 }
 
-// ouverture d'une liaison http, envoi d'une requète
+// ouverture d'une liaison http, envoi d'une requÃ¨te
 // mode: 0 GET  1 HEAD  [2 POST]
 // treat: traiter header?
 // waitconnect: attendre le connect()
@@ -673,7 +673,7 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
   T_SOC soc=INVALID_SOCKET;
   //char *p,*q;
   
-  // retour prédéfini: erreur
+  // retour prÃ©dÃ©fini: erreur
   if (retour) {
     retour->adr=NULL;
     retour->size=0;
@@ -687,7 +687,7 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
   
   // ouvrir liaison
 #if HDEBUG
-  printf("Création d'une socket sur %s\n",adr);
+  printf("CrÃ©ation d'une socket sur %s\n",adr);
 #endif
 
 #if CNXDEBUG
@@ -706,7 +706,7 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
       ) {    /* pas de proxy, ou non utilisable ici */
       soc=newhttp(opt,adr,retour,-1,waitconnect);
     } else {
-      soc=newhttp(opt, retour->req.proxy.name, retour,retour->req.proxy.port, waitconnect);  // ouvrir sur le proxy à la place
+      soc=newhttp(opt, retour->req.proxy.name, retour,retour->req.proxy.port, waitconnect);  // ouvrir sur le proxy Ã  la place
     }
   } else {
     soc=newhttp(opt,adr,NULL,-1,waitconnect);    
@@ -785,10 +785,10 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
     char rcvd[1100];
     rcvd[0]='\0';
 #if HDEBUG
-    printf("Ok, connexion réussie, id=%d\n",soc);
+    printf("Ok, connexion rÃ©ussie, id=%d\n",soc);
 #endif
     
-    // connecté?
+    // connectÃ©?
     if (waitconnect) {
       http_sendhead(opt,NULL,mode,xsend,adr,fil,NULL,NULL,retour);
     } 
@@ -796,20 +796,20 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
     if (soc!=INVALID_SOCKET) {
       
 #if HDEBUG
-      printf("Attente de la réponse:\n");
+      printf("Attente de la rÃ©ponse:\n");
 #endif
       
-      // si GET (réception d'un fichier), réceptionner en-tête d'abord,
+      // si GET (rÃ©ception d'un fichier), rÃ©ceptionner en-tÃªte d'abord,
       // et ensuite le corps
-      // si POST on ne réceptionne rien du tout, c'est après que l'on fera
-      // une réception standard pour récupérer l'en tête
-      if ((treat) && (waitconnect)) {  // traiter (attendre!) en-tête        
-        // Réception de la status line et de l'en-tête (norme RFC1945)
+      // si POST on ne rÃ©ceptionne rien du tout, c'est aprÃ¨s que l'on fera
+      // une rÃ©ception standard pour rÃ©cupÃ©rer l'en tÃªte
+      if ((treat) && (waitconnect)) {  // traiter (attendre!) en-tÃªte        
+        // RÃ©ception de la status line et de l'en-tÃªte (norme RFC1945)
         
-        // status-line à récupérer
+        // status-line Ã  rÃ©cupÃ©rer
         finput(soc,rcvd,1024);
         if (strnotempty(rcvd)==0)
-          finput(soc,rcvd,1024);    // "certains serveurs buggés envoient un \n au début" (RFC)
+          finput(soc,rcvd,1024);    // "certains serveurs buggÃ©s envoient un \n au dÃ©but" (RFC)
 
         // traiter status-line
         treatfirstline(retour,rcvd);
@@ -818,9 +818,9 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
         printf("Status-Code=%d\n",retour->statuscode);
 #endif
         
-        // en-tête
+        // en-tÃªte
         
-        // header // ** !attention! HTTP/0.9 non supporté
+        // header // ** !attention! HTTP/0.9 non supportÃ©
         do {
           finput(soc,rcvd,1024);          
 #if HDEBUG
@@ -836,8 +836,8 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
         //if (retour)
         //  retour->totalsize=rcvsize;
         
-      } else { // si GET, on recevra l'en tête APRES
-        //rcvsize=-1;    // on ne connait pas la taille de l'en-tête
+      } else { // si GET, on recevra l'en tÃªte APRES
+        //rcvsize=-1;    // on ne connait pas la taille de l'en-tÃªte
         if (retour)
           retour->totalsize=-1;
       }
@@ -850,10 +850,10 @@ T_SOC http_xfopen(httrackp *opt,int mode,int treat,int waitconnect,char* xsend,c
 }
 
 
-// envoi d'une requète
+// envoi d'une requÃ¨te
 int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,char* fil,char* referer_adr,char* referer_fil,htsblk* retour) {
   char BIGSTK buff[8192];
-  //int use_11=0;     // HTTP 1.1 utilisé
+  //int use_11=0;     // HTTP 1.1 utilisÃ©
   int direct_url=0; // ne pas analyser l'url (exemple: ftp://)
   char* search_tag=NULL;
   buff[0]='\0';
@@ -864,10 +864,10 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
   //sendc("\n");
   //strcatbuff(buff,buff);
 
-  // possibilité non documentée: >post: et >postfile:
-  // si présence d'un tag >post: alors executer un POST
+  // possibilitÃ© non documentÃ©e: >post: et >postfile:
+  // si prÃ©sence d'un tag >post: alors executer un POST
   // exemple: http://www.someweb.com/test.cgi?foo>post:posteddata=10&foo=5
-  // si présence d'un tag >postfile: alors envoyer en tête brut contenu dans le fichier en question
+  // si prÃ©sence d'un tag >postfile: alors envoyer en tÃªte brut contenu dans le fichier en question
   // exemple: http://www.someweb.com/test.cgi?foo>postfile:post0.txt
   search_tag=strstr(fil,POSTTOK":");
   if (!search_tag) {
@@ -898,7 +898,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
   // Fin postfile
   
   if (strnotempty(buff)==0) {    // PAS POSTFILE
-    // Type de requète?
+    // Type de requÃ¨te?
     if ((search_tag) && (mode==0)) {
       strcatbuff(buff,"POST ");
     } else if (mode==0) {    // GET
@@ -910,7 +910,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
         strcatbuff(buff,"HEAD ");
     }
     
-    // si on gère un proxy, il faut une Absolute URI: on ajoute avant http://www.adr.dom
+    // si on gÃ¨re un proxy, il faut une Absolute URI: on ajoute avant http://www.adr.dom
     if ( retour->req.proxy.active && (strncmp(adr,"https://", 8) != 0) ) {
       if (!link_has_authority(adr)) {  // default http
 #if HDEBUG
@@ -928,7 +928,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
     } 
     
     // NOM DU FICHIER
-    // on slash doit être présent en début, sinon attention aux bad request! (400)
+    // on slash doit Ãªtre prÃ©sent en dÃ©but, sinon attention aux bad request! (400)
     if (*fil!='/') strcatbuff(buff,"/");
     {
       char BIGSTK tempo[HTS_URLMAXSIZE*2];
@@ -938,20 +938,20 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
       else
         strcpybuff(tempo,fil);
       escape_check_url(tempo);
-      strcatbuff(buff,tempo);       // avec échappement
+      strcatbuff(buff,tempo);       // avec Ã©chappement
     }
     
     // protocole
     if (!retour->req.http11) {     // forcer HTTP/1.0
       //use_11=0;
       strcatbuff(buff," HTTP/1.0\x0d\x0a");
-    } else {                   // Requète 1.1
+    } else {                   // RequÃ¨te 1.1
       //use_11=1;
       strcatbuff(buff," HTTP/1.1\x0d\x0a");
     }
 
     /* supplemental data */
-    if (xsend) strcatbuff(buff,xsend);    // éventuelles autres lignes
+    if (xsend) strcatbuff(buff,xsend);    // Ã©ventuelles autres lignes
 
     // tester proxy authentication
     if (retour->req.proxy.active) {
@@ -1036,7 +1036,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
           b=cookie_nextfield(b);
         }
       } while( (b) && (max_cookies>0) && ((int)strlen(buff)<max_size));
-      if (cook) {                           // on a envoyé un (ou plusieurs) cookie?
+      if (cook) {                           // on a envoyÃ© un (ou plusieurs) cookie?
         strcatbuff(buff,H_CRLF);
 #if DEBUG_COOK
         printf("Header:\n%s\n",buff);
@@ -1044,7 +1044,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
       }
     }
     
-    // gérer le keep-alive (garder socket)
+    // gÃ©rer le keep-alive (garder socket)
     if (retour->req.http11 && !retour->req.nokeepalive) {
 			strcatbuff(buff,"Connection: Keep-Alive"H_CRLF);
 		} else {
@@ -1068,7 +1068,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
         strcatbuff(buff, H_CRLF);
       }
 
-      // Présence d'un user-agent?
+      // PrÃ©sence d'un user-agent?
       if (retour->req.user_agent_send) {  // ohh un user-agent
         char s[256];
         // HyperTextSeeker/"HTSVERSION
@@ -1136,10 +1136,10 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
     //strcatbuff(buff,"Accept-Language: en\n");
     //strcatbuff(buff,"Accept-Charset: iso-8859-1,*,utf-8\n");
     
-    // CRLF de fin d'en tête
+    // CRLF de fin d'en tÃªte
     strcatbuff(buff,H_CRLF);
     
-    // données complémentaires?
+    // donnÃ©es complÃ©mentaires?
     if (search_tag)
     if (mode==0)      // GET!
       strcatbuff(buff,unescape_http(OPT_GET_BUFF(opt),search_tag+strlen(POSTTOK)+1));
@@ -1171,7 +1171,7 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
   HTS_STAT.last_request = mtime_local();
   if (sendc(retour, buff)<0) {  // ERREUR, socket rompue?...
   //if (sendc(retour->soc,buff) != strlen(buff)) {  // ERREUR, socket rompue?...
-    deletesoc_r(retour);  // fermer tout de même
+    deletesoc_r(retour);  // fermer tout de mÃªme
     // et tenter de reconnecter
     
     strcpybuff(retour->msg, "Write error");
@@ -1185,29 +1185,29 @@ int http_sendhead(httrackp *opt,t_cookie* cookie,int mode,char* xsend,char* adr,
 
 
 
-// traiter 1ere ligne d'en tête
+// traiter 1ere ligne d'en tÃªte
 void treatfirstline(htsblk* retour,char* rcvd) {
   char* a=rcvd;
   // exemple:
   // HTTP/1.0 200 OK
   if (*a) {
-    // note: certains serveurs buggés renvoient HTTP/1.0\n200 OK ou " HTTP/1.0 200 OK"
-    while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // épurer espaces au début
+    // note: certains serveurs buggÃ©s renvoient HTTP/1.0\n200 OK ou " HTTP/1.0 200 OK"
+    while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // Ã©purer espaces au dÃ©but
     if (strfield(a, "HTTP/")) {
       // sauter HTTP/1.x
       while ((*a!=' ') && (*a!='\0') && (*a!=10) && (*a!=13) && (*a!=9)) a++;   
       if (*a != '\0') {
-        while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // épurer espaces
+        while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // Ã©purer espaces
         if ((*a>='0') && (*a<='9')) {
           sscanf(a,"%d",&(retour->statuscode));
           // sauter 200
           while ((*a!=' ') && (*a!='\0') && (*a!=10) && (*a!=13) && (*a!=9)) a++;   
-          while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // épurer espaces
+          while ((*a==' ') || (*a==10) || (*a==13) || (*a==9)) a++;      // Ã©purer espaces
           if ((strlen(a) > 1) && (strlen(a) < 64) )                // message retour
             strcpybuff(retour->msg,a);
           else
             infostatuscode(retour->msg,retour->statuscode);
-          // type MIME par défaut2
+          // type MIME par dÃ©faut2
           strcpybuff(retour->contenttype,HTS_HYPERTEXT_DEFAULT_MIME);
         } else {  // pas de code!
           retour->statuscode=STATUSCODE_INVALID;
@@ -1247,13 +1247,13 @@ void treatfirstline(htsblk* retour,char* rcvd) {
   }
 }
 
-// traiter ligne par ligne l'en tête
+// traiter ligne par ligne l'en tÃªte
 // gestion des cookies
 void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
   int p;
   if ((p=strfield(rcvd,"Content-length:"))!=0) {
 #if HDEBUG
-    printf("ok, Content-length: détecté\n");
+    printf("ok, Content-length: dÃ©tectÃ©\n");
 #endif
     if (sscanf(rcvd+p,LLintP,&(retour->totalsize)) == 1) {
       if (retour->totalsize == 0) {
@@ -1323,14 +1323,14 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
       retour->is_chunk=1;     // chunked
       //retour->http11=2;     // chunked
 #if HDEBUG
-      printf("ok, Transfer-Encoding: détecté\n");
+      printf("ok, Transfer-Encoding: dÃ©tectÃ©\n");
 #endif
     }
   }
   else if ((p=strfield(rcvd,"Content-type:"))!=0) {
     if (retour) {
       char tempo[1100];
-      // éviter les text/html; charset=foo
+      // Ã©viter les text/html; charset=foo
       {
         char* a=strchr(rcvd+p,';');
         if (a) {   // extended information
@@ -1506,8 +1506,8 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
       do {
         char* start_loop=a;
         while(is_space(*a)) a++;    // sauter espaces
-        token_st=a;                 // départ token
-        while((!is_space(*a)) && (*a) && (*a!=';') && (*a!='=')) a++;    // arrêter si espace, point virgule
+        token_st=a;                 // dÃ©part token
+        while((!is_space(*a)) && (*a) && (*a!=';') && (*a!='=')) a++;    // arrÃªter si espace, point virgule
         token_end=a;
         while(is_space(*a)) a++;    // sauter espaces
         if (*a=='=') {    // name=value
@@ -1518,7 +1518,7 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
           //while( ((*a!='"') || (*(a-1)=='\\')) && (*a)) a++;    // prochain " (et pas \")
           value_end=a;
           //if (*a==';') {  // finit par un ;
-          // vérifier débordements
+          // vÃ©rifier dÃ©bordements
           if ( (((int) (token_end - token_st))<200) && (((int) (value_end - value_st))<8000)
             && (((int) (token_end - token_st))>0)   && (((int) (value_end - value_st))>0) ) 
           {
@@ -1548,19 +1548,19 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
               }
             }
             else if (strfield2(name,"max-age")) {
-              // ignoré..
+              // ignorÃ©..
             }
             else if (strfield2(name,"expires")) {
-              // ignoré..
+              // ignorÃ©..
             }
             else if (strfield2(name,"version")) {
-              // ignoré..
+              // ignorÃ©..
             }
             else if (strfield2(name,"comment")) {
-              // ignoré
+              // ignorÃ©
             }
             else if (strfield2(name,"secure")) {    // ne devrait pas arriver ici
-              // ignoré
+              // ignorÃ©
             }
             else {
               if (value_len < sizeof(cook_value) - 1 && name_len < sizeof(cook_name) - 1) {
@@ -1568,7 +1568,7 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
                   strcpybuff(cook_name,name);
                   strcpybuff(cook_value,value);
                 } else {                             // prochain cookie
-                  a=start_loop;      // on devra recommencer à cette position
+                  a=start_loop;      // on devra recommencer Ã  cette position
                   next=1;            // enregistrer
                 }
               } else {
@@ -1594,7 +1594,7 @@ void treathead(t_cookie* cookie,char* adr,char* fil,htsblk* retour,char* rcvd) {
 }
 
 
-// transforme le message statuscode en chaîne
+// transforme le message statuscode en chaÃ®ne
 HTSEXT_API void infostatuscode(char* msg,int statuscode) {
   switch( statuscode) {    
     // Erreurs HTTP, selon RFC
@@ -1645,7 +1645,7 @@ HTSEXT_API void infostatuscode(char* msg,int statuscode) {
 }
 
 
-// identique au précédent, sauf que l'on donne adr+fil et non url complète
+// identique au prÃ©cÃ©dent, sauf que l'on donne adr+fil et non url complÃ¨te
 htsblk xhttpget(httrackp *opt,char* adr,char* fil) {
   T_SOC soc;
   htsblk retour;
@@ -1665,19 +1665,19 @@ htsblk xhttpget(httrackp *opt,char* adr,char* fil) {
   return retour;
 }
 
-// variation sur un thème...
-// réceptionne uniquement un en-tête (HEAD)
-// retourne dans xx.adr l'adresse pointant sur le bloc de mémoire de l'en tête
+// variation sur un thÃ¨me...
+// rÃ©ceptionne uniquement un en-tÃªte (HEAD)
+// retourne dans xx.adr l'adresse pointant sur le bloc de mÃ©moire de l'en tÃªte
 htsblk http_gethead(httrackp *opt,char* adr,char* fil) {
   T_SOC soc;
   htsblk retour;
 
   hts_init_htsblk(&retour);
   //memset(&retour, 0, sizeof(htsblk));
-  soc=http_xfopen(opt,1,0,1,NULL,adr,fil,&retour);  // HEAD, pas de traitement en-tête
+  soc=http_xfopen(opt,1,0,1,NULL,adr,fil,&retour);  // HEAD, pas de traitement en-tÃªte
 
   if (soc!=INVALID_SOCKET) {
-    http_fread(soc,&retour);    // réception en-tête
+    http_fread(soc,&retour);    // rÃ©ception en-tÃªte
 #if HTS_DEBUG_CLOSESOCK
     DEBUG_W("http_gethead: deletehttp\n");
 #endif
@@ -1686,11 +1686,11 @@ htsblk http_gethead(httrackp *opt,char* adr,char* fil) {
   }
   return retour;
 }
-// oui ca ressemble vachement à xhttpget - en étant sobre on peut voir LA différence..
+// oui ca ressemble vachement Ã  xhttpget - en Ã©tant sobre on peut voir LA diffÃ©rence..
 
 
-// lecture sur une socket ouverte, le header a déja été envoyé dans le cas de GET
-// il ne reste plus qu'à lire les données
+// lecture sur une socket ouverte, le header a dÃ©ja Ã©tÃ© envoyÃ© dans le cas de GET
+// il ne reste plus qu'Ã  lire les donnÃ©es
 // (pour HEAD le header est lu ici!)
 void http_fread(T_SOC soc,htsblk* retour) {  
   //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
@@ -1707,7 +1707,7 @@ void http_fread(T_SOC soc,htsblk* retour) {
     } 
     
 #if HDEBUG
-    printf("Ok, données reçues\n");
+    printf("Ok, donnÃ©es reÃ§ues\n");
 #endif   
 
     return ;
@@ -1766,12 +1766,12 @@ HTS_INLINE LLint http_fread1(htsblk* r) {
   return http_xfread1(r,TAILLE_BUFFER);
 }
 
-// idem, sauf qu'ici on peut choisir la taille max de données à recevoir
-// SI bufl==0 alors le buffer est censé être de 8kos, et on recoit par bloc de lignes
-// en éliminant les cr (ex: header), arrêt si double-lf
-// SI bufl==-1 alors le buffer est censé être de 8kos, et on recoit ligne par ligne
-// en éliminant les cr (ex: header), arrêt si double-lf
-// Note: les +1 dans les malloc sont dûs à l'octet nul rajouté en fin de fichier
+// idem, sauf qu'ici on peut choisir la taille max de donnÃ©es Ã  recevoir
+// SI bufl==0 alors le buffer est censÃ© Ãªtre de 8kos, et on recoit par bloc de lignes
+// en Ã©liminant les cr (ex: header), arrÃªt si double-lf
+// SI bufl==-1 alors le buffer est censÃ© Ãªtre de 8kos, et on recoit ligne par ligne
+// en Ã©liminant les cr (ex: header), arrÃªt si double-lf
+// Note: les +1 dans les malloc sont dÃ»s Ã  l'octet nul rajoutÃ© en fin de fichier
 LLint http_xfread1(htsblk* r,int bufl) {
   int nl=-1;
 
@@ -1781,8 +1781,8 @@ LLint http_xfread1(htsblk* r,int bufl) {
   }
 
   if (bufl>0) {
-    if (!r->is_write) {     // stocker en mémoire
-      if (r->totalsize>=0) {    // totalsize déterminé ET ALLOUE
+    if (!r->is_write) {     // stocker en mÃ©moire
+      if (r->totalsize>=0) {    // totalsize dÃ©terminÃ© ET ALLOUE
         if (r->adr==NULL) {
           r->adr = (char*) malloct((size_t) r->totalsize + 1);
           r->size = 0;
@@ -1799,11 +1799,11 @@ LLint http_xfread1(htsblk* r,int bufl) {
             nl = -1;  // break
           */
           
-          r->adr[r->size]='\0';    // caractère NULL en fin au cas où l'on traite des HTML
+          r->adr[r->size]='\0';    // caractÃ¨re NULL en fin au cas oÃ¹ l'on traite des HTML
         }
         
       } else {                 // inconnu..
-        // réserver de la mémoire?
+        // rÃ©server de la mÃ©moire?
         if (r->adr==NULL) {
 #if HDEBUG
           printf("..alloc xfread\n");
@@ -1862,7 +1862,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
         //if ((nl < 0) || ((r->totalsize>0) && (r->size >= r->totalsize)))
         //  nl=-1;  // break
 
-        // libérer bloc tempo
+        // libÃ©rer bloc tempo
         freet(buff);
       } else
         nl=READ_ERROR;
@@ -1872,7 +1872,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
       }
         
         
-    } // stockage disque ou mémoire
+    } // stockage disque ou mÃ©moire
 
   } else if (bufl == -2) {  // force reserve
     if (r->adr==NULL) {
@@ -1881,7 +1881,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
       return 0;
     }
     return -1;
-  } else {    // réception d'un en-tête octet par octet
+  } else {    // rÃ©ception d'un en-tÃªte octet par octet
     int count=256;
     int tot_nl=0;
     int lf_detected=0;
@@ -1907,7 +1907,7 @@ LLint http_xfread1(htsblk* r,int bufl) {
                 count=-1;
               lf_detected=1;
             }
-            if (*(r->adr+r->size) != 13) {   // sauter caractères 13
+            if (*(r->adr+r->size) != 13) {   // sauter caractÃ¨res 13
               if (
                 (*(r->adr+r->size) != 10)
                 &&
@@ -1942,9 +1942,9 @@ LLint http_xfread1(htsblk* r,int bufl) {
 }
 
 
-// teste une adresse, et suit l'éventuel chemin "moved"
+// teste une adresse, et suit l'Ã©ventuel chemin "moved"
 // retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
-// copie dans loc la véritable adresse si celle-ci est différente
+// copie dans loc la vÃ©ritable adresse si celle-ci est diffÃ©rente
 htsblk http_location(httrackp *opt,char* adr,char* fil,char* loc) {
   htsblk retour;
   int retry=0;
@@ -1972,10 +1972,10 @@ htsblk http_location(httrackp *opt,char* adr,char* fil,char* loc) {
 }
 
 
-// teste si une URL (validité, header, taille)
+// teste si une URL (validitÃ©, header, taille)
 // retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
 // en cas de moved xx, dans location
-// abandonne désormais au bout de 30 secondes (aurevoir les sites
+// abandonne dÃ©sormais au bout de 30 secondes (aurevoir les sites
 // qui nous font poireauter 5 heures..) -> -2=timeout
 htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
   T_SOC soc;
@@ -1992,16 +1992,16 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
   loc[0]='\0';
   hts_init_htsblk(&retour);
   //memset(&retour, 0, sizeof(htsblk));    // effacer
-  retour.location=loc;    // si non nul, contiendra l'adresse véritable en cas de moved xx
+  retour.location=loc;    // si non nul, contiendra l'adresse vÃ©ritable en cas de moved xx
 
   //soc=http_fopen(adr,fil,&retour,NULL);  // ouvrir, + header
 
-  // on ouvre en head, et on traite l'en tête
+  // on ouvre en head, et on traite l'en tÃªte
   soc=http_xfopen(opt,1,0,1,NULL,adr,fil,&retour);  // ouvrir HEAD, + envoi header
   
   if (soc!=INVALID_SOCKET) {
     int e=0;
-    // tant qu'on a des données, et qu'on ne recoit pas deux LF, et que le timeout n'arrie pas
+    // tant qu'on a des donnÃ©es, et qu'on ne recoit pas deux LF, et que le timeout n'arrie pas
     do {
       if (http_xfread1(&retour,0) < 0)
         e=1;
@@ -2030,11 +2030,11 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
 
 
         // ----------------------------------------
-        // traiter en-tête!
-        // status-line à récupérer
+        // traiter en-tÃªte!
+        // status-line Ã  rÃ©cupÃ©rer
         ptr+=binput(retour.adr+ptr,rcvd,1024);
         if (strnotempty(rcvd)==0)
-          ptr+=binput(retour.adr+ptr,rcvd,1024);    // "certains serveurs buggés envoient un \n au début" (RFC)
+          ptr+=binput(retour.adr+ptr,rcvd,1024);    // "certains serveurs buggÃ©s envoient un \n au dÃ©but" (RFC)
         
         // traiter status-line
         treatfirstline(&retour,rcvd);
@@ -2043,9 +2043,9 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
         printf("(Buffer) Status-Code=%d\n",retour.statuscode);
 #endif
         
-        // en-tête
+        // en-tÃªte
         
-        // header // ** !attention! HTTP/0.9 non supporté
+        // header // ** !attention! HTTP/0.9 non supportÃ©
         do {
           ptr+=binput(retour.adr+ptr,rcvd,1024);          
 #if HDEBUG
@@ -2057,7 +2057,7 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
         } while(strnotempty(rcvd));
         // ----------------------------------------                    
         
-        // libérer mémoire
+        // libÃ©rer mÃ©moire
         if (retour.adr!=NULL) { freet(retour.adr); retour.adr=NULL; }
       }
     } else {
@@ -2075,7 +2075,7 @@ htsblk http_test(httrackp *opt,char* adr,char* fil,char* loc) {
   return retour;    
 }
 
-// Crée un lien (http) vers une adresse internet iadr
+// CrÃ©e un lien (http) vers une adresse internet iadr
 // retour: structure (adresse, taille, message si erreur (si !adr))
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
 T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitconnect) {  
@@ -2095,23 +2095,23 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
     // effacer structure
     memset(&server, 0, sizeof(server));
 
-    // tester un éventuel id:pass et virer id:pass@ si détecté
+    // tester un Ã©ventuel id:pass et virer id:pass@ si dÃ©tectÃ©
     iadr = jump_identification(_iadr);
   
 #if HDEBUG
     printf("gethostbyname\n");
 #endif
     
-    // tester un éventuel port
+    // tester un Ã©ventuel port
     if (port==-1) {
       char *a=jump_toport(iadr);
 #if HTS_USEOPENSSL
       if (retour->ssl)
         port=443;
       else
-        port=80;    // port par défaut
+        port=80;    // port par dÃ©faut
 #else
-      port=80;    // port par défaut
+      port=80;    // port par dÃ©faut
 #endif
       if (a) {
         char BIGSTK iadr2[HTS_URLMAXSIZE*2];
@@ -2122,7 +2122,7 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
           port=(unsigned short int) i;
         }
         
-        // adresse véritable (sans :xx)
+        // adresse vÃ©ritable (sans :xx)
         strncatbuff(iadr2,iadr,(int) (a - iadr));
 
         // adresse sans le :xx
@@ -2130,17 +2130,17 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
         
       } else {
 
-        // adresse normale (port par défaut par la suite)
+        // adresse normale (port par dÃ©faut par la suite)
         hp = hts_gethostbyname(opt,iadr, &fullhostent_buffer);
         
       }
       
-    } else    // port défini
+    } else    // port dÃ©fini
       hp = hts_gethostbyname(opt,iadr, &fullhostent_buffer);
 
     
     // Conversion iadr -> adresse
-    // structure recevant le nom de l'hôte, etc
+    // structure recevant le nom de l'hÃ´te, etc
     //struct 	hostent 	*hp;
     if (hp == NULL) {
 #if DEBUG
@@ -2164,7 +2164,7 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
     SOCaddr_copyaddr(retour->address, retour->address_size, hp->h_addr_list[0], hp->h_length);
     // memcpy(&SOCaddr_sinaddr(server), hp->h_addr_list[0], hp->h_length);
      
-    // créer ("attachement") une socket (point d'accès) internet,en flot
+    // crÃ©er ("attachement") une socket (point d'accÃ¨s) internet,en flot
 #if HDEBUG
     printf("socket\n");
 #endif
@@ -2188,7 +2188,7 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
         sprintf(retour->msg,"Unable to create a socket: %s", strerror(last_errno));
 #endif
       }
-      return INVALID_SOCKET;                        // erreur création socket impossible
+      return INVALID_SOCKET;                        // erreur crÃ©ation socket impossible
     }
 
     // bind this address
@@ -2227,7 +2227,7 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
 #endif
     }
     
-    // Connexion au serveur lui même
+    // Connexion au serveur lui mÃªme
 #if HDEBUG
     printf("connect\n");
 #endif
@@ -2266,18 +2266,18 @@ T_SOC newhttp(httrackp *opt,const char* _iadr,htsblk* retour,int port,int waitco
 #endif
       
 #if HDEBUG
-      printf("connexion établie\n");
+      printf("connexion Ã©tablie\n");
 #endif
     
-    // A partir de maintenant, on peut envoyer et recevoir des données
-    // via le flot identifié par soc (socket): write(soc,adr,taille) et 
+    // A partir de maintenant, on peut envoyer et recevoir des donnÃ©es
+    // via le flot identifiÃ© par soc (socket): write(soc,adr,taille) et 
     // read(soc,adr,taille)
 
   } else {    // on doit ouvrir un fichier local!
-    // il sera géré de la même manière qu'une socket (c'est idem!)
+    // il sera gÃ©rÃ© de la mÃªme maniÃ¨re qu'une socket (c'est idem!)
 
     soc=LOCAL_SOCKET_ID;    // pseudo-socket locale..
-    // soc sera remplacé lors d'un http_fopen() par un handle véritable!
+    // soc sera remplacÃ© lors d'un http_fopen() par un handle vÃ©ritable!
 
   }   // teste fichier local ou http
   
@@ -2342,7 +2342,7 @@ int ident_url_absolute(const char* url,char* adr,char* fil) {
     const char *p,*q;
     p=url+pos;
 
-    // p pointe sur le début de l'adresse, ex: www.truc.fr/sommaire/index.html
+    // p pointe sur le dÃ©but de l'adresse, ex: www.truc.fr/sommaire/index.html
     q=strchr(jump_identification(p),'/');
     if (q==0) q=strchr(jump_identification(p),'?');     // http://www.foo.com?bar=1
     if (q==0) q=p+strlen(p);  // pointe sur \0
@@ -2356,9 +2356,9 @@ int ident_url_absolute(const char* url,char* adr,char* fil) {
     
     // recopier adresse www..
     strncatbuff(adr,p, ((int) (q - p)) );
-    // *( adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
+    // *( adr+( ((int) q) - ((int) p) ) )=0;  // faut arrÃªter la fumette!
     // recopier chemin /pub/..
-    if (q[0] != '/')    // page par défaut (/)
+    if (q[0] != '/')    // page par dÃ©faut (/)
       strcatbuff(fil,"/");
     strcatbuff(fil,q);
     // SECURITE:
@@ -2383,7 +2383,7 @@ int ident_url_absolute(const char* url,char* adr,char* fil) {
     
     a=strchr(fil,'?');
     if (a) 
-      *a='\0';      /* couper query (inutile pour file:// lors de la requête) */
+      *a='\0';      /* couper query (inutile pour file:// lors de la requÃªte) */
     // filtrer les \\ -> / pour les fichiers DOS
     for(i=0;i<(int) strlen(fil);i++)
       if (fil[i]=='\\')
@@ -2394,7 +2394,7 @@ int ident_url_absolute(const char* url,char* adr,char* fil) {
   if (!strnotempty(adr))
     return -1;    // erreur non reconnu
 
-  // nommer au besoin.. (non utilisé normalement)
+  // nommer au besoin.. (non utilisÃ© normalement)
   if (!strnotempty(fil))
     strcpybuff(fil,"default-index.html");
 
@@ -2646,7 +2646,7 @@ struct tm* convert_time_rfc822(struct tm *result, const char* s) {
     return NULL;
   strcpybuff(str,s);
   hts_lowcase(str);
-  /* éliminer :,- */
+  /* Ã©liminer :,- */
   while( (a=strchr(str,'-')) ) *a=' ';
   while( (a=strchr(str,':')) ) *a=' ';
   while( (a=strchr(str,',')) ) *a=' ';
@@ -2655,7 +2655,7 @@ struct tm* convert_time_rfc822(struct tm *result, const char* s) {
   while(*a) {
     char *first,*last;
     char tok[256];
-    /* découper mot */
+    /* dÃ©couper mot */
     while(*a==' ') a++;   /* sauter espaces */
     first=a;
     while((*a) && (*a!=' ')) a++;
@@ -2804,7 +2804,7 @@ HTSEXT_API char* int2char(strc_int2bytes2* strc, int n) {
   return strc->buff2;
 }
 
-// conversion en b,Kb,Mb, nombre et type séparés
+// conversion en b,Kb,Mb, nombre et type sÃ©parÃ©s
 // limite: 2.10^9.10^6B
 
 /* See http://physics.nist.gov/cuu/Units/binary.html */
@@ -2860,7 +2860,7 @@ int sig_ignore_flag( int setflag ) {     // flag ignore
 }
 #endif
 
-// envoi de texte (en têtes généralement) sur la socket soc
+// envoi de texte (en tÃªtes gÃ©nÃ©ralement) sur la socket soc
 HTS_INLINE int sendc(htsblk* r, const char* s) {
   int n, ssz = (int)strlen(s);
 
@@ -2900,7 +2900,7 @@ int finput(int fd,char* s,int max) {
     if (c!=0) {
       switch(c) {
       case 10: c=0; break;
-      case 13: break;  // sauter ces caractères
+      case 13: break;  // sauter ces caractÃ¨res
       default: s[j++]=c; break;
       }
     }
@@ -2927,7 +2927,7 @@ int binput(char* buff, char* s, int max) {
   return count + 1;
 } 
 
-// Lecture d'une ligne (peut être unicode à priori)
+// Lecture d'une ligne (peut Ãªtre unicode Ã  priori)
 int linput(FILE* fp,char* s,int max) {
   int c;
   int j=0;
@@ -2937,7 +2937,7 @@ int linput(FILE* fp,char* s,int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
+        case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -2959,7 +2959,7 @@ int linputsoc(T_SOC soc, char* s, int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
+        case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -2985,7 +2985,7 @@ int linput_trim(FILE* fp,char* s,int max) {
       // sauter espaces et tabs en fin
       while( (rlen>0) && ((ls[max(rlen-1,0)]==' ') || (ls[max(rlen-1,0)]=='\t')) )
         ls[--rlen]='\0';
-      // sauter espaces en début
+      // sauter espaces en dÃ©but
       a=ls;
       while((rlen>0) && ((*a==' ') || (*a=='\t'))) {
         a++;
@@ -3017,7 +3017,7 @@ int linput_cpp(FILE* fp,char* s,int max) {
   return rlen;
 }
 
-// idem avec les car spéciaux
+// idem avec les car spÃ©ciaux
 void rawlinput(FILE* fp,char* s,int max) {
   int c;
   int j=0;
@@ -3184,7 +3184,7 @@ int ishtml(httrackp *opt,const char* fil) {
       }
     }
     return ret;
-  } else return -2;   // indéterminé, par exemple /truc
+  } else return -2;   // indÃ©terminÃ©, par exemple /truc
 }
 
 // idem, mais pour uniquement l'extension
@@ -3200,7 +3200,7 @@ int ishtml_ext(const char* a) {
   else if (strfield2(a,"phtm"))  html = 1;
   else if (strfield2(a,"htmx"))  html = 1;
   //
-  // insuccès..
+  // insuccÃ¨s..
   else {
 #if 1
     html = -1;    // inconnu..
@@ -3239,7 +3239,7 @@ HTSEXT_API char* jump_identification(const char* source) {
   if (strcmp(source, "file://") == 0)
 	  return (char*) source;
   // rechercher dernier @ (car parfois email transmise dans adresse!)
-  // mais sauter ftp:// éventuel
+  // mais sauter ftp:// Ã©ventuel
   a = jump_protocol(source);
   trytofind = strrchr_limit(a, '@', strchr(a,'/'));
   return (char*) ( (trytofind != NULL) ? trytofind : a );
@@ -3726,7 +3726,7 @@ HTSEXT_API char* unescape_http(char *catbuff, const char* s) {
     if (s[i]=='%') {
       i++;
       catbuff[j++]=(char) ehex(s+i);
-      i++;    // sauter 2 caractères finalement
+      i++;    // sauter 2 caractÃ¨res finalement
     }
     /*
     NON a cause de trucs comme /home/0,1837,1|7|1173|Content,00.html
@@ -3856,12 +3856,12 @@ HTSEXT_API void x_escape_http(char* s,int mode) {
     }
     else if (mode==2)
       test=(*s == ' ');           // n'escaper que espace
-    else if (mode==3) {                   // échapper que ce qui est nécessaire
+    else if (mode==3) {                   // Ã©chapper que ce qui est nÃ©cessaire
       test = (
                 CHAR_SPECIAL(*s)
              || CHAR_XXAVOID(*s) );
     }
-    else if (mode==30) {                   // échapper que ce qui est nécessaire
+    else if (mode==30) {                   // Ã©chapper que ce qui est nÃ©cessaire
       test =
         ( *s != '/' && CHAR_RESERVED(*s) )
         || CHAR_DELIM(*s)
@@ -3910,8 +3910,8 @@ HTSEXT_API void escape_for_html_print_full(char* s, char* d) {
   *d = '\0';
 }
 
-// concat, concatène deux chaines et renvoi le résultat
-// permet d'alléger grandement le code
+// concat, concatÃ¨ne deux chaines et renvoi le rÃ©sultat
+// permet d'allÃ©ger grandement le code
 // il faut savoir qu'on ne peut mettre plus de 16 concat() dans une expression
 HTSEXT_API char* concat(char *catbuff,const char* a,const char* b) {
 	if (a != NULL && a[0] != '\0') {
@@ -3969,7 +3969,7 @@ void hts_lowcase(char* s) {
       s[i]+=('a'-'A');
 }
 
-// remplacer un caractère d'une chaîne dans une autre
+// remplacer un caractÃ¨re d'une chaÃ®ne dans une autre
 HTS_INLINE void hts_replace(char *s,char from,char to) { 
   char* a;
   while ((a=strchr(s,from))!=NULL) {
@@ -3978,7 +3978,7 @@ HTS_INLINE void hts_replace(char *s,char from,char to) {
 }
 
 
-// caractère espace, guillemets, CR, LF etc..
+// caractÃ¨re espace, guillemets, CR, LF etc..
 /* SECTION OPTIMISEE:
   #define  is_space(c) (strchr(" \"\x0d\x0a\x09'",c)!=NULL)
   #define  is_realspace(c) (strchr(" \x0d\x0a\x09\x0c",c)!=NULL)
@@ -3996,7 +3996,7 @@ HTS_INLINE int is_space(char c) {
 }
 */
 
-// caractère espace, CR, LF, TAB
+// caractÃ¨re espace, CR, LF, TAB
 /*
 HTS_INLINE int is_realspace(char c) {
   if (c==' ')  return 1;  // spc
@@ -4268,16 +4268,16 @@ HTSEXT_API int is_dyntype(const char *fil) {
   return 0;
 }
 
-// types critiques qui ne doivent pas être changés car renvoyés par des serveurs qui ne
+// types critiques qui ne doivent pas Ãªtre changÃ©s car renvoyÃ©s par des serveurs qui ne
 // connaissent pas le type
 int may_unknown(httrackp *opt,const char* st) {
   int j=0;
-  // types média
+  // types mÃ©dia
   if (may_be_hypertext_mime(opt,st, "")) {
     return 1;
   }
   while(strnotempty(hts_mime_keep[j])) {
-    if (strfield2(hts_mime_keep[j],st)) {      // trouvé
+    if (strfield2(hts_mime_keep[j],st)) {      // trouvÃ©
       return 1;
     }
     j++;
@@ -4543,7 +4543,7 @@ int hts_read(htsblk* r,char* buff,int size) {
     if (r->soc==INVALID_SOCKET)
       printf("!!WIDE_DEBUG ERROR, soc==INVALID hts_read\n");
 #endif
-    //HTS_TOTAL_RECV_CHECK(size);         // Diminuer au besoin si trop de données reçues
+    //HTS_TOTAL_RECV_CHECK(size);         // Diminuer au besoin si trop de donnÃ©es reÃ§ues
 #if HTS_USEOPENSSL
     if (SSL_is_available && r->ssl) {
       retour = SSL_read(r->ssl_con, buff, size);
@@ -4611,38 +4611,38 @@ void hts_cache_free(t_dnscache* cache) {
 	}
 }
 
-// lock le cache dns pour tout opération d'ajout
-// plus prudent quand plusieurs threads peuvent écrire dedans..
-// -1: status? 0: libérer 1:locker
+// lock le cache dns pour tout opÃ©ration d'ajout
+// plus prudent quand plusieurs threads peuvent Ã©crire dedans..
+// -1: status? 0: libÃ©rer 1:locker
 
 /* 
   Simple lock for cache
 */
 htsmutex dns_lock = HTSMUTEX_INIT;
 
-// routine pour le cache - retour optionnel à donner à chaque fois
-// NULL: nom non encore testé dans le cache
+// routine pour le cache - retour optionnel Ã  donner Ã  chaque fois
+// NULL: nom non encore testÃ© dans le cache
 // si h_length==0 alors le nom n'existe pas dans le dns
 t_hostent* _hts_ghbn(t_dnscache* cache,const char* iadr,t_hostent* retour) {
   t_hostent* ret = NULL;
   hts_mutexlock(&dns_lock);
   for(;;) {
-    if (strcmp(cache->iadr,iadr) == 0) {  // ok trouvé
-      if (cache->host_length > 0) {  // entrée valide
+    if (strcmp(cache->iadr,iadr) == 0) {  // ok trouvÃ©
+      if (cache->host_length > 0) {  // entrÃ©e valide
         if (retour->h_addr_list[0])
           memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
         retour->h_length=cache->host_length;
       } else if (cache->host_length == 0) {  // en cours
         ret = NULL;
         break;
-      } else {                    // erreur dans le dns, déja vérifié
+      } else {                    // erreur dans le dns, dÃ©ja vÃ©rifiÃ©
         if (retour->h_addr_list[0])
           retour->h_addr_list[0][0]='\0';
         retour->h_length=0;  // erreur, n'existe pas
       }
       ret = retour;
       break;
-    } else {    // on a pas encore trouvé
+    } else {    // on a pas encore trouvÃ©
       if (cache->n!=NULL) { // chercher encore
         cache = cache->n;   // suivant!
       } else {
@@ -4655,18 +4655,18 @@ t_hostent* _hts_ghbn(t_dnscache* cache,const char* iadr,t_hostent* retour) {
   return ret;
 }
 
-// tester si iadr a déja été testé (ou en cours de test)
+// tester si iadr a dÃ©ja Ã©tÃ© testÃ© (ou en cours de test)
 // 0 non encore
 // 1 ok
-// 2 non présent
+// 2 non prÃ©sent
 int hts_dnstest(httrackp *opt, const char* _iadr) {
   int ret = 0;
   t_dnscache* cache=_hts_cache(opt);  // adresse du cache 
 	char iadr[HTS_URLMAXSIZE*2];
 
-  // sauter user:pass@ éventuel
+  // sauter user:pass@ Ã©ventuel
   strcpybuff(iadr, jump_identification(_iadr));
-  // couper éventuel :
+  // couper Ã©ventuel :
   {
     char *a;
     if ( (a = jump_toport(iadr)) )
@@ -4674,22 +4674,22 @@ int hts_dnstest(httrackp *opt, const char* _iadr) {
   }
 
 #ifdef _WIN32
-  if (inet_addr(iadr)!=INADDR_NONE)  // numérique
+  if (inet_addr(iadr)!=INADDR_NONE)  // numÃ©rique
 #else
-  if (inet_addr(iadr)!=(in_addr_t) -1 )  // numérique
+  if (inet_addr(iadr)!=(in_addr_t) -1 )  // numÃ©rique
 #endif
     return 1;
 
   hts_mutexlock(&dns_lock);
   for(;;) {
-    if (strcmp(cache->iadr, iadr)==0) {  // ok trouvé
+    if (strcmp(cache->iadr, iadr)==0) {  // ok trouvÃ©
       ret = 1;
       break;
-    } else {    // on a pas encore trouvé
+    } else {    // on a pas encore trouvÃ©
       if (cache->n!=NULL) { // chercher encore
         cache=cache->n;   // suivant!
       } else {
-        ret = 2;    // non présent        
+        ret = 2;    // non prÃ©sent        
         break ;
       }
     }    
@@ -4772,7 +4772,7 @@ HTSEXT_API t_hostent* vxgethostbyname(char* hostname, void* v_buffer) {
   return NULL;
 }
 
-// cache dns interne à HTS // ** FREE A FAIRE sur la chaine
+// cache dns interne Ã  HTS // ** FREE A FAIRE sur la chaine
 t_hostent* hts_gethostbyname(httrackp *opt,const char* _iadr, void* v_buffer) {
   char BIGSTK iadr[HTS_URLMAXSIZE*2];
   t_fullhostent* buffer = (t_fullhostent*) v_buffer;
@@ -4783,14 +4783,14 @@ t_hostent* hts_gethostbyname(httrackp *opt,const char* _iadr, void* v_buffer) {
   fullhostent_init(buffer);
 
   strcpybuff(iadr,jump_identification(_iadr));
-  // couper éventuel :
+  // couper Ã©ventuel :
   {
     char *a;
     if ( (a=jump_toport(iadr)) )
       *a='\0';
   }
 
-  // effacer structure de retour, créer nouvelle
+  // effacer structure de retour, crÃ©er nouvelle
   /*
   memset(&host, 0, sizeof(t_hostent));  
   host.h_addr_list=he;
@@ -4807,8 +4807,8 @@ t_hostent* hts_gethostbyname(httrackp *opt,const char* _iadr, void* v_buffer) {
     if (hp->h_length>0)
       return hp;
     else
-      return NULL;    // entrée erronée (erreur DNS) dans le DNS
-  } else {  // non présent dans le cache dns, tester
+      return NULL;    // entrÃ©e erronÃ©e (erreur DNS) dans le DNS
+  } else {  // non prÃ©sent dans le cache dns, tester
     t_dnscache* c=cache;
     while(c->n) c=c->n;    // calculer queue
     
@@ -4829,7 +4829,7 @@ t_hostent* hts_gethostbyname(httrackp *opt,const char* _iadr, void* v_buffer) {
         printf("resolving (not cached) %s\n",iadr);
 #endif
         hp=vxgethostbyname(iadr, buffer);  // calculer IP host
-      } else {     // numérique, convertir sans passer par le dns
+      } else {     // numÃ©rique, convertir sans passer par le dns
         buffer->hp.h_addr_list[0]=(char*) &inetaddr;
         buffer->hp.h_length=4;
         hp=&buffer->hp;
@@ -4850,7 +4850,7 @@ t_hostent* hts_gethostbyname(httrackp *opt,const char* _iadr, void* v_buffer) {
       }
       cache->n->n=NULL;
       return hp;
-    } else {  // on peut pas noter, mais on peut renvoyer le résultat
+    } else {  // on peut pas noter, mais on peut renvoyer le rÃ©sultat
       return hp;
     }        
   }  // retour hp du cache
@@ -5360,12 +5360,12 @@ HTSEXT_API httrackp *hts_create_opt(void) {
 	opt->wizard=2;   // wizard automatique
   opt->quiet=0;     // questions
   //  
-  opt->travel=0;   // même adresse
-  opt->depth=9999; // mirror total par défaut
-  opt->extdepth=0; // mais pas à l'extérieur
+  opt->travel=0;   // mÃªme adresse
+  opt->depth=9999; // mirror total par dÃ©faut
+  opt->extdepth=0; // mais pas Ã  l'extÃ©rieur
   opt->seeker=1;   // down 
-  opt->urlmode=2;  // relatif par défaut
-  opt->debug=0;    // pas de débug en plus
+  opt->urlmode=2;  // relatif par dÃ©faut
+  opt->debug=0;    // pas de dÃ©bug en plus
   opt->getmode=3;  // linear scan
   opt->maxsite=-1; // taille max site (aucune)
   opt->maxfile_nonhtml=-1; // taille max fichier non html
@@ -5379,7 +5379,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->background_on_suspend=1; // Background the process if Control Z calls signal suspend.
   opt->makestat=0;  // pas de fichier de stats
   opt->maketrack=0; // ni de tracking
-  opt->timeout=120; // timeout par défaut (2 minutes)
+  opt->timeout=120; // timeout par dÃ©faut (2 minutes)
   opt->cache=1;     // cache prioritaire
   opt->shell=0;     // pas de shell par defaut
   opt->proxy.active=0;    // pas de proxy
@@ -5387,31 +5387,31 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->user_agent, "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
   StringCopy(opt->referer, "");
   StringCopy(opt->from, "");
-  opt->savename_83=0;     // noms longs par défaut
+  opt->savename_83=0;     // noms longs par dÃ©faut
   opt->savename_type=0;   // avec structure originale
   opt->savename_delayed=2;// hard delayed type (default)
   opt->delayed_cached=1;  // cached delayed type (default)
   opt->mimehtml=0;        // pas MIME-html
   opt->parsejava=HTSPARSE_DEFAULT; // parser classes
   opt->hostcontrol=0;     // PAS de control host pour timeout et traffic jammer
-  opt->retry=2;           // 2 retry par défaut
-  opt->errpage=1;         // copier ou générer une page d'erreur en cas d'erreur (404 etc.)
-  opt->check_type=1;      // vérifier type si inconnu (cgi,asp..) SAUF / considéré comme html
+  opt->retry=2;           // 2 retry par dÃ©faut
+  opt->errpage=1;         // copier ou gÃ©nÃ©rer une page d'erreur en cas d'erreur (404 etc.)
+  opt->check_type=1;      // vÃ©rifier type si inconnu (cgi,asp..) SAUF / considÃ©rÃ© comme html
   opt->all_in_cache=0;    // ne pas tout stocker en cache
   opt->robots=2;          // traiter les robots.txt
   opt->external=0;        // liens externes normaux
   opt->passprivacy=0;     // mots de passe dans les fichiers
-  opt->includequery=1;    // include query-string par défaut
+  opt->includequery=1;    // include query-string par dÃ©faut
   opt->mirror_first_page=0;  // pas mode mirror links
-  opt->accept_cookie=1;   // gérer les cookies
+  opt->accept_cookie=1;   // gÃ©rer les cookies
   opt->cookie=NULL;
   opt->http10=0;          // laisser http/1.1
   opt->nokeepalive = 0;   // pas keep-alive
   opt->nocompression=0;   // pas de compression
   opt->tolerant=0;        // ne pas accepter content-length incorrect
   opt->parseall=1;        // tout parser (tags inconnus, par exemple)
-  opt->parsedebug=0;      // pas de mode débuggage
-  opt->norecatch=0;       // ne pas reprendre les fichiers effacés par l'utilisateur
+  opt->parsedebug=0;      // pas de mode dÃ©buggage
+  opt->norecatch=0;       // ne pas reprendre les fichiers effacÃ©s par l'utilisateur
   opt->verbosedisplay=0;  // pas d'animation texte
   opt->sizehack=0;        // size hack
   opt->urlhack=1;         // url hack (normalizer)
@@ -5435,14 +5435,14 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->path_bin,"");
   //
 #if HTS_SPARE_MEMORY==0
-  opt->maxlink=100000;    // 100,000 liens max par défaut (400Kb)
-  opt->maxfilter=200;     // 200 filtres max par défaut
+  opt->maxlink=100000;    // 100,000 liens max par dÃ©faut (400Kb)
+  opt->maxfilter=200;     // 200 filtres max par dÃ©faut
 #else
-  opt->maxlink=10000;     // 10,000 liens max par défaut (40Kb)
-  opt->maxfilter=50;      // 50 filtres max par défaut
+  opt->maxlink=10000;     // 10,000 liens max par dÃ©faut (40Kb)
+  opt->maxfilter=50;      // 50 filtres max par dÃ©faut
 #endif
-  opt->maxcache=1048576*32;  // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
-  //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
+  opt->maxcache=1048576*32;  // a peu prÃ¨s 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
+  //opt->maxcache_anticipate=256;  // maximum de liens Ã  anticiper
   opt->maxtime=-1;        // temps max en secondes
 #if HTS_USEMMS
 	opt->mms_maxtime = 60*3600;		// max time for mms streams (one hour)
@@ -5579,7 +5579,7 @@ static int __cdecl htsdefault_postprocesshtml(t_hts_callbackarg *carg, httrackp 
 static int __cdecl htsdefault_checkhtml(t_hts_callbackarg *carg, httrackp *opt, char* html,int len,const char* url_adresse,const char* url_fichier) {
   return 1;
 }
-static int __cdecl htsdefault_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats) {    // appelé à chaque boucle de HTTrack
+static int __cdecl htsdefault_loop(t_hts_callbackarg *carg, httrackp *opt, lien_back* back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats) {    // appelÃ© Ã  chaque boucle de HTTrack
   return 1;
 }
 static const char* __cdecl htsdefault_query(t_hts_callbackarg *carg, httrackp *opt, const char* question) {

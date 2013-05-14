@@ -42,7 +42,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
-// Includes & définitions
+// Includes & dÃ©finitions
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -105,7 +105,7 @@ typedef struct filecreate_params filecreate_params;
 // aide pour la version en ligne de commande
 #include "htshelp.h"
 
-// génération du nom de fichier à sauver
+// gÃ©nÃ©ration du nom de fichier Ã  sauver
 #include "htsname.h"
 
 // gestion ftp
@@ -144,25 +144,25 @@ typedef struct lien_url lien_url;
 #endif
 struct lien_url {
   char firstblock;      // flag 1=premier malloc 
-  char link_import;     // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
-  int depth;            // profondeur autorisée lien ; >0 forte 0=faible
-  int pass2;            // traiter après les autres, seconde passe. si == -1, lien traité en background
-  int premier;          // pointeur sur le premier lien qui a donné lieu aux autres liens du domaine
-  int precedent;        // pointeur sur le lien qui a donné lieu à ce lien précis
+  char link_import;     // lien importÃ© Ã  la suite d'un moved - ne pas appliquer les rÃ¨gles classiques up/down
+  int depth;            // profondeur autorisÃ©e lien ; >0 forte 0=faible
+  int pass2;            // traiter aprÃ¨s les autres, seconde passe. si == -1, lien traitÃ© en background
+  int premier;          // pointeur sur le premier lien qui a donnÃ© lieu aux autres liens du domaine
+  int precedent;        // pointeur sur le lien qui a donnÃ© lieu Ã  ce lien prÃ©cis
   //int moved;          // pointeur sur moved
   int retry;            // nombre de retry restants
   int testmode;         // mode test uniquement, envoyer juste un head!
   char* adr;            // adresse
   char* fil;            // nom du fichier distant
-  char* sav;            // nom à sauver sur disque (avec chemin éventuel)
-  char* cod;            // chemin codebase éventuel si classe java
-  char* former_adr;     // adresse initiale (avant éventuel moved), peut être nulle
-  char* former_fil;     // nom du fichier distant initial (avant éventuel moved), peut être nul
+  char* sav;            // nom Ã  sauver sur disque (avec chemin Ã©ventuel)
+  char* cod;            // chemin codebase Ã©ventuel si classe java
+  char* former_adr;     // adresse initiale (avant Ã©ventuel moved), peut Ãªtre nulle
+  char* former_fil;     // nom du fichier distant initial (avant Ã©ventuel moved), peut Ãªtre nul
   // pour optimisation:
-  int hash_next[3];     // prochain lien avec même valeur hash
+  int hash_next[3];     // prochain lien avec mÃªme valeur hash
 };
 
-// chargement de fichiers en 'arrière plan'
+// chargement de fichiers en 'arriÃ¨re plan'
 #ifndef HTS_DEF_FWSTRUCT_lien_back
 #define HTS_DEF_FWSTRUCT_lien_back
 typedef struct lien_back lien_back;
@@ -173,38 +173,38 @@ struct lien_back {
 #endif
   char url_adr[HTS_URLMAXSIZE*2];     // adresse
   char url_fil[HTS_URLMAXSIZE*2];     // nom du fichier distant
-  char url_sav[HTS_URLMAXSIZE*2];     // nom à sauver sur disque (avec chemin éventuel)
+  char url_sav[HTS_URLMAXSIZE*2];     // nom Ã  sauver sur disque (avec chemin Ã©ventuel)
   char referer_adr[HTS_URLMAXSIZE*2]; // adresse host page referer
   char referer_fil[HTS_URLMAXSIZE*2]; // fichier page referer
   char location_buffer[HTS_URLMAXSIZE*2];  // "location" en cas de "moved" (302,..)
-  char* tmpfile;                           // nom à sauver temporairement (compressé)
-  char tmpfile_buffer[HTS_URLMAXSIZE*2];   // buffer pour le nom à sauver temporairement
-  char send_too[1024];    // données à envoyer en même temps que le header
-  int status;             // status (-1=non utilisé, 0: prêt, >0: opération en cours)
+  char* tmpfile;                           // nom Ã  sauver temporairement (compressÃ©)
+  char tmpfile_buffer[HTS_URLMAXSIZE*2];   // buffer pour le nom Ã  sauver temporairement
+  char send_too[1024];    // donnÃ©es Ã  envoyer en mÃªme temps que le header
+  int status;             // status (-1=non utilisÃ©, 0: prÃªt, >0: opÃ©ration en cours)
   int locked;             // locked (to be used soon)
   int testmode;           // mode de test
-  int timeout;            // gérer des timeouts? (!=0  : nombre de secondes)
+  int timeout;            // gÃ©rer des timeouts? (!=0  : nombre de secondes)
   TStamp timeout_refresh; // si oui, time refresh
-  int rateout;            // timeout refresh? (!=0 : taux minimum toléré en octets/s)
-  TStamp rateout_time;    // si oui, date de départ
+  int rateout;            // timeout refresh? (!=0 : taux minimum tolÃ©rÃ© en octets/s)
+  TStamp rateout_time;    // si oui, date de dÃ©part
   LLint maxfile_nonhtml;  // taille max d'un fichier non html
   LLint maxfile_html;     // idem pour un ficheir html
   htsblk r;               // structure htsblk de chaque objet en background 
   int is_update;          // mode update
-  int head_request;       // requète HEAD?
-  LLint range_req_size;   // range utilisé
+  int head_request;       // requÃ¨te HEAD?
+  LLint range_req_size;   // range utilisÃ©
   TStamp ka_time_start;   // refresh time for KA 
   //
-  int http11;             // L'en tête doit être signé HTTP/1.1 et non HTTP/1.0
+  int http11;             // L'en tÃªte doit Ãªtre signÃ© HTTP/1.1 et non HTTP/1.0
   int is_chunk;           // chunk?
   char* chunk_adr;        // adresse chunk en cours de chargement
   LLint chunk_size;       // taille chunk en cours de chargement
   LLint chunk_blocksize;  // taille data declaree par le chunk
-  LLint compressed_size;  // taille compressés (stats uniquement)
+  LLint compressed_size;  // taille compressÃ©s (stats uniquement)
   //
   //int links_index;        // to access liens[links_index]
   //
-  char info[256];         // éventuel status pour le ftp
+  char info[256];         // Ã©ventuel status pour le ftp
   int stop_ftp;           // flag stop pour ftp
   int finalized;          // finalized (optim memory)
   int early_add;          // was added before link heap saw it
@@ -265,7 +265,7 @@ typedef struct hash_struct hash_struct;
 #endif
 struct hash_struct {
   lien_url** liens;                     // pointeur sur liens
-  int max_lien;                         // indice le plus grand rencontré
+  int max_lien;                         // indice le plus grand rencontrÃ©
   int hash[3][HTS_HASH_SIZE];           // tables pour sav/adr-fil/former_adr-former_fil
 };
 

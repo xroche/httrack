@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-// Fichier réunissant l'ensemble des defines
+// Fichier rÃ©unissant l'ensemble des defines
 
 #ifndef HTTRACK_GLOBAL_DEFH
 #define HTTRACK_GLOBAL_DEFH
@@ -60,7 +60,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-// Définition plate-forme
+// DÃ©finition plate-forme
 #include "htsconfig.h"
 
 // WIN32 types
@@ -179,7 +179,7 @@ Please visit our Website: http://www.httrack.com
 #define BIGSTK
 #endif
 
-// compatibilité DOS
+// compatibilitÃ© DOS
 #ifdef _WIN32
 #define HTS_DOSNAME 1
 #else
@@ -279,7 +279,7 @@ Please visit our Website: http://www.httrack.com
 #define LF "\x0a"
 #endif
 
-/* équivaut à "paramètre vide", par exemple -F (none) */
+/* Ã©quivaut Ã  "paramÃ¨tre vide", par exemple -F (none) */
 #define HTS_NOPARAM "(none)"
 #define HTS_NOPARAM2 "\"(none)\""
 
@@ -381,7 +381,7 @@ typedef int T_SOC;
 #define __cdecl 
 #endif
 
-/* mode pour mkdir ET chmod (accès aux fichiers) */
+/* mode pour mkdir ET chmod (accÃ¨s aux fichiers) */
 #define HTS_PROTECT_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
 #if HTS_ACCESS
 #define HTS_ACCESS_FILE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
@@ -391,7 +391,7 @@ typedef int T_SOC;
 #define HTS_ACCESS_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
 #endif
 
-/* vérifier la déclaration des variables préprocesseur */
+/* vÃ©rifier la dÃ©claration des variables prÃ©processeur */
 #ifndef HTS_DOSNAME
 #error | HTS_DOSNAME Has not been defined.
 #error | Set it to 1 if you are under DOS, 0 under Unix.
@@ -401,7 +401,7 @@ typedef int T_SOC;
 #error
 #endif
 #ifndef HTS_ACCESS
-/* Par défaut, accès à tous les utilisateurs */
+/* Par dÃ©faut, accÃ¨s Ã  tous les utilisateurs */
 #define HTS_ACCESS 1
 #endif
 
@@ -412,7 +412,7 @@ typedef int T_SOC;
 
 /* HTSLib */
 
-// Cache DNS, accélère les résolution d'adresses
+// Cache DNS, accÃ©lÃ¨re les rÃ©solution d'adresses
 #define HTS_DNSCACHE 1
 
 // ID d'une pseudo-socket locale pour les file://
@@ -459,7 +459,7 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 /* Debugging                                                    */
 /* ------------------------------------------------------------ */
 
-// débuggage types
+// dÃ©buggage types
 #define DEBUG_SHOWTYPES 0
 // backing debug
 #define BDEBUG 0
@@ -477,29 +477,29 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #define DEBUG_ROBOTS 0
 // debug hash
 #define DEBUG_HASH 0
-// Vérification d'intégrité
+// VÃ©rification d'intÃ©gritÃ©
 #define DEBUG_CHECKINT 0
 // nbr sockets debug
 #define NSDEBUG 0
 
-// débuggage HTSLib
+// dÃ©buggage HTSLib
 #define HDEBUG 0
 // surveillance de la connexion
 #define CNXDEBUG 0
 // debuggage cookies
 #define DEBUG_COOK 0
-// débuggage hard..
+// dÃ©buggage hard..
 #define HTS_WIDE_DEBUG 0
 // debuggage deletehttp et cie
 #define HTS_DEBUG_CLOSESOCK 0
-// debug tracage mémoire
+// debug tracage mÃ©moire
 #define MEMDEBUG 0
 
 // htsmain
 #define DEBUG_STEPS 0
 
 
-// Débuggage de contrôle
+// DÃ©buggage de contrÃ´le
 #if HTS_DEBUG_CLOSESOCK
 #define _HTS_WIDE 1
 #endif

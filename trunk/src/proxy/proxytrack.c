@@ -131,7 +131,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 /* Network base */
 #include "htsbasenet.h"
 
-/* définitions globales */
+/* dÃ©finitions globales */
 #include "htsglobal.h"
 
 /* htsweb */
@@ -186,7 +186,7 @@ static int linputsoc(T_SOC soc, char* s, int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
+        case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -521,7 +521,7 @@ static time_t get_time_rfc822(const char* s) {
 			str[i] = s[i];
 	}
 	str[i] = 0;
-  /* éliminer :,- */
+  /* Ã©liminer :,- */
   while( (a=strchr(str,'-')) ) *a=' ';
   while( (a=strchr(str,':')) ) *a=' ';
   while( (a=strchr(str,',')) ) *a=' ';
@@ -530,7 +530,7 @@ static time_t get_time_rfc822(const char* s) {
   while(*a) {
     char *first,*last;
     char tok[256];
-    /* découper mot */
+    /* dÃ©couper mot */
     while(*a==' ') a++;   /* sauter espaces */
     first=a;
     while((*a) && (*a!=' ')) a++;

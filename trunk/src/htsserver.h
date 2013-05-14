@@ -132,7 +132,7 @@ static int linputsoc(T_SOC soc, char* s, int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 9: case 12: break;  // sauter ces caractères
+        case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -207,7 +207,7 @@ static int linput(FILE* fp,char* s,int max) {
       switch(c) {
         case 13: break;  // sauter CR
         case 10: c=-1; break;
-        case 0: case 9: case 12: break;  // sauter ces caractères
+        case 0: case 9: case 12: break;  // sauter ces caractÃ¨res
         default: s[j++]=(char) c; break;
       }
     }
@@ -227,7 +227,7 @@ static int linput_trim(FILE* fp,char* s,int max) {
       // sauter espaces et tabs en fin
       while( (rlen>0) && is_realspace(ls[max(rlen-1,0)]) )
         ls[--rlen]='\0';
-      // sauter espaces en début
+      // sauter espaces en dÃ©but
       a=ls;
       while((rlen>0) && ((*a==' ') || (*a=='\t'))) {
         a++;
@@ -266,7 +266,7 @@ static void unescapehttp(char* s, String* tempo) {
       i++;
       hc = (char) ehex(s+i);
       StringAddchar(*tempo, (char) hc);
-      i++;    // sauter 2 caractères finalement
+      i++;    // sauter 2 caractÃ¨res finalement
     }
     else if (s[i]=='+') {
       StringAddchar(*tempo, ' ');
@@ -290,7 +290,7 @@ static void unescapeini(char* s, String* tempo) {
       if (!is_retorsep(hc) || !is_retorsep(lastc)) {
         StringAddchar(*tempo, lastc = (char) hc);
       }
-      i++;    // sauter 2 caractères finalement
+      i++;    // sauter 2 caractÃ¨res finalement
     }
     else
       StringAddchar(*tempo, lastc = s[i]);

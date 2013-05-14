@@ -53,7 +53,7 @@ typedef struct htsblk htsblk;
 typedef struct t_dnscache t_dnscache;
 #endif
 
-/* définitions globales */
+/* dÃ©finitions globales */
 #include "htsglobal.h"
 
 /* basic net definitions */
@@ -71,8 +71,8 @@ typedef struct t_dnscache t_dnscache;
 /* cookies et auth */
 #include "htsbauth.h"
 
-// Attention, définition existante également dans le shell
-// (à modifier avec celle-ci)
+// Attention, dÃ©finition existante Ã©galement dans le shell
+// (Ã  modifier avec celle-ci)
 #define POSTTOK "?>post"
 
 #include "htsopt.h"
@@ -97,7 +97,7 @@ MSVC2003INLINEBUG HTS_STATIC char* getHtsOptBuff_(httrackp *opt) {
 #undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT) ( getHtsOptBuff_(OPT) )
 
-// structure pour paramètres supplémentaires lors de la requête
+// structure pour paramÃ¨tres supplÃ©mentaires lors de la requÃªte
 #ifndef HTS_DEF_FWSTRUCT_htsrequest_proxy
 #define HTS_DEF_FWSTRUCT_htsrequest_proxy
 typedef struct htsrequest_proxy htsrequest_proxy;
@@ -114,9 +114,9 @@ typedef struct htsrequest htsrequest;
 #endif
 struct htsrequest {
   short int user_agent_send;  // user agent (ex: httrack/1.0 [sun])
-  short int http11;           // l'en tête peut (doit) être signé HTTP/1.1 et non HTTP/1.0
+  short int http11;           // l'en tÃªte peut (doit) Ãªtre signÃ© HTTP/1.1 et non HTTP/1.0
   short int nokeepalive;      // pas de keep-alive
-  short int range_used;       // Range utilisé
+  short int range_used;       // Range utilisÃ©
   short int nocompression;    // Pas de compression
   short int flush_garbage;    // recycled
   char user_agent[128];
@@ -127,32 +127,32 @@ struct htsrequest {
 };
 
 
-// structure pour retour d'une connexion/prise d'en tête
+// structure pour retour d'une connexion/prise d'en tÃªte
 #ifndef HTS_DEF_FWSTRUCT_htsblk
 #define HTS_DEF_FWSTRUCT_htsblk
 typedef struct htsblk htsblk;
 #endif
 struct htsblk {
   int statuscode;        // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  short int notmodified; // page ou fichier NON modifié (transféré)
-  short int is_write;    // sortie sur disque (out) ou en mémoire (adr)
+  short int notmodified; // page ou fichier NON modifiÃ© (transfÃ©rÃ©)
+  short int is_write;    // sortie sur disque (out) ou en mÃ©moire (adr)
   short int is_chunk;    // mode chunk
-  short int compressed;  // compressé?
+  short int compressed;  // compressÃ©?
   short int empty;       // vide?
   short int keep_alive;  // Keep-Alive?
   short int keep_alive_trailers;  // ..with trailers extension
   int keep_alive_t;      // KA timeout
   int keep_alive_max;    // KA number of requests
-  char* adr;             // adresse du bloc de mémoire, NULL=vide
-  char* headers;         // adresse des en têtes si présents
-  FILE* out;             // écriture directe sur disque (si is_write=1)
+  char* adr;             // adresse du bloc de mÃ©moire, NULL=vide
+  char* headers;         // adresse des en tÃªtes si prÃ©sents
+  FILE* out;             // Ã©criture directe sur disque (si is_write=1)
   LLint size;            // taille fichier
-  char msg[80];          // message éventuel si échec ("\0"=non précisé)
+  char msg[80];          // message Ã©ventuel si Ã©chec ("\0"=non prÃ©cisÃ©)
   char contenttype[64];  // content-type ("text/html" par exemple)
   char charset[64];      // charset ("iso-8859-1" par exemple)
   char contentencoding[64];  // content-encoding ("gzip" par exemple)
-  char* location;        // on copie dedans éventuellement la véritable 'location'
-  LLint totalsize;       // taille totale à télécharger (-1=inconnue)
+  char* location;        // on copie dedans Ã©ventuellement la vÃ©ritable 'location'
+  LLint totalsize;       // taille totale Ã  tÃ©lÃ©charger (-1=inconnue)
   short int is_file;     // ce n'est pas une socket mais un descripteur de fichier si 1
   T_SOC soc;             // ID socket
   SOCaddr address;       // IP address
@@ -165,14 +165,14 @@ struct htsblk {
 #endif
   char lastmodified[64]; // Last-Modified
   char etag[64];         // Etag
-  char cdispo[256];      // Content-Disposition coupé
+  char cdispo[256];      // Content-Disposition coupÃ©
   LLint  crange;         // Content-Range
   LLint  crange_start;   // Content-Range
   LLint  crange_end;     // Content-Range
   int debugid;           // debug connection
   /* */
-  htsrequest req;        // paramètres pour la requête
-  /*char digest[32+2];   // digest md5 généré par le moteur ("" si non généré)*/
+  htsrequest req;        // paramÃ¨tres pour la requÃªte
+  /*char digest[32+2];   // digest md5 gÃ©nÃ©rÃ© par le moteur ("" si non gÃ©nÃ©rÃ©)*/
 };
 
 
@@ -192,26 +192,26 @@ typedef struct OLD_htsblk OLD_htsblk;
 #endif
 struct OLD_htsblk {
   int statuscode;  // ANCIENNE STURCTURE - status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  int notmodified; // ANCIENNE STURCTURE - page ou fichier NON modifié (transféré)
-  int is_write;    // ANCIENNE STURCTURE - sortie sur disque (out) ou en mémoire (adr)
-  char* adr;       // ANCIENNE STURCTURE - adresse du bloc de mémoire, NULL=vide
-  FILE* out;       // ANCIENNE STURCTURE - écriture directe sur disque (si is_write=1)
+  int notmodified; // ANCIENNE STURCTURE - page ou fichier NON modifiÃ© (transfÃ©rÃ©)
+  int is_write;    // ANCIENNE STURCTURE - sortie sur disque (out) ou en mÃ©moire (adr)
+  char* adr;       // ANCIENNE STURCTURE - adresse du bloc de mÃ©moire, NULL=vide
+  FILE* out;       // ANCIENNE STURCTURE - Ã©criture directe sur disque (si is_write=1)
   int size;        // ANCIENNE STURCTURE - taille fichier
-  char msg[80];    // ANCIENNE STURCTURE - message éventuel si échec ("\0"=non précisé)
+  char msg[80];    // ANCIENNE STURCTURE - message Ã©ventuel si Ã©chec ("\0"=non prÃ©cisÃ©)
   char contenttype[64];  // ANCIENNE STURCTURE - content-type ("text/html" par exemple)
-  char* location;  // ANCIENNE STURCTURE - on copie dedans éventuellement la véritable 'location'
-  int totalsize;   // ANCIENNE STURCTURE - taille totale à télécharger (-1=inconnue)
+  char* location;  // ANCIENNE STURCTURE - on copie dedans Ã©ventuellement la vÃ©ritable 'location'
+  int totalsize;   // ANCIENNE STURCTURE - taille totale Ã  tÃ©lÃ©charger (-1=inconnue)
   int is_file;     // ANCIENNE STURCTURE - ce n'est pas une socket mais un descripteur de fichier si 1
   T_SOC soc;       // ANCIENNE STURCTURE - ID socket
   FILE* fp;        // ANCIENNE STURCTURE - fichier pour file://
   OLD_t_proxy proxy;   // ANCIENNE STURCTURE - proxy
   int user_agent_send;  // ANCIENNE STURCTURE - user agent (ex: httrack/1.0 [sun])
   char user_agent[64];
-  int http11;           // ANCIENNE STURCTURE - l'en tête doit être signé HTTP/1.1 et non HTTP/1.0
+  int http11;           // ANCIENNE STURCTURE - l'en tÃªte doit Ãªtre signÃ© HTTP/1.1 et non HTTP/1.0
 };
 /* fin ANCIENNE STURCTURE pour cache 1.0 */
 
-// cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
+// cache pour le dns, pour Ã©viter de faire des gethostbyname sans arrÃªt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache
 #define HTS_DEF_FWSTRUCT_t_dnscache
 typedef struct t_dnscache t_dnscache;
@@ -220,9 +220,9 @@ struct t_dnscache {
   char iadr[1024];
   struct t_dnscache* n;
   char host_addr[HTS_MAXADDRLEN];    // 4 octets (v4), ou 16 octets (v6)
-  int host_length;                   // 4 normalement - ==0  alors en cours de résolution
+  int host_length;                   // 4 normalement - ==0  alors en cours de rÃ©solution
                                      // ou >16 si sockaddr
-                                     //                 ==-1 alors erreur (host n'éxiste pas)
+                                     //                 ==-1 alors erreur (host n'Ã©xiste pas)
 };
 
 
@@ -557,7 +557,7 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 #define HTTP_IS_OK(code) ( ( (code) / 100 ) == 2 )
 #define HTTP_IS_ERROR(code) ( !HTTP_IS_OK(code) && !HTTP_IS_REDIRECT(code) && !HTTP_IS_NOTMODIFIED(code) )
 
-// compare le début de f avec s et retourne la position de la fin
+// compare le dÃ©but de f avec s et retourne la position de la fin
 // 'A=a' (case insensitive)
 HTS_STATIC int strfield(const char* f,const char* s) {
   int r=0;

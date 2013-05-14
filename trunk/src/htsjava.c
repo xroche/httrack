@@ -191,7 +191,7 @@ static int hts_parse_java(t_hts_callbackarg *carg, httrackp *opt,
 #if JAVADEBUG
       printf("header\n");
 #endif
-      // tester en tête
+      // tester en tÃªte
       if (reverse_endian()) {
         header.magic = hts_swap32(header.magic);
         header.count = hts_swap16(header.count); 
@@ -415,7 +415,7 @@ static  RESP_STRUCT readtable(htsmoduleStruct* str,
     break;
   default:
     // printf("Type inconnue\n");
-    // on arrête tout 
+    // on arrÃªte tout 
     sprintf(str->err_msg,"Internal structure unknown (type %d)",trans.type);
     *error = 1;
     return(trans);

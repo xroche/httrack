@@ -107,7 +107,7 @@ static void unescapehttp(char* s, String* tempo) {
       i++;
       hc = (char) ehex(s+i);
       StringAddchar(*tempo, (char) hc);
-      i++;    // sauter 2 caractères finalement
+      i++;    // sauter 2 caractÃ¨res finalement
     }
     else if (s[i]=='+') {
       StringAddchar(*tempo, ' ');
@@ -117,11 +117,11 @@ static void unescapehttp(char* s, String* tempo) {
   }
 }
 
-// forme à partir d'un lien et du contexte (origin_fil et origin_adr d'où il est tiré) adr et fil
+// forme Ã  partir d'un lien et du contexte (origin_fil et origin_adr d'oÃ¹ il est tirÃ©) adr et fil
 // [adr et fil sont des buffers de 1ko]
 // 0 : ok
 // -1 : erreur
-// -2 : protocole non supporté (ftp)
+// -2 : protocole non supportÃ© (ftp)
 int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin_fil,char* adr,char* fil) {
   int ok=0;
   int scheme=0;
@@ -153,12 +153,12 @@ int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin
   }
   else if (strfield(lien,"ftp://")) {
     // Note: ftp:foobar.gif is not valid
-    if (ftp_available()) {     // ftp supporté
+    if (ftp_available()) {     // ftp supportÃ©
       if (ident_url_absolute(lien,adr,fil)==-1) {        
         ok=-1;    // erreur URL
       }
     } else {
-      ok=-2;  // non supporté
+      ok=-2;  // non supportÃ©
     }
 #if HTS_USEMMS
 	} else if (strfield(lien,"mms://")) {
@@ -187,7 +187,7 @@ int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin
     )) {
     ok=-1;      // unknown scheme
   } else {    // c'est un lien relatif
-    // On forme l'URL complète à partie de l'url actuelle
+    // On forme l'URL complÃ¨te Ã  partie de l'url actuelle
     // et du chemin actuel si besoin est.
     
     // copier adresse
@@ -196,23 +196,23 @@ int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin
       /* patch scheme if necessary */
       if (strfield(lien,"http:")) {
         lien+=5;
-        strcpybuff(adr, jump_protocol(origin_adr));    // même adresse ; protocole vide (http)
+        strcpybuff(adr, jump_protocol(origin_adr));    // mÃªme adresse ; protocole vide (http)
       } else if (strfield(lien,"https:")) {
         lien+=6;
-        strcpybuff(adr, "https://");   // même adresse forcée en https
+        strcpybuff(adr, "https://");   // mÃªme adresse forcÃ©e en https
         strcatbuff(adr, jump_protocol(origin_adr));
       } else if (strfield(lien,"ftp:")) {
         lien+=4;
-        strcpybuff(adr, "ftp://");   // même adresse forcée en ftp
+        strcpybuff(adr, "ftp://");   // mÃªme adresse forcÃ©e en ftp
         strcatbuff(adr, jump_protocol(origin_adr));
 #if HTS_USEMMS
       } else if (strfield(lien,"mms:")) {
         lien+=4;
-        strcpybuff(adr, "mms://");   // même adresse forcée en ftp
+        strcpybuff(adr, "mms://");   // mÃªme adresse forcÃ©e en ftp
         strcatbuff(adr, jump_protocol(origin_adr));
 #endif
       } else {
-        strcpybuff(adr,origin_adr);    // même adresse ; et même éventuel protocole
+        strcpybuff(adr,origin_adr);    // mÃªme adresse ; et mÃªme Ã©ventuel protocole
       }
       
       if (*lien!='/') {  // sinon c'est un lien absolu
@@ -275,8 +275,8 @@ int ident_url_relatif(const char *lien,const char* origin_adr,const char* origin
 
 
 
-// créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
-// un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
+// crÃ©er dans s, Ã  partir du chemin courant curr_fil, le lien vers link (absolu)
+// un ident_url_relatif a dÃ©ja Ã©tÃ© fait avant, pour que link ne soit pas un chemin relatif
 int lienrelatif(char* s,const char* link,const char* curr_fil) {
   char BIGSTK _curr[HTS_URLMAXSIZE*2];
   char BIGSTK newcurr_fil[HTS_URLMAXSIZE*2],newlink[HTS_URLMAXSIZE*2];
@@ -288,7 +288,7 @@ int lienrelatif(char* s,const char* link,const char* curr_fil) {
   newcurr_fil[0]='\0'; newlink[0]='\0';
   //
 
-  // patch: éliminer les ? (paramètres) sinon bug
+  // patch: Ã©liminer les ? (paramÃ¨tres) sinon bug
   {
     const char* a;
     if ( (a=strchr(curr_fil,'?')) ) {
@@ -305,7 +305,7 @@ int lienrelatif(char* s,const char* link,const char* curr_fil) {
   curr=_curr;
   strcpybuff(curr,curr_fil);
   if ((a=strchr(curr,'?'))==NULL)  // couper au ? (params)
-    a=curr+strlen(curr)-1;         // pas de params: aller à la fin
+    a=curr+strlen(curr)-1;         // pas de params: aller Ã  la fin
   while((*a!='/') && ( a> curr)) a--;       // chercher dernier / du chemin courant
   if (*a=='/') *(a+1)='\0';                           // couper dernier /
   
@@ -321,14 +321,14 @@ int lienrelatif(char* s,const char* link,const char* curr_fil) {
     //c=curr;
     // couper ce qui est commun
     while ((streql(*link,*curr)) && (*link!=0)) {link++; curr++; }
-    // mais on veut un répertoirer entier!
+    // mais on veut un rÃ©pertoirer entier!
     // si on a /toto/.. et /toto2/.. on ne veut pas sauter /toto !
     while(((*link!='/') || (*curr!='/')) && ( link > l)) { link--; curr--; }
     //if (*link=='/') link++;
     //if (*curr=='/') curr++;
   }
   
-  // calculer la profondeur du répertoire courant et remonter
+  // calculer la profondeur du rÃ©pertoire courant et remonter
   // LES ../ ONT ETE SIMPLIFIES
   a=curr;
   if (*a=='/') a++;
@@ -337,7 +337,7 @@ int lienrelatif(char* s,const char* link,const char* curr_fil) {
 
   if (slash) strcatbuff(s,"/");    // garder absolu!!
   
-  // on est dans le répertoire de départ, copier
+  // on est dans le rÃ©pertoire de dÃ©part, copier
   strcatbuff(s,link + ((*link=='/')?1:0) );
 
   /* Security check */
@@ -400,7 +400,7 @@ void long_to_83(int mode,char* n83,char* save) {
 }
 
 
-// conversion nom de fichier/dossier isolé vers 8-3 ou ISO9660
+// conversion nom de fichier/dossier isolÃ© vers 8-3 ou ISO9660
 void longfile_to_83(int mode,char* n83,char* save) {
   int j=0,max=0;
   int i = 0;
@@ -480,7 +480,7 @@ void longfile_to_83(int mode,char* n83,char* save) {
   }
 }
 
-// écrire backblue.gif
+// Ã©crire backblue.gif
 /* Note: utf-8 */
 int verif_backblue(httrackp* opt, const char* base) {
   int* done = &opt->state.verif_backblue_done;
@@ -527,8 +527,8 @@ int verif_external(httrackp* opt,int nb,int test) {
 }
 
 
-// recherche chaîne de type truc<espaces>=
-// renvoi décalage à effectuer ou 0 si non trouvé
+// recherche chaÃ®ne de type truc<espaces>=
+// renvoi dÃ©calage Ã  effectuer ou 0 si non trouvÃ©
 /* SECTION OPTIMISEE:
 #define rech_tageq(adr,s) ( \
   ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) ? \
@@ -549,7 +549,7 @@ HTS_INLINE int rech_tageq(const char* adr,const char* s) {
   return 0;
 }
 */
-// Deuxième partie
+// DeuxiÃ¨me partie
 HTS_INLINE int __rech_tageq(const char* adr,const char* s) { 
   int p;
   p=strfield(adr,s);
@@ -638,7 +638,7 @@ HTS_INLINE int rech_sampletag(const char* adr,const char* s) {
   return 0;
 }
 
-// teste si le tag contenu dans from est égal à "tag"
+// teste si le tag contenu dans from est Ã©gal Ã  "tag"
 HTS_INLINE int check_tag(char* from,const char* tag) {
   char* a=from+1;
   int i=0;
@@ -649,7 +649,7 @@ HTS_INLINE int check_tag(char* from,const char* tag) {
   return (strfield2(s,tag));  // comparer
 }
 
-// teste si un fichier dépasse le quota
+// teste si un fichier dÃ©passe le quota
 int istoobig(httrackp *opt,LLint size,LLint maxhtml,LLint maxnhtml,char* type) {
   int ok=1;
   if (size>0) {
@@ -709,7 +709,7 @@ HTSEXT_API int hts_buildtopindex(httrackp* opt,const char* path,const char* binp
     fpo=fopen(fconcat(catbuff, rpath,"/index.html"),"wb");
     if (fpo) {
       find_handle h;
-      verif_backblue(opt,concat(catbuff, rpath,"/"));    // générer gif
+      verif_backblue(opt,concat(catbuff, rpath,"/"));    // gÃ©nÃ©rer gif
       // Header
       fprintf(fpo,toptemplate_header,
         "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->"

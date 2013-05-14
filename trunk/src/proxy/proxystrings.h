@@ -58,7 +58,7 @@ static void unescapehttp(const char* s, String* tempo) {
       i++;
       hc = (char) ehex(s+i);
       StringAddchar(*tempo, (char) hc);
-      i++;    // sauter 2 caractères finalement
+      i++;    // sauter 2 caractÃ¨res finalement
     }
     else if (s[i]=='+') {
       StringAddchar(*tempo, ' ');

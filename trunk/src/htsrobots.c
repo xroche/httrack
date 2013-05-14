@@ -48,7 +48,7 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-// fil="" : vérifier si règle déja enregistrée
+// fil="" : vÃ©rifier si rÃ¨gle dÃ©ja enregistrÃ©e
 int checkrobots(robots_wizard* robots,char* adr,char* fil) {
   while(robots) {
     if (strfield2(robots->adr,adr)) {
@@ -81,7 +81,7 @@ int checkrobots_set(robots_wizard* robots,char* adr,char* data) {
   if (((int) strlen(adr)) >= sizeof(robots->adr) - 2) return 0;
   if (((int) strlen(data)) >= sizeof(robots->token) - 2) return 0;
   while(robots) {
-    if (strfield2(robots->adr,adr)) {    // entrée existe
+    if (strfield2(robots->adr,adr)) {    // entrÃ©e existe
       strcpybuff(robots->token,data);
 #if DEBUG_ROBOTS
         printf("robots.txt: set %s to %s\n",adr,data);

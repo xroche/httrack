@@ -53,16 +53,16 @@ typedef struct _PT_Element {
 	int indexId;           // index identifier, if suitable (!= -1)
 	//
   int statuscode;        // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  char* adr;             // adresse du bloc de mémoire, NULL=vide
-  char* headers;         // adresse des en têtes si présents (RFC822 format)
+  char* adr;             // adresse du bloc de mÃ©moire, NULL=vide
+  char* headers;         // adresse des en tÃªtes si prÃ©sents (RFC822 format)
   size_t size;	         // taille fichier
   char msg[1024];        // error message ("\0"=undefined)
   char contenttype[64];  // content-type ("text/html" par exemple)
   char charset[64];      // charset ("iso-8859-1" par exemple)
-  char* location;        // on copie dedans éventuellement la véritable 'location'
+  char* location;        // on copie dedans Ã©ventuellement la vÃ©ritable 'location'
   char lastmodified[64]; // Last-Modified
   char etag[64];         // Etag
-  char cdispo[256];      // Content-Disposition coupé
+  char cdispo[256];      // Content-Disposition coupÃ©
 } _PT_Element;
 typedef struct _PT_Element *PT_Element;
 

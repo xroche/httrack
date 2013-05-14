@@ -59,7 +59,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
-/* définitions globales */
+/* dÃ©finitions globales */
 #include "htsglobal.h"
 
 /* htslib */
@@ -195,7 +195,7 @@ T_SOC smallserver_init(int* port,char* adr) {
           // effacer structure
           /*memset(&server2, 0, sizeof(server2));
           if (getsockname(soc,(struct sockaddr*) &server2,&len) == 0) {
-            *port=ntohs(SOCaddr_sinport(server));  // récupérer port*/
+            *port=ntohs(SOCaddr_sinport(server));  // rÃ©cupÃ©rer port*/
             if (listen(soc,10)>=0) {    // au pif le 10
               // SOCaddr_inetntoa(adr, 128, server2, len);
               strcpy(adr, h_loc);
@@ -1354,7 +1354,7 @@ static int htslang_load(char* limit_to, char* path) {
             }  while (strnotempty(test));
           }
 
-          if (!strnotempty(test)) {         // éviter doublons
+          if (!strnotempty(test)) {         // Ã©viter doublons
             // conv_printf(key,key);
             int len;
             char* buff;
@@ -1523,7 +1523,7 @@ static void LANG_DELETE(void) {
   inthash_delete(&NewLangStrKeys);
 }
 
-// sélection de la langue
+// sÃ©lection de la langue
 static void LANG_INIT(char* path) {
   //CWinApp* pApp = AfxGetApp();
   //if (pApp) {
