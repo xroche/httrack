@@ -5079,7 +5079,6 @@ int ftp_available(void) {
 }
 #endif
 
-static void hts_debug(int level);
 static void hts_debug_log_print(const char *format, ...);
 
 static int hts_dgb_init = 0;
