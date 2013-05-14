@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Charset conversion functions                           */
@@ -51,18 +48,20 @@ Please visit our Website: http://www.httrack.com
  * Convert the string "s" from charset "charset" to UTF-8.
  * Return NULL upon error.
  **/
-extern char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset);
+extern char *hts_convertStringToUTF8(const char *s, size_t size,
+                                     const char *charset);
 
 /**
  * Convert the string "s" from UTF-8 to charset "charset".
  * Return NULL upon error.
  **/
-extern char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset);
+extern char *hts_convertStringFromUTF8(const char *s, size_t size,
+                                       const char *charset);
 
 /**
  * Extract the charset from the HTML buffer "html"
  **/
-extern char* hts_getCharsetFromMeta(const char *html, size_t size);
+extern char *hts_getCharsetFromMeta(const char *html, size_t size);
 
 /**
  * Get an UTF-8 string length in characters.
@@ -74,7 +73,7 @@ extern size_t hts_stringLengthUTF8(const char *s);
 /**
  * Convert UTF-8 to WCHAR.
  **/
-extern LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int* pwsize);
+extern LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize);
 
 /**
  * Convert from WCHAR.

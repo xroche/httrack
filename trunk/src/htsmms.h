@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: basic mms protocol manager .h                          */
@@ -38,9 +35,8 @@ Please visit our Website: http://www.httrack.com
 /* Thanks to all of them!                                       */
 /* ------------------------------------------------------------ */
 
-
 #ifndef HTSMMS_DEFH
-#define HTSMMS_DEFH 
+#define HTSMMS_DEFH
 
 #if HTS_USEMMS
 
@@ -59,11 +55,11 @@ typedef struct httrackp httrackp;
 typedef struct MMSDownloadStruct MMSDownloadStruct;
 #endif
 struct MMSDownloadStruct {
-	lien_back *pBack;
-	httrackp *pOpt;
+  lien_back *pBack;
+  httrackp *pOpt;
 };
 
-void launch_mms(const MMSDownloadStruct* pStruct);
+void launch_mms(const MMSDownloadStruct * pStruct);
 #endif
 
 #endif

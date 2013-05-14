@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: httrack.c subroutines:                                 */
@@ -35,10 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-
-
 #ifndef HTSHASH_DEFH
-#define HTSHASH_DEFH 
+#define HTSHASH_DEFH
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -50,10 +45,11 @@ typedef struct hash_struct hash_struct;
 #endif
 
 // tables de hachage
-int hash_read(const hash_struct* hash,const char* nom1,const char* nom2,int type,int normalized);
-void hash_write(hash_struct* hash,int lpos,int normalized);
-int* hash_calc_chaine(hash_struct* hash,int type,int pos);
-unsigned long int hash_cle(const char* nom1,const char* nom2);
+int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
+              int type, int normalized);
+void hash_write(hash_struct * hash, int lpos, int normalized);
+int *hash_calc_chaine(hash_struct * hash, int type, int pos);
+unsigned long int hash_cle(const char *nom1, const char *nom2);
 #endif
 
 #endif

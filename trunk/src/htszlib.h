@@ -17,24 +17,20 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Unpacking subroutines using Jean-loup Gailly's Zlib    */
 /*       for http compressed data                               */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
-
 
 #ifndef HTS_DEFZLIB
 #define HTS_DEFZLIB
@@ -51,9 +47,9 @@ Please visit our Website: http://www.httrack.com
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 extern int gz_is_available;
-extern int hts_zunpack(char* filename,char* newfile);
-extern int hts_extract_meta(const char* path);
-extern const char* hts_get_zerror(int err);
+extern int hts_zunpack(char *filename, char *newfile);
+extern int hts_extract_meta(const char *path);
+extern const char *hts_get_zerror(int err);
 #endif
 
 #endif

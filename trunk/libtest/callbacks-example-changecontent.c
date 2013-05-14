@@ -25,33 +25,36 @@
 #include "htsdefines.h"
 
 /* Local function definitions */
-static int postprocess(t_hts_callbackarg *carg, httrackp *opt, 
-                       char** html, int* len,
-                       const char* url_address, const char* url_file);
+static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
+                       int *len, const char *url_address, const char *url_file);
 
 /* external functions */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv);
 
 /* 
 module entry point 
 */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   const char *arg = strchr(argv, ',');
+
   if (arg != NULL)
     arg++;
 
   /* Plug callback functions */
   CHAIN_FUNCTION(opt, postprocess, postprocess, NULL);
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
-static int postprocess(t_hts_callbackarg *carg, httrackp *opt, char** html,int* len,const char* url_address,const char* url_file) {
+static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
+                       int *len, const char *url_address,
+                       const char *url_file) {
   char *old = *html;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, postprocess) != NULL) {
-    if (CALLBACKARG_PREV_FUN(carg, postprocess)(CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
+    if (CALLBACKARG_PREV_FUN(carg, postprocess)
+        (CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
       /* Modified *html */
       old = *html;
     }

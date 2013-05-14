@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Basic net definitions                                  */
@@ -41,7 +38,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef _WIN32
 
 #if HTS_INET6==0
- #include <winsock2.h>
+#include <winsock2.h>
 #else
 
 #ifndef _WIN32_WCE
@@ -57,8 +54,8 @@ Please visit our Website: http://www.httrack.com
 //#include <winsock2.h>
 //#include <tpipv6.h>
 #else
- #include <winsock2.h>
- #include <socket.h>
+#include <winsock2.h>
+#include <socket.h>
 #endif
 
 #endif
@@ -67,8 +64,8 @@ typedef struct hostent FAR t_hostent;
 
 #else
 #define HTS_USESCOPEID
- #define INVALID_SOCKET -1
- typedef struct hostent t_hostent;
+#define INVALID_SOCKET -1
+typedef struct hostent t_hostent;
 #endif
 
 #if HTS_USEOPENSSL
@@ -113,26 +110,26 @@ typedef struct hostent FAR t_hostent;
 
 /* */
 typedef void SSL_CTX;
-typedef void* SSL;
+typedef void *SSL;
 typedef void SSL_METHOD;
-typedef int (*t_SSL_shutdown)(SSL *ssl);
-typedef void (*t_SSL_free)(SSL *ssl);
-typedef SSL (*t_SSL_new)(SSL_CTX *ctx);
-typedef int (*t_SSL_clear)(SSL *ssl);
-typedef int (*t_SSL_set_fd)(SSL *ssl, int fd);
-typedef void (*t_SSL_set_connect_state)(SSL *ssl);
-typedef int (*t_SSL_connect)(SSL *ssl);
-typedef int (*t_SSL_get_error)(SSL *ssl, int ret);
-typedef int (*t_SSL_write)(SSL *ssl, const void *buf, int num);
-typedef int (*t_SSL_read)(SSL *ssl, void *buf, int num);
-typedef int (*t_SSL_library_init)(void);
-typedef void (*t_ERR_load_crypto_strings)(void);
-typedef void (*t_ERR_load_SSL_strings)(void);
-typedef SSL_METHOD * (*t_SSLv23_client_method)(void);
-typedef SSL_CTX * (*t_SSL_CTX_new)(SSL_METHOD *method);
-typedef char * (*t_ERR_error_string)(unsigned long e, char *buf);
-typedef void (*t_SSL_load_error_strings)(void);
-typedef long (*t_SSL_CTX_ctrl)(SSL_CTX *ctx, int cmd, long larg, char *parg);
+typedef int (*t_SSL_shutdown) (SSL * ssl);
+typedef void (*t_SSL_free) (SSL * ssl);
+typedef SSL(*t_SSL_new) (SSL_CTX * ctx);
+typedef int (*t_SSL_clear) (SSL * ssl);
+typedef int (*t_SSL_set_fd) (SSL * ssl, int fd);
+typedef void (*t_SSL_set_connect_state) (SSL * ssl);
+typedef int (*t_SSL_connect) (SSL * ssl);
+typedef int (*t_SSL_get_error) (SSL * ssl, int ret);
+typedef int (*t_SSL_write) (SSL * ssl, const void *buf, int num);
+typedef int (*t_SSL_read) (SSL * ssl, void *buf, int num);
+typedef int (*t_SSL_library_init) (void);
+typedef void (*t_ERR_load_crypto_strings) (void);
+typedef void (*t_ERR_load_SSL_strings) (void);
+typedef SSL_METHOD *(*t_SSLv23_client_method) (void);
+typedef SSL_CTX *(*t_SSL_CTX_new) (SSL_METHOD * method);
+typedef char *(*t_ERR_error_string) (unsigned long e, char *buf);
+typedef void (*t_SSL_load_error_strings) (void);
+typedef long (*t_SSL_CTX_ctrl) (SSL_CTX * ctx, int cmd, long larg, char *parg);
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -167,7 +164,7 @@ From /usr/include/openssl/ssl.h
 #define SSL_ERROR_WANT_READ             2
 #define SSL_ERROR_WANT_WRITE            3
 #define SSL_ERROR_WANT_X509_LOOKUP      4
-#define SSL_ERROR_SYSCALL               5 /* look at error stack/return value/errno */
+#define SSL_ERROR_SYSCALL               5       /* look at error stack/return value/errno */
 #define SSL_ERROR_ZERO_RETURN           6
 #define SSL_ERROR_WANT_CONNECT          7
 #define SSL_OP_ALL                                      0x000FFFFFL

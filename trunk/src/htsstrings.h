@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Strings                                                */
@@ -37,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 /* Safer Strings ; standalone .h library */
 
 #ifndef HTS_STRINGS_DEFSTATIC
-#define HTS_STRINGS_DEFSTATIC 
+#define HTS_STRINGS_DEFSTATIC
 
 /* System definitions. */
 #include <string.h>
@@ -63,7 +60,7 @@ typedef struct String String;
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
 struct String {
-  char* buffer_;
+  char *buffer_;
   size_t length_;
   size_t capacity_;
 };
@@ -135,8 +132,8 @@ struct String {
 #define StringRoom(BLK, SIZE) StringRoomTotal(BLK, StringLength(BLK) + (SIZE) + 1)
 
 /** Return the RW buffer for a strcat() operation of at most SIZE characters. **/
-#define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE) 
-HTS_STATIC char* StringBuffN_(String* blk, int size) {
+#define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE)
+HTS_STATIC char *StringBuffN_(String * blk, int size) {
   StringRoom(*blk, size);
   return StringBuffRW(*blk);
 }
@@ -212,8 +209,9 @@ The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
 } while(0)
 
 /** Acquire a string ; it's the client's responsability to free() it **/
-HTS_STATIC char* StringAcquire(String* blk) {
-  char* buff = StringBuffRW(*blk);
+HTS_STATIC char *StringAcquire(String * blk) {
+  char *buff = StringBuffRW(*blk);
+
   StringBuffRW(*blk) = NULL;
   StringCapacity(*blk) = 0;
   StringLength(*blk) = 0;
@@ -221,14 +219,15 @@ HTS_STATIC char* StringAcquire(String* blk) {
 }
 
 /** Clone a string. **/
-HTS_STATIC String StringDup(const String* src) {
+HTS_STATIC String StringDup(const String * src) {
   String s = STRING_EMPTY;
+
   StringMemcat(s, StringBuff(*src), StringLength(*src));
   return s;
 }
 
 /** Attach a string using a pointer. **/
-HTS_STATIC void StringAttach(String* blk, char** str) {
+HTS_STATIC void StringAttach(String * blk, char **str) {
   StringFree(*blk);
   if (str != NULL && *str != NULL) {
     StringBuffRW(*blk) = *str;

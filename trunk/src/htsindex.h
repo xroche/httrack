@@ -17,24 +17,20 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: htsindex.h                                             */
 /*       keyword indexing system (search index)                 */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
-
 
 #ifndef HTSKINDEX_DEFH
 #define HTSKINDEX_DEFH
@@ -44,9 +40,10 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-int index_keyword(const char* html_data,LLint size,const char* mime,const char* filename,const char* indexpath);
-void index_init(const char* indexpath);
-void index_finish(const char* indexpath,int mode);
+int index_keyword(const char *html_data, LLint size, const char *mime,
+                  const char *filename, const char *indexpath);
+void index_init(const char *indexpath);
+void index_finish(const char *indexpath, int mode);
 #endif
 
 #endif

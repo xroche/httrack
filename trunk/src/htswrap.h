@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: httrack.c subroutines:                                 */
@@ -36,7 +33,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #ifndef HTSWRAP_DEFH
-#define HTSWRAP_DEFH 
+#define HTSWRAP_DEFH
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -50,11 +47,11 @@ Please visit our Website: http://www.httrack.com
 typedef struct httrackp httrackp;
 #endif
 
-HTSEXT_API int htswrap_init(void);	// LEGACY
-HTSEXT_API int htswrap_free(void);	// LEGACY
+HTSEXT_API int htswrap_init(void);      // LEGACY
+HTSEXT_API int htswrap_free(void);      // LEGACY
 
-HTSEXT_API int htswrap_add(httrackp *opt, const char* name, void* fct);
-HTSEXT_API uintptr_t htswrap_read(httrackp *opt, const char* name);
+HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
+HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
 
 #endif
 

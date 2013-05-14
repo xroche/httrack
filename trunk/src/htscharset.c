@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Charset conversion functions                           */
@@ -39,8 +36,10 @@ Please visit our Website: http://www.httrack.com
 
 static int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
-  for(i = 0 ; i < size ; i++) {
+
+  for(i = 0; i < size; i++) {
     const unsigned char c = (const unsigned char) s[i];
+
     if (c >= 0x80) {
       return 0;
     }
@@ -205,16 +204,19 @@ static const wincodepage_t codepages[] = {
 /* Get a Windows codepage, by its name. Return 0 upon error. */
 UINT hts_getCodepage(const char *name) {
   int id;
+
 #define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
 #define CHAR_LOWER(C) ( ((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C) )
-  for(id = 0 ; codepages[id].name != NULL ; id++) {
+  for(id = 0; codepages[id].name != NULL; id++) {
     int i, j;
+
     /* Compare the two strings, lowercase and alphanum only (ISO88591 == iso-8859-1) */
     const char *a = name, *b = codepages[id].name;
-    for(i = 0, j = 0 ; ; i++, j++) {
+
+    for(i = 0, j = 0;; i++, j++) {
       /* Skip non-alnum */
-      for( ; a[i] != '\0' && !IS_ALNUM(a[i]) ; i++) ;
-      for( ; b[j] != '\0' && !IS_ALNUM(b[j]) ; j++) ;
+      for(; a[i] != '\0' && !IS_ALNUM(a[i]); i++) ;
+      for(; b[j] != '\0' && !IS_ALNUM(b[j]); j++) ;
       /* Compare */
       if (CHAR_LOWER(a[i]) != CHAR_LOWER(b[j])) {
         break;
@@ -233,6 +235,7 @@ UINT hts_getCodepage(const char *name) {
 
 static char *strndup(const char *s, size_t size) {
   char *dest = malloc(size + 1);
+
   if (dest != NULL) {
     memcpy(dest, s, size);
     dest[size] = '\0';
@@ -241,14 +244,19 @@ static char *strndup(const char *s, size_t size) {
   return NULL;
 }
 
-LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int* pwsize) {
+LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
   /* Size in wide chars of the output */
   const int wsize = MultiByteToWideChar(cp, 0, (LPCSTR) s, size, NULL, 0);
+
   if (wsize > 0) {
     LPSTR uoutput = NULL;
-    LPWSTR woutput = malloc((wsize + 1)*sizeof(WCHAR));
-    if (woutput != NULL && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput, wsize) == wsize) {
-      const int usize = WideCharToMultiByte(CP_UTF8, 0, woutput, wsize, NULL, 0, NULL, FALSE);
+    LPWSTR woutput = malloc((wsize + 1) * sizeof(WCHAR));
+
+    if (woutput != NULL
+        && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
+                               wsize) == wsize) {
+      const int usize =
+        WideCharToMultiByte(CP_UTF8, 0, woutput, wsize, NULL, 0, NULL, FALSE);
       if (usize > 0) {
         woutput[wsize] = 0x0;
         if (pwsize != NULL)
@@ -262,16 +270,19 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int* pwsize) {
   return NULL;
 }
 
-LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int* pwsize) {
+LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize) {
   return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
 }
 
 char *hts_convertUCS2StringToCP(LPWSTR woutput, int wsize, UINT cp) {
-  const int usize = WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, FALSE);
+  const int usize =
+    WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, FALSE);
   if (usize > 0) {
-    char *const uoutput = malloc((usize + 1)*sizeof(char));
+    char *const uoutput = malloc((usize + 1) * sizeof(char));
+
     if (uoutput != NULL) {
-      if (WideCharToMultiByte(cp, 0, woutput, wsize, uoutput, usize, NULL, FALSE) == usize) {
+      if (WideCharToMultiByte
+          (cp, 0, woutput, wsize, uoutput, usize, NULL, FALSE) == usize) {
         uoutput[usize] = '\0';
         return uoutput;
       } else {
@@ -300,8 +311,10 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
     /* Size in wide chars of the output */
     int wsize;
     LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, cp, &wsize);
+
     if (woutput != NULL) {
       char *const uoutput = hts_convertUCS2StringToUTF8(woutput, wsize);
+
       free(woutput);
       return uoutput;
     }
@@ -325,8 +338,10 @@ char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
     /* Size in wide chars of the output */
     int wsize;
     LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, CP_UTF8, &wsize);
+
     if (woutput != NULL) {
       char *const uoutput = hts_convertUCS2StringToCP(woutput, wsize, cp);
+
       free(woutput);
       return uoutput;
     }
@@ -338,11 +353,13 @@ char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
 
 char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
   const UINT cp = hts_getCodepage(charset);
+
   return hts_convertStringCPToUTF8(s, size, cp);
 }
 
 char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
   const UINT cp = hts_getCodepage(charset);
+
   return hts_convertStringCPFromUTF8(s, size, cp);
 }
 
@@ -355,7 +372,8 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 #include <errno.h>
 #include <iconv.h>
 
-static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to, const char *from) {
+static char *hts_convertStringToUTF8_(const char *s, size_t size,
+                                      const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
     return strdup("");
@@ -367,8 +385,9 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to
   /* Find codepage */
   else {
     const iconv_t cp = iconv_open(to, from);
-    if (cp != (iconv_t) -1) {
-      char *inbuf = (char*) s;
+
+    if (cp != (iconv_t) - 1) {
+      char *inbuf = (char *) s;
       size_t inbytesleft = size;
       size_t outbufCapa = 0;
       char *outbuf = NULL;
@@ -376,7 +395,7 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to
       size_t finalSize;
 
       /* Initial size to around the string size */
-      for(outbufCapa = 16 ; outbufCapa < size + 1 ; outbufCapa *= 2) ;
+      for(outbufCapa = 16; outbufCapa < size + 1; outbufCapa *= 2) ;
       outbuf = malloc(outbufCapa);
       outbytesleft = outbufCapa;
 
@@ -384,10 +403,12 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size, const char *to
       while(outbuf != NULL && inbytesleft != 0) {
         const size_t offset = outbufCapa - outbytesleft;
         char *outbufCurrent = outbuf + offset;
-        const size_t ret = iconv(cp, &inbuf, &inbytesleft, &outbufCurrent, &outbytesleft);
-        if (ret == (size_t) -1) {
+        const size_t ret =
+          iconv(cp, &inbuf, &inbytesleft, &outbufCurrent, &outbytesleft);
+        if (ret == (size_t) - 1) {
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
+
             outbufCapa *= 2;
             outbuf = realloc(outbuf, outbufCapa);
             if (outbuf == NULL) {
@@ -430,7 +451,8 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
     return strdup("");
   }
   /* Already UTF-8 ? */
-  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0 || hts_isStringAscii(s, size)) {
+  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0
+      || hts_isStringAscii(s, size)) {
     return strndup(s, size);
   }
   /* Find codepage */
@@ -445,7 +467,8 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
     return strdup("");
   }
   /* Already UTF-8 ? */
-  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0 || hts_isStringAscii(s, size)) {
+  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0
+      || hts_isStringAscii(s, size)) {
     return strndup(s, size);
   }
   /* Find codepage */
@@ -456,25 +479,32 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 
 #endif
 
-HTS_STATIC char* hts_getCharsetFromContentType(const char *mime) {
+HTS_STATIC char *hts_getCharsetFromContentType(const char *mime) {
   /* text/html; charset=utf-8 */
   const char *const charset = "charset";
   char *pos = strstr(mime, charset);
+
   if (pos != NULL) {
     /* Skip spaces */
     int eq = 0;
-    for(pos += strlen(charset) ; *pos == ' ' || *pos == '=' || *pos == '"' || *pos == '\'' ; pos++) {
+
+    for(pos += strlen(charset);
+        *pos == ' ' || *pos == '=' || *pos == '"' || *pos == '\''; pos++) {
       if (*pos == '=') {
         eq = 1;
       }
     }
     if (eq == 1) {
       int len;
-      for(len = 0 ; pos[len] == ' ' || pos[len] == ';' || pos[len] == '"' || *pos == '\'' ; pos++) ;
+
+      for(len = 0;
+          pos[len] == ' ' || pos[len] == ';' || pos[len] == '"' || *pos == '\'';
+          pos++) ;
       if (len != 0) {
         char *const s = malloc(len + 1);
         int i;
-        for(i = 0 ; i < len ; i++) {
+
+        for(i = 0; i < len; i++) {
           s[i] = pos[i];
         }
         s[len] = '\0';
@@ -503,46 +533,60 @@ static int is_space_or_equal_or_quote(char c) {
 }
 
 size_t hts_stringLengthUTF8(const char *s) {
-  const unsigned char *const bytes = (const unsigned char*) s;
+  const unsigned char *const bytes = (const unsigned char *) s;
   size_t i, len;
-  for(i = 0, len = 0 ; bytes[i] != '\0' ; i++) {
+
+  for(i = 0, len = 0; bytes[i] != '\0'; i++) {
     const unsigned char c = bytes[i];
-    if (HTS_IS_LEADING_UTF8(c)) {  // ASCII or leading byte
+
+    if (HTS_IS_LEADING_UTF8(c)) {       // ASCII or leading byte
       len++;
     }
   }
   return len;
 }
 
-char* hts_getCharsetFromMeta(const char *html, size_t size) {
+char *hts_getCharsetFromMeta(const char *html, size_t size) {
   int i;
+
   // <META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8" >
-  for(i = 0 ; i < size ; i++) {
-    if (html[i] == '<' && strncasecmp(&html[i + 1], "meta", 4) == 0 && is_space(html[i + 5]) ) {
+  for(i = 0; i < size; i++) {
+    if (html[i] == '<' && strncasecmp(&html[i + 1], "meta", 4) == 0
+        && is_space(html[i + 5])) {
       /* Skip spaces */
-      for(i += 5 ; is_space(html[i]) ; i++) ;
-      if (strncasecmp(&html[i], "HTTP-EQUIV", 10) == 0 && is_space_or_equal(html[i + 10]) ) {
-        for(i += 10 ; is_space_or_equal_or_quote(html[i]) ; i++) ;
+      for(i += 5; is_space(html[i]); i++) ;
+      if (strncasecmp(&html[i], "HTTP-EQUIV", 10) == 0
+          && is_space_or_equal(html[i + 10])) {
+        for(i += 10; is_space_or_equal_or_quote(html[i]); i++) ;
         if (strncasecmp(&html[i], "CONTENT-TYPE", 12) == 0) {
-          for(i += 12 ; is_space_or_equal_or_quote(html[i]) ; i++) ;
-          if (strncasecmp(&html[i], "CONTENT", 7) == 0 && is_space_or_equal(html[i + 7]) ) {
-            for(i += 7 ; is_space_or_equal_or_quote(html[i]) ; i++) ;
+          for(i += 12; is_space_or_equal_or_quote(html[i]); i++) ;
+          if (strncasecmp(&html[i], "CONTENT", 7) == 0
+              && is_space_or_equal(html[i + 7])) {
+            for(i += 7; is_space_or_equal_or_quote(html[i]); i++) ;
             /* Skip content-type */
-            for( ; i < size && html[i] != ';' && html[i] != '"' && html[i] != '\'' ; i++) ;
+            for(;
+                i < size && html[i] != ';' && html[i] != '"' && html[i] != '\'';
+                i++) ;
             /* Expect charset attribute here */
             if (html[i] == ';') {
-              for(i++ ; is_space(html[i]) ; i++) ;
+              for(i++; is_space(html[i]); i++) ;
               /* Look for charset */
-              if (strncasecmp(&html[i], "charset", 7) == 0 && is_space_or_equal(html[i + 7])) {
+              if (strncasecmp(&html[i], "charset", 7) == 0
+                  && is_space_or_equal(html[i + 7])) {
                 int len;
-                for(i += 7 ; is_space_or_equal(html[i]) || html[i] == '\'' ; i++) ;
+
+                for(i += 7; is_space_or_equal(html[i]) || html[i] == '\'';
+                    i++) ;
                 /* Charset */
-                for(len = 0 ; i + len < size && html[i + len] != '"' && html[i + len] != '\'' && html[i + len] != ' ' ; len++) ;
+                for(len = 0;
+                    i + len < size && html[i + len] != '"'
+                    && html[i + len] != '\'' && html[i + len] != ' '; len++) ;
                 /* No error ? */
                 if (len != 0 && i < size) {
                   char *const s = malloc(len + 1);
                   int j;
-                  for(j = 0 ; j < len ; j++) {
+
+                  for(j = 0; j < len; j++) {
                     s[j] = html[i + j];
                   }
                   s[len] = '\0';
@@ -557,4 +601,3 @@ char* hts_getCharsetFromMeta(const char *html, size_t size) {
   }
   return NULL;
 }
-

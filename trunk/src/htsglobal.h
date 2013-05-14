@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Global #define file                                    */
@@ -71,7 +68,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-
 // config.h
 #ifdef _WIN32
 
@@ -101,7 +97,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SPARE_MEMORY 1
 #define HTS_ALIGN 8
 #define BIGSTK static
-#undef DLLIB   // LoadLibrary(libssl) crashes
+#undef DLLIB                    // LoadLibrary(libssl) crashes
 #define NOSTRDEBUG 1
 #undef HTS_MAKE_KEYWORD_INDEX
 #ifdef HTS_CECOMPAT
@@ -175,7 +171,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SPARE_MEMORY 0
 #endif
 
-#ifndef BIGSTK 
+#ifndef BIGSTK
 #define BIGSTK
 #endif
 
@@ -304,7 +300,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSEXT_API __declspec(dllimport)
 #endif
 #else
-#define HTSEXT_API 
+#define HTSEXT_API
 #endif
 
 #ifndef HTS_LONGLONG
@@ -320,41 +316,48 @@ Please visit our Website: http://www.httrack.com
 
 #if HTS_LONGLONG
 #ifdef LLINT_FORMAT
-  typedef LLINT_TYPE LLint;
-  typedef LLINT_TYPE TStamp;
-  #define LLintP LLINT_FORMAT
+typedef LLINT_TYPE LLint;
+typedef LLINT_TYPE TStamp;
+
+#define LLintP LLINT_FORMAT
 #else
 
 #ifdef _WIN32
- typedef __int64 LLint;
- typedef __int64 TStamp;
- #define LLintP "%I64d"
+typedef __int64 LLint;
+typedef __int64 TStamp;
+
+#define LLintP "%I64d"
 #elif (defined(__x86_64__) || defined(_LP64) || defined(__64BIT__))
-  typedef unsigned long int LLint;
-  typedef unsigned long int TStamp;
-  #define LLintP "%ld"
+typedef unsigned long int LLint;
+typedef unsigned long int TStamp;
+
+#define LLintP "%ld"
 #else
-  typedef long long int LLint;
-  typedef long long int TStamp;
-  #define LLintP "%lld"
+typedef long long int LLint;
+typedef long long int TStamp;
+
+#define LLintP "%lld"
 #endif
 
-#endif  /* HTS_LONGLONG */
+#endif /* HTS_LONGLONG */
 
 #else
- typedef int LLint;
- #define LLintP "%d"
- typedef double TStamp;
+typedef int LLint;
+
+#define LLintP "%d"
+typedef double TStamp;
 #endif
 
 #ifdef LFS_FLAG
 typedef LLint INTsys;
+
 #define INTsysP LLintP
 #ifdef __linux
 #define HTS_FSEEKO
 #endif
 #else
 typedef int INTsys;
+
 #define INTsysP "%d"
 #endif
 
@@ -378,7 +381,7 @@ typedef int T_SOC;
 
 #ifdef _WIN32
 #else
-#define __cdecl 
+#define __cdecl
 #endif
 
 /* mode pour mkdir ET chmod (accès aux fichiers) */
@@ -408,8 +411,6 @@ typedef int T_SOC;
 /* fflush sur stdout */
 #define io_flush { fflush(stdout); fflush(stdin); }
 
-
-
 /* HTSLib */
 
 // Cache DNS, accélère les résolution d'adresses
@@ -435,15 +436,16 @@ typedef int T_SOC;
 //#define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
 typedef unsigned long int t_htsboundary;
+
 #ifndef HTS_DEF_FWSTRUCT_mlink
 #define HTS_DEF_FWSTRUCT_mlink
 typedef struct mlink mlink;
 #endif
 struct mlink {
-  char* adr;
+  char *adr;
   int len;
   int id;
-  struct mlink* next;
+  struct mlink *next;
 };
 static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
@@ -453,7 +455,6 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
 #endif
-
 
 /* ------------------------------------------------------------ */
 /* Debugging                                                    */
@@ -498,7 +499,6 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 // htsmain
 #define DEBUG_STEPS 0
 
-
 // Débuggage de contrôle
 #if HTS_DEBUG_CLOSESOCK
 #define _HTS_WIDE 1
@@ -507,13 +507,11 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #define _HTS_WIDE 1
 #endif
 #if _HTS_WIDE
-extern FILE* DEBUG_fp;
+extern FILE *DEBUG_fp;
+
 #define DEBUG_W(A)  { if (DEBUG_fp==NULL) DEBUG_fp=fopen("bug.out","wb"); fprintf(DEBUG_fp,":>"A); fflush(DEBUG_fp); }
 #undef _
 #define _ ,
 #endif
 
-
-
 #endif
-

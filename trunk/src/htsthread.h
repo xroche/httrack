@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Threads                                                */
@@ -64,24 +61,25 @@ typedef struct htsmutex_s htsmutex_s, *htsmutex;
 struct htsmutex_s {
   HANDLE handle;
 };
-#else  /* #ifdef _WIN32 */
+#else /* #ifdef _WIN32 */
 struct htsmutex_s {
   pthread_mutex_t handle;
 };
-#endif  /* #ifdef _WIN32 */
+#endif /* #ifdef _WIN32 */
 
 /* Library internal definictions */
-HTSEXT_API int hts_newthread( void (*fun)(void *arg), void *arg);
+HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
+
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API void htsthread_wait(void );
+HTSEXT_API void htsthread_wait(void);
 #endif
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
 /* Locking functions */
-HTSEXT_API void hts_mutexinit(htsmutex* mutex);
-HTSEXT_API void hts_mutexfree(htsmutex* mutex);
-HTSEXT_API void hts_mutexlock(htsmutex* mutex);
-HTSEXT_API void hts_mutexrelease(htsmutex* mutex);
+HTSEXT_API void hts_mutexinit(htsmutex * mutex);
+HTSEXT_API void hts_mutexfree(htsmutex * mutex);
+HTSEXT_API void hts_mutexlock(htsmutex * mutex);
+HTSEXT_API void hts_mutexrelease(htsmutex * mutex);
 
 #ifdef HTS_INTERNAL_BYTECODE
 /* Thread initialization */

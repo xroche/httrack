@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: httrack.c subroutines:                                 */
@@ -35,10 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-
-
 #ifndef HTSMAINHSR_DEFH
-#define HTSMAINHSR_DEFH 
+#define HTSMAINHSR_DEFH
 
 // --assume standard
 #define HTS_ASSUME_STANDARD \
@@ -52,13 +47,12 @@ Please visit our Website: http://www.httrack.com
 // Main, récupère les paramètres et appelle le robot
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API int hts_main(int argc, char **argv);
-HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
+HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
 #endif
 
-int cmdl_opt(char* s);
-int check_path(String* s,char* defaultname);
+int cmdl_opt(char *s);
+int check_path(String * s, char *defaultname);
 
 #endif
-
 
 #endif

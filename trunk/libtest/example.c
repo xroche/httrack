@@ -38,34 +38,36 @@ int main(void) {
   /* 
      First, ask for an URL 
      Note: For the test, option r2 (mirror max depth=1) and --testscan (no index, no cache, do not store, no log files)
-  */
-  char _argv[][256] = {"httrack_test" , "<URL>" , "-r3" , "--testscan" , ""  };
-  char* argv[]      = {NULL           , NULL    , NULL  , NULL        , NULL};
-  int         argc = 0;
+   */
+  char _argv[][256] = { "httrack_test", "<URL>", "-r3", "--testscan", "" };
+  char *argv[] = { NULL, NULL, NULL, NULL, NULL };
+  int argc = 0;
   httrackp *opt;
-	int ret;
+  int ret;
+
   while(strlen(_argv[argc])) {
-    argv[argc]=_argv[argc];
+    argv[argc] = _argv[argc];
     argc++;
   }
-  argv[argc]=NULL;
+  argv[argc] = NULL;
   printf("HTTrackLib test program\n");
   printf("Enter URL (example: www.foobar.com/index.html) :");
-  scanf("%s",argv[1]);
+  scanf("%s", argv[1]);
   printf("Test: 1 depth\n");
 
-	/* Initialize the library */
+  /* Initialize the library */
 #ifdef _WIN32
   {
-    WORD   wVersionRequested;   // requested version WinSock API
+    WORD wVersionRequested;     // requested version WinSock API
     WSADATA wsadata;            // Windows Sockets API data
     int stat;
+
     wVersionRequested = 0x0101;
-    stat = WSAStartup( wVersionRequested, &wsadata );
+    stat = WSAStartup(wVersionRequested, &wsadata);
     if (stat != 0) {
       printf("Winsock not found!\n");
       return;
-    } else if (LOBYTE(wsadata.wVersion) != 1  && HIBYTE(wsadata.wVersion) != 1) {
+    } else if (LOBYTE(wsadata.wVersion) != 1 && HIBYTE(wsadata.wVersion) != 1) {
       printf("WINSOCK.DLL does not support version 1.1\n");
       WSACleanup();
       return;
@@ -74,8 +76,8 @@ int main(void) {
 #endif
   hts_init();
 
-	/* Create option settings and set callbacks (wrappers) */
-	opt = hts_create_opt();
+  /* Create option settings and set callbacks (wrappers) */
+  opt = hts_create_opt();
 
   CHAIN_FUNCTION(opt, init, httrack_wrapper_init, NULL);
   CHAIN_FUNCTION(opt, uninit, httrack_wrapper_uninit, NULL);
@@ -102,15 +104,15 @@ int main(void) {
   CHAIN_FUNCTION(opt, receivehead, httrack_wrapper_receiveheader, NULL);
 
   /* Then, launch the mirror */
-	ret = hts_main2(argc, argv, opt);
+  ret = hts_main2(argc, argv, opt);
 
   /* Wait for a key */
   printf("\nPress ENTER key to exit\n");
-  scanf("%s",argv[1]);
+  scanf("%s", argv[1]);
 
-	/* Clear option state */
-	hts_free_opt(opt);
-	hts_uninit();
+  /* Clear option state */
+  hts_free_opt(opt);
+  hts_uninit();
 #ifdef _WIN32
   WSACleanup();
 #endif
@@ -119,83 +121,132 @@ int main(void) {
   return 0;
 }
 
-
 /* CALLBACK FUNCTIONS */
 
 /* Initialize the Winsock */
-static void CDECL httrack_wrapper_init(t_hts_callbackarg *carg) {
+static void CDECL httrack_wrapper_init(t_hts_callbackarg * carg) {
   printf("Engine started\n");
 }
-static void CDECL httrack_wrapper_uninit(t_hts_callbackarg *carg) {
+static void CDECL httrack_wrapper_uninit(t_hts_callbackarg * carg) {
   printf("Engine exited\n");
 }
-static int CDECL httrack_wrapper_start(t_hts_callbackarg *carg, httrackp* opt) {
+static int CDECL httrack_wrapper_start(t_hts_callbackarg * carg, httrackp * opt) {
   printf("Start of mirror\n");
-  return 1; 
-}
-static int CDECL httrack_wrapper_chopt(t_hts_callbackarg *carg, httrackp* opt) {
   return 1;
 }
-static int CDECL httrack_wrapper_end(t_hts_callbackarg *carg, httrackp* opt) { 
+static int CDECL httrack_wrapper_chopt(t_hts_callbackarg * carg, httrackp * opt) {
+  return 1;
+}
+static int CDECL httrack_wrapper_end(t_hts_callbackarg * carg, httrackp * opt) {
   printf("End of mirror\n");
-  return 1; 
-}
-static int CDECL httrack_wrapper_checkhtml(t_hts_callbackarg *carg, httrackp *opt,  char* html,int len,const char* url_address,const char* url_file) {
-  printf("Parsing html file: http://%s%s\n",url_address,url_file);
   return 1;
 }
-static int CDECL httrack_wrapper_loop(t_hts_callbackarg *carg, httrackp *opt,  void* _back,int back_max,int back_index,int lien_n,int lien_tot,int stat_time,hts_stat_struct* stats) {
+static int CDECL httrack_wrapper_checkhtml(t_hts_callbackarg * carg,
+                                           httrackp * opt, char *html, int len,
+                                           const char *url_address,
+                                           const char *url_file) {
+  printf("Parsing html file: http://%s%s\n", url_address, url_file);
+  return 1;
+}
+static int CDECL httrack_wrapper_loop(t_hts_callbackarg * carg, httrackp * opt,
+                                      void *_back, int back_max, int back_index,
+                                      int lien_n, int lien_tot, int stat_time,
+                                      hts_stat_struct * stats) {
   /* printf("..httrack_wrapper_loop called\n"); */
   return 1;
 }
-static const char* CDECL httrack_wrapper_query(t_hts_callbackarg *carg, httrackp *opt,  const char* question) {
+static const char *CDECL httrack_wrapper_query(t_hts_callbackarg * carg,
+                                               httrackp * opt,
+                                               const char *question) {
   /* Answer is No */
   return "N";
 }
-static const char* CDECL httrack_wrapper_query2(t_hts_callbackarg *carg, httrackp *opt,  const char* question) {
+static const char *CDECL httrack_wrapper_query2(t_hts_callbackarg * carg,
+                                                httrackp * opt,
+                                                const char *question) {
   /* Answer is No */
   return "N";
 }
-static const char* CDECL httrack_wrapper_query3(t_hts_callbackarg *carg, httrackp *opt,  const char* question) {
+static const char *CDECL httrack_wrapper_query3(t_hts_callbackarg * carg,
+                                                httrackp * opt,
+                                                const char *question) {
   /* Answer is "" */
   return "";
 }
-static int CDECL httrack_wrapper_check(t_hts_callbackarg *carg, httrackp *opt,  const char* adr,const char* fil,int status) {
-  printf("Link status tested: http://%s%s\n",adr,fil);
+static int CDECL httrack_wrapper_check(t_hts_callbackarg * carg, httrackp * opt,
+                                       const char *adr, const char *fil,
+                                       int status) {
+  printf("Link status tested: http://%s%s\n", adr, fil);
   return -1;
 }
-static void CDECL httrack_wrapper_pause(t_hts_callbackarg *carg, httrackp *opt,  const char* lockfile) {
+static void CDECL httrack_wrapper_pause(t_hts_callbackarg * carg,
+                                        httrackp * opt, const char *lockfile) {
   /* Wait until lockfile is removed.. */
 }
-static void CDECL httrack_wrapper_filesave(t_hts_callbackarg *carg, httrackp *opt,  const char* file) {
+static void CDECL httrack_wrapper_filesave(t_hts_callbackarg * carg,
+                                           httrackp * opt, const char *file) {
 }
-static int CDECL httrack_wrapper_linkdetected(t_hts_callbackarg *carg, httrackp *opt,  char* link) {
-  printf("Link detected: %s\n",link);
+static int CDECL httrack_wrapper_linkdetected(t_hts_callbackarg * carg,
+                                              httrackp * opt, char *link) {
+  printf("Link detected: %s\n", link);
   return 1;
 }
-static int CDECL httrack_wrapper_xfrstatus(t_hts_callbackarg *carg, httrackp *opt,  void* back) {
+static int CDECL httrack_wrapper_xfrstatus(t_hts_callbackarg * carg,
+                                           httrackp * opt, void *back) {
   return 1;
 }
-static int CDECL httrack_wrapper_preprocesshtml(t_hts_callbackarg *carg, httrackp *opt,  char** html,int* len,const char* url_address,const char* url_file) {
+static int CDECL httrack_wrapper_preprocesshtml(t_hts_callbackarg * carg,
+                                                httrackp * opt, char **html,
+                                                int *len,
+                                                const char *url_address,
+                                                const char *url_file) {
   return 1;
 }
-static int CDECL httrack_wrapper_postprocesshtml(t_hts_callbackarg *carg, httrackp *opt,  char** html,int* len,const char* url_address,const char* url_file) {
+static int CDECL httrack_wrapper_postprocesshtml(t_hts_callbackarg * carg,
+                                                 httrackp * opt, char **html,
+                                                 int *len,
+                                                 const char *url_address,
+                                                 const char *url_file) {
   return 1;
 }
-static int CDECL httrack_wrapper_check_mime(t_hts_callbackarg *carg, httrackp *opt,  const char* adr,const char* fil,const char* mime,int status) {
+static int CDECL httrack_wrapper_check_mime(t_hts_callbackarg * carg,
+                                            httrackp * opt, const char *adr,
+                                            const char *fil, const char *mime,
+                                            int status) {
   return -1;
 }
-static void CDECL httrack_wrapper_filesave2(t_hts_callbackarg *carg, httrackp *opt,  const char* adr, const char* fil, const char* save, int is_new, int is_modified,int not_updated) {
+static void CDECL httrack_wrapper_filesave2(t_hts_callbackarg * carg,
+                                            httrackp * opt, const char *adr,
+                                            const char *fil, const char *save,
+                                            int is_new, int is_modified,
+                                            int not_updated) {
 }
-static int CDECL httrack_wrapper_linkdetected2(t_hts_callbackarg *carg, httrackp *opt,  char* link, const char* start_tag) {
+static int CDECL httrack_wrapper_linkdetected2(t_hts_callbackarg * carg,
+                                               httrackp * opt, char *link,
+                                               const char *start_tag) {
   return 1;
 }
-static int CDECL httrack_wrapper_savename(t_hts_callbackarg *carg, httrackp *opt,  const char* adr_complete,const char* fil_complete,const char* referer_adr,const char* referer_fil,char* save) {
+static int CDECL httrack_wrapper_savename(t_hts_callbackarg * carg,
+                                          httrackp * opt,
+                                          const char *adr_complete,
+                                          const char *fil_complete,
+                                          const char *referer_adr,
+                                          const char *referer_fil, char *save) {
   return 1;
 }
-static int CDECL httrack_wrapper_sendheader(t_hts_callbackarg *carg, httrackp *opt,  char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* outgoing) {
+static int CDECL httrack_wrapper_sendheader(t_hts_callbackarg * carg,
+                                            httrackp * opt, char *buff,
+                                            const char *adr, const char *fil,
+                                            const char *referer_adr,
+                                            const char *referer_fil,
+                                            htsblk * outgoing) {
   return 1;
 }
-static int CDECL httrack_wrapper_receiveheader(t_hts_callbackarg *carg, httrackp *opt,  char* buff, const char* adr, const char* fil, const char* referer_adr, const char* referer_fil, htsblk* incoming) {
+static int CDECL httrack_wrapper_receiveheader(t_hts_callbackarg * carg,
+                                               httrackp * opt, char *buff,
+                                               const char *adr, const char *fil,
+                                               const char *referer_adr,
+                                               const char *referer_fil,
+                                               htsblk * incoming) {
   return 1;
 }

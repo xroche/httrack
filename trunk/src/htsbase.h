@@ -17,17 +17,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
 Important notes:
 
 - We hereby ask people using this source NOT to use it in purpose of grabbing
 emails addresses, or collecting any other private information on persons.
 This would disgrace our work, and spoil the many hours we spent on it.
 
-
 Please visit our Website: http://www.httrack.com
 */
-
 
 /* ------------------------------------------------------------ */
 /* File: Basic definitions                                      */
@@ -98,10 +95,8 @@ extern "C" {
 // caractère maj
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
 
-
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-
 
 // functions
 #ifdef _WIN32
@@ -111,8 +106,8 @@ extern "C" {
 #endif
 
 // emergency log
-typedef void (*t_abortLog)(char* msg, char* file, int line);
-extern HTSEXT_API t_abortLog abortLog__;
+  typedef void (*t_abortLog) (char *msg, char *file, int line);
+  extern HTSEXT_API t_abortLog abortLog__;
 #define abortLog(a) abortLog__(a, __FILE__, __LINE__)
 #define _ ,
 #ifndef _WIN32_WCE
@@ -173,14 +168,14 @@ extern HTSEXT_API t_abortLog abortLog__;
 #define strdupt(A)    hts_strdup(A)
 #define freet(A)      do { hts_free(A); (A) = NULL; } while(0)
 #define realloct(A,B) hts_realloc(A,B)
-void  hts_freeall();
-void* hts_malloc    (size_t);
-void* hts_calloc(size_t,size_t);
-char* hts_strdup(char*);
-void* hts_xmalloc(size_t,size_t);
-void  hts_free      (void*);
-void* hts_realloc   (void*,size_t);
-mlink* hts_find(char* adr);
+  void hts_freeall();
+  void *hts_malloc(size_t);
+  void *hts_calloc(size_t, size_t);
+  char *hts_strdup(char *);
+  void *hts_xmalloc(size_t, size_t);
+  void hts_free(void *);
+  void *hts_realloc(void *, size_t);
+  mlink *hts_find(char *adr);
 /* protected memcpy */
 #define memcpybuff(A, B, N) do { \
   mlink* lnk = hts_find((void*)(A)); \
@@ -195,9 +190,9 @@ mlink* hts_find(char* adr);
 
 #endif
 
-typedef void (* htsErrorCallback)(char* msg, char* file, int line);
-extern HTSEXT_API htsErrorCallback htsCallbackErr;
-extern HTSEXT_API int htsMemoryFastXfr;
+  typedef void (*htsErrorCallback) (char *msg, char *file, int line);
+  extern HTSEXT_API htsErrorCallback htsCallbackErr;
+  extern HTSEXT_API int htsMemoryFastXfr;
 
 /*
 */

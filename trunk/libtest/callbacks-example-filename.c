@@ -24,10 +24,13 @@
 #include "htsdefines.h"
 
 /* Local function definitions */
-static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save);
+static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
+                      const char *adr_complete, const char *fil_complete,
+                      const char *referer_adr, const char *referer_fil,
+                      char *save);
 
 /* external functions */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv);
 
 /* Options settings */
 #include "htsopt.h"
@@ -54,33 +57,40 @@ EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
 /* 
 module entry point 
 */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   const char *arg = strchr(argv, ',');
+
   if (arg != NULL)
     arg++;
 
   /* Plug callback functions */
   CHAIN_FUNCTION(opt, savename, mysavename, NULL);
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
-static int mysavename(t_hts_callbackarg *carg, httrackp *opt, const char* adr_complete, const char* fil_complete, const char* referer_adr, const char* referer_fil, char* save) {
-  char* a;
+static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
+                      const char *adr_complete, const char *fil_complete,
+                      const char *referer_adr, const char *referer_fil,
+                      char *save) {
+  char *a;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, savename) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, savename)(CALLBACKARG_PREV_CARG(carg), opt, adr_complete, fil_complete, referer_adr, referer_fil, save)) {
-      return 0;  /* Abort */
+    if (!CALLBACKARG_PREV_FUN(carg, savename)
+        (CALLBACKARG_PREV_CARG(carg), opt, adr_complete, fil_complete,
+         referer_adr, referer_fil, save)) {
+      return 0;                 /* Abort */
     }
   }
 
   /* Process */
-  for(a = save ; *a != 0 ; a++) {
+  for(a = save; *a != 0; a++) {
     char c = TOLOWER(*a);
+
     if (c >= 'a' && c <= 'z')
-      *a = ( ( ( c - 'a' ) + 13 ) % 26 ) + 'a';     // ROT-13
+      *a = (((c - 'a') + 13) % 26) + 'a';       // ROT-13
   }
-  
-  return 1;  /* success */
+
+  return 1;                     /* success */
 }

@@ -24,32 +24,37 @@
 #include "htsdefines.h"
 
 /* external functions */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv);
-EXTERNAL_FUNCTION int hts_unplug(httrackp *opt);
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv);
+EXTERNAL_FUNCTION int hts_unplug(httrackp * opt);
 
 /* local function called as "check_html" callback */
-static int process_file(t_hts_callbackarg /*the carg structure, holding various information*/*carg, /*the option settings*/httrackp *opt, 
-                        /*other parameters are callback-specific*/
-                        char* html, int len, const char* url_address, const char* url_file) {
-  void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
+static int process_file(t_hts_callbackarg
+                        /*the carg structure, holding various information */  *
+                        carg, /*the option settings */ httrackp * opt,
+                        /*other parameters are callback-specific */
+                        char *html, int len, const char *url_address,
+                        const char *url_file) {
+  void *ourDummyArg = (void *) CALLBACKARG_USERDEF(carg);       /*optional user-defined arg */
 
   (void) ourDummyArg;
 
   /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
   if (CALLBACKARG_PREV_FUN(carg, check_html) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, check_html)(CALLBACKARG_PREV_CARG(carg), opt,
-                                                html, len, url_address, url_file)) {
-        return 0;  /* abort */
-      }
+    if (!CALLBACKARG_PREV_FUN(carg, check_html)
+        (CALLBACKARG_PREV_CARG(carg), opt, html, len, url_address, url_file)) {
+      return 0;                 /* abort */
+    }
   }
 
   printf("file %s%s content: %s\n", url_address, url_file, html);
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
 /* local function called as "end" callback */
-static int end_of_mirror(t_hts_callbackarg /*the carg structure, holding various information*/*carg, /*the option settings*/httrackp *opt) {
-  void *ourDummyArg = (void*) CALLBACKARG_USERDEF(carg);    /*optional user-defined arg*/
+static int end_of_mirror(t_hts_callbackarg
+                         /*the carg structure, holding various information */  *
+                         carg, /*the option settings */ httrackp * opt) {
+  void *ourDummyArg = (void *) CALLBACKARG_USERDEF(carg);       /*optional user-defined arg */
 
   (void) ourDummyArg;
 
@@ -59,35 +64,37 @@ static int end_of_mirror(t_hts_callbackarg /*the carg structure, holding various
   /* call parent functions if multiple callbacks are chained. you can skip this part, if you don't want previous callbacks to be called. */
   if (CALLBACKARG_PREV_FUN(carg, end) != NULL) {
     /* status is ok on our side, return other callabck's status */
-    return CALLBACKARG_PREV_FUN(carg, end)(CALLBACKARG_PREV_CARG(carg), opt);
+    return CALLBACKARG_PREV_FUN(carg, end) (CALLBACKARG_PREV_CARG(carg), opt);
   }
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
 /*
 module entry point
 the function name and prototype MUST match this prototype
 */
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char* argv) {
+EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   /* optional argument passed in the commandline we won't be using here */
   const char *arg = strchr(argv, ',');
+
   if (arg != NULL)
     arg++;
 
   /* plug callback functions */
-  CHAIN_FUNCTION(opt, check_html, process_file, /*optional user-defined arg*/NULL);
-  CHAIN_FUNCTION(opt, end, end_of_mirror, /*optional user-defined arg*/NULL);
+  CHAIN_FUNCTION(opt, check_html, process_file, /*optional user-defined arg */
+                 NULL);
+  CHAIN_FUNCTION(opt, end, end_of_mirror, /*optional user-defined arg */ NULL);
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
 
 /*
 module exit point
 the function name and prototype MUST match this prototype
 */
-EXTERNAL_FUNCTION int hts_unplug(httrackp *opt) {
+EXTERNAL_FUNCTION int hts_unplug(httrackp * opt) {
   fprintf(stderr, "Module unplugged");
 
-  return 1;  /* success */
+  return 1;                     /* success */
 }
