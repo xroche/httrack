@@ -49,6 +49,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef _WIN32
 #include <pthread.h>
 #endif
+#include <stdarg.h>
 
 /* generic */
 
