@@ -65,44 +65,28 @@ int proxytrack_main(char* proxyAddr, int proxyPort,
 
 /* Static definitions */
 
-#define _ ,
-#define CRITICAL_(msg, file, line) do { \
-	fprintf(stderr, "* critical: "); \
-	fprintf(stderr, msg); \
-	fprintf(stderr, " at %s:%d\n", file, line); \
-	fflush(stderr); \
-} while(0)
-#define CRITICAL(msg) do { \
-	fprintf(stderr, "* critical: "); \
-	fprintf(stderr, msg); \
-	fprintf(stderr, " at %s:%d\n", __FILE__, __LINE__); \
-	fflush(stderr); \
-} while(0)
+static void proxytrack_print_log(const char *severity, const char *format, ...) {
+  if (severity != NULL) {
+    const int error = errno;
+    FILE *const fp = stderr;
+    va_list args;
+    fprintf(fp, " * %s: ", severity);
+    va_start(args, format);
+    (void) vfprintf(fp, format, args);
+    va_end(args);
+    fputs("\n", fp);
+    fflush(fp);
+    errno = error;
+  }
+}
 
-#define WARNING(msg) do { \
-	fprintf(stderr, "* warning: "); \
-	fprintf(stderr, msg); \
-	fprintf(stderr, "\n"); \
-	fflush(stderr); \
-} while(0)
-
-#define LOG(msg) do { \
-	fprintf(stderr, "* log: "); \
-	fprintf(stderr, msg); \
-	fprintf(stderr, "\n"); \
-	fflush(stderr); \
-} while(0)
-
+#define CRITICAL "critical"
+#define WARNING "warning"
+#define LOG "log"
 #if defined(_DEBUG) || defined(DEBUG)
-#define DEBUG(msg) do { \
-	fprintf(stderr, "* debug: "); \
-	fprintf(stderr, msg); \
-	fprintf(stderr, "\n"); \
-	fflush(stderr); \
-} while(0)
+#define DEBUG "debug"
 #else
-#define DEBUG_(msg, file, line) do { } while(0)
-#define DEBUG(msg) do { } while(0)
+#define DEBUG NULL
 #endif
 
 /* Header for generated pages */

@@ -281,7 +281,7 @@ static int PT_Index_Check__(PT_Index index, const char* file, int line) {
 		return 0;
 	if (index->type >= PT_CACHE_MIN && index->type <= PT_CACHE_MAX)
 		return 1;
-	CRITICAL_("index corrupted in memory", file, line);
+  proxytrack_print_log(CRITICAL, "index corrupted in memory at %s:%d", file, line);
 	return 0;
 }
 #define SAFE_INDEX(index) PT_Index_Check__(index, __FILE__, __LINE__)
@@ -458,7 +458,7 @@ char ** PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 						}
 					}
 				} else {
-					CRITICAL("PT_Enumerate:Corrupted central index locator");
+					proxytrack_print_log(CRITICAL, "PT_Enumerate:Corrupted central index locator");
 				}
 			}
 		}
@@ -527,12 +527,12 @@ PT_Index PT_LoadCache(const char *filename) {
 			index->slots.common.startUrl[0] = '\0';
 			index->slots.common.hash = inthash_new(8191);
 			if (!_IndexFuncts[type].PT_LoadCache(index, filename)) {
-				DEBUG("reading httrack cache (format #%d) %s : error" _ type _ filename );
+				proxytrack_print_log(DEBUG, "reading httrack cache (format #%d) %s : error", type, filename );
 				free(index);
 				index = NULL;
 				return NULL;
 			} else {
-				DEBUG("reading httrack cache (format #%d) %s : success" _ type _ filename );
+				proxytrack_print_log(DEBUG, "reading httrack cache (format #%d) %s : success", type, filename );
 			}
 			/* default starting URL is the first hash entry */
 			if (index->slots.common.startUrl[0] == '\0') {
@@ -603,7 +603,7 @@ int PT_EnumCache(PT_Indexes indexes, int (*callback)(void *, const char *url, PT
 						return ret;
 				}
 			} else {
-				CRITICAL("PT_ReadCache:Corrupted central index locator");
+				proxytrack_print_log(CRITICAL, "PT_ReadCache:Corrupted central index locator");
 				return -1;
 			}
 		}
@@ -662,7 +662,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex)
 							if (indexes->index[previous_index_id]->slots.common.timestamp > index->slots.common.timestamp)			// existing entry is newer
 								break;
 						} else {
-							CRITICAL("PT_IndexMerge:Corrupted central index locator");
+							proxytrack_print_log(CRITICAL, "PT_IndexMerge:Corrupted central index locator");
 						}
 					}
 					inthash_write(indexes->cil, chain->name, index_id);
@@ -670,7 +670,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex)
 				}
 			}
 		} else {
-			CRITICAL("PT_IndexMerge:Memory exhausted");
+			proxytrack_print_log(CRITICAL, "PT_IndexMerge:Memory exhausted");
 		}
 		return nMerged;
 	}
@@ -714,7 +714,7 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char* url, int flags)
 					return item;
 				}
 			} else {
-				CRITICAL("PT_ReadCache:Corrupted central index locator");
+				proxytrack_print_log(CRITICAL, "PT_ReadCache:Corrupted central index locator");
 			}
 		}
 	}
@@ -731,7 +731,7 @@ int PT_LookupIndex(PT_Indexes indexes, const char* url) {
 			if (index_id >= 0 && index_id <= indexes->index_size) {
 				return 1;
 			} else {
-				CRITICAL("PT_ReadCache:Corrupted central index locator");
+				proxytrack_print_log(CRITICAL, "PT_ReadCache:Corrupted central index locator");
 			}
 		}
 	}
