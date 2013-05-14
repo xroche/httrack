@@ -277,7 +277,7 @@ static String getip(SOCaddr *server, int serverLen) {
 	char * dotted = malloc(sizeMax + 1);
 	unsigned short port  = ntohs(SOCaddr_sinport(*server));
 	if (dotted == NULL) {
-		CRITICAL("memory exhausted");
+		proxytrack_print_log(CRITICAL, "memory exhausted");
 		return s;
 	}
 	SOCaddr_inetntoa(dotted, sizeMax, *server, serverLen);
@@ -824,7 +824,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #endif
 
 	if (buffer == NULL || line == NULL || line1 == NULL) {
-		CRITICAL("proxytrack_process_HTTP:memory exhausted");
+		proxytrack_print_log(CRITICAL, "proxytrack_process_HTTP:memory exhausted");
 #ifdef _WIN32
 		closesocket(soc_c);
 #else
@@ -1247,7 +1247,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 			if (element != NULL && element->contenttype[0] != '\0') {
 				contentType = element->contenttype;
 			}
-			LOG("HTTP %s %d %d %s %s %s" _ StringBuff(ip) _ msgCode _ (int)size _ command _ StringBuff(url) _ contentType);
+			proxytrack_print_log(LOG, "HTTP %s %d %d %s %s %s", StringBuff(ip), msgCode, (int)size, command, StringBuff(url), contentType);
 			StringFree(ip);
 		}
 
@@ -1357,7 +1357,7 @@ static int proxytrack_process_generic(void (*process)(PT_Indexes indexes, T_SOC 
 		param->process = process;
 		return startThread(proxytrack_process_th, param);
 	} else {
-		CRITICAL("proxytrack_process_generic:Memory exhausted");
+		proxytrack_print_log(CRITICAL, "proxytrack_process_generic:Memory exhausted");
 		return 0;
 	}
 	return 0;
@@ -1374,7 +1374,7 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
     T_SOC soc_c;
 		if ( (soc_c = (T_SOC) accept(soc, NULL, NULL)) != INVALID_SOCKET) {
 			if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
-				CRITICAL("proxytrack_start_HTTP::Can not fork a thread");
+				proxytrack_print_log(CRITICAL, "proxytrack_start_HTTP::Can not fork a thread");
 			}
 		}
 	}
@@ -1449,7 +1449,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 	int bufferSize = 16384;
 	unsigned char * buffer = (unsigned char*) malloc(bufferSize + 1);
 	if (buffer == NULL) {
-		CRITICAL("proxytrack_start_ICP:memory exhausted");
+		proxytrack_print_log(CRITICAL, "proxytrack_start_ICP:memory exhausted");
 #ifdef _WIN32
 		closesocket(soc);
 #else
@@ -1561,7 +1561,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 				} else {
 					StringCopy(ip, "unknown");
 				}
-				LOG("ICP %s %s/%s %s" _ StringBuff(ip) _ LogRequest _ LogReply _ (UrlRequest ? UrlRequest : "-") );
+				proxytrack_print_log(LOG, "ICP %s %s/%s %s", StringBuff(ip), LogRequest, LogReply, (UrlRequest ? UrlRequest : "-") );
 				StringFree(ip);
 			}
 
