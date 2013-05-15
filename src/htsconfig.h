@@ -72,9 +72,6 @@ Please visit our Website: http://www.httrack.com
 // poll stdin autorisé? (0/1)
 #define HTS_POLL 1
 
-// vérifier les liens sans extension (0/1) [à éviter, très lent]
-#define HTS_CHECK_STRANGEDIR 0
-
 // le slash est un html par défaut (exemple/ est toujours un html)
 #define HTS_SLASH_ISHTML 1
 

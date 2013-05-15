@@ -2262,46 +2262,6 @@ int htsparse(htsmoduleStruct* str, htsmoduleStructExtended* stre) {
                     adr[0]='\0';
                   }
 
-#if HTS_CHECK_STRANGEDIR
-                  // !ATTENTION!
-                  // Ici on teste les exotiques du genre www.truc.fr/machin (sans slash à la fin)
-                  // je n'ai pas encore trouvé le moyen de faire la différence entre un répertoire
-                  // et un fichier en http A PRIORI : je fais donc un test
-                  // En cas de moved xxx, on recalcule adr et fil, tout simplement
-                  // DEFAUT: test effectué plusieurs fois! à revoir!!!
-                  if ((adr[0]!='\0') && (strcmp(adr,"file://") && (p_type!=2) && (p_type!=-2)) {
-                    //## if ((adr[0]!='\0') && (adr[0]!=lOCAL_CHAR) && (p_type!=2) && (p_type!=-2)) {
-                    if (fil[strlen(fil)-1]!='/') {  // pas répertoire
-                      if (ishtml(opt,fil)==-2) {    // pas d'extension
-                        char BIGSTK loc[HTS_URLMAXSIZE*2];  // éventuelle nouvelle position
-                        loc[0]='\0';
-                        hts_log_print(opt, LOG_DEBUG, "link-check-directory: %s%s",adr,fil);
-
-                        // tester éventuelle nouvelle position
-                        switch (http_location(adr,fil,loc).statuscode) {
-                      case 200: // ok au final
-                        if (strnotempty(loc)) {  // a changé d'adresse
-                          hts_log_print(opt, LOG_WARNING, "Link %s%s has moved to %s for %s%s",adr,fil,loc,urladr,urlfil);
-
-                          // recalculer adr et fil!
-                          if (ident_url_absolute(loc,adr,fil)==-1) {
-                            adr[0]='\0';  // cancel
-                            hts_log_print(opt, LOG_DEBUG, "link-check-dir: %s%s",adr,fil);
-                          }
-
-                        }
-                        break;
-                      case -2: case -3:  // timeout ou erreur grave
-                        hts_log_print(opt, LOG_WARNING, "Connection too slow for testing link %s%s (from %s%s)",adr,fil,urladr,urlfil);
-
-                        break;
-                        }
-
-                      }
-                    } 
-                  }
-#endif
-
                   // Le lien doit juste être réécrit, mais ne doit pas générer un lien
                   // exemple: <FORM ACTION="url_cgi">
                   if (p_nocatch) {
