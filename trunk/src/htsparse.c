@@ -1218,7 +1218,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       /* OK, événement repéré */
                       if (p) {
                         inscript_tag_lastc = *(adr + p);        /* à attendre à la fin */
-                        adr += p + 1;   /* saut */
+                        adr += p /*+ 1*/;   /* saut */
                         /*
                            On est désormais dans du code javascript
                          */
@@ -1404,6 +1404,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       int nc;
 
                       nc = strfield(adr, ".src");       // nom.src="image";
+                      if (!nc && inscript_tag && inscript_tag_lastc == *(adr - 1))
+                        nc = strfield(adr, "src");       // onXXX='src="image";'
                       if (!nc)
                         nc = strfield(adr, ".location");        // document.location="doc"
                       if (!nc)
@@ -1437,8 +1439,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         expected_end = ")";     // fin: parenthèse
                         can_avoid_quotes = 1;
                         quotes_replacement = ')';
-                      } else {
-                        nc = 0;
                       }
                       if (!nc)
                         if ((nc = strfield(adr, "import"))) {   // import "url"
