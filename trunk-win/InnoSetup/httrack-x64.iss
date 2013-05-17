@@ -1,8 +1,8 @@
 ; HTTrack Website Copier - x64 edition
 
 [Setup]
-AppVerName=WinHTTrack Website Copier 3.47-6 (x64)
-AppVersion=3.47.6
+AppVerName=WinHTTrack Website Copier 3.47-12 (x64)
+AppVersion=3.47.12
 AppName=WinHTTrack Website Copier
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -40,9 +40,9 @@ Source: "O:\HTTrack\httrack\templates\*.*"; DestDir: "{app}\templates"; CopyMode
 Source: "O:\HTTrack\httrack\lang\*.*"; DestDir: "{app}\lang"; CopyMode: alwaysoverwrite; Flags: recursesubdirs
 Source: "O:\HTTrack\httrack\libtest\*.*"; DestDir: "{app}\libtest"; CopyMode: alwaysoverwrite; Flags: recursesubdirs
 Source: "O:\HTTrack\httrack\src\*.*"; DestDir: "{app}\src"; CopyMode: alwaysoverwrite; Flags: recursesubdirs
-Source: "O:\HTTrack\httrack\src_win\*.*"; DestDir: "{app}\src_win"; CopyMode: alwaysoverwrite; Flags: recursesubdirs
-Source: "O:\HTTrack\httrack\*.*"; Excludes: "*.dll,*.manifest,*.exe"; DestDir: "{app}"; CopyMode: alwaysoverwrite
-Source: "O:\HTTrack\httrack\x64\*"; DestDir: "{app}"; CopyMode: alwaysoverwrite
+Source: "O:\HTTrack\httrack\src_win\*.*"; Excludes: "*.ncb"; DestDir: "{app}\src_win"; CopyMode: alwaysoverwrite; Flags: recursesubdirs
+Source: "O:\HTTrack\httrack\*.*"; Excludes: "*.dll,*.manifest,*.exe,*.pdb,*.ncb"; DestDir: "{app}"; CopyMode: alwaysoverwrite
+Source: "O:\HTTrack\httrack\x64\*"; Excludes: "*.pdb,*.ncb"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 Source: "O:\HTTrack\file_id.diz"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 Source: "O:\HTTrackFiles\winhttrack.log"; DestDir: "{app}"; CopyMode: alwaysoverwrite
 ;Source: "O:\HTTrack\httrack\dll\*.dll"; DestDir: "{sys}"; CopyMode: normal; Flags: uninsneveruninstall sharedfile restartreplace
