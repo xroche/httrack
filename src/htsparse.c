@@ -1512,8 +1512,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     }
                                     // Suspicious, abort.
                                     else if (a[i] == '"' || a[i] == '\''
-                                             || a[i] != '\t' || a[i] != '\r'
-                                             || a[i] != '\n') {
+                                             || a[i] == '\t' || a[i] == '\r'
+                                             || a[i] == '\n') {
                                       a = NULL;
                                       break;
                                     } else if (a[i] != ' ') {
