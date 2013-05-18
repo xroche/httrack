@@ -112,27 +112,14 @@ static void cleanDoubleSlash(char *s) {
   }
 }
 
-// legacy version, without page charset
+// forme le nom du fichier à sauver (save) à partir de fil et adr
+// système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
 int url_savename(char *adr_complete, char *fil_complete, char *save,
                  char *former_adr, char *former_fil, char *referer_adr,
                  char *referer_fil, httrackp * opt, lien_url ** liens,
                  int lien_tot, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers) {
-  return url_savename2(adr_complete, fil_complete, save, former_adr, former_fil,
-                       referer_adr, referer_fil, opt, liens, lien_tot, sback,
-                       cache, hash, ptr, numero_passe, headers, /* unknown */
-                       NULL);
-}
-
-// forme le nom du fichier à sauver (save) à partir de fil et adr
-// système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
-int url_savename2(char *adr_complete, char *fil_complete, char *save,
-                  char *former_adr, char *former_fil, char *referer_adr,
-                  char *referer_fil, httrackp * opt, lien_url ** liens,
-                  int lien_tot, struct_back * sback, cache_back * cache,
-                  hash_struct * hash, int ptr, int numero_passe,
-                  const lien_back * headers, const char *charset) {
   char catbuff[CATBUFF_SIZE];
   const char *mime_type = (headers
                            && !HTTP_IS_REDIRECT(headers->r.
@@ -670,10 +657,10 @@ int url_savename2(char *adr_complete, char *fil_complete, char *save,
                   strcpybuff(fil_complete, curr_fil);
                   // copier adr, fil
 
-                  return url_savename2(curr_adr, curr_fil, save, NULL, NULL,
-                                       referer_adr, referer_fil, opt, liens,
-                                       lien_tot, sback, cache, hash, ptr,
-                                       numero_passe, NULL, charset);
+                  return url_savename(curr_adr, curr_fil, save, NULL, NULL,
+                                      referer_adr, referer_fil, opt, liens,
+                                      lien_tot, sback, cache, hash, ptr,
+                                      numero_passe, NULL);
                 }
                 // --- --- ---
 
@@ -1374,18 +1361,18 @@ int url_savename2(char *adr_complete, char *fil_complete, char *save,
   /* ensure that there is no ../ (potential vulnerability) */
   fil_simplifie(save);
 
-  /* convert name to UTF-8 ? */
-  if (charset != NULL && charset[0] != '\0') {
-    char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
+  /* convert name to UTF-8 ? Note: already done while parsing. */
+  //if (charset != NULL && charset[0] != '\0') {
+  //  char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
 
-    if (s != NULL) {
-      hts_log_print(opt, LOG_DEBUG,
-                    "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
-                    save, s, charset);
-      strcpybuff(save, s);
-      free(s);
-    }
-  }
+  //  if (s != NULL) {
+  //    hts_log_print(opt, LOG_DEBUG,
+  //                  "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
+  //                  save, s, charset);
+  //    strcpybuff(save, s);
+  //    free(s);
+  //  }
+  //}
 
   /* callback */
   RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,

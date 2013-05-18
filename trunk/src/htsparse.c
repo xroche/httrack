@@ -2082,6 +2082,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                 /* Unescape/escape %20 and other &nbsp; */
                 {
+                  const char *const charset = str->page_charset_;
+                  const int hasCharset = charset != NULL 
+                    && *charset != '\0';
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
                   char *a = strchr(lien, '?');
 
@@ -2094,13 +2097,24 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   unescape_amp(lien);
                   unescape_amp(query);
                   // décoder l'inutile (%2E par exemple) et coder espaces
-                  // Bad: strcpybuff(lien,unescape_http(lien));
-                  // Bad: strcpybuff(lien,unescape_http_unharm(lien, (no_esc_utf)?0:1));
-                  /* Never unescape high-chars (we don't know the encoding!!) */
-                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1));     /* note: '%' is still escaped */
+                  // Unescape high-chars foir UTF-8 conversion
+                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, !hasCharset));     /* note: '%' is still escaped */
                   escape_remove_control(lien);
                   // ???? No! escape_spc_url(lien);
                   strcatbuff(lien, query);      /* restore */
+
+                  // Charset conversion for the URI filename
+                  // (not for the query string!)
+                  if (hasCharset) {
+                    char *const s = hts_convertStringToUTF8(lien, (int) strlen(lien), charset);
+                    if (s != NULL) {
+                      hts_log_print(opt, LOG_DEBUG,
+                        "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
+                        lien, s, charset);
+                      strcpybuff(lien, s);
+                      free(s);
+                    }
+                  }
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
@@ -2495,10 +2509,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcpybuff(last_adr, adr);        // ancienne adresse
                       //strcpybuff(last_fil,fil);    // ancien chemin
                       r_sv =
-                        url_savename2(adr, fil, save, former_adr, former_fil,
-                                      liens[ptr]->adr, liens[ptr]->fil, opt,
-                                      liens, lien_tot, sback, cache, hash, ptr,
-                                      numero_passe, NULL, str->page_charset_);
+                        url_savename(adr, fil, save, former_adr, former_fil,
+                                     liens[ptr]->adr, liens[ptr]->fil, opt,
+                                     liens, lien_tot, sback, cache, hash, ptr,
+                                     numero_passe, NULL);
                       if (strcmp(jump_identification(last_adr), jump_identification(adr)) != 0) {       // a changé
 
                         // 2e test si moved
@@ -3585,12 +3599,11 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
               char BIGSTK mov_sav[HTS_URLMAXSIZE * 2];
 
               // calculer lien et éventuellement modifier addresse/fichier
-              if (url_savename2
+              if (url_savename
                   (mov_adr, mov_fil, mov_sav, NULL, NULL,
                    liens[liens[ptr]->precedent]->adr,
                    liens[liens[ptr]->precedent]->fil, opt, liens, lien_tot,
-                   sback, cache, hash, ptr, numero_passe, NULL,
-                   str->page_charset_) != -1) {
+                   sback, cache, hash, ptr, numero_passe, NULL) != -1) {
                 if (hash_read(hash, mov_sav, "", 0, 0) < 0) {   // n'existe pas déja
                   // enregistrer lien (MACRO) avec SAV IDENTIQUE
                   liens_record(mov_adr, mov_fil, liens[ptr]->sav, "", "");
@@ -4026,10 +4039,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         char BIGSTK add_sav[HTS_URLMAXSIZE * 2];
 
         // calculer lien et éventuellement modifier addresse/fichier
-        if (url_savename2
+        if (url_savename
             (add_adr, add_fil, add_sav, NULL, NULL, NULL, NULL, opt, liens,
-             lien_tot, sback, cache, hash, ptr, numero_passe, NULL,
-             str->page_charset_) != -1) {
+             lien_tot, sback, cache, hash, ptr, numero_passe, NULL) != -1) {
           if (hash_read(hash, add_sav, "", 0, 0) < 0) { // n'existe pas déja
             // enregistrer lien (MACRO)
             liens_record(add_adr, add_fil, add_sav, "", "");
@@ -4552,9 +4564,9 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          url_savename2(adr, fil, save, former_adr, former_fil, liens[ptr]->adr,
-                        liens[ptr]->fil, opt, liens, lien_tot, sback, cache,
-                        hash, ptr, numero_passe, &back, str->page_charset_);
+          url_savename(adr, fil, save, former_adr, former_fil, liens[ptr]->adr,
+                       liens[ptr]->fil, opt, liens, lien_tot, sback, cache,
+                       hash, ptr, numero_passe, &back);
 
           /* Recompute authorization with MIME type */
           {
@@ -4625,10 +4637,9 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
 
           /* Recompute filename with MIME type */
           save[0] = '\0';
-          url_savename2(adr, fil, save, former_adr, former_fil, liens[ptr]->adr,
-                        liens[ptr]->fil, opt, liens, lien_tot, sback, cache,
-                        hash, ptr, numero_passe, &delayed_back,
-                        str->page_charset_);
+          url_savename(adr, fil, save, former_adr, former_fil, liens[ptr]->adr,
+                       liens[ptr]->fil, opt, liens, lien_tot, sback, cache,
+                       hash, ptr, numero_passe, &delayed_back);
 
           /* Recompute authorization with MIME type */
           {
@@ -4814,10 +4825,10 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
 
                   /* Recompute filename for hash lookup */
                   save[0] = '\0';
-                  url_savename2(adr, fil, save, former_adr, former_fil,
-                                liens[ptr]->adr, liens[ptr]->fil, opt, liens,
-                                lien_tot, sback, cache, hash, ptr, numero_passe,
-                                &delayed_back, str->page_charset_);
+                  url_savename(adr, fil, save, former_adr, former_fil,
+                               liens[ptr]->adr, liens[ptr]->fil, opt, liens,
+                               lien_tot, sback, cache, hash, ptr, numero_passe,
+                               &delayed_back);
                 } else {
                   hts_log_print(opt, LOG_WARNING,
                                 "Unable to test %s%s (loop to same filename)",
@@ -4833,10 +4844,9 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
           if (!continue_loop) {
             /* Recompute filename with MIME type */
             save[0] = '\0';
-            url_savename2(adr, fil, save, former_adr, former_fil,
-                          liens[ptr]->adr, liens[ptr]->fil, opt, liens, lien_tot,
-                          sback, cache, hash, ptr, numero_passe, &delayed_back,
-                          str->page_charset_);
+            url_savename(adr, fil, save, former_adr, former_fil,
+                         liens[ptr]->adr, liens[ptr]->fil, opt, liens, lien_tot,
+                         sback, cache, hash, ptr, numero_passe, &delayed_back);
 
             /* Recompute authorization with MIME type */
             {

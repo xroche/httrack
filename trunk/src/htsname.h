@@ -89,12 +89,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                  int lien_tot, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers);
-int url_savename2(char *adr_complete, char *fil_complete, char *save,
-                  char *former_adr, char *former_fil, char *referer_adr,
-                  char *referer_fil, httrackp * opt, lien_url ** liens,
-                  int lien_tot, struct_back * sback, cache_back * cache,
-                  hash_struct * hash, int ptr, int numero_passe,
-                  const lien_back * headers, const char *charset);
 void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
                    int short_ver);
 void url_savename_addstr(char *d, char *s);
