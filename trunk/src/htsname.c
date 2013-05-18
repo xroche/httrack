@@ -670,10 +670,10 @@ int url_savename2(char *adr_complete, char *fil_complete, char *save,
                   strcpybuff(fil_complete, curr_fil);
                   // copier adr, fil
 
-                  return url_savename(curr_adr, curr_fil, save, NULL, NULL,
-                                      referer_adr, referer_fil, opt, liens,
-                                      lien_tot, sback, cache, hash, ptr,
-                                      numero_passe, NULL);
+                  return url_savename2(curr_adr, curr_fil, save, NULL, NULL,
+                                       referer_adr, referer_fil, opt, liens,
+                                       lien_tot, sback, cache, hash, ptr,
+                                       numero_passe, NULL, charset);
                 }
                 // --- --- ---
 
@@ -1380,8 +1380,8 @@ int url_savename2(char *adr_complete, char *fil_complete, char *save,
 
     if (s != NULL) {
       hts_log_print(opt, LOG_DEBUG,
-                    "engine: save-name: charset conversion from '%s' to '%s'",
-                    save, s);
+                    "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
+                    save, s, charset);
       strcpybuff(save, s);
       free(s);
     }
