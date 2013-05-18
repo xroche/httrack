@@ -4833,9 +4833,10 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
           if (!continue_loop) {
             /* Recompute filename with MIME type */
             save[0] = '\0';
-            url_savename(adr, fil, save, former_adr, former_fil,
-                         liens[ptr]->adr, liens[ptr]->fil, opt, liens, lien_tot,
-                         sback, cache, hash, ptr, numero_passe, &delayed_back);
+            url_savename2(adr, fil, save, former_adr, former_fil,
+                          liens[ptr]->adr, liens[ptr]->fil, opt, liens, lien_tot,
+                          sback, cache, hash, ptr, numero_passe, &delayed_back,
+                          str->page_charset_);
 
             /* Recompute authorization with MIME type */
             {
