@@ -78,8 +78,8 @@ am_libhttrack_la_OBJECTS = htscore.lo htsparse.lo htsback.lo \
 	htsinthash.lo htshelp.lo htslib.lo htscoremain.lo htsname.lo \
 	htsrobots.lo htstools.lo htswizard.lo htsalias.lo htsthread.lo \
 	htsindex.lo htsbauth.lo htsmd5.lo htszlib.lo htswrap.lo \
-	htsmodules.lo htscharset.lo md5.lo htsmms.lo ioapi.lo \
-	mztools.lo unzip.lo zip.lo error.lo mms.lo
+	htsmodules.lo htscharset.lo punycode.lo md5.lo htsmms.lo \
+	ioapi.lo mztools.lo unzip.lo zip.lo error.lo mms.lo
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
@@ -287,7 +287,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htsmd5.c htszlib.c htswrap.c \
-	htsmodules.c htscharset.c \
+	htsmodules.c htscharset.c punycode.c \
 	md5.c \
 	htsmms.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
@@ -300,7 +300,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htszlib.h  \
-	htsstrings.h httrack-library.h htscharset.h \
+	htsstrings.h httrack-library.h htscharset.h punycode.h \
 	md5.h \
 	htsmms.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
@@ -502,6 +502,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-store.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-unzip.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-zip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/punycode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unzip.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zip.Plo@am__quote@
 
