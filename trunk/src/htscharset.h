@@ -64,6 +64,16 @@ extern char *hts_convertStringFromUTF8(const char *s, size_t size,
 extern char *hts_getCharsetFromMeta(const char *html, size_t size);
 
 /**
+ * Is the given string an ASCII string ?
+ **/
+extern int hts_isStringAscii(const char *s, size_t size);
+
+/**
+ * Is the given charset the UTF-8 charset ?
+ **/
+extern int hts_isCharsetUTF8(const char *charset);
+
+/**
  * Get an UTF-8 string length in characters.
  **/
 extern size_t hts_stringLengthUTF8(const char *s);
@@ -84,6 +94,11 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * Convert current system codepage to UTF-8.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+
+/**
+ * Convert an UTF-8 string to an IDNA (RFC 3492) string.
+ **/
+extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
 
 #endif
 

@@ -2103,14 +2103,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // ???? No! escape_spc_url(lien);
                   strcatbuff(lien, query);      /* restore */
 
-                  // Charset conversion for the URI filename
-                  // (not for the query string!)
-                  if (hasCharset) {
+                  // Charset conversion for the URI filename, 
+                  // and not already UTF-8
+                  // (note: not for the query string!)
+                  if (hasCharset && !hts_isCharsetUTF8(charset)) {
                     char *const s = hts_convertStringToUTF8(lien, (int) strlen(lien), charset);
                     if (s != NULL) {
                       hts_log_print(opt, LOG_DEBUG,
-                        "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
-                        lien, s, charset);
+                        "engine: save-name: '%s' charset conversion from '%s' to '%s'",
+                        charset, lien, s);
                       strcpybuff(lien, s);
                       free(s);
                     }
