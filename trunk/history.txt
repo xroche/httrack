@@ -22,8 +22,8 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: images in CSS were sometimes not correctly detected (Martin)
 + Fixed: links within javascript events were sometimes not correctly detected (wquatan)
 + Fixed: webhttrack caused bus error on certain systems, such as Mac OSX, due to the stack size (Patrick Gundlach)
-+ Fixed: bogus charset for requests when filenames have non-ascii characters
-+ Fixed: bogus charset on disk when filenames have non-ascii characters
++ Fixed: bogus charset for requests when filenames have non-ascii characters (Steven Hsiao)
++ Fixed: bogus charset on disk when filenames have non-ascii characters (Steven Hsiao)
 + New: support for IDNA / RFC 3492 (punycode) handling
 
 3.46-1
