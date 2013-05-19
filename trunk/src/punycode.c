@@ -278,6 +278,9 @@ enum punycode_status punycode_decode(punycode_uint input_length,
   return punycode_success;
 }
 
+#ifdef PUNYCODE_COSTELLO_RFC3492_INCLUDE_TEST
+#define PUNYCODE_COSTELLO_RFC3492_INCLUDE_TEST
+
 /******************************************************************/
 /* Wrapper for testing (would normally go in a separate .c file): */
 
@@ -320,6 +323,8 @@ static const char too_big[] =
 static const char invalid_input[] = "invalid input\n";
 static const char overflow[] = "arithmetic overflow\n";
 static const char io_error[] = "I/O error\n";
+
+#endif
 
 /* The following string is used to convert printable */
 /* characters between ASCII and the native charset:  */
