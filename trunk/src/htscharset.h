@@ -59,6 +59,11 @@ extern char *hts_convertStringFromUTF8(const char *s, size_t size,
                                        const char *charset);
 
 /**
+ * Convert an UTF-8 string to an IDNA (RFC 3492) string.
+ **/
+extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
+
+/**
  * Extract the charset from the HTML buffer "html"
  **/
 extern char *hts_getCharsetFromMeta(const char *html, size_t size);
@@ -94,11 +99,6 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * Convert current system codepage to UTF-8.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
-
-/**
- * Convert an UTF-8 string to an IDNA (RFC 3492) string.
- **/
-extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
 
 #endif
 
