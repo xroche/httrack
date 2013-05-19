@@ -5534,8 +5534,7 @@ HTSEXT_API int hts_init(void) {
      Initialize the OpensSSL library
    */
   if (!openssl_ctx) {
-    if (SSL_load_error_strings)
-      SSL_load_error_strings();
+    SSL_load_error_strings();
     SSL_library_init();
     ///if (SSL_load_error_strings)  SSL_load_error_strings();
     //if (ERR_load_crypto_strings) ERR_load_crypto_strings();
