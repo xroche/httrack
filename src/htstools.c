@@ -170,13 +170,9 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 #endif
 #if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
-    if (SSL_is_available) {
-      // Note: ftp:foobar.gif is not valid
-      if (ident_url_absolute(lien, adr, fil) == -1) {
-        ok = -1;                // erreur URL
-      }
-    } else {
-      ok = -1;
+    // Note: ftp:foobar.gif is not valid
+    if (ident_url_absolute(lien, adr, fil) == -1) {
+      ok = -1;                // erreur URL
     }
 #endif
   } else if ((scheme) && ((!strfield(lien, "http:"))

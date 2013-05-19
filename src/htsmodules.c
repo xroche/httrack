@@ -64,26 +64,6 @@ t_gzread gzread = NULL;
 t_gzclose gzclose = NULL;
 #endif
 
-int SSL_is_available = 0;
-t_SSL_shutdown SSL_shutdown = NULL;
-t_SSL_free SSL_free = NULL;
-t_SSL_CTX_ctrl SSL_CTX_ctrl = NULL;
-t_SSL_new SSL_new = NULL;
-t_SSL_clear SSL_clear = NULL;
-t_SSL_set_fd SSL_set_fd = NULL;
-t_SSL_set_connect_state SSL_set_connect_state = NULL;
-t_SSL_connect SSL_connect = NULL;
-t_SSL_get_error SSL_get_error = NULL;
-t_SSL_write SSL_write = NULL;
-t_SSL_read SSL_read = NULL;
-t_SSL_library_init SSL_library_init = NULL;
-t_ERR_load_crypto_strings ERR_load_crypto_strings = NULL;
-t_ERR_load_SSL_strings ERR_load_SSL_strings = NULL;
-t_SSLv23_client_method SSLv23_client_method = NULL;
-t_SSL_CTX_new SSL_CTX_new = NULL;
-t_ERR_error_string ERR_error_string = NULL;
-t_SSL_load_error_strings SSL_load_error_strings = NULL;
-
 int V6_is_available = HTS_INET6;
 
 static char WHAT_is_available[64] = "";
@@ -280,106 +260,15 @@ void htspe_init(void) {
     /* Zlib is now statically linked */
     gz_is_available = 1;
 
-    /* OpenSSL */
-#if HTS_DLOPEN
-    {
-      void *handle;
-
-#ifdef _WIN32
-      handle = LoadLibraryA((char *) "ssleay32");
-#else
-      /* We are compatible with 0.9.6/7/8/8b and potentially above */
-      static const char *const libs[] = {
-#ifdef __APPLE__
-        "libssl.dylib",
-#endif
-        "libssl.so.1.0",
-        "libssl.so.1",
-        "libssl.so.1.0.0",
-        /* */
-        "libssl.so.0",
-        "libssl.so.0.9",
-        "libssl.so.0.9.8p",
-        "libssl.so.0.9.8o",
-        "libssl.so.0.9.8n",
-        "libssl.so.0.9.8m",
-        "libssl.so.0.9.8l",
-        "libssl.so.0.9.8k",     /* (Debarshi Ray) */
-        "libssl.so.0.9.8j",     /* (Debarshi Ray) */
-        "libssl.so.0.9.8g",     /* Added 8g release too (Debarshi Ray) */
-        "libssl.so.0.9.8b",
-        "libssl.so.0.9.8",
-        "libssl.so.0.9.7",
-        "libssl.so.0.9.6",
-        "libssl.so",            /* Try harder with devel link */
-        NULL
-      };
-      int i;
-
-      for(i = 0, handle = NULL; handle == NULL && libs[i] != NULL; i++) {
-        handle = dlopen(libs[i], RTLD_LAZY);
-      }
-#endif
-      ssl_handle = handle;
-      if (handle != NULL) {
-        SSL_shutdown =
-          (t_SSL_shutdown) DynamicGet(handle, (char *) "SSL_shutdown");
-        SSL_free = (t_SSL_free) DynamicGet(handle, (char *) "SSL_free");
-        SSL_new = (t_SSL_new) DynamicGet(handle, (char *) "SSL_new");
-        SSL_clear = (t_SSL_clear) DynamicGet(handle, (char *) "SSL_clear");
-        SSL_set_fd = (t_SSL_set_fd) DynamicGet(handle, (char *) "SSL_set_fd");
-        SSL_set_connect_state =
-          (t_SSL_set_connect_state) DynamicGet(handle,
-                                               (char *)
-                                               "SSL_set_connect_state");
-        SSL_connect =
-          (t_SSL_connect) DynamicGet(handle, (char *) "SSL_connect");
-        SSL_get_error =
-          (t_SSL_get_error) DynamicGet(handle, (char *) "SSL_get_error");
-        SSL_write = (t_SSL_write) DynamicGet(handle, (char *) "SSL_write");
-        SSL_read = (t_SSL_read) DynamicGet(handle, (char *) "SSL_read");
-        SSL_library_init =
-          (t_SSL_library_init) DynamicGet(handle, (char *) "SSL_library_init");
-        ERR_load_SSL_strings =
-          (t_ERR_load_SSL_strings) DynamicGet(handle,
-                                              (char *) "ERR_load_SSL_strings");
-        SSLv23_client_method =
-          (t_SSLv23_client_method) DynamicGet(handle,
-                                              (char *) "SSLv23_client_method");
-        SSL_CTX_new =
-          (t_SSL_CTX_new) DynamicGet(handle, (char *) "SSL_CTX_new");
-        SSL_load_error_strings =
-          (t_SSL_load_error_strings) DynamicGet(handle,
-                                                (char *)
-                                                "SSL_load_error_strings");
-        SSL_CTX_ctrl =
-          (t_SSL_CTX_ctrl) DynamicGet(handle, (char *) "SSL_CTX_ctrl");
-#ifdef _WIN32
-        handle = LoadLibraryA((char *) "libeay32");
-        ssl_handle_2 = handle;
-#endif
-        ERR_load_crypto_strings =
-          (t_ERR_load_crypto_strings) DynamicGet(handle,
-                                                 (char *)
-                                                 "ERR_load_crypto_strings");
-        ERR_error_string =
-          (t_ERR_error_string) DynamicGet(handle, (char *) "ERR_error_string");
-
-        if (SSL_shutdown && SSL_free && SSL_CTX_ctrl && SSL_new && SSL_clear
-            && SSL_set_fd && SSL_set_connect_state && SSL_connect
-            && SSL_get_error && SSL_write && SSL_read && SSL_library_init
-            && SSLv23_client_method && SSL_CTX_new && SSL_load_error_strings
-            && ERR_error_string) {
-          SSL_is_available = 1;
-        }
-      }
-    }
-#endif
-    /* */
-
     /* Options availability */
     sprintf(WHAT_is_available, "%s%s%s", V6_is_available ? "" : "-noV6",
-            gz_is_available ? "" : "-nozip", SSL_is_available ? "" : "-nossl");
+            gz_is_available ? "" : "-nozip",
+#if HTS_USEOPENSSL
+            ""
+#else
+            "-nossl"
+#endif
+            );
   }
 }
 

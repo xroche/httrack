@@ -1685,8 +1685,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   if ((strfield(tempo, "http:"))
                                       || (strfield(tempo, "ftp:"))
 #if HTS_USEOPENSSL
-                                      || (SSL_is_available
-                                          && (strfield(tempo, "https:"))
+                                      || (strfield(tempo, "https:")
                                       )
 #endif
 #if HTS_USEMMS

@@ -67,12 +67,12 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libhtsjava_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) libhttrack.la
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) libhttrack.la
 am_libhtsjava_la_OBJECTS = htsjava.lo
 libhtsjava_la_OBJECTS = $(am_libhtsjava_la_OBJECTS)
 libhttrack_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_libhttrack_la_OBJECTS = htscore.lo htsparse.lo htsback.lo \
 	htscache.lo htscatchurl.lo htsfilters.lo htsftp.lo htshash.lo \
 	htsinthash.lo htshelp.lo htslib.lo htscoremain.lo htsname.lo \
@@ -86,10 +86,11 @@ PROGRAMS = $(bin_PROGRAMS)
 am_htsserver_OBJECTS = htsserver.$(OBJEXT) htsweb.$(OBJEXT)
 htsserver_OBJECTS = $(am_htsserver_OBJECTS)
 htsserver_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	libhttrack.la
+	$(am__DEPENDENCIES_1) libhttrack.la
 httrack_SOURCES = httrack.c
 httrack_OBJECTS = httrack.$(OBJEXT)
-httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
+httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	libhttrack.la
 am_proxytrack_OBJECTS = proxytrack-main.$(OBJEXT) \
 	proxytrack-proxytrack.$(OBJEXT) proxytrack-store.$(OBJEXT) \
 	proxytrack-htsinthash.$(OBJEXT) proxytrack-htsmd5.$(OBJEXT) \
@@ -176,6 +177,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_LIBS = @OPENSSL_LIBS@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -268,8 +270,8 @@ INCLUDES = \
 	-DDATADIR=\""$(datadir)"\" \
 	-DLIBDIR=\""$(libdir)"\"
 
-httrack_LDADD = $(THREADS_LIBS) libhttrack.la
-htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
+httrack_LDADD = $(THREADS_LIBS) $(OPENSSL_LIBS) libhttrack.la
+htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(OPENSSL_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
@@ -306,10 +308,10 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
 	mmsrip/error.h mmsrip/mms.h
 
-libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
+libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
-libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
+libhtsjava_la_LIBADD = $(THREADS_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
 		minizip/ChangeLogUnzip \

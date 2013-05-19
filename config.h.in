@@ -54,6 +54,9 @@
 /* Check for large files support */
 #undef HTS_LFS
 
+/* Check for OpenSSL */
+#undef HTS_USEOPENSSL
+
 /* Check for libiconv */
 #undef LIBICONV
 

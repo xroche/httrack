@@ -114,6 +114,11 @@ AC_MSG_WARN([*** in_addr_t not found]),
 ### zlib
 CHECK_ZLIB()
 
+### OpenSSL
+AC_CHECK_LIB(ssl, SSL_library_init, [OPENSSL_LIBS="-lcrypto -lssl"
+AC_DEFINE(HTS_USEOPENSSL, 1,[Check for OpenSSL])], AC_MSG_RESULT([not necessary]))
+AC_SUBST(OPENSSL_LIBS)
+
 ### Support IPv6
 AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
 AC_DEFINE(HTS_INET6, 1,[Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
