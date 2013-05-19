@@ -1405,7 +1405,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (hts_stringLengthUTF8(save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
-    char BIGSTK tempo[HTS_URLMAXSIZE * 2];
     const size_t parentLen =
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
     // parent path length is not insane (otherwise, ignore and pick 200 as suffix length)
@@ -1422,7 +1421,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     }
     // add as much pathes as we can
     for(i = 0, sofar = 0; i < lastSeg && i + MIN_LAST_SEG_RESERVE < maxLen; i++) {
-      tempo[i] = save[i];
       if (save[i] == '/') {
         // validate segment so far
         sofar = i + 1;
