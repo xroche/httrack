@@ -135,8 +135,6 @@ extern void htspe_init(void);
 extern void htspe_uninit(void);
 extern int hts_parse_externals(htsmoduleStruct * str);
 
-extern int gz_is_available;
-
 /*extern int swf_is_available;*/
 extern int SSL_is_available;
 extern int V6_is_available;

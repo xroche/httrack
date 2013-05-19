@@ -56,8 +56,6 @@ extern int fspc(httrackp * opt, FILE * fp, const char *type);
 
 /* >>> Put all modules variables here */
 
-int gz_is_available = 0;
-
 #if 0
 t_gzopen gzopen = NULL;
 t_gzread gzread = NULL;
@@ -257,12 +255,9 @@ void htspe_init(void) {
     }
 #endif
 
-    /* Zlib is now statically linked */
-    gz_is_available = 1;
-
     /* Options availability */
     sprintf(WHAT_is_available, "%s%s%s", V6_is_available ? "" : "-noV6",
-            gz_is_available ? "" : "-nozip",
+            "",
 #if HTS_USEOPENSSL
             ""
 #else

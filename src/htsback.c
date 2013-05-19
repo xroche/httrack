@@ -499,7 +499,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
 
         /* décompression */
 #if HTS_USEZLIB
-        if (gz_is_available && back[p].r.compressed) {
+        if (back[p].r.compressed) {
           if (back[p].r.size > 0) {
             //if ( (back[p].r.adr) && (back[p].r.size>0) ) {
             // stats

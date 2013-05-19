@@ -1103,7 +1103,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         if (retour->req.http11) {
 #if HTS_USEZLIB
           //strcatbuff(buff,"Accept-Encoding: gzip, deflate, compress, identity"H_CRLF);
-          if (gz_is_available && (!retour->req.range_used)
+          if ((!retour->req.range_used)
               && (!retour->req.nocompression))
             strcatbuff(buff, "Accept-Encoding: " "gzip" /* gzip if the preffered encoding */
                        ", " "identity;q=0.9" H_CRLF);
