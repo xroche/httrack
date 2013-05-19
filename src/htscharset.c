@@ -618,7 +618,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 #undef ADD_BYTE
 #undef INCREASE_CAPA
 #define INCREASE_CAPA() do { \
-  capa = capa < 16 ? 16 : capa << 1; \
+  capa = capa < 16 ? 16 : ( capa << 1 ); \
   dest = realloc(dest, capa); \
   if (dest == NULL) { \
     return NULL; \
@@ -631,7 +631,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   dest[destSize++] = (char) (C); \
 } while(0)
 
-  for(i = startSeg = 0, nonAsciiFound = FALSE ; i <= size ; i++) {
+  for(i = startSeg = 0, nonAsciiFound = 0 ; i <= size ; i++) {
     const unsigned char c = i < size ? (unsigned char) s[i] : 0;
     /* separator (ending, url segment, scheme, path segment, query string) */
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
@@ -665,7 +665,6 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
               if (utfSeq != (size_t) -1) {
                 /* unicode character */
                 punycode_uint uc = 0;
-                size_t step = 0;
 
                 /* utf-8 sequence macro */
 #define SEQ_MATCH(FROM, TO) \
