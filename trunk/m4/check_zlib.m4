@@ -1,6 +1,28 @@
-dnl Available from the GNU Autoconf Macro Archive at:
-dnl http://www.gnu.org/software/ac-archive/htmldoc/check_zlib.html
+dnl @synopsis CHECK_ZLIB()
 dnl
+dnl This macro searches for an installed zlib library. If nothing was
+dnl specified when calling configure, it searches first in /usr/local
+dnl and then in /usr. If the --with-zlib=DIR is specified, it will try
+dnl to find it in DIR/include/zlib.h and DIR/lib/libz.a. If
+dnl --without-zlib is specified, the library is not searched at all.
+dnl
+dnl If either the header file (zlib.h) or the library (libz) is not
+dnl found, the configuration exits on error, asking for a valid zlib
+dnl installation directory or --without-zlib.
+dnl
+dnl The macro defines the symbol HAVE_LIBZ if the library is found. You
+dnl should use autoheader to include a definition for this symbol in a
+dnl config.h file. Sample usage in a C/C++ source is as follows:
+dnl
+dnl   #ifdef HAVE_LIBZ
+dnl   #include <zlib.h>
+dnl   #endif /* HAVE_LIBZ */
+dnl
+dnl @category InstalledPackages
+dnl @author Loic Dachary <loic@senga.org>
+dnl @version 2004-09-20
+dnl @license GPLWithACException
+
 AC_DEFUN([CHECK_ZLIB],
 #
 # Handle user hints
@@ -12,17 +34,21 @@ AC_ARG_WITH(zlib,
   --without-zlib to disable zlib usage completely],
 [if test "$withval" != no ; then
   AC_MSG_RESULT(yes)
-  ZLIB_HOME="$withval"
+  if test -d "$withval"
+  then
+    ZLIB_HOME="$withval"
+  else
+    AC_MSG_WARN([Sorry, $withval does not exist, checking usual places])
+  fi
 else
   AC_MSG_RESULT(no)
-fi], [
-AC_MSG_RESULT(yes)
+fi])
+
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"
 then
         ZLIB_HOME=/usr
 fi
-])
 
 #
 # Locate zlib, if wanted
@@ -36,7 +62,7 @@ then
         AC_LANG_SAVE
         AC_LANG_C
         AC_CHECK_LIB(z, inflateEnd, [zlib_cv_libz=yes], [zlib_cv_libz=no])
-        AC_CHECK_HEADER(zlib.h, [zlib_cv_zlib_h=yes], [zlib_cvs_zlib_h=no])
+        AC_CHECK_HEADER(zlib.h, [zlib_cv_zlib_h=yes], [zlib_cv_zlib_h=no])
         AC_LANG_RESTORE
         if test "$zlib_cv_libz" = "yes" -a "$zlib_cv_zlib_h" = "yes"
         then

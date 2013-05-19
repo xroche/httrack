@@ -2486,7 +2486,7 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
     strcpybuff(adr, "ftp://");  // FTP!!
     //!!p+=3;
 #if HTS_USEOPENSSL
-  } else if (SSL_is_available && (pos = strfield(url, "https:"))) {     // HTTPS
+  } else if ((pos = strfield(url, "https:"))) {     // HTTPS
     strcpybuff(adr, "https://");
 #endif
 #if HTS_USEMMS
@@ -2641,7 +2641,7 @@ HTS_INLINE void deletehttp(htsblk * r) {
 #endif
 #if HTS_USEOPENSSL
   /* Free OpenSSL structures */
-  if (SSL_is_available && r->ssl_con) {
+  if (r->ssl_con) {
     SSL_shutdown(r->ssl_con);
     SSL_free(r->ssl_con);
     r->ssl_con = NULL;
@@ -2702,7 +2702,7 @@ HTS_INLINE void deletesoc(T_SOC soc) {
 /* Will also clean other things */
 HTS_INLINE void deletesoc_r(htsblk * r) {
 #if HTS_USEOPENSSL
-  if (SSL_is_available && r->ssl_con) {
+  if (r->ssl_con) {
     SSL_shutdown(r->ssl_con);
     // SSL_CTX_set_quiet_shutdown(r->ssl_con->ctx, 1);
     SSL_free(r->ssl_con);
@@ -3075,7 +3075,7 @@ HTS_INLINE int sendc(htsblk * r, const char *s) {
 #endif
 
 #if HTS_USEOPENSSL
-  if (SSL_is_available && r->ssl) {
+  if (r->ssl) {
     n = SSL_write(r->ssl_con, s, ssz);
   } else
 #endif
@@ -4871,7 +4871,7 @@ int hts_read(htsblk * r, char *buff, int size) {
 #endif
     //HTS_TOTAL_RECV_CHECK(size);         // Diminuer au besoin si trop de données reçues
 #if HTS_USEOPENSSL
-    if (SSL_is_available && r->ssl) {
+    if (r->ssl) {
       retour = SSL_read(r->ssl_con, buff, size);
       if (retour <= 0) {
         int err_code = SSL_get_error(r->ssl_con, retour);
@@ -5533,7 +5533,7 @@ HTSEXT_API int hts_init(void) {
   /*
      Initialize the OpensSSL library
    */
-  if (!openssl_ctx && SSL_is_available) {
+  if (!openssl_ctx) {
     if (SSL_load_error_strings)
       SSL_load_error_strings();
     SSL_library_init();

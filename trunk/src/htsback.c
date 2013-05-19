@@ -1952,7 +1952,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
       }
 #endif
 #if HTS_USEOPENSSL
-      else if (SSL_is_available && strfield(back[p].url_adr, "https://")) {     // let's rock
+      else if (strfield(back[p].url_adr, "https://")) {     // let's rock
         back[p].r.ssl = 1;
         // back[p].r.ssl_soc = NULL;
         back[p].r.ssl_con = NULL;
@@ -2621,7 +2621,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
 #if HTS_USEOPENSSL
           /* SSL mode */
-          if (SSL_is_available && back[i].r.ssl) {
+          if (back[i].r.ssl) {
             // handshake not yet launched
             if (!back[i].r.ssl_con) {
               SSL_CTX_set_options(openssl_ctx, SSL_OP_ALL);
@@ -2691,7 +2691,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         // attente gethostbyname
       }
 #if HTS_USEOPENSSL
-      else if (SSL_is_available && back[i].status == STATUS_SSL_WAIT_HANDSHAKE) {       // wait for SSL handshake
+      else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE) {       // wait for SSL handshake
         /* SSL mode */
         if (back[i].r.ssl) {
           int conn_code;

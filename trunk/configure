@@ -638,6 +638,7 @@ THREADS_CFLAGS
 THREADS_LIBS
 LFS_FLAG
 V6_FLAG
+OPENSSL_LIBS
 VERSION_INFO
 DEFAULT_CFLAGS
 CXXCPP
@@ -15497,23 +15498,25 @@ if test "${with_zlib+set}" = set; then :
   withval=$with_zlib; if test "$withval" != no ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-  ZLIB_HOME="$withval"
+  if test -d "$withval"
+  then
+    ZLIB_HOME="$withval"
+  else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Sorry, $withval does not exist, checking usual places" >&5
+$as_echo "$as_me: WARNING: Sorry, $withval does not exist, checking usual places" >&2;}
+  fi
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
-else
+fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"
 then
         ZLIB_HOME=/usr
 fi
-
-fi
-
 
 #
 # Locate zlib, if wanted
@@ -15577,7 +15580,7 @@ fi
 if test "x$ac_cv_header_zlib_h" = xyes; then :
   zlib_cv_zlib_h=yes
 else
-  zlib_cvs_zlib_h=no
+  zlib_cv_zlib_h=no
 fi
 
 
@@ -15653,6 +15656,55 @@ $as_echo_n "checking zlib in ${ZLIB_HOME}... " >&6; }
 $as_echo "failed" >&6; }
                 as_fn_error $? "either specify a valid zlib installation with --with-zlib=DIR or disable zlib usage with --without-zlib" "$LINENO" 5
         fi
+fi
+
+
+
+### OpenSSL
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
+$as_echo_n "checking for SSL_library_init in -lssl... " >&6; }
+if ${ac_cv_lib_ssl_SSL_library_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lssl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char SSL_library_init ();
+int
+main ()
+{
+return SSL_library_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ssl_SSL_library_init=yes
+else
+  ac_cv_lib_ssl_SSL_library_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_library_init" >&5
+$as_echo "$ac_cv_lib_ssl_SSL_library_init" >&6; }
+if test "x$ac_cv_lib_ssl_SSL_library_init" = xyes; then :
+  OPENSSL_LIBS="-lcrypto -lssl"
+
+$as_echo "#define HTS_USEOPENSSL 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: not necessary" >&5
+$as_echo "not necessary" >&6; }
 fi
 
 

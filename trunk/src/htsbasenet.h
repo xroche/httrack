@@ -77,103 +77,15 @@ typedef struct hostent t_hostent;
 #ifndef HTS_OPENSSL_H_INCLUDED
 #define HTS_OPENSSL_H_INCLUDED
 
-/*
+/* OpenSSL definitions */
 #include <openssl/ssl.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
-*/
 
-/* Library internal definictions */
-#ifdef HTS_INTERNAL_BYTECODE
-
-/* OpenSSL definitions */
-#define SSL_shutdown hts_ptrfunc_SSL_shutdown
-#define SSL_free hts_ptrfunc_SSL_free
-#define SSL_new hts_ptrfunc_SSL_new
-#define SSL_clear hts_ptrfunc_SSL_clear
-#define SSL_set_fd hts_ptrfunc_SSL_set_fd
-#define SSL_set_connect_state hts_ptrfunc_SSL_set_connect_state
-#define SSL_connect hts_ptrfunc_SSL_connect
-#define SSL_get_error hts_ptrfunc_SSL_get_error
-#define SSL_write hts_ptrfunc_SSL_write
-#define SSL_read hts_ptrfunc_SSL_read
-#define SSL_library_init hts_ptrfunc_SSL_library_init
-#define ERR_load_crypto_strings hts_ptrfunc_ERR_load_crypto_strings
-#define ERR_load_SSL_strings hts_ptrfunc_ERR_load_SSL_strings
-#define SSLv23_client_method hts_ptrfunc_SSLv23_client_method
-#define SSL_CTX_new hts_ptrfunc_SSL_CTX_new
-#define ERR_error_string hts_ptrfunc_ERR_error_string
-#define SSL_load_error_strings hts_ptrfunc_SSL_load_error_strings
-#define SSL_CTX_ctrl hts_ptrfunc_SSL_CTX_ctrl
-
-#endif
-
-/* */
-typedef void SSL_CTX;
-typedef void *SSL;
-typedef void SSL_METHOD;
-typedef int (*t_SSL_shutdown) (SSL * ssl);
-typedef void (*t_SSL_free) (SSL * ssl);
-typedef SSL(*t_SSL_new) (SSL_CTX * ctx);
-typedef int (*t_SSL_clear) (SSL * ssl);
-typedef int (*t_SSL_set_fd) (SSL * ssl, int fd);
-typedef void (*t_SSL_set_connect_state) (SSL * ssl);
-typedef int (*t_SSL_connect) (SSL * ssl);
-typedef int (*t_SSL_get_error) (SSL * ssl, int ret);
-typedef int (*t_SSL_write) (SSL * ssl, const void *buf, int num);
-typedef int (*t_SSL_read) (SSL * ssl, void *buf, int num);
-typedef int (*t_SSL_library_init) (void);
-typedef void (*t_ERR_load_crypto_strings) (void);
-typedef void (*t_ERR_load_SSL_strings) (void);
-typedef SSL_METHOD *(*t_SSLv23_client_method) (void);
-typedef SSL_CTX *(*t_SSL_CTX_new) (SSL_METHOD * method);
-typedef char *(*t_ERR_error_string) (unsigned long e, char *buf);
-typedef void (*t_SSL_load_error_strings) (void);
-typedef long (*t_SSL_CTX_ctrl) (SSL_CTX * ctx, int cmd, long larg, char *parg);
-
-/* Library internal definictions */
-#ifdef HTS_INTERNAL_BYTECODE
-
-extern int SSL_is_available;
-extern t_SSL_shutdown SSL_shutdown;
-extern t_SSL_free SSL_free;
-extern t_SSL_new SSL_new;
-extern t_SSL_clear SSL_clear;
-extern t_SSL_set_fd SSL_set_fd;
-extern t_SSL_set_connect_state SSL_set_connect_state;
-extern t_SSL_connect SSL_connect;
-extern t_SSL_get_error SSL_get_error;
-extern t_SSL_write SSL_write;
-extern t_SSL_read SSL_read;
-extern t_SSL_library_init SSL_library_init;
-extern t_ERR_load_crypto_strings ERR_load_crypto_strings;
-extern t_ERR_load_SSL_strings ERR_load_SSL_strings;
-extern t_SSLv23_client_method SSLv23_client_method;
-extern t_SSL_CTX_new SSL_CTX_new;
-extern t_ERR_error_string ERR_error_string;
-extern t_SSL_load_error_strings SSL_load_error_strings;
-extern t_SSL_CTX_ctrl SSL_CTX_ctrl;
-
-#endif
-
-/*
-From /usr/include/openssl/ssl.h
-*/
-#define SSL_ERROR_NONE                  0
-#define SSL_ERROR_SSL                   1
-#define SSL_ERROR_WANT_READ             2
-#define SSL_ERROR_WANT_WRITE            3
-#define SSL_ERROR_WANT_X509_LOOKUP      4
-#define SSL_ERROR_SYSCALL               5       /* look at error stack/return value/errno */
-#define SSL_ERROR_ZERO_RETURN           6
-#define SSL_ERROR_WANT_CONNECT          7
-#define SSL_OP_ALL                                      0x000FFFFFL
-#define SSL_CTRL_OPTIONS                        32
-#define SSL_CTX_set_options(ctx,op) \
-        SSL_CTX_ctrl(ctx,SSL_CTRL_OPTIONS,op,NULL)
-
-//#include <openssl/bio.h>
 /* OpenSSL structure */
+#include <openssl/bio.h>
+
+/* Global SSL context */
 extern SSL_CTX *openssl_ctx;
 
 #endif
