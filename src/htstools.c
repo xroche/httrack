@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htstools.h"
 #include "htsstrings.h"
+#include "htscharset.h"
 #ifdef _WIN32
 #include "windows.h"
 #else
@@ -273,6 +274,21 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       if ((*a >= 'A') && (*a <= 'Z'))
         *a += 'a' - 'A';
       a++;
+    }
+  }
+
+  // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
+  if (!link_has_authority(adr) || strfield(adr, "https:")) {
+    char *const a = jump_identification(adr);
+    // Non-ASCII characters (theorically forbidden, but browsers are lenient)
+    if (!hts_isStringAscii(a, strlen(a))) {
+      char *const idna = hts_convertStringUTF8ToIDNA(a, strlen(a));
+      if (idna != NULL) {
+        if (strlen(idna) < HTS_URLMAXSIZE) {
+          strcpybuff(a, idna);
+        }
+        free(idna);
+      }
     }
   }
 

@@ -33,8 +33,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscharset.h"
 #include "htsbase.h"
+#include "punycode.h"
 
-static int hts_isStringAscii(const char *s, size_t size) {
+#include <assert.h>
+
+int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
 
   for(i = 0; i < size; i++) {
@@ -451,8 +454,7 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
     return strdup("");
   }
   /* Already UTF-8 ? */
-  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0
-      || hts_isStringAscii(s, size)) {
+  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
     return strndup(s, size);
   }
   /* Find codepage */
@@ -467,8 +469,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
     return strdup("");
   }
   /* Already UTF-8 ? */
-  if (strcasecmp(charset, "utf-8") == 0 || strcasecmp(charset, "utf8") == 0
-      || hts_isStringAscii(s, size)) {
+  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
     return strndup(s, size);
   }
   /* Find codepage */
@@ -546,6 +547,12 @@ size_t hts_stringLengthUTF8(const char *s) {
   return len;
 }
 
+int hts_isCharsetUTF8(const char *charset) {
+  return charset != NULL 
+    && ( strcasecmp(charset, "utf-8") == 0 
+         || strcasecmp(charset, "utf8") == 0 );
+}
+
 char *hts_getCharsetFromMeta(const char *html, size_t size) {
   int i;
 
@@ -600,4 +607,191 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
     }
   }
   return NULL;
+}
+
+char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
+  char *dest = NULL;
+  size_t capa = 0, destSize = 0;
+  size_t i, startSeg;
+  int nonAsciiFound;
+
+#undef ADD_BYTE
+#undef INCREASE_CAPA
+#define INCREASE_CAPA() do { \
+  capa = capa < 16 ? 16 : capa << 1; \
+  dest = realloc(dest, capa); \
+  if (dest == NULL) { \
+    return NULL; \
+  } \
+} while(0)
+#define ADD_BYTE(C) do { \
+  if (capa == destSize) { \
+    INCREASE_CAPA(); \
+  } \
+  dest[destSize++] = (char) (C); \
+} while(0)
+
+  for(i = startSeg = 0, nonAsciiFound = FALSE ; i <= size ; i++) {
+    const unsigned char c = i < size ? (unsigned char) s[i] : 0;
+    /* separator (ending, url segment, scheme, path segment, query string) */
+    if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
+      /* non-empty segment */
+      if (startSeg != i) {
+        /* IDNA ? */
+        if (nonAsciiFound) {
+          const size_t segSize = i - startSeg;
+          const unsigned char *segData = (const unsigned char*) &s[startSeg];
+          punycode_uint *segInt = NULL;
+          size_t j, utfSeq, segOutputSize;
+
+          punycode_uint output_length;
+          punycode_status status;
+
+          /* IDNA prefix */
+          ADD_BYTE('x');
+          ADD_BYTE('n');
+          ADD_BYTE('-');
+          ADD_BYTE('-');
+          
+          /* copy utf-8 to integers */
+          segInt = malloc(segSize*sizeof(punycode_uint));
+          for(j = 0, segOutputSize = 0, utfSeq = (size_t) -1
+            ; j <= segSize ; j++) {
+            const unsigned char c = j < segSize ? segData[j] : 0;
+
+            /* character start (ascii, or utf-8 leading sequence) */
+            if (HTS_IS_LEADING_UTF8(c)) {
+              /* commit sequence ? */
+              if (utfSeq != (size_t) -1) {
+                /* unicode character */
+                punycode_uint uc = 0;
+                size_t step = 0;
+
+                /* utf-8 sequence macro */
+#define SEQ_MATCH(FROM, TO) \
+  (utfSeq < j && segData[utfSeq] >= FROM && segData[utfSeq] <= TO \
+    && (uc *= (TO - FROM + 1), \
+        uc += segData[utfSeq] - FROM, \
+        utfSeq++, \
+        1) \
+  )
+                /* decode UTF-8 sequence */
+                if (SEQ_MATCH(0xC2, 0xDF)) {
+                  if (SEQ_MATCH(0x80, 0xBF)) {
+                    uc += 0x0080;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xE0, 0xE0)) {
+                  if (SEQ_MATCH(0xA0, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
+                    uc += 0x0800;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xE1, 0xEC)) {
+                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
+                    uc += 0x1000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xED, 0xED)) {
+                  if (SEQ_MATCH(0x80, 0x9F) && SEQ_MATCH(0x80, 0xBF)) {
+                    uc += 0xD000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xEE, 0xEF)) {
+                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
+                    uc += 0xE000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xF0, 0xF0)) {
+                  if (SEQ_MATCH(0x90, 0xBF) && SEQ_MATCH(0x80, 0xBF) 
+                    && SEQ_MATCH(0x80, 0xBF)) {
+                      uc += 0x10000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xF1, 0xF3)) {
+                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)
+                    && SEQ_MATCH(0x80, 0xBF)) {
+                      uc += 0x40000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else if (SEQ_MATCH(0xF4, 0xF4)) {
+                  if (SEQ_MATCH(0x80, 0x8F) && SEQ_MATCH(0x80, 0xBF)
+                    && SEQ_MATCH(0x80, 0xBF)) {
+                      uc += 0x100000;
+                  } else {
+                    uc = 0xfffd;  /* replacement character */
+                  }
+                } else {
+                  uc = 0xfffd;  /* replacement character */
+                }
+#undef SEQ_MATCH
+
+                /* copy character */
+                assert(segOutputSize < segSize);
+                segInt[segOutputSize++] = uc;
+
+                /* not anymore in sequence */
+                utfSeq = (size_t) -1;
+              }
+
+              /* ascii ? */
+              if (c < 0x80) {
+                assert(segOutputSize < segSize);
+                segInt[segOutputSize] = c;
+                if (c != 0) {
+                  segOutputSize++;
+                }
+              }
+              /* new UTF8 sequence */
+              else {
+                utfSeq = j;
+              }
+            }
+          }
+
+          /* encode */
+          output_length = (punycode_uint) ( capa - destSize );
+          while(status = punycode_encode((punycode_uint) segOutputSize,
+            segInt, NULL, &output_length, &dest[destSize])
+            == punycode_big_output) {
+              INCREASE_CAPA();
+              output_length = (punycode_uint) ( capa - destSize );
+          }
+
+          /* success ? */
+          if (status == punycode_success) {
+            destSize += output_length;
+          }
+        }
+        /* copy ascii segment otherwise */
+        else {
+          size_t j;
+          for(j = startSeg ; j < i ; j++) {
+            const unsigned char c = (unsigned char) s[j];
+            ADD_BYTE(c);
+          }
+        }
+      }
+      /* next segment start */
+      startSeg = i + 1;
+      nonAsciiFound = 0;
+      /* add separator (including terminating \0) */
+      ADD_BYTE(c);
+    }
+    /* found non-ascii */
+    else if (c >= 0x80) {
+      nonAsciiFound = 1;
+    }
+  }
+
+#undef ADD_BYTE
+#undef INCREASE_CAPA
+
+  return dest;
 }
