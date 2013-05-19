@@ -56,7 +56,7 @@ int hts_zunpack(char *filename, char *newfile) {
   int ret = -1;
   char catbuff[CATBUFF_SIZE];
 
-  if (gz_is_available && filename && newfile) {
+  if (filename && newfile) {
     if (filename[0] && newfile[0]) {
       // not: NOT an UTF-8 filename
       gzFile gz = gzopen(filename, "rb");
