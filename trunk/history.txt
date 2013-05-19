@@ -21,6 +21,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: serious bug that may lead to download several times the same file, and "Unexpected 412/416 error" errors
 + Fixed: images in CSS were sometimes not correctly detected (Martin)
 + Fixed: links within javascript events were sometimes not correctly detected (wquatan)
++ Fixed: webhttrack caused bus error on certain systems, such as Mac OSX, due to the stack size (Patrick Gundlach)
 
 3.46-1
 * New: Unicode filenames handling
