@@ -609,12 +609,220 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
   return NULL;
 }
 
-char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
-  char *dest = NULL;
-  size_t capa = 0, destSize = 0;
-  size_t i, startSeg;
-  int nonAsciiFound;
+/* UTF-8 helpers */
 
+/* Number of leading zeros. Returns a value between 0 and 8. */
+static unsigned int nlz8(unsigned char x) {
+  unsigned int b = 0;
+
+  if (x & 0xf0) {
+    x >>= 4;
+  } else {
+    b += 4;
+  }
+
+  if (x & 0x0c) {
+    x >>= 2;
+  } else {
+    b += 2;
+  }
+
+  if (! (x & 0x02) ) {
+    b++;
+  }
+
+  return b;
+}
+
+/*
+  Emit the Unicode character 'UC' (internal)
+  See <http://en.wikipedia.org/wiki/UTF-8>
+  7	  U+0000		U+007F		1	0xxxxxxx
+  11	U+0080		U+07FF		2	110xxxxx
+  16	U+0800		U+FFFF		3	1110xxxx
+  21	U+10000		U+1FFFFF	4	11110xxx
+  26	U+200000	U+3FFFFFF	5	111110xx
+  31	U+4000000	U+7FFFFFFF	6	1111110x
+*/
+#define ADD_SEQ(UC, BITS, EMITTER) do {                                 \
+    /* number of data bits in first octet */                            \
+    const int bits = BITS % 6;                                          \
+    /* shift for first octet */                                         \
+    const int shift0 = BITS - bits;                                     \
+    /* first octet */                                                   \
+    const unsigned char lead =                                          \
+      /* leading bits */                                                \
+      ( 0xff ^ ( ( 1 << ( bits + 1 ) ) - 1 ) )                          \
+      /* encoded bits */                                                \
+      | ( ( (UC) >> shift0 ) & ( ( 1 << ( bits + 1 ) ) - 1 ) )          \
+      ;                                                                 \
+    /* further bytes are encoding 6 bits */                             \
+    const unsigned char second =                                        \
+      0x80 | ( ( (UC) >> ( shift0 - 6 ) ) & 0x3f );                     \
+    EMITTER(lead);                                                      \
+    EMITTER(second);                                                    \
+    if (BITS > 6*2) {                                                   \
+      const unsigned char next =                                        \
+        0x80 | ( ( (UC) >> ( shift0 - 6*2 ) ) & 0x3f );                 \
+      EMITTER(next);                                                    \
+      if (BITS > 6*3) {                                                 \
+        const unsigned char next =                                      \
+          0x80 | ( ( (UC) >> ( shift0 - 6*3 ) ) & 0x3f );               \
+        EMITTER(next);                                                  \
+        if (BITS > 6*4) {                                               \
+          const unsigned char next =                                    \
+            0x80 | ( ( (UC) >> ( shift0 - 6*4 ) ) & 0x3f );             \
+          EMITTER(next);                                                \
+          if (BITS > 6*5) {                                             \
+            const unsigned char next =                                  \
+              0x80 | ( ( (UC) >> ( shift0 - 6*5 ) ) & 0x3f );           \
+            EMITTER(next);                                              \
+          }                                                             \
+        }                                                               \
+      }                                                                 \
+    }                                                                   \
+  } while(0)
+
+/* UC is a constant. EMITTER is a macro function taking an unsigned int. */
+#define EMIT_UNICODE(UC, EMITTER) do {          \
+    if ((UC) < 0x80) {                          \
+      EMITTER(((unsigned char) (UC)));          \
+    } else if ((UC) < 0x0800) {                 \
+      ADD_SEQ(UC, 11, EMITTER);                 \
+    } else if ((UC) < 0x10000) {                \
+      ADD_SEQ(UC, 16, EMITTER);                 \
+    } else if ((UC) < 0x200000) {               \
+      ADD_SEQ(UC, 21, EMITTER);                 \
+    } else if ((UC) < 0x4000000) {              \
+      ADD_SEQ(UC, 26, EMITTER);                 \
+    } else {                                    \
+      ADD_SEQ(UC, 31, EMITTER);                 \
+    }                                           \
+  } while(0)
+
+#undef READ_LOOP
+#define READ_LOOP(C, READER, EMITTER, CLEARED)  \
+  do {                                          \
+    unsigned int uc_ =                          \
+      (C) & ( (1 << (CLEARED - 1)) - 1 );       \
+    int i_;                                     \
+    /* loop should be unrolled by compiler */   \
+    for(i_ = 0 ; i_ < 7 - CLEARED ; i_++) {     \
+      const int c_ = READER;                    \
+      /* continuation byte 10xxxxxx */          \
+      if (c_ != -1 && ( c_ >> 6 ) == 0x2) {     \
+        uc_ <<= 6;                              \
+        uc_ |= (c_ & 0x3f);                     \
+      } else {                                  \
+        uc_ = (unsigned int) -1;                \
+        break;                                  \
+      }                                         \
+    }                                           \
+    EMITTER(((int) uc_));                       \
+  } while(0)
+
+/* READER is a macro returning an int (-1 for error).
+   EMITTER is a macro function taking an int (-1 for error). */
+#define READ_UNICODE(READER, EMITTER) do {      \
+    const unsigned int f_ =                     \
+      (unsigned int) READER;                    \
+    /* 1..8 */                                  \
+    const unsigned int c_ =                     \
+      nlz8((unsigned char)~f_);                 \
+    /* ascii */                                 \
+    switch(c_) {                                \
+    case 0:                                     \
+      EMITTER(((int)f_));                       \
+      break;                                    \
+      /* 110xxxxx 10xxxxxx */                   \
+    case 2:                                     \
+      READ_LOOP(f_, READER, EMITTER, 6);        \
+      break;                                    \
+    case 3:                                     \
+      READ_LOOP(f_, READER, EMITTER, 5);        \
+      break;                                    \
+    case 4:                                     \
+      READ_LOOP(f_, READER, EMITTER, 4);        \
+      break;                                    \
+    case 5:                                     \
+      READ_LOOP(f_, READER, EMITTER, 3);        \
+      break;                                    \
+    case 6:                                     \
+      READ_LOOP(f_, READER, EMITTER, 2);        \
+      break;                                    \
+      /* unexpected continuation/bogus */       \
+    default:                                    \
+      EMITTER(-1);                              \
+      break;                                    \
+    }                                           \
+  } while(0)
+
+/* Sample. */
+#if 0
+
+int main(int argc, char **argv) {
+  int i;
+  int hex = 0;
+  
+#define READ_INT(DEST)                                  \
+  ( ( !hex && sscanf(argv[i], "%d", &(DEST)) == 1)      \
+    || (hex && sscanf(argv[i], "%x", &(DEST)) == 1 ) )
+  
+  for(i = 1 ; i < argc ; i++) {
+    unsigned int uc, from, to;
+    
+    if (strcmp(argv[i], "--hex") == 0) {
+      hex = 1;
+    }
+    else if (strcmp(argv[i], "--decimal") == 0) {
+      hex = 0;
+    }
+    else if (strcmp(argv[i], "--decode") == 0) {
+#define RD fgetc_unlocked(stdin)
+#define WR(C) do {                              \
+        if (C != -1) {                          \
+          printf("%04x\n", C);                  \
+        } else if (!feof(stdin)) {              \
+          fprintf(stderr, "read error\n");      \
+          exit(EXIT_FAILURE);                   \
+        }                                       \
+      } while(0)
+      while(!feof(stdin)) {
+        READ_UNICODE(RD, WR);
+      }
+#undef RD
+#undef WR
+    }
+    else if (strcmp(argv[i], "-range") == 0
+             && i + 2 < argc
+             && (++i, 1)
+             && READ_INT(from)
+             && (++i, 1)
+             && READ_INT(to)
+             ) {
+      unsigned int i;
+      for(i = from ; i < to ; i++) {
+#define EM(C) fputc_unlocked(C, stdout)
+        EMIT_UNICODE(i, EM);
+#undef EM
+      }
+    }
+    else if (READ_INT(uc)) {
+#define EM(C) fputc_unlocked(C, stdout)
+      EMIT_UNICODE(uc, EM);
+#undef EM
+    }
+    else {
+      return EXIT_FAILURE;
+    }
+  }
+  
+  return EXIT_SUCCESS;
+}
+
+#endif
+
+/* IDNA helpers. */
 #undef ADD_BYTE
 #undef INCREASE_CAPA
 #define INCREASE_CAPA() do { \
@@ -630,6 +838,18 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   } \
   dest[destSize++] = (char) (C); \
 } while(0)
+#define FREE_BUFFER() do { \
+  if (dest != NULL) { \
+    free(dest); \
+    dest = NULL; \
+  } \
+} while(0)
+
+char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
+  char *dest = NULL;
+  size_t capa = 0, destSize = 0;
+  size_t i, startSeg;
+  int nonAsciiFound;
 
   for(i = startSeg = 0, nonAsciiFound = 0 ; i <= size ; i++) {
     const unsigned char c = i < size ? (unsigned char) s[i] : 0;
@@ -653,8 +873,12 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           ADD_BYTE('-');
           ADD_BYTE('-');
           
-          /* copy utf-8 to integers */
-          segInt = malloc(segSize*sizeof(punycode_uint));
+          /* copy utf-8 to integers. note: buffer is sufficient! */
+          segInt = (punycode_uint*) malloc(segSize*sizeof(punycode_uint));
+          if (segInt == NULL) {
+            FREE_BUFFER();
+            return NULL;
+          }
           for(j = 0, segOutputSize = 0, utfSeq = (size_t) -1
             ; j <= segSize ; j++) {
             const unsigned char c = j < segSize ? segData[j] : 0;
@@ -666,70 +890,16 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
                 /* unicode character */
                 punycode_uint uc = 0;
 
-                /* utf-8 sequence macro */
-#define SEQ_MATCH(FROM, TO) \
-  (utfSeq < j && segData[utfSeq] >= FROM && segData[utfSeq] <= TO \
-    && (uc *= (TO - FROM + 1), \
-        uc += segData[utfSeq] - FROM, \
-        utfSeq++, \
-        1) \
-  )
-                /* decode UTF-8 sequence */
-                if (SEQ_MATCH(0xC2, 0xDF)) {
-                  if (SEQ_MATCH(0x80, 0xBF)) {
-                    uc += 0x0080;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xE0, 0xE0)) {
-                  if (SEQ_MATCH(0xA0, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
-                    uc += 0x0800;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xE1, 0xEC)) {
-                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
-                    uc += 0x1000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xED, 0xED)) {
-                  if (SEQ_MATCH(0x80, 0x9F) && SEQ_MATCH(0x80, 0xBF)) {
-                    uc += 0xD000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xEE, 0xEF)) {
-                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)) {
-                    uc += 0xE000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xF0, 0xF0)) {
-                  if (SEQ_MATCH(0x90, 0xBF) && SEQ_MATCH(0x80, 0xBF) 
-                    && SEQ_MATCH(0x80, 0xBF)) {
-                      uc += 0x10000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xF1, 0xF3)) {
-                  if (SEQ_MATCH(0x80, 0xBF) && SEQ_MATCH(0x80, 0xBF)
-                    && SEQ_MATCH(0x80, 0xBF)) {
-                      uc += 0x40000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else if (SEQ_MATCH(0xF4, 0xF4)) {
-                  if (SEQ_MATCH(0x80, 0x8F) && SEQ_MATCH(0x80, 0xBF)
-                    && SEQ_MATCH(0x80, 0xBF)) {
-                      uc += 0x100000;
-                  } else {
-                    uc = 0xfffd;  /* replacement character */
-                  }
-                } else {
-                  uc = 0xfffd;  /* replacement character */
-                }
-#undef SEQ_MATCH
+                /* Reader: can read bytes up to j */
+#define RD ( utfSeq < j ? segData[utfSeq++] : -1 )
+
+                /* Writer: upon error, return FFFD (replacement character) */
+#define WR(C) uc = C != -1 ? (punycode_uint) C : (punycode_uint) 0xfffd
+
+                /* Read Unicode character. */
+                READ_UNICODE(RD, WR);
+#undef RD
+#undef WR
 
                 /* copy character */
                 assert(segOutputSize < segSize);
@@ -763,9 +933,15 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
               output_length = (punycode_uint) ( capa - destSize );
           }
 
+          /* cleanup */
+          free(segInt);
+
           /* success ? */
           if (status == punycode_success) {
             destSize += output_length;
+          } else {
+            FREE_BUFFER();
+            return NULL;
           }
         }
         /* copy ascii segment otherwise */
@@ -777,9 +953,11 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           }
         }
       }
+
       /* next segment start */
       startSeg = i + 1;
       nonAsciiFound = 0;
+
       /* add separator (including terminating \0) */
       ADD_BYTE(c);
     }
@@ -789,8 +967,98 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
     }
   }
 
-#undef ADD_BYTE
-#undef INCREASE_CAPA
+  return dest;
+}
+
+char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
+  char *dest = NULL;
+  size_t capa = 0, destSize = 0;
+  size_t i, startSeg;
+  for(i = startSeg = 0 ; i <= size ; i++) {
+    const unsigned char c = i < size ? s[i] : 0;
+    if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
+      const size_t segSize = i - startSeg;
+      /* IDNA segment ? */
+      if (segSize > 4
+          && strncasecmp(&s[startSeg], "xn--", 4) == 0) {
+        punycode_status status;
+        punycode_uint output_capa;
+        punycode_uint output_length;
+        punycode_uint *output_dest;
+
+        /* encode. pre-reserve buffer. */
+        for(output_capa = 16 ; output_capa < segSize 
+          ; output_capa <<= 1) ;
+        output_dest =
+          (punycode_uint*) malloc(output_capa*sizeof(punycode_uint));
+        if (output_dest == NULL) {
+          FREE_BUFFER();
+          return NULL;
+        }
+        for(output_length = output_capa 
+          ; (status = punycode_decode((punycode_uint) segSize - 4,
+            &s[startSeg + 4], &output_length, output_dest, NULL))
+            == punycode_big_output 
+          ; ) {
+          output_capa <<= 1;
+          output_dest =
+            (punycode_uint*) realloc(output_dest,
+                                     output_capa*sizeof(punycode_uint));
+          if (output_dest == NULL) {
+            FREE_BUFFER();
+            return NULL;
+          }
+          output_length = output_capa;
+        }
+
+        /* success ? */
+        if (status == punycode_success) {
+          punycode_uint j;
+          for(j = 0 ; j < output_length ; j++) {
+            const punycode_uint uc = output_dest[j];
+            if (uc < 0x80) {
+              ADD_BYTE((unsigned char) uc);
+            } else {
+              /* emiter (byte per byte) */
+#define EM(C) do { \
+  if (C != -1) {   \
+    ADD_BYTE(C);   \
+  } else {         \
+    FREE_BUFFER(); \
+    return NULL;   \
+  }                \
+} while(0)
+              /* Emit codepoint */
+              EMIT_UNICODE(uc, EM);
+#undef EM
+            }
+          }
+        }
+
+        /* cleanup */
+        free(output_dest);
+
+        /* error ? */
+        if (status != punycode_success) {
+          FREE_BUFFER();
+          return NULL;
+        }
+      } else {
+        size_t j;
+        for(j = startSeg ; j < i ; j++) {
+          const unsigned char c = (unsigned char) s[j];
+          ADD_BYTE(c);
+        }
+      }
+      /* next segment start */
+      startSeg = i + 1;
+      /* add separator (including terminating \0) */
+      ADD_BYTE(c);
+    }
+  }
 
   return dest;
 }
+
+#undef ADD_BYTE
+#undef INCREASE_CAPA
