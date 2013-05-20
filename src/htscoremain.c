@@ -2290,19 +2290,54 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   return 0;
                 }
                 break;
-              case '3':        // charset tests: httrack #3 "iso-8859-1" "café"
-                if (argc == 3) {
+              case '3':        // charset tests: httrack -#3 "iso-8859-1" "café"
+                if (++na + 1 < argc) {
                   char *s =
-                    hts_convertStringToUTF8(argv[2], strlen(argv[2]), argv[1]);
+                    hts_convertStringToUTF8(argv[na+1], strlen(argv[na+1]), argv[na]);
                   if (s != NULL) {
-                    printf(">> %s\n", s);
+                    printf("%s\n", s);
                     free(s);
                   } else {
-                    fprintf(stderr, "invalid string for charset %s\n", argv[1]);
+                    fprintf(stderr, "invalid string for charset %s\n", argv[na]);
                   }
+                  na += 2;
                 } else {
-                  HTS_PANIC_PRINTF
-                    ("Option #3 needs to be followed by a charset and a string");
+                  fprintf(stderr,
+                    "Option #3 needs to be followed by a charset and a string");
+                }
+                htsmain_free();
+                return 0;
+                break;
+              case '4':  // IDNA encoder: httrack -#4 "www.café.com"
+                if (++na < argc) {
+                  char *s = hts_convertStringUTF8ToIDNA(argv[na], strlen(argv[na]));
+                  if (s != NULL) {
+                    printf("%s\n", s);
+                    free(s);
+                  } else {
+                    fprintf(stderr, "invalid string '%s'\n", argv[na]);
+                  }
+                  na += 1;
+                } else {
+                  fprintf(stderr,
+                    "Option #4 needs to be followed by an IDNA string");
+                }
+                htsmain_free();
+                return 0;
+                break;
+              case '5':  // IDNA encoder: httrack -#5
+                if (++na < argc) {
+                  char *s = hts_convertStringIDNAToUTF8(argv[na], strlen(argv[na]));
+                  if (s != NULL) {
+                    printf("%s\n", s);
+                    free(s);
+                  } else {
+                    fprintf(stderr, "invalid string '%s'\n", argv[na]);
+                  }
+                  na += 1;
+                } else {
+                  fprintf(stderr,
+                    "Option #5 needs to be followed by an IDNA string");
                 }
                 htsmain_free();
                 return 0;
@@ -2321,6 +2356,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     fprintf(stderr, "process returned error code %d\n", code);
                   }
                 }
+                htsmain_free();
+                return 0;
                 break;
               case 'd':
                 opt->parsedebug = 1;
