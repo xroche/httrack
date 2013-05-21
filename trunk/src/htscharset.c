@@ -547,6 +547,22 @@ size_t hts_stringLengthUTF8(const char *s) {
   return len;
 }
 
+size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
+  const unsigned char *const bytes = (const unsigned char *) src;
+  size_t i, mark;
+
+  for(i = 0, mark = 0; ( i == 0 || bytes[i + 1] != '\0' ) && i <= size; i++) {
+    const unsigned char c = bytes[i];
+
+    if (HTS_IS_LEADING_UTF8(c)) {
+      mark = i;
+    }
+  }
+  dest[mark] = '\0';
+
+  return mark;
+}
+
 int hts_isCharsetUTF8(const char *charset) {
   return charset != NULL 
     && ( strcasecmp(charset, "utf-8") == 0 
@@ -981,6 +997,8 @@ int hts_isStringIDNA(const char *s, size_t size) {
           && strncasecmp(&s[startSeg], "xn--", 4) == 0) {
         return 1;
       }
+      /* next segment start */
+      startSeg = i + 1;
     }
   }
   return 0;
