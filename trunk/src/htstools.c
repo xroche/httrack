@@ -485,7 +485,7 @@ void longfile_to_83(int mode, char *n83, char *save) {
      /:;?\#*~
      0x00-0x1f and 0x80-0xff
    */
-  for(i = 0; save[i] != 0; i++) {
+  for(i = 0, j = 0; save[i] != 0; i++) {
     char a = save[i];
 
     if (a >= 'a' && a <= 'z') {
@@ -494,10 +494,14 @@ void longfile_to_83(int mode, char *n83, char *save) {
       if (!
           ((a >= 'A' && a <= 'Z') || (a >= '0' && a <= '9') || a == '_'
            || a == '.')) {
+      if (j != 0 && save[j - 1] == '_') {
+        continue;  // avoid __
+      }
       a = '_';
     }
-    save[i] = a;
+    save[j++] = a;
   }
+  save[j] = '\0';
 
   i = j = 0;
   while((i < max) && (save[j]) && (save[j] != '.')) {

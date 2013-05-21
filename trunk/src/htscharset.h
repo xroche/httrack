@@ -101,6 +101,14 @@ extern size_t hts_stringLengthUTF8(const char *s);
 extern size_t hts_copyStringUTF8(char *dest, const char *src, 
                                  size_t nBytes);
 
+/**
+ * Append at most 'nBytes' bytes from src to dest, not truncating UTF-8
+ * sequences.
+ * Returns the number of bytes appended, not including the terminating \0.
+ **/
+extern size_t hts_appendStringUTF8(char *dest, const char *src, 
+                                   size_t nBytes);
+
 /* WIN32 specific. */
 
 #ifdef _WIN32
