@@ -554,6 +554,7 @@ size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
   for(i = 0, mark = 0; ( i == 0 || bytes[i + 1] != '\0' ) && i <= size; i++) {
     const unsigned char c = bytes[i];
 
+    dest[i] = c;
     if (HTS_IS_LEADING_UTF8(c)) {
       mark = i;
     }
@@ -561,6 +562,11 @@ size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
   dest[mark] = '\0';
 
   return mark;
+}
+
+size_t hts_appendStringUTF8(char *dest, const char *src,  size_t nBytes) {
+  const size_t size = strlen(dest);
+  return hts_copyStringUTF8(dest + size, src, nBytes);
 }
 
 int hts_isCharsetUTF8(const char *charset) {

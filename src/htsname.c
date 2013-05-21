@@ -1046,11 +1046,11 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         } else {              // noms 8-3
           if (strlen(final_adr) > 4) {
             if (strfield(final_adr, "www."))
-              strncatbuff(save, final_adr + 4, max_char);
+              hts_appendStringUTF8(save, final_adr + 4, max_char);
             else
-              strncatbuff(save, final_adr, max_char);
+              hts_appendStringUTF8(save, final_adr, max_char);
           } else
-            strncatbuff(save, final_adr, max_char);
+            hts_appendStringUTF8(save, final_adr, max_char);
         }
 
         /* release */
@@ -1092,12 +1092,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         } else {              // noms 8-3
           if (strlen(final_adr) > 4) {
             if (strfield(final_adr, "www."))
-              strncatbuff(save, final_adr + 4, max_char);
+              hts_appendStringUTF8(save, final_adr + 4, max_char);
             else
-              strncatbuff(save, final_adr, max_char);
+              hts_appendStringUTF8(save, final_adr, max_char);
             strcatbuff(save, "/");
           } else {
-            strncatbuff(save, final_adr, max_char);
+            hts_appendStringUTF8(save, final_adr, max_char);
             strcatbuff(save, "/");
           }
         }
@@ -1281,16 +1281,15 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
   //
   {                             // éliminer les // (comme ftp://)
-    char *a;
+    size_t i;
 
-    //while( (a=strstr(save,"//")) ) *a='_';
     cleanDoubleSlash(save);
-    // Eliminer chars spéciaux
-    a = save - 1;
-    while(*(++a))
-      if (((unsigned char) (*a) <= 31)
-          || ((unsigned char) (*a) == 127))
-        *a = '_';
+
+    for(i = 0 ; save[i] != '\0' ; i++) {
+      unsigned char c = (unsigned char) save[i];
+      if (c < 32 || c == 127)
+        save[i] = '_';
+    }
   }
 
 #if HTS_OVERRIDE_DOS_FOLDERS
