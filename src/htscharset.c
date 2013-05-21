@@ -970,6 +970,22 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   return dest;
 }
 
+int hts_isStringIDNA(const char *s, size_t size) {
+  size_t i, startSeg;
+  for(i = startSeg = 0 ; i <= size ; i++) {
+    const unsigned char c = i < size ? s[i] : 0;
+    if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
+      const size_t segSize = i - startSeg;
+      /* IDNA segment ? */
+      if (segSize > 4
+          && strncasecmp(&s[startSeg], "xn--", 4) == 0) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
 char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
   char *dest = NULL;
   size_t capa = 0, destSize = 0;

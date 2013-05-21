@@ -69,6 +69,11 @@ extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
 extern char *hts_convertStringIDNAToUTF8(const char *s, size_t size);
 
 /**
+ * Has the given string any IDNA segments ?
+ **/
+extern int hts_isStringIDNA(const char *s, size_t size);
+
+/**
  * Extract the charset from the HTML buffer "html"
  **/
 extern char *hts_getCharsetFromMeta(const char *html, size_t size);
