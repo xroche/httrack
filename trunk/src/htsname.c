@@ -138,11 +138,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   static const char *protocol_str[] =
     { "http", "https", "ftp", "file", "mms", "unknown" };
   int protocol = PROTOCOL_HTTP;
-  char *normadr;
-  char *normfil;
-  char *fil;
-  char *adr;
-  char *print_adr;
+  const char *const adr = jump_identification(adr_complete);
+  char *fil = fil_complete;
+  // copy of fil, used for lookups (see urlhack)
+  const char *normadr = adr;
+  const char *normfil = fil;
+  const char *const print_adr = jump_protocol(adr);
   char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
 
   // pour changement d'extension ou de nom (content-disposition)
@@ -153,6 +154,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
   //CLEAR
   newfil[0] = ext[0] = '\0';
+  save[0] = '\0';
 
   /* 8-3 ? */
   switch (opt->savename_83) {
@@ -166,20 +168,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     max_char = 8;
     break;
   }
-
-  // effacer save
-  save[0] = '\0';
-  // fil
-  fil = fil_complete;
-  // copy of fil, used for lookups (see urlhack)
-  normfil = fil;
-  // et adr (sauter user/pass)
-  // on prend le parti de mettre les fichiers avec login/pass au même endroit que si ils
-  // étaient capturés sans ces paramètres
-  // c'est pour cette raison qu'on ignore totalement adr_complete (même pour la recherche en table de hachage)
-  adr = jump_identification(adr_complete);
-  // copy of adr, used for lookups (see urlhack)
-  normadr = adr;
 
   // normalize the URL:
   // www.foo.com -> foo.com
@@ -204,7 +192,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
 
   // à afficher sans ftp://
-  print_adr = jump_protocol(adr);
   if (strfield(adr_complete, "https:")) {
     protocol = PROTOCOL_HTTPS;
   } else if (strfield(adr_complete, "ftp:")) {
@@ -224,6 +211,29 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       return 0;
     }
   }
+
+  /* Declare adr (IDNA-decoded if necessary) */
+#define DECLARE_ADR(FINAL_ADR) \
+  char *idna_adr =\
+    /* http or https */\
+    (\
+    protocol == PROTOCOL_HTTP\
+    || protocol == PROTOCOL_HTTPS \
+    )\
+    /* and contains IDNA */\
+    && hts_isStringIDNA(adr_complete, strlen(print_adr))\
+    ? hts_convertStringIDNAToUTF8(print_adr, strlen(print_adr))\
+    : NULL;\
+  const char *const FINAL_ADR = idna_adr != NULL \
+    ? idna_adr : ( protocol == PROTOCOL_FILE ? "file" : print_adr )
+
+  /* Release adr */
+#define RELEASE_ADR() do {\
+  if (idna_adr != NULL) {\
+    free(idna_adr);\
+    idna_adr = NULL;\
+  }\
+} while(0)
 
   // vérifier que le nom n'a pas déja été calculé (si oui le renvoyer tel que)
   // vérifier que le nom n'est pas déja pris...
@@ -937,7 +947,23 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           }
           b += strlen(b);       // pointer à la fin
           break;
-        case 'h':              // host
+        case 'h':              // host (IDNA decoded if suitable)
+          // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
+          {
+            DECLARE_ADR(final_adr);
+
+            /* Copy address */
+            *b = '\0';
+            if (!short_ver)
+              strcpybuff(b, final_adr);
+            else
+              strcpybuff(b, final_adr);
+
+            /* release */
+            RELEASE_ADR();
+          }
+          break;
+        case 'H':              // host, raw (old mode)
           *b = '\0';
           if (strcmp(adr_complete, "file://") == 0) {
             if (!short_ver)     // Noms longs
@@ -1012,26 +1038,24 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     /* recopier www.. */
     if (opt->savename_type != 100) {
       if (((opt->savename_type / 1000) % 2) == 0) {     // >1000 signifie "pas de www/"
-        if (strcmp(adr_complete, "file://") == 0) {
-          //## if (*adr==lOCAL_CHAR) {
-          if (opt->savename_83 != 1)    // noms longs
-            strcatbuff(save, "localhost");
-          else
-            strcatbuff(save, "local");
-        } else {
-          // adresse url
-          if (!opt->savename_83) {      // noms longs (et pas de .)
-            strcatbuff(save, print_adr);
-          } else {              // noms 8-3
-            if (strlen(print_adr) > 4) {
-              if (strfield(print_adr, "www."))
-                strncatbuff(save, print_adr + 4, max_char);
-              else
-                strncatbuff(save, print_adr, 8);
-            } else
-              strncatbuff(save, print_adr, max_char);
-          }
+        DECLARE_ADR(final_adr);
+
+        // adresse url
+        if (!opt->savename_83) {      // noms longs (et pas de .)
+          strcatbuff(save, final_adr);
+        } else {              // noms 8-3
+          if (strlen(final_adr) > 4) {
+            if (strfield(final_adr, "www."))
+              strncatbuff(save, final_adr + 4, max_char);
+            else
+              strncatbuff(save, final_adr, max_char);
+          } else
+            strncatbuff(save, final_adr, max_char);
         }
+
+        /* release */
+        RELEASE_ADR();
+
         if (*fil != '/')
           strcatbuff(save, "/");
       }
@@ -1060,30 +1084,26 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     // dossier "web" ou "www.xxx" ?
     if (((opt->savename_type / 1000) % 2) == 0) {       // >1000 signifie "pas de www/"
       if ((opt->savename_type / 100) % 2) {
-        if (strcmp(adr_complete, "file://") == 0) {
-          //## if (*adr==lOCAL_CHAR) {
-          if (opt->savename_83 != 1)    // noms longs
-            strcatbuff(save, "localhost/");
-          else
-            strcatbuff(save, "local/");
-        } else {
-          // adresse url
-          if (!opt->savename_83) {      // noms longs
-            strcatbuff(save, print_adr);
+        DECLARE_ADR(final_adr);
+
+        if (!opt->savename_83) {      // noms longs
+          strcatbuff(save, final_adr);
+          strcatbuff(save, "/");
+        } else {              // noms 8-3
+          if (strlen(final_adr) > 4) {
+            if (strfield(final_adr, "www."))
+              strncatbuff(save, final_adr + 4, max_char);
+            else
+              strncatbuff(save, final_adr, max_char);
             strcatbuff(save, "/");
-          } else {              // noms 8-3
-            if (strlen(print_adr) > 4) {
-              if (strfield(print_adr, "www."))
-                strncatbuff(save, print_adr + 4, max_char);
-              else
-                strncatbuff(save, print_adr, max_char);
-              strcatbuff(save, "/");
-            } else {
-              strncatbuff(save, print_adr, max_char);
-              strcatbuff(save, "/");
-            }
+          } else {
+            strncatbuff(save, final_adr, max_char);
+            strcatbuff(save, "/");
           }
         }
+
+        /* release */
+        RELEASE_ADR();
       } else {
         strcatbuff(save, "web/");       // répertoire général
       }
