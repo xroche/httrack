@@ -849,7 +849,7 @@ int main(int argc, char **argv) {
 #undef INCREASE_CAPA
 #define INCREASE_CAPA() do { \
   capa = capa < 16 ? 16 : ( capa << 1 ); \
-  dest = realloc(dest, capa); \
+  dest = realloc(dest, capa*sizeof(dest[0])); \
   if (dest == NULL) { \
     return NULL; \
   } \
@@ -858,7 +858,7 @@ int main(int argc, char **argv) {
   if (capa == destSize) { \
     INCREASE_CAPA(); \
   } \
-  dest[destSize++] = (char) (C); \
+  dest[destSize++] = (C); \
 } while(0)
 #define FREE_BUFFER() do { \
   if (dest != NULL) { \
@@ -970,7 +970,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
         else {
           size_t j;
           for(j = startSeg ; j < i ; j++) {
-            const unsigned char c = (unsigned char) s[j];
+            const char c = s[j];
             ADD_BYTE(c);
           }
         }
@@ -1057,7 +1057,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
           for(j = 0 ; j < output_length ; j++) {
             const punycode_uint uc = output_dest[j];
             if (uc < 0x80) {
-              ADD_BYTE((unsigned char) uc);
+              ADD_BYTE((char) uc);
             } else {
               /* emiter (byte per byte) */
 #define EM(C) do { \
@@ -1086,7 +1086,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
       } else {
         size_t j;
         for(j = startSeg ; j < i ; j++) {
-          const unsigned char c = (unsigned char) s[j];
+          const char c = s[j];
           ADD_BYTE(c);
         }
       }
@@ -1098,6 +1098,68 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
   }
 
   return dest;
+}
+
+hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars) {
+  size_t i;
+  hts_UCS4 *dest = NULL;
+  size_t capa = 0, destSize = 0;
+
+  if (nChars != NULL) {
+    *nChars = 0;
+  }
+  for(i = 0 ; i < size ; ) {
+    hts_UCS4 uc;
+
+    /* Reader: can read bytes up to j */
+#define RD ( i < size ? s[i++] : -1 )
+
+    /* Writer: upon error, return FFFD (replacement character) */
+#define WR(C) uc = (C) != -1 ? (hts_UCS4) (C) : (hts_UCS4) 0xfffd
+
+    /* Read Unicode character. */
+    READ_UNICODE(RD, WR);
+#undef RD
+#undef WR
+
+    /* Emit char */
+    ADD_BYTE(uc);
+    if (nChars != NULL) {
+      (*nChars)++;
+    }
+  }
+  ADD_BYTE('\0');
+
+  return dest;
+}
+
+char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
+  size_t i;
+  char *dest = NULL;
+  size_t capa = 0, destSize = 0;
+  for(i = 0 ; i < nChars ; i++) {
+    const hts_UCS4 uc = s[i];
+    /* emitter (byte per byte) */
+#define EM(C) do { \
+  if (C != -1) {   \
+    ADD_BYTE(C);   \
+  } else {         \
+    FREE_BUFFER(); \
+    return NULL;   \
+  }                \
+} while(0)
+    EMIT_UNICODE(uc, EM);
+#undef EM
+  }
+  ADD_BYTE('\0');
+
+  return dest;
+}
+
+size_t hts_stringLengthUCS4(const hts_UCS4 *s) {
+  size_t i;
+  for(i = 0 ; s[i] != 0 ; i++) ;
+  return i;
 }
 
 #undef ADD_BYTE
