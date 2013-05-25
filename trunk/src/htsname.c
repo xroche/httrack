@@ -359,10 +359,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (is_html < 0 && opt->check_type && !ext_chg) {
     int ishtest = 0;
 
-    if ((!strfield(adr_complete, "file://"))
-        && (!strfield(adr_complete, "ftp://"))
+    if (protocol != PROTOCOL_FILE
+        && protocol != PROTOCOL_FTP
 #if HTS_USEMMS
-        && (!strfield(adr_complete, "mms://"))
+        && protocol != PROTOCOL_MMS
 #endif
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
@@ -965,7 +965,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           break;
         case 'H':              // host, raw (old mode)
           *b = '\0';
-          if (strcmp(adr_complete, "file://") == 0) {
+          if (protocol == PROTOCOL_FILE) {
             if (!short_ver)     // Noms longs
               strcpybuff(b, "localhost");
             else
@@ -1418,52 +1418,89 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       strcatbuff(lastDot, "." DELAYED_EXT);
     }
   }
-  // enforce 256-character path limit before inserting destination path
-#define HTS_MAX_PATH_LEN 250
-#define MIN_LAST_SEG_RESERVE 30
+  // enforce 260-character path limit before inserting destination path
+  // note: 12 characters at least for WIN32, and 12 for ".99.delayed"
+  // (MSDN) "When using an API to create a directory, the specified path 
+  // cannot be so long that you cannot append an 8.3 file name 
+  // (that is, the directory name cannot exceed MAX_PATH minus 12)."
+#define HTS_MAX_PATH_LEN ( 260 - 12 - 12 )
+#define MIN_LAST_SEG_RESERVE 12
+#define MAX_LAST_SEG_RESERVE 24
+#define MAX_SEG_LEN 48
   if (hts_stringLengthUTF8(save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
-    const size_t parentLen =
-      hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
-    // parent path length is not insane (otherwise, ignore and pick 200 as suffix length)
-    const size_t maxLen =
-      parentLen <
-      HTS_MAX_PATH_LEN / 2 ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
-    size_t i, j, lastSeg, sofar;
+    // convert to Unicode (much simpler)
+    size_t wsaveLen;
+    hts_UCS4 *const wsave = hts_convertUTF8StringToUCS4(save, strlen(save), &wsaveLen);
+    if (wsave != NULL) {
+      const size_t parentLen =
+        hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
+      // parent path length is not insane (otherwise, ignore and pick 200 as 
+      // suffix length)
+      const size_t maxLen =
+        parentLen <
+        HTS_MAX_PATH_LEN - HTS_MAX_PATH_LEN / 4
+        ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
+      size_t i, j, lastSeg, lastSegSize, dirSize;
+      char *saveFinal;
 
-    // pick up last segment
-    for(i = 0, lastSeg = 0; save[i] != '\0'; i++) {
-      if (save[i] == '/') {
-        lastSeg = i + 1;
+      // pick up last segment
+      for(i = 0, lastSeg = 0; wsave[i] != '\0'; i++) {
+        if (wsave[i] == '/') {
+          lastSeg = i + 1;
+        }
       }
-    }
-    // add as much pathes as we can
-    for(i = 0, sofar = 0; i < lastSeg && i + MIN_LAST_SEG_RESERVE < maxLen; i++) {
-      if (save[i] == '/') {
-        // validate segment so far
-        sofar = i + 1;
+      lastSegSize = wsaveLen - lastSeg;
+      if (lastSegSize > MAX_LAST_SEG_RESERVE) {
+        lastSegSize = MAX_LAST_SEG_RESERVE;
       }
-    }
-    // last segment
+      else if (lastSegSize < MIN_LAST_SEG_RESERVE) {
+        lastSegSize = MIN_LAST_SEG_RESERVE;
+      }
+
+      // add as much pathes as we can.
+      // note: i is in bytes, iUtf in characters
+      for(i = 0, j = 0, dirSize = 0
+        ; i + 1 < lastSeg && j + lastSegSize < maxLen; i++) {
+          // reset segment counting
+          if (wsave[i] == '/') {
+            dirSize = 0;
+          }
+
+          // copy if not too long
+          if (dirSize < MAX_SEG_LEN) {
+            wsave[j++] = wsave[i];
+            dirSize++;
+          }
+      }
+
+      // last segment
+      wsave[j++] = '/';
 #define MAX_UTF8_SEQ_CHARS 4
-    for(j = 0; save[j + i] != '\0'; j++) {
-      // Stop here before next sequence
-      if (sofar + j + MAX_UTF8_SEQ_CHARS >= maxLen
-          && HTS_IS_LEADING_UTF8(save[i + j])) {
-        break;
+      for(i = lastSeg; wsave[i] != '\0' && j < maxLen; i++) {
+        wsave[j++] = wsave[i];
       }
-      // Stop is overflowing
-      else if (sofar + j >= maxLen) {
-        break;
+      // terminating \0
+      wsave[j++] = '\0';
+
+      // copy final name and cleanup
+      saveFinal = hts_convertUCS4StringToUTF8(wsave, j);
+      if (saveFinal != NULL) {
+        strcpybuff(save, saveFinal);
+        free(saveFinal);
+      } else {
+        hts_log_print(opt, LOG_ERROR, "Could not revert to UTF-8: %s%s",
+          adr_complete, fil_complete);
       }
-      save[sofar + j] = save[i + j];
+      free(wsave);
+
+      // log in debug
+      hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
+        adr_complete, fil_complete, save);
+    } else {
+      hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", save);
     }
-    // terminating \0
-    save[sofar + j] = '\0';
-    // log in debug
-    hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
-                  adr_complete, fil_complete, save);
   }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
@@ -1486,7 +1523,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
       //
       nom_ok = 1;               // à priori bon
-      // on part de la fin pour optimiser, plus les opti de taille pour aller encore plus vite..
+      // on part de la fin pour optimiser, plus les opti de taille pour 
+      // aller encore plus vite..
 #if DEBUG_SAVENAME
       printf("\nStart search\n");
 #endif
