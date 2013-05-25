@@ -41,6 +41,9 @@ Please visit our Website: http://www.httrack.com
 #include <windows.h>
 #endif
 
+/** UCS4 type. **/
+typedef unsigned int hts_UCS4;
+
 /** Leading character (ASCII or leading UTF-8 sequence) **/
 #define HTS_IS_LEADING_UTF8(C) ((unsigned char)(C) < 0x80 || (unsigned char)(C) >= 0xc0)
 
@@ -108,6 +111,22 @@ extern size_t hts_copyStringUTF8(char *dest, const char *src,
  **/
 extern size_t hts_appendStringUTF8(char *dest, const char *src, 
                                    size_t nBytes);
+
+/**
+ * Convert an UTF-8 string into an Unicode string (0-terminated).
+ **/
+extern hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, 
+                                             size_t *nChars);
+
+/**
+ * Convert an Unicode string into an UTF-8 string.
+ **/
+extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars);
+
+/**
+ * Return the length (in characters) of an UCS4 string terminated by 0.
+ **/
+extern size_t hts_stringLengthUCS4(const hts_UCS4 *s);
 
 /* WIN32 specific. */
 
