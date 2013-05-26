@@ -151,6 +151,76 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
 
 // 1- Init the URL catcher
 
+// get hostname. return 1 upon success.
+static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
+  if (hostname != NULL && *hostname != '\0') {
+#if HTS_INET6==0
+    /* ipV4 resolver */
+    t_hostent *hp = gethostbyname(hostname);
+
+    if (hp != NULL) {
+      if (hp->h_length) {
+        SOCaddr_copyaddr(*server, server_size, hp->h_addr_list[0],
+          hp->h_length);
+        return 1;
+      }
+    }
+#else
+    /* ipV6 resolver */
+    struct addrinfo *res = NULL;
+    struct addrinfo hints;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
+      if (res) {
+        if ((res->ai_addr) && (res->ai_addrlen)) {
+          SOCaddr_copyaddr(*server, server_size, res->ai_addr, res->ai_addrlen);
+          freeaddrinfo(res);
+          return 1;
+        }
+      }
+    }
+    if (res) {
+      freeaddrinfo(res);
+    }
+#endif
+  }
+  return 0;
+}
+
+static int my_getlocalhost(char *h_loc, size_t size) {
+  SOCaddr addr;
+  strcpy(h_loc, "localhost");
+  if (gethost(h_loc, &addr, sizeof(addr)) == 1) {
+    return 0;
+  }
+  // come on ...
+  else {
+    strcpy(h_loc, "127.0.0.1");
+    return 0;
+  }
+}
+
+// get local hostname; falls back to "localhost" in case of error 
+// always returns 0
+static int my_gethostname(char *h_loc, size_t size) {
+  h_loc[0] = '\0';
+  if (gethostname(h_loc, (int) size) == 0) {    // host name
+    SOCaddr addr;
+    if (gethost(h_loc, &addr, sizeof(addr)) == 1) {
+      return 0;
+    } else {
+      return my_getlocalhost(h_loc, size);
+    }
+  } else {
+    return my_getlocalhost(h_loc, size);
+  }
+  return 0;
+}
+
 // smallserver_init(&port,&return_host);
 T_SOC smallserver_init(int *port, char *adr) {
   T_SOC soc = INVALID_SOCKET;
@@ -165,7 +235,7 @@ T_SOC smallserver_init(int *port, char *adr) {
     free(commandReturnCmdl);
   commandReturnCmdl = NULL;
 
-  if (gethostname(h_loc, 256) == 0) {   // host name
+  if (my_gethostname(h_loc, 256) == 0) {   // host name
     SOCaddr server;
     int server_size = sizeof(server);
 
@@ -175,9 +245,8 @@ T_SOC smallserver_init(int *port, char *adr) {
     // effacer structure
     memset(&server, 0, sizeof(server));
 
-                                                                /*if ( (hp_loc=vxgethostbyname(h_loc, &buffer)) ) */  {
-                                                                // notre host      
-
+                                                                /*if ( (hp_loc=vxgethostbyname(h_loc, &buffer)) ) */
+    {
       // copie adresse
       // NO (bind all)
       // SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0], hp_loc->h_length);
