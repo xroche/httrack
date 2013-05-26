@@ -400,8 +400,11 @@ void CNewProj::OnChangeprojname()
       stl.GetBuffer(0)[i] = '\'';
       modified = TRUE;
     }
-    else if (stl[i] == ',' 
-      || stl[i] == '~'
+    else if (((unsigned char)stl[i]) < 32) {
+      stl.GetBuffer(0)[i] = ' ';
+      modified = TRUE;
+    }
+    else if (stl[i] == '~'
       || stl[i] == '\\'
       || stl[i] == '/'
       || stl[i] == ':'
@@ -410,9 +413,6 @@ void CNewProj::OnChangeprojname()
       || stl[i] == '<'
       || stl[i] == '>'
       || stl[i] == '|'
-      || stl[i] == '#'
-      || stl[i] == '$'
-      || ((unsigned char)stl[i]) < 32
       ) {
       stl.GetBuffer(0)[i] = '_';
       modified = TRUE;
