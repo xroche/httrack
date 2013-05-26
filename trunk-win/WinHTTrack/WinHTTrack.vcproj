@@ -55,7 +55,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="2"
 				RuntimeTypeInfo="true"
@@ -155,7 +155,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="2"
 				RuntimeTypeInfo="true"
@@ -256,7 +256,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -288,6 +288,7 @@
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz;C:\Dev\openssl\lib\out32dll;C:\temp\Releaselib"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile="O:\HTTrack\httrack\WinHTTrack.pdb"
 				SubSystem="2"
 				RandomizedBaseAddress="1"
@@ -353,7 +354,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -385,6 +386,7 @@
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz64;C:\Dev\openssl\lib\out32dll;C:\temp\Releaselib"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile="O:\HTTrack\httrack\x64\WinHTTrack.pdb"
 				SubSystem="2"
 				RandomizedBaseAddress="1"
@@ -448,7 +450,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOW;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -512,6 +514,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="COPY C:\Dev\openssl-1.0.1e\bin\ssleay32.dll C:\temp\httrack&#x0D;&#x0A;COPY C:\Dev\openssl-1.0.1e\bin\libeay32.dll C:\temp\httrack&#x0D;&#x0A;"
 			/>
 		</Configuration>
 		<Configuration
@@ -549,7 +552,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -613,6 +616,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="COPY C:\Dev\openssl-1.0.1e\x64\bin\ssleay32.dll C:\temp\httrack64&#x0D;&#x0A;COPY C:\Dev\openssl-1.0.1e\x64\bin\libeay32.dll C:\temp\httrack64&#x0D;&#x0A;"
 			/>
 		</Configuration>
 	</Configurations>
