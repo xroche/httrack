@@ -147,6 +147,13 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
 
+/**
+ * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.
+ * Return the number of bytes written, or 0 upon error.
+ * Note: does not \0-terminate the destination buffer.
+ **/
+extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
+
 #endif
 
 #endif
