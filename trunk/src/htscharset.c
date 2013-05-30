@@ -1156,6 +1156,20 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   return dest;
 }
 
+size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
+  size_t offs = 0;
+#define EM(C) do {       \
+  if (offs + 1 < size) { \
+    dest[offs++] = C;    \
+  } else {               \
+    return 0;            \
+  }                      \
+} while(0)
+  EMIT_UNICODE(uc, EM);
+#undef EM
+  return offs; 
+}
+
 size_t hts_stringLengthUCS4(const hts_UCS4 *s) {
   size_t i;
   for(i = 0 ; s[i] != 0 ; i++) ;
