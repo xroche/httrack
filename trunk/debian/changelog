@@ -2,13 +2,13 @@ httrack (3.47.14-3) unstable; urgency=low
 
   * Fixed source-upload only
 
- -- Xavier Roche <roche@proliant.localnet>  Sun, 26 May 2013 13:14:29 +0200
+ -- Xavier Roche <xavier@debian.org>  Sun, 26 May 2013 13:14:29 +0200
 
 httrack (3.47.14-2) unstable; urgency=low
 
   * Fixed Build-depends on libssl-dev
 
- -- Xavier Roche <roche@proliant.localnet>  Sun, 26 May 2013 12:44:15 +0200
+ -- Xavier Roche <xavier@debian.org>  Sun, 26 May 2013 12:44:15 +0200
 
 httrack (3.47.14-1) unstable; urgency=low
 
