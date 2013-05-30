@@ -25,8 +25,8 @@ INCLUDES = \
 
 bin_PROGRAMS = proxytrack httrack htsserver
 
-httrack_LDADD = $(THREADS_LIBS) $(OPENSSL_LIBS) libhttrack.la
-htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(OPENSSL_LIBS) libhttrack.la
+httrack_LDADD = $(THREADS_LIBS) libhttrack.la
+htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT
 
@@ -47,7 +47,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htsmd5.c htszlib.c htswrap.c \
-	htsmodules.c htscharset.c punycode.c \
+	htsmodules.c htscharset.c punycode.c htsencoding.c \
 	md5.c \
 	htsmms.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
@@ -60,7 +60,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htszlib.h  \
-	htsstrings.h httrack-library.h htscharset.h punycode.h \
+	htsstrings.h httrack-library.h htscharset.h punycode.h htsencoding.h \
 	md5.h \
 	htsmms.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
@@ -69,7 +69,7 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
-libhtsjava_la_LIBADD = $(THREADS_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) libhttrack.la
+libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \

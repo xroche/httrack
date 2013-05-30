@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htsmodules.h"
 #include "htscharset.h"
+#include "htsencoding.h"
 
 #ifdef _WIN32
 #ifndef  _WIN32_WCE
@@ -3737,255 +3738,6 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
   *b++ = '\0';
 }
 
-// remplacer &quot; par " etc..
-// buffer MAX 1Ko
-#define strcmpbeg(a, b) strncmp(a, b, strlen(b))
-HTSEXT_API void unescape_amp(char *s) {
-  while(*s) {
-    if (*s == '&') {
-      char *end = strchr(s, ';');
-
-      if (end && (((int) (end - s)) <= 8)) {
-        unsigned char c = 0;
-
-        // http://www.w3.org/TR/xhtml-modularization/dtd_module_defs.html
-        if (strcmpbeg(s, "&#") == 0) {
-          int num = 0;
-
-          if ((s[2] == 'x') || (s[2] == 'X')) {
-            if (sscanf(s + 3, "%x", &num) == 1 && num <= 0xff) {
-              c = (unsigned char) num;
-            }
-          } else {
-            if (sscanf(s + 2, "%d", &num) == 1 && num <= 0xff) {
-              c = (unsigned char) num;
-            }
-          }
-        } else if (strcmpbeg(s, "&nbsp;") == 0)
-          c = 32;               // hack - c=160;
-        else if (strcmpbeg(s, "&iexcl;") == 0)
-          c = 161;
-        else if (strcmpbeg(s, "&cent;") == 0)
-          c = 162;
-        else if (strcmpbeg(s, "&pound;") == 0)
-          c = 163;
-        else if (strcmpbeg(s, "&curren;") == 0)
-          c = 164;
-        else if (strcmpbeg(s, "&yen;") == 0)
-          c = 165;
-        else if (strcmpbeg(s, "&brvbar;") == 0)
-          c = 166;
-        else if (strcmpbeg(s, "&sect;") == 0)
-          c = 167;
-        else if (strcmpbeg(s, "&uml;") == 0)
-          c = 168;
-        else if (strcmpbeg(s, "&copy;") == 0)
-          c = 169;
-        else if (strcmpbeg(s, "&ordf;") == 0)
-          c = 170;
-        //else if (strcmpbeg(s, "&laquo;")==0)
-        //  c=171;
-        else if (strcmpbeg(s, "&not;") == 0)
-          c = 172;
-        //else if (strcmpbeg(s, "&shy;")==0)
-        //  c=173;
-        else if (strcmpbeg(s, "&reg;") == 0)
-          c = 174;
-        else if (strcmpbeg(s, "&macr;") == 0)
-          c = 175;
-        else if (strcmpbeg(s, "&deg;") == 0)
-          c = 176;
-        else if (strcmpbeg(s, "&plusmn;") == 0)
-          c = 177;
-        else if (strcmpbeg(s, "&sup2;") == 0)
-          c = 178;
-        else if (strcmpbeg(s, "&sup3;") == 0)
-          c = 179;
-        else if (strcmpbeg(s, "&acute;") == 0)
-          c = 180;
-        else if (strcmpbeg(s, "&micro;") == 0)
-          c = 181;
-        else if (strcmpbeg(s, "&para;") == 0)
-          c = 182;
-        else if (strcmpbeg(s, "&middot;") == 0)
-          c = 183;
-        else if (strcmpbeg(s, "&cedil;") == 0)
-          c = 184;
-        else if (strcmpbeg(s, "&sup1;") == 0)
-          c = 185;
-        else if (strcmpbeg(s, "&ordm;") == 0)
-          c = 186;
-        //else if (strcmpbeg(s, "&raquo;")==0)
-        //  c=187;
-        else if (strcmpbeg(s, "&frac14;") == 0)
-          c = 188;
-        else if (strcmpbeg(s, "&frac12;") == 0)
-          c = 189;
-        else if (strcmpbeg(s, "&frac34;") == 0)
-          c = 190;
-        else if (strcmpbeg(s, "&iquest;") == 0)
-          c = 191;
-        else if (strcmpbeg(s, "&Agrave;") == 0)
-          c = 192;
-        else if (strcmpbeg(s, "&Aacute;") == 0)
-          c = 193;
-        else if (strcmpbeg(s, "&Acirc;") == 0)
-          c = 194;
-        else if (strcmpbeg(s, "&Atilde;") == 0)
-          c = 195;
-        else if (strcmpbeg(s, "&Auml;") == 0)
-          c = 196;
-        else if (strcmpbeg(s, "&Aring;") == 0)
-          c = 197;
-        else if (strcmpbeg(s, "&AElig;") == 0)
-          c = 198;
-        else if (strcmpbeg(s, "&Ccedil;") == 0)
-          c = 199;
-        else if (strcmpbeg(s, "&Egrave;") == 0)
-          c = 200;
-        else if (strcmpbeg(s, "&Eacute;") == 0)
-          c = 201;
-        else if (strcmpbeg(s, "&Ecirc;") == 0)
-          c = 202;
-        else if (strcmpbeg(s, "&Euml;") == 0)
-          c = 203;
-        else if (strcmpbeg(s, "&Igrave;") == 0)
-          c = 204;
-        else if (strcmpbeg(s, "&Iacute;") == 0)
-          c = 205;
-        else if (strcmpbeg(s, "&Icirc;") == 0)
-          c = 206;
-        else if (strcmpbeg(s, "&Iuml;") == 0)
-          c = 207;
-        else if (strcmpbeg(s, "&ETH;") == 0)
-          c = 208;
-        else if (strcmpbeg(s, "&Ntilde;") == 0)
-          c = 209;
-        else if (strcmpbeg(s, "&Ograve;") == 0)
-          c = 210;
-        else if (strcmpbeg(s, "&Oacute;") == 0)
-          c = 211;
-        else if (strcmpbeg(s, "&Ocirc;") == 0)
-          c = 212;
-        else if (strcmpbeg(s, "&Otilde;") == 0)
-          c = 213;
-        else if (strcmpbeg(s, "&Ouml;") == 0)
-          c = 214;
-        else if (strcmpbeg(s, "&times;") == 0)
-          c = 215;
-        else if (strcmpbeg(s, "&Oslash;") == 0)
-          c = 216;
-        else if (strcmpbeg(s, "&Ugrave;") == 0)
-          c = 217;
-        else if (strcmpbeg(s, "&Uacute;") == 0)
-          c = 218;
-        else if (strcmpbeg(s, "&Ucirc;") == 0)
-          c = 219;
-        else if (strcmpbeg(s, "&Uuml;") == 0)
-          c = 220;
-        else if (strcmpbeg(s, "&Yacute;") == 0)
-          c = 221;
-        else if (strcmpbeg(s, "&THORN;") == 0)
-          c = 222;
-        else if (strcmpbeg(s, "&szlig;") == 0)
-          c = 223;
-        else if (strcmpbeg(s, "&agrave;") == 0)
-          c = 224;
-        else if (strcmpbeg(s, "&aacute;") == 0)
-          c = 225;
-        else if (strcmpbeg(s, "&acirc;") == 0)
-          c = 226;
-        else if (strcmpbeg(s, "&atilde;") == 0)
-          c = 227;
-        else if (strcmpbeg(s, "&auml;") == 0)
-          c = 228;
-        else if (strcmpbeg(s, "&aring;") == 0)
-          c = 229;
-        else if (strcmpbeg(s, "&aelig;") == 0)
-          c = 230;
-        else if (strcmpbeg(s, "&ccedil;") == 0)
-          c = 231;
-        else if (strcmpbeg(s, "&egrave;") == 0)
-          c = 232;
-        else if (strcmpbeg(s, "&eacute;") == 0)
-          c = 233;
-        else if (strcmpbeg(s, "&ecirc;") == 0)
-          c = 234;
-        else if (strcmpbeg(s, "&euml;") == 0)
-          c = 235;
-        else if (strcmpbeg(s, "&igrave;") == 0)
-          c = 236;
-        else if (strcmpbeg(s, "&iacute;") == 0)
-          c = 237;
-        else if (strcmpbeg(s, "&icirc;") == 0)
-          c = 238;
-        else if (strcmpbeg(s, "&iuml;") == 0)
-          c = 239;
-        else if (strcmpbeg(s, "&eth;") == 0)
-          c = 240;
-        else if (strcmpbeg(s, "&ntilde;") == 0)
-          c = 241;
-        else if (strcmpbeg(s, "&ograve;") == 0)
-          c = 242;
-        else if (strcmpbeg(s, "&oacute;") == 0)
-          c = 243;
-        else if (strcmpbeg(s, "&ocirc;") == 0)
-          c = 244;
-        else if (strcmpbeg(s, "&otilde;") == 0)
-          c = 245;
-        else if (strcmpbeg(s, "&ouml;") == 0)
-          c = 246;
-        else if (strcmpbeg(s, "&divide;") == 0)
-          c = 247;
-        else if (strcmpbeg(s, "&oslash;") == 0)
-          c = 248;
-        else if (strcmpbeg(s, "&ugrave;") == 0)
-          c = 249;
-        else if (strcmpbeg(s, "&uacute;") == 0)
-          c = 250;
-        else if (strcmpbeg(s, "&ucirc;") == 0)
-          c = 251;
-        else if (strcmpbeg(s, "&uuml;") == 0)
-          c = 252;
-        else if (strcmpbeg(s, "&yacute;") == 0)
-          c = 253;
-        else if (strcmpbeg(s, "&thorn;") == 0)
-          c = 254;
-        else if (strcmpbeg(s, "&yuml;") == 0)
-          c = 255;
-        //        
-        else if (strcmpbeg(s, "&amp;") == 0)
-          c = '&';
-        else if (strcmpbeg(s, "&gt;") == 0)
-          c = '>';
-        else if (strcmpbeg(s, "&laquo;") == 0)
-          c = '\"';
-        else if (strcmpbeg(s, "&lt;") == 0)
-          c = '<';
-        else if (strcmpbeg(s, "&nbsp;") == 0)
-          c = ' ';
-        else if (strcmpbeg(s, "&quot;") == 0)
-          c = '\"';
-        else if (strcmpbeg(s, "&raquo;") == 0)
-          c = '\"';
-        else if (strcmpbeg(s, "&shy;") == 0)
-          c = '-';
-        else if (strcmpbeg(s, "&tilde;") == 0)
-          c = '~';
-        // remplacer?
-        if (c) {
-          char BIGSTK buff[HTS_URLMAXSIZE * 2];
-
-          buff[0] = (char) c;
-          strcpybuff(buff + 1, end + 1);
-          strcpybuff(s, buff);
-        }
-      }
-    }
-    s++;
-  }
-}
-
 static int ehexh(char c) {
   if ((c >= '0') && (c <= '9'))
     return c - '0';
@@ -3998,6 +3750,12 @@ static int ehexh(char c) {
 
 static int ehex(const char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
+}
+
+void unescape_amp(char *s) {
+  if (hts_unescape_entities(s, s, strlen(s) + 1) != 0) {
+    assertf(! "error escaping html entities");
+  }
 }
 
 // remplacer %20 par ' ', | par : etc..
