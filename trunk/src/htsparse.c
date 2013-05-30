@@ -2092,11 +2092,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     *a = '\0';
                   } else
                     query[0] = '\0';
-                  // conversion &amp; -> & et autres joyeusetés
-                  unescape_amp(lien);
-                  unescape_amp(query);
                   // décoder l'inutile (%2E par exemple) et coder espaces
-                  // Unescape high-chars foir UTF-8 conversion
+                  // Unescape high-chars for UTF-8 conversion
                   strcpybuff(lien, unescape_http_unharm(catbuff, lien, !hasCharset));     /* note: '%' is still escaped */
                   escape_remove_control(lien);
                   // ???? No! escape_spc_url(lien);
@@ -2115,6 +2112,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       free(s);
                     }
                   }
+                  // conversion entities
+                  unescape_amp(lien);
+                  unescape_amp(query);
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!

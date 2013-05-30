@@ -2342,6 +2342,23 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return 0;
                 break;
+              case '6':  // entities: httrack -#6
+                if (++na < argc) {
+                  char *const s = strdup(argv[na]);
+                  if (s != NULL && hts_unescape_entities(s, s, strlen(s)) == 0) {
+                    printf("%s\n", s);
+                    free(s);
+                  } else {
+                    fprintf(stderr, "invalid string '%s'\n", argv[na]);
+                  }
+                  na += 1;
+                } else {
+                  fprintf(stderr,
+                    "Option #6 needs to be followed by a string");
+                }
+                htsmain_free();
+                return 0;
+                break;
               case '!':
                 if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF
