@@ -31,8 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef HTS_CHARSET_DEFH
-#define HTS_CHARSET_DEFH
+#ifndef HTS_ENCODING_DEFH
+#define HTS_ENCODING_DEFH
 
 /** Standard includes. **/
 #include <stdlib.h>
@@ -48,8 +48,19 @@ Please visit our Website: http://www.httrack.com
  * needs to hold as space as the source.
  * Returns 0 upon success.
  **/
-extern int hts_unescape_entities(const char *src,
-                                 char *dest, const size_t max);
+extern int hts_unescapeEntities(const char *src,
+                                char *dest, const size_t max);
+
+/**
+ * Unescape HTML entities (as per HTML 4.0 Specification)
+ * and replace them in-place by their charset equivalents.
+ * Note: source and destination may be the same, and the destination only
+ * needs to hold as space as the source.
+ * Returns 0 upon success.
+ **/
+extern int hts_unescapeEntitiesWithCharset(const char *src,
+                                           char *dest, const size_t max,
+                                           const char *charset);
 
 #endif
 

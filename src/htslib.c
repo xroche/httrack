@@ -3753,7 +3753,7 @@ static int ehex(const char *s) {
 }
 
 void unescape_amp(char *s) {
-  if (hts_unescape_entities(s, s, strlen(s) + 1) != 0) {
+  if (hts_unescapeEntities(s, s, strlen(s) + 1) != 0) {
     assertf(! "error escaping html entities");
   }
 }
