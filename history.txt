@@ -4,7 +4,7 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.47-14
+3.47-15
 + Fixed: random closing of files/sockets, leading to "zip_zipWriteInFileInZip_failed" assertion, "bogus state" messages, or random garbage in downloaded files
 + Fixed: libssl.dylib is now in the search list for libssl on OSX (Nils Breunese)
 + Fixed: bogus charset because the meta http-equiv tag is placed too far in the html page
@@ -25,6 +25,8 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: bogus charset for requests when filenames have non-ascii characters (Steven Hsiao)
 + Fixed: bogus charset on disk when filenames have non-ascii characters (Steven Hsiao)
 + Fixed: fixed 260-characters path limit for Windows (lugusto)
++ Fixed: non-ascii characters encoding issue inside query string (lugusto)
++ Fixed: HTML entities not properly decoded inside URI and query string
 + New: support for IDNA / RFC 3492 (punycode) handling
 + New: openssl is no longer dynamically probed at stratup, but dynamically linked
 
