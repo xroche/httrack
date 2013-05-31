@@ -718,9 +718,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           strncpy(s, a, b - a + 1);
                           *(s + (b - a) + 1) = '\0';
                         }
+
+                        // Decode title with encoding
+                        if (str->page_charset_ != NULL 
+                            && *str->page_charset_ != '\0') {
+                          char *const sUtf = 
+                            hts_convertStringToUTF8(s, (int) strlen(s), 
+                                                    str->page_charset_);
+                          if (sUtf != NULL) {
+                            strcpy(s, sUtf);
+                            free(sUtf);
+                          }
+                        }
+
                         // Body
                         fprintf(makeindex_fp, template_body, tempo, s);
-
                       }
                     }
                   }
