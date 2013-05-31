@@ -2342,10 +2342,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return 0;
                 break;
-              case '6':  // entities: httrack -#6
+              case '6':  // entities: httrack -#6 "&foo;" ["encoding"]
                 if (++na < argc) {
                   char *const s = strdup(argv[na]);
-                  if (s != NULL && hts_unescape_entities(s, s, strlen(s)) == 0) {
+                  const char *const enc = na + 1 < argc ? argv[na + 1] : "UTF-8";
+                  if (s != NULL 
+                    && hts_unescapeEntitiesWithCharset(s, s, strlen(s), 
+                                                       enc) == 0) {
                     printf("%s\n", s);
                     free(s);
                   } else {

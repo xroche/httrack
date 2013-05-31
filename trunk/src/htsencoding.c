@@ -60,7 +60,7 @@ static int get_hex_value(char c) {
     (HASH) += (C);                              \
   } while(0)
 
-int hts_unescape_entities(const char *src, char *dest, const size_t max) {
+int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
   size_t i, j, ampStart, ampStartDest;
   int uc;
   int hex;
@@ -106,8 +106,29 @@ int hts_unescape_entities(const char *src, char *dest, const size_t max) {
         
         /* success ? */
         if (uc > 0) {
+          const size_t maxOut = max - ampStartDest;
           /* write at position */
-          len = hts_writeUTF8(uc, &dest[ampStartDest], max - ampStartDest);
+          if (charset != NULL && hts_isCharsetUTF8(charset)) {
+            len = hts_writeUTF8(uc, &dest[ampStartDest], maxOut);
+          } else {
+            size_t ulen;
+            char buffer[32];
+            len = 0;
+            if ( ( ulen = hts_writeUTF8(uc, buffer, sizeof(buffer)) ) != 0) {
+              char *s;
+              buffer[ulen] = '\0';
+              s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
+              if (s != NULL) {
+                const size_t sLen = strlen(s);
+                if (sLen < maxOut) {
+                  // Do not copy \0.
+                  memcpy(&dest[ampStartDest], s, sLen);
+                  ulen = sLen;
+                }
+                free(s);
+              }
+            }
+          }
           if (len > 0) {
             /* new dest position */
             j = ampStartDest + len;
@@ -173,4 +194,8 @@ int hts_unescape_entities(const char *src, char *dest, const size_t max) {
   dest[j] = '\0';
 
   return 0;
+}
+
+int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
+  return hts_unescapeEntitiesWithCharset(src, dest, max, "UTF-8");
 }

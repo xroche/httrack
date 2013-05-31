@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htsindex.h"
 #include "htscharset.h"
+#include "htsencoding.h"
 
 /* external modules */
 #include "htsmodules.h"
@@ -2081,25 +2082,31 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                 /* Unescape/escape %20 and other &nbsp; */
                 {
+                  // Note: always true (iso-8859-1 as default)
                   const char *const charset = str->page_charset_;
                   const int hasCharset = charset != NULL 
                     && *charset != '\0';
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
-                  char *a = strchr(lien, '?');
+                  char *const a = strchr(lien, '?');
 
-                  if (a) {
+                  // cut query string
+                  if (a != NULL) {
                     strcpybuff(query, a);
                     *a = '\0';
-                  } else
+                  } else {
                     query[0] = '\0';
+                  }
+
                   // décoder l'inutile (%2E par exemple) et coder espaces
                   // Unescape high-chars for UTF-8 conversion
                   strcpybuff(lien, unescape_http_unharm(catbuff, lien, !hasCharset));     /* note: '%' is still escaped */
                   escape_remove_control(lien);
-                  // ???? No! escape_spc_url(lien);
-                  strcatbuff(lien, query);      /* restore */
+                  
+                  // we need to encode query string non-ascii chars, 
+                  // leaving the encoding as-is (unlike the file part)
+                  escape_check_url(query);
 
-                  // Charset conversion for the URI filename, 
+                  // charset conversion for the URI filename, 
                   // and not already UTF-8
                   // (note: not for the query string!)
                   if (hasCharset && !hts_isCharsetUTF8(charset)) {
@@ -2112,9 +2119,25 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       free(s);
                     }
                   }
-                  // conversion entities
-                  unescape_amp(lien);
-                  unescape_amp(query);
+
+                  // decode URI entities with UTF-8 charset
+                  if (!hts_unescapeEntities(lien, lien, strlen(lien))) {
+                    hts_log_print(opt, LOG_WARNING,
+                      "could not decode URI '%s' with charset '%s'", lien, charset);
+                  }
+
+                  // decode query string entities with page charset
+                  if (hasCharset) {
+                    if (!hts_unescapeEntitiesWithCharset(query, 
+                                                         query, strlen(query),
+                                                         charset)) {
+                        hts_log_print(opt, LOG_WARNING,
+                          "could not decode query string '%s' with charset '%s'", query, charset);
+                    }
+                  }
+
+                  // copy back query
+                  strcatbuff(lien, query);      /* restore */
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
