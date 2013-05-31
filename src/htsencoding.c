@@ -123,7 +123,7 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
                 if (sLen < maxOut) {
                   // Do not copy \0.
                   memcpy(&dest[ampStartDest], s, sLen);
-                  ulen = sLen;
+                  len = sLen;
                 }
                 free(s);
               }
