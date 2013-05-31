@@ -132,9 +132,9 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
           if (len > 0) {
             /* new dest position */
             j = ampStartDest + len;
+            /* do not copy ; */
+            continue;
           }
-          /* do not copy ; */
-          continue;
         }
       }
       /* numerical entity */
