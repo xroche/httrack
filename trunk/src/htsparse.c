@@ -2981,21 +2981,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           }
                         }
 
-                        // convert to local codepage
-                        if (str->page_charset_ != NULL
-                            && *str->page_charset_ != '\0') {
-                          char *const local_save =
-                            hts_convertStringFromUTF8(tempo, strlen(tempo),
-                                                      str->page_charset_);
-                          if (local_save != NULL) {
-                            strcpybuff(tempo, local_save);
-                            free(local_save);
-                          } else {
-                            hts_log_print(opt, LOG_DEBUG,
-                                          "Warning: could not build local charset representation of '%s' in '%s'",
-                                          tempo, str->page_charset_);
-                          }
-                        }
                         // put original query string if any (ex: "www.example.com/foo4242.html?q=45)
                         pos = strchr(fil, '?');
                         if (pos != NULL) {
