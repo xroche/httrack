@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmodules.h"
 #include "htszlib.h"
 #include "htscharset.h"
+#include "htsencoding.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
