@@ -2121,16 +2121,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
 
                   // decode URI entities with UTF-8 charset
-                  if (!hts_unescapeEntities(lien, lien, strlen(lien))) {
+                  if (hts_unescapeEntities(lien, lien, strlen(lien) + 1) != 0) {
                     hts_log_print(opt, LOG_WARNING,
                       "could not decode URI '%s' with charset '%s'", lien, charset);
                   }
 
                   // decode query string entities with page charset
                   if (hasCharset) {
-                    if (!hts_unescapeEntitiesWithCharset(query, 
-                                                         query, strlen(query),
-                                                         charset)) {
+                    if (hts_unescapeEntitiesWithCharset(query, 
+                                                        query, strlen(query) + 1,
+                                                        charset) != 0) {
                         hts_log_print(opt, LOG_WARNING,
                           "could not decode query string '%s' with charset '%s'", query, charset);
                     }
