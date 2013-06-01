@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Tools */
 
-static int ehexh(char c) {
+HTS_UNUSED static int ehexh(char c) {
   if ((c >= '0') && (c <= '9'))
     return c - '0';
   if ((c >= 'a') && (c <= 'f'))
@@ -44,11 +44,11 @@ static int ehexh(char c) {
   return 0;
 }
 
-static int ehex(const char *s) {
+HTS_UNUSED static int ehex(const char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-static void unescapehttp(const char *s, String * tempo) {
+HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
   int i;
 
   for(i = 0; s[i] != '\0'; i++) {
@@ -69,7 +69,7 @@ static void unescapehttp(const char *s, String * tempo) {
   }
 }
 
-static void escapexml(const char *s, String * tempo) {
+HTS_UNUSED static void escapexml(const char *s, String * tempo) {
   int i;
 
   for(i = 0; s[i] != '\0'; i++) {
@@ -86,7 +86,7 @@ static void escapexml(const char *s, String * tempo) {
   }
 }
 
-static char *concat(char *catbuff, const char *a, const char *b) {
+HTS_UNUSED static char *concat(char *catbuff, const char *a, const char *b) {
   if (a != NULL && a[0] != '\0') {
     strcpy(catbuff, a);
   } else {
@@ -98,7 +98,7 @@ static char *concat(char *catbuff, const char *a, const char *b) {
   return catbuff;
 }
 
-static char *__fconv(char *a) {
+HTS_UNUSED static char *__fconv(char *a) {
 #ifdef WIN32
   int i;
 
@@ -109,11 +109,11 @@ static char *__fconv(char *a) {
   return a;
 }
 
-static char *fconcat(char *catbuff, const char *a, const char *b) {
+HTS_UNUSED static char *fconcat(char *catbuff, const char *a, const char *b) {
   return __fconv(concat(catbuff, a, b));
 }
 
-static char *fconv(char *catbuff, const char *a) {
+HTS_UNUSED static char *fconv(char *catbuff, const char *a) {
   return __fconv(concat(catbuff, a, ""));
 }
 

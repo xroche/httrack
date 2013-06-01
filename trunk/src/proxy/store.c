@@ -467,7 +467,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
                 if (isFolder)
                   StringCat(list, "/");
                 StringMemcat(list, "\0", 1);    /* NULL terminated strings */
-                StringMemcat(listindexes, &ptr, sizeof(ptr));
+                StringMemcat(listindexes, (char*) &ptr, sizeof(ptr));
                 listCount++;
                 inthash_write(hdupes, StringBuff(subitem), 0);
               }
@@ -488,7 +488,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
       char *startStrings;
 
       /* NULL terminated index */
-      StringMemcat(listindexes, &nullPointer, sizeof(nullPointer));
+      StringMemcat(listindexes, (char*) &nullPointer, sizeof(nullPointer));
       /* start of all strings (index) */
       startStrings = nullPointer + StringLength(listindexes);
       /* copy list of URLs after indexes */
@@ -1030,7 +1030,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
       if (unzOpenCurrentFile(index->zFile) == Z_OK) {
         char headerBuff[8192 + 2];
         int readSizeHeader;
-        int totalHeader = 0;
+        //int totalHeader = 0;
         int dataincache = 0;
 
         /* For BIG comments */
@@ -1086,7 +1086,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               }
             }
           } while(offset < readSizeHeader && !lineEof);
-          totalHeader = offset;
+          //totalHeader = offset;
 
           /* Previous entry */
           if (previous_save_[0] != '\0') {
@@ -1257,7 +1257,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
     }
     /* 64 characters MAX for first line */
     sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1',
-            element->statuscode, element->msg);
+            element->statuscode, message);
   }
   headersSize += (int) strlen(headers + headersSize);
 
@@ -1300,9 +1300,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
                                    */
                                   headers, (uInt) strlen(headers), NULL, 0, NULL,       /* comment */
                                   Z_DEFLATED, Z_DEFAULT_COMPRESSION)) != Z_OK) {
-    int zip_zipOpenNewFileInZip_failed = 0;
-
-    assertf(zip_zipOpenNewFileInZip_failed);
+    assertf(! "zip_zipOpenNewFileInZip_failed");
   }
 
   /* Write data in cache */
@@ -1310,24 +1308,18 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
     if ((zErr =
          zipWriteInFileInZip(zFileOut, element->adr,
                              (int) element->size)) != Z_OK) {
-      int zip_zipWriteInFileInZip_failed = 0;
-
-      assertf(zip_zipWriteInFileInZip_failed);
+      assertf(! "zip_zipWriteInFileInZip_failed");
     }
   }
 
   /* Close */
   if ((zErr = zipCloseFileInZip(zFileOut)) != Z_OK) {
-    int zip_zipCloseFileInZip_failed = 0;
-
-    assertf(zip_zipCloseFileInZip_failed);
+    assertf(! "zip_zipCloseFileInZip_failed");
   }
 
   /* Flush */
   if ((zErr = zipFlush(zFileOut)) != 0) {
-    int zip_zipFlush_failed = 0;
-
-    assertf(zip_zipFlush_failed);
+    assertf(! "zip_zipFlush_failed");
   }
 
   return 0;
@@ -1379,9 +1371,7 @@ static void cache_rstr(FILE * fp, char *s) {
     i = 0;
   if (i > 0) {
     if ((int) fread(s, 1, i, fp) != i) {
-      int fread_cache_failed = 0;
-
-      assertf(fread_cache_failed);
+      assertf(! "fread_cache_failed");
     }
   }
   *(s + i) = '\0';
@@ -1400,9 +1390,7 @@ static char *cache_rstr_addr(FILE * fp) {
     addr = malloc(i + 1);
     if (addr != NULL) {
       if ((int) fread(addr, 1, i, fp) != i) {
-        int fread_cache_failed = 0;
-
-        assertf(fread_cache_failed);
+        assertf(! "fread_cache_failed");
       }
       *(addr + i) = '\0';
     }

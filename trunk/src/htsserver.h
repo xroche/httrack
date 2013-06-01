@@ -90,30 +90,18 @@ extern int smallserver_setkey(char *key, char *value);
 extern int smallserver_setkeyint(char *key, LLint value);
 extern int smallserver_setkeyarr(char *key, int id, char *key2, char *value);
 
-/* Language files */
-static int htslang_load(char *limit_to, char *apppath);
-static void conv_printf(char *from, char *to);
-static void LANG_DELETE(void);
-static void LANG_INIT(char *path);
-static int LANG_T(char *path, int l);
-static int QLANG_T(int l);
-static char *LANGSEL(char *name);
-static char *LANGINTKEY(char *name);
-static int LANG_SEARCH(char *path, char *iso);
-static int LANG_LIST(char *path, char *buffer);
-
 int htslang_init(void);
 int htslang_uninit(void);
 
 /* Static definitions */
 
-static char *gethomedir(void);
-static int linput_cpp(FILE * fp, char *s, int max);
-static int linput_trim(FILE * fp, char *s, int max);
-static int fexist(const char *s);
-static int linput(FILE * fp, char *s, int max);
+HTS_UNUSED static char *gethomedir(void);
+HTS_UNUSED static int linput_cpp(FILE * fp, char *s, int max);
+HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max);
+HTS_UNUSED static int fexist(const char *s);
+HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
-static int linputsoc(T_SOC soc, char *s, int max) {
+HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
   int c;
   int j = 0;
 
@@ -145,7 +133,7 @@ static int linputsoc(T_SOC soc, char *s, int max) {
   return j;
 }
 
-static int check_readinput_t(T_SOC soc, int timeout) {
+HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
   if (soc != INVALID_SOCKET) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
@@ -163,7 +151,7 @@ static int check_readinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
-static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
+HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   if (check_readinput_t(soc, timeout)) {
     return linputsoc(soc, s, max);
   }
@@ -278,7 +266,7 @@ static int ehex(char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-static void unescapehttp(char *s, String * tempo) {
+HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
   int i;
 
   for(i = 0; i < (int) strlen(s); i++) {
@@ -299,7 +287,7 @@ static void unescapehttp(char *s, String * tempo) {
   }
 }
 
-static void unescapeini(char *s, String * tempo) {
+HTS_UNUSED static void unescapeini(char *s, String * tempo) {
   int i;
   char lastc = 0;
 

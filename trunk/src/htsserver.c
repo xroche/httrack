@@ -112,13 +112,24 @@ static void sig_brpipe(int code) {
   /* ignore */
 }
 
-static int check_readinput_t(T_SOC soc, int timeout);
-static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
-static int linputsoc(T_SOC soc, char *s, int max);
-static int check_readinput(htsblk * r);
-static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
+HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
+HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max);
+HTS_UNUSED static int check_readinput(htsblk * r);
+HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
-static int linput(FILE * fp, char *s, int max);
+/* Language files */
+HTS_UNUSED static int htslang_load(char *limit_to, char *apppath);
+HTS_UNUSED static void conv_printf(char *from, char *to);
+HTS_UNUSED static void LANG_DELETE(void);
+HTS_UNUSED static void LANG_INIT(char *path);
+HTS_UNUSED static int LANG_T(char *path, int l);
+HTS_UNUSED static int QLANG_T(int l);
+HTS_UNUSED static char *LANGSEL(char *name);
+HTS_UNUSED static char *LANGINTKEY(char *name);
+HTS_UNUSED static int LANG_SEARCH(char *path, char *iso);
+HTS_UNUSED static int LANG_LIST(char *path, char *buffer);
 
 // URL Link catcher
 
@@ -697,7 +708,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               intptr_t adrcd = 0;
 
               if (inthash_readptr(NewLangList, "command_do", &adrcd)) {
-                intptr_t adrw = 0, adrpath = 0;
+                intptr_t adrw = 0;
 
                 if (inthash_readptr(NewLangList, "winprofile", &adrw)) {
 

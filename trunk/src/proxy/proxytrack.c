@@ -345,11 +345,11 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
   T_SOC socICP = smallserver_init(proxyAddr, icpPort, SOCK_DGRAM);
 
   if (soc != INVALID_SOCKET && socICP != INVALID_SOCKET) {
-    char url[HTS_URLMAXSIZE * 2];
-    char method[32];
-    char data[32768];
+    //char url[HTS_URLMAXSIZE * 2];
+    //char method[32];
+    //char data[32768];
 
-    url[0] = method[0] = data[0] = '\0';
+    //url[0] = method[0] = data[0] = '\0';
     //
     printf("HTTP Proxy installed on %s:%d/\n", proxyAddr, proxyPort);
     printf("ICP Proxy installed on %s:%d/\n", icpAddr, icpPort);
@@ -949,7 +949,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     char *command;
     char *proto;
     char *surl;
-    int directHit = 0;
+    //int directHit = 0;
     int headRequest = 0;
     int listRequest = 0;
 
@@ -1094,7 +1094,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         if (strncasecmp
             (surl, "http://proxytrack/",
              sizeof("http://proxytrack/") - 1) == 0) {
-          directHit = 1;        /* Another direct hit hack */
+          //directHit = 1;        /* Another direct hit hack */
         }
         StringCopy(url, surl);
       } else {
@@ -1115,7 +1115,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
               toHit += 7;
             }
             /* Direct hit */
-            directHit = 1;
+            //directHit = 1;
             StringCopy(url, "");
             if (!link_has_authority(toHit))
               StringCat(url, "http://");
@@ -1126,7 +1126,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             const char *toHit = surl + sizeof("/proxytrack/") - 1;
 
             /* Direct hit */
-            directHit = 1;
+            //directHit = 1;
             StringCopy(url, "");
             if (!link_has_authority(toHit))
               StringCat(url, "http://");
@@ -1399,19 +1399,28 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 }
 
 /* Generic threaded function start */
+
+#ifdef _WIN32
+
 static int startThread(void (*funct) (void *), void *param) {
   if (param != NULL) {
-#ifdef _WIN32
     if (_beginthread(funct, 0, param) == -1) {
       free(param);
       return 0;
     }
     return 1;
-#else
-    pthread_t handle = 0;
-    int retcode;
+  } else {
+    return 0;
+  }
+}
 
-    retcode = pthread_create(&handle, NULL, funct, param);
+#else
+
+/* Generic threaded function start */
+static int startThread(void* (*funct) (void *), void *param) {
+  if (param != NULL) {
+    pthread_t handle = 0;
+    int retcode = pthread_create(&handle, NULL, funct, param);
     if (retcode != 0) {         /* error */
       free(param);
       return 0;
@@ -1420,11 +1429,12 @@ static int startThread(void (*funct) (void *), void *param) {
       pthread_detach(handle);
       return 1;
     }
-#endif
   } else {
     return 0;
   }
 }
+
+#endif
 
 /* Generic socket/index structure */
 typedef struct proxytrack_process_th_p {
@@ -1433,8 +1443,16 @@ typedef struct proxytrack_process_th_p {
   void (*process) (PT_Indexes indexes, T_SOC soc_c);
 } proxytrack_process_th_p;
 
+#ifdef _WIN32
+typedef void proxytrack_process_th_return_t;
+#define PROXYTRACK_PROCESS_TH_RETURN return
+#else
+typedef void* proxytrack_process_th_return_t;
+#define PROXYTRACK_PROCESS_TH_RETURN return NULL
+#endif
+
 /* Generic socket/index function stub */
-static void proxytrack_process_th(void *param_) {
+static proxytrack_process_th_return_t proxytrack_process_th(void *param_) {
   proxytrack_process_th_p *param = (proxytrack_process_th_p *) param_;
   T_SOC soc_c = param->soc_c;
   PT_Indexes indexes = param->indexes;
@@ -1442,7 +1460,7 @@ static void proxytrack_process_th(void *param_) {
 
   free(param);
   process(indexes, soc_c);
-  return;
+  PROXYTRACK_PROCESS_TH_RETURN;
 }
 
 /* Process generic socket/index operation */
@@ -1517,7 +1535,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
   unsigned char *buffer;
 
   if (Message_Length == 0 && Message != NULL)   /* We have to get the message size */
-    Message_Length = (unsigned int) strlen(Message) + 1;        /* NULL terminated */
+    Message_Length = (unsigned int) strlen((char*) Message) + 1;        /* NULL terminated */
   BufferSize = 20 + Message_Length;
   buffer = malloc(BufferSize);
   if (buffer != NULL) {
@@ -1588,9 +1606,9 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         unsigned char Version = buffer[1];
         unsigned short Message_Length = READ_NET16(&buffer[2]);
         unsigned int Request_Number = READ_NET32(&buffer[4]);   /* Session ID */
-        unsigned int Options = READ_NET32(&buffer[8]);
-        unsigned int Option_Data = READ_NET32(&buffer[12]);     /* ICP_FLAG_SRC_RTT */
-        unsigned int Sender_Host_Address = READ_NET32(&buffer[16]);     /* ignored */
+        //unsigned int Options = READ_NET32(&buffer[8]);
+        //unsigned int Option_Data = READ_NET32(&buffer[12]);     /* ICP_FLAG_SRC_RTT */
+        //unsigned int Sender_Host_Address = READ_NET32(&buffer[16]);     /* ignored */
         unsigned char *Payload = &buffer[20];
 
         buffer[bufferSize] = '\0';      /* Ensure payload is NULL terminated */
@@ -1609,14 +1627,14 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                     ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_DENIED,
                               Version, 0, Request_Number, 0, 0, 0, UrlRequest);
                     LogReply = "ICP_OP_DENIED";
-                  } else if (PT_LookupIndex(indexes, UrlRequest)) {
+                  } else if (PT_LookupIndex(indexes, (char*) UrlRequest)) {
                     ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_HIT,
                               Version, 0, Request_Number, 0, 0, 0, UrlRequest);
                     LogReply = "ICP_OP_HIT";
                   } else {
                     if (UrlRequestSize > 0
                         && UrlRequest[UrlRequestSize - 1] != '/'
-                        && strchr(UrlRequest, '?') == NULL) {
+                        && strchr((char*) UrlRequest, '?') == NULL) {
                       char *UrlRedirect = malloc(UrlRequestSize + 1 + 1);
 
                       if (UrlRedirect != NULL) {
@@ -1681,7 +1699,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
           StringCopy(ip, "unknown");
         }
         proxytrack_print_log(LOG, "ICP %s %s/%s %s", StringBuff(ip), LogRequest,
-                             LogReply, (UrlRequest ? UrlRequest : "-"));
+                             LogReply, (UrlRequest ? (char*) UrlRequest : "-"));
         StringFree(ip);
       }
 
@@ -1698,11 +1716,14 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
   return 1;
 }
 
+static void proxytrack_start_ICP_th(PT_Indexes indexes, T_SOC soc) {
+  (void) proxytrack_start_ICP(indexes, soc);
+}
+
 static int proxytrack_start(PT_Indexes indexes, T_SOC soc, T_SOC socICP) {
   int ret = 1;
 
-  if (proxytrack_process_generic(proxytrack_start_ICP, indexes, socICP)) {
-    //if (!proxytrack_process_generic(proxytrack_start_HTTP, indexes, soc))
+  if (proxytrack_process_generic(proxytrack_start_ICP_th, indexes, socICP)) {
     if (!proxytrack_start_HTTP(indexes, soc)) {
       ret = 0;
     }

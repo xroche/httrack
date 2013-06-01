@@ -65,7 +65,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
 
 /* Static definitions */
 
-static void proxytrack_print_log(const char *severity, const char *format, ...) {
+HTS_UNUSED static void proxytrack_print_log(const char *severity, const char *format, ...) {
   if (severity != NULL) {
     const int error = errno;
     FILE *const fp = stderr;
@@ -110,7 +110,7 @@ static void proxytrack_print_log(const char *severity, const char *format, ...) 
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
-static char *gethomedir(void) {
+HTS_UNUSED static char *gethomedir(void) {
   char *home = getenv("HOME");
 
   if (home)
@@ -119,7 +119,7 @@ static char *gethomedir(void) {
     return ".";
 }
 
-static int linput(FILE * fp, char *s, int max) {
+HTS_UNUSED static int linput(FILE * fp, char *s, int max) {
   int c;
   int j = 0;
 
@@ -146,7 +146,7 @@ static int linput(FILE * fp, char *s, int max) {
   return j;
 }
 
-static int link_has_authority(const char *lien) {
+HTS_UNUSED static int link_has_authority(const char *lien) {
   const char *a = lien;
 
   if (isalpha((const unsigned char) *a)) {
@@ -163,7 +163,7 @@ static int link_has_authority(const char *lien) {
   return 0;
 }
 
-static const char *jump_protocol(const char *source) {
+HTS_UNUSED static const char *jump_protocol(const char *source) {
   int p;
 
   // scheme
@@ -184,7 +184,7 @@ static const char *jump_protocol(const char *source) {
   return source;
 }
 
-static const char *strrchr_limit(const char *s, char c, const char *limit) {
+HTS_UNUSED static const char *strrchr_limit(const char *s, char c, const char *limit) {
   if (limit == NULL) {
     char *p = strrchr(s, c);
 
@@ -201,7 +201,7 @@ static const char *strrchr_limit(const char *s, char c, const char *limit) {
   }
 }
 
-static const char *jump_protocol_and_auth(const char *source) {
+HTS_UNUSED static const char *jump_protocol_and_auth(const char *source) {
   const char *a, *trytofind;
 
   if (strcmp(source, "file://") == 0)
@@ -217,7 +217,7 @@ static const char *jump_protocol_and_auth(const char *source) {
 #ifndef max
 #define max(a,b) ((a)>(b)?(a):(b))
 #endif
-static int linput_trim(FILE * fp, char *s, int max) {
+HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
   char *ls = (char *) malloc(max + 2);
 
@@ -251,7 +251,7 @@ static int linput_trim(FILE * fp, char *s, int max) {
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
 #endif
-static int fexist(char *s) {
+HTS_UNUSED static int fexist(char *s) {
   struct stat st;
 
   memset(&st, 0, sizeof(st));
@@ -264,14 +264,14 @@ static int fexist(char *s) {
 }
 
 /* convertir une chaine en temps */
-static void set_lowcase(char *s) {
+HTS_UNUSED static void set_lowcase(char *s) {
   int i;
 
   for(i = 0; i < (int) strlen(s); i++)
     if ((s[i] >= 'A') && (s[i] <= 'Z'))
       s[i] += ('a' - 'A');
 }
-static struct tm *convert_time_rfc822(struct tm *result, const char *s) {
+HTS_UNUSED static struct tm *convert_time_rfc822(struct tm *result, const char *s) {
   char months[] = "jan feb mar apr may jun jul aug sep oct nov dec";
   char str[256];
   char *a;
@@ -363,7 +363,7 @@ static struct tm *convert_time_rfc822(struct tm *result, const char *s) {
   }
   return NULL;
 }
-static struct tm PT_GetTime(time_t t) {
+HTS_UNUSED static struct tm PT_GetTime(time_t t) {
   struct tm tmbuf;
 
 #ifdef _WIN32
@@ -378,7 +378,7 @@ static struct tm PT_GetTime(time_t t) {
     return tmbuf;
   }
 }
-static int set_filetime(const char *file, struct tm *tm_time) {
+HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   struct utimbuf tim;
 
 #ifndef HTS_DO_NOT_USE_FTIME
@@ -394,7 +394,7 @@ static int set_filetime(const char *file, struct tm *tm_time) {
 #endif
   return utime(file, &tim);
 }
-static int set_filetime_time_t(const char *file, time_t t) {
+HTS_UNUSED static int set_filetime_time_t(const char *file, time_t t) {
   if (t != (time_t) 0 && t != (time_t) - 1) {
     struct tm tm = PT_GetTime(t);
 
@@ -402,7 +402,7 @@ static int set_filetime_time_t(const char *file, time_t t) {
   }
   return -1;
 }
-static int set_filetime_rfc822(const char *file, const char *date) {
+HTS_UNUSED static int set_filetime_rfc822(const char *file, const char *date) {
   struct tm buffer;
   struct tm *tm_s = convert_time_rfc822(&buffer, date);
 

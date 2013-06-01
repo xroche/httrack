@@ -321,7 +321,6 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
   int stat_warnings = -1;
   int stat_infos = -1;
   int nbk = -1;
-  LLint nb = -1;
   int stat_nsocket = -1;
   LLint stat_bytes = -1;
   LLint stat_bytes_recv = -1;
@@ -336,7 +335,6 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
     nbk = stats->nbk;
     stat_nsocket = stats->stat_nsocket;
     irate = (int) stats->rate;
-    nb = stats->nb;
     stat_bytes = stats->nb;
     stat_bytes_recv = stats->HTS_TOTAL_RECV;
   }
