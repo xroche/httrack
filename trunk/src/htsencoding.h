@@ -46,7 +46,7 @@ Please visit our Website: http://www.httrack.com
  * and replace them in-place by their UTF-8 equivalents.
  * Note: source and destination may be the same, and the destination only
  * needs to hold as space as the source.
- * Returns 0 upon success.
+ * Returns 0 upon success, -1 upon overflow or error.
  **/
 extern int hts_unescapeEntities(const char *src,
                                 char *dest, const size_t max);
@@ -56,11 +56,19 @@ extern int hts_unescapeEntities(const char *src,
  * and replace them in-place by their charset equivalents.
  * Note: source and destination may be the same, and the destination only
  * needs to hold as space as the source.
- * Returns 0 upon success.
+ * Returns 0 upon success, -1 upon overflow or error.
  **/
 extern int hts_unescapeEntitiesWithCharset(const char *src,
                                            char *dest, const size_t max,
                                            const char *charset);
 
-#endif
+/**
+ * Unescape an URL-encoded string. The implicit charset is UTF-8.
+ * In case of UTF-8 decoding error inside URL-encoded characters, 
+ * the characters are left undecoded.
+ * Note: source and destination MUST NOT be the same.
+ * Returns 0 upon success, -1 upon overflow or error.
+ **/
+extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
 
+#endif
