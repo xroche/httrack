@@ -540,7 +540,7 @@ size_t hts_stringLengthUTF8(const char *s) {
   for(i = 0, len = 0; bytes[i] != '\0'; i++) {
     const unsigned char c = bytes[i];
 
-    if (HTS_IS_LEADING_UTF8(c)) {       // ASCII or leading byte
+    if (HTS_IS_LEADING_UTF8(c)) {       /* ASCII or leading byte */
       len++;
     }
   }
@@ -578,7 +578,7 @@ int hts_isCharsetUTF8(const char *charset) {
 char *hts_getCharsetFromMeta(const char *html, size_t size) {
   int i;
 
-  // <META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8" >
+  /* <META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8" > */
   for(i = 0; i < size; i++) {
     if (html[i] == '<' && strncasecmp(&html[i + 1], "meta", 4) == 0
         && is_space(html[i + 5])) {
@@ -1168,6 +1168,32 @@ size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
   EMIT_UNICODE(uc, EM);
 #undef EM
   return offs; 
+}
+
+size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc) {
+  size_t i = 0;
+  int uc = -1;
+
+  /* Reader: can read bytes up to j */
+#define RD ( i < size ? src[i++] : -1 )
+
+  /* Writer: upon error, return FFFD (replacement character) */
+#define WR(C) uc = (C)
+
+  /* Read Unicode character. */
+  READ_UNICODE(RD, WR);
+#undef RD
+#undef WR
+
+  /* Return */
+  if (uc != -1) {
+    if (puc != NULL) {
+      *puc = (hts_UCS4) uc;
+    }
+    return i;
+  }
+
+  return 0;
 }
 
 size_t hts_stringLengthUCS4(const hts_UCS4 *s) {

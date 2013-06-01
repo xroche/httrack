@@ -135,25 +135,33 @@ extern size_t hts_stringLengthUCS4(const hts_UCS4 *s);
  **/
 extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
 
-/* WIN32 specific. */
+/**
+ * Read the next Unicode character within 'src' of size 'size' and, upon
+ * successful reading, return the number of bytes read and place the
+ * character is 'puc'.
+ * Return 0 upon error.
+ **/
+extern size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc);
 
+/** WIN32 specific functions. **/
 #ifdef _WIN32
-
 /**
  * Convert UTF-8 to WCHAR.
+ * This function is WIN32 specific.
  **/
 extern LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize);
 
 /**
  * Convert from WCHAR.
+ * This function is WIN32 specific.
  **/
 extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
 
 /**
  * Convert current system codepage to UTF-8.
+ * This function is WIN32 specific.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
-
 #endif
 
 #endif
