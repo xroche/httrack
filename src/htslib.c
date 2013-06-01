@@ -3791,11 +3791,11 @@ HTSEXT_API char *unescape_http_unharm(char *catbuff, const char *s, int no_high)
     if (s[i] == '%') {
       int nchar = (char) ehex(s + i + 1);
 
-      int test = ((CHAR_RESERVED(nchar) && nchar != '+')        /* %2B => + (not in query!) */
-                  ||CHAR_DELIM(nchar)
+      int test = ((  CHAR_RESERVED(nchar) && nchar != '+')        /* %2B => + (not in query!) */
+                  || CHAR_DELIM(nchar)
                   || CHAR_UNWISE(nchar)
                   || CHAR_LOW(nchar)    /* CHAR_SPECIAL */
-                  ||CHAR_XXAVOID(nchar)
+                  || CHAR_XXAVOID(nchar)
                   || ((no_high)
                       && CHAR_HIG(nchar)
                   )
