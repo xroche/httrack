@@ -31,6 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <assert.h>
+
 #include "htscharset.h"
 #include "htsencoding.h"
 
@@ -65,6 +67,8 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
   int uc;
   int hex;
   unsigned int hash;
+
+  assert(max != 0);
   for(i = 0, j = 0, ampStart = (size_t) -1, ampStartDest = 0,
         uc = -1, hex = 0, hash = 0 ; src[i] != '\0' ; i++) {
     /* start of entity */
@@ -121,7 +125,7 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
               if (s != NULL) {
                 const size_t sLen = strlen(s);
                 if (sLen < maxOut) {
-                  // Do not copy \0.
+                  /* Do not copy \0. */
                   memcpy(&dest[ampStartDest], s, sLen);
                   len = sLen;
                 }
@@ -198,4 +202,81 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
 
 int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
   return hts_unescapeEntitiesWithCharset(src, dest, max, "UTF-8");
+}
+
+int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
+  size_t i, j, lastJ, k, utfBufferJ;
+  char utfBuffer[32];
+
+  assert(src != dest);
+  assert(max != 0);
+
+  for(i = 0, j = 0, k = 0, utfBufferJ = 0, lastJ = (size_t) -1 
+      ; src[i] != '\0' ; i++) {
+    char c = src[i];
+
+    /* Replacement for ' ' */
+    if (c == '+') {
+      c = ' ';
+    }
+    /* Escape sequence start */
+    else if (c == '%') {
+      /* last known position of % written on destination
+         copy blindly c, we'll rollback later */
+      lastJ = j;
+    }
+    /* End of sequence seen */
+    else if (i >= 2 && i == lastJ + 2) {
+      const int a1 = get_hex_value(src[i - 1]);
+      const int a2 = get_hex_value(src[i - 0]);
+      if (a1 != -1 && a2 != -1) {
+        const char ec = a1*16 + a2;  /* new character */
+
+        /* New leading character ? Flush UTF-8 buffer now. */
+        if (k != 0 && HTS_IS_LEADING_UTF8(ec)) {
+          const size_t utfBufferSize = k;
+          const size_t nRead = hts_readUTF8(utfBuffer, utfBufferSize, NULL);
+          const size_t destPos = utfBufferJ;
+          
+          /* Reset UTF-8 buffer in all cases. */
+          k = 0;
+          /* New destination-centric offset of utf-8 buffer beginning */
+          utfBufferJ = lastJ;
+
+          /* Was the character read successfully ? */
+          if (nRead == utfBufferSize) {
+            /* Rollback and copy */
+            j = destPos;
+            memcpy(&dest[j], utfBuffer, utfBufferSize);
+            j += utfBufferSize;
+            /* Skip current character */
+            continue;
+          }
+        }
+
+        /* Shortcut for ASCII (do not unescape non-printable) */
+        if ((unsigned char) ec < 0x80 && (unsigned char) ec >= 32) {
+          assert(k == 0);
+          /* Rollback new write position and character */
+          j = lastJ;
+          c = ec;
+        }
+        /* Copy if no overflow */
+        else if (k < sizeof(utfBuffer)) {
+          utfBuffer[k++] = ec;
+        }
+      }
+    }
+
+    /* Check for overflow */
+    if (j + 1 > max) {
+      return -1;
+    }
+
+    /* Copy current */
+    dest[j++] = c;
+  }
+  dest[j] = '\0';
+
+  return 0;
 }
