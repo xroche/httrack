@@ -2109,15 +2109,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     query[0] = '\0';
                   }
 
-                  // décoder l'inutile (%2E par exemple) et coder espaces
-                  // Unescape high-chars for UTF-8 conversion
-                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, !hasCharset));     /* note: '%' is still escaped */
+                  // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
+                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1));     /* note: '%' is still escaped */
+
+                  // Force to encode non-printable chars (should never happend)
                   escape_remove_control(lien);
                   
-                  // we need to encode query string non-ascii chars, 
-                  // leaving the encoding as-is (unlike the file part)
-                  escape_check_url(query);
-
                   // charset conversion for the URI filename, 
                   // and not already UTF-8
                   // (note: not for the query string!)
@@ -2147,6 +2144,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           "could not decode query string '%s' with charset '%s'", query, charset);
                     }
                   }
+
+                  // Decode remaining %XX high characters with UTF-8 
+                  // but only when this leads to valid UTF-8.
+                  // Otherwise, leave them unescaped.
+                  if (hts_unescapeUrl(lien, catbuff, sizeof(catbuff)) == 0) {
+                    strcpybuff(lien, catbuff);
+                  } else {
+                    hts_log_print(opt, LOG_WARNING,
+                      "could not URL-decode string '%s'", lien);
+                  }
+
+                  // we need to encode query string non-ascii chars, 
+                  // leaving the encoding as-is (unlike the file part)
+                  escape_check_url(query);
 
                   // copy back query
                   strcatbuff(lien, query);      /* restore */
