@@ -1480,11 +1480,13 @@ int httpmirror(char *url1, httrackp * opt) {
                 free(charset);
             }
             /* Could not detect charset: could it be UTF-8 ? */
-            if (page_charset[0] == '\0') {
-              if (is_unicode_utf8(r.adr, r.size)) {
-                strcpy(page_charset, "utf-8");
-              }
-            }
+            /* No, we can not do that: browsers do not do it 
+               (and it would break links). */
+            //if (page_charset[0] == '\0') {
+            //  if (is_unicode_utf8(r.adr, r.size)) {
+            //    strcpy(page_charset, "utf-8");
+            //  }
+            //}
             /* Could not detect charset */
             if (page_charset[0] == '\0') {
               hts_log_print(opt, LOG_INFO,
