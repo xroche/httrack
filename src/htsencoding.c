@@ -205,65 +205,97 @@ int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
 }
 
 int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
-  size_t i, j, lastJ, k, utfBufferJ;
+  size_t i, j, lastI, lastJ, k, utfBufferJ, utfBufferSize;
   char utfBuffer[32];
 
   assert(src != dest);
   assert(max != 0);
 
-  for(i = 0, j = 0, k = 0, utfBufferJ = 0, lastJ = (size_t) -1 
+  for(i = 0, j = 0, k = 0, utfBufferJ = 0, utfBufferSize = 0,
+      lastI = (size_t) -1, lastJ = (size_t) -1
       ; src[i] != '\0' ; i++) {
     char c = src[i];
+    unsigned char cUtf = (unsigned char) c;
 
     /* Replacement for ' ' */
     if (c == '+') {
-      c = ' ';
+      c = cUtf = ' ';
+      k = 0;  /* cancel any sequence */
     }
     /* Escape sequence start */
     else if (c == '%') {
       /* last known position of % written on destination
          copy blindly c, we'll rollback later */
+      lastI = i;
       lastJ = j;
     }
     /* End of sequence seen */
-    else if (i >= 2 && i == lastJ + 2) {
-      const int a1 = get_hex_value(src[i - 1]);
-      const int a2 = get_hex_value(src[i - 0]);
+    else if (i >= 2 && i == lastI + 2) {
+      const int a1 = get_hex_value(src[lastI + 1]);
+      const int a2 = get_hex_value(src[lastI + 2]);
       if (a1 != -1 && a2 != -1) {
         const char ec = a1*16 + a2;  /* new character */
-
-        /* New leading character ? Flush UTF-8 buffer now. */
-        if (k != 0 && HTS_IS_LEADING_UTF8(ec)) {
-          const size_t utfBufferSize = k;
-          const size_t nRead = hts_readUTF8(utfBuffer, utfBufferSize, NULL);
-          const size_t destPos = utfBufferJ;
-          
-          /* Reset UTF-8 buffer in all cases. */
-          k = 0;
-          /* New destination-centric offset of utf-8 buffer beginning */
-          utfBufferJ = lastJ;
-
-          /* Was the character read successfully ? */
-          if (nRead == utfBufferSize) {
-            /* Rollback and copy */
-            j = destPos;
-            memcpy(&dest[j], utfBuffer, utfBufferSize);
-            j += utfBufferSize;
-            /* Skip current character */
-            continue;
-          }
-        }
+        cUtf = (unsigned char) ec;
 
         /* Shortcut for ASCII (do not unescape non-printable) */
         if ((unsigned char) ec < 0x80 && (unsigned char) ec >= 32) {
-          assert(k == 0);
           /* Rollback new write position and character */
           j = lastJ;
           c = ec;
         }
-        /* Copy if no overflow */
-        else if (k < sizeof(utfBuffer)) {
-          utfBuffer[k++] = ec;
+      } else {
+        k = 0;  /* cancel any sequence */
+      }
+    }
+    /* ASCII (and not in %xx) */
+    else if (cUtf < 0x80 && i != lastI + 1) {
+      k = 0;  /* cancel any sequence */
+    }
+    
+    /* UTF-8 sequence in progress (either a raw or a %xx character) */
+    if (cUtf >= 0x80) {
+      /* Leading UTF ? */
+      if (HTS_IS_LEADING_UTF8(cUtf)) {
+        k = 0;  /* cancel any sequence */
+      }
+
+      /* Copy */
+      if (k < sizeof(utfBuffer)) {
+        /* First character */
+        if (k == 0) {
+          /* New destination-centric offset of utf-8 buffer beginning */
+          if (i == lastI + 2) {  /* just read a %xx */
+            utfBufferJ = lastJ;  /* position of % */
+          } else {
+            utfBufferJ = j;      /* current position otherwise */
+          }
+
+          /* Sequence length */
+          utfBufferSize = hts_getUTF8SequenceLength(cUtf);
+        }
+
+        /* Copy */
+        utfBuffer[k++] = cUtf;
+
+        /* Flush UTF-8 buffer when completed. */
+        if (k == utfBufferSize) {
+          const size_t nRead = hts_readUTF8(utfBuffer, utfBufferSize, NULL);
+
+          /* Reset UTF-8 buffer in all cases. */
+          k = 0;
+
+          /* Was the character read successfully ? */
+          if (nRead == utfBufferSize) {
+            /* Rollback write position to sequence start write position */
+            j = utfBufferJ;
+
+            /* Copy full character sequence */
+            memcpy(&dest[j], utfBuffer, utfBufferSize);
+            j += utfBufferSize;
+
+            /* Skip current character */
+            continue;
+          }
         }
       }
     }
