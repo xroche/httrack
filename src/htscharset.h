@@ -143,6 +143,13 @@ extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
  **/
 extern size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc);
 
+/**
+ * Given the first UTF-8 sequence character, get the total number of
+ * characters in the sequence (1 for ASCII). 
+ * Return 0 upon error (not a leading character).
+ **/
+extern size_t hts_getUTF8SequenceLength(const char lead);
+
 /** WIN32 specific functions. **/
 #ifdef _WIN32
 /**
