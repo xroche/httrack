@@ -16367,7 +16367,7 @@ $as_echo "#define PREFER_PORTABLE_SNPRINTF 1" >>confdefs.h
 
 fi
 
-ac_config_files="$ac_config_files Makefile src/Makefile man/Makefile m4/Makefile templates/Makefile lang/Makefile html/Makefile libtest/Makefile"
+ac_config_files="$ac_config_files Makefile src/Makefile man/Makefile m4/Makefile templates/Makefile lang/Makefile html/Makefile libtest/Makefile tests/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -17471,6 +17471,7 @@ do
     "lang/Makefile") CONFIG_FILES="$CONFIG_FILES lang/Makefile" ;;
     "html/Makefile") CONFIG_FILES="$CONFIG_FILES html/Makefile" ;;
     "libtest/Makefile") CONFIG_FILES="$CONFIG_FILES libtest/Makefile" ;;
+    "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

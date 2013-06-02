@@ -1,0 +1,4 @@
+#!/bin/bash
+#
+
+bash crawl-test.sh --errors 0 --files 5 httrack http://ut.httrack.com/simple/basic.html

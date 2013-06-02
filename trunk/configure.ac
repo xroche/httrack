@@ -188,4 +188,5 @@ templates/Makefile
 lang/Makefile
 html/Makefile
 libtest/Makefile
+tests/Makefile
 ])
