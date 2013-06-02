@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htstools.h"
 #include "htscharset.h"
+#include "htsencoding.h"
 #include <ctype.h>
 
 #define ADD_STANDARD_PATH \
@@ -290,11 +291,14 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     }
     fil = newfil;
   }
-  // Decode remaining %
-  strcpybuff(fil, unescape_http(catbuff, fil));
-  // , BUT do not decode high chars
-  //strcpybuff(fil,unescape_http_unharm(fil, 1));
-  // YES (not server side, but fs/client side)
+
+  // decode remaining % (normally not necessary; already done in htsparse.c)
+  if (hts_unescapeUrl(fil, catbuff, sizeof(catbuff)) == 0) {
+    strcpybuff(fil, catbuff);
+  } else {
+    hts_log_print(opt, LOG_WARNING,
+      "could not URL-decode string '%s'", fil);
+  }
 
 #if HTS_USEMMS
   /* .asx hack */

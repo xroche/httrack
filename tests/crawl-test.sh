@@ -68,7 +68,7 @@ function start-crawl {
       ;;
     --no-purge|--summary)
       ;;
-    --errors|--files)
+    --errors|--files|--found|--not-found|--directory)
       pos=$[${pos}+1]
       test "$#" -ge "$pos" || warning "missing argument" || return 1
       ;;
@@ -127,12 +127,40 @@ function start-crawl {
       ;;
     --errors)
       shift
-      test "$#" -gt 0 || warning "missing argument" || return 1
       assert_equals "checking errors" "$1" "$(grep -iEc "^[0-9\:]*[[:space:]]Error:" "${tmp}/hts-log.txt")"
+      ;;
+    --found)
+      shift
+      info "checking for $1"
+      if test -f "${tmp}/$1" ; then
+        result "OK"
+      else
+        result "not found"
+        exit 1
+      fi
+      ;;
+    --not-found)
+      shift
+      info "checking for $1"
+      if test -f "${tmp}/$1" ; then
+        result "OK"
+      else
+        result "not found"
+        exit 1
+      fi
+      ;;
+    --directory)
+      shift
+      info "checking for $1"
+      if test -d "${tmp}/$1" ; then
+        result "OK"
+      else
+        result "not found"
+        exit 1
+      fi
       ;;
     --files)
       shift
-      test "$#" -gt 0 || warning "missing argument" || return 1
       nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${tmp}/hts-log.txt" \
         | sed -e 's/.*[[:space:]]\([^ ]*\)[[:space:]]files written.*/\1/g')
       assert_equals "checking files" "$1" "$nFiles"
