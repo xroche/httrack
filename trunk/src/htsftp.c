@@ -256,6 +256,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     t_hostent *hp;
     char *a;
     char _adr[256];
+    const char *error = "unknown error";
 
     _adr[0] = '\0';
     //T_SOC soc_ctl;
@@ -272,9 +273,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
-    hp = hts_gethostbyname(opt, _adr, &fullhostent_buffer);
+    hp = hts_gethostbyname2(opt, _adr, &fullhostent_buffer, &error);
     if (hp == NULL) {
-      strcpybuff(back->r.msg, "Unable to get server's address");
+      snprintf(back->r.msg, sizeof(back->r.msg),
+               "Unable to get server's address: %s", error);
       // back->status=STATUS_FTP_READY;    // fini
       back->r.statuscode = STATUSCODE_NON_FATAL;
       _HALT_FTP return 0;
@@ -583,6 +585,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           SOCaddr server;
           int server_size = sizeof(server);
           t_hostent *hp;
+          const char *error = "unknown error";
 
           // effacer structure
           memset(&server, 0, sizeof(server));
@@ -592,7 +595,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
           // résoudre
           if (adr_ip[0]) {
-            hp = hts_gethostbyname(opt, adr_ip, &fullhostent_buffer);
+            hp = hts_gethostbyname2(opt, adr_ip, &fullhostent_buffer, &error);
             if (hp) {
               SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0],
                                hp->h_length);
@@ -657,7 +660,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               back->r.statuscode = STATUSCODE_INVALID;
             }                   // sinon on est prêts
           } else {
-            sprintf(back->r.msg, "Unable to resolve IP %s", adr_ip);
+            snprintf(back->r.msg, sizeof(back->r.msg),
+                     "Unable to resolve IP %s: %s", adr_ip, error);
             // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts

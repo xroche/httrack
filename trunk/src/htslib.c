@@ -2241,6 +2241,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     SOCaddr server;
     int server_size = sizeof(server);
     t_hostent *hp;
+    const char *error = "unknown error";
 
     // effacer structure
     memset(&server, 0, sizeof(server));
@@ -2277,17 +2278,16 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
         strncatbuff(iadr2, iadr, (int) (a - iadr));
 
         // adresse sans le :xx
-        hp = hts_gethostbyname(opt, iadr2, &fullhostent_buffer);
+        hp = hts_gethostbyname2(opt, iadr2, &fullhostent_buffer, &error);
 
       } else {
 
         // adresse normale (port par défaut par la suite)
-        hp = hts_gethostbyname(opt, iadr, &fullhostent_buffer);
-
+        hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
       }
 
     } else                      // port défini
-      hp = hts_gethostbyname(opt, iadr, &fullhostent_buffer);
+      hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
 
     // Conversion iadr -> adresse
     // structure recevant le nom de l'hôte, etc
@@ -2298,15 +2298,11 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #endif
       if (retour && retour->msg) {
 #ifdef _WIN32
-        int last_errno = WSAGetLastError();
-
-        sprintf(retour->msg, "Unable to get server's address: %s",
-                strerror(last_errno));
+        snprintf(retour->msg, sizeof(retour->msg),
+                 "Unable to get server's address: %s", error);
 #else
-        int last_errno = errno;
-
-        sprintf(retour->msg, "Unable to get server's address: %s",
-                strerror(last_errno));
+        snprintf(retour->msg, sizeof(retour->msg),
+                 "Unable to get server's address: %s", error);
 #endif
       }
       return INVALID_SOCKET;
@@ -2352,24 +2348,22 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     // bind this address
     if (retour != NULL && retour->req.proxy.bindhost[0] != 0) {
       t_fullhostent bind_buffer;
+      const char *error = "unknown error";
 
-      hp = hts_gethostbyname(opt, retour->req.proxy.bindhost, &bind_buffer);
+      hp = hts_gethostbyname2(opt, retour->req.proxy.bindhost, &bind_buffer,
+                              &error);
       if (hp == NULL
           || bind(soc, (struct sockaddr *) hp->h_addr_list[0],
                   hp->h_length) != 0) {
         if (retour && retour->msg) {
 #ifdef _WIN32
-          int last_errno = WSAGetLastError();
-
-          sprintf(retour->msg,
-                  "Unable to bind the specificied server address: %s",
-                  strerror(last_errno));
+          snprintf(retour->msg, sizeof(retour->msg),
+                   "Unable to bind the specificied server address: %s",
+                   error);
 #else
-          int last_errno = errno;
-
-          sprintf(retour->msg,
-                  "Unable to bind the specificied server address: %s",
-                  strerror(last_errno));
+          snprintf(retour->msg, sizeof(retour->msg),
+                   "Unable to bind the specificied server address: %s",
+                   error);
 #endif
         }
         deletesoc(soc);
@@ -4782,7 +4776,7 @@ int hts_dnstest(httrackp * opt, const char *_iadr) {
   return ret;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
+HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error) {
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
 
   /* Clear */
@@ -4831,6 +4825,7 @@ HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
      */
     struct addrinfo *res = NULL;
     struct addrinfo hints;
+    int gerr;
 
     memset(&hints, 0, sizeof(hints));
     if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
@@ -4841,7 +4836,7 @@ HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
       hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
+    if ( ( gerr = getaddrinfo(hostname, NULL, &hints, &res) ) == 0) {
       if (res) {
         if ((res->ai_addr) && (res->ai_addrlen)
             && (res->ai_addrlen <= buffer->addr_maxlen)) {
@@ -4850,6 +4845,10 @@ HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
           freeaddrinfo(res);
           return &(buffer->hp);
         }
+      }
+    } else {
+      if (error != NULL) {
+        *error = gai_strerror(gerr);
       }
     }
     if (res) {
@@ -4860,8 +4859,12 @@ HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
   return NULL;
 }
 
+HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
+  return vxgethostbyname2(hostname, v_buffer, NULL);
+}
+
 // cache dns interne à HTS // ** FREE A FAIRE sur la chaine
-t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) {
+t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
@@ -4920,7 +4923,7 @@ t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) 
 #if DEBUGDNS
         printf("resolving (not cached) %s\n", iadr);
 #endif
-        hp = vxgethostbyname(iadr, buffer);     // calculer IP host
+        hp = vxgethostbyname2(iadr, buffer, error);     // calculer IP host
       } else {                  // numérique, convertir sans passer par le dns
         buffer->hp.h_addr_list[0] = (char *) &inetaddr;
         buffer->hp.h_length = 4;
@@ -4946,6 +4949,10 @@ t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) 
       return hp;
     }
   }                             // retour hp du cache
+}
+
+t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) {
+  return hts_gethostbyname2(opt ,_iadr, v_buffer, NULL);
 }
 
 #else
