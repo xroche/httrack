@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+# unicode tests
+bash crawl-test.sh --errors 1 --files 10 httrack http://ut.httrack.com/unicode-links/utf8.html
+bash crawl-test.sh --errors 4 --files  7 httrack http://ut.httrack.com/unicode-links/default.html
+bash crawl-test.sh --errors 2 --files  9 httrack http://ut.httrack.com/unicode-links/iso88591.html
