@@ -1,7 +1,8 @@
-AC_INIT(src/httrack.c)
+AC_INIT([httrack], [3.47.16], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
-AM_INIT_AUTOMAKE(httrack, 3.47.16)
+AM_INIT_AUTOMAKE
 VERSION_INFO="2:47:0"
 AM_MAINTAINER_MODE
 
