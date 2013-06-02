@@ -16,3 +16,9 @@ bash crawl-test.sh --errors 0 --files 3 \
 	--found ut.httrack.com/parsing/fade.gif \
 	httrack http://ut.httrack.com/parsing/background-image.html
 
+# javascript parsing
+bash crawl-test.sh --errors 0 --files 3 \
+	--found ut.httrack.com/parsing/back.gif \
+	--found ut.httrack.com/parsing/fade.gif \
+	--found ut.httrack.com/parsing/javascript.html \
+	httrack http://ut.httrack.com/parsing/javascript.html
