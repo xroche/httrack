@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+# http://code.google.com/p/httrack/issues/detail?id=4&can=1
+bash crawl-test.sh --errors 0 --files 4 \
+	httrack http://ut.httrack.com/parsing/events.html
+
+# http://code.google.com/p/httrack/issues/detail?id=2&can=1
+bash crawl-test.sh --errors 0 --files 3 \
+	httrack http://ut.httrack.com/parsing/background-image.html
+
