@@ -28,14 +28,7 @@ configure-stamp:
 	dh_testdir
 
 	autoreconf -v -i
-
-	./configure \
-		--prefix=/usr \
-		--host=$(DEB_HOST_GNU_TYPE) \
-		--build=$(DEB_BUILD_GNU_TYPE) \
-		--mandir=\$${prefix}/share/man \
-		--sysconfdir=/etc \
-		$(shell dpkg-buildflags --export=configure)
+	dh_auto_configure
 
 	touch configure-stamp
 
@@ -47,18 +40,15 @@ build-arch: build-stamp
 
 build-stamp: configure-stamp 
 	dh_testdir
-
-	$(MAKE)
-
+	dh_auto_build
+	dh_auto_test
 	touch build-stamp
 
 clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
-
-	[ ! -f Makefile ] || $(MAKE) distclean
-
+	dh_auto_clean
 	dh_clean
 
 install: build
@@ -86,8 +76,9 @@ install: build
 
 	# Lintian overrides
 	mkdir -p $(CURDIR)/debian/httrack/usr/share/lintian/overrides
-	cp $(CURDIR)/debian/httrack-doc.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
 	cp $(CURDIR)/debian/httrack.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
+	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
+	cp $(CURDIR)/debian/httrack-doc.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
 
 	dh_movefiles --sourcedir=debian/httrack
 	# don't move history file to httrack-doc
