@@ -99,14 +99,14 @@ function start-crawl {
   mkdir "$tmp" || ! warning "could not create $tmp" || return 1
 
   which httrack >/dev/null || ! warning "could not find httrack" || return 1
-  ver=$(httrack -O /dev/null --version)
+  ver=$(httrack -O /dev/null --version | sed -e 's/HTTrack version //')
   test -n "$ver" || ! warning "could not run httrack" || return 1
 
   # start crawl
   log="${tmp}/log"
   debug starting httrack -O "${tmp}" ${moreargs} ${@:${pos}}
   info "running httrack ${@:${pos}}"
-  httrack -O "${tmp}" --user-agent="HTTrack $ver Unit Tests ($(uname -omrs))" ${moreargs} ${@:${pos}} >"${log}" 2>&1 &
+  httrack -O "${tmp}" --user-agent="httrack $ver ut ($(uname -omrs))" ${moreargs} ${@:${pos}} >"${log}" 2>&1 &
   crawlpid="$!"
   debug "started cralwer on pid $crawlpid"
   wait "$crawlpid"
