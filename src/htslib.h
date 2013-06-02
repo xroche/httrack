@@ -290,9 +290,12 @@ HTSEXT_API void infostatuscode(char *msg, int statuscode);
 htsblk xhttpget(httrackp * opt, char *adr, char *fil);
 htsblk http_gethead(httrackp * opt, char *adr, char *fil);
 LLint http_xfread1(htsblk * r, int bufl);
+HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
+                                        void *v_buffer, const char **error);
 HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
                                         void *v_buffer);
 #ifndef HTTRACK_DEFLIB
+HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
 HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
 #endif
 t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour);
@@ -608,6 +611,7 @@ HTS_STATIC int strcmpnocase(char *a, char *b) {
 #ifdef _WIN32
 #define strcasecmp(a,b) stricmp(a,b)
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
+#define snprintf _snprintf
 #endif
 
 #define strfield2(f,s) ( (strlen(f)!=strlen(s)) ? 0 : (strfield(f,s)) )
