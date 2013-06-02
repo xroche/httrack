@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+# unicode tests
+bash crawl-test.sh --errors 1 --files 5 \
+	httrack 'http://ut.httrack.com/unicode-links/idna.html' \
+	'+*.ut.httrack.com/*' --robots=0
+
