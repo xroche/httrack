@@ -293,6 +293,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
 
   // decode remaining % (normally not necessary; already done in htsparse.c)
+  // this will NOT decode buggy %xx (ie. not UTF-8) ones
   if (hts_unescapeUrl(fil, catbuff, sizeof(catbuff)) == 0) {
     strcpybuff(fil, catbuff);
   } else {
