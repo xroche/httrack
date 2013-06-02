@@ -3,9 +3,16 @@
 
 # http://code.google.com/p/httrack/issues/detail?id=4&can=1
 bash crawl-test.sh --errors 0 --files 4 \
+	--found ut.httrack.com/parsing/back5e1f.gif \
+	--found ut.httrack.com/parsing/events.html \
+	--found ut.httrack.com/parsing/fade230f4.gif \
+	--found ut.httrack.com/parsing/fade3860.gif \
 	httrack http://ut.httrack.com/parsing/events.html
 
 # http://code.google.com/p/httrack/issues/detail?id=2&can=1
 bash crawl-test.sh --errors 0 --files 3 \
+	--found ut.httrack.com/parsing/background-image.css \
+	--found ut.httrack.com/parsing/background-image.html \
+	--found ut.httrack.com/parsing/fade.gif \
 	httrack http://ut.httrack.com/parsing/background-image.html
 
