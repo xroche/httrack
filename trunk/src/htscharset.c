@@ -730,7 +730,7 @@ static unsigned int nlz8(unsigned char x) {
     int i_;                                     \
     /* loop should be unrolled by compiler */   \
     for(i_ = 0 ; i_ < 7 - CLEARED ; i_++) {     \
-      const int c_ = READER;                    \
+      const int c_ = (READER);                  \
       /* continuation byte 10xxxxxx */          \
       if (c_ != -1 && ( c_ >> 6 ) == 0x2) {     \
         uc_ <<= 6;                              \
@@ -747,7 +747,7 @@ static unsigned int nlz8(unsigned char x) {
    EMITTER is a macro function taking an int (-1 for error). */
 #define READ_UNICODE(READER, EMITTER) do {      \
     const unsigned int f_ =                     \
-      (unsigned int) READER;                    \
+      (unsigned int) (READER);                  \
     /* 1..8 */                                  \
     const unsigned int c_ =                     \
       nlz8((unsigned char)~f_);                 \
@@ -1101,6 +1101,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
 }
 
 hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars) {
+  const unsigned char *const data = (const unsigned char*) s;
   size_t i;
   hts_UCS4 *dest = NULL;
   size_t capa = 0, destSize = 0;
@@ -1112,7 +1113,7 @@ hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars
     hts_UCS4 uc;
 
     /* Reader: can read bytes up to j */
-#define RD ( i < size ? s[i++] : -1 )
+#define RD ( i < size ? data[i++] : -1 )
 
     /* Writer: upon error, return FFFD (replacement character) */
 #define WR(C) uc = (C) != -1 ? (hts_UCS4) (C) : (hts_UCS4) 0xfffd
@@ -1171,11 +1172,12 @@ size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
 }
 
 size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc) {
+  const unsigned char *const data = (const unsigned char*) src;
   size_t i = 0;
   int uc = -1;
 
   /* Reader: can read bytes up to j */
-#define RD ( i < size ? src[i++] : -1 )
+#define RD ( i < size ? data[i++] : -1 )
 
   /* Writer: upon error, return FFFD (replacement character) */
 #define WR(C) uc = (C)
@@ -1194,6 +1196,29 @@ size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc) {
   }
 
   return 0;
+}
+
+size_t hts_getUTF8SequenceLength(const char lead) {
+  const unsigned char f = (unsigned char) lead;
+  const unsigned int c = nlz8(~f);
+  switch(c) {
+  case 0:
+    /* ASCII */
+    return 1;
+    break;
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+    /* UTF-8 */
+    return c;
+    break;
+  default:
+    /* ERROR */
+    return 0;
+    break;
+  }
 }
 
 size_t hts_stringLengthUCS4(const hts_UCS4 *s) {
