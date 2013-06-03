@@ -28,6 +28,7 @@ configure-stamp:
 	dh_testdir
 
 	autoreconf -v -i
+	# to be replaced by 'dh_auto_configure' only when compat=9
 	dh_auto_configure -- $(shell dpkg-buildflags --export=configure)
 
 	touch configure-stamp
