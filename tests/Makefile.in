@@ -122,6 +122,7 @@ RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SHLIBPATH_VAR = @SHLIBPATH_VAR@
 SOCKET_LIBS = @SOCKET_LIBS@
 STRIP = @STRIP@
 THREADS_CFLAGS = @THREADS_CFLAGS@
@@ -178,8 +179,7 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh
-TESTS_ENVIRONMENT =  \
-	LD_LIBRARY_PATH=$(top_builddir)/src/.libs:$$LD_LIBRARY_PATH \
+TESTS_ENVIRONMENT = $(SHLIBPATH_VAR)="$(top_builddir)/src/.libs$${$(SHLIBPATH_VAR):+:}$$$(SHLIBPATH_VAR)" \
 	PATH=$(top_builddir)/src/.libs:$$PATH
 TESTS = *.test
 all: all-am
