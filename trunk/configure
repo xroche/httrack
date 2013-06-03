@@ -644,6 +644,7 @@ V6_FLAG
 OPENSSL_LIBS
 VERSION_INFO
 DEFAULT_CFLAGS
+SHLIBPATH_VAR
 CXXCPP
 OTOOL64
 OTOOL
@@ -15203,6 +15204,10 @@ else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no, using $LN_S" >&5
 $as_echo "no, using $LN_S" >&6; }
 fi
+
+
+# Export
+SHLIBPATH_VAR=$shlibpath_var
 
 
 ### Default CFLAGS

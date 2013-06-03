@@ -14,6 +14,9 @@ AC_STDC_HEADERS
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
 
+# Export
+AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
+
 ### Default CFLAGS
 DEFAULT_CFLAGS=""
 DEFAULT_CFLAGS="-O -g3 -Wall -Wcast-align -Wstrict-prototypes \
