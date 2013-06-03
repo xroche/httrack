@@ -14,8 +14,11 @@ AC_STDC_HEADERS
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
 
-# Export
+# Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
+
+# Export .libs or equivalent.
+AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 
 ### Default CFLAGS
 DEFAULT_CFLAGS=""

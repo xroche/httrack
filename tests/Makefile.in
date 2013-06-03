@@ -98,6 +98,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_CV_OBJDIR = @LT_CV_OBJDIR@
 MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
@@ -179,8 +180,8 @@ sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh
-TESTS_ENVIRONMENT = $(SHLIBPATH_VAR)="$(top_builddir)/src/.libs$${$(SHLIBPATH_VAR):+:}$$$(SHLIBPATH_VAR)" \
-	PATH=$(top_builddir)/src/.libs:$$PATH
+TESTS_ENVIRONMENT = $(SHLIBPATH_VAR)="$(top_builddir)/src/$(LT_CV_OBJDIR)$${$(SHLIBPATH_VAR):+:}$$$(SHLIBPATH_VAR)" \
+	PATH=$(top_builddir)/src/$(LT_CV_OBJDIR):$$PATH
 TESTS = *.test
 all: all-am
 

@@ -644,6 +644,7 @@ V6_FLAG
 OPENSSL_LIBS
 VERSION_INFO
 DEFAULT_CFLAGS
+LT_CV_OBJDIR
 SHLIBPATH_VAR
 CXXCPP
 OTOOL64
@@ -15206,8 +15207,12 @@ $as_echo "no, using $LN_S" >&6; }
 fi
 
 
-# Export
+# Export LD_LIBRARY_PATH name or equivalent.
 SHLIBPATH_VAR=$shlibpath_var
+
+
+# Export .libs or equivalent.
+LT_CV_OBJDIR=$lt_cv_objdir
 
 
 ### Default CFLAGS
