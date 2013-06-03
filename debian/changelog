@@ -4,7 +4,7 @@ httrack (3.47.17-2) unstable; urgency=low
     Replaced dh_clean -k by dh_prep as advised
     Moved from compat=5 to to compat=8
 
- -- Xavier Roche <roche@proliant.localnet>  Mon, 03 Jun 2013 09:52:34 +0200
+ -- Xavier Roche <xavier@debian.org>  Mon, 03 Jun 2013 09:52:34 +0200
 
 httrack (3.47.17-1) unstable; urgency=low
 
