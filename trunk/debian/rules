@@ -28,7 +28,7 @@ configure-stamp:
 	dh_testdir
 
 	autoreconf -v -i
-	dh_auto_configure
+	dh_auto_configure -- $(shell dpkg-buildflags --export=configure)
 
 	touch configure-stamp
 
