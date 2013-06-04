@@ -1,4 +1,4 @@
-EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh
+EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += $(SHLIBPATH_VAR)="$(top_builddir)/src/$(LT_CV_OBJDIR)$${$(SHLIBPATH_VAR):+:}$$$(SHLIBPATH_VAR)"
