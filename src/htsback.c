@@ -3955,7 +3955,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (back[i].status > 0) {       // réception/connexion/..
           if (back[i].timeout > 0) {
             //printf("time check %d\n",((int) (act-back[i].timeout_refresh))-back[i].timeout);
-            if (((int) (act - back[i].timeout_refresh)) >= back[i].timeout) {
+            if (((int) (act - back[i].timeout_refresh)) + 1 >= back[i].timeout) {
+              hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s", back[i].url_adr,
+                back[i].url_fil);
               if (back[i].r.soc != INVALID_SOCKET) {
 #if HTS_DEBUG_CLOSESOCK
                 DEBUG_W("back_wait(timeout): deletehttp\n");
@@ -4046,7 +4048,7 @@ int back_checkmirror(httrackp * opt) {
   }
   // Check max time
   if ((opt->maxtime > 0)
-      && ((time_local() - HTS_STAT.stat_timestart) > opt->maxtime)) {
+      && ((time_local() - HTS_STAT.stat_timestart) >= opt->maxtime)) {
     if (!opt->state.stop) {     /* not yet stopped */
       hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
                     opt->maxtime);
