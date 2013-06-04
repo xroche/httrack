@@ -4,6 +4,17 @@
 # ensure the httrack unit tests are available so that ut will not break
 # the build in case of network outage
 
+# do not enable online tests (./configure --disable-online-unit-tests)
+if test "$ONLINE_UNIT_TESTS" == "no"; then
+exit 1
+
+# enable online tests (--enable-online-unit-tests)
+elif test "$ONLINE_UNIT_TESTS" == "yes"; then
+exit 0
+
+# check if online tests are reachable
+else
+
 # test url
 url=http://ut.httrack.com/enabled
 
@@ -17,13 +28,14 @@ if test -f $cache ; then
 	else
 		exit 1
 	fi
-fi
 
 # fetch single file
-if bash crawl-test.sh --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null ; then
+elif bash crawl-test.sh --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null ; then
 	echo "ok" > $cache
 	exit 0
 else
 	echo "error" > $cache
 	exit 1
+fi
+
 fi
