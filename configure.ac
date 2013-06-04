@@ -187,6 +187,14 @@ AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
 ### Check for snprintf
 AC_FUNC_SNPRINTF()
 
+## Options
+AC_ARG_ENABLE([online-unit-tests],
+	[AC_HELP_STRING([--enable-online-unit-tests=@<:@yes/no@:>@],
+		[Enable online-unit-tests @<:@default=yes@:>@])],
+	[online_unit_tests=$enableval],
+	[online_unit_tests=maybe])
+AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
+
 AC_OUTPUT([ Makefile
 src/Makefile
 man/Makefile
