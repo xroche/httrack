@@ -111,7 +111,7 @@ const char *hts_optalias[][4] = {
     {"connection", "-c", "param", "number of simultaneous connections allowed"},
   {"connection-per-second", "-%c", "param",
    "number of connection per second allowed"},
-  {"timeout", "-T", "", ""},
+  {"timeout", "-T", "param", ""},
   {"retries", "-R", "param", "number of retries for non-fatal errors"},
   {"min-rate", "-J", "param", ""},
   {"host-control", "-H", "param", ""},
