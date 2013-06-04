@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+bash check-network.sh ||  ! echo "no network; skipping" || exit 77
+
 # unicode tests
 bash crawl-test.sh \
 	--errors 1 --files 5 \
