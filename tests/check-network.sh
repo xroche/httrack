@@ -20,7 +20,7 @@ if test -f $cache ; then
 fi
 
 # fetch single file
-if bash crawl-test.sh --errors 0 --files 1 --summary httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null ; then
+if bash crawl-test.sh --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null ; then
 	echo "ok" > $cache
 	exit 0
 else
