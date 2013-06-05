@@ -130,7 +130,7 @@ AC_ARG_ENABLE([https],
 	case "${enableval}" in
 	no|yes|auto)
 		https_support=$enableval
-		AC_MSG_RESULT($enableval)
+		AC_MSG_RESULT($https_support)
 		;;
 	*)
 		AC_MSG_ERROR(bad value for https, expected yes/no/auto)
@@ -139,7 +139,7 @@ AC_ARG_ENABLE([https],
 	],
 	[
 	https_support=yes
-	AC_MSG_RESULT($https_support=)
+	AC_MSG_RESULT($https_support)
 	])
 if test x"$https_support" = x"no"; then
 AC_MSG_NOTICE([disabling https support])
