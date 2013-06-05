@@ -887,6 +887,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 
           linput(fp, line, 1000);
           if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
+            int ret;
             // selon que l'on a ou pas un proxy
             if (retour->req.proxy.active)
               sprintf(buff, "%s http://%s%s %s\r\n", method, adr, url,
@@ -894,7 +895,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
             else
               sprintf(buff, "%s %s %s\r\n", method, url, protocol);
             // lire le reste en brut
-            if (fread(buff + strlen(buff), 8000 - strlen(buff), 1, fp) < 0) {
+            ret = fread(buff + strlen(buff), 8000 - strlen(buff), 1, fp);
+            if (ret < 0) {
               return -1;
             }
           }
