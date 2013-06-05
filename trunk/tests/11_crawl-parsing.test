@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 
-bash check-network.sh ||  ! echo "no network; skipping" || exit 77
+bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
 
 # http://code.google.com/p/httrack/issues/detail?id=4&can=1
 bash crawl-test.sh --errors 0 --files 4 \
