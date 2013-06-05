@@ -121,7 +121,7 @@ AC_MSG_WARN([*** in_addr_t not found]),
 ### zlib
 CHECK_ZLIB()
 
-### OpenSSL
+### OpenSSL is explicitely enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
 AC_ARG_ENABLE([https],
 	[AC_HELP_STRING([--enable-https=@<:@yes/no/auto@:>@],
@@ -141,6 +141,9 @@ AC_ARG_ENABLE([https],
 	https_support=yes
 	AC_MSG_RESULT($https_support)
 	])
+AC_SUBST(HTTPS_SUPPORT,$https_support)
+
+# Probe OpenSSL ?
 if test x"$https_support" = x"no"; then
 AC_MSG_NOTICE([disabling https support])
 AC_DEFINE(HTS_USEOPENSSL, 0)

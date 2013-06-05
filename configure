@@ -643,6 +643,7 @@ THREADS_LIBS
 LFS_FLAG
 V6_FLAG
 OPENSSL_LIBS
+HTTPS_SUPPORT
 VERSION_INFO
 DEFAULT_CFLAGS
 LT_CV_OBJDIR
@@ -15688,7 +15689,7 @@ fi
 
 
 
-### OpenSSL
+### OpenSSL is explicitely enabled/disabled ?
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable https support" >&5
 $as_echo_n "checking whether to enable https support... " >&6; }
 # Check whether --enable-https was given.
@@ -15713,6 +15714,10 @@ $as_echo "$https_support" >&6; }
 
 fi
 
+HTTPS_SUPPORT=$https_support
+
+
+# Probe OpenSSL ?
 if test x"$https_support" = x"no"; then
 { $as_echo "$as_me:${as_lineno-$LINENO}: disabling https support" >&5
 $as_echo "$as_me: disabling https support" >&6;}
