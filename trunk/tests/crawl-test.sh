@@ -86,7 +86,7 @@ function start-crawl {
   debug "remaining args: ${@:${pos}}"
 
   # ut/ won't exceed 2 minutes
-  moreargs="--quiet --max-time=120 --connection-per-second=5"
+  moreargs="--quiet --max-time=120 --timeout=30 --connection-per-second=5"
 
   # proxy environment ?
   if test -n "$http_proxy"; then
