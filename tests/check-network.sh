@@ -6,6 +6,7 @@
 
 # do not enable online tests (./configure --disable-online-unit-tests)
 if test "$ONLINE_UNIT_TESTS" == "no"; then
+echo "online tests are disabled" >&2
 exit 1
 
 # enable online tests (--enable-online-unit-tests)
@@ -26,6 +27,7 @@ if test -f $cache ; then
 	if grep -q "ok" $cache ; then
 		exit 0
 	else
+		echo "online tests are disabled (cached)" >&2
 		exit 1
 	fi
 
@@ -35,6 +37,7 @@ elif bash crawl-test.sh --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$
 	exit 0
 else
 	echo "error" > $cache
+	echo "online tests are disabled (auto)" >&2
 	exit 1
 fi
 
