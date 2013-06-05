@@ -15697,8 +15697,8 @@ if test "${enable_https+set}" = set; then :
 	case "${enableval}" in
 	no|yes|auto)
 		https_support=$enableval
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $enableval" >&5
-$as_echo "$enableval" >&6; }
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $https_support" >&5
+$as_echo "$https_support" >&6; }
 		;;
 	*)
 		as_fn_error expected yes/no/auto "bad value for https" "$LINENO" 5
@@ -15708,8 +15708,8 @@ $as_echo "$enableval" >&6; }
 else
 
 	https_support=yes
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $https_support=" >&5
-$as_echo "$https_support=" >&6; }
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $https_support" >&5
+$as_echo "$https_support" >&6; }
 
 fi
 
