@@ -775,6 +775,7 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 with_zlib
+enable_https
 enable_online_unit_tests
 '
       ac_precious_vars='build_alias
@@ -1417,7 +1418,9 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --enable-online-unit-tests=[yes/no]
+  --enable-https=[yes/no/auto]
+                          Enable https support [default=yes]
+  --enable-online-unit-tests=[yes/no/auto]
                           Enable online-unit-tests [default=yes]
 
 Optional Packages:
@@ -15686,6 +15689,36 @@ fi
 
 
 ### OpenSSL
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable https support" >&5
+$as_echo_n "checking whether to enable https support... " >&6; }
+# Check whether --enable-https was given.
+if test "${enable_https+set}" = set; then :
+  enableval=$enable_https;
+	case "${enableval}" in
+	no|yes|auto)
+		https_support=$enableval
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $enableval" >&5
+$as_echo "$enableval" >&6; }
+		;;
+	*)
+		as_fn_error expected yes/no/auto "bad value for https" "$LINENO" 5
+		;;
+	esac
+
+else
+
+	https_support=yes
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $https_support=" >&5
+$as_echo "$https_support=" >&6; }
+
+fi
+
+if test x"$https_support" = x"no"; then
+{ $as_echo "$as_me:${as_lineno-$LINENO}: disabling https support" >&5
+$as_echo "$as_me: disabling https support" >&6;}
+$as_echo "#define HTS_USEOPENSSL 0" >>confdefs.h
+
+else
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
 $as_echo_n "checking for SSL_library_init in -lssl... " >&6; }
 if ${ac_cv_lib_ssl_SSL_library_init+:} false; then :
@@ -15723,16 +15756,26 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_library_init" >&5
 $as_echo "$ac_cv_lib_ssl_SSL_library_init" >&6; }
 if test "x$ac_cv_lib_ssl_SSL_library_init" = xyes; then :
-  OPENSSL_LIBS="-lcrypto -lssl"
+
+	OPENSSL_LIBS="-lcrypto -lssl"
 
 $as_echo "#define HTS_USEOPENSSL 1" >>confdefs.h
 
+
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: not necessary" >&5
-$as_echo "not necessary" >&6; }
+
+	if test x"$https_support" = x"yes"; then
+	as_fn_error $? "not available" "$LINENO" 5
+	else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: not available" >&5
+$as_echo "not available" >&6; }
+	fi
+
+
 fi
 
 
+fi
 
 ### Support IPv6
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for getaddrinfo in -lc" >&5
@@ -16392,17 +16435,35 @@ $as_echo "#define PREFER_PORTABLE_SNPRINTF 1" >>confdefs.h
 
 fi
 
-## Options
+## Online unit tests
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable online unit tests" >&5
+$as_echo_n "checking whether to enable online unit tests... " >&6; }
 # Check whether --enable-online-unit-tests was given.
 if test "${enable_online_unit_tests+set}" = set; then :
-  enableval=$enable_online_unit_tests; online_unit_tests=$enableval
+  enableval=$enable_online_unit_tests;
+	case "${enableval}" in
+	no|yes|auto)
+		online_unit_tests=$enableval
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $enableval" >&5
+$as_echo "$enableval" >&6; }
+		;;
+	*)
+		as_fn_error expected yes/no/auto "bad value for online-unit-tests" "$LINENO" 5
+		;;
+	esac
+
 else
-  online_unit_tests=maybe
+
+	online_unit_tests=no
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
 fi
 
 ONLINE_UNIT_TESTS=$online_unit_tests
 
 
+# Final output
 ac_config_files="$ac_config_files Makefile src/Makefile man/Makefile m4/Makefile templates/Makefile lang/Makefile html/Makefile libtest/Makefile tests/Makefile"
 
 cat >confcache <<\_ACEOF

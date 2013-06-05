@@ -122,13 +122,48 @@ AC_MSG_WARN([*** in_addr_t not found]),
 CHECK_ZLIB()
 
 ### OpenSSL
-AC_CHECK_LIB(ssl, SSL_library_init, [OPENSSL_LIBS="-lcrypto -lssl"
-AC_DEFINE(HTS_USEOPENSSL, 1,[Check for OpenSSL])], AC_MSG_RESULT([not necessary]))
+AC_MSG_CHECKING(whether to enable https support)
+AC_ARG_ENABLE([https],
+	[AC_HELP_STRING([--enable-https=@<:@yes/no/auto@:>@],
+		[Enable https support @<:@default=yes@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		https_support=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR(bad value for https, expected yes/no/auto)
+		;;
+	esac	
+	],
+	[
+	https_support=yes
+	AC_MSG_RESULT($https_support=)
+	])
+if test x"$https_support" = x"no"; then
+AC_MSG_NOTICE([disabling https support])
+AC_DEFINE(HTS_USEOPENSSL, 0)
+else
+AC_CHECK_LIB(ssl, SSL_library_init,
+	[
+	OPENSSL_LIBS="-lcrypto -lssl"
+	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
+	],
+	[
+	if test x"$https_support" = x"yes"; then
+	AC_MSG_ERROR([not available])
+	else
+	AC_MSG_RESULT([not available])
+	fi
+	]
+	)
 AC_SUBST(OPENSSL_LIBS)
+fi
 
 ### Support IPv6
 AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
-AC_DEFINE(HTS_INET6, 1,[Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
+AC_DEFINE(HTS_INET6, 1, [Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
 AC_SUBST(V6_FLAG)
 
 ### Check for LFS
@@ -187,15 +222,31 @@ AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
 ### Check for snprintf
 AC_FUNC_SNPRINTF()
 
-## Options
+## Online unit tests
+AC_MSG_CHECKING(whether to enable online unit tests)
 AC_ARG_ENABLE([online-unit-tests],
-	[AC_HELP_STRING([--enable-online-unit-tests=@<:@yes/no@:>@],
+	[AC_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],
 		[Enable online-unit-tests @<:@default=yes@:>@])],
-	[online_unit_tests=$enableval],
-	[online_unit_tests=maybe])
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		online_unit_tests=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR(bad value for online-unit-tests, expected yes/no/auto)
+		;;
+	esac
+	],
+	[
+	online_unit_tests=no
+	AC_MSG_RESULT(no)
+	])
 AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
 
-AC_OUTPUT([ Makefile
+# Final output
+AC_OUTPUT([
+Makefile
 src/Makefile
 man/Makefile
 m4/Makefile
