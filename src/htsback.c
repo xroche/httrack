@@ -2500,6 +2500,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // vérification de sécurité
           if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
+#if HTS_USEOPENSSL
             if (!(back[i].r.ssl && back[i].status > 0 && back[i].status < 1000)) {
               do_wait = 1;
 
@@ -2521,6 +2522,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 nfds = back[i].r.soc;
               }
             }
+#endif
           } else {
             back[i].r.statuscode = STATUSCODE_CONNERROR;
             if (back[i].status == STATUS_CONNECTING)
@@ -2831,8 +2833,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         //## if (back[i].url_adr[0]!=lOCAL_CHAR)
         if (back[i].r.is_file)
           dispo = 1;
+#if HTS_USEOPENSSL
         else if (back[i].r.ssl)
           dispo = 1;
+#endif
         else
           dispo = FD_ISSET(back[i].r.soc, &fds);
 
@@ -3955,7 +3959,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (back[i].status > 0) {       // réception/connexion/..
           if (back[i].timeout > 0) {
             //printf("time check %d\n",((int) (act-back[i].timeout_refresh))-back[i].timeout);
-            if (((int) (act - back[i].timeout_refresh)) + 1 >= back[i].timeout) {
+            if (((int) (act - back[i].timeout_refresh)) >= back[i].timeout) {
               hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s", back[i].url_adr,
                 back[i].url_fil);
               if (back[i].r.soc != INVALID_SOCKET) {
