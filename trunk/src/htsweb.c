@@ -593,11 +593,11 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                 break;
               default:
                 if (back[i].status == STATUS_READY) {   // prêt
-                  if ((back[i].r.statuscode == HTTP_OK)) {
+                  if (back[i].r.statuscode == HTTP_OK) {
                     strcpybuff(StatsBuffer[index].state, "ready");
                     ok = 1;
-                  } else if ((back[i].r.statuscode >= 100)
-                             && (back[i].r.statuscode <= 599)) {
+                  } else if (back[i].r.statuscode >= 100
+                             && back[i].r.statuscode <= 599) {
                     char tempo[256];
 
                     tempo[0] = '\0';
