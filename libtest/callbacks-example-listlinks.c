@@ -28,7 +28,7 @@ static int process_file(t_hts_callbackarg * carg, httrackp * opt, char *html,
                         int len, const char *url_address, const char *url_file);
 static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
                               char *link);
-static int check_loop(t_hts_callbackarg * carg, httrackp * opt, void *back,
+static int check_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back *back,
                       int back_max, int back_index, int lien_tot, int lien_ntot,
                       int stat_time, hts_stat_struct * stats);
 static int end(t_hts_callbackarg * carg, httrackp * opt);
@@ -112,7 +112,7 @@ static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
   return 1;                     /* success */
 }
 
-static int check_loop(t_hts_callbackarg * carg, httrackp * opt, void *back,
+static int check_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back *back,
                       int back_max, int back_index, int lien_tot, int lien_ntot,
                       int stat_time, hts_stat_struct * stats) {
   static int fun_animation = 0;
