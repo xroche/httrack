@@ -388,7 +388,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   back->r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                sprintf(back->r.msg, "CWD error: %s", linejmp(line));
+                snprintf(back->r.msg, sizeof(back->r.msg), "CWD error: %s", linejmp(line));
                 // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode = STATUSCODE_INVALID;
               }                 // sinon on est prêts
@@ -400,17 +400,17 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #endif
 
           } else {
-            sprintf(back->r.msg, "Bad password: %s", linejmp(line));
+            snprintf(back->r.msg, sizeof(back->r.msg), "Bad password: %s", linejmp(line));
             // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode = STATUSCODE_INVALID;
           }
         } else {
-          sprintf(back->r.msg, "Bad user name: %s", linejmp(line));
+          snprintf(back->r.msg, sizeof(back->r.msg), "Bad user name: %s", linejmp(line));
           // back->status=STATUS_FTP_READY;    // fini
           back->r.statuscode = STATUSCODE_INVALID;
         }
       } else {
-        sprintf(back->r.msg, "Connection refused: %s", linejmp(line));
+        snprintf(back->r.msg, sizeof(back->r.msg), "Connection refused: %s", linejmp(line));
         // back->status=STATUS_FTP_READY;    // fini
         back->r.statuscode = STATUSCODE_INVALID;
       }
@@ -478,7 +478,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             }
             // -- fin analyse de l'adresse IP et du port --
           } else {
-            sprintf(back->r.msg, "PASV incorrect: %s", linejmp(line));
+            snprintf(back->r.msg, sizeof(back->r.msg), "PASV incorrect: %s", linejmp(line));
             // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
@@ -510,12 +510,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 }
               }
             } else {
-              sprintf(back->r.msg, "EPSV incorrect: %s", linejmp(line));
+              snprintf(back->r.msg, sizeof(back->r.msg), "EPSV incorrect: %s", linejmp(line));
               // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode = STATUSCODE_INVALID;
             }
           } else {
-            sprintf(back->r.msg, "PASV/EPSV error: %s", linejmp(line));
+            snprintf(back->r.msg, sizeof(back->r.msg), "PASV/EPSV error: %s", linejmp(line));
             // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
@@ -638,7 +638,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   deletesoc(soc_dat);
                   soc_dat = INVALID_SOCKET;
                   //
-                  sprintf(back->r.msg, "RETR command errror: %s",
+                  snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s",
                           linejmp(line));
                   // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode = STATUSCODE_INVALID;
@@ -666,7 +666,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
         } else {
-          sprintf(back->r.msg, "PASV incorrect: %s", linejmp(line));
+          snprintf(back->r.msg, sizeof(back->r.msg), "PASV incorrect: %s", linejmp(line));
           // back->status=STATUS_FTP_READY;    // fini
           back->r.statuscode = STATUSCODE_INVALID;
         }                       // sinon on est prêts
@@ -692,12 +692,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 back->r.statuscode = STATUSCODE_INVALID;
               }
             } else {
-              sprintf(back->r.msg, "RETR command errror: %s", linejmp(line));
+              snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s", linejmp(line));
               // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode = STATUSCODE_INVALID;
             }
           } else {
-            sprintf(back->r.msg, "PORT command error: %s", linejmp(line));
+            snprintf(back->r.msg, sizeof(back->r.msg), "PORT command error: %s", linejmp(line));
             // back->status=STATUS_FTP_READY;    // fini
             back->r.statuscode = STATUSCODE_INVALID;
           }
@@ -745,7 +745,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 len = 0;        // fin
                 break;
               case 0:
-                sprintf(back->r.msg, "Time out (%d)", timeout);
+                snprintf(back->r.msg, sizeof(back->r.msg), "Time out (%d)", timeout);
                 // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode = STATUSCODE_INVALID;
                 len = 0;        // fin
@@ -815,7 +815,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode = HTTP_OK;
               } else {
-                sprintf(back->r.msg, "RETR incorrect: %s", linejmp(line));
+                snprintf(back->r.msg, sizeof(back->r.msg), "RETR incorrect: %s", linejmp(line));
                 // back->status=STATUS_FTP_READY;    // fini
                 back->r.statuscode = STATUSCODE_INVALID;
               }
