@@ -70,8 +70,8 @@ int back_launch_ftp(FTPDownloadStruct * params);
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, char *data);
-int get_ftp_line(T_SOC soc, char *line, int timeout);
-T_SOC get_datasocket(char *to_send);
+int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout);
+T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket(T_SOC soc);
