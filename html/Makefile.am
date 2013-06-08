@@ -1,13 +1,13 @@
 
-HelpHtmlrootdir = $(datadir)/doc/httrack
-HelpHtmldir = $(datadir)/doc/httrack/html
-HelpHtmlimgdir = $(datadir)/doc/httrack/html/img
-HelpHtmldivdir = $(datadir)/doc/httrack/html/div
-HelpHtmlimagesdir = $(datadir)/doc/httrack/html/images
-HelpHtmlTxtdir = $(datadir)/doc/httrack/html
-WebHtmldir = $(datadir)/doc/httrack/html/server
-WebHtmlimagesdir = $(datadir)/doc/httrack/html/server/images
-WebHtmlsfxdir = $(datadir)/doc/httrack/html/server/sfx
+HelpHtmlrootdir = $(docdir)
+HelpHtmldir = $(htmldir)
+HelpHtmlimgdir = $(HelpHtmldir)/img
+HelpHtmldivdir = $(HelpHtmldir)/div
+HelpHtmlimagesdir = $(HelpHtmldir)/images
+HelpHtmlTxtdir = $(HelpHtmldir)
+WebHtmldir = $(HelpHtmldir)/server
+WebHtmlimagesdir = $(HelpHtmldir)/server/images
+WebHtmlsfxdir = $(HelpHtmldir)/server/sfx
 WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
@@ -41,8 +41,6 @@ EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 install-data-hook:
 	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
 		( cd $(DESTDIR)$(prefix)/share/httrack \
-			&& mv -f ../doc/httrack/html html \
-			&& cd ../doc/httrack/ \
-			&& $(LN_S) ../../httrack/html html \
+			&& $(LN_S) $(htmldir) html \
 		) \
 	fi
