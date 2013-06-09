@@ -1,4 +1,4 @@
-﻿Informations on this project:
+Informations on this project:
 
 This project has been developed by:
 Xavier Roche (xroche at httrack.com)
