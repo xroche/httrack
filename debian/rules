@@ -57,9 +57,27 @@ install: build
 	dh_testroot
 	dh_prep
 	dh_installdirs
+	dh_auto_install --destdir=$(CURDIR)/debian/httrack
+	##$(MAKE) install DESTDIR=$(CURDIR)/debian/httrack
 
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/httrack
+	# place html files (doc, webhttrack files)
 
+	# remove symlink created by html/Makefile's install-data-hook
+	rm $(CURDIR)/debian/httrack/usr/share/httrack/html
+	# and put back in place data
+	mv $(CURDIR)/debian/httrack/usr/share/doc/httrack \
+		$(CURDIR)/debian/httrack/usr/share/httrack/html
+	# create symlink on the other side
+	mkdir $(CURDIR)/debian/httrack/usr/share/doc/httrack
+	ln -s ../../httrack/html \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/html
+	# and put in place the two outer files
+	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
+	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/history.txt \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/history.txt
+
+	# place libraries and cleanup
 	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/
 	mv $(CURDIR)/debian/httrack/usr/bin/htsserver \
 		$(CURDIR)/debian/httrack/usr/lib/httrack/
@@ -77,13 +95,20 @@ install: build
 
 	# Lintian overrides
 	mkdir -p $(CURDIR)/debian/httrack/usr/share/lintian/overrides
-	cp $(CURDIR)/debian/httrack.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
-	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
-	cp $(CURDIR)/debian/httrack-doc.lintian-overrides $(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
+	cp $(CURDIR)/debian/httrack.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
+	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
+	cp $(CURDIR)/debian/httrack-doc.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
 
 	dh_movefiles --sourcedir=debian/httrack
+
 	# don't move history file to httrack-doc
-	mv $(CURDIR)/debian/httrack-doc/usr/share/doc/httrack/history.txt $(CURDIR)/debian/httrack/usr/share/doc/httrack/
+	mv $(CURDIR)/debian/httrack-doc/usr/share/doc/httrack/history.txt \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/
+
+	# remove empty dirs
 	find debian -type d | xargs rmdir -p --ignore-fail-on-non-empty
 
 # Build architecture-independent files here.
