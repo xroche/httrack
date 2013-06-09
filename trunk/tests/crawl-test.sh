@@ -126,7 +126,7 @@ function start-crawl {
       grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${tmp}/hts-log.txt"
       ;;
     --print-files)
-      find "${tmp}" -type f -mindepth 1
+      find "${tmp}" -mindepth 1 -type f
       ;;
     --errors)
       shift
