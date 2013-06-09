@@ -1,4 +1,4 @@
-﻿
+
 HTTrack Website Copier release history:
 --------------------------------------
 
