@@ -49,3 +49,19 @@ bash crawl-test.sh \
 	--found ut.httrack.com/unicode-links/iso88591.html \
 	httrack http://ut.httrack.com/unicode-links/iso88591.html
 
+bash crawl-test.sh \
+	--errors 4 --files  9 \
+	--found ut.httrack.com/unicode-links/caf%a8%a6c72a.html \
+	--found ut.httrack.com/unicode-links/caf%a9bf59.html \
+	--found ut.httrack.com/unicode-links/café8007.html \
+	--found ut.httrack.com/unicode-links/cafébf43.html \
+	--found ut.httrack.com/unicode-links/cafédcd8.html \
+	--found ut.httrack.com/unicode-links/café2461.html \
+	--found ut.httrack.com/unicode-links/caf%a8%a61bce.html \
+	--found ut.httrack.com/unicode-links/caf%a9ae52.html \
+	--found ut.httrack.com/unicode-links/café7b30.html \
+	--found ut.httrack.com/unicode-links/café30f4.html \
+	--found ut.httrack.com/unicode-links/café5e1f.html \
+	--found ut.httrack.com/unicode-links/café3860.html \
+	--found ut.httrack.com/unicode-links/gb18030.html \
+	httrack http://ut.httrack.com/unicode-links/gb18030.html
