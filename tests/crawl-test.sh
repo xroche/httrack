@@ -66,7 +66,7 @@ function start-crawl {
     --debug)
       verbose=1
       ;;
-    --no-purge|--summary)
+    --no-purge|--summary|--print-files)
       ;;
     --errors|--files|--found|--not-found|--directory)
       pos=$[${pos}+1]
@@ -124,6 +124,9 @@ function start-crawl {
       ;;
     --summary)
       grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${tmp}/hts-log.txt"
+      ;;
+    --print-files)
+      find "${tmp}" -type f -mindepth 1
       ;;
     --errors)
       shift
