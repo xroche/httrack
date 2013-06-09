@@ -74,8 +74,6 @@ install: build
 	# and put in place the two outer files
 	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
 		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
-	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/history.txt \
-		$(CURDIR)/debian/httrack/usr/share/doc/httrack/history.txt
 
 	# place libraries and cleanup
 	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/
@@ -103,10 +101,6 @@ install: build
 		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
 
 	dh_movefiles --sourcedir=debian/httrack
-
-	# don't move history file to httrack-doc
-	mv $(CURDIR)/debian/httrack-doc/usr/share/doc/httrack/history.txt \
-		$(CURDIR)/debian/httrack/usr/share/doc/httrack/
 
 	# remove empty dirs
 	find debian -type d | xargs rmdir -p --ignore-fail-on-non-empty
