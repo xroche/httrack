@@ -5,6 +5,6 @@ On most systems (including GNU/Linux), installing can be easily acheived using t
 
 ./configure && make && make install
 -or- (if not compiling as root)
-./configure && make && su -c 'make install'
+./configure --prefix=$HOME && make && make install
 
 See also the INSTALL generic help file.
