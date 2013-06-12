@@ -108,8 +108,42 @@ static void cleanDoubleSlash(char *s) {
     }
     j++;
   }
+  // terminating \0
   if (i != j) {
     s[j] = s[i];
+  }
+}
+
+/* Strip all ending . or ' ' (windows-forbidden) */
+static void cleanEndingSpaceOrDot(char *s) {
+  int i, j, lastWriteEnd;
+
+  for(i = 0, j = 0, lastWriteEnd = 0; i == 0 || s[i - 1] != '\0'; i++) {
+    if (s[i] == '/' || s[i] == '\0') {
+      // Last write was not good, revert
+      if (j != lastWriteEnd) {
+        j = lastWriteEnd;
+      }
+    }
+     
+    if (i != j) {
+      s[j] = s[i];
+    }
+    j++;
+
+    // Commit good candidate for terminating character
+    if (s[i] != ' ' && s[i] != '.') {
+      lastWriteEnd = j;
+    }
+  }
+
+  for(i = 0; s[i] != '\0'; i++) {
+    if (i != 0 
+      && (s[i] == ' ' || s[i] == '.')
+      && (s[i + 1] == '/'  || s[i + 1] == '\0')
+      ) {
+        s[i] = '_';
+    }
   }
 }
 
@@ -1265,37 +1299,43 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     strcpybuff(tempo, save + 1);
     strcpybuff(save, tempo);
   }
-  // changer les ~,:,",*,? en _ pour sauver sur disque
-  hts_replace(save, '~', '_');  // interdit sous unix (~foo)
-  //
-  hts_replace(save, '\\', '_');
-  hts_replace(save, ':', '_');  // interdit sous windows
-  hts_replace(save, '*', '_');  // interdit sous windows
-  hts_replace(save, '?', '_');  // doit pas arriver!!
-  hts_replace(save, '\"', '_'); // interdit sous windows
-  hts_replace(save, '<', '_');  // interdit sous windows
-  hts_replace(save, '>', '_');  // interdit sous windows
-  hts_replace(save, '|', '_');  // interdit sous windows
-  //
-  hts_replace(save, '@', '_');
-  if (opt->savename_83 == 2) {  // CDROM
-    // maybe other ones?
-    hts_replace(save, '-', '_');
-    hts_replace(save, '=', '_');
-    hts_replace(save, '+', '_');
-  }
-  //
-  {                             // éliminer les // (comme ftp://)
+
+  /* Cleanup reserved or forbidden characters. */
+  {
     size_t i;
-
-    cleanDoubleSlash(save);
-
     for(i = 0 ; save[i] != '\0' ; i++) {
       unsigned char c = (unsigned char) save[i];
-      if (c < 32 || c == 127)
-        save[i] = '_';
+      if (c < 32      // control
+        || c == 127   // unwise
+        || c == '~'   // unix unwise
+        || c == '\\'  // windows separator
+        || c == ':'   // windows forbidden
+        || c == '*'   // windows forbidden
+        || c == '?'   // windows forbidden
+        || c == '\"'  // windows forbidden
+        || c == '<'   // windows forbidden
+        || c == '>'   // windows forbidden
+        || c == '|'   // windows forbidden
+        //|| c == '@' // ?
+        ||
+          (
+            opt->savename_83 == 2 // CDROM
+            &&
+            (
+              c == '-'
+              || c == '='
+              || c == '+'
+            )
+          )
+        )
+      {
+         save[i] = '_';
+      }
     }
   }
+
+  // éliminer les // (comme ftp://)
+  cleanDoubleSlash(save);
 
 #if HTS_OVERRIDE_DOS_FOLDERS
   /* Replace /foo/nul/bar by /foo/nul_/bar */
@@ -1326,7 +1366,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       i++;
     }
   }
+
   /* Strip ending . or ' ' forbidden on windoz */
+  cleanEndingSpaceOrDot(save);
+
   {
     int len;
     char *a = save;
@@ -1506,6 +1549,9 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     } else {
       hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", save);
     }
+
+    // Re-check again ending space or dot after cut (see bug #5)
+    cleanEndingSpaceOrDot(save);
   }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
