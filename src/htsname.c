@@ -136,15 +136,6 @@ static void cleanEndingSpaceOrDot(char *s) {
       lastWriteEnd = j;
     }
   }
-
-  for(i = 0; s[i] != '\0'; i++) {
-    if (i != 0 
-      && (s[i] == ' ' || s[i] == '.')
-      && (s[i + 1] == '/'  || s[i + 1] == '\0')
-      ) {
-        s[i] = '_';
-    }
-  }
 }
 
 // forme le nom du fichier à sauver (save) à partir de fil et adr
