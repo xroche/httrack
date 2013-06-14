@@ -1361,22 +1361,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(save);
 
-  {
-    int len;
-    char *a = save;
-
-    while((a = strstr(a, "./"))) {
-      *a = '_';
-    }
-    a = save;
-    while((a = strstr(a, " /"))) {
-      *a = '_';
-    }
-    len = (int) strlen(save);
-    if (len > 0 && (save[len - 1] == '.' || save[len - 1] == ' ')) {
-      save[len - 1] = '_';
-    }
-  }
 #endif
 
   // conversion 8-3 .. y compris pour les répertoires
