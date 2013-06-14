@@ -214,7 +214,7 @@ Please visit our Website: http://www.httrack.com
   if (makeindex_links == 1) { \
   char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
   strcpybuff(link_escaped, makeindex_firstlink); \
-  escape_check_url(link_escaped); \
+  escape_uri_utf(link_escaped); \
   sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,link_escaped); \
   } else \
   tempo[0]='\0'; \
