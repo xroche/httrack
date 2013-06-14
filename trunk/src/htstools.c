@@ -898,7 +898,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               char BIGSTK hname[HTS_URLMAXSIZE * 2];
 
               strcpybuff(hname, sortedElts[i]->name);
-              escape_check_url(hname);
+              escape_uri_utf(hname);
 
               /* Changed category */
               if (strcmp(category, sortedElts[i]->category) != 0) {

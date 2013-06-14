@@ -732,6 +732,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Body
+                        escape_uri_utf(tempo);
                         fprintf(makeindex_fp, template_body, tempo, s);
                       }
                     }
