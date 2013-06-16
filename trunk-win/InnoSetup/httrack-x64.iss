@@ -1,8 +1,8 @@
 ; HTTrack Website Copier - x64 edition
 
 [Setup]
-AppVerName=WinHTTrack Website Copier 3.47-14 (x64)
-AppVersion=3.47.14
+AppVerName=WinHTTrack Website Copier 3.47-19 (x64)
+AppVersion=3.47.19
 AppName=WinHTTrack Website Copier
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
