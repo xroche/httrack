@@ -1,8 +1,9 @@
-httrack (3.47.19-2) unstable; urgency=low
+httrack (3.47.19-3) unstable; urgency=low
 
   * Updated to 3.47.19 (3.47-19)
     Gentoo merges, Lintian fixes, build cleanup
   * Fixed arch-indep only upload not working
+  * Minor fix in copyright file, removed old library entry
 
  -- Xavier Roche <xavier@debian.org>  Sun, 16 Jun 2013 14:20:25 +0200
 
