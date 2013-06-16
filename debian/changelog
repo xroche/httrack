@@ -1,9 +1,10 @@
-httrack (3.47.19-1) UNRELEASED; urgency=low
+httrack (3.47.19-2) unstable; urgency=low
 
   * Updated to 3.47.19 (3.47-19)
     Gentoo merges, Lintian fixes, build cleanup
+  * Fixed arch-indep only upload not working
 
- -- Xavier Roche <roche@proliant.localnet>  Sun, 16 Jun 2013 09:38:51 +0200
+ -- Xavier Roche <xavier@debian.org>  Sun, 16 Jun 2013 14:20:25 +0200
 
 httrack (3.47.18-1) unstable; urgency=low
 
