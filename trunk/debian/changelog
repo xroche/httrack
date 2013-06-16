@@ -1,3 +1,10 @@
+httrack (3.47.19-1) UNRELEASED; urgency=low
+
+  * Updated to 3.47.19 (3.47-19)
+    Gentoo merges, Lintian fixes, build cleanup
+
+ -- Xavier Roche <roche@proliant.localnet>  Sun, 16 Jun 2013 09:38:51 +0200
+
 httrack (3.47.18-1) unstable; urgency=low
 
   * Fixed FTBFS introduced in 3.47.17 on Ubuntu due to online unit tests
