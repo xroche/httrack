@@ -3196,7 +3196,7 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
 
     if (lap < minLap) {
       n = 0;
-    } else {
+    } else if (minLap != 0) {
       int nMax = (int) (lap / minLap);
 
       n = min(n, nMax);
