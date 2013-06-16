@@ -637,7 +637,7 @@ void help(char *app, int more) {
   infomsg
     ("Dangerous options: (do NOT use unless you exactly know what you are doing)");
   infomsg
-    (" %!  bypass built-in security limits aimed to avoid bandwith abuses (bandwidth, simultaneous connections)");
+    (" %!  bypass built-in security limits aimed to avoid bandwidth abuses (bandwidth, simultaneous connections)");
   infomsg("     IMPORTANT NOTE: DANGEROUS OPTION, ONLY SUITABLE FOR EXPERTS");
   infomsg("                     USE IT WITH EXTREME CARE");
   infomsg("");

@@ -2971,7 +2971,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 
     io_flush;
 
-    /* Enforce limits to avoid bandwith abuse. The bypass_limits should only be used by administrators and experts. */
+    /* Enforce limits to avoid bandwidth abuse. The bypass_limits should only be used by administrators and experts. */
     if (!opt->bypass_limits) {
       if (opt->maxsoc <= 0 || opt->maxsoc > 8) {
         opt->maxsoc = 8;
