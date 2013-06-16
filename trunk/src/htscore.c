@@ -1235,7 +1235,7 @@ int httpmirror(char *url1, httrackp * opt) {
                             urlfil);
             }
 
-            /* This hack allows to avoid problems with parsing '\0' characters  */
+            /* This hack allows you to avoid problems with parsing '\0' characters  */
             if (!is_binary) {
               for(i = 0; i < r.size; i++) {
                 if (r.adr[i] == '\0')
