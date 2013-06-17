@@ -15775,7 +15775,7 @@ fi
 
 
 
-### OpenSSL is explicitely enabled/disabled ?
+### OpenSSL is explicitly enabled/disabled ?
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable https support" >&5
 $as_echo_n "checking whether to enable https support... " >&6; }
 # Check whether --enable-https was given.

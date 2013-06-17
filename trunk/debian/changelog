@@ -10,7 +10,7 @@ httrack (3.47.19-3) unstable; urgency=low
 httrack (3.47.18-1) unstable; urgency=low
 
   * Fixed FTBFS introduced in 3.47.17 on Ubuntu due to online unit tests
-    Fixed FTBFS when OpenSSL is disabled explicitely
+    Fixed FTBFS when OpenSSL is disabled explicitly
 
  -- Xavier Roche <xavier@debian.org>  Wed, 05 Jun 2013 18:36:57 +0200
 
