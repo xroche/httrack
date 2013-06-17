@@ -120,7 +120,7 @@ AC_MSG_WARN([*** in_addr_t not found]),
 ### zlib
 CHECK_ZLIB()
 
-### OpenSSL is explicitely enabled/disabled ?
+### OpenSSL is explicitly enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
 AC_ARG_ENABLE([https],
 	[AC_HELP_STRING([--enable-https=@<:@yes/no/auto@:>@],

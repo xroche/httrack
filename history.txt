@@ -31,9 +31,9 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: HTML entities not properly decoded inside URI and query string
 + Fixed: URL-encoding issue within URI
 + Fixed: --timeout alias did not work
-+ Fixed: more windows-specific fixes regarding 260-character path limit<br />
-+ Fixed: escaping issue in top index<br />
-+ Fixed: Linux build cleanup (gentoo patches merge, lintian fixes et al.)<br />
++ Fixed: more windows-specific fixes regarding 260-character path limit
++ Fixed: escaping issue in top index
++ Fixed: Linux build cleanup (gentoo patches merge, lintian fixes et al.)
 
 3.46-1
 * New: Unicode filenames handling
@@ -178,7 +178,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + New: improved background download to handle large sites
 + New: '--assume foo/bar.cgi=text/html' is now possible
 + New: MIME type scan rules (such as -mime:video/* +mime:video/mpeg)
-+ New: size scan rules now allows you to rewrite uncaught links as external links
++ New: size scan rules now allows to rewrite uncaught links as external links
 + Fixed: crash fixed when ftime()/localtime()==NULL
 + Fixed: iso-9660 option now using '_' for collision character
 + Fixed: collision problems with CaSe SeNsItIvItY
