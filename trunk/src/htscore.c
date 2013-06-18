@@ -1970,7 +1970,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   /* 
      updating-a-remotely-deteted-website hack
-     no much data transfered, no data saved
+     no much data transferred, no data saved
      <no files successfulyl saved>
      we assume that something was bad (no connection)
      just backup old cache and restore everything
@@ -1979,7 +1979,7 @@ int httpmirror(char *url1, httrackp * opt) {
       && (HTS_STAT.HTS_TOTAL_RECV < 32768)      /* should be fine */
     ) {
     hts_log_print(opt, LOG_INFO,
-                  "No data seems to have been transfered during this session! : restoring previous one!");
+                  "No data seems to have been transferred during this session! : restoring previous one!");
     XH_uninit;
     if ((fexist
          (fconcat
@@ -2169,7 +2169,7 @@ int httpmirror(char *url1, httrackp * opt) {
         (int) ((LLint) (HTS_STAT.total_packed * 100) / HTS_STAT.total_unpacked);
       sprintf(finalInfo + strlen(finalInfo),
               ", " LLintP
-              " bytes transfered using HTTP compression in %d files, ratio %d%%",
+              " bytes transferred using HTTP compression in %d files, ratio %d%%",
               (LLint) HTS_STAT.total_unpacked, HTS_STAT.total_packedfiles,
               (int) packed_ratio);
     }

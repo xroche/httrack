@@ -129,7 +129,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const int p);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back * sback, int i, int j, char *s);
-LLint back_transfered(LLint add, struct_back * sback);
+LLint back_transferred(LLint add, struct_back * sback);
 
 // hostback
 #if HTS_XGETHOST

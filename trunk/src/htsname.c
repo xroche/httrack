@@ -84,7 +84,7 @@ static const char *hts_tbdev[] = {
     HTS_STAT.stat_warnings=fspc(opt,NULL,"warning"); \
     HTS_STAT.stat_infos=fspc(opt,NULL,"info"); \
     HTS_STAT.nbk=backlinks_done(sback,liens,lien_tot,ptr); \
-    HTS_STAT.nb=back_transfered(HTS_STAT.stat_bytes,sback); \
+    HTS_STAT.nb=back_transferred(HTS_STAT.stat_bytes,sback); \
     /* Check */ \
     { \
       if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count,-1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
@@ -530,7 +530,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
                   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
                   HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-                  HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+                  HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
                   if (!RUN_CALLBACK7
                       (opt, loop, sback->lnk, sback->count, b, ptr, lien_tot,

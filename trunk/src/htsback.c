@@ -1843,7 +1843,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
             } else {
               hts_log_print(opt, LOG_NOTICE,
                             "File partially present (" LLintP
-                            " bytes) retransfered due to lack of cache: %s%s",
+                            " bytes) retransferred due to lack of cache: %s%s",
                             (LLint) sz, back[p].url_adr, back[p].url_fil);
               /* Sinon requête normale... */
               back[p].http11 = 0;
@@ -1861,7 +1861,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
         } else {
           hts_log_print(opt, LOG_NOTICE,
                         "HTML file (" LLintP
-                        " bytes) retransfered due to lack of cache: %s%s",
+                        " bytes) retransferred due to lack of cache: %s%s",
                         (LLint) sz, back[p].url_adr, back[p].url_fil);
           /* Sinon requête normale... */
           back[p].http11 = 0;
@@ -4041,7 +4041,7 @@ int back_checkmirror(httrackp * opt) {
     if (!opt->state.stop) {     /* not yet stopped */
       hts_log_print(opt, LOG_ERROR,
                     "More than " LLintP
-                    " bytes have been transfered.. giving up",
+                    " bytes have been transferred.. giving up",
                     (LLint) opt->maxsite);
       /* cancel mirror smoothly */
       hts_request_stop(opt, 0);
@@ -4064,7 +4064,7 @@ int back_checkmirror(httrackp * opt) {
 }
 
 // octets transférés + add
-LLint back_transfered(LLint nb, struct_back * sback) {
+LLint back_transferred(LLint nb, struct_back * sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;

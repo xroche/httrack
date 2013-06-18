@@ -3453,7 +3453,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
           HTS_STAT.stat_infos = fspc(opt, NULL, "info");
           HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-          HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+          HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
           if (!RUN_CALLBACK7
               (opt, loop, sback->lnk, sback->count, 0, ptr, lien_tot,
@@ -4009,7 +4009,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
           HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
           HTS_STAT.stat_infos = fspc(opt, NULL, "info");
           HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-          HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+          HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
           b = 0;
           if (!RUN_CALLBACK7
@@ -4137,7 +4137,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
       HTS_STAT.stat_infos = fspc(opt, NULL, "info");
       HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-      HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+      HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
       if (!RUN_CALLBACK7
           (opt, loop, sback->lnk, sback->count, b, ptr, lien_tot,
@@ -4337,7 +4337,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
         HTS_STAT.stat_infos = fspc(opt, NULL, "info");
         HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-        HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+        HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
         if (!RUN_CALLBACK7
             (opt, loop, sback->lnk, sback->count, b, ptr, lien_tot,
@@ -4740,7 +4740,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
             HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
             HTS_STAT.stat_infos = fspc(opt, NULL, "info");
             HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
-            HTS_STAT.nb = back_transfered(HTS_STAT.stat_bytes, sback);
+            HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
             if (!RUN_CALLBACK7
                 (opt, loop, sback->lnk, sback->count, b, ptr, lien_tot,
