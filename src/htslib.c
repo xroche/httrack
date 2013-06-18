@@ -4552,7 +4552,7 @@ LLint check_downloadable_bytes(int rate) {
   if (rate > 0) {
     TStamp time_now;
     TStamp elapsed_useconds;
-    LLint bytes_transfered_during_period;
+    LLint bytes_transferred_during_period;
     LLint left;
 
     // get the older timer
@@ -4561,10 +4561,10 @@ LLint check_downloadable_bytes(int rate) {
     time_now = mtime_local();
     elapsed_useconds = time_now - HTS_STAT.istat_timestart[id_timer];
     // NO totally stupid - elapsed_useconds+=1000;      // for the next second, too
-    bytes_transfered_during_period =
+    bytes_transferred_during_period =
       (HTS_STAT.HTS_TOTAL_RECV - HTS_STAT.istat_bytes[id_timer]);
 
-    left = ((rate * elapsed_useconds) / 1000) - bytes_transfered_during_period;
+    left = ((rate * elapsed_useconds) / 1000) - bytes_transferred_during_period;
     if (left <= 0)
       left = 0;
 

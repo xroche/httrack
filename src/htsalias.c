@@ -173,7 +173,7 @@ const char *hts_optalias[][4] = {
   {"structure", "-N", "param1", "user-defined structure"},
   {"usercommand", "-V", "param1", "user-defined command"},
   {"display", "-%v", "single",
-   "show files transfered and other funny realtime information"},
+   "show files transferred and other funny realtime information"},
   {"dos83", "-L0", "single", ""},
   {"iso9660", "-L2", "single", ""},
   {"disable-module", "-%w", "param1", ""},
