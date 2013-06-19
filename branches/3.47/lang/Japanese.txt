@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Japanese
+LANGUAGE_FILE
+Japanese
+LANGUAGE_ISO
+jp
+LANGUAGE_AUTHOR
+TAPKAL\r\n
+LANGUAGE_CHARSET
+shift-jis
+LANGUAGE_WINDOWSID
+Japanese
+OK
+OK
+Cancel
+キャンセル
+Exit
+終了
+Close
+閉じる
+Cancel changes
+変更をキャンセル
+Click to confirm
+クリックして確認
+Click to get help!
+クリックしてヘルプ!
+Click to return to previous screen
+クリックして前の画面に戻る
+Click to go to next screen
+クリックして次の画面へ進む
+Hide password
+パスワードを隠す
+Save project
+プロジェクトを保存
+Close current project?
+現在のプロジェクトを保存しますか?
+Delete this project?
+このプロジェクトを削除しますか?
+Delete empty project %s?
+空白のプロジェクト%s を削除しますか?
+Action not yet implemented
+機能はまた実装されていません
+Error deleting this project
+このプロジェクトの削除に失敗しました
+Select a rule for the filter
+フィルタのルールを選択してください
+Enter keywords for the filter
+フィルタへのキーワードを入力してください
+Cancel
+キャンセル
+Add this rule
+このルールの追加
+Please enter one or several keyword(s) for the rule
+このルールのひとつ、またはいくつかのキーワードを入力してください
+Add Scan Rule
+スキャンルールの追加
+Criterion
+フィルタのルール
+String
+文字列
+Add
+追加
+Scan Rules
+スキャンルール
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+URLを含める、または除外するためにワイルドカードを使用します。\n\nいくつかのスキャン文字列を同じ行に置くことができます。\nスペース（空白）を分割のために使用してください。\n例: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+リンクの除外
+Include link(s)
+リンクを含める
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Tipp: 全てのGIFファイルを含めるためには、+www.someweb.com/*.gifのように書きます。 \n(+*.gif / -*.gif で全てのサイトの全てのGIFを 含み/排除し ます。)
+Save prefs
+設定の保存
+Matching links will be excluded:
+マッチしたリンクは排除される:
+Matching links will be included:
+マッチしたリンクは含まれる:
+Example:
+例:
+gif\r\nWill match all GIF files
+gif\r\n全てのGIFファイルにマッチ
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\n全ての'blue'を含むファイル（'bluesky-small.jpeg'のような）にマッチ
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\n は 'bigfile.mov' にマッチしますが、 'bigfile2.mov' にはマッチしません。
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\n は部分文字列 'cgi' を持つ /cgi-bin/somecgi.cgi のようなフォルダにマッチするリンクを見つけます。
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nFindet Links zu Ordnern namens 'cgi-bin'という完全な文字列をにマッチするフォルダ名をもつリンクを見つけます(しかし、'cgi-bin-2'のようなものは除く)。
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nwww.someweb.comやprivate.someweb.comといった部分文字列にマッチするリンクを見つけます。
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nwww.someweb.comやwww.someweb.edu, private.someweb.otherweb.comなどのような部分文字列にマッチするフォルダへのリンクを見つけます。
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nwww.someweb.com/...のような完全な文字列にマッチするリンクを見つけます(しかし、private.someweb.com/...のようなものは除く)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nFindet Links wie www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\n 'www.test.com/test/someweb.html'というファイルのみを見つけます。 完全なパス (URLとサイト内パス)の両方を入力しなければならないことに注意してください。
+All links will match
+全てのリンクにマッチ
+Add exclusion filter
+排除フィルタを追加
+Add inclusion filter
+含めるためのフィルタを追加
+Existing filters
+既存のフィルタ
+Cancel changes
+変更のキャンセル
+Save current preferences as default values
+現在の設定を規定値として保存
+Click to confirm
+クリックして確認
+No log files in %s!
+%s にはログファイルがありません!
+No 'index.html' file in %s!
+%s にはindex.htmlがありません!
+Click to quit WinHTTrack Website Copier
+WinHTTrack Website Copier を終わるにはここをクリックしてください
+View log files
+ログファイルを見る
+Browse HTML start page
+HTMLのスタートページをブラウズ
+End of mirror
+コピー（ミラー）の終了
+View log files
+ログファイルを見る
+Browse Mirrored Website
+ミラーされたサイトのブラウズ
+New project...
+新規プロジェクト...
+View error and warning reports
+エラーと警告のログを見る
+View report
+ログを見る
+Close the log file window
+ログファイルを閉じる
+Info type:
+情報の種類:
+Errors
+エラー
+Infos
+情報
+Find
+検索
+Find a word
+単語の検索
+Info log file
+ログファイル情報
+Warning/Errors log file
+警告/エラーログファイル
+Unable to initialize the OLE system
+OLE を初期化できません
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack は、特定されたフォルダには中断されたダウンロードキャッシュを見つけることができませんでした!
+Could not connect to provider
+プロバイダと接続できません
+receive
+受信
+request
+リクエスト
+connect
+接続
+search
+サーチ
+ready
+完了
+error
+エラー
+Receiving files..
+ファイルを受け取っています...
+Parsing HTML file..
+HTML ファイルの解析中...
+Purging files..
+ファイルの解析中...
+Loading cache in progress..
+
+Parsing HTML file (testing links)..
+HTML ファイルの解析中 (リンクのテスト)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+中断 -  メニューの[ミラー]/[転送を中断]をクリックすると再開します
+Finishing pending transfers - Select [Cancel] to stop now!
+中断された転送の終了 - [キャンセル]ですぐに停止!
+scanning
+スキャン中
+Waiting for scheduled time..
+設定された開始時間を待っています..
+Connecting to provider
+プロバイダへ接続中
+[%d seconds] to go before start of operation
+開始まで[%d 秒]
+Site mirroring in progress [%s, %s bytes]
+サイトのコピー（ミラー）進行中 [%s, %s bytes]
+Site mirroring finished!
+サイトのコピー（ミラー）完了
+A problem occured during the mirroring operation\n
+コピー（ミラー）の際、問題が発生しました\n
+\nDuring:\n
+\r\n\n発生した箇所:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\r\n\n必要ならばログファイルをご覧になってください。\n\n'終了' をクリックすると WinHTTrack Website Copier を終了します。\n\n WinHTTrack をご利用いただきありがとうございました!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+コピー（ミラー）は完了しました。\n「終了」で WinHTTrackを終了します。\n必要なら全てがOKであることを確認するためにログファイルをご覧になってください。\n WinHTTrack をご利用いただきありがとうございました!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * コピー（ミラー）が中断されました! * *\r\n現在の一時的キャッシュはあらゆる更新作業に必要で、また現在の中断されたセッションにおけるデータしか持っていません。\r\n以前のキャッシュはもっと完全な情報を持っているかもしれません。; もし、その情報を失いたくない場合は、それを復元（リストア）して現在のキャッシュを削除する必要があります。\r\n[メモ: これは hts-cache/new.* であらわされるファイルを削除することで簡単に行うことができます]\r\n\r\n以前のキャッシュがより多い情報を持っていたと考えますか?そしてそれを復元したいと思いますか?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * コピー（ミラー）のエラー! * *\r\nHTTrackは現在のコピー（ミラー）が空であると感知しました。もしこれが更新であるなら、以前のコピー（ミラー）が復元されます。\r\n原因:最初のページが見つからない、または接続に問題が発生しました。\r\n=> Webサイトがまだ存在すること、またはプロキシの設定を確認してください。<=
+\n\nTip: Click [View log file] to see warning or error messages
+\r\n\n\nTipp: [ログを見る] をクリックすると警告とエラーを見ることができます。
+Error deleting a hts-cache/new.* file, please do it manually
+hts-cache/new.* の中のファイル削除に失敗しました。マニュアルでの削除をお願いします。
+Do you really want to quit WinHTTrack Website Copier?
+WinHTTrack Website Copier を本当に終了しますか?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- コピー（ミラー）モード -\n\nアドレス を URL入力欄に入力してください
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- インタラクティブなウィザードモード -\n\nアドレスを URL入力欄に入力してください
+- File Download Mode -\n\nEnter file address(es) in URL box
+- ファイルダウンロードモード -\n\nDatei-Adresse(n) in das URL-Feld eingeben
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- リンクテストモード -\n\nリンクと共にWebアドレスをURL記入欄に入力してください。
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- 更新モード -\n\n URL 入力欄のアドレスを確認してください。必要ならばパラメータをチェックして「次へ」ボタンをクリックしてください。
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- 再開（レジューム）モード (中断された操作の再開) -\n\n URL入力欄のアドレスを確認してください。必要ならパラメータをチェックして「次へ」ボタンをクリックしてください。
+Log files Path
+ログファイルのパス
+Path
+ファイルのパス
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+-リンクリストモード -\n\nURL 入力欄にコピー（ミラー）するリンクを含むサイトのアドレスを入力してください。
+New project / Import?
+新規プロジェクト / 読み込み?
+Choose criterion
+基準の選択
+Maximum link scanning depth
+スキャンするリンクの階層
+Enter address(es) here
+アドレスをここに入力してください
+Define additional filtering rules
+追加するフィルタルールの定義
+Proxy Name (if needed)
+プロキシ名 (必要ならば)
+Proxy Port
+プロキシのポート
+Define proxy settings
+プロキシの設定
+Use standard HTTP proxy as FTP proxy
+標準のHTTPプロキシをFTPプロキシとして使う
+Path
+パス
+Select Path
+選択されたパス
+Path
+パス
+Select Path
+選択されたパス
+Quit WinHTTrack Website Copier
+WinHTTrackを終了
+About WinHTTrack
+WinHTTrackについて
+Save current preferences as default values
+現在のオプションを既定として保存
+Click to continue
+クリックして続けます
+Click to define options
+クリックしてオプションを設定します
+Click to add a URL
+クリックして URL を追加します
+Load URL(s) from text file
+テキストファイルからURLを読み込みます
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack 設定 (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+アドレスリストのテキストファイル (*.txt)|*.txt||
+File not found!
+ファイルが見つかりません!
+Do you really want to change the project name/path?
+本当にプロジェクト名/パスを変更しますか?
+Load user-default options?
+既定のオプションを読み込みますか?
+Save user-default options?
+ユーザ定義のオプションを保存しますか?
+Reset all default options?
+全ての既定のオプションをリセットしますか?
+Welcome to WinHTTrack!
+WinHTTrackへようこそ!
+Action:
+アクション:
+Max Depth
+最大階層:
+Maximum external depth:
+最大外部階層:
+Filters (refuse/accept links) :
+フィルタルール (含む/排除する リンク) :
+Paths
+パス
+Save prefs
+保存設定
+Define..
+定義...
+Set options..
+オプション設定...
+Preferences and mirror options:
+オプションとコピー（ミラー）オプション:
+Project name
+プロジェクト名
+Add a URL...
+URLの追加...
+Web Addresses: (URL)
+Webアドレス (URL):
+Stop WinHTTrack?
+WinHTTrackを停止しますか?
+No log files in %s!
+ログファイルが %s にはありません!
+Pause Download?
+ダウンロードを中断しますか?
+Stop the mirroring operation
+コピー（ミラー）を停止
+Minimize to System Tray
+システムトレイに最小化
+Click to skip a link or stop parsing
+クリックしてリンクを停止、または解析を停止
+Click to skip a link
+クリックしてリンクをスキップ
+Bytes saved
+保存したバイト数:
+Links scanned
+スキャンされたリンク
+Time:
+経過時間:
+Connections:
+接続:
+Running:
+動作中:
+Hide
+最小化
+Transfer rate
+接続レート:
+SKIP
+スキップ
+Information
+情報
+Files written:
+ファイル作成:
+Files updated:
+ファイル更新:
+Errors:
+エラー:
+In progress:
+進行中:
+Follow external links
+外部リンクの追跡
+Test all links in pages
+ページの全てのリンクのテスト
+Try to ferret out all links
+全てのリンクを探し出そうと試みる
+Download HTML files first (faster)
+HTMLファイルを最初にダウンロードする (より速い)
+Choose local site structure
+ローカルの保存フォルダの選択
+Set user-defined structure on disk
+ディスク上にユーザー定義のフォルダを設定する
+Use a cache for updates and retries
+更新（アップデート）とリトライにキャッシュを使用する
+Do not update zero size or user-erased files
+0サイズまたはユーザが消去したファイルの更新を行わない
+Create a Start Page
+スタートページの作成
+Create a word database of all html pages
+全てのHTMLページに単語データベースを作成する
+Create error logging and report files
+エラーログとレポートファイルを作成する
+Generate DOS 8-3 filenames ONLY
+DOSファイルネーム(8+3)のみ作成
+Generate ISO9660 filenames ONLY for CDROM medias
+
+Do not create HTML error pages
+HTMLエラーページを作成しない
+Select file types to be saved to disk
+保存するファイルの種類の選択
+Select parsing direction
+解析の方向の選択
+Select global parsing direction
+グローバルな解析の方向の選択
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+内部リンク（ダウンロードされたもの）と外部リンク（ダウンロードされていないもの）へのルールの再書き込みを設定する。
+Max simultaneous connections
+最大同時接続数
+File timeout
+ファイルタイムアウト
+Cancel all links from host if timeout occurs
+タイムアウトした場合、ホストからの全てのリンクをキャンセル
+Minimum admissible transfer rate
+最小許容転送レート
+Cancel all links from host if too slow
+あまりにも遅い場合、ホストからの全てのリンクをキャンセル
+Maximum number of retries on non-fatal errors
+致命的エラーでない場合の最大再試行数
+Maximum size for any single HTML file
+単一のHTMLファイルの最大サイズ
+Maximum size for any single non-HTML file
+単一の非HTMLファイルの最大サイズ
+Maximum amount of bytes to retrieve from the Web
+Webからの最大取得バイト数
+Make a pause after downloading this amount of bytes
+ダウンロードしてこのバイト数になったなら中断する
+Maximum duration time for the mirroring operation
+コピー（ミラー）の最大経過時間
+Maximum transfer rate
+最大転送レート
+Maximum connections/seconds (avoid server overload)
+最大の接続数/秒 (サーバの過負荷の回避)
+Maximum number of links that can be tested (not saved!)
+テストされる最大リンク数（保存されません!)
+Browser identity
+ブラウザID
+Comment to be placed in each HTML file
+どのHTMLファイルにも挿入されるコメント
+Back to starting page
+スタートページに戻る
+Save current preferences as default values
+現在の設定を既定として保存
+Click to continue
+クリックして続けます
+Click to cancel changes
+クリックして変更をキャンセル
+Follow local robots rules on sites
+サイトのロボット規則に従う
+Links to non-localised external pages will produce error pages
+ローカルコンピュータに保存されていない外部ページへのリンクはエラーページとする
+Do not erase obsolete files after update
+更新後古くなったファイルを消去しない
+Accept cookies?
+クッキーを許可しますか?
+Check document type when unknown?
+不明のファイルタイプをチェックしますか?
+Parse java applets to retrieve included files that must be downloaded?
+ダウンロードすべきファイルのためにJavaアプレットを解析しますか?
+Store all files in cache instead of HTML only
+HTMLファイルだけではなく、全てのキャッシュ内のファイルを保存する
+Log file type (if generated)
+ファイルの種類のログ (新規作成された場合)
+Maximum mirroring depth from root address
+ルートアドレスからの最大のコピー（ミラー）階層
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+外部/禁止されたアドレスへの最大コピー（ミラー）階層 (既定は0, コピーをこころみない)
+Create a debugging file
+デバッグファイルの作成n
+Use non-standard requests to get round some server bugs
+いくつかのサーバのバグを回避するために標準でないリクエストを使用する
+Use old HTTP/1.0 requests (limits engine power!)
+以前の HTTP/1.0 リクエストを使用する (作業スピードの制限!)
+Attempt to limit retransfers through several tricks (file size test..)
+いくつかのトリック（ファイルサイズテストなど）による再転送制限を行ってみる
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+ログイン名/パスワードなしに外部リンクを書き出す
+Write internal links without query string
+内部リンクは検索文字列なしに書き出す
+Get non-HTML files related to a link, eg external .ZIP or pictures
+非HTMLファイルでリンクに関連するファイル、すなわち外部のZIPや画像ファイルを取得する
+Test all links (even forbidden ones)
+全てのリンクのテスト (禁止されているものについても)
+Try to catch all URLs (even in unknown tags/code)
+全てのURLを取得しようと試みる (不明なタグとスクリプトについても)
+Get HTML files first!
+HTMLファイルを先に取得する!
+Structure type (how links are saved)
+保存フォルダの設定 (リンクの保存方法)
+Use a cache for updates
+更新にキャッシュを使用する
+Do not re-download locally erased files
+ローカルで削除されたファイルは再ダウンロードしない
+Make an index
+インデックスの作成
+Make a word database
+単語データベースを作成する
+Log files
+ログファイル
+DOS names (8+3)
+DOS名 (8+3)
+ISO9660 names (CDROM)
+
+No error pages
+エラーページなし
+Primary Scan Rule
+優先されるスキャンルール
+Travel mode
+探索方法
+Global travel mode
+グローバルな探査方法
+These options should be modified only exceptionally
+これらのオプションは普通変更されるべきではありません。
+Activate Debugging Mode (winhttrack.log)
+デバッグモードを使う (winhttrack.log)
+Rewrite links: internal / external
+リンクを再書き込みする 内部 / 外部
+Flow control
+接続コントロール
+Limits
+リミット
+Identity
+ID
+HTML footer
+HTMLフッタ
+N# connections
+接続数
+Abandon host if error
+エラーの際にはホストを放棄
+Minimum transfer rate (B/s)
+最小転送レート (B/s)
+Abandon host if too slow
+あまりにも遅い場合にはホストを放棄
+Configure
+コンフィグ
+Use proxy for ftp transfers
+FTP転送にプロキシを使用する
+TimeOut(s)
+タイムアウト
+Persistent connections (Keep-Alive)
+
+Reduce connection time and type lookup time using persistent connections
+
+Retries
+再試行数
+Size limit
+サイズの制限
+Max size of any HTML file (B)
+HTMLファイルの最大バイト数
+Max size of any non-HTML file
+任意の非HTMLファイルの最大バイト数
+Max site size
+最大サイトサイズ
+Max time
+最大時間
+Save prefs
+設定の保存
+Max transfer rate
+最大転送レート
+Follow robots.txt
+robots.txt を追跡する
+No external pages
+外部ページなし
+Do not purge old files
+ふるいファイルを消去しない
+Accept cookies
+クッキーを受け入れる
+Check document type
+ドキュメントの種類をチェックする
+Parse java files
+JAVAファイルを解析する
+Store ALL files in cache
+全てのファイルをキャッシュに保存
+Tolerant requests (for servers)
+サーバの許容リクエスト数
+Update hack (limit re-transfers)
+更新のトリック (再転送制限)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+以前の HTTP/1.0 リクエストを強要する (1.1ではなく)
+Max connections / seconds
+最大接続数 / 秒
+Maximum number of links
+リンクの最大数
+Pause after downloading..
+ダウンロードのあとに中断する...
+Hide passwords
+パスワードを隠す
+Hide query strings
+検索文字列を隠す
+Links
+リンク
+Build
+ビルド
+Experts Only
+上級者向け
+Flow Control
+接続コントロール
+Limits
+接続制限
+Browser ID
+ブラウザ ID
+Scan Rules
+スキャンルール
+Spider
+スパイダー
+Log, Index, Cache
+ログ、インデックス、キャッシュ
+Proxy
+プロキシ
+MIME Types
+
+Do you really want to quit WinHTTrack Website Copier?
+WinHTTrackを本当に終了しますか?
+Do not connect to a provider (already connected)
+プロバイダと接続しない (すでに接続)
+Do not use remote access connection
+リモートアクセスを使わない
+Schedule the mirroring operation
+コピー（ミラー）のスケジュール設定
+Quit WinHTTrack Website Copier
+WinHTTrackを終了します
+Back to starting page
+スタートページに戻る
+Click to start!
+クリックして開始します!
+No saved password for this connection!
+この接続にはパスワードが保存されていません!
+Can not get remote connection settings
+リモート接続の設定を取得できません
+Select a connection provider
+接続プロバイダの選択
+Start
+開始
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+必要ならば接続パラメータを調整してください、\n「完了」を押すとコピー（ミラー）がはじまります。
+Save settings only, do not launch download now.
+設定のみで今はダウンロードを開始しない
+On hold
+中断中
+Transfer scheduled for: (hh/mm/ss)
+転送スケジュール: (hh/mm/ss)
+Start
+開始
+Connect to provider (RAS)
+プロバイダへの接続 (RAS)
+Connect to this provider
+このプロバイダへの接続
+Disconnect when finished
+終了したら接続を切断する
+Disconnect modem on completion
+完了したらモデムとの接続を切断する
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(バグまたは問題についてわれわれに知らせてください)\r\n\r\nDevelopment:\r\nInterface(Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nJapanese translation :TAPKAL(nakataka@mars.dti.ne.jp)
+About WinHTTrack Website Copier
+WinHTTrackについて
+Please visit our Web page
+われわれのウェブページにいらっしゃってください!
+Wizard query
+ウィザード
+Your answer:
+あなたのこたえ
+Link detected..
+リンクが検知されました...
+Choose a rule
+ルールの選択
+Ignore this link
+このリンクの無視
+Ignore directory
+ディレクトリの無視
+Ignore domain
+ドメインを無視する
+Catch this page only
+このページのみ取得
+Mirror site
+サイトのコピー（ミラー）
+Mirror domain
+ドメインのコピー（ミラー）
+Ignore all
+全て無視
+Wizard query
+ウィザード
+NO
+いいえ
+File
+ファイル
+Options
+オプション
+Log
+ログ
+Window
+ウィンドウ
+Help
+ヘルプ
+Pause transfer
+転送を中断
+Exit
+終了
+Modify options
+オプションを修正する
+View log
+ログを見る
+View error log
+エラーログを見る
+View file transfers
+ファイル転送を見る
+Hide
+最小化
+About WinHTTrack Website Copier
+WinHTTrack Website Copierについて
+Check program updates...
+プログラム更新のチェック...
+&Toolbar
+&ツールバー
+&Status Bar
+&ステータスバー
+S&plit
+&分割
+File
+ファイル
+Preferences
+設定
+Mirror
+ミラー
+Log
+ログ
+Window
+ウィンドウ
+Help
+ヘルプ
+Exit
+終了
+Load default options
+規定のオプションの読み込み
+Save default options
+規定のオプションの保存
+Reset to default options
+規定のオプションにリセット
+Load options...
+オプションの読み込み...
+Save options as...
+オプションを名前を付けて保存...
+Language preference...
+言語設定...
+Contents...
+ヘルプのコンテンツ...
+About WinHTTrack...
+WinHTTrackについて...
+New project\tCtrl+N
+&新規プロジェクト\tAlt+N
+&Open...\tCtrl+O
+&開く...\tAlt+O
+&Save\tCtrl+S
+&保存\tAlt+S
+Save &As...
+名前を付けて保存 &名前...
+&Delete...
+&削除...
+&Browse sites...
+&サイトのブラウズ...
+User-defined structure
+ユーザ定義のフォルダ
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tファイルの種類なしでファイル名のみ (例: gazou)\r\n%N\tファイル名とファイルの種類 (例: gazou.gif)\r\n%t\tファイルの種類 (例: gif)\r\n%p\tパス [最後の / なし] (例: /gazofile)\r\n%h\tドメイン名 (例: www.someweb.com)\r\n%M\tURL MD5 (128 Bits, 32 ASCII-Bytes)\r\n%Q\tMD5 クエリー文字列 (128 Bits, 32 ASCII-Bytes)\r\n%q\tスモールMD5クエリー文字列 (16 Bits, 4 ASCII-Bytes)\r\n\r\n%s?\tDOSファイル名(例: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+例:\t%h%p/%n%q.%t\n->\t\tc:\\kagami\\www.someweb.com\\gazofile\\gazou.gif
+Proxy settings
+プロキシの設定
+Proxy address:
+プロキシのアドレス
+Proxy port:
+プロキシのポート
+Authentication (only if needed)
+権限設定 (必要があれば)
+Login
+ログイン名
+Password
+パスワード
+Enter proxy address here
+プロキシのアドレスをここに入力
+Enter proxy port here
+プロキシのポートをここに入力
+Enter proxy login
+プロキシのログイン名の入力
+Enter proxy password
+プロキシのパスワードの入力
+Enter project name here
+プロジェクト名をここに記入してください
+Enter saving path here
+保存するパスをここに入力
+Select existing project to update
+更新する既存のプロジェクトを選択
+Click here to select path
+ここをクリックしてパスの選択
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack プロジェクトウィザード
+New project name:
+新規プロジェクト名
+Existing project name:
+既存のプロジェクト名
+Project name:
+プロジェクト名
+Base path:
+基準パス
+Project category:
+
+C:\\My Web Sites
+C:\\My Web Sites
+Type a new project name, \r\nor select existing project to update/resume
+新しいプロジェクト名を記入してください。 \r\n既存のプロジェクトをアップデート/再開するには上のリストから選択してください。
+New project
+新規プロジェクト
+Insert URL
+URLの挿入
+URL:
+URL:
+Authentication (only if needed)
+権限設定 (必要があれば)
+Login
+ログイン名
+Password
+パスワード
+Forms or complex links:
+フォームまたは複雑なリンク:
+Capture URL...
+URLを取得しています...
+Enter URL address(es) here
+URLをここに入力してください
+Enter site login
+サイトのログイン名の入力
+Enter site password
+サイトのパスワード入力
+Use this capture tool for links that can only be accessed through forms or javascript code
+フォームまたはJava-Scriptによってのみアクセス可能なリンクを、このツールを使って取得する
+Choose language according to preference
+設定にしたがって言語を選択する
+Catch URL!
+URLの取得!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+現在のブラウザのプロキシ設定を次の値に入力してください (プロキシのアドレスとポートをコピー/ペーストします）\n次にKlicken Sie dann im Browser auf den Schalter Submit/Absenden o. . des Formulars oder auf die spezielle Verkn・fung, die Sie laden wollen.
+This will send the desired link from your browser to WinHTTrack.
+これによって望ましいリンクをブラウザから WinHTTrack に送ります。
+ABORT
+中断
+Copy/Paste the temporary proxy parameters here
+現在のプロキシのパラメータをコピー/ペーストし（よみこみ）ます
+Cancel
+キャンセル
+Unable to find Help files!
+ヘルプファイルを見つけることができません!
+Unable to save parameters!
+パラメータを保存できません!
+Please drag only one folder at a time
+１回にはひとつのフォルダをドラッグしてください
+Please drag only folders, not files
+ファイルではなくフォルダのみをドラッグしてください。
+Please drag folders only
+フォルダのみをドラッグしてください
+Select user-defined structure?
+ユーザ定義のフォルダを選択しますか?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+ユーザ定義の文字列が正しいことを確認してください。 \n そうでなければファイル名が正しくありません。
+Do you really want to use a user-defined structure?
+本当にユーザ定義のフォルダを使用しますか?
+Too manu URLs, cannot handle so many links!!
+URLが多すぎます! これほど多くのリンクは処理できません!
+Not enough memory, fatal internal error..
+十分なメモリがありません。 致命的内部エラー...
+Unknown operation!
+不明なオペレーション!
+Add this URL?\r\n
+このURLを追加しますか?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+警告: メインプロセスがまだ応答しません。URLを追加できません..
+Type/MIME associations
+ファイルの種類/MIME関連
+File types:
+ファイルの種類
+MIME identity:
+MIME識別
+Select or modify your file type(s) here
+ここであなたのファイルの種類を選択または修正してください
+Select or modify your MIME type(s) here
+ここであたなたのMIMEの種類を選択または修正してください
+Go up
+上へ
+Go down
+下へ
+File download information
+ファイルダウンロード情報
+Freeze Window
+ウィンドウの固定
+More information:
+より深い情報
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+WinHTTrack Website Copierへようこそ!\n\n 新しいプロジェクトを開始するか\n または 部分ダウンロードを再開するには\n 「つぎへ」をクリックしてください
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+拡張子付きファイル名:\n次を含むファイル名:\nこのファイル名:\n次を含むフォルダ名:\nこのフォルダ名:\nこのドメインのリンク:\n次を含むドメインのリンク:\nこのホストからのリンク:\n次を含むリンク:\nこのリンク:\n全てのリンク
+Show all\nHide debug\nHide infos\nHide debug and infos
+全てを表示\nデバッグを隠す\n情報を隠す\nデバッグと情報を隠す
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+サイトそのままの再現(既定)\nHtmlファイルをフォルダweb/, 画像ほかのファイルをweb/images/\nHtmlファイルをフォルダ/html, ウェブの画像ほかのファイルを/images\nHtmlファイルをルートフォルダ/, 画像ほかのファイルをweb/\nHtmlファイルをweb/, 画像ほかのファイルをweb/xxx, xxxはファイルの拡張子ごと\nHtmlファイルをweb/html, 画像ほかのファイルをweb/xxx\nwww.domain.xxx/なしでサイトの再現\nHtmlファイルをsite_name/, 画像ほかのファイルをsite_name/images/\nHtmlファイルをsite_name/html, 画像ほかをsite_name/images\nHtmlファイルをsite_name/, 画像ほかをsite_name/\nHtmlファイルを site_name/に, f画像そのほかを site_name/xxxに\nHtmlファイルを site_name/htmlに, 画像その他を site_name/xxxに\n全てのファイルを web/にランダムな名前を付けて(ガジェット!)\n全てのファイルを フォルダsite_name/にランダムな名前を付けて(ガジェット!)\nユーザ定義のフォルダ...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+スキャンのみ\nHTMLファイルの保存\n非HTMLファイルの保存\n全てのファイルの保存 (既定)\n最初にHTMLファイルを保存
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+同一ディレクトリにとどまる\n下のディレクトリへの移動を許可 (既定)\n上のディレクトリへの移動を許可\n上下のディレクトリへの移動を許可
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+同一アドレスにとどまる (既定)\n同一ドメインにとどまる\nトップレベルのドメインにとどまる\nWebのどこへでも行く
+Never\nIf unknown (except /)\nIf unknown
+拒否\n未知の場合 (/を除く)\n未知の場合
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+robots.txt が無視される場合のルール\nウィザードを除き、robots.txtのルールに従う\nrobots.txtのルールに従う
+normal\nextended\ndebug
+既定\n拡張\nデバッグ
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+ウェブサイトの自動ダウンロード\nウェブサイトの質問付きダウンロード\n分割ファイルの取得\nページ中全てのサイトのダウンロード (複数サイトのコピー(ミラー))\nページのリンクのテスト\n* 中断されたダウンロードの継続\n* 既存のダウンロードの更新
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+相対URI(URI一部記述) / 絶対URL(URLフル記述)(既定)\n絶対URL / 絶対URL\n絶対URI / 絶対URL\nオリジナルのURL / オリジナルのURL
+Open Source offline browser
+
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+
+httrack, winhttrack, webhttrack, offline browser
+
+URL list (.txt)
+
+Previous
+
+Next
+
+URLs
+
+Warning
+
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+
+Thank you
+
+You can now close this window
+
+Server terminated
+
+A fatal error has occured during this mirror
+

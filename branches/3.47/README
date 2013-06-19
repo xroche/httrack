@@ -1,0 +1,58 @@
+HTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) Xavier Roche and other contributors
+
+Welcome to HTTrack Website Copier!
+
+
+Information:
+
+The folder html/ contains the documentation
+You might want to read these files, especially for installing HTTrack:
+  - See INSTALL file for installation information (NO WARRANTY)
+  - See license.txt file for license information
+
+
+Contacting us:
+
+If you want to ask any question, feel free to contact us!
+email: httrack@httrack.com
+
+
+Donations:
+
+HTTrack Website Copier is free software, but if you can, please donate to the Free Software Foundation (FSF) to support free software!
+
+(Europe)
+http://www.fsfeurope.org/help/donate.html
+
+(World)
+http://www.fsf.org/help/donate.html
+
+
+Engine limits:
+
+These are the principals limits of HTTrack for that moment. Note that we did not heard about any other utility
+that would have solved them.
+
+- Several scripts generating complex filenames may not find them (ex: img.src='image'+a+Mobj.dst+'.gif')
+- Some java classes may not find some files on them (class included)
+- Cgi-bin links may not work properly in some cases (parameters needed). To avoid them: use filters like -*cgi-bin*
+
+
+Advanced options:
+
+These options may not be necessary for a normal usage. But they can solve several problems.
+
+- If you need more than 100,000 links: -#L1000000 (1,000,000 links)
+- If you need more than 500 filters: -#F1000 (1,000 filters)
+- If you need transfer rate statictics every minutes: -#Z
+- If you need transfer operations statistics every minutes: -#T
+- If you want log files to be refreshed after every line: -#f
+
+
+Thank you!
+
+
+Have fun with HTTrack Website Copier!
+The authors
+

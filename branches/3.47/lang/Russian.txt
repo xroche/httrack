@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Russian
+LANGUAGE_FILE
+Russian
+LANGUAGE_ISO
+ru
+LANGUAGE_AUTHOR
+Andrei Iliev (iliev at vitaplus.ru) \r\n
+LANGUAGE_CHARSET
+windows-1251
+LANGUAGE_WINDOWSID
+Russian
+OK
+LANGUAGE_WINDOWSID
+Cancel
+Отмена
+Exit
+Выход
+Close
+Закрыть
+Cancel changes
+Отменить изменения
+Click to confirm
+Подтвердить
+Click to get help!
+Получить справку
+Click to return to previous screen
+Вернуться назад
+Click to go to next screen
+Перейти к следующему экрану
+Hide password
+Скрыть пароль
+Save project
+Сохранить проект
+Close current project?
+Закрыть текущий проект?
+Delete this project?
+Удалить этот проект?
+Delete empty project %s?
+Удалить пустой проект %s?
+Action not yet implemented
+Пока не реализовано
+Error deleting this project
+Ошибка удаления проекта
+Select a rule for the filter
+Выбрать тип фильтра
+Enter keywords for the filter
+Введите значения условий фильтра
+Cancel
+Отмена
+Add this rule
+Добавить это условие
+Please enter one or several keyword(s) for the rule
+Введите значения условий фильтра
+Add Scan Rule
+Добавить фильтр
+Criterion
+Выбрать тип:
+String
+Ввести значение:
+Add
+Добавить
+Scan Rules
+Фильтры
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Используя маски вы можете исключить/включить сразу несколько адресов\nКак разделитель фильтров используйте запятые или пробелы.\nПример: +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
+Exclude links
+Исключить...
+Include link(s)
+Включить...
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Совет: Если вы хотите скачать все gif-файлы, используйте, например, такой фильтр +www.someweb.com/*.gif. \n(+*.gif / -*.gif разрешает/запрещает для скачивания ВСЕ gif-файлы на ВСЕХ сайтах)
+Save prefs
+Сохранить настройки
+Matching links will be excluded:
+Линки, удовлетворяющие этому условию будут исключены:
+Matching links will be included:
+Линки, удовлетворяющие этому условию будут включены:
+Example:
+Пример:
+gif\r\nWill match all GIF files
+gif\r\nОбнаружит все gif (или GIF) файлы
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nОтловит все файлы, содержащие в имени подстроку 'blue', например 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nОтловит файл 'bigfile.mov', но, в тоже время, пропустит файл 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nОтловит адреса, содержащие каталоги с подстрокой 'cgi', такие как /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nОтловит адреса, содержащие каталог 'cgi-bin' (но не cgi-bin-2, например)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nОтловит такие линки, как www.someweb.com, private.someweb.com и т.п..
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nОтловит адреса типа www.someweb.com, www.someweb.edu, private.someweb.otherweb.com и т.д.\r\n
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nОтловит адреса, такие как www.someweb.com/... (но не такие, как private.someweb.com/..)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nОтловит все линки такие, как www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html и т.п.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nОтловит только www.test.com/test/someweb.html. Заметим, что необходимо указать полный адрес ресурса - хост (www.xxx.yyy) и путь (/test/someweb.html)
+All links will match
+Все линки допустимы
+Add exclusion filter
+Добавить исключающий фильтр
+Add inclusion filter
+Добавить включающий фильтр
+Existing filters
+Дополнительные фильтры
+Cancel changes
+Отменить изменения
+Save current preferences as default values
+Сохранить текущие настройки как значения по умолчанию
+Click to confirm
+Подтвердить
+No log files in %s!
+Отсутствуют лог файлы в %s!
+No 'index.html' file in %s!
+Отсутствует файл index.html в %s!
+Click to quit WinHTTrack Website Copier
+Выйти из программы WinHTTrack Website Copier
+View log files
+Просмотр лог файлов
+Browse HTML start page
+Отобразить стартовую html страницу
+End of mirror
+Создание зеркала завершено
+View log files
+Просмотр log файлов
+Browse Mirrored Website
+Просмотр зеркала
+New project...
+Новый проект...
+View error and warning reports
+Просмотр отчета об ошибках и предупреждениях
+View report
+Просмотр отчета
+Close the log file window
+Закрыть окно лога
+Info type:
+Тип информации
+Errors
+Ошибки
+Infos
+Информация
+Find
+Найти
+Find a word
+Найти слово
+Info log file
+Инфо лог-файл
+Warning/Errors log file
+Лог файл ошибок/предупреждений
+Unable to initialize the OLE system
+Невозможно инициализировать OLE
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+В указанном каталоге WinHTTrack не может найти ни одного кэша прерванной закачки!
+Could not connect to provider
+Не возможно соединиться с провайдером
+receive
+получение
+request
+запрос
+connect
+соединение
+search
+поиск
+ready
+готов
+error
+ошибка
+Receiving files..
+Получаем файлы
+Parsing HTML file..
+Разбор HTML файла...
+Purging files..
+Удаляем файлы...
+Loading cache in progress..
+Идет загрузка кэша..
+Parsing HTML file (testing links)..
+Анализируем HTML файл (проверяем линки)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Остановлено (для продолжения выберете [Зеркало]/[Приостановить закачку] )
+Finishing pending transfers - Select [Cancel] to stop now!
+Завершаются отложенные закачки - чтобы прервать, нажмите Cancel!
+scanning
+сканируем
+Waiting for scheduled time..
+Ожидаем заданное время начала
+Connecting to provider
+Соединяемся с провайдером
+[%d seconds] to go before start of operation
+Осталось [%d секунд] до начала
+Site mirroring in progress [%s, %s bytes]
+Создается зеркало [%s, %s байт]
+Site mirroring finished!
+Создание зеркала завершено!
+A problem occured during the mirroring operation\n
+В процессе закачки произошла ошибка\n
+\nDuring:\n
+В течении:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+В случае необходимости, смотри лог файл.\n\nДля выхода из WinHTTrack нажмите кнопку OK.\n\nСпасибо за использование WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Создание зеркала завершено.\nДля выхода из программы нажмите кнопку OK.\nДля проверки успешности закачки посмотрите лог файл(ы).\n\nСпасибо за использование WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * ЗАКАЧКА ПРЕРВАНА! * *\r\nВременный кэш, созданный во время текущей сессий, содержит данные, загруженные только во время данной сессии и потребуется только в случае возобновления закачки.\r\nОднако, предыдущий кэш может содержать более полную информацию. Если вы не хотите потерять эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Это можно легко сделать прямо здесь, удалив файлы hts-cache/new.]\r\n\r\nСчитает-ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * ОШИБКА! * *\r\nТекущее зеркало - пусто. Если это было обновление, предыдущая версия зеркала восстановлена.\r\nПричина: первая страница(ы) или не найдена, или были проблемы с соединением.\r\n=> Убедитесь, что вебсайт все-еще существует, и/или проверьте  установки прокси-сервера! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\nПодсказка:Для просмотра сообщений об ошибках и предупреждений нажмите [Просмотр лог файла]
+Error deleting a hts-cache/new.* file, please do it manually
+Ошибка удаления файла hts-cache/new.* , пожалуйста, удалите его ручками.\r\n
+Do you really want to quit WinHTTrack Website Copier?
+Вы действительно хотите выйти из WinHTTrack?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Мода зеркализации -\n\nВведите адрес(а) в поле URL.
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Интерактивная мода - Мастер создания зеркала (будут заданы вопросы) -\n\nВведите адрес(а) в поле URL.
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Мода закачки отдельных файлов -\n\nВведите адрес(а) файлов в поле URL.
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Мода тестирования линков -\n\nВведите адрес(а) страниц, содержащих URL'ы, которые вы хотите протестировать.
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Мода обновления -\n\nПроверьте адрес(а) в поле URL, затем нажмите кнопку 'ДАЛЕЕ' и проверьте параметры.
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Мода продолжения ранее прерванного создания зеркала -\n\nПроверьте адрес(а) в поле URL, затем нажмите кнопку 'ДАЛЕЕ' и проверьте параметры.
+Log files Path
+Путь к лог файлам
+Path
+Путь
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+Мода создания зеркал из списка-\n\nВ поле URL заполните адреса страниц, содержащих URL'ы, которые вы хотите зеркализовать.
+New project / Import?
+Новый проект / импортировать?
+Choose criterion
+Выберете действие
+Maximum link scanning depth
+Макс.глубина сканирования
+Enter address(es) here
+Введите адреса
+Define additional filtering rules
+Задать дополнительные фильтры
+Proxy Name (if needed)
+Прокси, если требуется
+Proxy Port
+Номер порта прокси-сервера
+Define proxy settings
+Задайте установки прокси
+Use standard HTTP proxy as FTP proxy
+Использовать HTTP прокси как FTP прокси
+Path
+Путь
+Select Path
+Выберете путь
+Path
+Путь
+Select Path
+Выберете путь
+Quit WinHTTrack Website Copier
+Выйти из WinHTTrack Website Copier
+About WinHTTrack
+О программе WinHTTrack
+Save current preferences as default values
+Сохранить текущие установки как параметры по умолчанию
+Click to continue
+Продолжить
+Click to define options
+Задать параметры закачки
+Click to add a URL
+Добавить URL
+Load URL(s) from text file
+Загрузить URL(ы) из текстового файла
+WinHTTrack preferences (*.opt)|*.opt||
+Настройки WinHTTrack (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Текстовый файл списка адресов(*.txt)|*.txt||
+File not found!
+Файл не найден!
+Do you really want to change the project name/path?
+Вы действительно хотите изменить название проекта/путь?
+Load user-default options?
+Загрузить установки по умолчанию?
+Save user-default options?
+Сохранить настройки?
+Reset all default options?
+Переустановить все параметры по умолчанию?
+Welcome to WinHTTrack!
+WinHTTrack приветствует вас!
+Action:
+Тип работы:
+Max Depth
+Макс. глубина:
+Maximum external depth:
+Максимальная глубина внешних сайтов:
+Filters (refuse/accept links) :
+Фильтры (включить/выключить линки)
+Paths
+Пути
+Save prefs
+Сохранить настройки
+Define..
+Задать...
+Set options..
+Задать параметры...
+Preferences and mirror options:
+Настройки параметров закачки::
+Project name
+Название проекта
+Add a URL...
+Добавить URL...
+Web Addresses: (URL)
+Веб адреса: (URL)
+Stop WinHTTrack?
+Прервать WinHTTrack?
+No log files in %s!
+Нет лог файлов в %s!
+Pause Download?
+Приостановить закачку?
+Stop the mirroring operation
+Прервать закачку
+Minimize to System Tray
+Спрятать в системный трэй
+Click to skip a link or stop parsing
+Пропустить линк или прервать анализ файла
+Click to skip a link
+Пропустить линк
+Bytes saved
+Сохранено байт:
+Links scanned
+Просканировано линков:
+Time:
+Время:
+Connections:
+Соединений:
+Running:
+Состояние:
+Hide
+Спрятать
+Transfer rate
+Скорость закачки:
+SKIP
+ПРОПУСТИТЬ
+Information
+Информация
+Files written:
+Сохранено файлов:
+Files updated:
+Обновлено файлов:
+Errors:
+Ошибок:
+In progress:
+В процессе:
+Follow external links
+Закачать файлы из внешних линков
+Test all links in pages
+Проверять все файлы на страницах
+Try to ferret out all links
+Стараться определить все линки
+Download HTML files first (faster)
+Загрузить вначале HTML-файлы (быстрее)
+Choose local site structure
+Выбрать локальную структуру сайта
+Set user-defined structure on disk
+Установить заданную локальную структуру сайта
+Use a cache for updates and retries
+Использовать кэш для обновления и докачки
+Do not update zero size or user-erased files
+Не качать файлы, которые были однажды скачаны, даже если они нулевой длины или удалены
+Create a Start Page
+Создать начальную страницу
+Create a word database of all html pages
+уПЪДБФШ ВБЪХ ДБООЩИ УМПЧ, УПДЕТЦБЭЙИУС Ч html-УФТБОЙГБИ
+Create error logging and report files
+Создать лог файлы с информацией о работе и ошибках
+Generate DOS 8-3 filenames ONLY
+Создавать файлы в DOS-формате 8.3
+Generate ISO9660 filenames ONLY for CDROM medias
+Создавать имена файлов в стандарте ISO9660 только для CDROM
+Do not create HTML error pages
+Не записывать файлы html-ошибок
+Select file types to be saved to disk
+Выберете типы файлов, сохраняемых на диске
+Select parsing direction
+Выберете направление продвижения по сайту
+Select global parsing direction
+Выберете глобальное направление продвижения по сайту
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Установить правила переименования линков как для внутренних (закачиваемых) так и для внешних (не загружаемых) адресов
+Max simultaneous connections
+Maксимальное число соединений
+File timeout
+Maксимальное время не активности закачки
+Cancel all links from host if timeout occurs
+В случае превышения времени ожидания отменить все линки с данного хоста
+Minimum admissible transfer rate
+Mинимально допустимая скорость закачки
+Cancel all links from host if too slow
+В случае, если хост слишком медленный, отменить все линки с данного хоста
+Maximum number of retries on non-fatal errors
+Maксимальное число повторных попыток, в случае не фатальных ошибок.
+Maximum size for any single HTML file
+Maксимальный размер любого html-файла
+Maximum size for any single non-HTML file
+Maксимальный размер любого не HTML-файла
+Maximum amount of bytes to retrieve from the Web
+Maксимальное количество байт, допустимых для закачки
+Make a pause after downloading this amount of bytes
+После загрузки указанного числа байтов, сделать паузу
+Maximum duration time for the mirroring operation
+Maкс. продолжительность зеркализации
+Maximum transfer rate
+Макс. скорость закачки
+Maximum connections/seconds (avoid server overload)
+Макс. количество соединений в секунду (не перегружать сервер)
+Maximum number of links that can be tested (not saved!)
+нБЛУЙНБМШОПЕ ЮЙУМП ФЕУФЙТХЕНЩИ МЙОЛПЧ (ФЕУФЙТХЕНЩИ, Б ОЕ УПИТБОСЕНЩИ!)
+Browser identity
+Идентификация броузера (строка User-Agent)
+Comment to be placed in each HTML file
+Комментарий, размещаемый в каждом HTML файле
+Back to starting page
+Назад на начальную страницу
+Save current preferences as default values
+Сохранить настройки как значения по умолчанию
+Click to continue
+Продолжить
+Click to cancel changes
+Отменить изменения
+Follow local robots rules on sites
+Подчиняться правилам для роботов, устанавливаемым сайтами
+Links to non-localised external pages will produce error pages
+По ссылкам на внешние страницы (не скачанные) будет переход к страницам ошибок
+Do not erase obsolete files after update
+Не удалять старые файлы после процедуры обновления зеркала
+Accept cookies?
+Разрешить cookies?
+Check document type when unknown?
+Проверять тип документа, в случае когда он не известен?
+Parse java applets to retrieve included files that must be downloaded?
+Анализировать ява-апплеты с целью определения включаемые файлов?
+Store all files in cache instead of HTML only
+Принудительно сохранять все файлы в кэше, а не только файлы HTML
+Log file type (if generated)
+Тип log фала
+Maximum mirroring depth from root address
+Макс. глубина создания зеркала от начального адреса
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Максимальная глубина закачки для внешних/запрещенных адресов (0, т.е., нет ограничений, это значение поумолчанию)
+Create a debugging file
+Создать файл с отладочной информацией
+Use non-standard requests to get round some server bugs
+Попытаться обойти ошибки некоторых серверов, используя не стандартные запросы
+Use old HTTP/1.0 requests (limits engine power!)
+Использовать старый протокол HTTP/1.0 (ограничит возможности программы!)
+Attempt to limit retransfers through several tricks (file size test..)
+Попытка ограничить перекачку испольуя некоторые приемы (тест на размер файла..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Ограничить число линков, удаляя аналогичные линки (www.foo.com==foo.com, http=https ..)
+Write external links without login/password
+Сохранять внешние линки без логина/пароля
+Write internal links without query string
+Сохранять внутренние линки усеченно (до занака ?)
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Качать не-html файлы вблизи ссылки (напр.: внешние .ZIP или граф. файлы)
+Test all links (even forbidden ones)
+Проверять все линки (даже запрещенные к закачке)
+Try to catch all URLs (even in unknown tags/code)
+Стараться определять все URL'ы (даже в неопознанных тэгах/скриптах)
+Get HTML files first!
+Получить вначале HTML файлы!
+Structure type (how links are saved)
+Тип локальной структуры зеркала (способ сохранения файлов)
+Use a cache for updates
+Использовать кэш для обновления
+Do not re-download locally erased files
+Не качать заново локально удаленные файлы
+Make an index
+Создать индекс
+Make a word database
+уПЪДБФШ ВБЪХ ДБООЩИ УМПЧ
+Log files
+Log файлы
+DOS names (8+3)
+DOS-формат файлов (8+3)
+ISO9660 names (CDROM)
+Имена в стандарте ISO9660 (CDROM)
+No error pages
+Без страниц ошибок
+Primary Scan Rule
+Основной фильтр
+Travel mode
+Мода сканирования
+Global travel mode
+Глобальная мода сканирования
+These options should be modified only exceptionally
+Как правило, эти настройки изменять не следует
+Activate Debugging Mode (winhttrack.log)
+Включить моду отладки (winhttrack.log)
+Rewrite links: internal / external
+Переименовать линки: внутренние/внешние
+Flow control
+Контроль направления сканирования
+Limits
+Ограничения
+Identity
+Идентификатор
+HTML footer
+Нижний HTML колонтитул
+N# connections
+N# соединений
+Abandon host if error
+Прекратить закачку с хоста, в случае ошибки
+Minimum transfer rate (B/s)
+Mинимальная скорость закачки (B/s)
+Abandon host if too slow
+Прекратить закачку с хоста, если она слишком медленная
+Configure
+Настроить
+Use proxy for ftp transfers
+Использовать прокси для ftp-закачки
+TimeOut(s)
+Тайм-аут
+Persistent connections (Keep-Alive)
+Постоянные соединения (Keep-Alive)
+Reduce connection time and type lookup time using persistent connections
+Уменьшить времена соединения и обращения используя постоянные соединения
+Retries
+Повторные попытки
+Size limit
+Ограничение по размеру
+Max size of any HTML file (B)
+Макс. размер html-файла:
+Max size of any non-HTML file
+Макс. размер не-html:
+Max site size
+Макс. размер сайта
+Max time
+Макс. время закачки
+Save prefs
+Сохранить настройки
+Max transfer rate
+Макс. скорость закачки
+Follow robots.txt
+Следовать правилам из robots.txt
+No external pages
+Без внешних ссылок
+Do not purge old files
+Не удалять старые файлы
+Accept cookies
+Разрешить cookies
+Check document type
+Проверять тип документа
+Parse java files
+Анализ ява файлов
+Store ALL files in cache
+Сохранять ВСЕ файлы в кэше
+Tolerant requests (for servers)
+Толерантные запросы (к серверам)
+Update hack (limit re-transfers)
+Update hack (ограничение  повторных закачек)
+URL hacks (join similar URLs)
+Хак URL  (объеденить аналогичные URLs)
+Force old HTTP/1.0 requests (no 1.1)
+Использовать старый протокол HTTP/1.0 (не 1.1)
+Max connections / seconds
+Макс. число соединений/сек.
+Maximum number of links
+нБЛУЙНБМШОПЕ ЮНУМП МЙОЛПЧ
+Pause after downloading..
+Пауза после загрузки...
+Hide passwords
+Скрыть пароли
+Hide query strings
+Спрятать запросную часть строки (все, что после знака ?)
+Links
+Линки
+Build
+Структура
+Experts Only
+Эксперт
+Flow Control
+Управление закачкой
+Limits
+Ограничения
+Browser ID
+Идентификация
+Scan Rules
+Фильтры
+Spider
+Качалка
+Log, Index, Cache
+Лог, Индекс. Кэш
+Proxy
+Прокси
+MIME Types
+MIME Types (Типы файлов)
+Do you really want to quit WinHTTrack Website Copier?
+Вы действительно хотите завершить работу с программой?
+Do not connect to a provider (already connected)
+Не соединяться с провайдером (соединение уже установлено)
+Do not use remote access connection
+Не испоьзовать удаленной соединения
+Schedule the mirroring operation
+Закачка по расписанию
+Quit WinHTTrack Website Copier
+Выйти из WinHTTrack Website Copier
+Back to starting page
+Назад к начальной странице
+Click to start!
+Начать!
+No saved password for this connection!
+Нет сохраненного пароля для этого соединения
+Can not get remote connection settings
+Не могу получить установки удаленного соединения
+Select a connection provider
+Выберете провайдера, к которому установить соединение
+Start
+Начать
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Вы можете или начать закачку, нажав кнопку СТАРТ, или можете задать дополнительные параметры соединения
+Save settings only, do not launch download now.
+Только сохранить установки, не начинать закачку.
+On hold
+Задержка
+Transfer scheduled for: (hh/mm/ss)
+Ждем до: (hh/mm/ss)
+Start
+Начать!
+Connect to provider (RAS)
+Соединиться с провайдером (RAS)
+Connect to this provider
+Соединиться с этим провайдером
+Disconnect when finished
+Отсоединиться при завершении
+Disconnect modem on completion
+Отсоеденить при завершении
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Сообщите нам пожалуйста о замеченных проблемах и ошибках)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nКачалка (spider): Xavier Roche\r\nПарсер ява-классов: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Russian translations to:\r\nAndrei Iliev (andreiiliev@mail.ru)
+About WinHTTrack Website Copier
+О программе WinHTTrack Website Copier
+Please visit our Web page
+Пожалуйста, посетите нашу веб-страницу
+Wizard query
+Вопрос мастера
+Your answer:
+Ваш ответ:
+Link detected..
+Найден линк
+Choose a rule
+Выберете правило
+Ignore this link
+Игнорировать этот линк
+Ignore directory
+Игнорировать директорию
+Ignore domain
+Игнорировать домен
+Catch this page only
+Скачать только эту страничку
+Mirror site
+Зеркализовать сайт
+Mirror domain
+Зеркализовать домен
+Ignore all
+Игнорировать все
+Wizard query
+Вопрос мастера
+NO
+НЕТ
+File
+Файл
+Options
+Настройки
+Log
+Лог
+Window
+Окно
+Help
+Помощь
+Pause transfer
+Приостановить закачку
+Exit
+Выход
+Modify options
+Изменить настройки
+View log
+Просмотреть лог
+View error log
+Просмотреть лог ошибок
+View file transfers
+Посмотреть процесс передачи файлов
+Hide
+Спрятать
+About WinHTTrack Website Copier
+О программе...
+Check program updates...
+Проверить наличие обновленний программы...
+&Toolbar
+Панель инструпентов
+&Status Bar
+Панель состояния
+S&plit
+Разделить
+File
+Файл
+Preferences
+Настройки
+Mirror
+Зеркало
+Log
+Лог
+Window
+Окно
+Help
+Помощь
+Exit
+Выход
+Load default options
+Загрузить значения параметров по умолчанию
+Save default options
+Сохранить значения по умолчанию
+Reset to default options
+Очистить значения по умолчанию
+Load options...
+Загрузить настройки...
+Save options as...
+Сохранить настройки как...
+Language preference...
+Выбор языка
+Contents...
+Содержание...
+About WinHTTrack...
+О WinHTTrack...
+New project\tCtrl+N
+Новый проект\tCtrl+N
+&Open...\tCtrl+O
+&Открыть...\tCtrl+O
+&Save\tCtrl+S
+&Сохранить\tCtrl+S
+Save &As...
+Сохранить &Как...
+&Delete...
+&Удалить...
+&Browse sites...
+&Просмотр сайтов...
+User-defined structure
+Задание структуры
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tИмя файла без расширения (напр.: image)\r\n%N\tИмя файла с расширением (напр.: image.gif)\r\n%t\tРасширение файла (напр.: gif)\r\n%p\tПуть к файлу [без оканчивающего /] (напр.: /someimages)\r\n%h\tИмя хоста (напр.: www.someweb.com)\r\n%M\tURL MD5 (128 bits, 32 ascii bytes)\r\n%Q\tquery string MD5 (128 bits, 32 ascii bytes)\r\n%q\tsmall query string MD5 (16 bits, 4 ascii bytes)\r\n\r\n%s?\tDOS'кое имя (напр: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Пример:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Настройки прокси
+Proxy address:
+Адрес прокси:
+Proxy port:
+Номер порта:
+Authentication (only if needed)
+Аутентификация (если требуется)
+Login
+Логин
+Password
+Пароль
+Enter proxy address here
+Введите адрес прокси сервера
+Enter proxy port here
+Введите номер порта прокси сервера
+Enter proxy login
+Введите логин прокси
+Enter proxy password
+Введите пароль для прокси сервера
+Enter project name here
+Введите имя проекта
+Enter saving path here
+Укажите каталог для сохранения проекта
+Select existing project to update
+Для обновления проекта, выберете его из списка
+Click here to select path
+Выбрать каталог проекта
+Select or create a new category name, to sort your mirrors in categories
+Выбрать или создать новую категорию для сортировки зеркал по категориям
+HTTrack Project Wizard...
+Мастер создания проекта HTTrack...
+New project name:
+Имя нового проекта:
+Existing project name:
+Имя существующего проекта:
+Project name:
+Имя проекта:
+Base path:
+Каталог:
+Project category:
+Категория проекта:
+C:\\My Web Sites
+C:\\Мои Web Сайты
+Type a new project name, \r\nor select existing project to update/resume
+Задайте название нового проекта, \r\nили выберете существующий проект для его актуализации/продолжения
+New project
+Новый проект
+Insert URL
+Вставьте URL
+URL:
+URL:
+Authentication (only if needed)
+Аутентификация (если нужно)
+Login
+Логин:
+Password
+Пароль:
+Forms or complex links:
+Сложные линки:
+Capture URL...
+Засечь URL...
+Enter URL address(es) here
+Введите URL адрес
+Enter site login
+Введите логин для доступа к сайту
+Enter site password
+Введите пароль для доступа к сайту
+Use this capture tool for links that can only be accessed through forms or javascript code
+Используйте это средство для отлова динамических URL (javascript, формы и т.п.)
+Choose language according to preference
+Выбор языка
+Catch URL!
+Поймать URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Временно установите в настройках прокси вашего броузера указанные ниже значения адреса и номера порта.\nЗатем, в броузере выполните необходимые действия (послать форму, активизировать скрипт и т.п.) .
+This will send the desired link from your browser to WinHTTrack.
+Таким образом вы сможете передать желаемый линк из браузера в HTTrack.
+ABORT
+Отмена
+Copy/Paste the temporary proxy parameters here
+Скопируй/вставь временные настройки прокси
+Cancel
+Отмена
+Unable to find Help files!
+Не найдены файлы помощи!
+Unable to save parameters!
+Не возможно сохранить параметры!
+Please drag only one folder at a time
+Пожалуйста, перетаскивайте только одну папку
+Please drag only folders, not files
+Пожалуйста, тащите только папку, а не файл
+Please drag folders only
+Пожалуйста, тащите только папку
+Select user-defined structure?
+Выбрать заданную вами структуру?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Проверьте, что определенная вами структура правильна, в противном случае, имена файлов будут непредсказуемы
+Do you really want to use a user-defined structure?
+Вы действительно хотите выбрать заданную структуру?
+Too manu URLs, cannot handle so many links!!
+Слишком много URL'ов, не могу обработать такое количество линков!
+Not enough memory, fatal internal error..
+Не достаточно памяти, фатальная внутренняя ошибка...
+Unknown operation!
+Неизвестная операция
+Add this URL?\r\n
+Добавить этот URL?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Внимание: программа не отвечает на запросы, не возможно добавить URL'ы...
+Type/MIME associations
+Соответсвие типу файлов (Type/MIME)
+File types:
+Типы файлов:
+MIME identity:
+MIME identity
+Select or modify your file type(s) here
+Выбрать или изменить типы файлов
+Select or modify your MIME type(s) here
+Выбрать или изменить типы файлов
+Go up
+Вверх
+Go down
+Вниз
+File download information
+Информация о загрузке файла
+Freeze Window
+Заморозить окно
+More information:
+Дополнительная информация:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Добро пожаловать в программу WinHTTrack Website Copier!\n\nПожалуйста нажмите кнопку ДАЛЕЕ для того, чтобы\n\n- начать новый проект\n- или возобновить частичную закачку
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Имена файлов с раширением:\nИмена файлов, содержащие:\nЭтот файл:\nИмена фолдеров содержат:\nЭтот фолдер:\nЛинки из этого домена:\nЛинки из доменов, содержащие:\nЛинки из этого хоста:\nЛинки содержащие:\nЭтот линк:\nВСЕ ЛИНКИ
+Show all\nHide debug\nHide infos\nHide debug and infos
+Показать все\nСпрятать отладку\nСпрятать инфо\nСпрятать отладку и инфо
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Структура сайта (по умолчанию)\nHtml/, файлы изображений/другие файлы/файлы изображений/\nHtml/html, файлы изображений/другие файлы/файлы изображений\nHtml/, файлы изображений/другие файлы/\nHtml/, файлы изображений/другие файлы/xxx, где xxx - расширение файла\nHtml, файлы изображений/другие файлы/xxx\nСтруктура сайта без www.domain.xxx/\nHtml в site_name/ файлы изображений/другие файлы в site_name/файлы изображений/\nHtml в site_name/html, файлы изображений/другие файлы в site_name/файлы изображений\nHtml в site_name/, файлы изображений/другие файлы в site_name/\nHtml в site_name/, файлы изображений/другие файлы в site_name/xxx\nHtml в site_name/html, файлы изображений/другие файлы в site_name/xxx\nВсе файлы из веба/, с произвольными именами (новинка !)\nВсе файлы из site_name/, с произвольными именами (новинка !)\nЗаданная пользователем структура...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Только сканировать\nСохранять html файлы\nСохранять не html файлы\nСохранять все файлы (по умолчанию)\nСохранять вначале html файлы
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Оставаться в тойже директории\nМожно двигаться вниз (по умолчанию)\nМожно двигаться вверх\nМожно двигаться вверх и вниз
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Оставаться на том же адресе (по умолчаниюt)\nОставаться на том же домене\nОставаться на том де домене верхнего уровня\nИдти куда угодно
+Never\nIf unknown (except /)\nIf unknown
+Никогда\nЕсли неизвестно (кроме /)\nЕсли неизвестно
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+Не подчиняться правилам robots.txt\nrobots.txt кроме Мастера\nподчиняться правилам robots.txt
+normal\nextended\ndebug
+Обычная\nрасширенная\nотладка
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Загрузить сайт(ы)\nЗагрузить сайт(ы) +вопросы\nЗагрузить отдельные файлы\nЗагрузить все сайты со страницы (несколько зеркал)\nТестировать линки со страницы (тест закладок)\n* Продолжить прерванную загрузку\n* Обновить существующую закачку
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Относительный URI / Абсолютный URL (по-умолчанию)\nАбсолютный URL / Абсолютный URL\nАбсолютный URI / Абсолютный URL\nПервоначальный URL / Первоначальный URL
+Open Source offline browser
+Open Source оффлайн браузер
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Качалка вебсайтов/Оффлайн браузер. Качает вебсайты на ваш компьютер. Бесплатно.
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline browser
+URL list (.txt)
+Лист URL'ов (.txt)
+Previous
+Назад
+Next
+Вперед
+URLs
+URLs
+Warning
+Предупреждение
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Ваш браузер или не поддерживает javascript или  его поддержка выключена. Для получения наилучшего результата активизируйте поддержку javascript.
+Thank you
+Спасибо
+You can now close this window
+Теперь Вы можете закрыть это окно
+Server terminated
+Server terminated
+A fatal error has occured during this mirror
+Во время текущей закачки произошла фатальная ошибка

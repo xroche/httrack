@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Categories=Network;
+Terminal=false
+Name=WebHTTrack Website Copier
+Comment=Copy websites to your computer
+Exec=webhttrack
+Icon=httrack
