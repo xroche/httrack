@@ -449,15 +449,13 @@ int httpmirror(char *url1, httrackp * opt) {
   // initialiser ptr et lien_tot
   ptr = 0;
   lien_tot = 0;
-  // initialiser hachage
-  {
-    int i;
 
-    for(i = 0; i < HTS_HASH_SIZE; i++)
-      hash.hash[0][i] = hash.hash[1][i] = hash.hash[2][i] = -1; // pas d'entrées
-    hash.liens = liens;
-    hash.max_lien = 0;
-  }
+  // initialiser hachage
+  hash_init(&hash);
+  hash.liens = liens;
+
+  // we need it
+  opt->liens = liens;
 
   // copier adresse(s) dans liste des adresses
   {

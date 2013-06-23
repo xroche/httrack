@@ -163,6 +163,12 @@ struct fspc_strc {
   int info;
 };
 
+/* lien_url */
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+
 #ifndef HTS_DEF_DEFSTRUCT_hts_log_type
 #define HTS_DEF_DEFSTRUCT_hts_log_type
 typedef enum hts_log_type {
@@ -355,6 +361,7 @@ struct httrackp {
   String urllist;               // fichier liste de filtres à inclure
   htsfilters filters;           // contient les pointeurs pour les filtres
   hash_struct *hash;            // hash structure
+  lien_url **liens;             // liens
   robots_wizard *robotsptr;     // robots ptr
   String lang_iso;              // en, fr ..
   String mimedefs;              // ext1=mimetype1\next2=mimetype2..
