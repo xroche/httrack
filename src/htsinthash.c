@@ -28,46 +28,211 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* File: httrack.c subroutines:                                 */
-/*       hash table system (fast index)                         */
+/*       hash tables                                            */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
+
+/**
+ * Library notes:
+ * This small hashtable library provides key/value hashtable, with a string
+ * key, and integer/pointer value (with an associated optional allocator)
+ * It features O(1) average insertion, O(1) lookup, and O(1) delete.
+ *
+ * Implementation notes:
+ * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
+ * with a LCG hash function, with one additional auxiliary hash function.
+ * It also uses a small stash area to handle rare cases of collisions.
+ * Enumeration of all key/values is possible, deletion is also possible, but
+ * currently without any auto-shrinking (ie. table will never shrink).
+ * Overall, two main blocks are allocated: one for the items, and one for
+ * the keys (pool).
+ *
+ * References: 
+ * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
+ * LCG http://en.wikipedia.org/wiki/Linear_congruential_generator
+ * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
+ **/
 
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
 #include "htsinthash.h"
 
-/* specific definitions */
+#ifdef LIBHTTRACK_EXPORTS
 #include "htsbase.h"
-#include "htsmd5.h"
-/* END specific definitions */
-
-/* Specific macros */
-#ifdef NO_MALLOCT
-#undef malloct
-#undef freet
-#undef calloct
-#undef strcpybuff
-#endif
-#ifndef malloct
-#define malloct malloc
-#define freet free
-#define calloct calloc
-#define strcpybuff strcpy
+#undef assert
+#define assert assertf
 #endif
 
-// static functions
+/* Key (32-bit) */
+typedef unsigned int inthash_key;
 
-static void inthash_delchain(inthash_chain * hash,
-                             t_inthash_freehandler free_handler);
-static void inthash_default_free_handler(void *value);
-static unsigned long int inthash_key(const char *value);
-static void inthash_init(inthash hashtable);
+/* Numerical Recipes function. */
+#define HASH_PRIME ( 1664525 )
+#define HASH_CONST ( 1013904223 )
+#define HASH_ADD(HASH, C) do {                  \
+    (HASH) *= HASH_PRIME;                       \
+    (HASH) += HASH_CONST;                       \
+    (HASH) += (C);                              \
+  } while(0)
 
-// inthash -- simple hash table, using a key (char[]) and a value (ulong int)
+/* 2**X */
+#define POW2(X) ( (size_t) 1 << (X) )
 
-static unsigned long int inthash_key(const char *value) {
-  return md5sum32(value);
+/* pair of hashes */
+typedef struct inthash_keys {
+  inthash_key hash1;
+  inthash_key hash2;
+} inthash_keys;
+
+static inthash_keys inthash_calc_hashes(const char *value) {
+  /* compute two lcg hashes using different seeds */
+  inthash_keys hash = { 0, (inthash_key) -1 };
+  size_t i;
+  for(i = 0 ; value[i] != '\0' ; i++) {
+    const unsigned char c1 = value[i];
+    const unsigned char c2 = 0xff - c1;
+    HASH_ADD(hash.hash1, c1);
+    HASH_ADD(hash.hash2, c2);
+  }
+  /* yes, it may happen */
+  if (hash.hash1 == hash.hash2) {
+    hash.hash2 = ~hash.hash2;
+  }
+  return hash;
+}
+
+static int inthash_is_free(const inthash hashtable, size_t pos) {
+  return hashtable->items[pos].name == NULL;
+}
+
+static int inthash_matches(const inthash hashtable, 
+                           size_t pos, const char *name) {
+  return hashtable->items[pos].name != NULL
+    && strcmp(hashtable->items[pos].name, name) == 0;
+}
+
+/* realloc (expand) string pool ; does not change the compacity */
+static void inthash_realloc_pool(inthash hashtable) {
+  const size_t hash_size = POW2(hashtable->hash_size_power);
+  char *const oldbase = hashtable->string_pool;
+  size_t i;
+  hashtable->string_pool = realloc(hashtable->string_pool,
+    hashtable->string_pool_capacity);
+  if (hashtable->string_pool == NULL) {
+    fprintf(stderr, 
+      "** hashtable string pool allocation error: could not allocate %u bytes", 
+      (int) hashtable->string_pool_capacity);
+    assert(! "hashtable string pool allocation error");
+  }
+
+  /* recompute string address */
+#define RECOMPUTE_STRING(S) do {                                   \
+    if (S != NULL) {                                               \
+      const size_t offset = (S) - oldbase;                         \
+      hashtable->items[i].name = &hashtable->string_pool[offset];   \
+    }                                                              \
+} while(0)
+
+  /* recompute */
+  for(i = 0 ; i < hash_size ; i++) {
+    RECOMPUTE_STRING(hashtable->items[i].name);
+  }
+  for(i = 0 ; i < hashtable->stash_size ; i++) {
+    RECOMPUTE_STRING(hashtable->stash[i].name);
+  }
+
+#undef RECOMPUTE_STRING
+}
+
+/* compact string pool ; does not change the capacity */
+static void inthash_compact_pool(inthash hashtable) {
+  const size_t hash_size = POW2(hashtable->hash_size_power);
+  size_t i;
+  char* old_pool = hashtable->string_pool;
+
+  hashtable->string_pool = malloc(hashtable->string_pool_capacity);
+  hashtable->string_pool_size = 0;
+  hashtable->string_pool_chars = 0;
+  if (hashtable->string_pool == NULL) {
+    fprintf(stderr, 
+      "** hashtable string pool compaction error: could not allocate %u bytes", 
+      (int) hashtable->string_pool_capacity);
+    assert(! "hashtable string pool compaction error");
+  }
+
+  /* relocate a string on a different pool */
+#define RELOCATE_STRING(S) do {                                    \
+    if (S != NULL) {                                               \
+      const size_t len = strlen(S) + 1;                            \
+      assert(hashtable->string_pool_size + len                    \
+        <= hashtable->string_pool_capacity);                       \
+      memcpy(&hashtable->string_pool[hashtable->string_pool_size], \
+        S, len);                                                   \
+      S = &hashtable->string_pool[hashtable->string_pool_size];    \
+      hashtable->string_pool_size += len;                          \
+    }                                                              \
+} while(0)
+
+  /* relocate */
+  for(i = 0 ; i < hash_size ; i++) {
+    RELOCATE_STRING(hashtable->items[i].name);
+  }
+  for(i = 0 ; i < hashtable->stash_size ; i++) {
+    RELOCATE_STRING(hashtable->stash[i].name);
+  }
+
+#undef RELOCATE_STRING
+
+  /* compacted (used chars == current size) */
+  hashtable->string_pool_chars = hashtable->string_pool_size;
+
+  /* wipe previous pool */
+  free(old_pool);
+}
+
+static char* inthash_dup_name(inthash hashtable, const char *name) {
+  const size_t len = strlen(name) + 1;
+  char *s;
+
+  if (hashtable->string_pool_capacity - hashtable->string_pool_size < len) {
+    if (hashtable->string_pool_capacity == 0) {
+      hashtable->string_pool_capacity = 16;
+    }
+    for( ; hashtable->string_pool_capacity - hashtable->string_pool_size < len
+      ; hashtable->string_pool_capacity <<= 1) ;
+    inthash_realloc_pool(hashtable);
+  }
+
+  s = &hashtable->string_pool[hashtable->string_pool_size];
+  memcpy(s, name, len);
+  hashtable->string_pool_size += len;
+  hashtable->string_pool_chars += len;
+
+  return s;
+}
+
+static void inthash_free_name(inthash hashtable, char *name) {
+  const size_t len = strlen(name) + 1;
+  hashtable->string_pool_chars -= len;
+  if (hashtable->string_pool_chars < hashtable->string_pool_size / 2) {
+    inthash_compact_pool(hashtable);
+  }
+}
+
+static size_t inthash_hash_to_pos_(size_t hash_size_power, inthash_key hash) {
+  const inthash_key mask = POW2(hash_size_power) - 1;
+  /* TODO: investigate if lower bits of LCG are sane */
+  return hash & mask;
+}
+
+static size_t inthash_hash_to_pos(const inthash hashtable, inthash_key hash) {
+  return inthash_hash_to_pos_(hashtable->hash_size_power, hash);
 }
 
 int inthash_read_pvoid(inthash hashtable, const char *name, void **pvalue) {
@@ -90,10 +255,9 @@ void inthash_add_pvoid(inthash hashtable, const char *name, void *pvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
   value.ptr = pvalue;
-  inthash_add_value(hashtable, name, value);
+  inthash_write_value(hashtable, name, value);
 }
 
-// Check for duplicate entry (==1 : added)
 int inthash_write(inthash hashtable, const char *name, intptr_t intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
@@ -101,33 +265,239 @@ int inthash_write(inthash hashtable, const char *name, intptr_t intvalue) {
   return inthash_write_value(hashtable, name, value);
 }
 
-int inthash_write_value(inthash hashtable, const char *name,
-                        inthash_value value) {
-  int pos = (inthash_key(name) % hashtable->hash_size);
-  inthash_chain *h = hashtable->hash[pos];
+static void inthash_default_free_handler(void *value) {
+  if (value)
+    free(value);
+}
 
-  while(h) {
-    if (strcmp(h->name, name) == 0) {
-      /* Delete element */
-      if (hashtable->flag_valueismalloc) {
-        void *ptr = h->value.ptr;
+static void inthash_del_value_(inthash hashtable, inthash_value *pvalue) {
+  if (hashtable->flag_valueismalloc) {
+    if (hashtable->free_handler)
+      hashtable->free_handler(pvalue->ptr);
+    else
+      inthash_default_free_handler(pvalue->ptr);
+  }
+  pvalue->ptr = NULL;
+}
 
-        if (ptr != NULL) {
-          if (hashtable->free_handler)
-            hashtable->free_handler(ptr);
-          else
-            freet(ptr);
+static void inthash_del_value(inthash hashtable, size_t pos) {
+  inthash_del_value_(hashtable, &hashtable->items[pos].value);
+}
+
+static void inthash_del_name_(inthash hashtable, char **pname) {
+  char *const name = *pname;
+  *pname = NULL;
+  /* free after detach (we may compact the pool) */
+  inthash_free_name(hashtable, name);
+}
+
+static void inthash_del_name(inthash hashtable, size_t pos) {
+  inthash_del_name_(hashtable, &hashtable->items[pos].name);
+}
+
+static void inthash_del_item(inthash hashtable, inthash_item *pitem) {
+  inthash_del_value_(hashtable, &pitem->value);
+  inthash_del_name_(hashtable, &pitem->name);
+}
+
+static int inthash_write_value_(inthash hashtable, const char *name,
+                                inthash_value value) {
+  inthash_item item;
+  size_t pos;
+  inthash_keys hashes = inthash_calc_hashes(name);
+  inthash_key cuckoo_hash, initial_cuckoo_hash;
+  size_t loops;
+
+  /* replace at position 1 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+  if (inthash_matches(hashtable, pos, name)) {
+    inthash_del_value(hashtable, pos);
+    hashtable->items[pos].value = value;
+    return 0;  /* replaced */
+  }
+
+  /* replace at position 2 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+  if (inthash_matches(hashtable, pos, name)) {
+    inthash_del_value(hashtable, pos);
+    hashtable->items[pos].value = value;
+    return 0;  /* replaced */
+  }
+
+  /* replace in the stash ? */
+  if (hashtable->stash_size != 0) {
+    size_t i;
+    for(i = 0 ; i < hashtable->stash_size ; i++) {
+      if (strcmp(hashtable->stash[i].name, name) == 0) {
+        inthash_del_value_(hashtable, &hashtable->stash[i].value);
+        hashtable->stash[i].value = value;
+        return 0;  /* replaced */
+      }
+    }
+  }
+
+  /* otherwise we need to create a new item */
+  item.name = inthash_dup_name(hashtable, name);
+  item.value = value;
+
+  /* place at free position 1 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+  if (inthash_is_free(hashtable, pos)) {
+    hashtable->items[pos] = item;
+    return 1; /* added */
+  } else {
+    /* place at free position 2 ? */
+    pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+    if (inthash_is_free(hashtable, pos)) {
+      hashtable->items[pos] = item;
+      return 1; /* added */
+    }
+    /* prepare cuckoo ; let's take position 1 */
+    else {
+      cuckoo_hash = initial_cuckoo_hash = hashes.hash1;
+    }
+  }
+
+  /* put 'item' in place with hash 'cuckoo_hash' */
+  for(loops = POW2(hashtable->hash_size_power) ; loops != 0 ; --loops) {
+    const size_t pos = inthash_hash_to_pos(hashtable, cuckoo_hash);
+
+    /* place at alternate free position ? */
+    if (inthash_is_free(hashtable, pos)) {
+      hashtable->items[pos] = item;
+      return 1; /* added */
+    }
+    /* then cuckoo's place it is */
+    else {
+      const inthash_item backup_item = hashtable->items[pos];
+      hashtable->items[pos] = item;
+      /* take care of new lost item */
+      item = backup_item;
+      hashes = inthash_calc_hashes(item.name);
+      /* we just kicked this item from its position 1 */
+      if (pos == inthash_hash_to_pos(hashtable, hashes.hash1)) {
+        /* then place it on position 2 on next run */
+        cuckoo_hash = hashes.hash2;
+      }
+      /* we just kicked this item from its position 2 */
+      else if (pos == inthash_hash_to_pos(hashtable, hashes.hash2)) {
+        /* then place it on position 1 on next run */
+        cuckoo_hash = hashes.hash1;
+
+        /* we are looping */
+        if (cuckoo_hash == initial_cuckoo_hash) {
+          /* emergency stash */
+          break;
         }
       }
-      /* Insert */
-      h->value = value;
-      return 0;
+      else {
+        assert(! "hashtable internal error: unexpected position");
+      }
     }
-    h = h->next;
   }
-  // Not found, add it!
-  inthash_add_value(hashtable, name, value);
-  return 1;
+
+  /* emergency stashing */
+  if (hashtable->stash_size < STASH_SIZE) {
+    hashtable->stash[hashtable->stash_size] = item;
+    hashtable->stash_size++;
+    return 1; /* added */
+  } else {
+    /* we are doomed. hopefully the probability is lower than being killed
+       by a wandering radioactive monkey */
+    assert(! "hashtable internal error: cuckoo/stash collision");
+    /* not reachable code */
+    return -1;
+  }
+}
+
+int inthash_write_value(inthash hashtable, const char *name,
+                        inthash_value value) {
+  /* replace of add item */
+  const int ret = inthash_write_value_(hashtable, name, value);
+  if (ret) {
+    /* size of half of the table */
+    const size_t half_size = POW2(hashtable->hash_size_power - 1);
+
+    /* item was added: increase count */
+    hashtable->nitems++;
+
+    /* table is more than half-full */
+    if (hashtable->nitems >= half_size) {
+      size_t i;
+      char *data;
+
+      /* size before  */
+      const size_t prev_power = hashtable->hash_size_power;
+      const size_t prev_size = half_size * 2;
+      const size_t prev_alloc_size = prev_size*sizeof(inthash_item);
+
+      /* size after doubling it */
+      const size_t new_size = prev_size * 2;
+      const size_t alloc_size = prev_alloc_size * 2;
+
+      /* realloc */
+      hashtable->hash_size_power++;
+      hashtable->items = 
+        (inthash_item *) realloc(hashtable->items, alloc_size);
+      if (hashtable->items == NULL) {
+        fprintf(stderr, 
+          "** hashtable allocation error: could not allocate %u bytes", 
+          (int) alloc_size);
+        assert(! "hashtable allocation error");
+      }
+
+      /* clear upper half */
+      data = (char*) hashtable->items;
+      memset(data + prev_size, 0, prev_size);
+
+      /* relocate lower half items when needed */
+      for(i = 0 ; i < prev_size ; i++) {
+        const inthash_keys hashes = inthash_calc_hashes(hashtable->items[i].name);
+        size_t pos;
+        /* currently at old position 1 */
+        pos = inthash_hash_to_pos_(prev_power, hashes.hash1);
+        if (pos == i) {
+          const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+          /* no more the expected position */
+          if (pos != i) {
+            hashtable->items[pos] = hashtable->items[i];
+            memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+          }
+        }
+        else if (inthash_hash_to_pos_(prev_power, hashes.hash2) == i) {
+          const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+          /* no more the expected position */
+          if (pos != i) {
+            hashtable->items[pos] = hashtable->items[i];
+            memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+          }
+        }
+        else {
+          assert(! "hashtable unexpected internal error");
+        }
+      }
+
+      /* attempt to merge the stash if present */
+      if (hashtable->stash_size != 0) {
+        size_t i;
+        /* backup stash and reset it */
+        inthash_item stash[STASH_SIZE];
+        memcpy(&stash, hashtable->stash, sizeof(hashtable->stash));
+        hashtable->stash_size = 0;
+        /* insert all items */
+        for(i = 0 ; i < hashtable->stash_size ; i++) {
+          const int ret = inthash_write_value_(hashtable, stash[i].name, stash[i].value);
+          if (ret == 0) {
+            assert(! "hashtable duplicate key when merging the stash");
+          }
+          inthash_free_name(hashtable, stash[i].name);
+        }
+      }
+
+    }
+  }
+
+  return ret;
 }
 
 // Increment pos value, create one if necessary (=0)
@@ -152,44 +522,7 @@ void inthash_add(inthash hashtable, const char *name, intptr_t intvalue) {
 
   memset(&value, 0, sizeof(value));
   value.intg = intvalue;
-  inthash_add_value(hashtable, name, value);
-}
-
-void inthash_add_value(inthash hashtable, const char *name, inthash_value value) {
-  int pos = (inthash_key(name) % hashtable->hash_size);
-  inthash_chain **h = &hashtable->hash[pos];
-
-  while(*h)
-    h = &((*h)->next);
-  *h = (inthash_chain *) calloct(1, sizeof(inthash_chain)
-                                 + strlen(name) + 2);
-  if (*h) {
-    (*h)->name = ((char *) (*h)) + sizeof(inthash_chain);
-    (*h)->next = NULL;
-    strcpybuff((*h)->name, name);
-    (*h)->value = value;
-    hashtable->nitems++;
-  }
-}
-
-void *inthash_addblk(inthash hashtable, const char *name, int blksize) {
-  int pos = (inthash_key(name) % hashtable->hash_size);
-  inthash_chain **h = &hashtable->hash[pos];
-
-  while(*h)
-    h = &((*h)->next);
-  *h = (inthash_chain *) calloct(1, sizeof(inthash_chain)
-                                 + strlen(name) + 2 + blksize);
-  if (*h) {
-    (*h)->name = ((char *) (*h)) + sizeof(inthash_chain);
-    (*h)->next = NULL;
-    strcpybuff((*h)->name, name);
-    (*h)->value.ptr =
-      (void *) (((char *) (*h)) + sizeof(inthash_chain) + strlen(name) + 2);
-    hashtable->nitems++;
-    return (*h)->value.ptr;
-  }
-  return NULL;
+  inthash_write_value(hashtable, name, value);
 }
 
 int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue) {
@@ -203,17 +536,38 @@ int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue) {
 
 int inthash_read_value(inthash hashtable, const char *name,
                        inthash_value * value) {
-  int pos = (inthash_key(name) % hashtable->hash_size);
-  inthash_chain *h = hashtable->hash[pos];
+  const inthash_keys hashes = inthash_calc_hashes(name);
+  size_t pos;
 
-  while(h) {
-    if (strcmp(h->name, name) == 0) {
-      if (value != NULL)
-        *value = h->value;
-      return 1;
-    }
-    h = h->next;
+  /* found at position 1 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+  if (inthash_matches(hashtable, pos, name)) {
+    if (value != NULL)
+      *value = hashtable->items[pos].value;
+    return 1;
   }
+
+  /* found at position 2 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+  if (inthash_matches(hashtable, pos, name)) {
+    if (value != NULL)
+      *value = hashtable->items[pos].value;
+    return 1;
+  }
+
+  /* find in stash ? */
+  if (hashtable->stash_size != 0) {
+    size_t i;
+    for(i = 0 ; i < hashtable->stash_size ; i++) {
+      if (strcmp(hashtable->stash[i].name, name) == 0) {
+        if (value != NULL)
+          *value = hashtable->stash[i].value;
+        return 1;
+      }
+    }
+  }
+
+  /* not found */
   return 0;
 }
 
@@ -221,41 +575,45 @@ int inthash_exists(inthash hashtable, const char *name) {
   return inthash_read_value(hashtable, name, NULL);
 }
 
-int inthash_remove(inthash hashtable, const char *name) {
-  int pos = (inthash_key(name) % hashtable->hash_size);
-  inthash_chain **h = &hashtable->hash[pos];
-  t_inthash_freehandler free_handler = NULL;
+static int inthash_remove_(inthash hashtable, const char *name) {
+  const inthash_keys hashes = inthash_calc_hashes(name);
+  size_t pos;
 
-  if (hashtable->flag_valueismalloc) {
-    if (hashtable->free_handler)
-      free_handler = hashtable->free_handler;
-    else
-      free_handler = inthash_default_free_handler;
+  /* found at position 1 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+  if (inthash_matches(hashtable, pos, name)) {
+    inthash_del_item(hashtable, &hashtable->items[pos]);
+    return 1;
   }
-  while(*h) {
-    if (strcmp((*h)->name, name) == 0) {
-      inthash_chain *next;
 
-      if (free_handler) {
-        if ((*h)->value.ptr) {
-          void *ptr = (*h)->value.ptr;
+  /* found at position 2 ? */
+  pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+  if (inthash_matches(hashtable, pos, name)) {
+    inthash_del_item(hashtable, &hashtable->items[pos]);
+    return 1;
+  }
 
-          if (free_handler)
-            free_handler(ptr);
-          else
-            freet(ptr);
-          (*h)->value.ptr = 0;
+  /* find in stash ? */
+  if (hashtable->stash_size != 0) {
+    size_t i;
+    for(i = 0 ; i < hashtable->stash_size ; i++) {
+      if (strcmp(hashtable->stash[i].name, name) == 0) {
+        inthash_del_item(hashtable, &hashtable->stash[i]);
+        for( ; i + 1 < hashtable->stash_size ; i++) {
+          hashtable->stash[i] = hashtable->stash[i + 1];
         }
+        hashtable->stash_size--;
+        return 1;
       }
-      next = (*h)->next;
-      freet(*h);
-      *h = next;
-      hashtable->nitems--;
-      return 1;
     }
-    h = &((*h)->next);
   }
+
+  /* not found */
   return 0;
+}
+
+int inthash_remove(inthash hashtable, const char *name) {
+  return inthash_remove_(hashtable, name);
 }
 
 int inthash_readptr(inthash hashtable, const char *name, intptr_t * value) {
@@ -268,63 +626,29 @@ int inthash_readptr(inthash hashtable, const char *name, intptr_t * value) {
   return ret;
 }
 
-static void inthash_init(inthash hashtable) {
-  unsigned int i;
-
-  for(i = 0; i < hashtable->hash_size; i++) {
-    hashtable->hash[i] = NULL;
-  }
-}
-
-static void inthash_delchain(inthash_chain * hash,
-                             t_inthash_freehandler free_handler) {
-  while(hash != NULL) {
-    inthash_chain *next = hash->next;
-
-    if (free_handler) {         // pos is a malloc() block, delete it!
-      if (hash->value.ptr) {
-        void *ptr = hash->value.ptr;
-
-        if (free_handler)
-          free_handler(ptr);
-        else
-          freet(ptr);
-        hash->value.ptr = 0;
-      }
-    }
-    freet(hash);
-    hash = next;
-  }
-}
-
-static void inthash_default_free_handler(void *value) {
-  if (value)
-    freet(value);
-}
-
-// --
-
-inthash inthash_new(int size) {
-  inthash hashtable = (inthash) calloct(1, sizeof(struct_inthash));
+inthash inthash_new(size_t initial_size) {
+  inthash hashtable = (inthash) calloc(1, sizeof(struct_inthash));
 
   if (hashtable) {
-    hashtable->hash_size = 0;
+    size_t size;
+    for(size = 8 ; POW2(size) < initial_size ; size++) ;
     hashtable->flag_valueismalloc = 0;
-    if ((hashtable->hash =
-         (inthash_chain **) calloct(size, sizeof(inthash_chain *)))) {
-      hashtable->hash_size = size;
-      inthash_init(hashtable);
+    if ((hashtable->items =
+         (inthash_item *) calloc(POW2(size), sizeof(inthash_item)))) {
+      hashtable->hash_size_power = size;
     }
     hashtable->nitems = 0;
+    hashtable->stash_size = 0;
+    hashtable->string_pool = NULL;
+    hashtable->string_pool_size = 0;
+    hashtable->string_pool_capacity = 0;
+    hashtable->string_pool_chars = 0;
   }
   return hashtable;
 }
 
 int inthash_created(inthash hashtable) {
-  if (hashtable)
-    if (hashtable->hash)
-      return 1;
-  return 0;
+  return hashtable != NULL && hashtable->items != NULL;
 }
 
 void inthash_value_is_malloc(inthash hashtable, int flag) {
@@ -336,34 +660,52 @@ void inthash_value_set_free_handler(inthash hashtable,
   hashtable->free_handler = free_handler;
 }
 
-unsigned int inthash_nitems(inthash hashtable) {
+size_t inthash_nitems(inthash hashtable) {
   if (hashtable != NULL)
     return hashtable->nitems;
   return 0;
 }
 
-void inthash_delete(inthash * hashtable) {
-  if (hashtable) {
-    if (*hashtable) {
-      if ((*hashtable)->hash) {
-        unsigned int i;
-        t_inthash_freehandler free_handler = NULL;
-
-        if ((*hashtable)->flag_valueismalloc) {
-          if ((*hashtable)->free_handler)
-            free_handler = (*hashtable)->free_handler;
-          else
-            free_handler = inthash_default_free_handler;
+void inthash_delete(inthash *phashtable) {
+  if (phashtable != NULL) {
+    inthash hashtable = *phashtable;
+    if (hashtable != NULL) {
+      if (hashtable->items != NULL) {
+        /* we need to delete values */
+        const size_t hash_size = POW2(hashtable->hash_size_power);
+        const t_inthash_freehandler free_handler = 
+          hashtable->flag_valueismalloc ? 
+          ( hashtable->free_handler != NULL 
+          ? hashtable->free_handler : inthash_default_free_handler )
+          : NULL;
+        size_t i;
+        /* wipe hashtable */
+        for(i = 0 ; i < hash_size ; i++) {
+          if (!inthash_is_free(hashtable, i)) {
+            if (free_handler != NULL) {
+              free_handler(hashtable->items[i].value.ptr);
+            }
+            hashtable->items[i].value.ptr = NULL;
+            inthash_free_name(hashtable, hashtable->items[i].name);
+            hashtable->items[i].name = NULL;
+          }
         }
-        for(i = 0; i < (*hashtable)->hash_size; i++) {
-          inthash_delchain((*hashtable)->hash[i], free_handler);
-          (*hashtable)->hash[i] = NULL;
+        /* wipe auxiliary stash if any */
+        for(i = 0 ; i < hashtable->stash_size ; i++) {
+          if (free_handler != NULL) {
+            free_handler(hashtable->stash[i].value.ptr);
+          }
+          hashtable->stash[i].value.ptr = NULL;
+          inthash_free_name(hashtable, hashtable->stash[i].name);
+          hashtable->stash[i].name = NULL;
         }
-        freet((*hashtable)->hash);
-        (*hashtable)->hash = NULL;
       }
-      freet(*hashtable);
-      *hashtable = NULL;
+      /* wipe top-level */
+      hashtable->hash_size_power = 0;
+      hashtable->nitems = 0;
+      free(hashtable->items);
+      free(hashtable);
+      *phashtable = NULL;
     }
   }
 }
@@ -373,25 +715,30 @@ void inthash_delete(inthash * hashtable) {
 struct_inthash_enum inthash_enum_new(inthash hashtable) {
   struct_inthash_enum e;
 
-  memset(&e, 0, sizeof(e));
   e.index = 0;
-  e.item = NULL;
   e.table = hashtable;
   return e;
 }
 
-inthash_chain *inthash_enum_next(struct_inthash_enum * e) {
-  inthash_chain *item = NULL;
-
-  if (e != NULL) {
-    while(e->item == NULL && e->index < (int) e->table->hash_size) {
-      e->item = e->table->hash[e->index];
-      e->index++;
-    }
-    if (e->item != NULL) {
-      item = e->item;
-      e->item = e->item->next;
-    }
+inthash_item *inthash_enum_next(struct_inthash_enum * e) {
+  const size_t hash_size = POW2(e->table->hash_size_power);
+  for( ; e->index < hash_size 
+    && inthash_is_free(e->table, e->index) ; e->index++) ;
+  /* enumerate all table */
+  if (e->index < hash_size) {
+    inthash_item *const next = &e->table->items[e->index];
+    e->index++;
+    return next;
   }
-  return item;
+  /* enumerate stash if present */
+  else if (e->index < hash_size + e->table->stash_size) {
+    const size_t index = e->index - hash_size;
+    inthash_item *const next = &e->table->stash[index];
+    e->index++;
+    return next;
+  }
+  /* eof */
+  else {
+    return NULL;
+  }
 }

@@ -56,15 +56,16 @@ typedef union inthash_value {
 #define INTHASH_VALUE_NULL { 0 }
 
 // simple hash table for other routines
-#ifndef HTS_DEF_FWSTRUCT_inthash_chain
-#define HTS_DEF_FWSTRUCT_inthash_chain
-typedef struct inthash_chain inthash_chain;
+#ifndef HTS_DEF_FWSTRUCT_inthash_item
+#define HTS_DEF_FWSTRUCT_inthash_item
+typedef struct inthash_item inthash_item;
 #endif
-struct inthash_chain {
+struct inthash_item {
   char *name;                   /* key (name) */
   inthash_value value;          /* value */
-  struct inthash_chain *next;   /* next element */
 };
+
+typedef inthash_item inthash_chain;
 
 typedef void (*t_inthash_freehandler) (void *value);
 
@@ -73,12 +74,19 @@ typedef void (*t_inthash_freehandler) (void *value);
 #define HTS_DEF_FWSTRUCT_struct_inthash
 typedef struct struct_inthash struct_inthash, *inthash;
 #endif
+#define STASH_SIZE 16
 struct struct_inthash {
-  inthash_chain **hash;
-  unsigned int nitems;
+  inthash_item *items;
+  size_t nitems;
   t_inthash_freehandler free_handler;
-  unsigned int hash_size;
-  unsigned short flag_valueismalloc;
+  size_t hash_size_power;
+  inthash_item stash[STASH_SIZE];
+  size_t stash_size;
+  char *string_pool;
+  size_t string_pool_size;
+  size_t string_pool_capacity;
+  size_t string_pool_chars;
+  unsigned char flag_valueismalloc;
 };
 
 // enumeration
@@ -88,8 +96,7 @@ typedef struct struct_inthash_enum struct_inthash_enum;
 #endif
 struct struct_inthash_enum {
   inthash table;
-  int index;
-  inthash_chain *item;
+  size_t index;
 };
 
 /* Library internal definictions */
@@ -98,9 +105,9 @@ struct struct_inthash_enum {
 // main functions:
 
 /* Hash functions: */
-inthash inthash_new(int size);  /* Create a new hash table */
+inthash inthash_new(size_t size);  /* Create a new hash table */
 int inthash_created(inthash hashtable); /* Test if the hash table was successfully created */
-unsigned int inthash_nitems(inthash hashtable); /* Number of items */
+size_t inthash_nitems(inthash hashtable); /* Number of items */
 void inthash_delete(inthash * hashtable);       /* Delete an hash table */
 void inthash_value_is_malloc(inthash hashtable, int flag);      /* Is the 'value' member a value that needs to be free()'ed ? */
 void inthash_value_set_free_handler(inthash hashtable,  /* value free() handler (default one is 'free') */
@@ -116,8 +123,6 @@ int inthash_read_value(inthash hashtable, const char *name,
                        inthash_value * value);
 int inthash_write_value(inthash hashtable, const char *name,
                         inthash_value value);
-void inthash_add_value(inthash hashtable, const char *name,
-                       inthash_value value);
 /* */
 int inthash_read_pvoid(inthash hashtable, const char *name, void **value);
 int inthash_write_pvoid(inthash hashtable, const char *name, void *value);
@@ -125,14 +130,13 @@ void inthash_add_pvoid(inthash hashtable, const char *name, void *value);
 
 /* */
 void inthash_add(inthash hashtable, const char *name, intptr_t value);  /* Add entry in the hash table */
-void *inthash_addblk(inthash hashtable, const char *name, int blksize); /* Add entry in the hash table and set value to a new memory block */
 int inthash_write(inthash hashtable, const char *name, intptr_t value); /* Overwrite/add entry in the hash table */
 int inthash_inc(inthash hashtable, const char *name);   /* Increment entry in the hash table */
 int inthash_remove(inthash hashtable, const char *name);        /* Remove an entry from the hashtable */
 
 /* */
 struct_inthash_enum inthash_enum_new(inthash hashtable);        /* Start a new enumerator */
-inthash_chain *inthash_enum_next(struct_inthash_enum * e);      /* Fetch an item in the enumerator */
+inthash_item *inthash_enum_next(struct_inthash_enum * e);      /* Fetch an item in the enumerator */
 
 /* End of hash functions: */
 #endif
