@@ -408,7 +408,7 @@ int back_done_incache(struct_back * sback) {
   // stored (ready) slots
   if (sback->ready != NULL) {
 #ifndef HTS_NO_BACK_ON_DISK
-    n += inthash_nitems(sback->ready);
+    n += (int) inthash_nitems(sback->ready);
 #else
     struct_inthash_enum e = inthash_enum_new(sback->ready);
     inthash_chain *item;
@@ -2308,7 +2308,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
           int index = hash_read(opt->hash, back[i].url_sav, "", 0, opt->urlhack);       // lecture type 0 (sav)
 
           if (index >= 0) {
-            opt->hash->liens[index]->pass2 = -1;        /* DONE! */
+            opt->liens[index]->pass2 = -1;        /* DONE! */
           } else {
             hts_log_print(opt, LOG_INFO,
                           "engine: warning: entry cleaned up, but no trace on heap: %s%s (%s)",

@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsmd5.h"
 #include "htscore.h"
+#include "htsinthash.h"
 /* END specific definitions */
 
 /* Specific macros */
@@ -59,143 +60,76 @@ Please visit our Website: http://www.httrack.com
 // #define HTS_HASH_SIZE 8191  (premier si possible!)
 // type: numero enregistrement - 0 est case insensitive (sav) 1 (adr+fil) 2 (former_adr+former_fil)
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
+
+void hash_init(hash_struct * hash) {
+  hash->sav = inthash_new(0);
+  hash->adrfil = inthash_new(0);
+  hash->former_adrfil = inthash_new(0);
+}
+
 // retour: position ou -1 si non trouvé
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               int type, int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
   const char *normfil;
-  const char *normadr;
-  unsigned int cle;
-  int pos;
+  intptr_t intvalue;
+  char *name;
 
-  // calculer la clé de recherche, non modulée
-  if (type)
-    cle = hash_cle(nom1, nom2);
-  else
-    cle = hash_cle(convtolower(catbuff, nom1), nom2);   // case insensitive
-  // la position se calcule en modulant
-  pos = (int) (cle % HTS_HASH_SIZE);
-  // entrée trouvée?
-  if (hash->hash[type][pos] >= 0) {     // un ou plusieurs enregistrement(s) avec une telle clé existe..
-    // tester table de raccourcis (hash)
-    // pos est maintenant la position recherchée dans liens
-    pos = hash->hash[type][pos];
-    while(pos >= 0) {           // parcourir la chaine
-      switch (type) {
-      case 0:                  // sav
-        if (strfield2(nom1, hash->liens[pos]->sav)) {   // case insensitive
-#if DEBUG_HASH==2
-          printf("hash: found shortcut at %d\n", pos);
-#endif
-          return pos;
-        }
-        break;
-      case 1:                  // adr+fil
-        {
-          if (!normalized)
-            normfil = hash->liens[pos]->fil;
-          else
-            normfil = fil_normalized(hash->liens[pos]->fil, normfil_);
-          if (!normalized)
-            normadr = jump_identification(hash->liens[pos]->adr);
-          else
-            normadr = jump_normalized(hash->liens[pos]->adr);
-          if ((strfield2(nom1, normadr) != 0) && (strcmp(nom2, normfil) == 0)) {
-#if DEBUG_HASH==2
-            printf("hash: found shortcut at %d\n", pos);
-#endif
-            return pos;
-          }
-        }
-        break;
-      case 2:                  // former_adr+former_fil
-        {
-          if (hash->liens[pos]->former_adr) {
-            if (!normalized)
-              normfil = hash->liens[pos]->former_fil;
-            else
-              normfil = fil_normalized(hash->liens[pos]->former_fil, normfil_);
-            if (!normalized)
-              normadr = jump_identification(hash->liens[pos]->former_adr);
-            else
-              normadr = jump_normalized(hash->liens[pos]->former_adr);
-
-            if ((strfield2(nom1, normadr) != 0) && (strcmp(nom2, normfil) == 0)) {
-#if DEBUG_HASH==2
-              printf("hash: found shortcut at %d\n", pos);
-#endif
-              return pos;
-            }
-          }
-        }
-        break;
-      }
-      // calculer prochaine position dans la chaine
-      {
-        int old = pos;
-
-        pos = hash->liens[pos]->hash_next[type];        // sinon prochain dans la chaine
-        if (old == pos)
-          pos = -1;             // erreur de bouclage (ne devrait pas arriver)
-      }
+  /* dispatch type */
+  switch(type) {
+  case 0:
+    /* first entry: destination filename (lowercased) */
+    assertf(nom2 == NULL || *nom2 == '\0');
+    name = convtolower(catbuff, nom1);
+    break;
+  case 1:
+  case 2:
+    /* second and third entries: URL address and path */
+    if (!normalized)
+      normfil = nom1;
+    else
+      normfil = fil_normalized(nom1, normfil_);
+    if (!normalized) {
+      strcpybuff(catbuff, jump_identification(nom2));
+    } else {
+      strcpybuff(catbuff, jump_normalized(nom2));
     }
+    strcatbuff(catbuff, normfil);
+    name = catbuff;
+    break;
+  default:
+    assertf(! "unexpected case");
+    break;
+  }
 
-    // Ok va falloir chercher alors..
-    /*pos=hash->max_lien;    // commencer à max_lien
-       switch (type) {
-       case 0:         // sav
-       while(pos>=0) {
-       if (hash->liens[pos]->hash_sav == cle ) {
-       if (strcmp(nom1,hash->liens[pos]->sav)==0) {
-       hash->hash[type][(int) (cle%HTS_HASH_SIZE)] = pos;    // noter plus récent dans shortcut table
-       #if DEBUG_HASH==2
-       printf("hash: found long search at %d\n",pos);
-       #endif
-       return pos;
-       }
-       }
-       pos--;
-       }
-       break;
-       case 1:         // adr+fil
-       while(pos>=0) {
-       if (hash->liens[pos]->hash_adrfil == cle ) {
-       if ((strcmp(nom1,hash->liens[pos]->adr)==0) && (strcmp(nom2,hash->liens[pos]->fil)==0)) {
-       hash->hash[type][(int) (cle%HTS_HASH_SIZE)] = pos;    // noter plus récent dans shortcut table
-       #if DEBUG_HASH==2
-       printf("hash: found long search at %d\n",pos);
-       #endif
-       return pos;
-       }
-       }
-       pos--;
-       }
-       break;
-       case 2:         // former_adr+former_fil
-       while(pos>=0) {
-       if (hash->liens[pos]->hash_fadrfil == cle ) {
-       if (hash->liens[pos]->former_adr)
-       if ((strcmp(nom1,hash->liens[pos]->former_adr)==0) && (strcmp(nom2,hash->liens[pos]->former_fil)==0)) {
-       hash->hash[type][(int) (cle%HTS_HASH_SIZE)] = pos;    // noter plus récent dans shortcut table
-       #if DEBUG_HASH==2
-       printf("hash: found long search at %d\n",pos);
-       #endif
-       return pos;
-       }
-       }
-       pos--;
-       }
-       } */
-#if DEBUG_HASH==1
-    printf("hash: not found after test %s%s\n", nom1, nom2);
-#endif
-    return -1;                  // non trouvé
-  } else {
-#if DEBUG_HASH==2
-    printf("hash: not found %s%s\n", nom1, nom2);
-#endif
-    return -1;                  // non trouvé : clé non entrée (même une fois)
+  /* read */
+  switch(type) {
+  case 0:
+    if (inthash_read(hash->sav, name, &intvalue)) {
+      return (int) intvalue;
+    } else {
+      return -1;
+    }
+    break;
+  case 1:
+    if (inthash_read(hash->adrfil, name, &intvalue)) {
+      return (int) intvalue;
+    } else {
+      return -1;
+    }
+    break;
+  case 2:
+    if (inthash_read(hash->former_adrfil, name, &intvalue)) {
+      return (int) intvalue;
+    } else {
+      return -1;
+    }
+    break;
+  default:
+    assertf(! "unexpected case");
+    return -1;
+    break;
   }
 }
 
@@ -204,119 +138,37 @@ void hash_write(hash_struct * hash, int lpos, int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
   const char *normfil;
-  unsigned int cle;
-  int pos;
-  int *ptr;
+  const char *name;
 
-  //
-  if (hash->liens[lpos]) {      // on sait jamais..
-    hash->max_lien = max(hash->max_lien, lpos);
-#if DEBUG_HASH
-    hashnumber = hash->max_lien;
-#endif
-    // élément actuel sur -1 (fin de chaine)
-    hash->liens[lpos]->hash_next[0] = hash->liens[lpos]->hash_next[1] =
-      hash->liens[lpos]->hash_next[2] = -1;
-    //
-    cle = hash_cle(convtolower(catbuff, hash->liens[lpos]->sav), "");   // CASE INSENSITIVE
-    pos = (int) (cle % HTS_HASH_SIZE);
-    ptr = hash_calc_chaine(hash, 0, pos);       // calculer adresse chaine
-    *ptr = lpos;                // noter dernier enregistré
-#if DEBUG_HASH==3
-    printf("[%d", pos);
-#endif
-    //
-    if (!normalized)
-      normfil = hash->liens[lpos]->fil;
-    else
-      normfil = fil_normalized(hash->liens[lpos]->fil, normfil_);
-    if (!normalized)
-      cle = hash_cle(jump_identification(hash->liens[lpos]->adr), normfil);
-    else
-      cle = hash_cle(jump_normalized(hash->liens[lpos]->adr), normfil);
-    pos = (int) (cle % HTS_HASH_SIZE);
-    ptr = hash_calc_chaine(hash, 1, pos);       // calculer adresse chaine
-    *ptr = lpos;                // noter dernier enregistré
-#if DEBUG_HASH==3
-    printf(",%d", pos);
-#endif
-    //
-    if (hash->liens[lpos]->former_adr) {        // former_adr existe?
-      if (!normalized)
-        normfil = hash->liens[lpos]->former_fil;
-      else
-        normfil = fil_normalized(hash->liens[lpos]->former_fil, normfil_);
-      if (!normalized)
-        cle =
-          hash_cle(jump_identification(hash->liens[lpos]->former_adr), normfil);
-      else
-        cle = hash_cle(jump_normalized(hash->liens[lpos]->former_adr), normfil);
-      pos = (int) (cle % HTS_HASH_SIZE);
-      ptr = hash_calc_chaine(hash, 2, pos);     // calculer adresse chaine
-      *ptr = lpos;              // noter dernier enregistré
-#if DEBUG_HASH==3
-      printf(",%d", pos);
-#endif
+  /* first entry: destination filename (lowercased) */
+  name = convtolower(catbuff, hash->liens[lpos]->sav);
+  inthash_write(hash->sav, name, lpos);
+
+  /* second entry: URL address and path */
+  if (!normalized)
+    normfil = hash->liens[lpos]->fil;
+  else
+    normfil = fil_normalized(hash->liens[lpos]->fil, normfil_);
+  if (!normalized) {
+    strcpybuff(catbuff, jump_identification(hash->liens[lpos]->adr));
+  } else {
+    strcpybuff(catbuff, jump_normalized(hash->liens[lpos]->adr));
+  }
+  strcatbuff(catbuff, normfil);
+  inthash_write(hash->adrfil, name, lpos);
+
+  /* third entry: URL address and path before redirect */
+  if (hash->liens[lpos]->former_adr) {        // former_adr existe?
+    if (!normalized) {
+      normfil = hash->liens[lpos]->former_fil;
+    } else {
+      normfil = fil_normalized(hash->liens[lpos]->former_fil, normfil_);
     }
-#if DEBUG_HASH==3
-    printf("] ");
-    fflush(stdout);
-#endif
+    if (!normalized)
+      strcpybuff(catbuff, jump_identification(hash->liens[lpos]->former_adr));
+    else
+      strcpybuff(catbuff, jump_normalized(hash->liens[lpos]->former_adr));
+    strcatbuff(catbuff, normfil);
+    inthash_write(hash->former_adrfil, name, lpos);
   }
-#if DEBUT_HASH
-  else {
-    printf("* hash_write=0!!\n");
-    abortLogFmt("unexpected error in hash_write (pos=%d)" _pos);
-    abort();
-  }
-#endif
-  //
 }
-
-// calcul clé
-// il n'y a pas de formule de hashage universelle, celle-ci semble acceptable..
-unsigned long int hash_cle(const char *nom1, const char *nom2) {
-  /*
-     unsigned int sum=0;
-     int i=0;
-     while(*nom1) {
-     sum += 1;
-     sum += (unsigned int) *(nom1);
-     sum *= (unsigned int) *(nom1++);
-     sum += (unsigned int) i;
-     i++;
-     }
-     while(*nom2) {
-     sum += 1;
-     sum += (unsigned int) *(nom2);
-     sum *= (unsigned int) *(nom2++);
-     sum += (unsigned int) i;
-     i++;
-     }
-   */
-  return md5sum32(nom1)
-    + md5sum32(nom2);
-}
-
-// calcul de la position finale dans la chaine des elements ayant la même clé
-int *hash_calc_chaine(hash_struct * hash, int type, int pos) {
-#if DEBUG_HASH
-  int count = 0;
-#endif
-  if (hash->hash[type][pos] == -1)
-    return &(hash->hash[type][pos]);    // premier élément dans la chaine
-  pos = hash->hash[type][pos];
-  while(hash->liens[pos]->hash_next[type] != -1) {
-    pos = hash->liens[pos]->hash_next[type];
-#if DEBUG_HASH
-    count++;
-#endif
-  }
-#if DEBUG_HASH
-  count++;
-  longest_hash[type] = max(longest_hash[type], count);
-#endif
-  return &(hash->liens[pos]->hash_next[type]);
-}
-
-// FIN GESTION DES TABLES DE HACHAGE

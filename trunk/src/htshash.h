@@ -45,6 +45,7 @@ typedef struct hash_struct hash_struct;
 #endif
 
 // tables de hachage
+void hash_init(hash_struct * hash);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               int type, int normalized);
 void hash_write(hash_struct * hash, int lpos, int normalized);

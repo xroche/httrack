@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_SERVER_DEFH
 #define HTS_SERVER_DEFH
 
+#include <sys/stat.h>
 #include "htsnet.h"
 
 /* String */
@@ -223,7 +224,7 @@ static int linput(FILE * fp, char *s, int max) {
 }
 static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloct(max + 2);
+  char *ls = (char *) malloc(max + 2);
 
   s[0] = '\0';
   if (ls) {
@@ -247,7 +248,7 @@ static int linput_trim(FILE * fp, char *s, int max) {
       }
     }
     //
-    freet(ls);
+    free(ls);
   }
   return rlen;
 }

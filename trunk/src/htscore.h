@@ -261,9 +261,14 @@ struct cache_back {
 typedef struct hash_struct hash_struct;
 #endif
 struct hash_struct {
-  lien_url **liens;             // pointeur sur liens
-  int max_lien;                 // indice le plus grand rencontré
-  int hash[3][HTS_HASH_SIZE];   // tables pour sav/adr-fil/former_adr-former_fil
+  /* Links big array reference */
+  const lien_url **liens;
+  /* Savename (case insensitive ; lowercased) */
+  inthash sav;
+  /* Address and path */
+  inthash adrfil;
+  /* Former address and path */
+  inthash former_adrfil;
 };
 
 #ifndef HTS_DEF_FWSTRUCT_filecreate_params
