@@ -32,7 +32,26 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-// inthash -- simple hash table, using a key (char[]) and a value (uintptr_t)
+/**
+ * Library notes:
+ * This small hashtable library provides key/value hashtable, with a string
+ * key, and integer/pointer value (with an associated optional allocator)
+ * It features O(1) average insertion, O(1) lookup, and O(1) delete.
+ *
+ * Implementation notes:
+ * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
+ * with a LCG hash function, with one additional auxiliary hash function.
+ * It also uses a small stash area to handle rare cases of collisions.
+ * Enumeration of all key/values is possible, deletion is also possible, but
+ * currently without any auto-shrinking (ie. table will never shrink).
+ * Overall, two main blocks are allocated: one for the items, and one for
+ * the keys (pool).
+ *
+ * References: 
+ * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
+ * LCG http://en.wikipedia.org/wiki/Linear_congruential_generator
+ * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
+ **/
 
 #ifndef HTSINTHASH_DEFH
 #define HTSINTHASH_DEFH
@@ -47,53 +66,50 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 #endif
 
-// value
+/** Value. **/
 typedef union inthash_value {
-  uintptr_t intg;               /* integer value */
-  void *ptr;                    /* ptr value */
+  /** Integer value. **/
+  uintptr_t intg;
+  /** Pointer value. **/
+  void *ptr;
 } inthash_value;
 
+/** NULL Value. **/
 #define INTHASH_VALUE_NULL { 0 }
 
-// simple hash table for other routines
 #ifndef HTS_DEF_FWSTRUCT_inthash_item
 #define HTS_DEF_FWSTRUCT_inthash_item
 typedef struct inthash_item inthash_item;
 #endif
+
+/** Item holding a value. **/
 struct inthash_item {
-  char *name;                   /* key (name) */
-  inthash_value value;          /* value */
+  /** Key. **/
+  char *name;
+  /** Value. **/
+  inthash_value value;
 };
 
+/* Alias for legacy code */
 typedef inthash_item inthash_chain;
 
+/* Free handler */
 typedef void (*t_inthash_freehandler) (void *value);
 
-/* inthash structure */
+/** Hashtable (opaque structure). **/
 #ifndef HTS_DEF_FWSTRUCT_struct_inthash
 #define HTS_DEF_FWSTRUCT_struct_inthash
 typedef struct struct_inthash struct_inthash, *inthash;
 #endif
 #define STASH_SIZE 16
-struct struct_inthash {
-  inthash_item *items;
-  size_t nitems;
-  t_inthash_freehandler free_handler;
-  size_t hash_size_power;
-  inthash_item stash[STASH_SIZE];
-  size_t stash_size;
-  char *string_pool;
-  size_t string_pool_size;
-  size_t string_pool_capacity;
-  size_t string_pool_chars;
-  unsigned char flag_valueismalloc;
-};
 
-// enumeration
+/** Hashtable enumeration (opaque structure). **/
 #ifndef HTS_DEF_FWSTRUCT_struct_inthash_enum
 #define HTS_DEF_FWSTRUCT_struct_inthash_enum
 typedef struct struct_inthash_enum struct_inthash_enum;
 #endif
+
+/** Enumeration. **/
 struct struct_inthash_enum {
   inthash table;
   size_t index;
@@ -101,8 +117,6 @@ struct struct_inthash_enum {
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-
-// main functions:
 
 /* Hash functions: */
 inthash inthash_new(size_t size);  /* Create a new hash table */

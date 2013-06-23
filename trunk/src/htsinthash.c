@@ -32,27 +32,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/**
- * Library notes:
- * This small hashtable library provides key/value hashtable, with a string
- * key, and integer/pointer value (with an associated optional allocator)
- * It features O(1) average insertion, O(1) lookup, and O(1) delete.
- *
- * Implementation notes:
- * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
- * with a LCG hash function, with one additional auxiliary hash function.
- * It also uses a small stash area to handle rare cases of collisions.
- * Enumeration of all key/values is possible, deletion is also possible, but
- * currently without any auto-shrinking (ie. table will never shrink).
- * Overall, two main blocks are allocated: one for the items, and one for
- * the keys (pool).
- *
- * References: 
- * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
- * LCG http://en.wikipedia.org/wiki/Linear_congruential_generator
- * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
- **/
-
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
@@ -62,6 +41,21 @@ Please visit our Website: http://www.httrack.com
 #include <assert.h>
 
 #include "htsinthash.h"
+
+/** Hashtable. **/
+struct struct_inthash {
+  inthash_item *items;
+  size_t nitems;
+  t_inthash_freehandler free_handler;
+  size_t hash_size_power;
+  inthash_item stash[STASH_SIZE];
+  size_t stash_size;
+  char *string_pool;
+  size_t string_pool_size;
+  size_t string_pool_capacity;
+  size_t string_pool_chars;
+  unsigned char flag_valueismalloc;
+};
 
 #ifdef LIBHTTRACK_EXPORTS
 #include "htsbase.h"
