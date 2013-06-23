@@ -139,7 +139,6 @@ extern "C" {
     if (htsCallbackErr != NULL) { \
       htsCallbackErr("assert failed: " #exp, __FILE__ , __LINE__ ); \
     } \
-    assert(exp); \
     abort(); \
   } \
 } while(0)
