@@ -92,7 +92,7 @@ typedef struct inthash_keys {
 
 static inthash_keys inthash_calc_hashes(const char *value) {
   /* compute two lcg hashes using different seeds */
-  inthash_keys hash = { 0, (inthash_key) -1 };
+  inthash_keys hash = { 0, ~0 };
   size_t i;
   for(i = 0 ; value[i] != '\0' ; i++) {
     const unsigned char c1 = value[i];
@@ -452,28 +452,30 @@ int inthash_write_value(inthash hashtable, const char *name,
 
       /* relocate lower half items when needed */
       for(i = 0 ; i < prev_size ; i++) {
-        const inthash_keys hashes = inthash_calc_hashes(hashtable->items[i].name);
-        size_t pos;
-        /* currently at old position 1 */
-        pos = inthash_hash_to_pos_(prev_power, hashes.hash1);
-        if (pos == i) {
-          const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash1);
-          /* no more the expected position */
-          if (pos != i) {
-            hashtable->items[pos] = hashtable->items[i];
-            memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+        if (!inthash_is_free(hashtable, i)) {
+          const inthash_keys hashes = inthash_calc_hashes(hashtable->items[i].name);
+          size_t pos;
+          /* currently at old position 1 */
+          pos = inthash_hash_to_pos_(prev_power, hashes.hash1);
+          if (pos == i) {
+            const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+            /* no more the expected position */
+            if (pos != i) {
+              hashtable->items[pos] = hashtable->items[i];
+              memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+            }
           }
-        }
-        else if (inthash_hash_to_pos_(prev_power, hashes.hash2) == i) {
-          const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash2);
-          /* no more the expected position */
-          if (pos != i) {
-            hashtable->items[pos] = hashtable->items[i];
-            memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+          else if (inthash_hash_to_pos_(prev_power, hashes.hash2) == i) {
+            const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+            /* no more the expected position */
+            if (pos != i) {
+              hashtable->items[pos] = hashtable->items[i];
+              memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
+            }
           }
-        }
-        else {
-          assert(! "hashtable unexpected internal error");
+          else {
+            assert(! "hashtable unexpected internal error");
+          }
         }
       }
 
