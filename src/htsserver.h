@@ -87,6 +87,9 @@ extern httrackp *global_opt;
 #define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 
+#define min(a,b) ((a)>(b)?(b):(a))
+#define max(a,b) ((a)>(b)?(a):(b))
+
 extern int smallserver_setkey(char *key, char *value);
 extern int smallserver_setkeyint(char *key, LLint value);
 extern int smallserver_setkeyarr(char *key, int id, char *key2, char *value);
