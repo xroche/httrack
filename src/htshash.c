@@ -67,59 +67,65 @@ void hash_init(hash_struct * hash) {
   hash->former_adrfil = inthash_new(0);
 }
 
-// retour: position ou -1 si non trouvé
-int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
-              int type, int normalized) {
-  char BIGSTK normfil_[HTS_URLMAXSIZE * 2];
-  char catbuff[CATBUFF_SIZE];
-  const char *normfil;
-  intptr_t intvalue;
-  char *name;
-
+static char * normalize_key(const char *nom1, const char *nom2,
+                            hash_struct_type type, int normalized, 
+                            char *normfil_, char *catbuff) {
   /* dispatch type */
+  const char *normfil;
   switch(type) {
-  case 0:
+  case HASH_STRUCT_FILENAME:
     /* first entry: destination filename (lowercased) */
     assertf(nom2 == NULL || *nom2 == '\0');
-    name = convtolower(catbuff, nom1);
+    return convtolower(catbuff, nom1);
     break;
-  case 1:
-  case 2:
+  case HASH_STRUCT_ADR_PATH:
+  case HASH_STRUCT_ORIGINAL_ADR_PATH:
     /* second and third entries: URL address and path */
     if (!normalized)
-      normfil = nom1;
+      normfil = nom2;
     else
-      normfil = fil_normalized(nom1, normfil_);
+      normfil = fil_normalized(nom2, normfil_);
     if (!normalized) {
-      strcpybuff(catbuff, jump_identification(nom2));
+      strcpybuff(catbuff, jump_identification(nom1));
     } else {
-      strcpybuff(catbuff, jump_normalized(nom2));
+      strcpybuff(catbuff, jump_normalized(nom1));
     }
     strcatbuff(catbuff, normfil);
-    name = catbuff;
+    return catbuff;
     break;
   default:
     assertf(! "unexpected case");
+    return NULL;
     break;
   }
+}
+
+// retour: position ou -1 si non trouvé
+int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
+              hash_struct_type type, int normalized) {
+  char BIGSTK normfil_[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
+  intptr_t intvalue;
+  char *const name = normalize_key(nom1, nom2, type, normalized, 
+    normfil_, catbuff);
 
   /* read */
   switch(type) {
-  case 0:
+  case HASH_STRUCT_FILENAME:
     if (inthash_read(hash->sav, name, &intvalue)) {
       return (int) intvalue;
     } else {
       return -1;
     }
     break;
-  case 1:
+  case HASH_STRUCT_ADR_PATH:
     if (inthash_read(hash->adrfil, name, &intvalue)) {
       return (int) intvalue;
     } else {
       return -1;
     }
     break;
-  case 2:
+  case HASH_STRUCT_ORIGINAL_ADR_PATH:
     if (inthash_read(hash->former_adrfil, name, &intvalue)) {
       return (int) intvalue;
     } else {
@@ -141,34 +147,20 @@ void hash_write(hash_struct * hash, int lpos, int normalized) {
   const char *name;
 
   /* first entry: destination filename (lowercased) */
-  name = convtolower(catbuff, hash->liens[lpos]->sav);
+  name = normalize_key(hash->liens[lpos]->sav, NULL, HASH_STRUCT_FILENAME,
+    normalized, normfil_, catbuff);
   inthash_write(hash->sav, name, lpos);
 
   /* second entry: URL address and path */
-  if (!normalized)
-    normfil = hash->liens[lpos]->fil;
-  else
-    normfil = fil_normalized(hash->liens[lpos]->fil, normfil_);
-  if (!normalized) {
-    strcpybuff(catbuff, jump_identification(hash->liens[lpos]->adr));
-  } else {
-    strcpybuff(catbuff, jump_normalized(hash->liens[lpos]->adr));
-  }
-  strcatbuff(catbuff, normfil);
+  name = normalize_key(hash->liens[lpos]->adr, hash->liens[lpos]->fil, 
+    HASH_STRUCT_ADR_PATH, normalized, normfil_, catbuff);
   inthash_write(hash->adrfil, name, lpos);
 
   /* third entry: URL address and path before redirect */
   if (hash->liens[lpos]->former_adr) {        // former_adr existe?
-    if (!normalized) {
-      normfil = hash->liens[lpos]->former_fil;
-    } else {
-      normfil = fil_normalized(hash->liens[lpos]->former_fil, normfil_);
-    }
-    if (!normalized)
-      strcpybuff(catbuff, jump_identification(hash->liens[lpos]->former_adr));
-    else
-      strcpybuff(catbuff, jump_normalized(hash->liens[lpos]->former_adr));
-    strcatbuff(catbuff, normfil);
+    name = normalize_key(hash->liens[lpos]->former_adr, 
+      hash->liens[lpos]->former_fil, HASH_STRUCT_ORIGINAL_ADR_PATH,
+      normalized, normfil_, catbuff);
     inthash_write(hash->former_adrfil, name, lpos);
   }
 }

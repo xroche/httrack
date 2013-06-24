@@ -43,6 +43,12 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsinthash.h"
 
+#define USES_MD5
+
+#ifdef USES_MD5
+#include "htsmd5.h"
+#endif
+
 /** Hashtable. **/
 struct struct_inthash {
   inthash_item *items;
@@ -77,7 +83,7 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 #define HASH_ADD(HASH, C) do {                  \
     (HASH) *= HASH_PRIME;                       \
     (HASH) += HASH_CONST;                       \
-    (HASH) += (C);                              \
+    (HASH) ^= ( (C) << 24);                     \
   } while(0)
 
 /* 2**X */
@@ -95,7 +101,31 @@ static void inthash_log(inthash hashtable,
   va_end(args);
 }
 
+#ifndef USES_MD5
+static unsigned int rev32(unsigned int v) {
+  /* swap odd and even bits */
+  v = ((v >> 1) & 0x55555555) | ((v & 0x55555555) << 1);
+  /* swap consecutive pairs */
+  v = ((v >> 2) & 0x33333333) | ((v & 0x33333333) << 2);
+  /* swap nibbles ...  */
+  v = ((v >> 4) & 0x0F0F0F0F) | ((v & 0x0F0F0F0F) << 4);
+  /* swap bytes */
+  v = ((v >> 8) & 0x00FF00FF) | ((v & 0x00FF00FF) << 8);
+  /* swap 2-byte long pairs */
+  v = ( v >> 16             ) | ( v               << 16);
+  return v;
+}
+#endif
+
 static inthash_keys inthash_calc_hashes(const char *value) {
+#ifdef USES_MD5
+  union {
+    char md5digest[16];
+    inthash_keys hashes;
+  } u;
+  domd5mem(value, strlen(value), u.md5digest, 0);
+  return u.hashes;
+#else
   /* compute two lcg hashes using different seeds */
   inthash_keys hash = { 0, ~0 };
   size_t i;
@@ -109,7 +139,12 @@ static inthash_keys inthash_calc_hashes(const char *value) {
   if (hash.hash1 == hash.hash2) {
     hash.hash2 = ~hash.hash2;
   }
+  /* reverse bits: "higher-order bits have longer periods than the lower 
+     order bits" (Wikipedia) */
+  hash.hash1 ^= rev32(hash.hash1);
+  hash.hash2 ^= rev32(hash.hash2);
   return hash;
+#endif
 }
 
 static HTS_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
@@ -167,7 +202,7 @@ static void inthash_realloc_pool(inthash hashtable) {
 
 #undef RECOMPUTE_STRING
 
-  inthash_log(hashtable, "reallocated string pool for %d strings: %d bytes\n",
+  inthash_log(hashtable, "reallocated string pool for %d strings: %d bytes",
               count, (int) hashtable->string_pool_capacity);
 }
 
@@ -257,7 +292,6 @@ static void inthash_free_name(inthash hashtable, char *name) {
 static HTS_INLINE size_t inthash_hash_to_pos_(size_t hash_size_power,
                                               inthash_key hash) {
   const inthash_key mask = POW2(hash_size_power) - 1;
-  /* TODO: investigate if lower bits of LCG are sane */
   return hash & mask;
 }
 
@@ -385,6 +419,8 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     /* prepare cuckoo ; let's take position 1 */
     else {
       cuckoo_hash = initial_cuckoo_hash = hashes.hash1;
+      inthash_log(hashtable, "debug:collision with '%s' at %d (%x)", 
+        item.name, pos, cuckoo_hash);
     }
   }
 
@@ -392,8 +428,12 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   for(loops = POW2(hashtable->hash_size_power) ; loops != 0 ; --loops) {
     const size_t pos = inthash_hash_to_pos(hashtable, cuckoo_hash);
 
+    inthash_log(hashtable, "\tdebug:placing cuckoo '%s' at %d (%x)", 
+      item.name, pos, cuckoo_hash);
+
     /* place at alternate free position ? */
     if (inthash_is_free(hashtable, pos)) {
+      inthash_log(hashtable, "debug:free position");
       hashtable->items[pos] = item;
       return 1; /* added */
     }
@@ -408,11 +448,13 @@ static int inthash_write_value_(inthash hashtable, const char *name,
       /* we just kicked this item from its position 1 */
       if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash1)) {
         /* then place it on position 2 on next run */
+        inthash_log(hashtable, "\tdebug:position 1");
         cuckoo_hash = item.hashes.hash2;
       }
       /* we just kicked this item from its position 2 */
       else if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash2)) {
         /* then place it on position 1 on next run */
+        inthash_log(hashtable, "\tdebug:position 2");
         cuckoo_hash = item.hashes.hash1;
       }
       else {
@@ -421,7 +463,7 @@ static int inthash_write_value_(inthash hashtable, const char *name,
 
       /* we are looping (back to same hash) */
       /* TODO FIXME: we should actually check the positions */
-      if (cuckoo_hash == initial_cuckoo_hash) {
+      if (cuckoo_hash == initial_cuckoo_hash && 0) {
         /* emergency stash */
         break;
       }
@@ -433,7 +475,8 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     hashtable->stash[hashtable->stash_size] = item;
     hashtable->stash_size++;
     inthash_log(hashtable, "used stash because of collision (%d entries)",
-                (int) hashtable->stash_size++);
+                (int) hashtable->stash_size);
+    inthash_log(hashtable, "debug:stash position");
     return 1; /* added */
   } else {
     /* we are doomed. hopefully the probability is lower than being killed
@@ -483,18 +526,16 @@ int inthash_write_value(inthash hashtable, const char *name,
 
       /* clear upper half */
       data = (char*) hashtable->items;
-      memset(data + prev_size, 0, prev_size);
+      memset(data + prev_alloc_size, 0, prev_alloc_size);
 
       /* relocate lower half items when needed */
       for(i = 0 ; i < prev_size ; i++) {
         if (!inthash_is_free(hashtable, i)) {
-          const inthash_keys hashes = hashtable->items[i].hashes;
-          size_t pos;
+          const inthash_keys *const hashes = &hashtable->items[i].hashes;
 
           /* currently at old position 1 */
-          pos = inthash_hash_to_pos_(prev_power, hashes.hash1);
-          if (pos == i) {
-            const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+          if (inthash_hash_to_pos_(prev_power, hashes->hash1) == i) {
+            const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash1);
             /* no more the expected position */
             if (pos != i) {
               inthash_assert(pos >= prev_size);
@@ -502,8 +543,8 @@ int inthash_write_value(inthash hashtable, const char *name,
               memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
             }
           }
-          else if (inthash_hash_to_pos_(prev_power, hashes.hash2) == i) {
-            const size_t pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+          else if (inthash_hash_to_pos_(prev_power, hashes->hash2) == i) {
+            const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash2);
             /* no more the expected position */
             if (pos != i) {
               inthash_assert(pos >= prev_size);
@@ -512,7 +553,7 @@ int inthash_write_value(inthash hashtable, const char *name,
             }
           }
           else {
-            inthash_assert(! "hashtable unexpected internal error");
+            inthash_assert(! "hashtable unexpected internal error (bad position)");
           }
         }
       }
@@ -531,7 +572,7 @@ int inthash_write_value(inthash hashtable, const char *name,
         hashtable->stash_size = 0;
 
         /* insert all items */
-        for(i = 0 ; i < hashtable->stash_size ; i++) {
+        for(i = 0 ; i < old_size ; i++) {
           const int ret = inthash_write_value_(hashtable, stash[i].name,
                                                stash[i].value);
           if (ret == 0) {
@@ -539,7 +580,7 @@ int inthash_write_value(inthash hashtable, const char *name,
           }
         }
 
-        /* delete old names */
+        /* delete old names (not values) */
         for(i = 0 ; i < hashtable->stash_size ; i++) {
           inthash_del_name(hashtable, &stash[i]);
         }
@@ -678,6 +719,8 @@ static int inthash_remove_(inthash hashtable, const char *name,
         }
         hashtable->stash_size--;
         *removed = (size_t) -1;
+        inthash_log(hashtable, "debug:deleted item in stash (%d entries)",
+          (int) hashtable->stash_size);
         return 1;
       }
     }
@@ -715,6 +758,9 @@ int inthash_remove(inthash hashtable, const char *name) {
             hashtable->stash[i] = hashtable->stash[i + 1];
           }
           hashtable->stash_size--;
+          inthash_log(hashtable, "debug:moved item from stash (%d entries)",
+            (int) hashtable->stash_size);
+          break;
         }
       }
     }
@@ -782,22 +828,25 @@ void inthash_delete(inthash *phashtable) {
         const size_t hash_size = POW2(hashtable->hash_size_power);
         size_t i;
 
-        /* wipe hashtable */
+        /* wipe hashtable values (not names) */
         for(i = 0 ; i < hash_size ; i++) {
           if (!inthash_is_free(hashtable, i)) {
-            inthash_del_item(hashtable, &hashtable->items[i]);
+            inthash_del_value(hashtable, i);
           }
         }
 
-        /* wipe auxiliary stash if any */
+        /* wipe auxiliary stash values (not names) if any */
         for(i = 0 ; i < hashtable->stash_size ; i++) {
-          inthash_del_item(hashtable, &hashtable->stash[i]);
+          inthash_del_value_(hashtable, &hashtable->stash[i].value);
         }
       }
       /* wipe top-level */
       hashtable->hash_size_power = 0;
       hashtable->nitems = 0;
+      free(hashtable->string_pool);
+      hashtable->string_pool = NULL;
       free(hashtable->items);
+      hashtable->items = NULL;
       free(hashtable);
       *phashtable = NULL;
     }
