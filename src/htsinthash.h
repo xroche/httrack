@@ -70,6 +70,7 @@ Please visit our Website: http://www.httrack.com
 typedef union inthash_value {
   /** Integer value. **/
   uintptr_t intg;
+
   /** Pointer value. **/
   void *ptr;
 } inthash_value;
@@ -82,12 +83,28 @@ typedef union inthash_value {
 typedef struct inthash_item inthash_item;
 #endif
 
+/* Hash key (32-bit) */
+typedef unsigned int inthash_key;
+
+/* Pair of hashes */
+typedef struct inthash_keys {
+  inthash_key hash1;
+  inthash_key hash2;
+} inthash_keys;
+
+/** NULL pair of hashes. **/
+#define INTHASH_KEYS_NULL { 0, 0 }
+
 /** Item holding a value. **/
 struct inthash_item {
   /** Key. **/
   char *name;
+
   /** Value. **/
   inthash_value value;
+
+  /** Hashes of the key. **/
+  inthash_keys hashes;
 };
 
 /* Alias for legacy code */
@@ -146,6 +163,7 @@ void inthash_add_pvoid(inthash hashtable, const char *name, void *value);
 void inthash_add(inthash hashtable, const char *name, intptr_t value);  /* Add entry in the hash table */
 int inthash_write(inthash hashtable, const char *name, intptr_t value); /* Overwrite/add entry in the hash table */
 int inthash_inc(inthash hashtable, const char *name);   /* Increment entry in the hash table */
+int inthash_dec(inthash hashtable, const char *name);   /* Decrement entry in the hash table */
 int inthash_remove(inthash hashtable, const char *name);        /* Remove an entry from the hashtable */
 
 /* */
