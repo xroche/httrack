@@ -44,12 +44,19 @@ Please visit our Website: http://www.httrack.com
 typedef struct hash_struct hash_struct;
 #endif
 
+/** Type of hash. **/
+typedef enum hash_struct_type {
+  HASH_STRUCT_FILENAME = 0,
+  HASH_STRUCT_ADR_PATH,
+  HASH_STRUCT_ORIGINAL_ADR_PATH
+} hash_struct_type;
+
 // tables de hachage
 void hash_init(hash_struct * hash);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
-              int type, int normalized);
+              hash_struct_type type, int normalized);
 void hash_write(hash_struct * hash, int lpos, int normalized);
-int *hash_calc_chaine(hash_struct * hash, int type, int pos);
+int *hash_calc_chaine(hash_struct * hash, hash_struct_type type, int pos);
 unsigned long int hash_cle(const char *nom1, const char *nom2);
 #endif
 
