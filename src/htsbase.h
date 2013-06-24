@@ -68,10 +68,12 @@ extern "C" {
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
 #define HTS_STATIC static __attribute__ ((unused))
+#define HTS_INLINE __inline__
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
+#define HTS_INLINE
 #define HTS_PRINTF_FUN(fmt, arg)
 #endif
 #endif
