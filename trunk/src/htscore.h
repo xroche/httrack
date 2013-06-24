@@ -155,8 +155,6 @@ struct lien_url {
   char *cod;                    // chemin codebase éventuel si classe java
   char *former_adr;             // adresse initiale (avant éventuel moved), peut être nulle
   char *former_fil;             // nom du fichier distant initial (avant éventuel moved), peut être nul
-  // pour optimisation:
-  int hash_next[3];             // prochain lien avec même valeur hash
 };
 
 // chargement de fichiers en 'arrière plan'
