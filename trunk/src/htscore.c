@@ -452,7 +452,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // initialiser hachage
   hash_init(&hash);
-  hash.liens = liens;
+  // note: we need a cast because of the const
+  hash.liens = (const lien_url **) liens;
 
   // we need it
   opt->liens = liens;
