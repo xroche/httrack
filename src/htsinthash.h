@@ -40,7 +40,7 @@ Please visit our Website: http://www.httrack.com
  *
  * Implementation notes:
  * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
- * with a LCG hash function, with one additional auxiliary hash function.
+ * with a FNV hash function, with one additional auxiliary hash function.
  * It also uses a small stash area to handle rare cases of collisions.
  * Enumeration of all key/values is possible, deletion is also possible, but
  * currently without any auto-shrinking (ie. table will never shrink).
@@ -49,8 +49,8 @@ Please visit our Website: http://www.httrack.com
  *
  * References: 
  * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
- * LCG http://en.wikipedia.org/wiki/Linear_congruential_generator
  * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
+ * FNV http://www.isthe.com/chongo/tech/comp/fnv/
  **/
 
 #ifndef HTSINTHASH_DEFH
@@ -59,6 +59,8 @@ Please visit our Website: http://www.httrack.com
 /* Includes */
 #ifdef _WIN32
 #include <stddef.h>
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
 #elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
   || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
 #include <inttypes.h>
@@ -84,7 +86,7 @@ typedef struct inthash_item inthash_item;
 #endif
 
 /* Hash key (32-bit) */
-typedef unsigned int inthash_key;
+typedef uint32_t inthash_key;
 
 /* Pair of hashes */
 typedef struct inthash_keys {
@@ -118,7 +120,6 @@ typedef void (*t_inthash_freehandler) (void *value);
 #define HTS_DEF_FWSTRUCT_struct_inthash
 typedef struct struct_inthash struct_inthash, *inthash;
 #endif
-#define STASH_SIZE 16
 
 /** Hashtable enumeration (opaque structure). **/
 #ifndef HTS_DEF_FWSTRUCT_struct_inthash_enum

@@ -143,7 +143,6 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
 void hash_write(hash_struct * hash, int lpos, int normalized) {
   char BIGSTK normfil_[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
-  const char *normfil;
   const char *name;
 
   /* first entry: destination filename (lowercased) */
