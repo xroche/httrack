@@ -57,6 +57,16 @@ Please visit our Website: http://www.httrack.com
 
 #define STASH_SIZE 16
 
+/* 64-bit constant */
+#if defined(WIN32)
+#define UINT_64_CONST(X) ((uint64_t) (X))
+#elif (defined(_LP64) || defined(__x86_64__) \
+       || defined(__powerpc64__) || defined(__64BIT__))
+#define UINT_64_CONST(X) ((uint64_t) X##UL)
+#else
+#define UINT_64_CONST(X) ((uint64_t) X##ULL)
+#endif
+
 /** Hashtable. **/
 struct struct_inthash {
   /** Hashtable items. **/
@@ -105,7 +115,7 @@ struct struct_inthash {
     size_t rehash_count;
     /** Number of pool compact operations. **/
     size_t pool_compact_count;
-    /** Number of pool compact operations. **/
+    /** Number of pool realloc operations. **/
     size_t pool_realloc_count;
   } stats;
 
@@ -163,19 +173,19 @@ static inthash_keys inthash_calc_hashes(const char *value) {
 
   return u.hashes;
 #else
-  /* compute two Fowler–Noll–Vo hashes (64-bit FNV-1 variant) ;
+  /* compute two Fowler-Noll-Vo hashes (64-bit FNV-1 variant) ;
      each 64-bit hash being XOR-folded into a single 32-bit hash. */
   size_t i;
   inthash_keys hashes;
   uint64_t h1, h2;
 
   /* FNV-1, 64-bit. */
-#define FNV1_PRIME 1099511628211
-#define FNV1_OFFSET_BASIS 14695981039346656037
+#define FNV1_PRIME UINT_64_CONST(1099511628211)
+#define FNV1_OFFSET_BASIS UINT_64_CONST(14695981039346656037)
 
   /* compute the hashes ; second variant is using xored data */
-  h1 = (uint64_t) FNV1_OFFSET_BASIS;
-  h2 = (uint64_t) ~FNV1_OFFSET_BASIS;
+  h1 = FNV1_OFFSET_BASIS;
+  h2 = ~FNV1_OFFSET_BASIS;
   for(i = 0 ; value[i] != '\0' ; i++) {
     const unsigned char c1 = value[i];
     const unsigned char c2 = ~c1;

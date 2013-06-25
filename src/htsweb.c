@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsinthash.c"
 #include "htsmd5.c"
 #include "md5.c"
+#undef HTS_PRINTF_FUN
 
 #include "htsserver.h"
 #include "htsweb.h"
