@@ -55,16 +55,26 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #endif
 
+/** Size of auxiliary stash. **/
 #define STASH_SIZE 16
+
+/** Minimum value for lg_size. **/
+#define MIN_LG_SIZE 8
+
+/** Minimum value for pool.capacity. **/
+#define MIN_POOL_CAPACITY 256
 
 /* 64-bit constant */
 #if defined(WIN32)
 #define UINT_64_CONST(X) ((uint64_t) (X))
+#define UINT_64_FORMAT "I64d"
 #elif (defined(_LP64) || defined(__x86_64__) \
        || defined(__powerpc64__) || defined(__64BIT__))
 #define UINT_64_CONST(X) ((uint64_t) X##UL)
+#define UINT_64_FORMAT "ld"
 #else
 #define UINT_64_CONST(X) ((uint64_t) X##ULL)
+#define UINT_64_FORMAT "lld"
 #endif
 
 /** Hashtable. **/
@@ -235,7 +245,7 @@ static void inthash_realloc_pool(inthash hashtable) {
   const size_t hash_size = POW2(hashtable->lg_size);
   char *const oldbase = hashtable->pool.buffer;
   size_t i;
-  int count = 0;
+  size_t count = 0;
 
   /* statistics */
   hashtable->stats.pool_realloc_count++;
@@ -244,9 +254,10 @@ static void inthash_realloc_pool(inthash hashtable) {
   hashtable->pool.buffer = realloc(hashtable->pool.buffer,
     hashtable->pool.capacity);
   if (hashtable->pool.buffer == NULL) {
-    fprintf(stderr, 
-      "** hashtable string pool allocation error: could not allocate %u bytes", 
-      (int) hashtable->pool.capacity);
+    inthash_log(hashtable,
+      "** hashtable string pool allocation error: could not allocate "
+      "%"UINT_64_FORMAT" bytes", 
+      (uint64_t) hashtable->pool.capacity);
     inthash_assert(! "hashtable string pool allocation error");
   }
 
@@ -269,8 +280,9 @@ static void inthash_realloc_pool(inthash hashtable) {
 
 #undef RECOMPUTE_STRING
 
-  inthash_log(hashtable, "reallocated string pool for %d strings: %d bytes",
-              count, (int) hashtable->pool.capacity);
+  inthash_log(hashtable, "reallocated string pool for "
+              "%"UINT_64_FORMAT" strings: %"UINT_64_FORMAT" bytes",
+              (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
 /* compact string pool ; does not change the capacity */
@@ -279,7 +291,7 @@ static void inthash_compact_pool(inthash hashtable) {
   size_t i;
   char* old_pool = hashtable->pool.buffer;
   const size_t old_size = hashtable->pool.size;
-  int count = 0;
+  size_t count = 0;
 
   /* statistics */
   hashtable->stats.pool_compact_count++;
@@ -289,9 +301,10 @@ static void inthash_compact_pool(inthash hashtable) {
   hashtable->pool.size = 0;
   hashtable->pool.used = 0;
   if (hashtable->pool.buffer == NULL) {
-    fprintf(stderr, 
-      "** hashtable string pool compaction error: could not allocate %u bytes", 
-      (int) hashtable->pool.capacity);
+    inthash_log(hashtable,
+      "** hashtable string pool compaction error: could not allocate "
+      "%"UINT_64_FORMAT" bytes", 
+      (uint64_t) hashtable->pool.capacity);
     inthash_assert(! "hashtable string pool compaction error");
   }
 
@@ -326,8 +339,10 @@ static void inthash_compact_pool(inthash hashtable) {
   free(old_pool);
 
   inthash_log(hashtable,
-              "compacted string pool for %d strings: %d bytes => %d bytes",
-              count, (int) old_size, (int) hashtable->pool.size);
+              "compacted string pool for %"UINT_64_FORMAT" strings: "
+              "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
+              (uint64_t) count, (uint64_t) old_size,
+              (uint64_t) hashtable->pool.size);
 }
 
 static char* inthash_dup_name(inthash hashtable, const char *name) {
@@ -336,7 +351,7 @@ static char* inthash_dup_name(inthash hashtable, const char *name) {
 
   if (hashtable->pool.capacity - hashtable->pool.size < len) {
     if (hashtable->pool.capacity == 0) {
-      hashtable->pool.capacity = 16;
+      hashtable->pool.capacity = MIN_POOL_CAPACITY;
     }
     for( ; hashtable->pool.capacity - hashtable->pool.size < len
       ; hashtable->pool.capacity <<= 1) ;
@@ -492,8 +507,9 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     /* prepare cuckoo ; let's take position 1 */
     else {
       cuckoo_hash = initial_cuckoo_hash = hashes.hash1;
-      inthash_log(hashtable, "debug:collision with '%s' at %d (%x)", 
-        item.name, pos, cuckoo_hash);
+      inthash_log(hashtable,
+                  "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
+        item.name, (uint64_t) pos, cuckoo_hash);
     }
   }
 
@@ -501,8 +517,9 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   for(loops = POW2(hashtable->lg_size) ; loops != 0 ; --loops) {
     const size_t pos = inthash_hash_to_pos(hashtable, cuckoo_hash);
 
-    inthash_log(hashtable, "\tdebug:placing cuckoo '%s' at %d (%x)", 
-      item.name, pos, cuckoo_hash);
+    inthash_log(hashtable,
+                "\tdebug:placing cuckoo '%s' at %"UINT_64_FORMAT" (%x)", 
+      item.name, (uint64_t) pos, cuckoo_hash);
 
     /* place at alternate free position ? */
     if (inthash_is_free(hashtable, pos)) {
@@ -547,7 +564,7 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     }
   }
 
-  /* emergency stashing */
+  /* emergency stashing for the rare cases of collisions */
   if (hashtable->stash.size < STASH_SIZE) {
     hashtable->stash.items[hashtable->stash.size] = item;
     hashtable->stash.size++;
@@ -603,9 +620,10 @@ int inthash_write_value(inthash hashtable, const char *name,
       hashtable->items = 
         (inthash_item *) realloc(hashtable->items, alloc_size);
       if (hashtable->items == NULL) {
-        fprintf(stderr, 
-          "** hashtable allocation error: could not allocate %u bytes", 
-          (int) alloc_size);
+        inthash_log(hashtable,
+          "** hashtable allocation error: "
+          "could not allocate %"UINT_64_FORMAT" bytes", 
+          (uint64_t) alloc_size);
         inthash_assert(! "hashtable allocation error");
       }
 
@@ -643,8 +661,9 @@ int inthash_write_value(inthash hashtable, const char *name,
         }
       }
 
-      inthash_log(hashtable, "expanded hashtable to %d elements",
-                  (int) POW2(hashtable->lg_size));
+      inthash_log(hashtable,
+                  "expanded hashtable to %"UINT_64_FORMAT" elements",
+                  (uint64_t) POW2(hashtable->lg_size));
 
       /* attempt to merge the stash if present */
       if (hashtable->stash.size != 0) {
@@ -673,11 +692,12 @@ int inthash_write_value(inthash hashtable, const char *name,
         /* logging */
         inthash_assert(hashtable->stash.size <= old_size);
         if (hashtable->stash.size < old_size) {
-          inthash_log(hashtable, "reduced stash size from %d to %d",
-                      (int) old_size, (int) hashtable->stash.size);
+          inthash_log(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
+                      "to %"UINT_64_FORMAT,
+                      (uint64_t) old_size, (uint64_t) hashtable->stash.size);
         } else {
-          inthash_log(hashtable, "stash has still %d elements",
-                      (int) hashtable->stash.size);
+          inthash_log(hashtable, "stash has still %"UINT_64_FORMAT" elements",
+                      (uint64_t) hashtable->stash.size);
         }
       }
 
@@ -869,7 +889,7 @@ inthash inthash_new(size_t initial_size) {
 
   if (hashtable) {
     size_t size;
-    for(size = 8 ; POW2(size) < initial_size ; size++) ;
+    for(size = MIN_LG_SIZE ; POW2(size) < initial_size ; size++) ;
     if ((hashtable->items =
          (inthash_item *) calloc(POW2(size), sizeof(inthash_item)))) {
       hashtable->lg_size = size;
@@ -917,23 +937,43 @@ size_t inthash_nitems(inthash hashtable) {
   return 0;
 }
 
+size_t inthash_memory_size(inthash hashtable) {
+  const size_t size_struct = sizeof(struct_inthash);
+  const size_t hash_size = POW2(hashtable->lg_size)*sizeof(inthash_item);
+  const size_t pool_size = hashtable->pool.capacity*sizeof(char);
+  return size_struct + hash_size + pool_size;
+}
+
+static void inthash_log_stats(inthash hashtable) {
+  inthash_log(hashtable, "freeing table ; "
+              "writes=%"UINT_64_FORMAT" "
+              "(new=%"UINT_64_FORMAT") "
+              "moved=%"UINT_64_FORMAT " "
+              "stashed=%"UINT_64_FORMAT" "
+              "max-stash-size=%"UINT_64_FORMAT" "
+              "avg-moved=%g "
+              "rehash=%"UINT_64_FORMAT" "
+              "pool-compact=%"UINT_64_FORMAT" "
+              "pool-realloc=%"UINT_64_FORMAT" "
+              "memory=%"UINT_64_FORMAT,
+              (uint64_t) hashtable->stats.write_count,
+              (uint64_t) hashtable->stats.add_count,
+              (uint64_t) hashtable->stats.cuckoo_moved,
+              (uint64_t) hashtable->stats.stash_added,
+              (uint64_t) hashtable->stats.max_stash_size,
+              (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
+              (uint64_t) hashtable->stats.rehash_count,
+              (uint64_t) hashtable->stats.pool_compact_count,
+              (uint64_t) hashtable->stats.pool_realloc_count,
+              (uint64_t) inthash_memory_size(hashtable)
+              );
+}
+
 void inthash_delete(inthash *phashtable) {
   if (phashtable != NULL) {
     inthash hashtable = *phashtable;
     if (hashtable != NULL) {
-      inthash_log(hashtable, "freeing table ; "
-                  "writes=%d (new=%d) moved=%d stashed=%d collision-room=%d "
-                  "avg-moved=%g rehash=%d pool-compact=%d pool-realloc=%d",
-                  (int) hashtable->stats.write_count,
-                  (int) hashtable->stats.add_count,
-                  (int) hashtable->stats.cuckoo_moved,
-                  (int) hashtable->stats.stash_added,
-                  (int) hashtable->stats.max_stash_size,
-                  (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
-                  (int) hashtable->stats.rehash_count,
-                  (int) hashtable->stats.pool_compact_count,
-                  (int) hashtable->stats.pool_realloc_count
-                  );
+      inthash_log_stats(hashtable);
       if (hashtable->items != NULL) {
         /* we need to delete values */
         const size_t hash_size = POW2(hashtable->lg_size);

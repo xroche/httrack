@@ -85,10 +85,10 @@ typedef union inthash_value {
 typedef struct inthash_item inthash_item;
 #endif
 
-/* Hash key (32-bit) */
+/** Hash key (32-bit) **/
 typedef uint32_t inthash_key;
 
-/* Pair of hashes */
+/** Pair of hashes **/
 typedef struct inthash_keys {
   inthash_key hash1;
   inthash_key hash2;
@@ -109,10 +109,10 @@ struct inthash_item {
   inthash_keys hashes;
 };
 
-/* Alias for legacy code */
+/** Alias for legacy code. **/
 typedef inthash_item inthash_chain;
 
-/* Free handler */
+/** Free handler **/
 typedef void (*t_inthash_freehandler) (void *value);
 
 /** Hashtable (opaque structure). **/
@@ -136,42 +136,135 @@ struct struct_inthash_enum {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
-/* Hash functions: */
-inthash inthash_new(size_t size);  /* Create a new hash table */
-int inthash_created(inthash hashtable); /* Test if the hash table was successfully created */
-size_t inthash_nitems(inthash hashtable); /* Number of items */
-void inthash_delete(inthash * hashtable);       /* Delete an hash table */
-void inthash_value_is_malloc(inthash hashtable, int flag);      /* Is the 'value' member a value that needs to be free()'ed ? */
-void inthash_value_set_free_handler(inthash hashtable,  /* value free() handler (default one is 'free') */
+/**
+ * Create a new hashtable, with initial bucket size of 'size'.
+ * If size is 0, use the default minimal bucket size.
+ * Return a non-NULL pointer upon success.
+ **/
+inthash inthash_new(size_t size);
+
+/**
+ * Was the hashtable successfully created ?
+ * Return non-zero value if the hashtable is valid.
+ **/
+int inthash_created(inthash hashtable);
+
+/**
+ * Delete a hashtable, freeing all entries.
+ **/
+void inthash_delete(inthash * hashtable);
+
+/**
+ * Return the number of items in the hashtable.
+ **/
+size_t inthash_nitems(inthash hashtable);
+
+/**
+ * Return the memory size taken by the hashtable.
+ * (This does not take account of the possible memory taken by values)
+ **/
+size_t inthash_memory_size(inthash hashtable);
+
+/**
+ * Are the values inside this hashtable to be free'd ?
+ **/
+void inthash_value_is_malloc(inthash hashtable, int flag);
+
+/**
+ * Set a free handler for values. This handler will be called when a value
+ * is to be removed from the hashtable.
+ **/
+void inthash_value_set_free_handler(inthash hashtable,
                                     t_inthash_freehandler free_handler);
 
-/* */
-int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue);     /* Read entry from the hash table */
-int inthash_readptr(inthash hashtable, const char *name, intptr_t * intvalue);  /* Same function, but returns 0 upon null ptr */
-int inthash_exists(inthash hashtable, const char *name);        /* Is the key existing ? */
+/**
+ * Read an integer entry from the hashtable.
+ * Return non-zero value upon success and sets intvalue.
+ **/
+int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue);
 
-/* */
+/**
+ * Same as inthash_read(), but return 0 is the value was zero.
+ **/
+int inthash_readptr(inthash hashtable, const char *name, intptr_t * intvalue);
+
+/**
+ * Return non-zero value if the given entry exists.
+ **/
+int inthash_exists(inthash hashtable, const char *name);
+
+/**
+ * Read an entry from the hashtable.
+ * Return non-zero value upon success and sets value.
+ **/
 int inthash_read_value(inthash hashtable, const char *name,
                        inthash_value * value);
+
+/**
+ * Write an entry to the hashtable.
+ * Return non-zero value if the entry was added, zero if it was replaced.
+ **/
 int inthash_write_value(inthash hashtable, const char *name,
                         inthash_value value);
-/* */
+/**
+ * Read a pointer entry from the hashtable.
+ * Return non-zero value upon success and sets value.
+ **/
 int inthash_read_pvoid(inthash hashtable, const char *name, void **value);
+
+/**
+ * Write a pointer entry to the hashtable.
+ * Return non-zero value if the entry was added, zero if it was replaced.
+ **/
 int inthash_write_pvoid(inthash hashtable, const char *name, void *value);
+
+/**
+ * Alias to inthash_write_pvoid()
+ **/
 void inthash_add_pvoid(inthash hashtable, const char *name, void *value);
 
-/* */
-void inthash_add(inthash hashtable, const char *name, intptr_t value);  /* Add entry in the hash table */
-int inthash_write(inthash hashtable, const char *name, intptr_t value); /* Overwrite/add entry in the hash table */
-int inthash_inc(inthash hashtable, const char *name);   /* Increment entry in the hash table */
-int inthash_dec(inthash hashtable, const char *name);   /* Decrement entry in the hash table */
-int inthash_remove(inthash hashtable, const char *name);        /* Remove an entry from the hashtable */
+/**
+ * Write an integer entry to the hashtable.
+ * Return non-zero value if the entry was added, zero if it was replaced.
+ **/
+int inthash_write(inthash hashtable, const char *name, intptr_t value);
 
-/* */
-struct_inthash_enum inthash_enum_new(inthash hashtable);        /* Start a new enumerator */
-inthash_item *inthash_enum_next(struct_inthash_enum * e);      /* Fetch an item in the enumerator */
+/**
+ * Alias to inthash_write()
+ **/
+void inthash_add(inthash hashtable, const char *name, intptr_t value);
 
-/* End of hash functions: */
+/**
+ * Increment an entry value in the hashtable
+ * (or create a new entry with value 1 if it does not yet exist)
+ * Return non-zero value if the entry was added, zero if it was changed.
+ **/
+int inthash_inc(inthash hashtable, const char *name);
+
+/**
+ * Decrement an entry value in the hashtable 
+ * (or create a new entry with value -1 if it does not yet exist)
+ * Return non-zero value if the entry was added, zero if it was changed.
+ **/
+int inthash_dec(inthash hashtable, const char *name);
+
+/**
+ * Remove an entry from the hashtable
+ * Return non-zero value if the entry was removed, zero otherwise.
+ **/
+int inthash_remove(inthash hashtable, const char *name);
+
+/**
+ * Return a new enumerator.
+ * Note: you may not add or delete entries while enumerating.
+ **/
+struct_inthash_enum inthash_enum_new(inthash hashtable);
+
+/**
+ * Enumerate the next entry.
+ **/
+inthash_item *inthash_enum_next(struct_inthash_enum * e);
+
 #endif
 
 #endif
