@@ -172,6 +172,7 @@ RUN_CALLBACK0(opt, end); \
   if (template_header) { freet(template_header); template_header=NULL; } \
   if (template_body)   { freet(template_body); template_body=NULL; } \
   if (template_footer) { freet(template_footer); template_footer=NULL; } \
+  hash_free(&hash); \
   clearCallbacks(&opt->state.callbacks); \
   /*structcheck_init(-1);*/ \
 } while(0)
@@ -263,7 +264,7 @@ int httpmirror(char *url1, httrackp * opt) {
   int lien_tot = 0;             // nombre de liens pour le moment
   lien_url **liens = NULL;      // les pointeurs sur les liens
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
-  hash_struct *hashptr = &hash;
+  hash_struct *const hashptr = &hash;
   t_cookie BIGSTK cookie;       // gestion des cookies
   int lien_max = 0;
   size_t lien_size = 0;         // octets restants dans buffer liens dispo
@@ -314,7 +315,6 @@ int httpmirror(char *url1, httrackp * opt) {
   robots_wizard BIGSTK robots;  // gestion robots.txt
   inthash cache_hashtable = NULL;
   inthash cache_tests = NULL;
-  int cache_hash_size = 0;
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
@@ -397,10 +397,8 @@ int httpmirror(char *url1, httrackp * opt) {
   cache.ptr_ant = cache.ptr_last = 0;   // pointeur pour anticiper
 
   // initialiser hash cache
-  if (!cache_hash_size)
-    cache_hash_size = HTS_HASH_SIZE;
-  cache_hashtable = inthash_new(cache_hash_size);
-  cache_tests = inthash_new(cache_hash_size);
+  cache_hashtable = inthash_new(0);
+  cache_tests = inthash_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
     filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
@@ -2196,34 +2194,6 @@ int httpmirror(char *url1, httrackp * opt) {
       cache.zipOutput = NULL;
     }
   }
-#if DEBUG_HASH
-  // noter les collisions
-  {
-    int i;
-    int empty1 = 0, empty2 = 0, empty3 = 0;
-
-    for(i = 0; i < HTS_HASH_SIZE; i++) {
-      if (hash.hash[0][i] == -1)
-        empty1++;
-      if (hash.hash[1][i] == -1)
-        empty2++;
-      if (hash.hash[2][i] == -1)
-        empty3++;
-    }
-    printf("\n");
-    printf("Debug info: Hash-table report\n");
-    printf("Number of files entered:   %d\n", hashnumber);
-    printf("Table size:                %d\n", HTS_HASH_SIZE);
-    printf("\n");
-    printf("Longest chain sav:              %d, empty: %d\n", longest_hash[0],
-           empty1);
-    printf("Longest chain adr,fil:          %d, empty: %d\n", longest_hash[1],
-           empty2);
-    printf("Longest chain former_adr/fil:   %d, empty: %d\n", longest_hash[2],
-           empty3);
-    printf("\n");
-  }
-#endif
   // fin afficher résumé dans log
 
   // ending

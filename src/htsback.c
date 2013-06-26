@@ -80,7 +80,7 @@ struct_back *back_new(int back_max) {
 
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
-  sback->ready = inthash_new(32767);
+  sback->ready = inthash_new(0);
   sback->ready_size_bytes = 0;
   inthash_value_is_malloc(sback->ready, 1);
   // init

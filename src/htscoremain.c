@@ -1931,7 +1931,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   int found = 0;
                   char *filter = NULL;
                   cache_back cache;
-                  inthash cache_hashtable = inthash_new(HTS_HASH_SIZE);
+                  inthash cache_hashtable = inthash_new(0);
                   int backupXFR = htsMemoryFastXfr;
                   int sendb = 0;
 

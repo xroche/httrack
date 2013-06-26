@@ -234,7 +234,7 @@ struct _PT_Cache {
 PT_Indexes PT_New(void) {
   PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
 
-  index->cil = inthash_new(127);
+  index->cil = inthash_new(0);
   index->index_size = 0;
   index->index = NULL;
   return index;
@@ -432,7 +432,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     inthash hdupes = NULL;
 
     if (!subtree)
-      hdupes = inthash_new(127);
+      hdupes = inthash_new(0);
     StringClear(list);
     StringClear(listindexes);
     StringClear(subitem);
@@ -549,7 +549,7 @@ PT_Index PT_LoadCache(const char *filename) {
       index->type = type;
       index->slots.common.timestamp = (time_t) time(NULL);
       index->slots.common.startUrl[0] = '\0';
-      index->slots.common.hash = inthash_new(8191);
+      index->slots.common.hash = inthash_new(0);
       if (!_IndexFuncts[type].PT_LoadCache(index, filename)) {
         proxytrack_print_log(DEBUG,
                              "reading httrack cache (format #%d) %s : error",
