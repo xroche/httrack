@@ -246,15 +246,11 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #if HTS_SPARE_MEMORY==0
-/* Gestion des tables de hashage */
-#define HTS_HASH_SIZE 20147
 /* Taille max d'une URL */
 #define HTS_URLMAXSIZE 1024
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
 #else
-/* Gestion des tables de hashage */
-#define HTS_HASH_SIZE 1023
 /* Taille max d'une URL */
 #define HTS_URLMAXSIZE 256
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */

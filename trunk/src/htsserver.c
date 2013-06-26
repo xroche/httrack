@@ -1443,7 +1443,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
 int htslang_init(void) {
   if (NewLangList == NULL) {
-    NewLangList = inthash_new(NewLangListSz);
+    NewLangList = inthash_new(0);
     if (NewLangList == NULL) {
       abortLog("Error in lang.h: not enough memory");
     } else {
@@ -1486,8 +1486,8 @@ static int htslang_load(char *limit_to, char *path) {
   //
   if (!limit_to) {
     LANG_DELETE();
-    NewLangStr = inthash_new(NewLangStrSz);
-    NewLangStrKeys = inthash_new(NewLangStrKeysSz);
+    NewLangStr = inthash_new(0);
+    NewLangStrKeys = inthash_new(0);
     if ((NewLangStr == NULL) || (NewLangStrKeys == NULL)) {
       abortLog("Error in lang.h: not enough memory");
     } else {

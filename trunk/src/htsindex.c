@@ -197,7 +197,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Create hash structure
   // Hash tables rulez da world!
-  WordIndexHash = inthash_new(WordIndexSize);
+  WordIndexHash = inthash_new(0);
   if (!WordIndexHash)
     return 0;
 

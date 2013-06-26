@@ -990,7 +990,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     String iname = STRING_EMPTY;
 
     if (type == 1) {
-      hashCateg = inthash_new(127);
+      hashCateg = inthash_new(0);
       StringCat(categ, "Test category 1");
       StringCat(categ, "\r\nTest category 2");
     }

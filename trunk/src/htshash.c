@@ -57,7 +57,6 @@ Please visit our Website: http://www.httrack.com
 // GESTION DES TABLES DE HACHAGE
 // Méthode à 2 clés (adr+fil), 2e cle facultative
 // hash[no_enregistrement][pos]->hash est un index dans le tableau général liens
-// #define HTS_HASH_SIZE 8191  (premier si possible!)
 // type: numero enregistrement - 0 est case insensitive (sav) 1 (adr+fil) 2 (former_adr+former_fil)
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 
@@ -65,6 +64,14 @@ void hash_init(hash_struct * hash) {
   hash->sav = inthash_new(0);
   hash->adrfil = inthash_new(0);
   hash->former_adrfil = inthash_new(0);
+}
+
+void hash_free(hash_struct *hash) {
+  if (hash != NULL) {
+    inthash_delete(&hash->sav);
+    inthash_delete(&hash->adrfil);
+    inthash_delete(&hash->former_adrfil);
+  }
 }
 
 static char * normalize_key(const char *nom1, const char *nom2,
