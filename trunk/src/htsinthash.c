@@ -557,7 +557,7 @@ static int inthash_write_value_(inthash hashtable, const char *name,
 
       /* we are looping (back to same hash) */
       /* TODO FIXME: we should actually check the positions */
-      if (cuckoo_hash == initial_cuckoo_hash && 0) {
+      if (cuckoo_hash == initial_cuckoo_hash) {
         /* emergency stash */
         break;
       }
