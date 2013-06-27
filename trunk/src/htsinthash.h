@@ -71,7 +71,10 @@ typedef unsigned __int64 uint64_t;
 /** Value. **/
 typedef union inthash_value {
   /** Integer value. **/
-  uintptr_t intg;
+  intptr_t intg;
+
+  /** Unsigned integer value. **/
+  uintptr_t uintg;
 
   /** Pointer value. **/
   void *ptr;
