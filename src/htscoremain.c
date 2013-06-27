@@ -2363,6 +2363,127 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return 0;
                 break;
+              case '7':  // hashtable selftest: httrack -#7 nb_entries
+                if (++na < argc) {
+                  char *const snum = strdup(argv[na]);
+                  unsigned long count;
+                  const char *const names[] = {
+                    "", "add", "delete", "dry-add", "dry-del",
+                    "test-exists", "test-not-exist"
+                  };
+                  const struct {
+                    enum {
+                      DO_END,
+                      DO_ADD,
+                      DO_DEL,
+                      DO_DRY_ADD,
+                      DO_DRY_DEL,
+                      TEST_ADD,
+                      TEST_DEL
+                    } type;
+                    size_t modulus;
+                    size_t offset;
+                  } bench[] = {
+                    { DO_ADD, 4, 0 },     /* add 4/0 */
+                    { TEST_ADD, 4, 0 },   /* check 4/0 */
+                    { TEST_DEL, 4, 1 },   /* check 4/1 */
+                    { TEST_DEL, 4, 2 },   /* check 4/2 */
+                    { TEST_DEL, 4, 3 },   /* check 4/3 */
+                    { DO_DRY_DEL, 4, 1 }, /* del 4/1 */
+                    { DO_DRY_DEL, 4, 2 }, /* del 4/2 */
+                    { DO_DRY_DEL, 4, 3 }, /* del 4/3 */
+                    { DO_ADD, 4, 1 },     /* add 4/1 */
+                    { DO_DRY_ADD, 4, 1 }, /* add 4/1 */
+                    { TEST_ADD, 4, 0 },   /* check 4/0 */
+                    { TEST_ADD, 4, 1 },   /* check 4/1 */
+                    { TEST_DEL, 4, 2 },   /* check 4/2 */
+                    { TEST_DEL, 4, 3 },   /* check 4/3 */
+                    { DO_ADD, 4, 2 },     /* add 4/2 */
+                    { DO_DRY_DEL, 4, 3 }, /* del 4/3 */
+                    { DO_ADD, 4, 3 },     /* add 4/3 */
+                    { DO_DEL, 4, 3 },     /* del 4/3 */
+                    { TEST_ADD, 4, 0 },   /* check 4/0 */
+                    { TEST_ADD, 4, 1 },   /* check 4/1 */
+                    { TEST_ADD, 4, 2 },   /* check 4/2 */
+                    { TEST_DEL, 4, 3 },   /* check 4/3 */
+                    { DO_DEL, 42, 0 },    /* add 42/0 */
+                    { TEST_DEL, 42, 0 },  /* check 42/0 */
+                    { TEST_ADD, 42, 2 },  /* check 42/2 */
+                    { DO_END }
+                  };
+#define FMT() \
+                  char name[256]; \
+                  const long expected = (long) i * 1664525 + 1013904223; \
+                  snprintf(name, sizeof(name), \
+                    "http://www.example.com/website/sample/for/hashtable/" \
+                    "%ld/index.html?foo=%ld&bar", \
+                    (long) i, (long) (expected))
+                  if (sscanf(snum, "%lu", &count) == 1) {
+                    inthash hashtable = inthash_new(0);
+                    size_t loop;
+                    for(loop = 0 ; bench[loop].type != DO_END ; loop++) {
+                      size_t i;
+                      for(i = bench[loop].offset ; i < (size_t) count
+                          ; i += bench[loop].modulus) {
+                        int result;
+                        FMT();
+                        if (bench[loop].type == DO_ADD
+                            || bench[loop].type == DO_DRY_ADD) {
+                          result = inthash_write(hashtable, name, (uintptr_t) expected);
+                          /* revert logic */
+                          if (bench[loop].type == DO_DRY_ADD) {
+                            result = result ? 0 : 1;
+                          }
+                        }
+                        else if (bench[loop].type == DO_DEL
+                            || bench[loop].type == DO_DRY_DEL) {
+                          result = inthash_remove(hashtable, name);
+                          /* revert logic */
+                          if (bench[loop].type == DO_DRY_DEL) {
+                            result = result ? 0 : 1;
+                          }
+                        }
+                        else if (bench[loop].type == TEST_ADD
+                            || bench[loop].type == TEST_DEL) {
+                          intptr_t value = -1;
+                          result = inthash_readptr(hashtable, name, &value);
+                          if (bench[loop].type == TEST_ADD && result
+                              && value != expected) {
+                            fprintf(stderr, "value failed for %s (expected %ld, got %ld)\n",
+                                    name, (long) expected, (long) value);
+                            exit(EXIT_FAILURE);
+                          }
+                          /* revert logic */
+                          if (bench[loop].type == TEST_DEL) {
+                            result = result ? 0 : 1;
+                          }
+                        }
+                        if (!result) {
+                          fprintf(stderr, "failed %s{%d/+%d} test on loop %ld"
+                                  " at offset %ld for %s\n",
+                                  names[bench[loop].type],
+                                  (int) bench[loop].modulus,
+                                  (int) bench[loop].offset,
+                                  (long) loop, (long) i, name);
+                          exit(EXIT_FAILURE);
+                        }
+                      }
+                    }
+                    inthash_delete(&hashtable);
+                    fprintf(stderr, "all hashtable tests were successful!\n");
+                  } else {
+                    fprintf(stderr, "Malformed number");
+                    exit(EXIT_FAILURE);
+                  }
+#undef FMT
+                } else {
+                  fprintf(stderr,
+                    "Option #7 needs to be followed by a number");
+                  exit(EXIT_FAILURE);
+                }
+                htsmain_free();
+                return 0;
+                break;
               case '!':
                 if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF
