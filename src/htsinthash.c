@@ -93,7 +93,7 @@ struct struct_inthash {
     /** Stash items. **/
     inthash_item items[STASH_SIZE];
 
-    /** Stash size (<= stash.size). **/
+    /** Stash size (<= STASH_SIZE). **/
     size_t size;
   } stash;
 
@@ -771,8 +771,8 @@ static size_t inthash_inc_(inthash hashtable, const char *name,
                            size_t inc) {
   inthash_value* const value = inthash_read_value_(hashtable, name);
   if (value != NULL) {
-    value->intg += inc;
-    return value->intg;
+    value->uintg += inc;
+    return value->uintg;
   } else {
     /* create a new value */
     const int ret = inthash_write(hashtable, name, inc);
