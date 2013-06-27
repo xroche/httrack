@@ -8,4 +8,4 @@ TESTS_ENVIRONMENT += ONLINE_UNIT_TESTS=$(ONLINE_UNIT_TESTS)
 TESTS_ENVIRONMENT += HTTPS_SUPPORT=$(HTTPS_SUPPORT)
 
 TEST_EXTENSIONS = .test
-TESTS = 00_runnable.test 01_engine-charset.test 01_engine-entities.test 01_engine-idna.test 01_engine-simplify.test 10_crawl-simple.test 11_crawl-cookies.test 11_crawl-idna.test 11_crawl-international.test 11_crawl-parsing.test 12_crawl_https.test 
+TESTS = 00_runnable.test 01_engine-charset.test 01_engine-entities.test 01_engine-hashtable.test 01_engine-idna.test 01_engine-simplify.test 10_crawl-simple.test 11_crawl-cookies.test 11_crawl-idna.test 11_crawl-international.test 11_crawl-parsing.test 12_crawl_https.test 
