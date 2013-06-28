@@ -40,7 +40,8 @@ Please visit our Website: http://www.httrack.com
  *
  * Implementation notes:
  * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
- * with a FNV hash function, with one additional auxiliary hash function.
+ * with a MD5 or FNV-1 hash function, with one additional auxiliary hash
+ * function.
  * It also uses a small stash area to handle rare cases of collisions.
  * Enumeration of all key/values is possible, deletion is also possible, but
  * currently without any auto-shrinking (ie. table will never shrink).
@@ -51,6 +52,7 @@ Please visit our Website: http://www.httrack.com
  * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
  * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
  * FNV http://www.isthe.com/chongo/tech/comp/fnv/
+ * MD5 http://en.wikipedia.org/wiki/MD5
  **/
 
 #ifndef HTSINTHASH_DEFH
