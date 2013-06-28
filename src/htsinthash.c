@@ -55,7 +55,7 @@ Please visit our Website: http://www.httrack.com
    was causing the stash area to be more filled than the MD5 variant.
 
    Simpler hashing functions, such as rolling hashes (LCG) were also tested,
-   but bith collision rate and diffusion were terrible.
+   but with collision rate and diffusion were terrible.
 
    [ On a 10M key tests, both variants acheived 0.45 cuckoo/add ration,
      but the FNV-1 variant collided 11 times with a maximum stash area
