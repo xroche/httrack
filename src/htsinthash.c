@@ -43,15 +43,30 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsinthash.h"
 
-/* We may use md5 as hashing function for its quality regarding diffusion and
+/* We use md5 as hashing function for its quality regarding diffusion and
    collisions. MD5 is slower than other hashing functions, but is known to be
-   an excellent hashing function. FNV-1 is however generally good enough for
-   this purpose, too.
+   an excellent hashing function. FNV-1 is generally good enough for this
+   purpose, too, but the performance gain is not sufficient to use it by
+   default.
+
+   On several benchmarks, both MD5 and FNV were quite good (0.45 cuckoo moved
+   on average for each new item inserted in the hashtable), but FNV-1 was more
+   prone to mutual collisions (creating cycles requiring stash handling), and
+   was causing the stash area to be more filled than the MD5 variant.
+
+   Simpler hashing functions, such as rolling hashes (LCG) were also tested,
+   but bith collision rate and diffusion were terrible.
+
+   [ On a 10M key tests, both variants acheived 0.45 cuckoo/add ration,
+     but the FNV-1 variant collided 11 times with a maximum stash area
+     filled with 4 entries ; whereas the MD5 variant did only collide
+     once ]
 */
-#if 0
-#define USES_MD5
+#ifndef HTS_INTHASH_USES_MD5
+#define HTS_INTHASH_USES_MD5 1
 #endif
-#ifdef USES_MD5
+
+#if HTS_INTHASH_USES_MD5 == 1
 #include "htsmd5.h"
 #endif
 
@@ -150,6 +165,27 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 #define HTS_INLINE
 #endif
 
+/* Logging level. */
+#if 0
+/* Verbose. */
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
+#define inthash_debug inthash_log
+#define inthash_trace inthash_log
+#elif 0
+/* Info. */
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
+#define inthash_debug inthash_log
+#define inthash_trace inthash_nolog
+#else
+/* No logging except stats and critical. */
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
+#define inthash_debug inthash_nolog
+#define inthash_trace inthash_nolog
+#endif
+
 /* 2**X */
 #define POW2(X) ( (size_t) 1 << (X) )
 
@@ -165,8 +201,13 @@ static void inthash_log(const inthash hashtable, const char *format, ...)
   putc('\n', stderr);
 }
 
+/* No logging (should be dropped by the compiler) */
+static void inthash_nolog(const inthash hashtable, const char *format, ...)
+                          HTS_PRINTF_FUN(2, 3) {
+}
+
 static inthash_keys inthash_calc_hashes(const char *value) {
-#ifdef USES_MD5
+#if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
   union {
     char md5digest[16];
@@ -178,7 +219,7 @@ static inthash_keys inthash_calc_hashes(const char *value) {
 
   /* do not keep identical hashes */
   if (u.hashes.hash1 == u.hashes.hash2) {
-    hashes.hash2 = ~hashes.hash2;
+    u.hashes.hash2 = ~u.hashes.hash2;
   }
 
   return u.hashes;
@@ -254,7 +295,7 @@ static void inthash_realloc_pool(inthash hashtable) {
   hashtable->pool.buffer = realloc(hashtable->pool.buffer,
     hashtable->pool.capacity);
   if (hashtable->pool.buffer == NULL) {
-    inthash_log(hashtable,
+    inthash_crit(hashtable,
       "** hashtable string pool allocation error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
@@ -265,7 +306,7 @@ static void inthash_realloc_pool(inthash hashtable) {
 #define RECOMPUTE_STRING(S) do {                                   \
     if (S != NULL) {                                               \
       const size_t offset = (S) - oldbase;                         \
-      hashtable->items[i].name = &hashtable->pool.buffer[offset];  \
+      S = &hashtable->pool.buffer[offset];                         \
       count++;                                                     \
     }                                                              \
 } while(0)
@@ -280,9 +321,9 @@ static void inthash_realloc_pool(inthash hashtable) {
 
 #undef RECOMPUTE_STRING
 
-  inthash_log(hashtable, "reallocated string pool for "
-              "%"UINT_64_FORMAT" strings: %"UINT_64_FORMAT" bytes",
-              (uint64_t) count, (uint64_t) hashtable->pool.capacity);
+  inthash_debug(hashtable, "reallocated string pool for "
+                "%"UINT_64_FORMAT" strings: %"UINT_64_FORMAT" bytes",
+                (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
 /* compact string pool ; does not change the capacity */
@@ -301,7 +342,7 @@ static void inthash_compact_pool(inthash hashtable) {
   hashtable->pool.size = 0;
   hashtable->pool.used = 0;
   if (hashtable->pool.buffer == NULL) {
-    inthash_log(hashtable,
+    inthash_debug(hashtable,
       "** hashtable string pool compaction error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
@@ -309,17 +350,17 @@ static void inthash_compact_pool(inthash hashtable) {
   }
 
   /* relocate a string on a different pool */
-#define RELOCATE_STRING(S) do {                                    \
-    if (S != NULL) {                                               \
-      const size_t len = strlen(S) + 1;                            \
+#define RELOCATE_STRING(S) do {                             \
+    if (S != NULL) {                                        \
+      const size_t len = strlen(S) + 1;                     \
       inthash_assert(hashtable->pool.size + len             \
         <= hashtable->pool.capacity);                       \
       memcpy(&hashtable->pool.buffer[hashtable->pool.size], \
-        S, len);                                                   \
+        S, len);                                            \
       S = &hashtable->pool.buffer[hashtable->pool.size];    \
       hashtable->pool.size += len;                          \
-      count++;                                                     \
-    }                                                              \
+      count++;                                              \
+    }                                                       \
 } while(0)
 
   /* relocate */
@@ -338,11 +379,11 @@ static void inthash_compact_pool(inthash hashtable) {
   /* wipe previous pool */
   free(old_pool);
 
-  inthash_log(hashtable,
-              "compacted string pool for %"UINT_64_FORMAT" strings: "
-              "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
-              (uint64_t) count, (uint64_t) old_size,
-              (uint64_t) hashtable->pool.size);
+  inthash_debug(hashtable,
+                "compacted string pool for %"UINT_64_FORMAT" strings: "
+                "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
+                (uint64_t) count, (uint64_t) old_size,
+                (uint64_t) hashtable->pool.size);
 }
 
 static char* inthash_dup_name(inthash hashtable, const char *name) {
@@ -507,9 +548,9 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     /* prepare cuckoo ; let's take position 1 */
     else {
       cuckoo_hash = initial_cuckoo_hash = hashes.hash1;
-      inthash_log(hashtable,
-                  "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
-        item.name, (uint64_t) pos, cuckoo_hash);
+      inthash_trace(hashtable,
+                    "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
+                     item.name, (uint64_t) pos, cuckoo_hash);
     }
   }
 
@@ -517,13 +558,13 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   for(loops = POW2(hashtable->lg_size) ; loops != 0 ; --loops) {
     const size_t pos = inthash_hash_to_pos(hashtable, cuckoo_hash);
 
-    inthash_log(hashtable,
-                "\tdebug:placing cuckoo '%s' at %"UINT_64_FORMAT" (%x)", 
-      item.name, (uint64_t) pos, cuckoo_hash);
+    inthash_trace(hashtable,
+                  "\tdebug:placing cuckoo '%s' at %"UINT_64_FORMAT" (%x)", 
+                  item.name, (uint64_t) pos, cuckoo_hash);
 
     /* place at alternate free position ? */
     if (inthash_is_free(hashtable, pos)) {
-      inthash_log(hashtable, "debug:free position");
+      inthash_trace(hashtable, "debug:free position");
       hashtable->items[pos] = item;
       return 1; /* added */
     }
@@ -542,13 +583,13 @@ static int inthash_write_value_(inthash hashtable, const char *name,
       /* we just kicked this item from its position 1 */
       if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash1)) {
         /* then place it on position 2 on next run */
-        inthash_log(hashtable, "\tdebug:position 1");
+        inthash_trace(hashtable, "\tdebug:position 1");
         cuckoo_hash = item.hashes.hash2;
       }
       /* we just kicked this item from its position 2 */
       else if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash2)) {
         /* then place it on position 1 on next run */
-        inthash_log(hashtable, "\tdebug:position 2");
+        inthash_trace(hashtable, "\tdebug:position 2");
         cuckoo_hash = item.hashes.hash1;
       }
       else {
@@ -573,9 +614,8 @@ static int inthash_write_value_(inthash hashtable, const char *name,
     if (hashtable->stash.size > hashtable->stats.max_stash_size) {
       hashtable->stats.max_stash_size = hashtable->stash.size;
     }
-    inthash_log(hashtable, "used stash because of collision (%d entries)",
-                (int) hashtable->stash.size);
-    inthash_log(hashtable, "debug:stash position");
+    inthash_debug(hashtable, "used stash because of collision (%d entries)",
+                  (int) hashtable->stash.size);
     return 1; /* added */
   } else {
     /* we are doomed. hopefully the probability is lower than being killed
@@ -602,7 +642,6 @@ int inthash_write_value(inthash hashtable, const char *name,
     /* table is more than half-full */
     if (hashtable->used >= half_size) {
       size_t i;
-      char *data;
 
       /* size before  */
       const size_t prev_power = hashtable->lg_size;
@@ -620,7 +659,7 @@ int inthash_write_value(inthash hashtable, const char *name,
       hashtable->items = 
         (inthash_item *) realloc(hashtable->items, alloc_size);
       if (hashtable->items == NULL) {
-        inthash_log(hashtable,
+        inthash_crit(hashtable,
           "** hashtable allocation error: "
           "could not allocate %"UINT_64_FORMAT" bytes", 
           (uint64_t) alloc_size);
@@ -628,8 +667,7 @@ int inthash_write_value(inthash hashtable, const char *name,
       }
 
       /* clear upper half */
-      data = (char*) hashtable->items;
-      memset(data + prev_alloc_size, 0, prev_alloc_size);
+      memset(&hashtable->items[prev_size], 0, prev_alloc_size);
 
       /* relocate lower half items when needed */
       for(i = 0 ; i < prev_size ; i++) {
@@ -661,9 +699,9 @@ int inthash_write_value(inthash hashtable, const char *name,
         }
       }
 
-      inthash_log(hashtable,
-                  "expanded hashtable to %"UINT_64_FORMAT" elements",
-                  (uint64_t) POW2(hashtable->lg_size));
+      inthash_debug(hashtable,
+                    "expanded hashtable to %"UINT_64_FORMAT" elements",
+                    (uint64_t) POW2(hashtable->lg_size));
 
       /* attempt to merge the stash if present */
       if (hashtable->stash.size != 0) {
@@ -692,12 +730,12 @@ int inthash_write_value(inthash hashtable, const char *name,
         /* logging */
         inthash_assert(hashtable->stash.size <= old_size);
         if (hashtable->stash.size < old_size) {
-          inthash_log(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
-                      "to %"UINT_64_FORMAT,
-                      (uint64_t) old_size, (uint64_t) hashtable->stash.size);
+          inthash_debug(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
+                        "to %"UINT_64_FORMAT,
+                        (uint64_t) old_size, (uint64_t) hashtable->stash.size);
         } else {
-          inthash_log(hashtable, "stash has still %"UINT_64_FORMAT" elements",
-                      (uint64_t) hashtable->stash.size);
+          inthash_trace(hashtable, "stash has still %"UINT_64_FORMAT" elements",
+                        (uint64_t) hashtable->stash.size);
         }
       }
 
@@ -824,7 +862,7 @@ static int inthash_remove_(inthash hashtable, const char *name,
         }
         hashtable->stash.size--;
         *removed = (size_t) -1;
-        inthash_log(hashtable, "debug:deleted item in stash (%d entries)",
+        inthash_debug(hashtable, "debug:deleted item in stash (%d entries)",
           (int) hashtable->stash.size);
         return 1;
       }
@@ -863,7 +901,7 @@ int inthash_remove(inthash hashtable, const char *name) {
             hashtable->stash.items[i] = hashtable->stash.items[i + 1];
           }
           hashtable->stash.size--;
-          inthash_log(hashtable, "debug:moved item from stash (%d entries)",
+          inthash_debug(hashtable, "debug:moved item from stash (%d entries)",
             (int) hashtable->stash.size);
           break;
         }
@@ -945,28 +983,28 @@ size_t inthash_memory_size(inthash hashtable) {
 }
 
 static void inthash_log_stats(inthash hashtable) {
-  inthash_log(hashtable, "freeing table ; "
-              "writes=%"UINT_64_FORMAT" "
-              "(new=%"UINT_64_FORMAT") "
-              "moved=%"UINT_64_FORMAT " "
-              "stashed=%"UINT_64_FORMAT" "
-              "max-stash-size=%"UINT_64_FORMAT" "
-              "avg-moved=%g "
-              "rehash=%"UINT_64_FORMAT" "
-              "pool-compact=%"UINT_64_FORMAT" "
-              "pool-realloc=%"UINT_64_FORMAT" "
-              "memory=%"UINT_64_FORMAT,
-              (uint64_t) hashtable->stats.write_count,
-              (uint64_t) hashtable->stats.add_count,
-              (uint64_t) hashtable->stats.cuckoo_moved,
-              (uint64_t) hashtable->stats.stash_added,
-              (uint64_t) hashtable->stats.max_stash_size,
-              (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
-              (uint64_t) hashtable->stats.rehash_count,
-              (uint64_t) hashtable->stats.pool_compact_count,
-              (uint64_t) hashtable->stats.pool_realloc_count,
-              (uint64_t) inthash_memory_size(hashtable)
-              );
+  inthash_info(hashtable, "freeing table ; "
+               "writes=%"UINT_64_FORMAT" "
+               "(new=%"UINT_64_FORMAT") "
+               "moved=%"UINT_64_FORMAT " "
+               "stashed=%"UINT_64_FORMAT" "
+               "max-stash-size=%"UINT_64_FORMAT" "
+               "avg-moved=%g "
+               "rehash=%"UINT_64_FORMAT" "
+               "pool-compact=%"UINT_64_FORMAT" "
+               "pool-realloc=%"UINT_64_FORMAT" "
+               "memory=%"UINT_64_FORMAT,
+               (uint64_t) hashtable->stats.write_count,
+               (uint64_t) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.cuckoo_moved,
+               (uint64_t) hashtable->stats.stash_added,
+               (uint64_t) hashtable->stats.max_stash_size,
+               (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.rehash_count,
+               (uint64_t) hashtable->stats.pool_compact_count,
+               (uint64_t) hashtable->stats.pool_realloc_count,
+               (uint64_t) inthash_memory_size(hashtable)
+               );
 }
 
 void inthash_delete(inthash *phashtable) {
