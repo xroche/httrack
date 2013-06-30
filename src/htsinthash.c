@@ -285,15 +285,93 @@ static HTS_INLINE int inthash_matches(const inthash hashtable, size_t pos,
   return inthash_matches_(item, name, hashes);
 }
 
+/* compact string pool ; does not change the capacity */
+static void inthash_compact_pool(inthash hashtable, size_t capacity) {
+  const size_t hash_size = POW2(hashtable->lg_size);
+  size_t i;
+  char* old_pool = hashtable->pool.buffer;
+  const size_t old_size = hashtable->pool.size;
+  size_t count = 0;
+
+  /* statistics */
+  hashtable->stats.pool_compact_count++;
+
+  /* change capacity now */
+  if (hashtable->pool.capacity != capacity) {
+    hashtable->pool.capacity = capacity;
+  }
+
+  /* realloc */
+  hashtable->pool.buffer = malloc(hashtable->pool.capacity);
+  hashtable->pool.size = 0;
+  hashtable->pool.used = 0;
+  if (hashtable->pool.buffer == NULL) {
+    inthash_debug(hashtable,
+      "** hashtable string pool compaction error: could not allocate "
+      "%"UINT_64_FORMAT" bytes", 
+      (uint64_t) hashtable->pool.capacity);
+    inthash_assert(! "hashtable string pool compaction error");
+  }
+
+  /* relocate a string on a different pool */
+#define RELOCATE_STRING(S) do {                             \
+    if (S != NULL) {                                        \
+      const size_t capacity = hashtable->pool.capacity;     \
+      const char *const src = S;                            \
+      char *const dest = hashtable->pool.buffer;            \
+      size_t i, j;                                          \
+      for(i = 0, j = hashtable->pool.size                   \
+        ; src[i] != '\0' ; i++, j++) {                      \
+        inthash_assert(j < capacity);                       \
+        dest[j] = src[i];                                   \
+      }                                                     \
+      dest[j++] = '\0';                                     \
+      hashtable->pool.size = j;                             \
+      count++;                                              \
+    }                                                       \
+} while(0)
+
+  /* relocate */
+  for(i = 0 ; i < hash_size ; i++) {
+    RELOCATE_STRING(hashtable->items[i].name);
+  }
+  for(i = 0 ; i < hashtable->stash.size ; i++) {
+    RELOCATE_STRING(hashtable->stash.items[i].name);
+  }
+
+#undef RELOCATE_STRING
+
+  /* compacted (used chars == current size) */
+  hashtable->pool.used = hashtable->pool.size;
+
+  /* wipe previous pool */
+  free(old_pool);
+
+  inthash_debug(hashtable,
+                "compacted string pool for %"UINT_64_FORMAT" strings: "
+                "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
+                (uint64_t) count, (uint64_t) old_size,
+                (uint64_t) hashtable->pool.size);
+}
+
 /* realloc (expand) string pool ; does not change the compacity */
-static void inthash_realloc_pool(inthash hashtable) {
+static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   char *const oldbase = hashtable->pool.buffer;
   size_t i;
   size_t count = 0;
 
+  /* compact instead ? */
+  if (hashtable->pool.used < ( hashtable->pool.size*3 ) / 4) {
+    inthash_compact_pool(hashtable, capacity);
+    return ;
+  }
+
   /* statistics */
   hashtable->stats.pool_realloc_count++;
+
+  /* change capacity now */
+  hashtable->pool.capacity = capacity;
 
   /* realloc */
   hashtable->pool.buffer = realloc(hashtable->pool.buffer,
@@ -330,79 +408,18 @@ static void inthash_realloc_pool(inthash hashtable) {
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
-/* compact string pool ; does not change the capacity */
-static void inthash_compact_pool(inthash hashtable) {
-  const size_t hash_size = POW2(hashtable->lg_size);
-  size_t i;
-  char* old_pool = hashtable->pool.buffer;
-  const size_t old_size = hashtable->pool.size;
-  size_t count = 0;
-
-  /* statistics */
-  hashtable->stats.pool_compact_count++;
-
-  /* realloc */
-  hashtable->pool.buffer = malloc(hashtable->pool.capacity);
-  hashtable->pool.size = 0;
-  hashtable->pool.used = 0;
-  if (hashtable->pool.buffer == NULL) {
-    inthash_debug(hashtable,
-      "** hashtable string pool compaction error: could not allocate "
-      "%"UINT_64_FORMAT" bytes", 
-      (uint64_t) hashtable->pool.capacity);
-    inthash_assert(! "hashtable string pool compaction error");
-  }
-
-  /* relocate a string on a different pool */
-#define RELOCATE_STRING(S) do {                             \
-    if (S != NULL) {                                        \
-      const size_t len = strlen(S) + 1;                     \
-      inthash_assert(hashtable->pool.size + len             \
-        <= hashtable->pool.capacity);                       \
-      memcpy(&hashtable->pool.buffer[hashtable->pool.size], \
-        S, len);                                            \
-      S = &hashtable->pool.buffer[hashtable->pool.size];    \
-      hashtable->pool.size += len;                          \
-      count++;                                              \
-    }                                                       \
-} while(0)
-
-  /* relocate */
-  for(i = 0 ; i < hash_size ; i++) {
-    RELOCATE_STRING(hashtable->items[i].name);
-  }
-  for(i = 0 ; i < hashtable->stash.size ; i++) {
-    RELOCATE_STRING(hashtable->stash.items[i].name);
-  }
-
-#undef RELOCATE_STRING
-
-  /* compacted (used chars == current size) */
-  hashtable->pool.used = hashtable->pool.size;
-
-  /* wipe previous pool */
-  free(old_pool);
-
-  inthash_debug(hashtable,
-                "compacted string pool for %"UINT_64_FORMAT" strings: "
-                "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
-                (uint64_t) count, (uint64_t) old_size,
-                (uint64_t) hashtable->pool.size);
-}
-
 static char* inthash_dup_name(inthash hashtable, const char *name) {
   const size_t len = strlen(name) + 1;
   char *s;
 
   if (hashtable->pool.capacity - hashtable->pool.size < len) {
-    if (hashtable->pool.capacity == 0) {
-      hashtable->pool.capacity = MIN_POOL_CAPACITY;
-    }
-    for( ; hashtable->pool.capacity - hashtable->pool.size < len
-      ; hashtable->pool.capacity <<= 1) ;
-    inthash_realloc_pool(hashtable);
+    size_t capacity;
+    for(capacity = MIN_POOL_CAPACITY ; capacity < hashtable->pool.size + len
+      ; capacity <<= 1) ;
+    inthash_realloc_pool(hashtable, capacity);
   }
 
+  assert(len + hashtable->pool.size <= hashtable->pool.capacity);
   s = &hashtable->pool.buffer[hashtable->pool.size];
   memcpy(s, name, len);
   hashtable->pool.size += len;
@@ -416,7 +433,7 @@ static void inthash_free_name(inthash hashtable, char *name) {
   const size_t len = strlen(name) + 1;
   hashtable->pool.used -= len;
   if (hashtable->pool.used < hashtable->pool.size / 2) {
-    inthash_compact_pool(hashtable);
+    inthash_compact_pool(hashtable, hashtable->pool.capacity);
   }
 }
 
