@@ -67,7 +67,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #if HTS_INTHASH_USES_MD5 == 1
-#include "htsmd5.h"
+#include "md5.h"
 #endif
 
 /** Size of auxiliary stash. **/
@@ -209,13 +209,17 @@ static void inthash_nolog(const inthash hashtable, const char *format, ...)
 static inthash_keys inthash_calc_hashes(const char *value) {
 #if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
+  MD5_CTX ctx;
   union {
-    char md5digest[16];
+    unsigned char md5digest[16];
     inthash_keys hashes;
   } u;
 
   /* compute MD5 */
-  domd5mem(value, strlen(value), u.md5digest, 0);
+  MD5Init(&ctx, 0);
+  MD5Update(&ctx, (const unsigned char *) value,
+    (unsigned int) strlen(value));
+  MD5Final(u.md5digest, &ctx);
 
   /* do not keep identical hashes */
   if (u.hashes.hash1 == u.hashes.hash2) {
