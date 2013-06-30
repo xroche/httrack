@@ -117,8 +117,19 @@ struct inthash_item {
 /** Alias for legacy code. **/
 typedef inthash_item inthash_chain;
 
-/** Free handler **/
-typedef void (*t_inthash_freehandler) (void *value);
+/** Value free handler **/
+typedef void (*t_inthash_freehandler) (void *arg, void *value);
+
+/** Name dup handler. **/
+typedef char* (*t_inthash_duphandler) (void *arg, const char *name);
+
+/** Hash computation handler. **/
+typedef inthash_keys (*t_inthash_hasheshandler)(void *arg, const char *value);
+
+/**
+ * Value comparison handler (returns non-zero value if strings are equal).
+ **/
+typedef int (*t_inthash_cmphandler)(void *arg, const char *a, const char *b);
 
 /** Hashtable (opaque structure). **/
 #ifndef HTS_DEF_FWSTRUCT_struct_inthash
@@ -171,16 +182,39 @@ size_t inthash_nitems(inthash hashtable);
 size_t inthash_memory_size(inthash hashtable);
 
 /**
- * Are the values inside this hashtable to be free'd ?
+ * If 'flag' is non-zero, calls inthash_value_set_value_handler() with
+ * default system free() handler function, otherwise, free the value handlers.
  **/
 void inthash_value_is_malloc(inthash hashtable, int flag);
 
 /**
- * Set a free handler for values. This handler will be called when a value
- * is to be removed from the hashtable.
+ * Set handlers for values.
+ * free: this handler will be called when a value is to be removed from
+ * the hashtable. if NULL, values won't be free'd.
+ * arg: opaque custom argument to be used by functions.
+ * Handler(s) MUST NOT be changed once elements have been added.
  **/
-void inthash_value_set_free_handler(inthash hashtable,
-                                    t_inthash_freehandler free_handler);
+void inthash_value_set_value_handler(inthash hashtable,
+                                     t_inthash_freehandler free,
+                                     void *arg);
+
+/**
+ * Set handlers for keys.
+ * dup: handler called to duplicate a key. if NULL, the internal pool is used.
+ * free: handler called to free a key. if NULL, the internal pool is used.
+ * hash: hashing handler, called to hash a key. if NULL, the default hash
+ * function is used.
+ * equals: comparison handler, returning non-zero value when two keys are
+ * identical. if NULL, the default comparison function is used.
+ * arg: opaque custom argument to be used by functions.
+ * Handler(s) MUST NOT be changed once elements have been added.
+ **/
+void inthash_value_set_key_handler(inthash hashtable,
+                                   t_inthash_duphandler dup,
+                                   t_inthash_freehandler free,
+                                   t_inthash_hasheshandler hash,
+                                   t_inthash_cmphandler equals,
+                                   void *arg);
 
 /**
  * Read an integer entry from the hashtable.
@@ -261,7 +295,8 @@ int inthash_remove(inthash hashtable, const char *name);
 
 /**
  * Return a new enumerator.
- * Note: you may not add or delete entries while enumerating.
+ * Note: deleting entries is safe while enumerating, but adding entries 
+ * lead to undefined enumeration behavior (yet safe).
  **/
 struct_inthash_enum inthash_enum_new(inthash hashtable);
 
@@ -269,6 +304,11 @@ struct_inthash_enum inthash_enum_new(inthash hashtable);
  * Enumerate the next entry.
  **/
 inthash_item *inthash_enum_next(struct_inthash_enum * e);
+
+/**
+ * Compute a hash, given a string value.
+ **/
+inthash_keys inthash_hash_value(const char *value);
 
 #endif
 

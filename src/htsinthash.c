@@ -146,8 +146,27 @@ struct struct_inthash {
 
   /** Settings. **/
   struct {
-    /** Items value de-allocator. (may be NULL) **/
-    t_inthash_freehandler free_handler;
+    /** How to handle values (might be NULL). **/
+    struct {
+      /** free() **/
+      t_inthash_freehandler free;
+      /** opaque argument **/
+      void *arg;
+    } value;
+
+    /** How to handle names (might be NULL). **/
+    struct {
+      /** strdup() **/
+      t_inthash_duphandler dup;
+      /** free() **/
+      t_inthash_freehandler free;
+      /** hash **/
+      t_inthash_hasheshandler hash;
+      /** comparison **/
+      t_inthash_cmphandler equals;
+      /** opaque argument **/
+      void *arg;
+    } key;
   } custom;
 };
 
@@ -206,7 +225,7 @@ static void inthash_nolog(const inthash hashtable, const char *format, ...)
                           HTS_PRINTF_FUN(2, 3) {
 }
 
-static inthash_keys inthash_calc_hashes(const char *value) {
+inthash_keys inthash_hash_value(const char *value) {
 #if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
   MD5_CTX ctx;
@@ -264,25 +283,41 @@ static inthash_keys inthash_calc_hashes(const char *value) {
 #endif
 }
 
+static HTS_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
+                                                   const char *value) {
+  return hashtable->custom.key.hash == NULL 
+    ? inthash_hash_value(value)
+    : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
+}
+
 /* position 'pos' is free ? */
 static HTS_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
   return hashtable->items[pos].name == NULL;
 }
 
-static HTS_INLINE int inthash_matches_(const inthash_item *const item,
+/* compare two keys ; by default using strcmp() */
+static HTS_INLINE int inthash_equals(inthash hashtable,
+                                     const char *a, const char *b) {
+  return hashtable->custom.key.equals == NULL
+    ? strcmp(a, b) == 0
+    : hashtable->custom.key.equals(hashtable->custom.key.arg, a, b);
+}
+
+static HTS_INLINE int inthash_matches_(inthash hashtable,
+                                       const inthash_item *const item,
                                        const char *name,
                                        const inthash_keys *hashes) {
   return item->name != NULL
     && item->hashes.hash1 == hashes->hash1
     && item->hashes.hash2 == hashes->hash2
-    && strcmp(item->name, name) == 0;
+    && inthash_equals(hashtable, item->name, name);
 }
 
-static HTS_INLINE int inthash_matches(const inthash hashtable, size_t pos,
+static HTS_INLINE int inthash_matches(inthash hashtable, size_t pos,
                                       const char *name,
                                       const inthash_keys *hashes) {
   const inthash_item *const item = &hashtable->items[pos];
-  return inthash_matches_(item, name, hashes);
+  return inthash_matches_(hashtable, item, name, hashes);
 }
 
 /* compact string pool ; does not change the capacity */
@@ -292,6 +327,9 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   char* old_pool = hashtable->pool.buffer;
   const size_t old_size = hashtable->pool.size;
   size_t count = 0;
+
+  /* we manage the string pool */
+  assert(hashtable->custom.key.dup == NULL);
 
   /* statistics */
   hashtable->stats.pool_compact_count++;
@@ -361,6 +399,9 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
   size_t i;
   size_t count = 0;
 
+  /* we manage the string pool */
+  assert(hashtable->custom.key.dup == NULL);
+
   /* compact instead ? */
   if (hashtable->pool.used < ( hashtable->pool.size*3 ) / 4) {
     inthash_compact_pool(hashtable, capacity);
@@ -408,7 +449,7 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
-static char* inthash_dup_name(inthash hashtable, const char *name) {
+static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
   const size_t len = strlen(name) + 1;
   char *s;
 
@@ -428,12 +469,30 @@ static char* inthash_dup_name(inthash hashtable, const char *name) {
   return s;
 }
 
-/* note: pointer must have been kicked from the pool first */
-static void inthash_free_name(inthash hashtable, char *name) {
+/* duplicate a key. default is to use the internal pool. */
+static HTS_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
+  return hashtable->custom.key.dup == NULL
+    ? inthash_dup_name_internal(hashtable, name)
+    : hashtable->custom.key.dup(hashtable->custom.key.arg, name);
+}
+
+/* internal pool free handler.
+   note: pointer must have been kicked from the pool first */
+static void inthash_free_key_internal(inthash hashtable, char *name) {
   const size_t len = strlen(name) + 1;
   hashtable->pool.used -= len;
   if (hashtable->pool.used < hashtable->pool.size / 2) {
     inthash_compact_pool(hashtable, hashtable->pool.capacity);
+  }
+}
+
+/* free a key. default is to use the internal pool.
+   note: pointer must have been kicked from the pool first */
+static void inthash_free_key(inthash hashtable, char *name) {
+  if (hashtable->custom.key.free == NULL) {
+    inthash_free_key_internal(hashtable, name);
+  } else {
+    hashtable->custom.key.free(hashtable->custom.key.arg, name);
   }
 }
 
@@ -450,7 +509,7 @@ static HTS_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
 
 int inthash_read_pvoid(inthash hashtable, const char *name, void **pvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
-  int ret =
+  const int ret =
     inthash_read_value(hashtable, name, (pvalue != NULL) ? &value : NULL);
   if (pvalue != NULL)
     *pvalue = value.ptr;
@@ -478,14 +537,14 @@ int inthash_write(inthash hashtable, const char *name, intptr_t intvalue) {
   return inthash_write_value(hashtable, name, value);
 }
 
-static void inthash_default_free_handler(void *value) {
+static void inthash_default_free_handler(void *arg, void *value) {
   if (value)
     free(value);
 }
 
 static void inthash_del_value_(inthash hashtable, inthash_value *pvalue) {
-  if (hashtable->custom.free_handler != NULL)
-    hashtable->custom.free_handler(pvalue->ptr);
+  if (hashtable->custom.value.free != NULL)
+    hashtable->custom.value.free(hashtable->custom.value.arg, pvalue->ptr);
   pvalue->ptr = NULL;
 }
 
@@ -499,7 +558,7 @@ static void inthash_del_name(inthash hashtable, inthash_item *item) {
   item->name = NULL;  /* there must be no reference remaining */
   item->hashes = nullHash;
   /* free after detach (we may compact the pool) */
-  inthash_free_name(hashtable, name);
+  inthash_free_key(hashtable, name);
 }
 
 static void inthash_del_item(inthash hashtable, inthash_item *pitem) {
@@ -511,7 +570,7 @@ static int inthash_write_value_(inthash hashtable, const char *name,
                                 inthash_value value) {
   inthash_item item;
   size_t pos;
-  const inthash_keys hashes = inthash_calc_hashes(name);
+  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
   inthash_key cuckoo_hash, initial_cuckoo_hash;
   size_t loops;
 
@@ -538,7 +597,8 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(&hashtable->stash.items[i], name, &hashes)) {
+      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name, 
+                           &hashes)) {
         inthash_del_value_(hashtable, &hashtable->stash.items[i].value);
         hashtable->stash.items[i].value = value;
         return 0;  /* replaced */
@@ -785,7 +845,7 @@ int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue) {
 
 static inthash_value* inthash_read_value_(inthash hashtable,
                                           const char *name) {
-  const inthash_keys hashes = inthash_calc_hashes(name);
+  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
   size_t pos;
 
   /* found at position 1 ? */
@@ -804,7 +864,8 @@ static inthash_value* inthash_read_value_(inthash hashtable,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(&hashtable->stash.items[i], name, &hashes)) {
+      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name,
+                           &hashes)) {
         return &hashtable->stash.items[i].value;
       }
     }
@@ -876,7 +937,8 @@ static int inthash_remove_(inthash hashtable, const char *name,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(&hashtable->stash.items[i], name, hashes)) {
+      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name,
+                           hashes)) {
         inthash_del_item(hashtable, &hashtable->stash.items[i]);
         for( ; i + 1 < hashtable->stash.size ; i++) {
           hashtable->stash.items[i] = hashtable->stash.items[i + 1];
@@ -895,7 +957,7 @@ static int inthash_remove_(inthash hashtable, const char *name,
 }
 
 int inthash_remove(inthash hashtable, const char *name) {
-  const inthash_keys hashes = inthash_calc_hashes(name);
+  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
   size_t removed;
   const int ret = inthash_remove_(hashtable, name, &hashes, &removed);
 
@@ -967,6 +1029,13 @@ inthash inthash_new(size_t initial_size) {
     hashtable->stats.pool_compact_count = 0;
     hashtable->stats.pool_realloc_count = 0;
     hashtable->stats.rehash_count = 0;
+    hashtable->custom.value.free = NULL;
+    hashtable->custom.value.arg = NULL;
+    hashtable->custom.key.dup = NULL;
+    hashtable->custom.key.free = NULL;
+    hashtable->custom.key.hash = NULL;
+    hashtable->custom.key.equals = NULL;
+    hashtable->custom.key.arg = NULL;
   }
   return hashtable;
 }
@@ -977,17 +1046,36 @@ int inthash_created(inthash hashtable) {
 
 void inthash_value_is_malloc(inthash hashtable, int flag) {
   if (flag) {
-    if (hashtable->custom.free_handler == NULL) {
-      hashtable->custom.free_handler = inthash_default_free_handler;
+    if (hashtable->custom.value.free == NULL) {
+      hashtable->custom.value.free = inthash_default_free_handler;
+      hashtable->custom.value.arg = NULL;
     }
   } else {
-    hashtable->custom.free_handler = NULL;
+    hashtable->custom.value.free = NULL;
+    hashtable->custom.value.arg = NULL;
   }
 }
 
-void inthash_value_set_free_handler(inthash hashtable,
-                                    t_inthash_freehandler free_handler) {
-  hashtable->custom.free_handler = free_handler;
+void inthash_value_set_value_handler(inthash hashtable,
+                                     t_inthash_freehandler free,
+                                     void *arg) {
+  hashtable->custom.value.free = free;
+  hashtable->custom.value.arg = arg;
+}
+
+void inthash_value_set_key_handler(inthash hashtable,
+                                   t_inthash_duphandler dup,
+                                   t_inthash_freehandler free,
+                                   t_inthash_hasheshandler hash,
+                                   t_inthash_cmphandler equals,
+                                   void *arg) {
+  /* dup and free must be consistent */
+  assert( ( dup == NULL ) == ( free == NULL ) );
+  hashtable->custom.key.dup = dup;
+  hashtable->custom.key.free = free;
+  hashtable->custom.key.hash = hash;
+  hashtable->custom.key.equals = equals;
+  hashtable->custom.key.arg = arg;
 }
 
 size_t inthash_nitems(inthash hashtable) {
