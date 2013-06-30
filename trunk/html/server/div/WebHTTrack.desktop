@@ -5,5 +5,6 @@ Categories=Network;
 Terminal=false
 Name=WebHTTrack Website Copier
 Comment=Copy websites to your computer
+Keywords=copy website;backup website;capture website;offline browser;surf offline;mirror;mirroring;archiving;forensics;crawl;preservation
 Exec=webhttrack
 Icon=httrack
