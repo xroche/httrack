@@ -1,3 +1,9 @@
+httrack (3.47.21-1) unstable; urgency=low
+
+  * Updated to 3.47.21 (3.47-21)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 05 Jul 2013 20:12:25 +0200
+
 httrack (3.47.20-1) unstable; urgency=low
 
   * Updated to 3.47.20 (3.47-20)
