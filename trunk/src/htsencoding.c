@@ -206,6 +206,7 @@ int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
 
 int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
   size_t i, j, lastI, lastJ, k, utfBufferJ, utfBufferSize;
+  int seenQuery = 0;
   char utfBuffer[32];
 
   assert(src != dest);
@@ -218,7 +219,7 @@ int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
     unsigned char cUtf = (unsigned char) c;
 
     /* Replacement for ' ' */
-    if (c == '+') {
+    if (c == '+' && seenQuery) {
       c = cUtf = ' ';
       k = 0;  /* cancel any sequence */
     }
@@ -250,6 +251,9 @@ int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
     /* ASCII (and not in %xx) */
     else if (cUtf < 0x80 && i != lastI + 1) {
       k = 0;  /* cancel any sequence */
+      if (!seenQuery && c == '?') {
+        seenQuery = 1;
+      }
     }
     
     /* UTF-8 sequence in progress (either a raw or a %xx character) */
