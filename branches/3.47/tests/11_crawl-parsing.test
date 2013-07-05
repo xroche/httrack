@@ -30,7 +30,7 @@ bash crawl-test.sh --errors 0 --files 6 \
 	--found ut.httrack.com/parsing/escaping.html \
 	--found "ut.httrack.com/parsing/foo bar30f4.html" \
 	--found "ut.httrack.com/parsing/foo bar5e1f.html" \
-	--found "ut.httrack.com/parsing/foo+bar3860.html" \
+	--found "ut.httrack.com/parsing/foo+bar+plus3860.html" \
 	--found "ut.httrack.com/parsing/foo barae52.html" \
 	--found "ut.httrack.com/parsing/foo bar7b30.html" \
 	httrack http://ut.httrack.com/parsing/escaping.html
