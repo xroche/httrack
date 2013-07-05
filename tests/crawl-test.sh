@@ -202,6 +202,6 @@ tmpdir="${tmptopdir}/httrack_ut.$$"
 mkdir "${tmpdir}"
 
 # rock'in
-start-crawl $*
+start-crawl "${@}"
 
 # that's all, folks!
