@@ -1,0 +1,59 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="@drawable/bg_rings"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    tools:context=".ProjSetupActivity" >
+
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/web_addresses" />
+
+    <EditText
+        android:id="@+id/fieldWebsiteURLs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonInterrupt"
+        android:layout_alignLeft="@+id/textView1"
+        android:layout_alignRight="@+id/buttonNext"
+        android:layout_below="@+id/textView1"
+        android:layout_marginTop="14dp"
+        android:ems="10"
+        android:hint="@string/hint_addresses"
+        android:inputType="textMultiLine" />
+
+    <Button
+        android:id="@+id/buttonNext"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/buttonPrevious"
+        android:layout_alignBottom="@+id/buttonPrevious"
+        android:layout_alignParentRight="true"
+        android:onClick="onClickNext"
+        android:text="@string/start" />
+
+    <Button
+        android:id="@+id/buttonPrevious"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/fieldWebsiteURLs"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="29dp"
+        android:onClick="onClickPrevious"
+        android:text="@string/previous" />
+
+    <Button
+        android:id="@+id/buttonInterrupt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignRight="@+id/buttonNext"
+        android:layout_centerVertical="true"
+        android:text="@string/options" />
+
+</RelativeLayout>

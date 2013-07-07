@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.httrack.android"
+    android:versionCode="1"
+    android:versionName="3.47" >
+
+    <uses-sdk
+        android:minSdkVersion="7"
+        android:targetSdkVersion="14" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name="com.httrack.android.StartupActivity"
+            android:label="@string/title_activity_startup" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.httrack.android.ProjNameActivity"
+            android:label="@string/title_activity_proj_name" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.ProjSetupActivity"
+            android:label="@string/title_activity_proj_setup" >
+        </activity>
+    </application>
+
+</manifest>
