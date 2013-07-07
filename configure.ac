@@ -39,83 +39,13 @@ AC_SUBST(VERSION_INFO)
 AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 
-### Check LLint format
-if test x"$ac_cv_sizeof_long" = x"8"; then
-AC_MSG_CHECKING(long printf format)
-AC_TRY_RUN([#include <stdio.h>
-main() { long int c = -1, d = -1; char* f = "%ld"; sscanf("1234", f, &c, &d); 
-         exit (c != 1234 || d != -1); }
-],
-	[AC_MSG_RESULT(found)
-	AC_DEFINE(LLINT_FORMAT,"%ld",[LLint format])
-	AC_DEFINE(LLINT_TYPE,long int,[LLint type])
-],
-[
-AC_TRY_RUN([#include <stdio.h>
-main() { long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d); 
-         exit (c != 1234 || d != -1); }
-],
-[
-	AC_MSG_RESULT(found)
-	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
-	AC_DEFINE(LLINT_TYPE,long int,[LLint type])
-],
-[
-	AC_MSG_RESULT(no)
-	AC_MSG_RESULT(assuming not on target machine)
-	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
-	AC_DEFINE(LLINT_TYPE,int,[LLint type])
-])
-])
-elif test x"$ac_cv_sizeof_long_long" = x"8"; then
-AC_MSG_CHECKING(long long printf format)
-AC_TRY_RUN([#include <stdio.h>
-main() { long long int c = -1, d = -1; char* f = "%lld"; sscanf("1234", f, &c, &d); 
-         exit (c != 1234 || d != -1); }
-],
-	[AC_MSG_RESULT(found) 
-	AC_DEFINE(LLINT_FORMAT,"%lld",[LLint format])
-	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
-],
-[	
-AC_TRY_RUN([#include <stdio.h>
-main() { long long int c = -1, d = -1; char* f = "%ld"; sscanf("1234", f, &c, &d); 
-         exit (c != 1234 || d != -1); }
-],
-[
-	AC_MSG_RESULT(found)
-	AC_DEFINE(LLINT_FORMAT,"%ld",[LLint format])
-	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
-],
-[
-AC_TRY_RUN([#include <stdio.h>
-main() { long long int c = -1, d = -1; char* f = "%d"; sscanf("1234", f, &c, &d); 
-         exit (c != 1234 || d != -1); }
-],
-[
-	AC_MSG_RESULT(found)
-	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
-	AC_DEFINE(LLINT_TYPE,long long int,[LLint type])
-],
-[
-	AC_MSG_RESULT(no)
-	AC_MSG_RESULT(assuming not on target machine)
-	AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
-	AC_DEFINE(LLINT_TYPE,int,[LLint type])
-])
-])
-])
-else
-AC_DEFINE(LLINT_FORMAT,"%d",[LLint format])
-AC_DEFINE(LLINT_TYPE,int,[LLint type])
-fi
-
 ### check for in_addr_t
 AC_CHECK_TYPE(in_addr_t,
 AC_DEFINE(HTS_DO_NOT_REDEFINE_in_addr_t,,[Check for in_addr_t]),
 AC_MSG_WARN([*** in_addr_t not found]),
 [#include <sys/types.h>
-#include <netinet/in.h>])
+#include <netinet/in.h>
+#include <arpa/inet.h>])
 
 ### zlib
 CHECK_ZLIB()
