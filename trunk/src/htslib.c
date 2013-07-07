@@ -74,6 +74,9 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 #include <time.h>
+#ifdef __ANDROID__
+extern long int  timezone;
+#endif
 #include <stdarg.h>
 
 #ifndef  _WIN32_WCE
