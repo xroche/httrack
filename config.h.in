@@ -63,12 +63,6 @@
 /* Check for libsocket */
 #undef LIBSOCKET
 
-/* LLint format */
-#undef LLINT_FORMAT
-
-/* LLint type */
-#undef LLINT_TYPE
-
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
