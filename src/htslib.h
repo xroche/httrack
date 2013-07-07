@@ -232,6 +232,9 @@ extern htsmutex dns_lock;
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 
+// version
+const char* hts_version(void);
+
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 

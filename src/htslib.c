@@ -5250,6 +5250,10 @@ static void hts_debug_log_print(const char *format, ...) {
   }
 }
 
+HTSEXT_API const char* hts_version(void) {
+  return HTTRACK_VERSIONID;
+}
+
 static int hts_init_ok = 0;
 HTSEXT_API int hts_init(void) {
   const char *dbg_env;

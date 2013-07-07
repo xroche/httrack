@@ -111,6 +111,7 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
 /* Infos */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
 HTSEXT_API const char *hts_is_available(void);
+HTSEXT_API const char* hts_version(void);
 
 /* Wrapper functions */
 HTSEXT_API int htswrap_init(void);      // DEPRECATED - DUMMY FUNCTION
