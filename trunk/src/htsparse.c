@@ -85,7 +85,7 @@ Please visit our Website: http://www.httrack.com
   if (ht_buff==NULL) { \
   printf("PANIC! : Not enough memory [%d]\n", __LINE__); \
   XH_uninit; \
-  abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct("LLintP") failed" _ ht_size); \
+  abortLogFmt("not enough memory for current html document in HT_ADD_CHK : realloct("LLintP") failed" _ (LLint) ht_size); \
   abort(); \
   } \
 } \
@@ -138,7 +138,7 @@ Please visit our Website: http://www.httrack.com
   if (ht_buff==NULL) { \
   printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
   XH_uninit; \
-  abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct("LLintP") failed" _ ht_size); \
+  abortLogFmt("not enough memory for current html document in HT_ADD_START : malloct("LLintP") failed" _ (LLint) ht_size); \
   abort(); \
   } \
   ht_buff[0]='\0'; \
