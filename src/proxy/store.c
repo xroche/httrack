@@ -31,6 +31,9 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef __ANDROID__
+extern long int  timezone;
+#endif
 
 /* Locking */
 #ifdef _WIN32
