@@ -75,7 +75,7 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <time.h>
 #ifdef __ANDROID__
-extern long int  timezone;
+static long int  timezone = 0;
 #endif
 #include <stdarg.h>
 
