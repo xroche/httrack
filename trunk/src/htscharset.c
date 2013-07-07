@@ -373,7 +373,14 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 #else
 
 #include <errno.h>
+
+#if ( defined(HTS_USEICONV) && ( HTS_USEICONV == 0 ) )
+#define DISABLE_ICONV
+#endif
+
+#ifndef DISABLE_ICONV
 #include <iconv.h>
+#endif
 
 static char *hts_convertStringToUTF8_(const char *s, size_t size,
                                       const char *to, const char *from) {
@@ -385,6 +392,7 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size,
   if (strcasecmp(from, to) == 0) {
     return strndup(s, size);
   }
+#ifndef DISABLE_ICONV
   /* Find codepage */
   else {
     const iconv_t cp = iconv_open(to, from);
@@ -443,6 +451,7 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size,
       return outbuf;
     }
   }
+#endif
 
   /* Error, charset not found! */
   return NULL;
