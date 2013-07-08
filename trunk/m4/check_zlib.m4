@@ -1,27 +1,26 @@
 dnl @synopsis CHECK_ZLIB()
 dnl
-dnl This macro searches for an installed zlib library. If nothing was
-dnl specified when calling configure, it searches first in /usr/local
+dnl This macro searches for an installed zlib library. If nothing
+dnl was specified when calling configure, it searches first in /usr/local
 dnl and then in /usr. If the --with-zlib=DIR is specified, it will try
-dnl to find it in DIR/include/zlib.h and DIR/lib/libz.a. If
-dnl --without-zlib is specified, the library is not searched at all.
+dnl to find it in DIR/include/zlib.h and DIR/lib/libz.a. If --without-zlib
+dnl is specified, the library is not searched at all.
 dnl
 dnl If either the header file (zlib.h) or the library (libz) is not
-dnl found, the configuration exits on error, asking for a valid zlib
-dnl installation directory or --without-zlib.
+dnl found, the configuration exits on error, asking for a valid
+dnl zlib installation directory or --without-zlib.
 dnl
-dnl The macro defines the symbol HAVE_LIBZ if the library is found. You
-dnl should use autoheader to include a definition for this symbol in a
-dnl config.h file. Sample usage in a C/C++ source is as follows:
+dnl The macro defines the symbol HAVE_LIBZ if the library is found. You should
+dnl use autoheader to include a definition for this symbol in a config.h
+dnl file. Sample usage in a C/C++ source is as follows:
 dnl
 dnl   #ifdef HAVE_LIBZ
 dnl   #include <zlib.h>
 dnl   #endif /* HAVE_LIBZ */
 dnl
-dnl @category InstalledPackages
+dnl @version $Id$
 dnl @author Loic Dachary <loic@senga.org>
-dnl @version 2004-09-20
-dnl @license GPLWithACException
+dnl
 
 AC_DEFUN([CHECK_ZLIB],
 #
@@ -34,24 +33,17 @@ AC_ARG_WITH(zlib,
   --without-zlib to disable zlib usage completely],
 [if test "$withval" != no ; then
   AC_MSG_RESULT(yes)
-  if test -d "$withval"
-  then
-    ZLIB_HOME="$withval"
-  else
-    AC_MSG_WARN([Sorry, $withval does not exist, checking usual places])
-  fi
+  ZLIB_HOME="$withval"
 else
   AC_MSG_RESULT(no)
-fi])
-
-# Added 'RX - totally fucked up script
-if test ! -f "${ZLIB_HOME}/include/zlib.h"
+fi], [
+AC_MSG_RESULT(yes)
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"
 then
         ZLIB_HOME=/usr
 fi
-fi
+])
 
 #
 # Locate zlib, if wanted
