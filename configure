@@ -15420,28 +15420,23 @@ if test "${with_zlib+set}" = set; then :
   withval=$with_zlib; if test "$withval" != no ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-  if test -d "$withval"
-  then
-    ZLIB_HOME="$withval"
-  else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Sorry, $withval does not exist, checking usual places" >&5
-$as_echo "$as_me: WARNING: Sorry, $withval does not exist, checking usual places" >&2;}
-  fi
+  ZLIB_HOME="$withval"
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
-fi
+else
 
-
-# Added 'RX - totally fucked up script
-if test ! -f "${ZLIB_HOME}/include/zlib.h"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"
 then
         ZLIB_HOME=/usr
 fi
+
 fi
+
 
 #
 # Locate zlib, if wanted
