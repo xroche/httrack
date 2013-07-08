@@ -325,8 +325,8 @@ typedef __int64 TStamp;
 #define LLintP "%I64d"
 #elif (defined(_LP64) || defined(__x86_64__) \
        || defined(__powerpc64__) || defined(__64BIT__))
-typedef unsigned long int LLint;
-typedef unsigned long int TStamp;
+typedef long int LLint;
+typedef long int TStamp;
 
 #define LLintP "%ld"
 #else
