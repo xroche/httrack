@@ -2499,9 +2499,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           // vérification de sécurité
           if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
-            // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
+            if (
+                // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
 #if HTS_USEOPENSSL
-            if (!(back[i].r.ssl && back[i].status > 0 && back[i].status < 1000)) {
+                !back[i].r.ssl && 
+#endif
+                back[i].status > 0 && back[i].status < 1000) {
               do_wait = 1;
 
               // noter socket read
@@ -2522,7 +2525,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 nfds = back[i].r.soc;
               }
             }
-#endif
           } else {
             back[i].r.statuscode = STATUSCODE_CONNERROR;
             if (back[i].status == STATUS_CONNECTING)
