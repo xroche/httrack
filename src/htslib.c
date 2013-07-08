@@ -2283,8 +2283,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #else
       const int flags = fcntl(soc, F_GETFL, 0);
       unsigned long p = 1;      // non bloquant
-      if (flags == -1 /*|| fcntl(soc, F_SETFL, flags | O_NONBLOCK) == -1*/
-          || ioctl(soc, FIONBIO, &p) != 0) {
+      if (flags == -1 || fcntl(soc, F_SETFL, flags | O_NONBLOCK) == -1) {
         snprintf(retour->msg, sizeof(retour->msg),
                  "Non-blocking socket failed: %s", strerror(errno));
         deletesoc(soc);
