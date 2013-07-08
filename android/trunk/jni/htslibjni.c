@@ -46,6 +46,21 @@ jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env) {
   return (*env)->NewStringUTF(env, version);
 }
 
+#if 0
+static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
+		lien_back * back, int back_max, int back_index, int lien_n,
+		int lien_tot, int stat_time, hts_stat_struct * stats) {
+}
+#endif
+
+static httrackp * global_opt = NULL;
+
+void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object, jboolean force) {
+  if (global_opt != NULL) {
+    hts_request_stop(global_opt, force);
+  }
+}
+
 jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
   const int argc = object != NULL ? (*env)->GetArrayLength(env, stringArray) : 0;
   char **argv = (char**) malloc( ( argc + 1 ) * sizeof(char*));
@@ -63,9 +78,15 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object, j
     }
     argv[i] = NULL;
 
-    /* Rock'in! */
+    /* Create options */
     opt = hts_create_opt();
+    global_opt = opt;  /* FIXME mutex */
+    /*CHAIN_FUNCTION(opt, loop, htsshow_loop, NULL);
+     */
+
+    /* Rock'in! */
     code = hts_main2(argc, argv, opt);
+    global_opt = NULL;  /* FIXME mutex */
 
     /* Cleanup */
     for (i = 0; i < argc; i++) {

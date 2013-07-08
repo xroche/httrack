@@ -21,6 +21,7 @@
 #  --prefix=/tmp/arm-inst \
 #  --enable-shared --disable-static \
 #  --with-sysroot=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm \
+#  --with-zlib=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr \
 #  --includedir=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/include \
 #  --disable-https \
 #  CC="/home/roche/bin/android-ndk-r8e/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm -I/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/include -L/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/lib" \

@@ -11,10 +11,10 @@ public class HTTrackLib {
 	 */
 	public static native String getVersion();
 
-	/**
-	 * Initialize the httrack library. MUST be called once.
-	 */
-	public static native void init();
+  /**
+   * Initialize the httrack library. MUST be called once.
+   */
+  public static native void init();
 
 	/**
 	 * Start the engine.
@@ -26,6 +26,11 @@ public class HTTrackLib {
 	 *             upon error
 	 */
 	public native int main(String[] args) throws IOException;
+
+  /**
+   * Stop the engine.
+   */
+  public native void stop(boolean force);
 
 	/**
 	 * Default constructor.

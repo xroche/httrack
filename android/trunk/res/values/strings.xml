@@ -4,8 +4,7 @@
     <string name="app_name">HTTrack Website Copier</string>
     <string name="title_activity_startup">HTTrack</string>
     <string name="action_settings">Settings</string>
-    <string name="hello_world">Hello world!</string>
-    <string name="welcome_message">Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
+    <string name="welcome_message">Welcome to HTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
     <string name="tab_next">Next</string>
     <string name="title_activity_proj_name">New Project</string>
     <string name="project_name">Project Name</string>
