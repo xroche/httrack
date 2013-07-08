@@ -2047,7 +2047,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
 #if HTS_XCONN
           back[p].status = STATUS_CONNECTING;   // connexion en cours
 #else
-          back[p].status = 99;  // chargement en tête en cours
+          back[p].status = STATUS_WAIT_HEADERS;  // chargement en tête en cours
 #endif
         else
           back[p].status = 1;   // chargement fichier
@@ -2687,7 +2687,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             back[i].url_adr, back[i].url_fil,
                             back[i].referer_adr, back[i].referer_fil,
                             &back[i].r);
-            back[i].status = 99;        // attendre en tête maintenant
+            back[i].status = STATUS_WAIT_HEADERS;        // attendre en tête maintenant
           }
         }
         // attente gethostbyname
