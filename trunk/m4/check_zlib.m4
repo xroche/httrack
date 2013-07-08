@@ -44,10 +44,13 @@ else
   AC_MSG_RESULT(no)
 fi])
 
+# Added 'RX - totally fucked up script
+if test ! -f "${ZLIB_HOME}/include/zlib.h"
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"
 then
         ZLIB_HOME=/usr
+fi
 fi
 
 #
