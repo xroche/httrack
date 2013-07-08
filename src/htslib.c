@@ -625,36 +625,6 @@ void hts_init_htsblk(htsblk * r) {
   r->totalsize = -1;
 }
 
-// Récupération d'un fichier http sur le net.
-// Renvoie une adresse sur le bloc de mémoire, ou bien
-// NULL si un retour.msgeur (buffer retour.msg) est survenue. 
-//
-// Une adresse de structure htsmsg peut être transmise pour
-// suivre l'évolution du chargement si le process a été lancé 
-// en background
-
-htsblk httpget(httrackp * opt, char *url) {
-  char BIGSTK adr[HTS_URLMAXSIZE * 2];  // adresse
-  char BIGSTK fil[HTS_URLMAXSIZE * 2];  // chemin
-
-  // séparer URL en adresse+chemin
-  if (ident_url_absolute(url, adr, fil) == -1) {
-    htsblk retour;
-
-    hts_init_htsblk(&retour);
-    //memset(&retour, 0, sizeof(htsblk));    // effacer
-    // retour prédéfini: erreur
-    retour.adr = NULL;
-    retour.size = 0;
-    retour.msg[0] = '\0';
-    retour.statuscode = STATUSCODE_INVALID;
-    strcpybuff(retour.msg, "Error invalid URL");
-    return retour;
-  }
-
-  return xhttpget(opt, adr, fil);
-}
-
 // ouvre une liaison http, envoie une requète GET et réceptionne le header
 // retour: socket
 T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
@@ -1789,80 +1759,6 @@ HTSEXT_API void infostatuscode(char *msg, int statuscode) {
   }
 }
 
-// identique au précédent, sauf que l'on donne adr+fil et non url complète
-htsblk xhttpget(httrackp * opt, char *adr, char *fil) {
-  T_SOC soc;
-  htsblk retour;
-
-  hts_init_htsblk(&retour);
-  //memset(&retour, 0, sizeof(htsblk));
-  soc = http_fopen(opt, adr, fil, &retour);
-
-  if (soc != INVALID_SOCKET) {
-    http_fread(soc, &retour);
-#if HTS_DEBUG_CLOSESOCK
-    DEBUG_W("xhttpget: deletehttp\n");
-#endif
-    if (retour.soc != INVALID_SOCKET)
-      deletehttp(&retour);      // fermer
-    retour.soc = INVALID_SOCKET;
-  }
-  return retour;
-}
-
-// variation sur un thème...
-// réceptionne uniquement un en-tête (HEAD)
-// retourne dans xx.adr l'adresse pointant sur le bloc de mémoire de l'en tête
-htsblk http_gethead(httrackp * opt, char *adr, char *fil) {
-  T_SOC soc;
-  htsblk retour;
-
-  hts_init_htsblk(&retour);
-  //memset(&retour, 0, sizeof(htsblk));
-  soc = http_xfopen(opt, 1, 0, 1, NULL, adr, fil, &retour);     // HEAD, pas de traitement en-tête
-
-  if (soc != INVALID_SOCKET) {
-    http_fread(soc, &retour);   // réception en-tête
-#if HTS_DEBUG_CLOSESOCK
-    DEBUG_W("http_gethead: deletehttp\n");
-#endif
-    if (retour.soc != INVALID_SOCKET)
-      deletehttp(&retour);      // fermer
-    retour.soc = INVALID_SOCKET;
-  }
-  return retour;
-}
-
-// oui ca ressemble vachement à xhttpget - en étant sobre on peut voir LA différence..
-
-// lecture sur une socket ouverte, le header a déja été envoyé dans le cas de GET
-// il ne reste plus qu'à lire les données
-// (pour HEAD le header est lu ici!)
-void http_fread(T_SOC soc, htsblk * retour) {
-  //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
-
-  if (retour)
-    retour->soc = soc;
-  if (soc != INVALID_SOCKET) {
-    // fonction de lecture d'une socket (plus propre)
-    while(http_fread1(retour) != -1) ;
-    soc = retour->soc;
-    if (retour->adr == NULL) {
-      if (strnotempty(retour->msg) == 0)
-        sprintf(retour->msg, "Unable to read");
-      return;                   // erreur
-    }
-#if HDEBUG
-    printf("Ok, données reçues\n");
-#endif
-
-    return;
-
-  }
-
-  return;
-}
-
 // check if data is available
 int check_readinput(htsblk * r) {
   if (r->soc != INVALID_SOCKET) {
@@ -1903,14 +1799,6 @@ int check_readinput_t(T_SOC soc, int timeout) {
       return 0;
   } else
     return 0;
-}
-
-// lecture d'un bloc sur une socket (ou un fichier!)
-// >=0 : nombre d'octets lus
-// <0 : fin ou erreur
-HTS_INLINE LLint http_fread1(htsblk * r) {
-  //int bufl=TAILLE_BUFFER;  // taille d'un buffer max.
-  return http_xfread1(r, TAILLE_BUFFER);
 }
 
 // idem, sauf qu'ici on peut choisir la taille max de données à recevoir
@@ -2383,12 +2271,25 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 
     // connexion non bloquante?
     if (!waitconnect) {
-      unsigned long p = 1;      // non bloquant
-
 #ifdef _WIN32
-      ioctlsocket(soc, FIONBIO, &p);
+      unsigned long p = 1;      // non bloquant
+      if (ioctlsocket(soc, FIONBIO, &val)) {
+        const int last_errno = WSAGetLastError();
+        snprintf(retour->msg, sizeof(retour->msg),
+                 "Non-blocking socket failed: %s", strerror(last_errno));
+        deletesoc(soc);
+        return INVALID_SOCKET;
+      }
 #else
-      ioctl(soc, FIONBIO, &p);
+      const int flags = fcntl(soc, F_GETFL, 0);
+      unsigned long p = 1;      // non bloquant
+      if (flags == -1 /*|| fcntl(soc, F_SETFL, flags | O_NONBLOCK) == -1*/
+          || ioctl(soc, FIONBIO, &p) != 0) {
+        snprintf(retour->msg, sizeof(retour->msg),
+                 "Non-blocking socket failed: %s", strerror(errno));
+        deletesoc(soc);
+        return INVALID_SOCKET;
+      }
 #endif
     }
     // Connexion au serveur lui même

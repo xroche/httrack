@@ -3012,7 +3012,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             } else
               retour_fread =
                 (int) http_xfread1(&(back[i].r), (int) max_read_bytes);
-            // retour_fread=http_fread1(&(back[i].r));
           } else
             retour_fread = READ_EOF;    // interruption ou annulation interne (peut ne pas être une erreur)
 
