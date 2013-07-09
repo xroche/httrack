@@ -1377,10 +1377,18 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'z':
-            opt->debug = 1;
+            if (opt->debug >= 2) {
+              opt->debug = 3;  /* -Zz */
+            } else {
+              opt->debug = 1;
+            }
             break;              // petit debug
           case 'Z':
-            opt->debug = 2;
+            if (opt->debug >= 1) {
+              opt->debug = 3;  /* -Zz */
+            } else {
+              opt->debug = 2;
+            }
             break;              // GROS debug
             //
           case '&':
