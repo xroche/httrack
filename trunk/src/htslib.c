@@ -5262,6 +5262,13 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...)
     const char *s_type = "unknown";
 
     switch (type & 0xff) {
+    case LOG_TRACE:
+      // check verbosity
+      if (opt->debug < 3) {
+        return;
+      }
+      s_type = "trace";
+      break;
     case LOG_DEBUG:
       // check verbosity
       if (opt->debug < 2) {
