@@ -4904,6 +4904,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
             /* Finalize now as we have the type */
             if (back[b].status == STATUS_READY) {
               if (!back[b].finalized) {
+                hts_log_print(opt, LOG_TRACE, "finalizing as we have the type");
                 back_finalize(opt, cache, sback, b);
               }
             }

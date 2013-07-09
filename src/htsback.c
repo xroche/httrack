@@ -456,6 +456,45 @@ int back_nsoc_overall(struct_back * sback) {
   return n;
 }
 
+/* generate temporary file on lien_back */
+static int create_back_tmpfile(httrackp * opt, lien_back *const back) {
+/* TEMPORARY */
+/* TEMPORARY */
+  char *const tmp = tempnam(StringBuff(opt->path_html_utf8), "httrack_temporaryGzipFile_");
+
+  if (tmp != NULL) {
+    strcpybuff(back->tmpfile_buffer, tmp);
+    free(tmp);
+    back->tmpfile = back->tmpfile_buffer;
+return 0;
+  } else {
+    back->tmpfile = NULL;
+  }
+/* TEMPORARY */
+/* TEMPORARY */
+
+  // do not use tempnam() but a regular filename
+  back->tmpfile_buffer[0] = '\0';
+  if (back->url_sav != NULL && back->url_sav[0] != '\0') {
+    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s.z", 
+             back->url_sav);
+    back->tmpfile = back->tmpfile_buffer;
+    if (structcheck(back->tmpfile) != 0) {
+      hts_log_print(opt, LOG_WARNING, "can not create directory to %s", 
+                    back->tmpfile);
+      return -1;
+    }
+  } else {
+    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer),
+             "%s/tmp%d.z", StringBuff(opt->path_html_utf8),
+             opt->state.tmpnameid++);
+    back->tmpfile = back->tmpfile_buffer;
+  }
+  /* OK */
+  hts_log_print(opt, LOG_TRACE, "produced temporary name %s", back->tmpfile);
+  return 0;
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -506,27 +545,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             back[p].compressed_size = back[p].r.size;
             // en mémoire -> passage sur disque
             if (!back[p].r.is_write) {
-#if 1
-#ifdef _WIN32
-#undef tempnam
-#define tempnam _tempnam
-#endif
-              char *const tmp = tempnam(NULL, "httrack_temporaryGzipFile_");
-
-              if (tmp != NULL) {
-                strcpybuff(back[p].tmpfile_buffer, tmp);
-                free(tmp);
-                back[p].tmpfile = back[p].tmpfile_buffer;
-              } else {
-                back[p].tmpfile = NULL;
-              }
-#else
-              back[p].tmpfile_buffer[0] = '\0';
-              back[p].tmpfile = tmpnam(back[p].tmpfile_buffer);
-#endif
-              if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
-                /* note: tmpfile is a local system filename */
-                back[p].r.out = fopen(back[p].tmpfile, "wb");
+              // do not use tempnam() but a regular filename
+              if (create_back_tmpfile(opt, &back[p]) == 0) {
+                assert(back[p].tmpfile != NULL);
+                /* note: tmpfile is utf-8 */
+                back[p].r.out = FOPEN(back[p].tmpfile, "wb");
                 if (back[p].r.out) {
                   if ((back[p].r.adr) && (back[p].r.size > 0)) {
                     if (fwrite
@@ -542,11 +565,15 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     strcpybuff(back[p].r.msg, "Empty compressed file");
                   }
                 } else {
+                  snprintf(back[p].r.msg, sizeof(back[p].r.msg),
+                           "Open error when decompressing (can not create temporary file %s)",
+                           back[p].tmpfile);
                   back[p].tmpfile[0] = '\0';
                   back[p].r.statuscode = STATUSCODE_INVALID;
-                  strcpybuff(back[p].r.msg,
-                             "Open error when decompressing (can not create a temporary file)");
                 }
+              } else {
+                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
+                         "Open error when decompressing (can not generate a temporary file)");
               }
             }
             // fermer fichier sortie
@@ -555,7 +582,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               back[p].r.out = NULL;
             }
             // décompression
-            if (back[p].tmpfile != NULL && back[p].tmpfile[0] != '\0') {
+            if (back[p].tmpfile != NULL) {
               if (back[p].url_sav[0]) {
                 LLint size;
 
@@ -705,6 +732,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             if (strcmp(back[p].url_fil, "/robots.txt") != 0) {
               HTS_STAT.stat_bytes += back[p].r.size;
               HTS_STAT.stat_files++;
+              hts_log_print(opt, LOG_TRACE, "added file %s%s => %s",
+                            back[p].url_adr, back[p].url_fil,
+                            back[p].url_sav != NULL ? back[p].url_sav : "");
             }
             if ((!back[p].r.notmodified) && (opt->is_update)) {
               HTS_STAT.stat_updated_files++;    // page modifiée
@@ -1293,6 +1323,7 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                       back[p].url_adr, back[p].url_fil, back[p].url_sav);
       }
       if (cache != NULL) {
+        //hts_log_print(opt, LOG_TRACE, "finalizing from back_delete");
         back_finalize(opt, cache, sback, p);
       }
     }
@@ -1684,6 +1715,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
             // finalize transfer
             if (!test) {
               if (back[p].r.statuscode > 0) {
+                hts_log_print(opt, LOG_TRACE, "finalizing in back_add");
                 back_finalize(opt, cache, sback, p);
               }
             }
@@ -2811,6 +2843,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           back_set_finished(sback, i);
           // finalize transfer
           if (back[i].r.statuscode > 0) {
+            hts_log_print(opt, LOG_TRACE, "finalizing ftp");
             back_finalize(opt, cache, sback, i);
           }
         }
@@ -2821,6 +2854,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         back_set_finished(sback, i);
         // finalize transfer
         if (back[i].r.statuscode > 0) {
+          hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
       } else if ((back[i].status > 0) && (back[i].status < 1000)) {     // en réception http
@@ -2878,25 +2912,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 (strfield
                                  (get_ext(catbuff, back[i].url_sav), "gz") == 0)
                               ) {
-#if 1
-#ifdef _WIN32
-#undef tempnam
-#define tempnam _tempnam
-#endif
-                              char *const tmp =
-                                tempnam(NULL, "httrack_temporaryGzipFile_");
-                              if (tmp != NULL) {
-                                strcpybuff(back[i].tmpfile_buffer, tmp);
-                                free(tmp);
-                                back[i].tmpfile = back[i].tmpfile_buffer;
-                              } else {
-                                back[i].tmpfile = NULL;
-                              }
-#else
-                              back[i].tmpfile_buffer[0] = '\0';
-                              back[i].tmpfile = tmpnam(back[p].tmpfile_buffer);
-#endif
-                              if (back[i].tmpfile != NULL && back[i].tmpfile[0]) {
+                              if (create_back_tmpfile(opt, &back[i]) == 0) {
+                                assert(back[i].tmpfile != NULL);
+                                /* note: tmpfile is utf-8 */
                                 if ((back[i].r.out =
                                      FOPEN(back[i].tmpfile, "wb")) == NULL) {
                                   last_errno = errno;
@@ -3080,6 +3098,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             // finalize transfer
             if (back[i].r.statuscode > 0 && !IS_DELAYED_EXT(back[i].url_sav)
               ) {
+              hts_log_print(opt, LOG_TRACE, "finalizing regular file");
               back_finalize(opt, cache, sback, i);
             }
 
@@ -3237,6 +3256,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                   // finalize transfer if not temporary
                   if (!IS_DELAYED_EXT(back[i].url_sav)) {
+                    hts_log_print(opt, LOG_TRACE, "finalizing at chunk end");
                     back_finalize(opt, cache, sback, i);
                   } else {
                     if (back[i].r.statuscode == HTTP_OK) {
@@ -3700,6 +3720,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       // finalize
                       //file_notify(back[i].url_adr, back[i].url_fil, back[i].url_sav, 0, 0, back[i].r.notmodified);        // not modified
                       if (back[i].r.statuscode > 0) {
+                        hts_log_print(opt, LOG_TRACE, "finalizing after cache load");
                         back_finalize(opt, cache, sback, i);
                       }
 #if DEBUGCA
@@ -3733,6 +3754,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     back_set_finished(sback, i);
                     // finalize
                     if (back[i].r.statuscode > 0) {
+                      hts_log_print(opt, LOG_TRACE, "finalizing redirect & 4xx");
                       back_finalize(opt, cache, sback, i);
                     }
 #endif
@@ -3859,6 +3881,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               && (back[i].r.adr = (char *) malloct(2))) {
                             back[i].r.adr[0] = 0;
                           }
+                          hts_log_print(opt, LOG_TRACE, "finalizing empty");
                           back_finalize(opt, cache, sback, i);
                         } else if (!back[i].r.is_chunk) {       // pas de chunk
                           //if (back[i].r.http11!=2) {    // pas de chunk
