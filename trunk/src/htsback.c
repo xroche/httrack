@@ -457,22 +457,8 @@ int back_nsoc_overall(struct_back * sback) {
 }
 
 /* generate temporary file on lien_back */
+/* Note: utf-8 */
 static int create_back_tmpfile(httrackp * opt, lien_back *const back) {
-/* TEMPORARY */
-/* TEMPORARY */
-  char *const tmp = tempnam(StringBuff(opt->path_html_utf8), "httrack_temporaryGzipFile_");
-
-  if (tmp != NULL) {
-    strcpybuff(back->tmpfile_buffer, tmp);
-    free(tmp);
-    back->tmpfile = back->tmpfile_buffer;
-return 0;
-  } else {
-    back->tmpfile = NULL;
-  }
-/* TEMPORARY */
-/* TEMPORARY */
-
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav != NULL && back->url_sav[0] != '\0') {
