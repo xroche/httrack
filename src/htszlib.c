@@ -56,10 +56,11 @@ int hts_zunpack(char *filename, char *newfile) {
   int ret = -1;
   char catbuff[CATBUFF_SIZE];
 
-  if (filename && newfile) {
+  if (filename != NULL && newfile != NULL) {
     if (filename[0] && newfile[0]) {
-      // not: NOT an UTF-8 filename
-      gzFile gz = gzopen(filename, "rb");
+      FILE *const in = FOPEN(fconv(catbuff, filename), "rb");
+      const int fd_in = in != NULL ? fileno(in) : -1;
+      gzFile gz = gzdopen(fd_in, "rb");
 
       if (gz) {
         FILE *const fpout = FOPEN(fconv(catbuff, newfile), "wb");
@@ -71,7 +72,7 @@ int hts_zunpack(char *filename, char *newfile) {
           do {
             char BIGSTK buff[1024];
 
-            nr = gzread(gz, buff, 1024);
+            nr = gzread(gz, buff, sizeof(buff));
             if (nr > 0) {
               size += nr;
               if (fwrite(buff, 1, nr, fpout) != nr)
@@ -83,6 +84,9 @@ int hts_zunpack(char *filename, char *newfile) {
           size = -1;
         gzclose(gz);
         ret = (int) size;
+      }
+      if (in != NULL) {
+        fclose(in);
       }
     }
   }
