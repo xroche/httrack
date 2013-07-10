@@ -232,6 +232,9 @@ extern htsmutex dns_lock;
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 
+// version
+const char* hts_version(void);
+
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
@@ -263,7 +266,6 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
                   char *adr, char *fil, char *referer_adr, char *referer_fil,
                   htsblk * retour);
-htsblk httpget(httrackp * opt, char *url);
 
 //int newhttp(char* iadr,char* err=NULL);
 T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
@@ -276,8 +278,6 @@ htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc);
 htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
-void http_fread(T_SOC soc, htsblk * retour);
-LLint http_fread1(htsblk * r);
 void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, char *rcvd);
@@ -287,8 +287,6 @@ HTSEXT_API void infostatuscode(char *msg, int statuscode);
 #endif
 
 // sous-fonctions
-htsblk xhttpget(httrackp * opt, char *adr, char *fil);
-htsblk http_gethead(httrackp * opt, char *adr, char *fil);
 LLint http_xfread1(htsblk * r, int bufl);
 HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
                                         void *v_buffer, const char **error);

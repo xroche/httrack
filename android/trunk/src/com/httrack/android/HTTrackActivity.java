@@ -1,11 +1,8 @@
 package com.httrack.android;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -33,7 +30,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-public class StartupActivity extends Activity {
+public class HTTrackActivity extends Activity {
   // Page layouts
   protected static final int layouts[] = { R.layout.activity_startup,
       R.layout.activity_proj_name, R.layout.activity_proj_setup,
@@ -156,7 +153,7 @@ public class StartupActivity extends Activity {
             .hasMoreElements();) {
           final InetAddress address = addresses.nextElement();
           if (address instanceof Inet6Address) {
-
+            return true;
           }
         }
       }
@@ -298,7 +295,11 @@ public class StartupActivity extends Activity {
    * Exit button.
    */
   protected void onFinish() {
-    finish();
+    runOnUiThread(new Runnable() {
+      public void run() {
+        finish();
+      }
+    });
   }
 
   /**
@@ -467,17 +468,21 @@ public class StartupActivity extends Activity {
    * "Browse Website"
    */
   public void onBrowse(View view) {
-    if (target != null && target.exists()) {
-      final File index = new File(target, "index.html");
-      if (index.exists()) {
-        try {
-          final URL url = index.toURI().toURL();
-          final Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url
-              .toString()));
-          startActivity(browser);
-        } catch (MalformedURLException e) {
+    runOnUiThread(new Runnable() {
+      public void run() {
+        if (target != null && target.exists()) {
+          final File index = new File(target, "index.html");
+          if (index.exists()) {
+            try {
+              final URL url = index.toURI().toURL();
+              final Intent browser = new Intent(Intent.ACTION_VIEW,
+                  Uri.parse(url.toString()));
+              startActivity(browser);
+            } catch (MalformedURLException e) {
+            }
+          }
         }
       }
-    }
+    });
   }
 }

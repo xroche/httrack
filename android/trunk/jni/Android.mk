@@ -39,6 +39,9 @@
 
 LOCAL_PATH := $(call my-dir)
 
+##$(shell (/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni))
+##"C:\Program Files\cygwin\bin\bash.exe" --login -c "/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni"
+
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libhttrack
 LOCAL_SRC_FILES := ../prebuild/libhttrack.so

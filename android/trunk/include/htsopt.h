@@ -172,6 +172,7 @@ typedef struct lien_url lien_url;
 #ifndef HTS_DEF_DEFSTRUCT_hts_log_type
 #define HTS_DEF_DEFSTRUCT_hts_log_type
 typedef enum hts_log_type {
+  LOG_TRACE,
   LOG_DEBUG,
   LOG_INFO,
   LOG_NOTICE,
