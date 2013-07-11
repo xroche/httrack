@@ -17,7 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-*/
+ */
 
 package com.httrack.android;
 
@@ -34,7 +34,9 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
+import com.httrack.android.jni.HTTrackCallbacks;
 import com.httrack.android.jni.HTTrackLib;
+import com.httrack.android.jni.HTTrackStats;
 
 import android.net.Uri;
 import android.os.Bundle;
@@ -186,8 +188,8 @@ public class HTTrackActivity extends Activity {
   /**
    * Engine thread runner.
    */
-  protected class Runner extends Thread {
-    private final HTTrackLib engine = new HTTrackLib();
+  protected class Runner extends Thread implements HTTrackCallbacks {
+    private final HTTrackLib engine = new HTTrackLib(this);
 
     @Override
     public void run() {
@@ -278,6 +280,30 @@ public class HTTrackActivity extends Activity {
      */
     public void stopMirror() {
       engine.stop(true);
+    }
+
+    @Override
+    public void onRefresh(HTTrackStats stats) {
+      final String message = "Bytes saved: "
+          + Long.toString(stats.bytesWritten) + "\tLinks scanned: "
+          + Long.toString(stats.linksScanned) + "/"
+          + Long.toString(stats.linksTotal) + " (+"
+          + Long.toString(stats.linksBackground) + ")\n" + "Time: "
+          + Long.toString(stats.elapsedTime) + "\tFiles written: "
+          + Long.toString(stats.filesWritten) + " (+"
+          + Long.toString(stats.filesWrittenBackground) + ")\n"
+          + "Transfer rate: " + Long.toString(stats.transferRate) + " ("
+          + Long.toString(stats.totalTransferRate) + ")\t" + "Files updated: "
+          + Long.toString(stats.filesUpdated) + "\n" + "Active connections: "
+          + Long.toString(stats.socketsCount) + "\t" + "Errors:"
+          + Long.toString(stats.errorsCount);
+      // Post refresh.
+      handlerUI.post(new Runnable() {
+        @Override
+        public void run() {
+          TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(message);
+        }
+      });
     }
   }
 

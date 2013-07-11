@@ -17,7 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-*/
+ */
 
 package com.httrack.android.jni;
 
@@ -109,14 +109,26 @@ public class HTTrackStats {
   /** For parsing, completion in percent (0..100) **/
   public long completion;
 
+  /** Links scanned. **/
+  public long linksScanned;
+
+  /** Total number of links so far. **/
+  public long linksTotal;
+
+  /** Total number of links written in background. **/
+  public long linksBackground;
+
   /** Network bytes received. **/
   public long bytesReceived;
 
   /** Bytes written on disk. **/
   public long bytesWritten;
 
-  /** Start timestamp. **/
+  /** Start timestamp (in seconds). **/
   public long startTime;
+
+  /** Elapsed time (in seconds). **/
+  public long elapsedTime;
 
   /** Bytes received compressed. **/
   public long bytesReceivedCompressed;

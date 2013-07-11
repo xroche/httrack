@@ -70,9 +70,13 @@ static jfieldID field_elements = NULL;
 #define LIST_OF_FIELDS() \
 DECLARE_FIELD(state); \
 DECLARE_FIELD(completion); \
+DECLARE_FIELD(linksScanned); \
+DECLARE_FIELD(linksTotal); \
+DECLARE_FIELD(linksBackground); \
 DECLARE_FIELD(bytesReceived); \
 DECLARE_FIELD(bytesWritten); \
 DECLARE_FIELD(startTime); \
+DECLARE_FIELD(elapsedTime); \
 DECLARE_FIELD(bytesReceivedCompressed); \
 DECLARE_FIELD(bytesReceivedUncompressed); \
 DECLARE_FIELD(filesReceivedCompressed); \
@@ -298,9 +302,13 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
     const long rate = (long) (stats->HTS_TOTAL_RECV / stat_time);
     COPY_(rate, totalTransferRate);
   }
+  COPY(nbk, linksBackground);
 
   COPY_(hts_is_testing(opt), state);
   COPY_(hts_is_parsing(opt, -1), completion);
+  COPY_(lien_n, linksScanned);
+  COPY_(lien_tot, linksTotal);
+  COPY_(stat_time, elapsedTime);
 
   /* Collect individual stats */
   if (back_index >= 0) {
