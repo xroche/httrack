@@ -50,6 +50,28 @@ int hts_isStringAscii(const char *s, size_t size) {
   return 1;
 }
 
+#define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
+#define CHAR_LOWER(C) ( ((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C) )
+static int hts_equalsAlphanum(const char *a, const char *b) {
+  size_t i, j;
+  for(i = 0, j = 0;; i++, j++) {
+    /* Skip non-alnum */
+    for(; a[i] != '\0' && !IS_ALNUM(a[i]); i++) ;
+    for(; b[j] != '\0' && !IS_ALNUM(b[j]); j++) ;
+    /* Compare */
+    if (CHAR_LOWER(a[i]) != CHAR_LOWER(b[j])) {
+      break;
+    }
+    /* End of string ? (note: a[i] == b[j]) */
+    else if (a[i] == '\0') {
+      return 1;
+    }
+  }
+  return 0;
+}
+#undef IS_ALNUM
+#undef CHAR_LOWER
+
 #ifdef _WIN32
 
 typedef struct wincodepage_t wincodepage_t;
@@ -208,30 +230,13 @@ static const wincodepage_t codepages[] = {
 UINT hts_getCodepage(const char *name) {
   int id;
 
-#define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
-#define CHAR_LOWER(C) ( ((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C) )
   for(id = 0; codepages[id].name != NULL; id++) {
-    int i, j;
-
     /* Compare the two strings, lowercase and alphanum only (ISO88591 == iso-8859-1) */
-    const char *a = name, *b = codepages[id].name;
-
-    for(i = 0, j = 0;; i++, j++) {
-      /* Skip non-alnum */
-      for(; a[i] != '\0' && !IS_ALNUM(a[i]); i++) ;
-      for(; b[j] != '\0' && !IS_ALNUM(b[j]); j++) ;
-      /* Compare */
-      if (CHAR_LOWER(a[i]) != CHAR_LOWER(b[j])) {
-        break;
-      }
-      /* End of string ? (note: a[i] == b[j]) */
-      else if (a[i] == '\0') {
-        return codepages[id].codepage;
-      }
+    if (hts_equalsAlphanum(name, codepages[id].name)) {
+      return codepages[id].codepage;
     }
   }
-#undef IS_ALNUM
-#undef CHAR_LOWER
+
   /* Not found */
   return 0;
 }
@@ -380,16 +385,55 @@ char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
 
 #ifndef DISABLE_ICONV
 #include <iconv.h>
+#else
+#include "htscodepages.h"
+
+/* decode from a codepage to UTF-8 */
+static char* hts_codepageToUTF8(const char *codepage, const char *s) {
+  /* find the given codepage */
+  size_t i;
+  for(i = 0 ; table_mappings[i].name != NULL
+      && !hts_equalsAlphanum(table_mappings[i].name, codepage) ; i++) ;
+
+  /* found ; decode */
+  if (table_mappings[i].name != NULL) {
+    size_t j, k;
+    char *dest = NULL;
+    size_t capa = 0;
+#define MAX_UTF 8
+    for(j = 0, k = 0 ; s[j] != '\0' ; j++) {
+      const unsigned char c = (unsigned char) s[j];
+      const hts_UCS4 uc = table_mappings[i].table[c];
+      const size_t max = k + MAX_UTF;
+      if (capa < max) {
+        for(capa = 16 ; capa < max ; capa <<= 1) ;
+        dest = realloc(dest, capa);
+        if (dest == NULL) {
+          return NULL;
+        }
+      }
+      if (dest != NULL) {
+        const size_t len = hts_writeUTF8(uc, &dest[k], MAX_UTF);
+        k += len;
+        assert(k < capa);
+      }
+    }
+    dest[k] = '\0';
+    return dest;
+#undef MAX_UTF
+  }
+  return NULL;
+}
 #endif
 
-static char *hts_convertStringToUTF8_(const char *s, size_t size,
+static char *hts_convertStringCharset(const char *s, size_t size,
                                       const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
     return strdup("");
   }
   /* Already on correct charset ? */
-  if (strcasecmp(from, to) == 0) {
+  if (hts_equalsAlphanum(from, to)) {
     return strndup(s, size);
   }
 #ifndef DISABLE_ICONV
@@ -451,6 +495,11 @@ static char *hts_convertStringToUTF8_(const char *s, size_t size,
       return outbuf;
     }
   }
+#else
+  /* Limited codepage decoding support only. */
+  if (hts_isCharsetUTF8(to)) {
+    return hts_codepageToUTF8(from, s);
+  }
 #endif
 
   /* Error, charset not found! */
@@ -468,7 +517,7 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
   }
   /* Find codepage */
   else {
-    return hts_convertStringToUTF8_(s, size, "utf-8", charset);
+    return hts_convertStringCharset(s, size, "utf-8", charset);
   }
 }
 
@@ -483,7 +532,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
   }
   /* Find codepage */
   else {
-    return hts_convertStringToUTF8_(s, size, charset, "utf-8");
+    return hts_convertStringCharset(s, size, charset, "utf-8");
   }
 }
 
