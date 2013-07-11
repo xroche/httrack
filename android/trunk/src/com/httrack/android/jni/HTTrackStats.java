@@ -83,6 +83,10 @@ public class HTTrackStats {
 
     /** Charset **/
     public String charset;
+
+    /** Default constructor. **/
+    public Element() {
+    }
   }
 
   /** Engine is parsing. **/
@@ -174,4 +178,8 @@ public class HTTrackStats {
 
   /** Elements currently in progress. **/
   public Element[] elements;
+
+  /** Default constructor. **/
+  public HTTrackStats() {
+  }
 }
