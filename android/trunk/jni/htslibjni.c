@@ -31,6 +31,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "htsdefines.h"
 #include "htscore.h"
 
+/* Our own assert version. */
+static void assert_failure(const char* exp, const char* file, int line) {
+  /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
+  FILE *const dumpFile = fopen("/mnt/sdcard/HTTrack/error.txt", "wb");
+  if (dumpFile != NULL) {
+    fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
+    fclose(dumpFile);
+  }
+  abort();
+}
+#undef assert
+#define assert(EXP) (void)( (EXP) || (assert_failure(#EXP, __FILE__, __LINE__), 0) )
+
 static httrackp * global_opt = NULL;
 static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -58,7 +71,7 @@ static jmethodID cons_HTTrackStats = NULL;
 static jmethodID cons_HTTrackStats_Element = NULL;
 
 /* HTTrackStats methods */
-static jmethodID meth_HTTrackStats_onRefresh = NULL;
+static jmethodID meth_HTTrackCallbacks_onRefresh = NULL;
 
 /* The stats field */
 static jfieldID field_callbacks = NULL;
@@ -141,13 +154,16 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   /* Constructors */
   cons_HTTrackStats = (*u.env)->GetMethodID(u.env, cls_HTTrackStats, "<init>", "()V");
+  assert(cons_HTTrackStats != NULL);
   cons_HTTrackStats_Element =
     (*u.env)->GetMethodID(u.env, cls_HTTrackStats_Element, "<init>", "()V");
+  assert(cons_HTTrackStats_Element != NULL);
 
   /* Methods */
-  meth_HTTrackStats_onRefresh =
+  meth_HTTrackCallbacks_onRefresh =
     (*u.env)->GetMethodID(u.env, cls_HTTrackCallbacks, "onRefresh",
                           "(Lcom/httrack/android/jni/HTTrackStats;)V");
+  assert(meth_HTTrackCallbacks_onRefresh != NULL);
 
   /* The "callbacks" field */
   field_callbacks = (*u.env)->GetFieldID(u.env, cls_HTTrackLib, "callbacks",
@@ -224,8 +240,8 @@ jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env) {
 
 typedef struct jni_context_t {
   JNIEnv *env;
-  /* Stats "this" object */
-  jobject thiz;
+  /* HTTrackCallbacks object */
+  jobject callbacks; 
 } jni_context_t;
 
 typedef enum hts_state_id_t {
@@ -248,9 +264,10 @@ typedef struct hts_state_t {
 /* NewStringUTF, but ignore invalid UTF-8 or NULL input. */
 static jobject newStringSafe(JNIEnv *env, const char *s) {
   if (s != NULL) {
+    const int ne = ! (*env)->ExceptionOccurred(env);
     jobject str = (*env)->NewStringUTF(env, s);
-    /* Hack */
-    if (str == NULL && (*env)->ExceptionOccurred(env)) {
+    /* Silently ignore UTF-8 exception. */
+    if (str == NULL && (*env)->ExceptionOccurred(env) && ne) {
       (*env)->ExceptionClear(env);
     }
     return str;
@@ -268,7 +285,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   size_t index = 0;
   jobject ostats;
 
-  if (t->thiz == NULL) {
+  if (t->callbacks == NULL) {
     return 1;
   }
   ostats = (*t->env)->NewObject(t->env, cls_HTTrackStats, cons_HTTrackStats);
@@ -278,7 +295,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
 
 #define COPY_(VALUE, FIELD) do { \
   (*t->env)->SetLongField(t->env, ostats, field_ ##FIELD, \
-      (long) VALUE); \
+      (long) (VALUE)); \
 } while(0)
 #define COPY(MEMBER, FIELD) COPY_(stats->MEMBER, FIELD)
 
@@ -325,6 +342,11 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
           const size_t i = (back_index + _i) % back_max;
           /* active link */
           if (back[i].status >= 0) {
+            /* Cleanup */
+            state[index].state = STATE_NONE;
+            state[index].code = 0;
+            state[index].message = NULL;
+
             /* Check state */
             switch (j) {
             case 0:          // prioritaire
@@ -359,9 +381,6 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
 
               /* Next one */
               index++;
-              state[index].state = STATE_NONE;
-              state[index].code = 0;
-              state[index].message = NULL;
             }
           }
         }
@@ -391,6 +410,9 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
       jobject element =
         (*t->env)->NewObject(t->env, cls_HTTrackStats_Element,
                              cons_HTTrackStats_Element);
+      if (element == NULL) {
+        return 0;
+      }
       (*t->env)->SetObjectArrayElement(t->env, elements, i, element);
 
       /* Fill item */
@@ -429,8 +451,8 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
     }
 
     /* Call refresh method */
-    (*t->env)->CallObjectMethod(t->env, t->thiz, meth_HTTrackStats_onRefresh,
-                                ostats);
+    (*t->env)->CallObjectMethod(t->env, t->callbacks,
+                                meth_HTTrackCallbacks_onRefresh, ostats);
   }
 
   return 1;
@@ -456,7 +478,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     int code;
     struct jni_context_t t;
     t.env = env;
-    t.thiz = (*env)->GetObjectField(env, object, field_callbacks);
+    t.callbacks = (*env)->GetObjectField(env, object, field_callbacks);
 
     /* Create options and reference it */
     MUTEX_LOCK(global_lock);

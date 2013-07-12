@@ -1,0 +1,1 @@
+In case of "Invalid attribute name: package" error, just do dos2unix ../AndroidManifest.xml

@@ -186,6 +186,17 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Emergency dump.
+   */
+  protected static emergencyDump(final Throwable e) {
+    final FileWriter writer =
+      new FileWriter("/mnt/sdcard/HTTrack/error.txt", true);
+    final PrintWriter print = new PrintWriter(writer);
+    e.printStackTrace(print);
+    writer.close();
+  }
+
+  /**
    * Engine thread runner.
    */
   protected class Runner extends Thread implements HTTrackCallbacks {
@@ -193,6 +204,14 @@ public class HTTrackActivity extends Activity {
 
     @Override
     public void run() {
+      try {
+        runInternal();
+      } catch(final Throwable e) {
+        HTTrackActivity.emergencyDump(e);
+      }
+    }
+
+    protected void runInternal() {
       target = new File(projectPath, getProjectName());
       final List<String> args = new ArrayList<String>();
 
@@ -284,6 +303,9 @@ public class HTTrackActivity extends Activity {
 
     @Override
     public void onRefresh(HTTrackStats stats) {
+      if (stats == null) {
+        return ;
+      }
       final String message = "Bytes saved: "
           + Long.toString(stats.bytesWritten) + "\tLinks scanned: "
           + Long.toString(stats.linksScanned) + "/"
