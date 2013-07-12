@@ -62,12 +62,22 @@ Please visit our Website: http://www.httrack.com
      filled with 4 entries ; whereas the MD5 variant did only collide
      once ]
 */
-#ifndef HTS_INTHASH_USES_MD5
+#if (!defined(HTS_INTHASH_USES_MD5) && !defined(HTS_INTHASH_USES_MURMUR))
 #define HTS_INTHASH_USES_MD5 1
 #endif
 
 #if HTS_INTHASH_USES_MD5 == 1
 #include "md5.h"
+#elif (defined(HTS_INTHASH_USES_MURMUR))
+#include "murmurhash3.h"
+#else
+/* use the Openssl implementation */
+#if 0
+#include <openssl/md5.h>
+#define MD5Init MD5_Init
+#define MD5Update MD5_Update
+#define MD5Final MD5_Final
+#endif
 #endif
 
 /** Size of auxiliary stash. **/
@@ -231,6 +241,7 @@ inthash_keys inthash_hash_value(const char *value) {
   MD5_CTX ctx;
   union {
     unsigned char md5digest[16];
+    inthash_keys mhashes[2];
     inthash_keys hashes;
   } u;
 
@@ -239,6 +250,28 @@ inthash_keys inthash_hash_value(const char *value) {
   MD5Update(&ctx, (const unsigned char *) value,
     (unsigned int) strlen(value));
   MD5Final(u.md5digest, &ctx);
+
+  /* mix mix mix */
+  u.mhashes[0].hash1 ^= u.mhashes[1].hash1;
+  u.mhashes[0].hash2 ^= u.mhashes[1].hash2;
+
+  /* do not keep identical hashes */
+  if (u.hashes.hash1 == u.hashes.hash2) {
+    u.hashes.hash2 = ~u.hashes.hash2;
+  }
+
+  return u.hashes;
+#elif (defined(HTS_INTHASH_USES_MURMUR))
+  union {
+    uint32_t result[4];
+    inthash_keys hashes;
+  } u;
+  MurmurHash3_x86_128(value, (const int) strlen(value),
+                      42, &u.result) ;
+
+  /* mix mix mix */
+  u.result[0] ^= u.result[2];
+  u.result[1] ^= u.result[3];
 
   /* do not keep identical hashes */
   if (u.hashes.hash1 == u.hashes.hash2) {

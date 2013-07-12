@@ -2374,7 +2374,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
               case '7':  // hashtable selftest: httrack -#7 nb_entries
                 if (++na < argc) {
                   char *const snum = strdup(argv[na]);
-                  unsigned long count;
+                  unsigned long count = 0;
                   const char *const names[] = {
                     "", "add", "delete", "dry-add", "dry-del",
                     "test-exists", "test-not-exist"
@@ -2419,14 +2419,56 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     { TEST_ADD, 42, 2 },  /* check 42/2 */
                     { DO_END }
                   };
+                  char *buff = NULL;
+                  const char **strings = NULL;
+
+                  /* produce key #i */
 #define FMT() \
-                  char name[256]; \
+                  char buffer[256]; \
+                  char *name = buffer; \
                   const long expected = (long) i * 1664525 + 1013904223; \
-                  snprintf(name, sizeof(name), \
-                    "http://www.example.com/website/sample/for/hashtable/" \
-                    "%ld/index.html?foo=%ld&bar", \
-                    (long) i, (long) (expected))
-                  if (sscanf(snum, "%lu", &count) == 1) {
+                  do { \
+                    if (strings == NULL) { \
+                      snprintf(name, sizeof(name), \
+                        "http://www.example.com/website/sample/for/hashtable/" \
+                        "%ld/index.html?foo=%ld&bar", \
+                        (long) i, (long) (expected)); \
+                    } else { \
+                      name = strings[i]; \
+                    } \
+                  } while(0)
+
+                  /* produce random patterns, or read from a file */
+                  if (sscanf(snum, "%lu", &count) != 1) {
+                    const off_t size = fsize(snum);
+                    FILE *fp = fopen(snum, "rb");
+                    if (fp != NULL) {
+                      buff = malloc(size);
+                      if (buff != NULL && fread(buff, 1, size, fp) == size) {
+                        size_t capa = 0;
+                        size_t i, last;
+                        for(i = 0, last = 0, count = 0 ; i < size ; i++) {
+                          if (buff[i] == 10 || buff[i] == 0) {
+                            buff[i] = '\0';
+                            if (capa == count) {
+                              if (capa == 0) {
+                                capa = 16;
+                              } else {
+                                capa <<= 1;
+                              }
+                              strings = realloc(strings, capa*sizeof(char*));
+                            }
+                            strings[count++] = &buff[last];
+                            last = i + 1;
+                          }
+                        }
+                      }
+                      fclose(fp);
+                    }
+                  }
+
+                  /* successfully read */
+                  if (count > 0) {
                     inthash hashtable = inthash_new(0);
                     size_t loop;
                     for(loop = 0 ; bench[loop].type != DO_END ; loop++) {
