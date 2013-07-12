@@ -17,60 +17,60 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-*/
+ */
 
 package com.httrack.android.jni;
 
 import java.io.IOException;
 
 public class HTTrackLib {
-  /** Statistics. **/
-  protected final HTTrackCallbacks callbacks;
+	/** Statistics. **/
+	protected final HTTrackCallbacks callbacks;
 
-  /**
-   * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
-   * 
-   * @return the current library version
-   */
-  public static native String getVersion();
+	/**
+	 * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
+	 * 
+	 * @return the current library version
+	 */
+	public static native String getVersion();
 
-  /**
-   * Initialize the httrack library. MUST be called once.
-   */
-  public static native void init();
+	/**
+	 * Initialize the httrack library. MUST be called once.
+	 */
+	public static native void init();
 
-  /**
-   * Start the engine.
-   * 
-   * @param args
-   *          main() arguments.
-   * @return The exit code upon completion.
-   * @throws IOException
-   *           upon error
-   */
-  public native int main(String[] args) throws IOException;
+	/**
+	 * Start the engine.
+	 * 
+	 * @param args
+	 *            main() arguments.
+	 * @return The exit code upon completion.
+	 * @throws IOException
+	 *             upon error
+	 */
+	public native int main(String[] args) throws IOException;
 
-  /**
-   * Stop the engine.
-   */
-  public native void stop(boolean force);
+	/**
+	 * Stop the engine.
+	 */
+	public native void stop(boolean force);
 
-  /**
-   * Default constructor.
-   */
-  public HTTrackLib() {
-    this(null);
-  }
+	/**
+	 * Default constructor.
+	 */
+	public HTTrackLib() {
+		this(null);
+	}
 
-  /**
-   * Constructor with statistics support.
-   */
-  public HTTrackLib(HTTrackCallbacks callbacks) {
-    this.callbacks = callbacks;
-  }
+	/**
+	 * Constructor with statistics support.
+	 */
+	public HTTrackLib(HTTrackCallbacks callbacks) {
+		this.callbacks = callbacks;
+	}
 
-  static {
-    System.loadLibrary("httrack");
-    System.loadLibrary("htslibjni");
-  }
+	static {
+		System.loadLibrary("httrack");
+		System.loadLibrary("htslibjni");
+	}
 }
