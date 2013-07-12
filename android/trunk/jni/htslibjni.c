@@ -34,7 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* Our own assert version. */
 static void assert_failure(const char* exp, const char* file, int line) {
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
-  FILE *const dumpFile = fopen("/mnt/sdcard/HTTrack/error.txt", "wb");
+  FILE *const dumpFile = fopen("/sdcard/HTTrack/error.txt", "wb");
   if (dumpFile != NULL) {
     fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
     fclose(dumpFile);
