@@ -25,161 +25,161 @@ package com.httrack.android.jni;
  * HTTrack statistics class.
  **/
 public class HTTrackStats {
-  /** Elements being processed currently. **/
-  public static class Element {
-    /** Unknown state. **/
-    public static final int STATE_NONE = 0;
+	/** Elements being processed currently. **/
+	public static class Element {
+		/** Unknown state. **/
+		public static final int STATE_NONE = 0;
 
-    /** Receiving data. **/
-    public static final int STATE_RECEIVE = 1;
+		/** Receiving data. **/
+		public static final int STATE_RECEIVE = 1;
 
-    /** Connecting. **/
-    public static final int STATE_CONNECTING = 2;
+		/** Connecting. **/
+		public static final int STATE_CONNECTING = 2;
 
-    /** Resolving DNS. **/
-    public static final int STATE_DNS = 3;
+		/** Resolving DNS. **/
+		public static final int STATE_DNS = 3;
 
-    /** FTP operation. **/
-    public static final int STATE_FTP = 4;
+		/** FTP operation. **/
+		public static final int STATE_FTP = 4;
 
-    /** Ready. **/
-    public static final int STATE_READY = 5;
+		/** Ready. **/
+		public static final int STATE_READY = 5;
 
-    /** Address **/
-    public String address;
+		/** Address **/
+		public String address;
 
-    /** Path (including query-string) **/
-    public String path;
+		/** Path (including query-string) **/
+		public String path;
 
-    /** Destination filename on disk (or null) **/
-    public String filename;
+		/** Destination filename on disk (or null) **/
+		public String filename;
 
-    /** File has previously been downloaded. **/
-    public boolean isUpdate;
+		/** File has previously been downloaded. **/
+		public boolean isUpdate;
 
-    /** Item state (see STATE_* fields) **/
-    public int state;
+		/** Item state (see STATE_* fields) **/
+		public int state;
 
-    /** HTTP status code, if suitable. **/
-    public int code;
+		/** HTTP status code, if suitable. **/
+		public int code;
 
-    /** HTTP status message, if suitable. **/
-    public String message;
+		/** HTTP status message, if suitable. **/
+		public String message;
 
-    /** File was not modified. **/
-    public boolean isNotModified;
+		/** File was not modified. **/
+		public boolean isNotModified;
 
-    /** File was compressed. **/
-    public boolean isCompressed;
+		/** File was compressed. **/
+		public boolean isCompressed;
 
-    /** File size (< 0 if unknown) **/
-    public long size;
+		/** File size (< 0 if unknown) **/
+		public long size;
 
-    /** File total size (< 0 if unknown) **/
-    public long totalSize;
+		/** File total size (< 0 if unknown) **/
+		public long totalSize;
 
-    /** MIME type **/
-    public String mime;
+		/** MIME type **/
+		public String mime;
 
-    /** Charset **/
-    public String charset;
+		/** Charset **/
+		public String charset;
 
-    /** Default constructor. **/
-    public Element() {
-    }
-  }
+		/** Default constructor. **/
+		public Element() {
+		}
+	}
 
-  /** Engine is parsing. **/
-  public static final long STATE_PARSING = 0;
+	/** Engine is parsing. **/
+	public static final long STATE_PARSING = 0;
 
-  /** Engine is testing links. **/
-  public static final long STATE_TESTING_LINKS = 1;
+	/** Engine is testing links. **/
+	public static final long STATE_TESTING_LINKS = 1;
 
-  /** Engine is purgine files at the end of the mirror. **/
-  public static final long STATE_PURGING_FILES = 2;
+	/** Engine is purgine files at the end of the mirror. **/
+	public static final long STATE_PURGING_FILES = 2;
 
-  /** Engine is loading cache. **/
-  public static final long STATE_LOADING_CACHE = 3;
+	/** Engine is loading cache. **/
+	public static final long STATE_LOADING_CACHE = 3;
 
-  /** Engine is waiting for starting time. **/
-  public static final long STATE_WAIT_SCHEDULER = 4;
+	/** Engine is waiting for starting time. **/
+	public static final long STATE_WAIT_SCHEDULER = 4;
 
-  /** Engine is throttling. **/
-  public static final long STATE_WAIT_THROTTLE = 5;
+	/** Engine is throttling. **/
+	public static final long STATE_WAIT_THROTTLE = 5;
 
-  /** State **/
-  public long state;
+	/** State **/
+	public long state;
 
-  /** For parsing, completion in percent (0..100) **/
-  public long completion;
+	/** For parsing, completion in percent (0..100) **/
+	public long completion;
 
-  /** Links scanned. **/
-  public long linksScanned;
+	/** Links scanned. **/
+	public long linksScanned;
 
-  /** Total number of links so far. **/
-  public long linksTotal;
+	/** Total number of links so far. **/
+	public long linksTotal;
 
-  /** Total number of links written in background. **/
-  public long linksBackground;
+	/** Total number of links written in background. **/
+	public long linksBackground;
 
-  /** Network bytes received. **/
-  public long bytesReceived;
+	/** Network bytes received. **/
+	public long bytesReceived;
 
-  /** Bytes written on disk. **/
-  public long bytesWritten;
+	/** Bytes written on disk. **/
+	public long bytesWritten;
 
-  /** Start timestamp (in seconds). **/
-  public long startTime;
+	/** Start timestamp (in seconds). **/
+	public long startTime;
 
-  /** Elapsed time (in seconds). **/
-  public long elapsedTime;
+	/** Elapsed time (in seconds). **/
+	public long elapsedTime;
 
-  /** Bytes received compressed. **/
-  public long bytesReceivedCompressed;
+	/** Bytes received compressed. **/
+	public long bytesReceivedCompressed;
 
-  /** Bytes received uncompressed. **/
-  public long bytesReceivedUncompressed;
+	/** Bytes received uncompressed. **/
+	public long bytesReceivedUncompressed;
 
-  /** Files received compressed. **/
-  public long filesReceivedCompressed;
+	/** Files received compressed. **/
+	public long filesReceivedCompressed;
 
-  /** Files written. **/
-  public long filesWritten;
+	/** Files written. **/
+	public long filesWritten;
 
-  /** Files updated. **/
-  public long filesUpdated;
+	/** Files updated. **/
+	public long filesUpdated;
 
-  /** Files written in background. **/
-  public long filesWrittenBackground;
+	/** Files written in background. **/
+	public long filesWrittenBackground;
 
-  /** Requests **/
-  public long requestsCount;
+	/** Requests **/
+	public long requestsCount;
 
-  /** Sockets allocated **/
-  public long socketsAllocated;
+	/** Sockets allocated **/
+	public long socketsAllocated;
 
-  /** Sockets count **/
-  public long socketsCount;
+	/** Sockets count **/
+	public long socketsCount;
 
-  /** Errors count **/
-  public long errorsCount;
+	/** Errors count **/
+	public long errorsCount;
 
-  /** Warnings count **/
-  public long warningsCount;
+	/** Warnings count **/
+	public long warningsCount;
 
-  /** Info count **/
-  public long infosCount;
+	/** Info count **/
+	public long infosCount;
 
-  /** Transfer rate overall **/
-  public long totalTransferRate;
+	/** Transfer rate overall **/
+	public long totalTransferRate;
 
-  /** Current transfer rate **/
-  public long transferRate;
+	/** Current transfer rate **/
+	public long transferRate;
 
-  /** Elements currently in progress. **/
-  public Element[] elements;
+	/** Elements currently in progress. **/
+	public Element[] elements;
 
-  /** Default constructor. **/
-  public HTTrackStats() {
-  }
+	/** Default constructor. **/
+	public HTTrackStats() {
+	}
 }
