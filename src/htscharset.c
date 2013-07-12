@@ -1192,6 +1192,28 @@ hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars
   return dest;
 }
 
+int hts_isStringUTF8(const char *s, size_t size) {
+  const unsigned char *const data = (const unsigned char*) s;
+  size_t i;
+
+  for(i = 0 ; i < size ; ) {
+    hts_UCS4 uc;
+
+    /* Reader: can read bytes up to j */
+#define RD ( i < size ? data[i++] : -1 )
+
+    /* Writer: upon error, return FFFD (replacement character) */
+#define WR(C) if ((C) == -1) { return 0; }
+
+    /* Read Unicode character. */
+    READ_UNICODE(RD, WR);
+#undef RD
+#undef WR
+  }
+
+  return 1;
+}
+
 char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   size_t i;
   char *dest = NULL;
