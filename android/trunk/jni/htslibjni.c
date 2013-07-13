@@ -335,7 +335,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
 
 #define COPY_(VALUE, FIELD) do { \
   (*t->env)->SetLongField(t->env, ostats, field_ ##FIELD, \
-      (long) (VALUE)); \
+      (jlong) (VALUE)); \
 } while(0)
 #define COPY(MEMBER, FIELD) COPY_(stats->MEMBER, FIELD)
 
@@ -356,7 +356,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   COPY(stat_warnings, warningsCount);
   COPY(stat_infos, infosCount);
   if (stat_time > 0 && stats->HTS_TOTAL_RECV > 0) {
-    const long rate = (long) (stats->HTS_TOTAL_RECV / stat_time);
+    const jlong rate = (jlong) (stats->HTS_TOTAL_RECV / stat_time);
     COPY_(rate, totalTransferRate);
   }
   COPY(nbk, linksBackground);
@@ -368,7 +368,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   COPY_(stat_time, elapsedTime);
 
   /* Collect individual stats */
-  if (back_index >= 0) {
+  if (0 && back_index >= 0) {
     const size_t index_max = STATE_MAX;
     size_t k;
     /* current links first */
