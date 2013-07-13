@@ -201,8 +201,8 @@ public class HTTrackActivity extends Activity {
       for (final Enumeration<NetworkInterface> interfaces = NetworkInterface
           .getNetworkInterfaces(); interfaces.hasMoreElements();) {
         final NetworkInterface iface = interfaces.nextElement();
-        for (Enumeration<InetAddress> addresses = iface.getInetAddresses(); addresses
-            .hasMoreElements();) {
+        for (final Enumeration<InetAddress> addresses = iface
+            .getInetAddresses(); addresses.hasMoreElements();) {
           final InetAddress address = addresses.nextElement();
           if (address instanceof Inet6Address) {
             return true;
@@ -267,7 +267,7 @@ public class HTTrackActivity extends Activity {
       args.add(target.getAbsolutePath());
 
       // Add URLs
-      for (String s : getProjectUrl().trim().split("\\s+")) {
+      for (final String s : getProjectUrl().trim().split("\\s+")) {
         if (s.length() != 0) {
           args.add(s);
         }
@@ -394,7 +394,7 @@ public class HTTrackActivity extends Activity {
 
           // url
           final int max_len = 32;
-          String s = element.address + element.filename;
+          final String s = element.address + element.filename;
           // cut string if necessary
           if (s.length() > max_len + 1) {
             str.append(s.substring(0, max_len / 2));
@@ -572,6 +572,7 @@ public class HTTrackActivity extends Activity {
    * Exit button.
    */
   protected void onFinish() {
+    // FIXME TODO CRASHES!
     runOnUiThread(new Runnable() {
       public void run() {
         finish();
@@ -761,6 +762,7 @@ public class HTTrackActivity extends Activity {
   public void onBrowse(View view) {
     final File target = getTargetFile();
 
+    // FIXME TODO CRASHES!
     runOnUiThread(new Runnable() {
       public void run() {
         if (target != null && target.exists()) {
