@@ -225,7 +225,6 @@ public class HTTrackActivity extends Activity {
       e.printStackTrace(print);
       writer.close();
     } catch (IOException io) {
-
     }
   }
 
@@ -383,10 +382,14 @@ public class HTTrackActivity extends Activity {
       if (stats.elements != null && stats.elements.length != 0) {
         str.append("\n");
         str.append("\n");
+        int maxElts = 32; // limit the number of displayed items
         for (final Element element : stats.elements) {
           if (element == null || element.address == null
               || element.filename == null) {
             continue;
+          }
+          if (--maxElts == 0) {
+            break;
           }
 
           // url
