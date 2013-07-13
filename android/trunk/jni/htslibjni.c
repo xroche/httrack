@@ -34,6 +34,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* fine-grained stats */
 #define GENERATE_FINE_STATS 1
 
+/* redirect stdio on a log file ? */
+#define REDIRECT_STDIO_LOG_FILE 1
+
 /* Our own assert version. */
 static void assert_failure(const char* exp, const char* file, int line) {
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
@@ -270,9 +273,21 @@ static void throwIOException(JNIEnv* env, const char *message) {
 }
 
 void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env) {
-  UNUSED(env);
+  /* redirect stdout and stderr to a log file for debugging purpose */
+#if REDIRECT_STDIO_LOG_FILE
+  FILE *const log = fopen("/sdcard/HTTrack/log.txt", "wb");
+  if (log != NULL) {
+    const int fd = fileno(log);
+    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
+      assert(! "could not redirect stdin/stdout");
+    }
+  }
+#endif
+
   assert(cls_HTTrackLib != NULL);
   hts_init();
+
+  UNUSED(env);
 }
 
 jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env) {
