@@ -315,28 +315,15 @@ static jobject newStringSafe(JNIEnv *env, const char *s) {
   return NULL;
 }
 
-static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
+static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
   lien_back * back, int back_max, int back_index, int lien_n,
   int lien_tot, int stat_time, hts_stat_struct * stats) {
-  void *const arg = (void *) CALLBACKARG_USERDEF(carg);
-  jni_context_t *const t = (jni_context_t*) arg;
 #define STATE_MAX 256
   hts_state_t state[STATE_MAX];
   size_t index = 0;
-  jobject ostats;
-
-  /* no callbacks */
-  if (t->callbacks == NULL) {
-    return 1;
-  }
-
-  /* no stats (even loop refresh) */
-  if (stats == NULL) {
-    return 1;
-  }
 
   /* create stats object */
-  ostats = (*t->env)->NewObject(t->env, cls_HTTrackStats, cons_HTTrackStats);
+  jobject ostats = (*t->env)->NewObject(t->env, cls_HTTrackStats, cons_HTTrackStats);
   if (ostats == NULL) {
     return 0;
   }
@@ -504,6 +491,44 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   }
 
   return 1;
+}
+
+static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
+  lien_back * back, int back_max, int back_index, int lien_n,
+  int lien_tot, int stat_time, hts_stat_struct * stats) {
+
+  /* get args context */
+  void *const arg = (void *) CALLBACKARG_USERDEF(carg);
+  jni_context_t *const t = (jni_context_t*) arg;
+  int code;
+
+  /* maximum number of objects on local frame */
+  const jint capacity = 128;
+
+  /* no stats ? (even loop refresh) */
+  if (stats == NULL) {
+    return 1;
+  }
+
+  /* no callbacks */
+  assert(t != NULL);
+  if (t->callbacks == NULL) {
+    return 1;
+  }
+
+  /* create a new local frame for local objects (stats, strings ...) */
+  if ((*t->env)->PushLocalFrame(t->env, capacity) != 0) {
+    return 0;  /* error */
+  }
+
+  /* call real code */
+  code = htsshow_loop_internal(t, opt, back, back_max, back_index,
+      lien_n, lien_tot, stat_time, stats);
+
+  /* wipe local frame */
+  (void) (*t->env)->PopLocalFrame(t->env, NULL);
+
+  return code;
 }
 
 void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
