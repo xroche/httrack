@@ -21,8 +21,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package com.httrack.android;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -32,6 +35,8 @@ import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -48,6 +53,7 @@ import android.os.Handler;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.util.Pair;
 import android.util.SparseArray;
 import android.view.Menu;
 import android.view.View;
@@ -75,6 +81,13 @@ public class HTTrackActivity extends Activity {
       { R.id.fieldProjectName, R.id.fieldProjectCategory },
       { R.id.fieldWebsiteURLs }, { R.id.fieldDisplay }, { R.id.fieldDisplay } };
 
+  // Fields used in serialization
+  @SuppressWarnings("unchecked")
+  protected static final Pair<Integer, String> fieldsSerializer[] = new Pair[] {
+      new Pair<Integer, String>(R.id.fieldProjectName, "projectName"),
+      new Pair<Integer, String>(R.id.fieldProjectCategory, "projectCategory"),
+      new Pair<Integer, String>(R.id.fieldWebsiteURLs, "websiteURLs") };
+
   // Engine
   protected Runner runner = null;
 
@@ -89,7 +102,6 @@ public class HTTrackActivity extends Activity {
   protected String version;
   protected File rootPath;
   protected File projectPath;
-  protected File target;
 
   private static File getExternalStorage() throws IOException {
     final String state = Environment.getExternalStorageState();
@@ -143,6 +155,20 @@ public class HTTrackActivity extends Activity {
     return cleanupString(map.get(R.id.fieldProjectName));
   }
 
+  /**
+   * Get the destination directory for the current project.
+   * 
+   * @return The destination directory.
+   */
+  protected File getTargetFile() {
+    final String name = getProjectName();
+    if (name != null && name.length() != 0) {
+      return new File(projectPath, name);
+    } else {
+      return null;
+    }
+  }
+
   protected String getProjectUrl() {
     return cleanupString(map.get(R.id.fieldWebsiteURLs));
   }
@@ -194,7 +220,7 @@ public class HTTrackActivity extends Activity {
   protected static void emergencyDump(final Throwable e) {
     try {
       final FileWriter writer = new FileWriter(Environment
-          .getExternalStorageDirectory().getPath() + "/HTTrack/error.txt", true);
+          .getExternalStorageDirectory().getPath() + "/HTTrack/error.txt");
       final PrintWriter print = new PrintWriter(writer);
       e.printStackTrace(print);
       writer.close();
@@ -219,7 +245,7 @@ public class HTTrackActivity extends Activity {
     }
 
     protected void runInternal() {
-      target = new File(projectPath, getProjectName());
+      final File target = getTargetFile();
       final List<String> args = new ArrayList<String>();
 
       // Program name
@@ -267,6 +293,9 @@ public class HTTrackActivity extends Activity {
         if (!target.mkdirs() && !target.isDirectory()) {
           throw new IOException("Unable to create " + target.getAbsolutePath());
         }
+
+        // Serialize settings
+        serialize();
 
         // Run engine
         final int code = engine.main(cargs);
@@ -417,6 +446,95 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Get the profile target file for the current project.
+   * 
+   * @return The profile target file.
+   */
+  private File getProfileFile() {
+    final File target = getTargetFile();
+    if (target != null) {
+      return new File(target, "andprofile.ini");
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Serialize current profile to disk.
+   * 
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected void serialize() throws IOException {
+    final File target = getTargetFile();
+
+    // Validate path
+    if (!target.mkdirs() && !target.isDirectory()) {
+      throw new IOException("Unable to create " + target.getAbsolutePath());
+    }
+
+    // Write settings
+    final File profile = getProfileFile();
+    final FileWriter writer = new FileWriter(profile);
+    final BufferedWriter lwriter = new BufferedWriter(writer);
+    try {
+      for (final Pair<Integer, String> field : fieldsSerializer) {
+        final String value = map.get(field.first);
+        final String key = field.second;
+        lwriter.write(key);
+        lwriter.write("=");
+        lwriter.write(URLEncoder.encode(value, "UTF-8"));
+        lwriter.write("\n");
+      }
+      lwriter.close();
+    } finally {
+      writer.close();
+    }
+  }
+
+  /**
+   * Unserialize profile from disk.
+   * 
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected void unserialize() throws IOException {
+    // Write settings
+    final File profile = getProfileFile();
+    if (!profile.exists()) {
+      throw new IOException("no such profile");
+    }
+    final FileReader reader = new FileReader(profile);
+    final BufferedReader lreader = new BufferedReader(reader);
+    try {
+      String rawline;
+      while ((rawline = lreader.readLine()) != null) {
+        final String line = rawline.trim();
+        if (line.length() == 0 || line.charAt(0) == ';') {
+          continue;
+        }
+        final int sep = line.indexOf('=');
+        if (sep != -1) {
+          final String key = line.substring(0, sep);
+          final String value = URLDecoder.decode(line.substring(sep + 1),
+              "UTF-8");
+          for (final Pair<Integer, String> field : fieldsSerializer) {
+            final int id = field.first;
+            final String fkey = field.second;
+            if (fkey.equals(key)) {
+              map.put(id, value);
+              break;
+            }
+          }
+        }
+      }
+      lreader.close();
+    } finally {
+      reader.close();
+    }
+  }
+
+  /**
    * We just entered in a new pane.
    */
   protected void onEnterNewPane() {
@@ -513,7 +631,19 @@ public class HTTrackActivity extends Activity {
   protected boolean validatePane() {
     switch (pane_id) {
     case 1:
-      return isStringNonEmpty(getFieldText(R.id.fieldProjectName));
+      final String name = getFieldText(R.id.fieldProjectName);
+      if (isStringNonEmpty(name)) {
+        // We need to put immediately the name in the map to be able to
+        // unserialize.
+        try {
+          map.put(R.id.fieldProjectName, name);
+          unserialize();
+        } catch (IOException e) {
+          // Ignore (if not found)
+        }
+        return true;
+      }
+      return false;
     case 2:
       return isStringNonEmpty(getFieldText(R.id.fieldWebsiteURLs));
     }
@@ -602,6 +732,8 @@ public class HTTrackActivity extends Activity {
    * "Show Logs"
    */
   public void onShowLogs(View view) {
+    final File target = getTargetFile();
+
     if (target != null && target.exists()) {
       final File log = new File(target, "hts-log.txt");
       if (log.exists()) {
@@ -624,6 +756,8 @@ public class HTTrackActivity extends Activity {
    * "Browse Website"
    */
   public void onBrowse(View view) {
+    final File target = getTargetFile();
+
     runOnUiThread(new Runnable() {
       public void run() {
         if (target != null && target.exists()) {
