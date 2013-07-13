@@ -1,0 +1,6 @@
+eclipse.preferences.version=1
+environment/project/com.android.toolchain.gcc.252069655/PATH/delimiter=;
+environment/project/com.android.toolchain.gcc.252069655/PATH/operation=append
+environment/project/com.android.toolchain.gcc.252069655/PATH/value=C\:\\Program Files\\cygwin\\bin
+environment/project/com.android.toolchain.gcc.252069655/append=true
+environment/project/com.android.toolchain.gcc.252069655/appendContributed=true
