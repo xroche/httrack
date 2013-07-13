@@ -59,4 +59,5 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := libhttrack
 #LOCAL_SHARED_LIBRARIES := libhttrack libhtsjava
 #LOCAL_LDLIBS := -lhttrack
+LOCAL_CFLAGS := -W -Wall -Wextra -Werror
 include $(BUILD_SHARED_LIBRARY)

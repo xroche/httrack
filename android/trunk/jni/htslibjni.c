@@ -59,8 +59,9 @@ static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
     }                                           \
   } while(0)
 
+#define UNUSED(VAR) (void) VAR
 
-/* HTTrackLib class pointer. */
+/* HTTrackLib global class pointer. */
 static jclass cls_HTTrackLib = NULL;
 static jclass cls_HTTrackCallbacks = NULL;
 static jclass cls_HTTrackStats = NULL;
@@ -133,6 +134,23 @@ LIST_OF_FIELDS();
 LIST_OF_FIELDS_ELT();
 #undef DECLARE_FIELD
 
+static jclass findClass(JNIEnv *env, const char *name) {
+  jclass localClass = (*env)->FindClass(env, name);
+  /* "Note however that the jclass is a class reference and must be protected
+   * with a call to NewGlobalRef " -- DARN! */
+  if (localClass != NULL) {
+    return (*env)->NewGlobalRef(env, localClass);
+  }
+  return NULL;
+}
+
+static void releaseClass(JNIEnv *env, jclass *cls) {
+  if (cls != NULL) {
+    (*env)->DeleteGlobalRef(env, *cls);
+    *cls = NULL;
+  }
+}
+
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   union {
     void *ptr;
@@ -141,16 +159,20 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   if ((*vm)->GetEnv(vm, &u.ptr, JNI_VERSION_1_6) != JNI_OK) {
     return -1;
   }
+  UNUSED(reserved);
 
   /* HTTrackLib class */
-  cls_HTTrackLib = (*u.env)->FindClass(u.env, "com/httrack/android/jni/HTTrackLib");
+  cls_HTTrackLib = findClass(u.env, "com/httrack/android/jni/HTTrackLib");
   assert(cls_HTTrackLib != NULL);
-  cls_HTTrackCallbacks = (*u.env)->FindClass(u.env, "com/httrack/android/jni/HTTrackCallbacks");
+  cls_HTTrackCallbacks = findClass(u.env, "com/httrack/android/jni/HTTrackCallbacks");
   assert(cls_HTTrackCallbacks != NULL);
-  cls_HTTrackStats = (*u.env)->FindClass(u.env, "com/httrack/android/jni/HTTrackStats");
+  cls_HTTrackStats = findClass(u.env, "com/httrack/android/jni/HTTrackStats");
   assert(cls_HTTrackStats != NULL);
-  cls_HTTrackStats_Element = (*u.env)->FindClass(u.env, "com/httrack/android/jni/HTTrackStats$Element");
+  cls_HTTrackStats_Element = findClass(u.env, "com/httrack/android/jni/HTTrackStats$Element");
   assert(cls_HTTrackStats_Element != NULL);
+
+  /* "Note that jfieldIDs and jmethodIDs are opaque types, not object
+   * references, and should not be passed to NewGlobalRef" */
 
   /* Constructors */
   cons_HTTrackStats = (*u.env)->GetMethodID(u.env, cls_HTTrackStats, "<init>", "()V");
@@ -198,6 +220,23 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   return JNI_VERSION_1_6;
 }
 
+/* note: never called on Android */
+void JNI_OnUnload(JavaVM *vm, void *reserved) {
+  union {
+    void *ptr;
+    JNIEnv *env;
+  } u;
+  UNUSED(reserved);
+
+  if ((*vm)->GetEnv(vm, &u.ptr, JNI_VERSION_1_6) != JNI_OK) {
+    return ;
+  }
+  releaseClass(u.env, &cls_HTTrackLib);
+  releaseClass(u.env, &cls_HTTrackCallbacks);
+  releaseClass(u.env, &cls_HTTrackStats);
+  releaseClass(u.env, &cls_HTTrackStats_Element);
+}
+
 /* FIXME -- This is dirty... we are supposed to keep the error message. */
 static char *getSafeCopy(const char *message) {
   static char *buffer = NULL;
@@ -214,7 +253,6 @@ static char *getSafeCopy(const char *message) {
 
 static void throwException(JNIEnv* env, const char *exception,
     const char *message) {
-  static char *buffer = NULL;
   jclass cls = (*env)->FindClass(env, exception);
   assert(cls != NULL);
   (*env)->ThrowNew(env, cls, getSafeCopy(message));
@@ -229,6 +267,8 @@ static void throwIOException(JNIEnv* env, const char *message) {
 }
 
 void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env) {
+  UNUSED(env);
+  assert(cls_HTTrackLib != NULL);
   hts_init();
 }
 
@@ -338,7 +378,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
       for(j = 0; j < 3 && index < index_max ; j++) {
         size_t _i;
         /* when k=0, just take first item (possibly being parsed) */
-        for(_i = k; _i < ( k == 0 ? 1 : back_max ) && index < index_max; _i++) {        // no lien
+        for(_i = k; _i < ( k == 0 ? 1 : (size_t) back_max ) && index < index_max; _i++) {        // no lien
           const size_t i = (back_index + _i) % back_max;
           /* active link */
           if (back[i].status >= 0) {
@@ -460,6 +500,8 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
 
 void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
     jboolean force) {
+  UNUSED(env);
+  UNUSED(object);
   MUTEX_LOCK(global_lock);
   if (global_opt != NULL) {
     hts_request_stop(global_opt, force);
