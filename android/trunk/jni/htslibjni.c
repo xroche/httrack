@@ -376,7 +376,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   COPY_(stat_time, elapsedTime);
 
   /* Collect individual stats */
-  if (0 && back_index >= 0) {
+  if (back_index >= 0) {
     const size_t index_max = STATE_MAX;
     size_t k;
     /* current links first */
@@ -499,8 +499,8 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
     }
 
     /* Call refresh method */
-    (*t->env)->CallObjectMethod(t->env, t->callbacks,
-                                meth_HTTrackCallbacks_onRefresh, ostats);
+    (*t->env)->CallVoidMethod(t->env, t->callbacks,
+                              meth_HTTrackCallbacks_onRefresh, ostats);
   }
 
   return 1;
