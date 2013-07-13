@@ -103,6 +103,7 @@ public class HTTrackActivity extends Activity {
   protected String version;
   protected File rootPath;
   protected File projectPath;
+  protected boolean mirrorRefresh;
 
   private static File getExternalStorage() throws IOException {
     final String state = Environment.getExternalStorageState();
@@ -339,9 +340,17 @@ public class HTTrackActivity extends Activity {
 
     @Override
     public void onRefresh(HTTrackStats stats) {
+      
+      // fake first refresh for cosmetic reasons.
       if (stats == null) {
-        return;
+        if (mirrorRefresh) {
+          return;
+        }
+        mirrorRefresh = true;
+        stats = new HTTrackStats();
       }
+
+      // build stats infos
       final String sep = " • ";
       final StringBuilder str = new StringBuilder();
       str.append("<b>Bytes saved</b>: ");

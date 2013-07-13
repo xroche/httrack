@@ -333,7 +333,7 @@ static jobject newStringSafe(JNIEnv *env, const char *s) {
   return NULL;
 }
 
-static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
+static jobject build_stats(jni_context_t *const t, httrackp * opt,
   lien_back * back, int back_max, int back_index, int lien_n,
   int lien_tot, int stat_time, hts_stat_struct * stats) {
 #define STATE_MAX 256
@@ -343,8 +343,10 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
   /* create stats object */
   jobject ostats = (*t->env)->NewObject(t->env, cls_HTTrackStats, cons_HTTrackStats);
   if (ostats == NULL) {
-    return 0;
+    return NULL;
   }
+
+  assert(stats != NULL);
 
 #define COPY_(VALUE, FIELD) do { \
   (*t->env)->SetLongField(t->env, ostats, field_ ##FIELD, \
@@ -354,6 +356,7 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
 
   /* Copy stats */
   COPY(HTS_TOTAL_RECV, bytesReceived);
+  COPY(rate, transferRate);
   COPY(stat_bytes, bytesWritten);
   COPY(stat_timestart, startTime);
   COPY(total_packed, bytesReceivedCompressed);
@@ -448,7 +451,7 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
     jobjectArray elements =
       (*t->env)->NewObjectArray(t->env, index, cls_HTTrackStats_Element, NULL);
     if (elements == NULL) {
-      return 0;
+      return NULL;
     }
 
     /* Put elements in elements field of stats */
@@ -464,7 +467,7 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
         (*t->env)->NewObject(t->env, cls_HTTrackStats_Element,
                              cons_HTTrackStats_Element);
       if (element == NULL) {
-        return 0;
+        return NULL;
       }
       (*t->env)->SetObjectArrayElement(t->env, elements, i, element);
 
@@ -504,13 +507,7 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
     }
   }
 
-  /* Call refresh method */
-  if (ostats != NULL) {
-    (*t->env)->CallVoidMethod(t->env, t->callbacks,
-                              meth_HTTrackCallbacks_onRefresh, ostats);
-  }
-
-  return 1;
+  return ostats;
 }
 
 static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
@@ -520,10 +517,13 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   /* get args context */
   void *const arg = (void *) CALLBACKARG_USERDEF(carg);
   jni_context_t *const t = (jni_context_t*) arg;
-  int code;
+  int code = 1;
 
   /* maximum number of objects on local frame */
   const jint capacity = 128;
+
+  /* object */
+  jobject ostats;
 
   /* no stats ? (even loop refresh) */
   if (stats == NULL) {
@@ -537,16 +537,31 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   }
 
   /* create a new local frame for local objects (stats, strings ...) */
-  if ((*t->env)->PushLocalFrame(t->env, capacity) != 0) {
+  if ((*t->env)->PushLocalFrame(t->env, capacity) == 0) {
+    /* build stats object */
+    if (stats != NULL) {
+      ostats = build_stats(t, opt, back, back_max, back_index, lien_n, lien_tot,
+                           stat_time, stats);
+    } else {
+      ostats = NULL;
+    }
+
+    /* Call refresh method */
+    if (ostats != NULL || stats == NULL) {
+      (*t->env)->CallVoidMethod(t->env, t->callbacks,
+                                meth_HTTrackCallbacks_onRefresh, ostats);
+      if ((*t->env)->ExceptionOccurred(t->env)) {
+        code = 0;
+      }
+    } else {
+      code = 0;
+    }
+
+    /* wipe local frame */
+    (void) (*t->env)->PopLocalFrame(t->env, NULL);
+  } else {
     return 0;  /* error */
   }
-
-  /* call real code */
-  code = htsshow_loop_internal(t, opt, back, back_max, back_index,
-      lien_n, lien_tot, stat_time, stats);
-
-  /* wipe local frame */
-  (void) (*t->env)->PopLocalFrame(t->env, NULL);
 
   return code;
 }
