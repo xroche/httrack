@@ -31,6 +31,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "htsdefines.h"
 #include "htscore.h"
 
+/* fine-grained stats */
+#define GENERATE_FINE_STATS 1
+
 /* Our own assert version. */
 static void assert_failure(const char* exp, const char* file, int line) {
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
@@ -423,8 +426,8 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
     }
   }
 
-  if (back_index >= 0) {
-    int i;
+  if (GENERATE_FINE_STATS && back_index >= 0) {
+    size_t i;
 
     /* Elements */
     jobjectArray elements =
@@ -437,7 +440,7 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
     (*t->env)->SetObjectField(t->env, ostats, field_elements, elements);
 
     /* Fill */
-    for(i = 0 ; i < back_index ; i++) {
+    for(i = 0 ; i < index ; i++) {
       /* Index to back[] */
       const int index = state[i].index;
 
@@ -484,8 +487,10 @@ static int htsshow_loop_internal(jni_context_t *const t, httrackp * opt,
                                 newStringSafe(t->env,
                                               back[index].r.charset));
     }
+  }
 
-    /* Call refresh method */
+  /* Call refresh method */
+  if (ostats != NULL) {
     (*t->env)->CallVoidMethod(t->env, t->callbacks,
                               meth_HTTrackCallbacks_onRefresh, ostats);
   }
