@@ -53,6 +53,7 @@ import android.os.Handler;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.text.Html;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.view.Menu;
@@ -146,7 +147,7 @@ public class HTTrackActivity extends Activity {
 
     // First pane text error
     if (errors != null) {
-      final TextView text = (TextView) this.findViewById(R.id.textView1);
+      final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
       text.append(errors);
     }
   }
@@ -343,45 +344,45 @@ public class HTTrackActivity extends Activity {
       }
       final String sep = " • ";
       final StringBuilder str = new StringBuilder();
-      str.append("Bytes saved: ");
+      str.append("<b>Bytes saved</b>: ");
       str.append(stats.bytesWritten);
       str.append(sep);
-      str.append("Links scanned: ");
+      str.append("<b>Links scanned</b>: ");
       str.append(stats.linksScanned);
       str.append("/");
       str.append(stats.linksTotal);
       str.append(" (+");
       str.append(stats.linksBackground);
-      str.append(")\n");
+      str.append(")<br />");
       /* */
-      str.append("Time: ");
+      str.append("<b>Time</b>: ");
       str.append(stats.elapsedTime);
       str.append(sep);
-      str.append("Files written: ");
+      str.append("<b>Files written</b>: ");
       str.append(stats.filesWritten);
       str.append(" (+");
       str.append(stats.filesWrittenBackground);
-      str.append(")\n");
+      str.append(")<br />");
       /* */
-      str.append("Transfer rate: ");
+      str.append("<b>Transfer rate</b>: ");
       str.append(stats.transferRate);
       str.append(" (");
       str.append(stats.totalTransferRate);
       str.append(")");
       str.append(sep);
-      str.append("Files updated: ");
+      str.append("<b>Files updated</b>: ");
       str.append(stats.filesUpdated);
-      str.append("\n");
+      str.append("<br />");
       /* */
-      str.append("Active connections: ");
+      str.append("<b>Active connections</b>: ");
       str.append(stats.socketsCount);
       str.append(sep);
-      str.append("Errors:");
+      str.append("<b>Errors</b>:");
       str.append(stats.errorsCount);
       /* */
       if (stats.elements != null && stats.elements.length != 0) {
-        str.append("\n");
-        str.append("\n");
+        str.append("<br />");
+        str.append("<i><br />");
         int maxElts = 32; // limit the number of displayed items
         for (final Element element : stats.elements) {
           if (element == null || element.address == null
@@ -434,15 +435,17 @@ public class HTTrackActivity extends Activity {
             str.append("???");
             break;
           }
-          str.append("\n");
+          str.append("<br />");
         }
+        str.append("</i>");
       }
       final String message = str.toString();
       // Post refresh.
       handlerUI.post(new Runnable() {
         @Override
         public void run() {
-          TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(message);
+          TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(
+              Html.fromHtml(message));
         }
       });
     }
@@ -543,12 +546,26 @@ public class HTTrackActivity extends Activity {
   protected void onEnterNewPane() {
     switch (layouts[pane_id]) {
     case R.layout.activity_startup:
-      final TextView text = (TextView) this.findViewById(R.id.textView1);
+      final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
+
+      // Welcome message.
+      final String html = getString(R.string.welcome_message);
+      final StringBuilder str = new StringBuilder(html);
+
+      // Debugging.
+      str.append("<br /><i>");
       if (version != null) {
-        text.append("\n\nVERSION: " + version);
+        str.append("<br />VERSION: ");
+        str.append(version);
       }
-      text.append("\nPATH: " + projectPath.getAbsolutePath());
-      text.append("\nIPv6: " + (isIPv6Enabled() ? "YES" : "NO"));
+      str.append("<br />PATH: ");
+      str.append(projectPath.getAbsolutePath());
+      str.append("<br />IPv6: ");
+      str.append(isIPv6Enabled() ? "YES" : "NO");
+      str.append("</i>");
+
+      // FIXME TODO: why do we need to to this by ourselves ?
+      text.setText(Html.fromHtml(str.toString()));
       break;
     case R.layout.activity_mirror_progress:
       if (runner == null) {

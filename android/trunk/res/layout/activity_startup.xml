@@ -9,14 +9,6 @@
     android:background="@drawable/bg_rings"
     tools:context=".HTTrackActivity" >
 
-    <TextView
-        android:id="@+id/textView1"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"
-        android:text="@string/welcome_message" />
-
     <Button
         android:id="@+id/buttonNext"
         android:layout_width="wrap_content"
@@ -26,5 +18,14 @@
         android:layout_marginBottom="26dp"
         android:onClick="onClickNext"
         android:text="@string/tab_next" />
+
+    <TextView
+        android:id="@+id/fieldDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignRight="@+id/buttonNext"
+        android:text="@string/welcome_message" />
 
 </RelativeLayout>
