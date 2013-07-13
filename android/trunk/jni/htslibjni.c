@@ -325,9 +325,17 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   size_t index = 0;
   jobject ostats;
 
+  /* no callbacks */
   if (t->callbacks == NULL) {
     return 1;
   }
+
+  /* no stats (even loop refresh) */
+  if (stats == NULL) {
+    return 1;
+  }
+
+  /* create stats object */
   ostats = (*t->env)->NewObject(t->env, cls_HTTrackStats, cons_HTTrackStats);
   if (ostats == NULL) {
     return 0;
