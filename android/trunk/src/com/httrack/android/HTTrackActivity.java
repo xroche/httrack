@@ -62,6 +62,8 @@ import android.view.Menu;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -212,6 +214,29 @@ public class HTTrackActivity extends Activity {
    */
   protected File getProjectRootFile() {
     return projectPath;
+  }
+
+  /**
+   * Return the already downloaded project names.
+   * 
+   * @return The list of project names.
+   */
+  protected String[] getProjectNames() {
+    final List<String> list = new ArrayList<String>();
+    final File dir = getProjectRootFile();
+    if (dir.exists() && dir.isDirectory()) {
+      for (final File item : dir.listFiles()) {
+        if (item.isDirectory()) {
+          final File profile = new File(new File(item, "hts-cache"),
+              "winprofile.ini");
+          if (profile.isFile() && profile.exists()) {
+            list.add(item.getName());
+          }
+        }
+      }
+      return list.toArray(new String[] {});
+    }
+    return null;
   }
 
   /**
@@ -641,7 +666,8 @@ public class HTTrackActivity extends Activity {
   protected void onEnterNewPane() {
     switch (layouts[pane_id]) {
     case R.layout.activity_startup:
-      final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
+      final TextView text = TextView.class.cast(this
+          .findViewById(R.id.fieldDisplay));
 
       // Welcome message.
       final String html = getString(R.string.welcome_message);
@@ -653,14 +679,23 @@ public class HTTrackActivity extends Activity {
         str.append("<br />VERSION: ");
         str.append(version);
       }
-      str.append("<br />PATH: ");
+      str.append(" • PATH: ");
       str.append(projectPath.getAbsolutePath());
-      str.append("<br />IPv6: ");
+      str.append("• IPv6: ");
       str.append(isIPv6Enabled() ? "YES" : "NO");
       str.append("</i>");
 
       // FIXME TODO: why do we need to to this by ourselves ?
       text.setText(Html.fromHtml(str.toString()));
+      break;
+    case R.layout.activity_proj_name:
+      final String[] names = getProjectNames();
+      if (names != null) {
+        final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
+            .findViewById(R.id.fieldProjectName));
+        name.setAdapter(new ArrayAdapter<String>(this,
+            android.R.layout.simple_dropdown_item_1line, names));
+      }
       break;
     case R.layout.activity_mirror_progress:
       if (runner == null) {
