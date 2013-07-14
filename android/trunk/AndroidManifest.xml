@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.httrack.android"
     android:versionCode="1"
-    android:versionName="3.47" >
+    android:versionName="3.47"
+    android:installLocation="preferExternal"
+    >
 
     <uses-sdk
         android:minSdkVersion="9"
@@ -24,7 +26,7 @@
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme" android:debuggable="false" android:description="@string/app_description">
+        android:theme="@style/AppTheme" android:description="@string/app_description">
         <activity
             android:name="com.httrack.android.HTTrackActivity"
             android:label="@string/title_activity_startup" >
