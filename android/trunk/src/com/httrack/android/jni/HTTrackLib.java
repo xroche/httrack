@@ -21,56 +21,74 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package com.httrack.android.jni;
 
+import java.io.File;
 import java.io.IOException;
 
 public class HTTrackLib {
-	/** Statistics. **/
-	protected final HTTrackCallbacks callbacks;
+  /** Statistics. **/
+  protected final HTTrackCallbacks callbacks;
 
-	/**
-	 * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
-	 * 
-	 * @return the current library version
-	 */
-	public static native String getVersion();
+  /**
+   * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
+   * 
+   * @return the current library version
+   */
+  public static native String getVersion();
 
-	/**
-	 * Initialize the httrack library. MUST be called once.
-	 */
-	public static native void init();
+  /**
+   * Initialize the httrack library. MUST be called once.
+   */
+  public static native void init();
 
-	/**
-	 * Start the engine.
-	 * 
-	 * @param args
-	 *            main() arguments.
-	 * @return The exit code upon completion.
-	 * @throws IOException
-	 *             upon error
-	 */
-	public native int main(String[] args) throws IOException;
+  /**
+   * Build the top-level index.
+   * 
+   * @param path
+   *          The target path;
+   * @param templatesPath
+   *          The templates path directory.
+   * @return 1 upon success
+   */
+  public static int buildTopIndex(File path, File templatesPath) {
+    final String p = path.getAbsolutePath() + "/";
+    final String t = templatesPath.getAbsolutePath() + "/";
+    return buildTopIndex(p, t);
+  }
 
-	/**
-	 * Stop the engine.
-	 */
-	public native void stop(boolean force);
+  /**
+   * Start the engine.
+   * 
+   * @param args
+   *          main() arguments.
+   * @return The exit code upon completion.
+   * @throws IOException
+   *           upon error
+   */
+  public native int main(String[] args) throws IOException;
 
-	/**
-	 * Default constructor.
-	 */
-	public HTTrackLib() {
-		this(null);
-	}
+  /**
+   * Stop the engine.
+   */
+  public native void stop(boolean force);
 
-	/**
-	 * Constructor with statistics support.
-	 */
-	public HTTrackLib(HTTrackCallbacks callbacks) {
-		this.callbacks = callbacks;
-	}
+  /**
+   * Default constructor.
+   */
+  public HTTrackLib() {
+    this(null);
+  }
 
-	static {
-		System.loadLibrary("httrack");
-		System.loadLibrary("htslibjni");
-	}
+  /**
+   * Constructor with statistics support.
+   */
+  public HTTrackLib(HTTrackCallbacks callbacks) {
+    this.callbacks = callbacks;
+  }
+
+  protected static native int buildTopIndex(String path, String templatesPath);
+
+  static {
+    System.loadLibrary("httrack");
+    System.loadLibrary("htslibjni");
+  }
 }

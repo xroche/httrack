@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <assert.h>
 #include <pthread.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsopt.h"
@@ -51,6 +54,7 @@ static void assert_failure(const char* exp, const char* file, int line) {
 #define assert(EXP) (void)( (EXP) || (assert_failure(#EXP, __FILE__, __LINE__), 0) )
 
 static httrackp * global_opt = NULL;
+static int global_opt_stop = 0;
 static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define MUTEX_LOCK(MUTEX) do {                  \
@@ -272,7 +276,11 @@ static void throwIOException(JNIEnv* env, const char *message) {
   throwException(env, "java/io/IOException", message);
 }
 
-void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env) {
+static void throwNPException(JNIEnv* env, const char *message) {
+  throwException(env, "java/lang/NullPointerException", message);
+}
+
+void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jclass clazz) {
   /* redirect stdout and stderr to a log file for debugging purpose */
 #if REDIRECT_STDIO_LOG_FILE
   FILE *const log = fopen("/sdcard/HTTrack/log.txt", "wb");
@@ -284,15 +292,21 @@ void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env) {
   }
 #endif
 
+  /* created files shall be seen by users */
+  umask(S_IWOTH);
+
+  /* initialize library */
   assert(cls_HTTrackLib != NULL);
   hts_init();
 
   UNUSED(env);
+  UNUSED(clazz);
 }
 
-jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env) {
+jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env, jclass clazz) {
   const char *version = hts_version();
   assert(version != NULL);
+  UNUSED(clazz);
   return (*env)->NewStringUTF(env, version);
 }
 
@@ -530,6 +544,11 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
     return 1;
   }
 
+  /* exit now */
+  if (global_opt_stop) {
+    return 0;
+  }
+
   /* no callbacks */
   assert(t != NULL);
   if (t->callbacks == NULL) {
@@ -572,9 +591,34 @@ void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
   UNUSED(object);
   MUTEX_LOCK(global_lock);
   if (global_opt != NULL) {
+    global_opt_stop = 1;
     hts_request_stop(global_opt, force);
   }
   MUTEX_UNLOCK(global_lock);
+}
+
+jint Java_com_httrack_android_jni_HTTrackLib_buildTopIndex(JNIEnv* env, jclass clazz,
+    jstring opath, jstring otemplates) {
+  if (opath != NULL && otemplates != NULL) {
+    const char* path = (*env)->GetStringUTFChars(env, opath, NULL);
+    const char* templates = (*env)->GetStringUTFChars(env, otemplates, NULL);
+    int ret;
+
+    httrackp * const opt = hts_create_opt();
+    opt->log = opt->errlog = NULL;
+    fprintf(stderr, "building top index to %s using templates %s\n", path, templates);
+    ret = hts_buildtopindex(opt, path, templates);
+    hts_free_opt(opt);
+
+    (*env)->ReleaseStringUTFChars(env, opath, path);
+    (*env)->ReleaseStringUTFChars(env, otemplates, templates);
+
+    return ret;
+  } else {
+    throwNPException(env, "null argument(s)");
+    return -1;
+  }
+  UNUSED(clazz);
 }
 
 jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
@@ -606,6 +650,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
       /* Create opt tab */
       opt = hts_create_opt();
       global_opt = opt;
+      global_opt_stop = 0;
       CHAIN_FUNCTION(opt, loop, htsshow_loop, &t);
     }
     MUTEX_UNLOCK(global_lock);
@@ -626,6 +671,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
       MUTEX_LOCK(global_lock);
       hts_free_opt(opt);
       global_opt = NULL;
+      global_opt_stop = 0;
       MUTEX_UNLOCK(global_lock);
 
       /* Cleanup */

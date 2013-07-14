@@ -25,9 +25,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -38,6 +40,8 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import com.httrack.android.jni.HTTrackCallbacks;
 import com.httrack.android.jni.HTTrackLib;
@@ -81,11 +85,12 @@ public class HTTrackActivity extends Activity {
       { R.id.fieldWebsiteURLs }, { R.id.fieldDisplay }, { R.id.fieldDisplay } };
 
   // Fields used in serialization
+  // note: names tend to match the Windows winprofile.ini version
   @SuppressWarnings("unchecked")
   protected static final Pair<Integer, String> fieldsSerializer[] = new Pair[] {
-      new Pair<Integer, String>(R.id.fieldProjectName, "projectName"),
-      new Pair<Integer, String>(R.id.fieldProjectCategory, "projectCategory"),
-      new Pair<Integer, String>(R.id.fieldWebsiteURLs, "websiteURLs") };
+      new Pair<Integer, String>(R.id.fieldProjectName, "ProjectName"),
+      new Pair<Integer, String>(R.id.fieldProjectCategory, "Category"),
+      new Pair<Integer, String>(R.id.fieldWebsiteURLs, "CurrentUrl") };
 
   // Engine
   protected Runner runner = null;
@@ -100,6 +105,7 @@ public class HTTrackActivity extends Activity {
   // Project settings
   protected String version;
   protected File rootPath;
+  protected File httrackPath;
   protected File projectPath;
   protected boolean mirrorRefresh;
 
@@ -127,7 +133,10 @@ public class HTTrackActivity extends Activity {
 
       // Fetch httrack engine version
       version = HTTrackLib.getVersion();
-    } catch (RuntimeException re) {
+
+      // Extract resources if necessary
+      getResourceFile();
+    } catch (final RuntimeException re) {
       // Woops, something is not right here.
       errors += "\n\nERROR: " + re.getMessage();
     }
@@ -135,11 +144,16 @@ public class HTTrackActivity extends Activity {
     // Default target directory on external storage
     try {
       rootPath = getExternalStorage();
-    } catch (IOException e) {
+    } catch (final IOException e) {
       errors += "\n\nWARNING: " + e.getMessage();
       projectPath = Environment.getExternalStorageDirectory();
     }
-    projectPath = new File(new File(rootPath, "HTTrack"), "Websites");
+    httrackPath = new File(rootPath, "HTTrack");
+    projectPath = new File(httrackPath, "Websites");
+
+    // Ensure users can see us
+    HTTrackActivity.setFileReadWrite(httrackPath);
+    HTTrackActivity.setFileReadWrite(projectPath);
 
     // Go to first pane now
     setPane(0);
@@ -149,6 +163,42 @@ public class HTTrackActivity extends Activity {
       final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
       text.append(errors);
     }
+  }
+
+  /** Get the resource directory. Create it if necessary. **/
+  private File getResourceFile() {
+    final File rscPath = new File(httrackPath, "resources");
+    if (!rscPath.exists()) {
+      if (HTTrackActivity.mkdirs(rscPath)) {
+        try {
+          final InputStream zipStream = getResources().openRawResource(
+              R.raw.resources);
+          final ZipInputStream file = new ZipInputStream(zipStream);
+          ZipEntry entry;
+          while ((entry = file.getNextEntry()) != null) {
+            final File dest = new File(rscPath.getAbsoluteFile() + "/"
+                + entry.getName());
+            if (entry.getName().endsWith("/")) {
+              dest.mkdirs();
+            } else {
+              final FileOutputStream writer = new FileOutputStream(dest);
+              byte[] bytes = new byte[1024];
+              int length;
+              while ((length = file.read(bytes)) >= 0) {
+                writer.write(bytes, 0, length);
+              }
+              writer.close();
+              dest.setLastModified(entry.getTime());
+            }
+          }
+          file.close();
+          zipStream.close();
+        } catch (final IOException io) {
+          rscPath.delete();
+        }
+      }
+    }
+    return rscPath;
   }
 
   protected String getProjectName() {
@@ -218,7 +268,7 @@ public class HTTrackActivity extends Activity {
           }
         }
       }
-    } catch (SocketException se) {
+    } catch (final SocketException se) {
     }
     return false;
   }
@@ -228,12 +278,14 @@ public class HTTrackActivity extends Activity {
    */
   protected static void emergencyDump(final Throwable e) {
     try {
-      final FileWriter writer = new FileWriter(Environment
-          .getExternalStorageDirectory().getPath() + "/HTTrack/error.txt");
+      final File dumpFile = new File(new File(Environment
+          .getExternalStorageDirectory().getPath(), "HTTrack"), "error.txt");
+      final FileWriter writer = new FileWriter(dumpFile);
       final PrintWriter print = new PrintWriter(writer);
       e.printStackTrace(print);
       writer.close();
-    } catch (IOException io) {
+      HTTrackActivity.setFileReadWrite(dumpFile);
+    } catch (final IOException io) {
     }
   }
 
@@ -264,7 +316,7 @@ public class HTTrackActivity extends Activity {
         args.add("-@i4");
       }
       // Build top index.
-      args.add("-%i");
+      // args.add("-%i");
 
       // TEMPORARY FIXME
       args.add("--max-time");
@@ -300,9 +352,10 @@ public class HTTrackActivity extends Activity {
       String message = null;
       try {
         // Validate path
-        if (!target.mkdirs() && !target.isDirectory()) {
+        if (!HTTrackActivity.mkdirs(target)) {
           throw new IOException("Unable to create " + target.getAbsolutePath());
         }
+        HTTrackActivity.setFileReadWrite(target);
 
         // Serialize settings
         serialize();
@@ -319,7 +372,13 @@ public class HTTrackActivity extends Activity {
         } else {
           message = "Error code " + code;
         }
-      } catch (IOException io) {
+
+        // Build top index
+        final File rsc = getResourceFile();
+        if (rsc != null) {
+          HTTrackLib.buildTopIndex(getProjectRootFile(), rsc);
+        }
+      } catch (final IOException io) {
         message = io.getMessage();
       }
 
@@ -477,10 +536,20 @@ public class HTTrackActivity extends Activity {
   private File getProfileFile() {
     final File target = getTargetFile();
     if (target != null) {
-      return new File(target, "andprofile.ini");
+      return new File(new File(target, "hts-cache"), "winprofile.ini");
     } else {
       return null;
     }
+  }
+
+  /** Make directorie(s) if necessary. **/
+  private static boolean mkdirs(final File target) {
+    return target.mkdirs() || target.isDirectory();
+  }
+
+  /** make the given file readable/writabe. **/
+  private static boolean setFileReadWrite(final File target) {
+    return target.setReadable(true) && target.setWritable(true);
   }
 
   /**
@@ -491,14 +560,21 @@ public class HTTrackActivity extends Activity {
    */
   protected void serialize() throws IOException {
     final File target = getTargetFile();
+    final File profile = getProfileFile();
+    final File cache = profile.getParentFile();
 
     // Validate path
-    if (!target.mkdirs() && !target.isDirectory()) {
+    if (!HTTrackActivity.mkdirs(target)) {
       throw new IOException("Unable to create " + target.getAbsolutePath());
     }
+    // Create cache for winprofile.ini
+    else if (!HTTrackActivity.mkdirs(cache)) {
+      throw new IOException("Unable to create " + cache);
+    }
+    HTTrackActivity.setFileReadWrite(target);
+    HTTrackActivity.setFileReadWrite(cache);
 
     // Write settings
-    final File profile = getProfileFile();
     final FileWriter writer = new FileWriter(profile);
     final BufferedWriter lwriter = new BufferedWriter(writer);
     try {
@@ -514,6 +590,7 @@ public class HTTrackActivity extends Activity {
     } finally {
       writer.close();
     }
+    HTTrackActivity.setFileReadWrite(profile);
   }
 
   /**
@@ -677,7 +754,7 @@ public class HTTrackActivity extends Activity {
         try {
           map.put(R.id.fieldProjectName, name);
           unserialize();
-        } catch (IOException e) {
+        } catch (final IOException e) {
           // Ignore (if not found)
         }
         return true;
@@ -785,7 +862,7 @@ public class HTTrackActivity extends Activity {
           final String logs = new String(data, "UTF-8");
           new AlertDialog.Builder(this).setTitle("Logs").setMessage(logs)
               .show();
-        } catch (IOException e) {
+        } catch (final IOException e) {
         }
       }
     }
@@ -796,6 +873,7 @@ public class HTTrackActivity extends Activity {
     if (index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
+      // Without that, Android tend to crash with a NPE (!)
       intent.setDataAndType(Uri.fromFile(index), "text/html");
       startActivity(intent);
     }
