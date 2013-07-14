@@ -276,11 +276,11 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * is IPv6 available on this phone ?
+   * Return the IPv6 address.
    * 
-   * @return true if IPv6 is available on this phone
+   * @return The ipv6 address, or @c null if no IPv6 connectivity is available.
    */
-  private static boolean isIPv6Enabled() {
+  protected static InetAddress getIPv6Address() {
     try {
       for (final Enumeration<NetworkInterface> interfaces = NetworkInterface
           .getNetworkInterfaces(); interfaces.hasMoreElements();) {
@@ -289,13 +289,26 @@ public class HTTrackActivity extends Activity {
             .getInetAddresses(); addresses.hasMoreElements();) {
           final InetAddress address = addresses.nextElement();
           if (address instanceof Inet6Address) {
-            return true;
+            if (!address.isLoopbackAddress() && !address.isLinkLocalAddress()
+                && !address.isSiteLocalAddress()
+                && !address.isMulticastAddress()) {
+              return address;
+            }
           }
         }
       }
     } catch (final SocketException se) {
     }
-    return false;
+    return null;
+  }
+
+  /**
+   * is IPv6 available on this phone ?
+   * 
+   * @return true if IPv6 is available on this phone
+   */
+  protected static boolean isIPv6Enabled() {
+    return getIPv6Address() != null;
   }
 
   /**
@@ -686,7 +699,9 @@ public class HTTrackActivity extends Activity {
       str.append(" • PATH: ");
       str.append(projectPath.getAbsolutePath());
       str.append("• IPv6: ");
-      str.append(isIPv6Enabled() ? "YES" : "NO");
+      final InetAddress addrV6 = getIPv6Address();
+      str.append(addrV6 != null ? ("YES (" + addrV6.getHostAddress() + ")")
+          : "NO");
       str.append("</i>");
 
       // FIXME TODO: why do we need to to this by ourselves ?
