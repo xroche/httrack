@@ -577,7 +577,8 @@ public class HTTrackActivity extends Activity {
 
   /** make the given file readable/writabe. **/
   private static boolean setFileReadWrite(final File target) {
-    return target.setReadable(true) && target.setWritable(true);
+    // return target.setReadable(true) && target.setWritable(true);
+    return true;
   }
 
   /**
