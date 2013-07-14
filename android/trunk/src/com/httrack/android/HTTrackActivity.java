@@ -31,10 +31,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -158,6 +156,15 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Get the project root directory.
+   * 
+   * @return The project root directory.
+   */
+  protected File getProjectRootFile() {
+    return projectPath;
+  }
+
+  /**
    * Get the destination directory for the current project.
    * 
    * @return The destination directory.
@@ -256,6 +263,8 @@ public class HTTrackActivity extends Activity {
       if (!isIPv6Enabled()) {
         args.add("-@i4");
       }
+      // Build top index.
+      args.add("-%i");
 
       // TEMPORARY FIXME
       args.add("--max-time");
@@ -733,7 +742,7 @@ public class HTTrackActivity extends Activity {
   /**
    * "Next"
    */
-  public void onClickNext(View view) {
+  public void onClickNext(final View view) {
     if (pane_id < layouts.length) {
       if (validatePaneWithEffects(true)) {
         setPane(pane_id + 1);
@@ -746,7 +755,7 @@ public class HTTrackActivity extends Activity {
   /**
    * "Previous"
    */
-  public void onClickPrevious(View view) {
+  public void onClickPrevious(final View view) {
     if (pane_id > 0) {
       setPane(pane_id - 1);
     }
@@ -755,13 +764,13 @@ public class HTTrackActivity extends Activity {
   /**
    * "Options"
    */
-  public void onClickOptions(View view) {
+  public void onClickOptions(final View view) {
   }
 
   /**
    * "Show Logs"
    */
-  public void onShowLogs(View view) {
+  public void onShowLogs(final View view) {
     final File target = getTargetFile();
 
     if (target != null && target.exists()) {
@@ -782,28 +791,31 @@ public class HTTrackActivity extends Activity {
     }
   }
 
+  /** Browser a specific index. **/
+  private void browse(final File index) {
+    if (index.exists()) {
+      final Intent intent = new Intent();
+      intent.setAction(android.content.Intent.ACTION_VIEW);
+      intent.setDataAndType(Uri.fromFile(index), "text/html");
+      startActivity(intent);
+    }
+  }
+
   /**
    * "Browse Website"
    */
-  public void onBrowse(View view) {
+  public void onBrowse(final View view) {
     final File target = getTargetFile();
+    final File index = new File(target, "index.html");
+    browse(index);
+  }
 
-    // FIXME TODO CRASHES!
-    runOnUiThread(new Runnable() {
-      public void run() {
-        if (target != null && target.exists()) {
-          final File index = new File(target, "index.html");
-          if (index.exists()) {
-            try {
-              final URL url = index.toURI().toURL();
-              final Intent browser = new Intent(Intent.ACTION_RUN,
-                  Uri.parse(url.toString()));
-              startActivity(browser);
-            } catch (MalformedURLException e) {
-            }
-          }
-        }
-      }
-    });
+  /**
+   * "Browse All Websites"
+   */
+  public void onBrowseAll(final View view) {
+    final File target = getProjectRootFile();
+    final File index = new File(target, "index.html");
+    browse(index);
   }
 }
