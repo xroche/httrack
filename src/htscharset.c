@@ -1197,8 +1197,6 @@ int hts_isStringUTF8(const char *s, size_t size) {
   size_t i;
 
   for(i = 0 ; i < size ; ) {
-    hts_UCS4 uc;
-
     /* Reader: can read bytes up to j */
 #define RD ( i < size ? data[i++] : -1 )
 
