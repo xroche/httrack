@@ -340,7 +340,7 @@ public class HTTrackActivity extends Activity {
 
     @Override
     public void onRefresh(HTTrackStats stats) {
-      
+
       // fake first refresh for cosmetic reasons.
       if (stats == null) {
         if (mirrorRefresh) {
@@ -796,7 +796,7 @@ public class HTTrackActivity extends Activity {
           if (index.exists()) {
             try {
               final URL url = index.toURI().toURL();
-              final Intent browser = new Intent(Intent.ACTION_VIEW,
+              final Intent browser = new Intent(Intent.ACTION_RUN,
                   Uri.parse(url.toString()));
               startActivity(browser);
             } catch (MalformedURLException e) {

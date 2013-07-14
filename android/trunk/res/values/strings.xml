@@ -23,5 +23,6 @@
     <string name="exit">Exit</string>
     <string name="show_logs">Show Logs</string>
     <string name="browse_website">Browse Website</string>
+    <string name="app_description">Copy websites to your computer (Offline browser)</string>
 
 </resources>

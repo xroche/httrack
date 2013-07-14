@@ -585,7 +585,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
   if (argv != NULL) {
     int i;
     httrackp * opt = NULL;
-    int code;
+    int code = -1;
     struct jni_context_t t;
     t.env = env;
     t.callbacks = (*env)->GetObjectField(env, object, field_callbacks);
