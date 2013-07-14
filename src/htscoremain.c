@@ -2425,14 +2425,15 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   /* produce key #i */
 #define FMT() \
                   char buffer[256]; \
-                  char *name = buffer; \
+                  char *name; \
                   const long expected = (long) i * 1664525 + 1013904223; \
                   do { \
                     if (strings == NULL) { \
-                      snprintf(name, sizeof(name), \
+                      snprintf(buffer, sizeof(buffer), \
                         "http://www.example.com/website/sample/for/hashtable/" \
                         "%ld/index.html?foo=%ld&bar", \
                         (long) i, (long) (expected)); \
+                      name = buffer; \
                     } else { \
                       name = strings[i]; \
                     } \
