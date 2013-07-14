@@ -483,17 +483,31 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
+/* the empty string for the string pool */
+static char the_empty_string[1] = { 0 };
+
 static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
   const size_t len = strlen(name) + 1;
   char *s;
 
+  /* the pool does not allow empty strings for safety purpose ; handhe that
+    (keys are being emptied when free'd to detect duplicate free) */
+  if (len == 1) {
+    assert(the_empty_string[0] == '\0');
+    return the_empty_string;
+  }
+
+  /* expand pool capacity */
+  assert(hashtable->pool.size <= hashtable->pool.capacity);
   if (hashtable->pool.capacity - hashtable->pool.size < len) {
     size_t capacity;
     for(capacity = MIN_POOL_CAPACITY ; capacity < hashtable->pool.size + len
       ; capacity <<= 1) ;
+    assert(hashtable->pool.size < capacity);
     inthash_realloc_pool(hashtable, capacity);
   }
 
+  /* copy */
   assert(len + hashtable->pool.size <= hashtable->pool.capacity);
   s = &hashtable->pool.buffer[hashtable->pool.size];
   memcpy(s, name, len);
@@ -514,12 +528,25 @@ static HTS_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
    note: pointer must have been kicked from the pool first */
 static void inthash_free_key_internal(inthash hashtable, char *name) {
   const size_t len = strlen(name) + 1;
+
+  /* see inthash_dup_name_internal() handling */
+  if (len == 1 && name == the_empty_string) {
+    assert(the_empty_string[0] == '\0');
+    return ;
+  }
+
+  assert(*name != '\0' || !"duplicate or bad string pool release");
   hashtable->pool.used -= len;
+  *name = '\0'; /* the string is now invalidated */
+
+  /* compact the pool is too many holes  */
   if (hashtable->pool.used < hashtable->pool.size / 2) {
     size_t capacity = hashtable->pool.capacity;
+    /* compact and shrink */
     if (hashtable->pool.used < capacity / 4) {
       capacity /= 2;
     }
+    assert(hashtable->pool.used < capacity);
     inthash_compact_pool(hashtable, capacity);
   }
 }
