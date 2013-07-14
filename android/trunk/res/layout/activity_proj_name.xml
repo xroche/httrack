@@ -17,14 +17,15 @@
         android:layout_alignTop="@+id/fieldProjectName"
         android:text="@string/project_name" />
 
-    <AutoCompleteTextView android:text="AutoCompleteTextView"
+    <AutoCompleteTextView
         android:id="@+id/fieldProjectName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="23dp"
         android:layout_toRightOf="@+id/textView1"
         android:ems="10"
-        android:hint="@string/projname_hint" >
+        android:hint="@string/projname_hint"
+        android:text="@string/projname_hint" >
 
         <requestFocus />
     </AutoCompleteTextView>
@@ -51,9 +52,9 @@
         android:id="@+id/buttonPrevious"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/TextView01"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="24dp"
+        android:layout_alignParentLeft="true"
+        android:layout_marginBottom="39dp"
         android:onClick="onClickPrevious"
         android:text="@string/previous" />
 
@@ -63,7 +64,7 @@
         android:layout_height="wrap_content"
         android:layout_alignBaseline="@+id/buttonPrevious"
         android:layout_alignBottom="@+id/buttonPrevious"
-        android:layout_alignRight="@+id/fieldProjectCategory"
+        android:layout_alignParentRight="true"
         android:onClick="onClickNext"
         android:text="@string/tab_next" />
 

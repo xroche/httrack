@@ -388,14 +388,17 @@ public class HTTrackActivity extends Activity {
         // Run engine
         final int code = engine.main(cargs);
         if (code == 0) {
-          message = "Success ; mirror copied in " + target.getAbsolutePath();
-          message += "\n";
+          message = "<b>Success</b>!<br /><br />Mirror copied in <i>"
+              + target.getAbsolutePath() + "</i>:";
+          message += "<br /><i>";
           for (final String f : target.list()) {
-            message += "\n\t" + f;
+            message += f;
+            message += "<br />";
           }
+          message += "</i>";
 
         } else {
-          message = "Error code " + code;
+          message = "<b>Error</b> (<i>code " + code + "</i>)";
         }
 
         // Build top index
@@ -408,7 +411,7 @@ public class HTTrackActivity extends Activity {
       }
 
       // Ensure we switch to the final pane
-      final String displayMessage = message;
+      final String displayMessage = "Mirror finished: " + message;
       handlerUI.post(new Runnable() {
         @Override
         public void run() {
@@ -418,7 +421,7 @@ public class HTTrackActivity extends Activity {
           // Fancy result message
           if (displayMessage != null) {
             TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(
-                "Mirror finished:\n" + displayMessage);
+                Html.fromHtml(displayMessage));
           }
         }
       });
