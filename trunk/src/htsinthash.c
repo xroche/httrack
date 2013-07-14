@@ -357,7 +357,7 @@ static HTS_INLINE int inthash_matches(inthash hashtable, size_t pos,
 static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   size_t i;
-  char* old_pool = hashtable->pool.buffer;
+  char*const old_pool = hashtable->pool.buffer;
   const size_t old_size = hashtable->pool.size;
   size_t count = 0;
 
@@ -396,6 +396,7 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
         inthash_assert(j < capacity);                       \
         dest[j] = src[i];                                   \
       }                                                     \
+      inthash_assert(j < capacity);                         \
       dest[j++] = '\0';                                     \
       hashtable->pool.size = j;                             \
       count++;                                              \
@@ -515,7 +516,11 @@ static void inthash_free_key_internal(inthash hashtable, char *name) {
   const size_t len = strlen(name) + 1;
   hashtable->pool.used -= len;
   if (hashtable->pool.used < hashtable->pool.size / 2) {
-    inthash_compact_pool(hashtable, hashtable->pool.capacity);
+    size_t capacity = hashtable->pool.capacity;
+    if (hashtable->pool.used < capacity / 4) {
+      capacity /= 2;
+    }
+    inthash_compact_pool(hashtable, capacity);
   }
 }
 
