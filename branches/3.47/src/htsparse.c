@@ -2601,8 +2601,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     // pas d'erreur, on continue
                     r_sv =
-                      hts_wait_delayed(str, adr, fil, save, parenturladr,
-                                       parenturlfil, former_adr, former_fil,
+                      hts_wait_delayed(str, adr, fil, save, liens[ptr]->adr,
+                                       liens[ptr]->fil, former_adr, former_fil,
                                        &forbidden_url);
 
                     /* User interaction, because hts_wait_delayed can be slow.. (3.43) */
