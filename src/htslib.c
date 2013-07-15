@@ -543,6 +543,7 @@ const char *hts_mime[][2] = {
   {"application/ogg", "ogg"},
 
   {"application/x-java-vm", "class"},
+  {"application/x-bittorrent","torrent"},
 
   {"", ""}
 };
