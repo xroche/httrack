@@ -126,6 +126,29 @@ int cookie_del(t_cookie * cookie, char *cook_name, char *domain, char *path) {
   return 0;
 }
 
+// Matches wildcard cookie domains that start with a dot
+// chk_dom: the domain stored in the cookie (potentially wildcard).
+// domain: query domain
+int cookie_cmp_wildcard_domain(char *chk_dom, char *domain) {
+    int n = strlen(chk_dom);
+    int m = strlen(domain);
+    int l = n < m ? n : m;
+    int i;
+    for (i = l - 1; i >= 0; i--) {
+        if (chk_dom[n - i - 1] != domain[m - i - 1]) {
+            return 1;
+        }
+    }
+    if (m < n && chk_dom[0] == '.') {
+        return 0;
+    }
+    else if (m != n) {
+        return 1;
+    }
+    return 0;
+}
+
+
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)
 // renvoie pointeur sur ligne, ou NULL si introuvable
 // path est aligné à droite et cook_name peut être vide (chercher alors tout cookie)
@@ -145,15 +168,15 @@ char *cookie_find(char *s, char *cook_name, char *domain, char *path) {
       //
       char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
 
-      if ((int) strlen(chk_dom) <= (int) strlen(domain)) {
-        if (strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) {  // même domaine
+      if (((int) strlen(chk_dom) <= (int) strlen(domain) &&
+        strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) ||
+        !cookie_cmp_wildcard_domain(chk_dom, domain)) {  // même domaine
           //
-          char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
+        char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
-          if ((int) strlen(chk_path) <= (int) strlen(path)) {
-            if (strncmp(path, chk_path, strlen(chk_path)) == 0) {       // même chemin
-              return a;
-            }
+        if ((int) strlen(chk_path) <= (int) strlen(path)) {
+          if (strncmp(path, chk_path, strlen(chk_path)) == 0) {       // même chemin
+            return a;
           }
         }
       }
