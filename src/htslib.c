@@ -5648,6 +5648,11 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
   }
 }
 
+// TEMPORARY - PUT THIS STRUCTURE INSIDE httrackp !
+const hts_stat_struct* hts_get_stats(httrackp * opt) {
+  return &HTS_STAT;
+}
+
 // defaut wrappers
 static void __cdecl htsdefault_init(t_hts_callbackarg * carg) {
 }

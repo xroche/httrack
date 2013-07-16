@@ -57,6 +57,10 @@ typedef enum hts_log_type {
   LOG_ERRNO = 1 << 8
 } hts_log_type;
 #endif
+#ifndef HTS_DEF_FWSTRUCT_hts_stat_struct
+#define HTS_DEF_FWSTRUCT_hts_stat_struct
+typedef struct hts_stat_struct hts_stat_struct;
+#endif
 
 /* Helpers for plugging callbacks
 requires: htsdefines.h */
@@ -113,6 +117,7 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
 HTSEXT_API const char *hts_is_available(void);
 HTSEXT_API const char* hts_version(void);
+HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 
 /* Wrapper functions */
 HTSEXT_API int htswrap_init(void);      // DEPRECATED - DUMMY FUNCTION
