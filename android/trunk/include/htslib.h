@@ -249,6 +249,7 @@ HTSEXT_API int hts_resetvar(void);      /* dummy */
 HTSEXT_API void hts_debug(int level);
 HTSEXT_API httrackp *hts_create_opt(void);
 HTSEXT_API void hts_free_opt(httrackp * opt);
+HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             const char *argv);

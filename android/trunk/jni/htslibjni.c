@@ -524,13 +524,9 @@ static jobject build_stats(jni_context_t *const t, httrackp * opt,
   return ostats;
 }
 
-static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
+static int htsshow_loop_internal(jni_context_t *t, httrackp * opt,
   lien_back * back, int back_max, int back_index, int lien_n,
   int lien_tot, int stat_time, hts_stat_struct * stats) {
-
-  /* get args context */
-  void *const arg = (void *) CALLBACKARG_USERDEF(carg);
-  jni_context_t *const t = (jni_context_t*) arg;
   int code = 1;
 
   /* maximum number of objects on local frame */
@@ -542,11 +538,6 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   /* no stats ? (even loop refresh) */
   if (stats == NULL) {
     return 1;
-  }
-
-  /* exit now */
-  if (global_opt_stop) {
-    return 0;
   }
 
   /* no callbacks */
@@ -583,6 +574,24 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   }
 
   return code;
+}
+
+static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
+  lien_back * back, int back_max, int back_index, int lien_n,
+  int lien_tot, int stat_time, hts_stat_struct * stats) {
+
+  /* get args context */
+  void *const arg = (void *) CALLBACKARG_USERDEF(carg);
+  jni_context_t *const t = (jni_context_t*) arg;
+
+  /* exit now */
+  if (global_opt_stop) {
+    return 0;
+  }
+
+  /* pass to internal version */
+  return htsshow_loop_internal(t, opt, back, back_max, back_index,
+      lien_n, lien_tot, stat_time, stats);
 }
 
 void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
@@ -656,8 +665,18 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     MUTEX_UNLOCK(global_lock);
 
     if (opt != NULL) {
+      const hts_stat_struct* stats;
+
       /* Rock'in! */
       code = hts_main2(argc, argv, opt);
+
+      /* Fetch last stats before cleaning up */
+      stats = hts_get_stats(opt);
+      assert(stats != NULL);
+      fprintf(stderr, "status code %d, %d errors, %d warnings\n",
+          code, stats->stat_errors, stats->stat_warnings);
+      (void) htsshow_loop_internal(&t, opt, NULL, 0, -1, 0, 0, 0,
+          (hts_stat_struct*) stats);
 
       /* Raise error if suitable */
       if (code == -1) {

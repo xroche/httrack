@@ -111,6 +111,9 @@ public class HTTrackActivity extends Activity {
   protected File projectPath;
   protected boolean mirrorRefresh;
 
+  // Stats
+  protected HTTrackStats lastStats;
+
   private static File getExternalStorage() throws IOException {
     final String state = Environment.getExternalStorageState();
 
@@ -332,6 +335,7 @@ public class HTTrackActivity extends Activity {
    */
   protected class Runner extends Thread implements HTTrackCallbacks {
     private final HTTrackLib engine = new HTTrackLib(this);
+    private boolean stopped;
 
     @Override
     public void run() {
@@ -353,15 +357,13 @@ public class HTTrackActivity extends Activity {
       if (!isIPv6Enabled()) {
         args.add("-@i4");
       }
-      // Build top index.
-      // args.add("-%i");
 
-      // TEMPORARY FIXME
+      // TEMPORARY SECURITY FIXME
       args.add("--max-time");
-      args.add("60");
+      args.add("3600");
       args.add("--max-size");
       args.add("10000000");
-      // TEMPORARY FIXME
+      // TEMPORARY SECURITY FIXME
 
       // Target
       args.add("-O");
@@ -400,8 +402,18 @@ public class HTTrackActivity extends Activity {
 
         // Run engine
         final int code = engine.main(cargs);
+
+        // Result
         if (code == 0) {
-          message = "<b>Success</b>!<br /><br />Mirror copied in <i>"
+          if (lastStats.errorsCount == 0) {
+            message = "<b>Success</b>!";
+          } else if (lastStats.filesWritten != 0) {
+            message = "<b>Success</b>! (" + lastStats.errorsCount + " errors)";
+          } else {
+            message = "<b>Failed</b>! (" + lastStats.errorsCount
+                + " errors, no files written)";
+          }
+          message += "<br /><br />Mirror copied in <i>"
               + target.getAbsolutePath() + "</i>:";
           message += "<br /><i>";
           for (final String f : target.list()) {
@@ -425,6 +437,7 @@ public class HTTrackActivity extends Activity {
 
       // Ensure we switch to the final pane
       final String displayMessage = "Mirror finished: " + message;
+      final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
       handlerUI.post(new Runnable() {
         @Override
         public void run() {
@@ -436,6 +449,11 @@ public class HTTrackActivity extends Activity {
             TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(
                 Html.fromHtml(displayMessage));
           }
+          if (errorsCount != 0) {
+            final Animation shake = AnimationUtils.loadAnimation(
+                HTTrackActivity.this, R.anim.shake);
+            findViewById(R.id.buttonLogs).startAnimation(shake);
+          }
         }
       });
     }
@@ -444,12 +462,21 @@ public class HTTrackActivity extends Activity {
      * Stop the mirror.
      */
     public void stopMirror() {
+      synchronized (this) {
+        stopped = true;
+      }
       engine.stop(true);
+    }
+
+    /**
+     * Has the mirror stopped ?
+     */
+    public synchronized boolean isStopped() {
+      return stopped;
     }
 
     @Override
     public void onRefresh(HTTrackStats stats) {
-
       // fake first refresh for cosmetic reasons.
       if (stats == null) {
         if (mirrorRefresh) {
@@ -457,6 +484,15 @@ public class HTTrackActivity extends Activity {
         }
         mirrorRefresh = true;
         stats = new HTTrackStats();
+      } else {
+        synchronized (this) {
+          lastStats = stats;
+        }
+      }
+
+      // Do not refresh GUI if stopped
+      if (isStopped()) {
+        return;
       }
 
       // build stats infos
@@ -729,6 +765,9 @@ public class HTTrackActivity extends Activity {
     case R.layout.activity_mirror_finished:
       if (runner != null) {
         runner.stopMirror();
+      }
+      if (lastStats != null && lastStats.errorsCount != 0) {
+        // TODO
       }
       break;
     }
