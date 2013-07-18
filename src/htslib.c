@@ -1441,7 +1441,7 @@ void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
         p += strlen("max=");
         sscanf(p, "%d", &retour->keep_alive_max);
       }
-      if (retour->keep_alive_max <= 1 || retour->keep_alive_t < 3) {
+      if (retour->keep_alive_max <= 1 || retour->keep_alive_t < 1) {
         retour->keep_alive = 0;
       }
     }
