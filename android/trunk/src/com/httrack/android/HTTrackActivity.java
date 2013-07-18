@@ -336,6 +336,7 @@ public class HTTrackActivity extends Activity {
   protected class Runner extends Thread implements HTTrackCallbacks {
     private final HTTrackLib engine = new HTTrackLib(this);
     private boolean stopped;
+    final StringBuilder str = new StringBuilder();
 
     @Override
     public void run() {
@@ -497,7 +498,7 @@ public class HTTrackActivity extends Activity {
 
       // build stats infos
       final String sep = " • ";
-      final StringBuilder str = new StringBuilder();
+      str.setLength(0);
       str.append("<b>Bytes saved</b>: ");
       str.append(stats.bytesWritten);
       str.append(sep);
@@ -661,7 +662,9 @@ public class HTTrackActivity extends Activity {
         final String key = field.second;
         lwriter.write(key);
         lwriter.write("=");
-        lwriter.write(URLEncoder.encode(value, "UTF-8"));
+        if (value != null) {
+          lwriter.write(URLEncoder.encode(value, "UTF-8"));
+        }
         lwriter.write("\n");
       }
       lwriter.close();
@@ -966,7 +969,7 @@ public class HTTrackActivity extends Activity {
     if (index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
-      // Without that, Android tend to crash with a NPE (!)
+      // Without the MIME, Android tend to crash with a NPE (!)
       intent.setDataAndType(Uri.fromFile(index), "text/html");
       startActivity(intent);
     }
