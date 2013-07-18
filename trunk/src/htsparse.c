@@ -4652,7 +4652,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
         /* We added the link before the parser recorded it -- the background download MUST NOT clean silently this entry! (Petr Gajdusek) */
         back[b].early_add = 1;
 
-        /* Cache read failed because file does not exists (bad delayed name!)
+        /* Cache read failed because file does not exist (bad delayed name!)
            Just re-add with the correct name, as we know the MIME now!
          */
         if (back[b].r.statuscode == STATUSCODE_INVALID && back[b].r.adr == NULL) {
@@ -4664,7 +4664,8 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
           back_copy_static(&back[b], &delayed_back);
 
           /* Delete entry */
-          back_delete(opt, cache, sback, b);    // cancel
+          back[b].r.statuscode = 0;  /* TEMPORARY INVESTIGATE WHY WE FETCHED A SOCKET HERE */
+          back_maydelete(opt, cache, sback, b);    // cancel
           b = -1;
 
           /* Recompute filename with MIME type */

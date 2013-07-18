@@ -1060,9 +1060,12 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
       lien_back tmp;
 
       strcpybuff(tmp.url_adr, back[p].url_adr);
+      tmp.ka_time_start = back[p].ka_time_start;
       if (back_letlive(opt, cache, sback, p)) {
         strcpybuff(back[p].url_adr, tmp.url_adr);
+        back[p].ka_time_start = tmp.ka_time_start;
         back[p].status = STATUS_ALIVE;  // alive & waiting
+        assert(back[p].ka_time_start != 0);
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully saved #%d (%s)",
                       back[p].r.debugid, back[p].url_adr);
@@ -1108,12 +1111,15 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
       lien_back tmp;
 
       strcpybuff(tmp.url_adr, back[p].url_adr);
+      tmp.ka_time_start = back[p].ka_time_start;
       deletehttp(&back[q].r);   // security check
       back_connxfr(&back[p].r, &back[q].r);     // transfer live connection settings from p to q
       back[q].ka_time_start = back[p].ka_time_start;    // refresh
       back[p].r.soc = INVALID_SOCKET;
       strcpybuff(back[q].url_adr, tmp.url_adr); // address
+      back[q].ka_time_start = tmp.ka_time_start;
       back[q].status = STATUS_ALIVE;    // alive & waiting
+      assert(back[q].ka_time_start != 0);
       hts_log_print(opt, LOG_DEBUG,
                     "(Keep-Alive): successfully preserved #%d (%s)",
                     back[q].r.debugid, back[q].url_adr);
@@ -1137,6 +1143,7 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
     if (i >= 0 && i != p) {
       deletehttp(&back[p].r);   // security check
       back_connxfr(&back[i].r, &back[p].r);     // transfer live connection settings from i to p
+      back[p].ka_time_start = back[i].ka_time_start;
       back_delete(opt, cache, sback, i);        // delete old slot
       back[p].status = STATUS_CONNECTING;       // ready to connect
       return 1;                 // success: will reuse live connection
@@ -2383,9 +2390,23 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
       if (!back[i].r.keep_alive || back[i].r.soc == INVALID_SOCKET
           || back[i].r.keep_alive_max < 1
           || time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
+        const char *reason = "unknown";
+        char buffer[128];
+        if (!back[i].r.keep_alive) {
+          reason = "not keep-alive";
+        } else if (back[i].r.soc == INVALID_SOCKET) {
+          reason = "closed";
+        } else if (back[i].r.keep_alive_max < 1) {
+          reason = "keep-alive-max reached";
+        } else if (time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
+          assert(back[i].ka_time_start != 0);
+          snprintf(buffer, sizeof(buffer), "keep-alive timeout = %ds)",
+                   (int) back[i].r.keep_alive_t);
+          reason = buffer;
+        }
         hts_log_print(opt, LOG_DEBUG,
-                      "(Keep-Alive): live socket closed #%d (%s)",
-                      back[i].r.debugid, back[i].url_adr);
+                      "(Keep-Alive): live socket #%d (%s) closed (%s)",
+                      back[i].r.debugid, back[i].url_adr, reason);
         back_delete(opt, cache, sback, i);      // delete backing entry
       }
     }
