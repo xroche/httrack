@@ -129,23 +129,23 @@ int cookie_del(t_cookie * cookie, char *cook_name, char *domain, char *path) {
 // Matches wildcard cookie domains that start with a dot
 // chk_dom: the domain stored in the cookie (potentially wildcard).
 // domain: query domain
-int cookie_cmp_wildcard_domain(char *chk_dom, char *domain) {
-    int n = strlen(chk_dom);
-    int m = strlen(domain);
-    int l = n < m ? n : m;
-    int i;
-    for (i = l - 1; i >= 0; i--) {
-        if (chk_dom[n - i - 1] != domain[m - i - 1]) {
-            return 1;
-        }
+static int cookie_cmp_wildcard_domain(char *chk_dom, char *domain) {
+  int n = strlen(chk_dom);
+  int m = strlen(domain);
+  int l = n < m ? n : m;
+  int i;
+  for (i = l - 1; i >= 0; i--) {
+    if (chk_dom[n - i - 1] != domain[m - i - 1]) {
+      return 1;
     }
-    if (m < n && chk_dom[0] == '.') {
-        return 0;
-    }
-    else if (m != n) {
-        return 1;
-    }
+  }
+  if (m < n && chk_dom[0] == '.') {
     return 0;
+  }
+  else if (m != n) {
+    return 1;
+  }
+  return 0;
 }
 
 
