@@ -5650,6 +5650,17 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
 
 // TEMPORARY - PUT THIS STRUCTURE INSIDE httrackp !
 const hts_stat_struct* hts_get_stats(httrackp * opt) {
+  if (opt == NULL) {
+    return NULL;
+  }
+
+  HTS_STAT.stat_nsocket = 0;
+  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
+  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
+  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.nbk = 0;
+  HTS_STAT.nb = 0;
+
   return &HTS_STAT;
 }
 
