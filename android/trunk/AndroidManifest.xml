@@ -1,32 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.httrack.android"
-    android:versionCode="3"
-    android:versionName="3.47"
     android:installLocation="preferExternal"
-    >
+    android:versionCode="4"
+    android:versionName="3.47" >
 
     <uses-sdk
         android:minSdkVersion="9"
         android:targetSdkVersion="17" />
 
-    <!--  We need to read/write copied websites to the SD card. -->
-    <uses-permission 
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    
-    <!--  We need to connect to the Internet. -->
-    <uses-permission 
-        android:name="android.permission.INTERNET" />
-    
-    <!--  We need to check the Internet connection (IPv6 enabled ?). -->
-    <uses-permission 
-        android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
+    <!-- We need to read/write copied Websites to the SD card. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- We need to connect to the Internet. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- We need to check the Internet connection (IPv6 enabled ?). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:allowBackup="true"
+        android:description="@string/app_description"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme" android:description="@string/app_description">
+        android:theme="@style/AppTheme" >
         <activity
             android:name="com.httrack.android.HTTrackActivity"
             android:label="@string/title_activity_startup" >
@@ -36,6 +33,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".CleanupActivity"
+            android:label="@string/title_activity_cleanup" >
+        </activity>
     </application>
-
 </manifest>
