@@ -2414,6 +2414,14 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     { TEST_ADD, 4, 1 },   /* check 4/1 */
                     { TEST_ADD, 4, 2 },   /* check 4/2 */
                     { TEST_DEL, 4, 3 },   /* check 4/3 */
+                    { DO_DEL, 4, 0 },     /* del 4/0 */
+                    { DO_DEL, 4, 1 },     /* del 4/1 */
+                    { DO_DEL, 4, 2 },     /* del 4/2 */
+                    /* empty here */
+                    { TEST_DEL, 1, 0 },   /* check */
+                    { DO_ADD, 4, 0 },     /* add 4/0 */
+                    { DO_ADD, 4, 1 },     /* add 4/1 */
+                    { DO_ADD, 4, 2 },     /* add 4/2 */
                     { DO_DEL, 42, 0 },    /* add 42/0 */
                     { TEST_DEL, 42, 0 },  /* check 42/0 */
                     { TEST_ADD, 42, 2 },  /* check 42/2 */
