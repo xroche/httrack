@@ -2425,7 +2425,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   /* produce key #i */
 #define FMT() \
                   char buffer[256]; \
-                  char *name; \
+                  const char *name; \
                   const long expected = (long) i * 1664525 + 1013904223; \
                   do { \
                     if (strings == NULL) { \

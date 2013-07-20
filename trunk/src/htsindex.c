@@ -146,7 +146,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   int i = 0;
 
   //
-  int WordIndexSize = 1024;
+  //int WordIndexSize = 1024;
   inthash WordIndexHash = NULL;
   FILE *tmpfp = NULL;
 
