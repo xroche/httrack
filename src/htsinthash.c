@@ -218,6 +218,9 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 /* 2**X */
 #define POW2(X) ( (size_t) 1 << (X) )
 
+/* the empty string for the string pool */
+static char the_empty_string[1] = { 0 };
+
 /* Logging */
 static void inthash_log(const inthash hashtable, const char *format, ...)
                         HTS_PRINTF_FUN(2, 3) {
@@ -386,19 +389,28 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
 
   /* relocate a string on a different pool */
 #define RELOCATE_STRING(S) do {                             \
-    if (S != NULL) {                                        \
+    if (S != NULL && S != the_empty_string) {               \
+      const char *const src = (S);                          \
+      char *const dest =                                    \
+        &hashtable->pool.buffer[hashtable->pool.size];      \
       const size_t capacity = hashtable->pool.capacity;     \
-      const char *const src = S;                            \
-      char *const dest = hashtable->pool.buffer;            \
-      size_t i, j;                                          \
-      for(i = 0, j = hashtable->pool.size                   \
-        ; src[i] != '\0' ; i++, j++) {                      \
-        inthash_assert(j < capacity);                       \
-        dest[j] = src[i];                                   \
+      char *const max_dest =                                \
+        &hashtable->pool.buffer[capacity];                  \
+      /* copy string */                                     \
+      inthash_assert(dest < max_dest);                      \
+      dest[0] = src[0];                                     \
+      {                                                     \
+        size_t i;                                           \
+        for(i = 1 ; src[i - 1] != '\0' ; i++) {             \
+          inthash_assert(&dest[i] < max_dest);              \
+          dest[i] = src[i];                                 \
+        }                                                   \
       }                                                     \
-      inthash_assert(j < capacity);                         \
-      dest[j++] = '\0';                                     \
-      hashtable->pool.size = j;                             \
+      /* update source */                                   \
+      S = dest;                                             \
+      /* update pool size */                                \
+      hashtable->pool.size += i;                            \
+      assert(hashtable->pool.size <= capacity);             \
       count++;                                              \
     }                                                       \
 } while(0)
@@ -461,8 +473,9 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
 
   /* recompute string address */
 #define RECOMPUTE_STRING(S) do {                                   \
-    if (S != NULL) {                                               \
+    if (S != NULL && S != the_empty_string) {                      \
       const size_t offset = (S) - oldbase;                         \
+      assert(offset < hashtable->pool.capacity);                   \
       S = &hashtable->pool.buffer[offset];                         \
       count++;                                                     \
     }                                                              \
@@ -482,9 +495,6 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
                 "%"UINT_64_FORMAT" strings: %"UINT_64_FORMAT" bytes",
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
-
-/* the empty string for the string pool */
-static char the_empty_string[1] = { 0 };
 
 static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
   const size_t len = strlen(name) + 1;
@@ -858,6 +868,8 @@ int inthash_write_value(inthash hashtable, const char *name,
         inthash_item stash[STASH_SIZE];
         memcpy(&stash, hashtable->stash.items, sizeof(hashtable->stash.items));
         hashtable->stash.size = 0;
+
+        /* FIXME do not modify the string pool by duping the keys */
 
         /* insert all items */
         for(i = 0 ; i < old_size ; i++) {
