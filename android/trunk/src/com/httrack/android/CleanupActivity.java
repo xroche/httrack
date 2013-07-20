@@ -1,6 +1,7 @@
 package com.httrack.android;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,6 +13,7 @@ import android.app.ListActivity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -76,7 +78,20 @@ public class CleanupActivity extends ListActivity {
     for (String name : projects) {
       final HashMap<String, String> map = new HashMap<String, String>();
       map.put("name", name);
-      map.put("description", name);
+
+      // Map used to lookup projects
+      final SparseArray<String> projectMap = new SparseArray<String>();
+      final File target = new File(projectRootFile, name);
+      try {
+        HTTrackActivity.unserialize(HTTrackActivity.getProfileFile(target),
+            projectMap);
+        final String description = projectMap.get(R.id.fieldWebsiteURLs);
+        map.put("description", description);
+      } catch (IOException e) {
+        map.put("description", name);
+      }
+
+      // Add item
       listItem.add(map);
     }
 
@@ -103,14 +118,16 @@ public class CleanupActivity extends ListActivity {
   private boolean deleteRecursively(final File file) {
     // TODO: check if this is necessary (symbolic link handling to avoid
     // infinite loops)
-    if (!file.delete()) {
+    if (file.delete()) {
+      return true;
+    } else {
       if (file.isDirectory()) {
         for (File child : file.listFiles()) {
           deleteRecursively(child);
         }
       }
+      return file.delete();
     }
-    return file.delete();
   }
 
   protected boolean deleteProjects() {
@@ -119,18 +136,21 @@ public class CleanupActivity extends ListActivity {
       // Delete project.
       final String name = projects[position];
       final File target = new File(projectRootFile, name);
-      if (!deleteRecursively(target)) {
+      if (deleteRecursively(target)) {
+        // Mark item as disabled.
+        final View item = list.getChildAt(position);
+        final View o = item.findViewById(R.id.blocCheck);
+        o.setBackgroundResource(R.color.gray);
+        final CheckBox cb = (CheckBox) item.findViewById(R.id.check);
+        cb.setClickable(false);
+        cb.setEnabled(false);
+      } else {
         success = false;
       }
 
-      // Mark item as disabled.
-      final View item = list.getChildAt(position);
-      final View o = item.findViewById(R.id.blocCheck);
-      o.setBackgroundResource(R.color.gray);
-      final CheckBox cb = (CheckBox) item.findViewById(R.id.check);
-      cb.setClickable(false);
-      cb.setEnabled(false);
     }
+    // Everything was deleted
+    toBeDeleted.clear();
     return success;
   }
 

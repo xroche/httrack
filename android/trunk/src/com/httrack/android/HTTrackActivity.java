@@ -611,8 +611,24 @@ public class HTTrackActivity extends Activity {
    * 
    * @return The profile target file.
    */
-  private File getProfileFile() {
+  protected File getProfileFile() {
     final File target = getTargetFile();
+    if (target != null) {
+      return getProfileFile(target);
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Get the profile target file for a given project.
+   * 
+   * @return The profile target file.
+   * @param target
+   *          The project directory
+   * @return The profile file
+   */
+  protected static File getProfileFile(final File target) {
     if (target != null) {
       return new File(new File(target, "hts-cache"), "winprofile.ini");
     } else {
@@ -675,14 +691,19 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * Unserialize profile from disk.
+   * /** Unserialize a specific profile from disk.
+   * 
+   * @param profile
+   *          The profile file (winprofile.ini)
+   * @param map
+   *          The map to be filled
    * 
    * @throws IOException
    *           Upon I/O error.
    */
-  protected void unserialize() throws IOException {
+  protected static void unserialize(final File profile,
+      final SparseArray<String> map) throws IOException {
     // Write settings
-    final File profile = getProfileFile();
     if (!profile.exists()) {
       throw new IOException("no such profile");
     }
@@ -714,6 +735,17 @@ public class HTTrackActivity extends Activity {
     } finally {
       reader.close();
     }
+  }
+
+  /**
+   * Unserialize profile from disk.
+   * 
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected void unserialize() throws IOException {
+    final File profile = getProfileFile();
+    unserialize(profile, map);
   }
 
   /**
