@@ -17,7 +17,7 @@
         android:layout_alignParentRight="true"
         android:layout_marginBottom="26dp"
         android:onClick="onClickNext"
-        android:text="@string/tab_new" />
+        android:text="@string/tab_next" />
 
     <TextView
         android:id="@+id/fieldDisplay"
@@ -34,8 +34,18 @@
         android:layout_height="wrap_content"
         android:layout_alignBaseline="@+id/buttonNext"
         android:layout_alignBottom="@+id/buttonNext"
-        android:layout_alignLeft="@+id/fieldDisplay"
+        android:layout_alignParentLeft="true"
         android:onClick="onBrowseAll"
         android:text="@string/browse_all" />
+
+    <Button
+        android:id="@+id/buttonClear"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/buttonBrowseAll"
+        android:layout_alignBottom="@+id/buttonBrowseAll"
+        android:layout_toRightOf="@+id/buttonBrowseAll"
+        android:onClick="onCleanup"
+        android:text="@string/cleanup_sites" />
 
 </RelativeLayout>

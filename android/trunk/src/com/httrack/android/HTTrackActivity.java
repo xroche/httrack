@@ -452,7 +452,7 @@ public class HTTrackActivity extends Activity {
           }
           if (errorsCount != 0) {
             final Animation shake = AnimationUtils.loadAnimation(
-                HTTrackActivity.this, R.anim.shake);
+                HTTrackActivity.this, R.anim.scale);
             findViewById(R.id.buttonLogs).startAnimation(shake);
           }
         }
@@ -991,5 +991,18 @@ public class HTTrackActivity extends Activity {
     final File target = getProjectRootFile();
     final File index = new File(target, "index.html");
     browse(index);
+  }
+
+  /**
+   * "Browse Website"
+   */
+  public void onCleanup(final View view) {
+    final String[] names = getProjectNames();
+    if (names != null && names.length != 0) {
+      final Intent intent = new Intent(this, CleanupActivity.class);
+      intent.putExtra("rootFile", getProjectRootFile());
+      intent.putExtra("projectNames", names);
+      startActivity(intent);
+    }
   }
 }

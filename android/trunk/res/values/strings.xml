@@ -2,9 +2,10 @@
 <resources>
 
     <string name="app_name">HTTrack Website Copier</string>
-    <string name="title_activity_startup">HTTrack</string>
+    <string name="title_activity_startup">HTTrack Website Copier</string>
+    <string name="title_activity_cleanup">HTTrack - Cleanup</string>
     <string name="action_settings">Settings</string>
-    <string name="welcome_message">Welcome to &lt;b&gt;HTTrack Website Copier&lt;/b&gt;!&lt;br /&gt;Please click on the &lt;b&gt;NEW&lt;/b&gt; button to&lt;br /&gt;&lt;br /&gt;- start a new project&lt;br /&gt;- or resume a partial download&lt;br /&gt;&lt;br /&gt;Click on the &lt;b&gt;BROWSE&lt;/b&gt; button to browse and manage existing sites.</string>
+    <string name="welcome_message">Welcome to &lt;b&gt;HTTrack Website Copier&lt;/b&gt;!&lt;br /&gt;Please click on the &lt;b&gt;NEXT&lt;/b&gt; button to&lt;br /&gt;&lt;br /&gt;- start a new project&lt;br /&gt;- or resume a partial download&lt;br /&gt;&lt;br /&gt;Click on the &lt;b&gt;BROWSE&lt;/b&gt; button to browse and manage existing sites.</string>
     <string name="tab_next">Next</string>
     <string name="title_activity_proj_name">New Project</string>
     <string name="project_name">Project Name</string>
@@ -26,5 +27,8 @@
     <string name="app_description">Copy websites to your computer (Offline browser)</string>
     <string name="browse_all">Browse Sites…</string>
     <string name="tab_new">New…</string>
+    <string name="cleanup_sites">Cleanup…</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="delete">Delete</string>
 
 </resources>
