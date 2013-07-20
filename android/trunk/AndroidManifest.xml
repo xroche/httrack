@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.httrack.android"
     android:installLocation="preferExternal"
-    android:versionCode="4"
+    android:versionCode="5"
     android:versionName="3.47" >
 
     <uses-sdk
@@ -34,8 +34,13 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".CleanupActivity"
+            android:name="com.httrack.android.CleanupActivity"
             android:label="@string/title_activity_cleanup" >
         </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity"
+            android:label="@string/title_activity_options" >
+        </activity>
     </application>
+
 </manifest>

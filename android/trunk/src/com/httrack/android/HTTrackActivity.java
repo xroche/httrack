@@ -55,6 +55,7 @@ import android.os.Handler;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.text.Html;
 import android.util.Pair;
 import android.util.SparseArray;
@@ -970,6 +971,9 @@ public class HTTrackActivity extends Activity {
    * "Options"
    */
   public void onClickOptions(final View view) {
+    final Intent intent = new Intent(this, OptionsActivity.class);
+    //FIXME TODO
+    //startActivity(intent);
   }
 
   /**
@@ -1036,5 +1040,10 @@ public class HTTrackActivity extends Activity {
       intent.putExtra("projectNames", names);
       startActivity(intent);
     }
+  }
+
+  @Override
+  public void onConfigurationChanged(Configuration newConfig) {
+    // TODO: handle orientation change ?
   }
 }

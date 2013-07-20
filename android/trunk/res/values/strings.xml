@@ -30,5 +30,7 @@
     <string name="cleanup_sites">Cleanup…</string>
     <string name="hello_world">Hello world!</string>
     <string name="delete">Delete</string>
-
+    <string name="title_activity_options">Settings</string>
+    <string name="config_changes">orientation</string>
+    
 </resources>

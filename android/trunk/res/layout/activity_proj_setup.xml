@@ -54,6 +54,7 @@
         android:layout_height="wrap_content"
         android:layout_alignRight="@+id/buttonNext"
         android:layout_centerVertical="true"
+        android:onClick="onClickOptions"
         android:text="@string/options" />
 
 </RelativeLayout>
