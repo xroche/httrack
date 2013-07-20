@@ -641,13 +641,14 @@ static void inthash_del_item(inthash hashtable, inthash_item *pitem) {
   inthash_del_name(hashtable, pitem);
 }
 
+static int inthash_add_item_(inthash hashtable, inthash_item item);
+
+/* Write (add or replace) a value in the hashtable. */
 static int inthash_write_value_(inthash hashtable, const char *name,
                                 inthash_value value) {
   inthash_item item;
   size_t pos;
   const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
-  inthash_key cuckoo_hash, initial_cuckoo_hash;
-  size_t loops;
 
   /* Statistics */
   hashtable->stats.write_count++;
@@ -689,21 +690,30 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   item.value = value;
   item.hashes = hashes;
 
+  return inthash_add_item_(hashtable, item);
+}
+
+/* Add a new item in the hashtable. The item SHALL NOT be alreasy present. */
+static int inthash_add_item_(inthash hashtable, inthash_item item) {
+  inthash_key cuckoo_hash, initial_cuckoo_hash;
+  size_t loops;
+  size_t pos;
+
   /* place at free position 1 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
+  pos = inthash_hash_to_pos(hashtable, item.hashes.hash1);
   if (inthash_is_free(hashtable, pos)) {
     hashtable->items[pos] = item;
     return 1; /* added */
   } else {
     /* place at free position 2 ? */
-    pos = inthash_hash_to_pos(hashtable, hashes.hash2);
+    pos = inthash_hash_to_pos(hashtable, item.hashes.hash2);
     if (inthash_is_free(hashtable, pos)) {
       hashtable->items[pos] = item;
       return 1; /* added */
     }
     /* prepare cuckoo ; let's take position 1 */
     else {
-      cuckoo_hash = initial_cuckoo_hash = hashes.hash1;
+      cuckoo_hash = initial_cuckoo_hash = item.hashes.hash1;
       inthash_trace(hashtable,
                     "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
                      item.name, (uint64_t) pos, cuckoo_hash);
@@ -869,20 +879,12 @@ int inthash_write_value(inthash hashtable, const char *name,
         memcpy(&stash, hashtable->stash.items, sizeof(hashtable->stash.items));
         hashtable->stash.size = 0;
 
-        /* FIXME do not modify the string pool by duping the keys */
-
         /* insert all items */
         for(i = 0 ; i < old_size ; i++) {
-          const int ret = inthash_write_value_(hashtable, stash[i].name,
-                                               stash[i].value);
+          const int ret = inthash_add_item_(hashtable, stash[i]);
           if (ret == 0) {
             inthash_assert(! "hashtable duplicate key when merging the stash");
           }
-        }
-
-        /* delete old names (not values) */
-        for(i = 0 ; i < hashtable->stash.size ; i++) {
-          inthash_del_name(hashtable, &stash[i]);
         }
 
         /* logging */
