@@ -405,12 +405,12 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
           inthash_assert(&dest[i] < max_dest);              \
           dest[i] = src[i];                                 \
         }                                                   \
+        /* update pool size */                              \
+        hashtable->pool.size += i;                          \
+        assert(hashtable->pool.size <= capacity);           \
       }                                                     \
       /* update source */                                   \
       S = dest;                                             \
-      /* update pool size */                                \
-      hashtable->pool.size += i;                            \
-      assert(hashtable->pool.size <= capacity);             \
       count++;                                              \
     }                                                       \
 } while(0)
