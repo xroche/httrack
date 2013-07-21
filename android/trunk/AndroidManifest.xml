@@ -41,6 +41,22 @@
             android:name="com.httrack.android.OptionsActivity"
             android:label="@string/title_activity_options" >
         </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$ScanRulesTab"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$LimitsTab"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$FlowControlTab"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$LinksTab"
+            android:label="@string/title_activity_options" >
+        </activity>
     </application>
 
 </manifest>

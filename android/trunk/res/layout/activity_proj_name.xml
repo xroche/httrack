@@ -9,7 +9,7 @@
     android:paddingTop="@dimen/activity_vertical_margin" >
 
     <TextView
-        android:id="@+id/textView1"
+        android:id="@+id/textLinksDetails"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignBottom="@+id/fieldProjectName"
@@ -21,7 +21,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="23dp"
-        android:layout_toRightOf="@+id/textView1"
+        android:layout_toRightOf="@+id/textLinksDetails"
         android:ems="10"
         android:hint="@string/projname_hint"
         android:text="@string/projname_hint" >
@@ -34,16 +34,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/fieldProjectName"
-        android:layout_alignTop="@+id/TextView01"
+        android:layout_alignTop="@+id/textMaxExtDepth"
         android:ems="10"
         android:hint="@string/hint_category" />
 
     <TextView
-        android:id="@+id/TextView01"
+        android:id="@+id/textMaxExtDepth"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/textView1"
-        android:layout_below="@+id/textView1"
+        android:layout_alignLeft="@+id/textLinksDetails"
+        android:layout_below="@+id/textLinksDetails"
         android:layout_marginTop="26dp"
         android:text="@string/project_category" />
 

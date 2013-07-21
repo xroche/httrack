@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import com.httrack.android.jni.HTTrackLib;
+
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.Context;
@@ -28,6 +30,7 @@ import android.widget.SimpleAdapter;
 public class CleanupActivity extends ListActivity {
   private ListView list;
   private File projectRootFile;
+  private File resourceFile;
   private String[] projects;
   private final HashSet<Integer> toBeDeleted = new HashSet<Integer>();
 
@@ -69,11 +72,16 @@ public class CleanupActivity extends ListActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_cleanup);
     list = getListView();
+    
+    // Fetch args from parent
     projectRootFile = File.class.cast(getIntent().getExtras().get("rootFile"));
+    resourceFile = File.class.cast(getIntent().getExtras().get("resourceFile"));
+    projects = (String[]) getIntent().getExtras().get("projectNames");
+    if (projectRootFile == null || resourceFile == null || projects == null) {
+      throw new RuntimeException("internal error");
+    }
 
     final ArrayList<HashMap<String, String>> listItem = new ArrayList<HashMap<String, String>>();
-
-    projects = (String[]) getIntent().getExtras().get("projectNames");
 
     for (String name : projects) {
       final HashMap<String, String> map = new HashMap<String, String>();
@@ -106,10 +114,10 @@ public class CleanupActivity extends ListActivity {
     final int position = Integer.parseInt(cb.getTag().toString());
     final View o = list.getChildAt(position).findViewById(R.id.blocCheck);
     if (cb.isChecked()) {
-      o.setBackgroundResource(R.color.red);
+      o.setBackgroundResource(R.color.transparent_red);
       toBeDeleted.add(position);
     } else {
-      o.setBackgroundResource(R.color.blue);
+      o.setBackgroundResource(R.color.transparent);
       toBeDeleted.remove(position);
     }
   }
@@ -151,6 +159,10 @@ public class CleanupActivity extends ListActivity {
     }
     // Everything was deleted
     toBeDeleted.clear();
+
+    // Rebuild top index
+    HTTrackLib.buildTopIndex(projectRootFile, resourceFile);
+
     return success;
   }
 

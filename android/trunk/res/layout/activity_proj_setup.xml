@@ -10,7 +10,7 @@
     tools:context=".ProjSetupActivity" >
 
     <TextView
-        android:id="@+id/textView1"
+        android:id="@+id/textLinksDetails"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/web_addresses" />
@@ -20,9 +20,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_above="@+id/buttonInterrupt"
-        android:layout_alignLeft="@+id/textView1"
+        android:layout_alignLeft="@+id/textLinksDetails"
         android:layout_alignRight="@+id/buttonNext"
-        android:layout_below="@+id/textView1"
+        android:layout_below="@+id/textLinksDetails"
         android:layout_marginTop="14dp"
         android:ems="10"
         android:hint="@string/hint_addresses"

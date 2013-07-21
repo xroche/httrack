@@ -207,6 +207,11 @@ public class HTTrackActivity extends Activity {
     return rscPath;
   }
 
+  /**
+   * Get the current project name
+   * 
+   * @return The current project name
+   */
   protected String getProjectName() {
     return cleanupString(map.get(R.id.fieldProjectName));
   }
@@ -332,6 +337,21 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Build the top index.
+   * 
+   * @return 1 upon success
+   */
+  protected int buildTopIndex() {
+    // Build top index
+    final File rsc = getResourceFile();
+    if (rsc != null) {
+      return HTTrackLib.buildTopIndex(getProjectRootFile(), rsc);
+    } else {
+      return 0;
+    }
+  }
+
+  /**
    * Engine thread runner.
    */
   protected class Runner extends Thread implements HTTrackCallbacks {
@@ -429,10 +449,7 @@ public class HTTrackActivity extends Activity {
         }
 
         // Build top index
-        final File rsc = getResourceFile();
-        if (rsc != null) {
-          HTTrackLib.buildTopIndex(getProjectRootFile(), rsc);
-        }
+        buildTopIndex();
       } catch (final IOException io) {
         message = io.getMessage();
       }
@@ -972,8 +989,7 @@ public class HTTrackActivity extends Activity {
    */
   public void onClickOptions(final View view) {
     final Intent intent = new Intent(this, OptionsActivity.class);
-    //FIXME TODO
-    //startActivity(intent);
+    startActivity(intent);
   }
 
   /**
@@ -1038,6 +1054,7 @@ public class HTTrackActivity extends Activity {
       final Intent intent = new Intent(this, CleanupActivity.class);
       intent.putExtra("rootFile", getProjectRootFile());
       intent.putExtra("projectNames", names);
+      intent.putExtra("resourceFile", getResourceFile());
       startActivity(intent);
     }
   }
