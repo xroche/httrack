@@ -217,14 +217,43 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * Get the project root directory.
+   * Are there any projects yet ?
    * 
-   * @return The project root directory.
+   * @return true if projects have been detected
+   */
+  protected boolean hasProjectNames() {
+    final String[] names = getProjectNames();
+    return names != null && names.length != 0;
+  }
+
+  /**
+   * Get the root directory.
+   * 
+   * @return The root directory.
    */
   protected File getProjectRootFile() {
     return projectPath;
   }
 
+  /**
+   * Get the root index.html file.
+   * 
+   * @return The root index.html file.
+   */
+  protected File getProjectRootIndexFile() {
+    final File target = getProjectRootFile();
+    return new File(target, "index.html");
+  }
+
+  /**
+   * A top index is present.
+   * 
+   * @return true if a top index.html is present
+   */
+  private boolean hasProjectRootIndexFile() {
+    return getProjectRootIndexFile().exists();
+  }
+  
   /**
    * Return the already downloaded project names.
    * 
@@ -260,6 +289,30 @@ public class HTTrackActivity extends Activity {
     } else {
       return null;
     }
+  }
+
+  /**
+   * Get the index.htm for the current project.
+   * 
+   * @return The destination directory.
+   */
+  protected File getTargetIndexFile() {
+    final File target = getTargetFile();
+    if (target != null) {
+      return new File(target, "index.html");
+    } else {
+      return null;
+    }
+  }
+  
+  /**
+   * Check whether an index.html file is present for the current project.
+   * 
+   * @return true if an index.html file is present for the current project.
+   */
+  protected boolean hasTargetIndexFile() {
+    final File index = getTargetIndexFile();
+    return index != null && index.exists();
   }
 
   protected String getProjectUrl() {
@@ -779,7 +832,7 @@ public class HTTrackActivity extends Activity {
       final String html = getString(R.string.welcome_message);
       final StringBuilder str = new StringBuilder(html);
 
-      // Debugging.
+      // Debugging and information.
       str.append("<br /><i>");
       if (version != null) {
         str.append("<br />VERSION: ");
@@ -787,14 +840,19 @@ public class HTTrackActivity extends Activity {
       }
       str.append(" • PATH: ");
       str.append(projectPath.getAbsolutePath());
-      str.append("• IPv6: ");
+      str.append(" • IPv6: ");
       final InetAddress addrV6 = getIPv6Address();
       str.append(addrV6 != null ? ("YES (" + addrV6.getHostAddress() + ")")
           : "NO");
       str.append("</i>");
-
-      // FIXME TODO: why do we need to to this by ourselves ?
       text.setText(Html.fromHtml(str.toString()));
+      
+      // Enable or disable browse & cleanup button depending on existing project(s)
+      View.class.cast(this.findViewById(R.id.buttonClear)).setEnabled(
+          hasProjectNames());
+      View.class.cast(this.findViewById(R.id.buttonBrowseAll)).setEnabled(
+          hasProjectRootIndexFile());
+      
       break;
     case R.layout.activity_proj_name:
       final String[] names = getProjectNames();
@@ -816,9 +874,16 @@ public class HTTrackActivity extends Activity {
       }
       break;
     case R.layout.activity_mirror_finished:
+      // Ensure the engine has stopped running
       if (runner != null) {
         runner.stopMirror();
       }
+
+      // Enable browse button if index.html exists
+      View.class.cast(this.findViewById(R.id.buttonBrowse)).setEnabled(
+          hasTargetIndexFile());
+
+      // Final stats
       if (lastStats != null && lastStats.errorsCount != 0) {
         // TODO
       }
@@ -1018,7 +1083,7 @@ public class HTTrackActivity extends Activity {
 
   /** Browser a specific index. **/
   private void browse(final File index) {
-    if (index.exists()) {
+    if (index != null && index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
       // Without the MIME, Android tend to crash with a NPE (!)
@@ -1031,18 +1096,14 @@ public class HTTrackActivity extends Activity {
    * "Browse Website"
    */
   public void onBrowse(final View view) {
-    final File target = getTargetFile();
-    final File index = new File(target, "index.html");
-    browse(index);
+    browse(getTargetIndexFile());
   }
 
   /**
    * "Browse All Websites"
    */
   public void onBrowseAll(final View view) {
-    final File target = getProjectRootFile();
-    final File index = new File(target, "index.html");
-    browse(index);
+    browse(getProjectRootIndexFile());
   }
 
   /**

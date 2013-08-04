@@ -25,7 +25,7 @@
     <string name="show_logs">Show Logs</string>
     <string name="browse_website">Browse Website</string>
     <string name="app_description">Copy websites to your computer (Offline browser)</string>
-    <string name="browse_all">Browse Sites…</string>
+    <string name="browse_all">Browse…</string>
     <string name="tab_new">New…</string>
     <string name="cleanup_sites">Cleanup…</string>
     <string name="hello_world">Hello world!</string>
