@@ -69,6 +69,18 @@
             android:name="com.httrack.android.OptionsActivity$Spider"
             android:label="@string/title_activity_options" >
         </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$Proxy"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$LogIndexCache"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$ExpertsOnly"
+            android:label="@string/title_activity_options" >
+        </activity>
     </application>
 
 </manifest>

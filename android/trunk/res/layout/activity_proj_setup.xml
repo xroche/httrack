@@ -19,7 +19,7 @@
         android:id="@+id/fieldWebsiteURLs"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/buttonInterrupt"
+        android:layout_above="@+id/buttonOptions"
         android:layout_alignLeft="@+id/textLinksDetails"
         android:layout_alignRight="@+id/buttonNext"
         android:layout_below="@+id/textLinksDetails"
@@ -52,12 +52,30 @@
         android:text="@string/previous" />
 
     <Button
-        android:id="@+id/buttonInterrupt"
+        android:id="@+id/buttonOptions"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignRight="@+id/buttonNext"
         android:layout_centerVertical="true"
         android:onClick="onClickOptions"
         android:text="@string/options" />
+
+    <RadioGroup
+        android:id="@+id/radioAction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/fieldWebsiteURLs"
+        android:layout_below="@+id/buttonOptions" >
+
+        <RadioButton
+            android:id="@+id/radioItemContinue"
+            android:layout_height="wrap_content"
+            android:text="@string/action_continue" />
+
+        <RadioButton
+            android:id="@+id/radioItemUpdate"
+            android:layout_height="wrap_content"
+            android:text="@string/action_update" />
+    </RadioGroup>
 
 </RelativeLayout>

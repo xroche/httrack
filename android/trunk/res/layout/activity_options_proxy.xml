@@ -11,43 +11,49 @@
 
     <LinearLayout
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content" >
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
 
         <TextView
-            android:id="@+id/textBrowserIdentity"
+            android:id="@+id/textProxy"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/browser_identity" />
+            android:layout_weight=".50"
+            android:text="@string/proxy" />
 
-        <AutoCompleteTextView
-            android:id="@+id/editBrowserIdentity"
+        <EditText
+            android:id="@+id/editProxy"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:hint="@string/hint_browser_identity" >
-
-            <requestFocus />
-        </AutoCompleteTextView>
+            android:layout_weight=".50"
+            android:hint="@string/hint_proxy_address" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content" >
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
 
         <TextView
-            android:id="@+id/textHtmlFooter"
+            android:id="@+id/textProxyPort"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/html_footer" />
+            android:layout_weight=".80"
+            android:text="@string/proxy_port" />
 
-        <AutoCompleteTextView
-            android:id="@+id/editHtmlFooter"
+        <EditText
+            android:id="@+id/editProxyPort"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:hint="@string/hint_footer" />
+            android:layout_weight=".20"
+            android:hint="@string/hint_proxy_port"
+            android:inputType="numberDecimal" />
     </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/checkUseProxyForFtp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/use_proxy_for_ftp" />
 
 </LinearLayout>

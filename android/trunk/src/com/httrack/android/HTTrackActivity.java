@@ -39,6 +39,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -98,6 +99,7 @@ public class HTTrackActivity extends Activity {
 
       /* URL */
       new Pair<Integer, String>(R.id.fieldWebsiteURLs, "CurrentUrl"),
+      new Pair<Integer, String>(R.id.radioAction, "CurrentAction"), /* FIXME */
 
       /* Scan Rules */
       new Pair<Integer, String>(R.id.editRules, "WildCardFilters"),
@@ -136,6 +138,11 @@ public class HTTrackActivity extends Activity {
       new Pair<Integer, String>(R.id.checkHidePasswords, "NoPwdInPages"),
       new Pair<Integer, String>(R.id.checkHideQueryStrings, "NoQueryStrings"),
       new Pair<Integer, String>(R.id.checkDoNotPurge, "NoPurgeOldFiles"),
+      new Pair<Integer, String>(R.id.radioBuild, "Build"),
+
+      /* Browser ID */
+      new Pair<Integer, String>(R.id.editBrowserIdentity, "UserID"),
+      new Pair<Integer, String>(R.id.editHtmlFooter, "Footer"),
 
       /* Spider */
       new Pair<Integer, String>(R.id.checkAcceptCookies, "Cookies"),
@@ -147,7 +154,82 @@ public class HTTrackActivity extends Activity {
       new Pair<Integer, String>(R.id.checkTolerentRequests, "TolerantRequests"),
       new Pair<Integer, String>(R.id.checkForceHttp10, "HTTP10"),
 
+      /* Proxy */
+      new Pair<Integer, String>(R.id.editProxy, "Proxy"),
+      new Pair<Integer, String>(R.id.editProxyPort, "Port"),
+      new Pair<Integer, String>(R.id.checkUseProxyForFtp, "UseHTTPProxyForFTP"),
+
+      /* Log, Index, Cache */
+      new Pair<Integer, String>(R.id.checkStoreAllFilesInCache,
+          "StoreAllInCache"),
+      new Pair<Integer, String>(R.id.checkDoNotRedownloadLocallErasedFiles,
+          "NoRecatch"),
+      new Pair<Integer, String>(R.id.checkCreateLogFiles, "Log"),
+      /* FIXME with Log */
+      new Pair<Integer, String>(R.id.radioVerbosity, "LogType"),
+      new Pair<Integer, String>(R.id.checkUseIndex, "Index"),
+
+      /* Experts Only */
+      new Pair<Integer, String>(R.id.checkUseCacheForUpdates, "Cache"),
+      new Pair<Integer, String>(R.id.radioPrimaryScanRule, "PrimaryScan"),
+      new Pair<Integer, String>(R.id.textTravelMode, "Travel"),
+      new Pair<Integer, String>(R.id.radioTravelMode, "GlobalTravel"),
+      new Pair<Integer, String>(R.id.radioGlobalTravelMode, "GlobalTravel"),
+      new Pair<Integer, String>(R.id.radioRewriteLinks, "RewriteLinks"),
+      new Pair<Integer, String>(R.id.checkActivateDebugging, "Debugging"), /* FIXME */
+
   };
+
+  // Default fields for empty profile
+  @SuppressWarnings("unchecked")
+  protected static final Pair<String, String> fieldsDefaults[] = new Pair[] {
+      new Pair<String, String>("Near", "0"),
+      new Pair<String, String>("Test", "0"),
+      new Pair<String, String>("ParseAll", "1"),
+      new Pair<String, String>("HTMLFirst", "0"),
+      new Pair<String, String>("Cache", "1"),
+      new Pair<String, String>("NoRecatch", "0"),
+      new Pair<String, String>("Dos", "0"),
+      new Pair<String, String>("Index", "1"),
+      new Pair<String, String>("Log", "1"),
+      new Pair<String, String>("RemoveTimeout", "0"),
+      new Pair<String, String>("RemoveRateout", "0"),
+      new Pair<String, String>("KeepAlive", "1"),
+      new Pair<String, String>("FollowRobotsTxt", "2"),
+      new Pair<String, String>("NoErrorPages", "0"),
+      new Pair<String, String>("NoExternalPages", "0"),
+      new Pair<String, String>("NoPwdInPages", "0"),
+      new Pair<String, String>("NoQueryStrings", "0"),
+      new Pair<String, String>("NoPurgeOldFiles", "0"),
+      new Pair<String, String>("Cookies", "1"),
+      new Pair<String, String>("CheckType", "1"),
+      new Pair<String, String>("ParseJava", "1"),
+      new Pair<String, String>("HTTP10", "0"),
+      new Pair<String, String>("TolerantRequests", "0"),
+      new Pair<String, String>("UpdateHack", "1"),
+      new Pair<String, String>("URLHack", "1"),
+      new Pair<String, String>("StoreAllInCache", "0"),
+      new Pair<String, String>("LogType", "0"),
+      new Pair<String, String>("UseHTTPProxyForFTP", "1"),
+      new Pair<String, String>("Build", "0"),
+      new Pair<String, String>("PrimaryScan", "3"),
+      new Pair<String, String>("Travel", "1"),
+      new Pair<String, String>("GlobalTravel", "0"),
+      new Pair<String, String>("RewriteLinks", "0"),
+      // new Pair<String, String>("BuildString", "%%h%%p/%%n%%q.%%t"),
+      new Pair<String, String>("UserID",
+          "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"),
+      new Pair<String, String>("Footer",
+          "<!-- Mirrored from %%s%%s by HTTrack Website Copier/3.x [XR&CO'2013], %%s -->"),
+      new Pair<String, String>("MaxRate", "25000"),
+      new Pair<String, String>(
+          "WildCardFilters",
+          "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar"),
+  // new Pair<String, String>("CurrentAction", "0")
+  };
+
+  // Name-to-ID hash map
+  protected HashMap<String, Integer> fieldsNameToId = new HashMap<String, Integer>();
 
   // Activity identifier when using startActivityForResult()
   protected static final int ACTIVITY_OPTIONS = 0;
@@ -184,6 +266,32 @@ public class HTTrackActivity extends Activity {
     }
   }
 
+  /*
+   * Build fieldsNameToId
+   */
+  private void createFieldsNameToId() {
+    // Create fieldsNameToId
+    for (final Pair<Integer, String> field : fieldsSerializer) {
+      final int id = field.first;
+      final String fkey = field.second;
+      fieldsNameToId.put(fkey, id);
+    }
+  }
+
+  /*
+   * Fill the map with default values
+   */
+  private void initializeMap() {
+    for (final Pair<String, String> field : fieldsDefaults) {
+      final Integer id = fieldsNameToId.get(field.first);
+      if (id == null) {
+        throw new RuntimeException("unexpecter error: unknown key "
+            + field.first);
+      }
+      map.put(id, field.second);
+    }
+  }
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -217,6 +325,12 @@ public class HTTrackActivity extends Activity {
     // Ensure users can see us
     HTTrackActivity.setFileReadWrite(httrackPath);
     HTTrackActivity.setFileReadWrite(projectPath);
+
+    // Create fieldsNameToId
+    createFieldsNameToId();
+
+    // Initialize default values for map
+    initializeMap();
 
     // Go to first pane now
     setPane(0);
@@ -772,6 +886,16 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Is there an existing profile yet ?
+   * 
+   * @return true if there is a winprofile.ini file
+   */
+  protected boolean hasProfileFile() {
+    final File profile = getProfileFile();
+    return profile != null && profile.exists();
+  }
+
+  /**
    * Get the profile target file for a given project.
    * 
    * @return The profile target file.
@@ -943,6 +1067,13 @@ public class HTTrackActivity extends Activity {
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
       }
+      break;
+    case R.layout.activity_proj_setup:
+      final boolean hasProfile = hasProfileFile();
+      View.class.cast(this.findViewById(R.id.radioAction)).setEnabled(
+          hasProfile);
+      View.class.cast(this.findViewById(R.id.radioAction)).setVisibility(
+          hasProfile ? View.VISIBLE : View.INVISIBLE);
       break;
     case R.layout.activity_mirror_progress:
       if (runner == null) {

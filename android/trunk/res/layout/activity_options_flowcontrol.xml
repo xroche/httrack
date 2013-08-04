@@ -26,6 +26,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
+            android:hint="8"
             android:inputType="numberDecimal" >
 
             <requestFocus />
@@ -56,6 +57,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
+            android:hint="120"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -83,6 +85,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
+            android:hint="3"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -103,6 +106,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
+            android:hint="50"
             android:inputType="numberDecimal" />
     </LinearLayout>
 

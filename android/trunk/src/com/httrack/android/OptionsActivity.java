@@ -25,10 +25,12 @@ import android.widget.TabHost.TabSpec;
  * Many thanks to Pierre-Emmanuel Mercier for his nice tutorial.
  */
 public class OptionsActivity extends TabActivity {
+  /* List of all tabs. */
   @SuppressWarnings("unchecked")
   protected static Class<? extends Tab>[] tabClasses = new Class[] {
       ScanRulesTab.class, LimitsTab.class, FlowControlTab.class,
-      LinksTab.class, BuildTab.class, BrowserId.class, Spider.class };
+      LinksTab.class, BuildTab.class, BrowserId.class, Spider.class,
+      Proxy.class, LogIndexCache.class, ExpertsOnly.class };
 
   protected final SparseArraySerializable map = new SparseArraySerializable();
   private TabHost tabHost;
@@ -54,15 +56,13 @@ public class OptionsActivity extends TabActivity {
       } else if (view instanceof RadioGroup) {
         if (value != null && value.length() != 0) {
           final int selected = Integer.parseInt(value);
-          if (selected != 0) {
-            final RadioGroup radio = (RadioGroup) view;
-            final View child = radio.getChildAt(selected - 1);
-            if (child == null) {
-              throw new RuntimeException("no such child "
-                  + Integer.toString(selected));
-            }
-            radio.check(child.getId());
+          final RadioGroup radio = (RadioGroup) view;
+          final View child = radio.getChildAt(selected);
+          if (child == null) {
+            // Ignore
+            return;
           }
+          radio.check(child.getId());
         }
       } else if (view instanceof TextView) {
         if (value != null) {
@@ -95,7 +95,7 @@ public class OptionsActivity extends TabActivity {
         if (checkedId != -1) {
           for (int i = 0; i < radio.getChildCount(); i++) {
             if (checkedId == radio.getChildAt(i).getId()) {
-              return Integer.toString(i + 1);
+              return Integer.toString(i);
             }
           }
           throw new RuntimeException("unexpected RadioGroup error");
@@ -245,7 +245,7 @@ public class OptionsActivity extends TabActivity {
       return new int[] { R.id.checkDosNames, R.id.checkIso9660,
           R.id.checkNoErrorPages, R.id.checkNoExternalPages,
           R.id.checkHidePasswords, R.id.checkHideQueryStrings,
-          R.id.checkDoNotPurge };
+          R.id.checkDoNotPurge, R.id.radioBuild };
     }
 
     @Override
@@ -282,6 +282,54 @@ public class OptionsActivity extends TabActivity {
     protected void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
       setContentView(R.layout.activity_options_spider);
+    }
+  }
+
+  @Title("Proxy")
+  public static class Proxy extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.editProxy, R.id.editProxyPort,
+          R.id.checkUseProxyForFtp };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_proxy);
+    }
+  }
+
+  @Title("Log, Index, Cache")
+  public static class LogIndexCache extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.checkStoreAllFilesInCache,
+          R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
+          R.id.radioVerbosity, R.id.checkUseIndex };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_logindexcache);
+    }
+  }
+
+  @Title("Experts Only")
+  public static class ExpertsOnly extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.checkUseCacheForUpdates,
+          R.id.radioPrimaryScanRule, R.id.textTravelMode, R.id.radioTravelMode,
+          R.id.radioGlobalTravelMode, R.id.radioRewriteLinks,
+          R.id.checkActivateDebugging };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_expertsonly);
     }
   }
 
