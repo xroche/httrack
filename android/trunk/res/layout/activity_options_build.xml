@@ -1,0 +1,54 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="@drawable/bg_rings"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin" >
+
+    <CheckBox
+        android:id="@+id/checkDosNames"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/dos_names" />
+
+    <CheckBox
+        android:id="@+id/checkIso9660"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/iso9660_names" />
+
+    <CheckBox
+        android:id="@+id/checkNoErrorPages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/no_error_pages" />
+
+    <CheckBox
+        android:id="@+id/checkNoExternalPages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/no_external_pages" />
+
+    <CheckBox
+        android:id="@+id/checkHidePasswords"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/hide_passwords" />
+
+    <CheckBox
+        android:id="@+id/checkHideQueryStrings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/hide_query_strings" />
+
+    <CheckBox
+        android:id="@+id/checkDoNotPurge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/do_not_purge_old_files" />
+
+</LinearLayout>

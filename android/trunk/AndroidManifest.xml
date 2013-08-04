@@ -57,6 +57,18 @@
             android:name="com.httrack.android.OptionsActivity$LinksTab"
             android:label="@string/title_activity_options" >
         </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$BuildTab"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$BrowserId"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
+            android:name="com.httrack.android.OptionsActivity$Spider"
+            android:label="@string/title_activity_options" >
+        </activity>
     </application>
 
 </manifest>

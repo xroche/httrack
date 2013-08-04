@@ -8,18 +8,22 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin" >
 
-    <EditText
-        android:id="@+id/editRules"
+    <TextView
+        android:id="@+id/textLinksDetails"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/buttonExclude"
+        android:layout_alignParentBottom="true"
+        android:text="@string/scan_rules_details"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <Button
+        android:id="@+id/buttonExclude"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentRight="true"
         android:layout_alignParentTop="true"
-        android:ems="10"
-        android:inputType="textMultiLine" >
-
-        <requestFocus />
-    </EditText>
+        android:text="@string/exclude_links" />
 
     <Button
         android:id="@+id/buttonInclude"
@@ -27,25 +31,21 @@
         android:layout_height="wrap_content"
         android:layout_alignBaseline="@+id/buttonExclude"
         android:layout_alignBottom="@+id/buttonExclude"
-        android:layout_alignRight="@+id/editRules"
+        android:layout_alignParentRight="true"
         android:text="@string/include_links" />
 
-    <Button
-        android:id="@+id/buttonExclude"
+    <EditText
+        android:id="@+id/editRules"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/editRules"
-        android:layout_below="@+id/editRules"
-        android:text="@string/exclude_links" />
+        android:layout_above="@+id/textLinksDetails"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/buttonExclude"
+        android:ems="10"
+        android:inputType="textMultiLine" >
 
-    <TextView
-        android:id="@+id/textLinksDetails"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/buttonExclude"
-        android:layout_alignParentBottom="true"
-        android:layout_marginBottom="29dp"
-        android:text="@string/scan_rules_details"
-        android:textAppearance="?android:attr/textAppearanceSmall" />
+        <requestFocus />
+    </EditText>
 
 </RelativeLayout>

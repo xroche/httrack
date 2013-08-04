@@ -57,6 +57,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.text.Html;
+import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.view.Menu;
@@ -91,16 +92,72 @@ public class HTTrackActivity extends Activity {
   // note: names tend to match the Windows winprofile.ini version
   @SuppressWarnings("unchecked")
   protected static final Pair<Integer, String> fieldsSerializer[] = new Pair[] {
+      /* Global settings */
       new Pair<Integer, String>(R.id.fieldProjectName, "ProjectName"),
       new Pair<Integer, String>(R.id.fieldProjectCategory, "Category"),
-      new Pair<Integer, String>(R.id.fieldWebsiteURLs, "CurrentUrl") };
+
+      /* URL */
+      new Pair<Integer, String>(R.id.fieldWebsiteURLs, "CurrentUrl"),
+
+      /* Scan Rules */
+      new Pair<Integer, String>(R.id.editRules, "WildCardFilters"),
+
+      /* Limits */
+      new Pair<Integer, String>(R.id.editMaxDepth, "Depth"),
+      new Pair<Integer, String>(R.id.editMaxExtDepth, "ExtDepth"),
+      new Pair<Integer, String>(R.id.editMaxSizeHtml, "MaxHtml"),
+      new Pair<Integer, String>(R.id.editMaxSizeOther, "MaxOther"),
+      new Pair<Integer, String>(R.id.editSiteSizeLimit, "MaxAll"),
+      new Pair<Integer, String>(R.id.editMaxTimeOverall, "MaxTime"),
+      new Pair<Integer, String>(R.id.editMaxTransferRate, "MaxRate"),
+      new Pair<Integer, String>(R.id.editMaxConnectionsSecond, "MaxConn"),
+      new Pair<Integer, String>(R.id.editMaxNumberLinks, "MaxLinks"),
+
+      /* Flow control */
+      new Pair<Integer, String>(R.id.editNumberOfConnections, "Sockets"),
+      new Pair<Integer, String>(R.id.checkPersistentConnections, "KeepAlive"),
+      new Pair<Integer, String>(R.id.editTimeout, "TimeOut"),
+      new Pair<Integer, String>(R.id.checkRemoveHostIfTimeout, "RemoveTimeout"),
+      new Pair<Integer, String>(R.id.editRetries, "Retry"),
+      new Pair<Integer, String>(R.id.editMinTransferRate, "RateOut"),
+      new Pair<Integer, String>(R.id.checkRemoveHostIfSlow, "RemoveRateout"),
+
+      /* Links */
+      new Pair<Integer, String>(R.id.checkDetectAllLinks, "ParseAll"),
+      new Pair<Integer, String>(R.id.checkGetNonHtmlNear, "Near"),
+      new Pair<Integer, String>(R.id.checkTestAllLinks, "Test"),
+      new Pair<Integer, String>(R.id.checkGetHtmlFirst, "HTMLFirst"),
+
+      /* Build */
+      new Pair<Integer, String>(R.id.checkDosNames, "Dos"),
+      new Pair<Integer, String>(R.id.checkIso9660, "Iso9660"), /* FIXME with Dos */
+      new Pair<Integer, String>(R.id.checkNoErrorPages, "NoErrorPages"),
+      new Pair<Integer, String>(R.id.checkNoExternalPages, "NoExternalPages"),
+      new Pair<Integer, String>(R.id.checkHidePasswords, "NoPwdInPages"),
+      new Pair<Integer, String>(R.id.checkHideQueryStrings, "NoQueryStrings"),
+      new Pair<Integer, String>(R.id.checkDoNotPurge, "NoPurgeOldFiles"),
+
+      /* Spider */
+      new Pair<Integer, String>(R.id.checkAcceptCookies, "Cookies"),
+      new Pair<Integer, String>(R.id.radioCheckDocumentType, "CheckType"),
+      new Pair<Integer, String>(R.id.checkParseJavaFiles, "ParseJava"),
+      new Pair<Integer, String>(R.id.radioSpider, "FollowRobotsTxt"),
+      new Pair<Integer, String>(R.id.checkUpdateHacks, "UpdateHack"),
+      new Pair<Integer, String>(R.id.checkUrlHacks, "URLHack"),
+      new Pair<Integer, String>(R.id.checkTolerentRequests, "TolerantRequests"),
+      new Pair<Integer, String>(R.id.checkForceHttp10, "HTTP10"),
+
+  };
+
+  // Activity identifier when using startActivityForResult()
+  protected static final int ACTIVITY_OPTIONS = 0;
 
   // Engine
   protected Runner runner = null;
 
   // Current pane id and context
   protected int pane_id = -1;
-  protected final SparseArray<String> map = new SparseArray<String>();
+  protected final SparseArraySerializable map = new SparseArraySerializable();
 
   // Handler to execute code in UI thread
   private Handler handlerUI = new Handler();
@@ -208,12 +265,35 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Get a map value.
+   * 
+   * @param key
+   *          The key
+   * @return The value
+   */
+  public String getMap(int key) {
+    return map.get(key);
+  }
+
+  /**
+   * Set a map value.
+   * 
+   * @param key
+   *          The key
+   * @param value
+   *          The value
+   */
+  public void setMap(int key, final String value) {
+    map.put(key, value);
+  }
+
+  /**
    * Get the current project name
    * 
    * @return The current project name
    */
   protected String getProjectName() {
-    return cleanupString(map.get(R.id.fieldProjectName));
+    return cleanupString(getMap(R.id.fieldProjectName));
   }
 
   /**
@@ -253,7 +333,7 @@ public class HTTrackActivity extends Activity {
   private boolean hasProjectRootIndexFile() {
     return getProjectRootIndexFile().exists();
   }
-  
+
   /**
    * Return the already downloaded project names.
    * 
@@ -267,7 +347,7 @@ public class HTTrackActivity extends Activity {
         if (item.isDirectory()) {
           final File profile = new File(new File(item, "hts-cache"),
               "winprofile.ini");
-          if (profile.isFile() && profile.exists()) {
+          if (profile.exists() && profile.isFile()) {
             list.add(item.getName());
           }
         }
@@ -304,7 +384,7 @@ public class HTTrackActivity extends Activity {
       return null;
     }
   }
-  
+
   /**
    * Check whether an index.html file is present for the current project.
    * 
@@ -316,7 +396,7 @@ public class HTTrackActivity extends Activity {
   }
 
   protected String getProjectUrl() {
-    return cleanupString(map.get(R.id.fieldWebsiteURLs));
+    return cleanupString(getMap(R.id.fieldWebsiteURLs));
   }
 
   /**
@@ -745,7 +825,7 @@ public class HTTrackActivity extends Activity {
     final BufferedWriter lwriter = new BufferedWriter(writer);
     try {
       for (final Pair<Integer, String> field : fieldsSerializer) {
-        final String value = map.get(field.first);
+        final String value = getMap(field.first);
         final String key = field.second;
         lwriter.write(key);
         lwriter.write("=");
@@ -846,13 +926,14 @@ public class HTTrackActivity extends Activity {
           : "NO");
       str.append("</i>");
       text.setText(Html.fromHtml(str.toString()));
-      
-      // Enable or disable browse & cleanup button depending on existing project(s)
+
+      // Enable or disable browse & cleanup button depending on existing
+      // project(s)
       View.class.cast(this.findViewById(R.id.buttonClear)).setEnabled(
           hasProjectNames());
       View.class.cast(this.findViewById(R.id.buttonBrowseAll)).setEnabled(
           hasProjectRootIndexFile());
-      
+
       break;
     case R.layout.activity_proj_name:
       final String[] names = getProjectNames();
@@ -963,7 +1044,7 @@ public class HTTrackActivity extends Activity {
         // We need to put immediately the name in the map to be able to
         // unserialize.
         try {
-          map.put(R.id.fieldProjectName, name);
+          setMap(R.id.fieldProjectName, name);
           unserialize();
         } catch (final IOException e) {
           // Ignore (if not found)
@@ -993,25 +1074,36 @@ public class HTTrackActivity extends Activity {
     return validated;
   }
 
+  /* Save current pane fieds into map. */
+  private void savePaneFields() {
+    if (pane_id != -1) {
+      for (final int id : fields[pane_id]) {
+        final String value = getFieldText(id);
+        setMap(id, value);
+      }
+    }
+  }
+
+  /* Load pane fields from map. */
+  private void loadPaneFields() {
+    // Entering a new pane: restore data
+    for (final int id : fields[pane_id]) {
+      final String value = getMap(id);
+      setFieldText(id, value);
+    }
+  }
+
   private void setPane(int position) {
     if (pane_id != position) {
       // Leaving a pane: save data
-      if (pane_id != -1) {
-        for (final int id : fields[pane_id]) {
-          final String value = getFieldText(id);
-          map.put(id, value);
-        }
-      }
+      savePaneFields();
 
       // Switch pane
       pane_id = position;
       setContentView(layouts[pane_id]);
 
       // Entering a new pane: restore data
-      for (final int id : fields[pane_id]) {
-        final String value = map.get(id);
-        setFieldText(id, value);
-      }
+      loadPaneFields();
 
       // Post-actions
       onEnterNewPane();
@@ -1053,8 +1145,33 @@ public class HTTrackActivity extends Activity {
    * "Options"
    */
   public void onClickOptions(final View view) {
+    // First save current pane settings
+    savePaneFields();
+
+    // Then start new activity
     final Intent intent = new Intent(this, OptionsActivity.class);
-    startActivity(intent);
+    fillExtra(intent);
+    intent.putExtra("map", map);
+    Log.d(this.getClass().getName(), "map size: " + map.size());
+    startActivityForResult(intent, ACTIVITY_OPTIONS);
+  }
+
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode,
+      final Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+    switch (requestCode) {
+    case ACTIVITY_OPTIONS:
+      if (resultCode == Activity.RESULT_OK) {
+        // Load modified map
+        map.unserialize(data.getParcelableExtra("map"));
+        Log.d(this.getClass().getName(), "received map size: " + map.size());
+
+        // Load possibly modified field(s)
+        loadPaneFields();
+      }
+      break;
+    }
   }
 
   /**
@@ -1107,15 +1224,25 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Fill intent with common settings (project path, etc.).
+   * 
+   * @param intent
+   *          The intent object
+   */
+  protected void fillExtra(final Intent intent) {
+    intent.putExtra("rootFile", getProjectRootFile());
+    intent.putExtra("resourceFile", getResourceFile());
+  }
+
+  /**
    * "Browse Website"
    */
   public void onCleanup(final View view) {
     final String[] names = getProjectNames();
     if (names != null && names.length != 0) {
       final Intent intent = new Intent(this, CleanupActivity.class);
-      intent.putExtra("rootFile", getProjectRootFile());
+      fillExtra(intent);
       intent.putExtra("projectNames", names);
-      intent.putExtra("resourceFile", getResourceFile());
       startActivity(intent);
     }
   }

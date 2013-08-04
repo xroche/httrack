@@ -11,8 +11,13 @@ import android.os.Bundle;
 import android.app.Activity;
 import android.app.TabActivity;
 import android.content.Intent;
+import android.util.Log;
 import android.view.Menu;
+import android.view.View;
+import android.widget.CheckBox;
+import android.widget.RadioGroup;
 import android.widget.TabHost;
+import android.widget.TextView;
 import android.widget.TabHost.TabSpec;
 
 /**
@@ -22,8 +27,10 @@ import android.widget.TabHost.TabSpec;
 public class OptionsActivity extends TabActivity {
   @SuppressWarnings("unchecked")
   protected static Class<? extends Tab>[] tabClasses = new Class[] {
-      ScanRulesTab.class, LimitsTab.class, FlowControlTab.class, LinksTab.class };
+      ScanRulesTab.class, LimitsTab.class, FlowControlTab.class,
+      LinksTab.class, BuildTab.class, BrowserId.class, Spider.class };
 
+  protected final SparseArraySerializable map = new SparseArraySerializable();
   private TabHost tabHost;
   private final List<TabSpec> tabSpec = new ArrayList<TabSpec>();
 
@@ -31,6 +38,131 @@ public class OptionsActivity extends TabActivity {
    * The tab activit(ies) common class.
    */
   public abstract static class Tab extends Activity {
+    protected OptionsActivity parentOptions;
+
+    /*
+     * Set text field.
+     */
+    private void setFieldText(int id, String value) {
+      final View view = this.findViewById(id);
+      if (view == null) {
+        throw new RuntimeException("no such view " + Integer.toString(id));
+      }
+      if (view instanceof CheckBox) {
+        final CheckBox checkbox = (CheckBox) view;
+        checkbox.setChecked("1".equalsIgnoreCase(value));
+      } else if (view instanceof RadioGroup) {
+        if (value != null && value.length() != 0) {
+          final int selected = Integer.parseInt(value);
+          if (selected != 0) {
+            final RadioGroup radio = (RadioGroup) view;
+            final View child = radio.getChildAt(selected - 1);
+            if (child == null) {
+              throw new RuntimeException("no such child "
+                  + Integer.toString(selected));
+            }
+            radio.check(child.getId());
+          }
+        }
+      } else if (view instanceof TextView) {
+        if (value != null) {
+          final TextView text = (TextView) view;
+          text.setText(value);
+        }
+      } else {
+        throw new RuntimeException("unsupported class "
+            + view.getClass().getName() + " with setFieldText");
+      }
+    }
+
+    /*
+     * Get field text
+     */
+    private String getFieldText(int id) {
+      final View view = this.findViewById(id);
+      if (view == null) {
+        throw new RuntimeException("no such view " + Integer.toString(id));
+      }
+      if (view instanceof CheckBox) {
+        final CheckBox checkbox = (CheckBox) view;
+        return checkbox.isChecked() ? "1" : "0";
+      } else if (view instanceof TextView) {
+        final TextView text = (TextView) view;
+        return text.getText().toString();
+      } else if (view instanceof RadioGroup) {
+        final RadioGroup radio = (RadioGroup) view;
+        final int checkedId = radio.getCheckedRadioButtonId();
+        if (checkedId != -1) {
+          for (int i = 0; i < radio.getChildCount(); i++) {
+            if (checkedId == radio.getChildAt(i).getId()) {
+              return Integer.toString(i + 1);
+            }
+          }
+          throw new RuntimeException("unexpected RadioGroup error");
+        } else {
+          return null;
+        }
+      } else {
+        throw new RuntimeException("unsupported class "
+            + view.getClass().getName() + " with getFieldText");
+      }
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      parentOptions = OptionsActivity.class.cast(getParent());
+      if (parentOptions == null) {
+        throw new RuntimeException("tab has no parent!");
+      }
+    }
+
+    /**
+     * List of fields.
+     * 
+     * @return
+     */
+    protected int[] getFields() {
+      return new int[] {};
+    }
+
+    /*
+     * Load serialized field(s)
+     */
+    protected void load() {
+      final int[] fields = getFields();
+      Log.d(this.getClass().getName(), "loading " + fields.length + " fields");
+      for (final int field : fields) {
+        final String value = parentOptions.getMap(field);
+        if (value != null) {
+          setFieldText(field, value);
+        }
+      }
+    }
+
+    /*
+     * Serialize and save field(s)
+     */
+    protected void save() {
+      final int[] fields = getFields();
+      Log.d(this.getClass().getName(), "saving " + fields.length + " fields");
+      for (final int field : fields) {
+        final String value = getFieldText(field);
+        parentOptions.setMap(field, value);
+      }
+    }
+
+    @Override
+    public void setContentView(int layoutResID) {
+      super.setContentView(layoutResID);
+      load();
+    }
+
+    @Override
+    public void finish() {
+      save();
+      super.finish();
+    }
   }
 
   /**
@@ -46,6 +178,11 @@ public class OptionsActivity extends TabActivity {
   @Title("Scan Rules")
   public static class ScanRulesTab extends Tab {
     @Override
+    protected int[] getFields() {
+      return new int[] { R.id.editRules };
+    }
+
+    @Override
     protected void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
       setContentView(R.layout.activity_options_scanrules);
@@ -54,6 +191,14 @@ public class OptionsActivity extends TabActivity {
 
   @Title("Limits")
   public static class LimitsTab extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.editMaxDepth, R.id.editMaxExtDepth,
+          R.id.editMaxSizeHtml, R.id.editMaxSizeOther, R.id.editSiteSizeLimit,
+          R.id.editMaxTimeOverall, R.id.editMaxTransferRate,
+          R.id.editMaxConnectionsSecond, R.id.editMaxNumberLinks };
+    }
+
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
@@ -64,6 +209,14 @@ public class OptionsActivity extends TabActivity {
   @Title("Flow Control")
   public static class FlowControlTab extends Tab {
     @Override
+    protected int[] getFields() {
+      return new int[] { R.id.editNumberOfConnections,
+          R.id.checkPersistentConnections, R.id.editTimeout,
+          R.id.checkRemoveHostIfTimeout, R.id.editRetries,
+          R.id.editMinTransferRate, R.id.checkRemoveHostIfSlow };
+    }
+
+    @Override
     protected void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
       setContentView(R.layout.activity_options_flowcontrol);
@@ -73,15 +226,74 @@ public class OptionsActivity extends TabActivity {
   @Title("Links")
   public static class LinksTab extends Tab {
     @Override
+    protected int[] getFields() {
+      return new int[] { R.id.checkDetectAllLinks, R.id.checkGetNonHtmlNear,
+          R.id.checkTestAllLinks, R.id.checkGetHtmlFirst };
+    }
+
+    @Override
     protected void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
       setContentView(R.layout.activity_options_links);
     }
   }
 
+  @Title("Build")
+  public static class BuildTab extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.checkDosNames, R.id.checkIso9660,
+          R.id.checkNoErrorPages, R.id.checkNoExternalPages,
+          R.id.checkHidePasswords, R.id.checkHideQueryStrings,
+          R.id.checkDoNotPurge };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_build);
+    }
+  }
+
+  @Title("Browser ID")
+  public static class BrowserId extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.editBrowserIdentity, R.id.editHtmlFooter };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_browserid);
+    }
+  }
+
+  @Title("Spider")
+  public static class Spider extends Tab {
+    @Override
+    protected int[] getFields() {
+      return new int[] { R.id.checkAcceptCookies, R.id.radioCheckDocumentType,
+          R.id.checkParseJavaFiles, R.id.radioSpider, R.id.checkUpdateHacks,
+          R.id.checkUrlHacks, R.id.checkTolerentRequests, R.id.checkForceHttp10 };
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      setContentView(R.layout.activity_options_spider);
+    }
+  }
+
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
+    // Load map
+    map.unserialize(getIntent().getParcelableExtra("map"));
+    Log.d(this.getClass().getName(), "map size: " + map.size());
+
+    // Set view
     setContentView(R.layout.activity_options);
 
     // Create tabs
@@ -105,4 +317,39 @@ public class OptionsActivity extends TabActivity {
     return true;
   }
 
+  /*
+   * Map getter.
+   */
+  protected String getMap(int key) {
+    return map.get(key);
+  }
+
+  /*
+   * Map setter.
+   */
+  protected void setMap(int key, final String value) {
+    map.put(key, value);
+  }
+
+  @Override
+  public void finish() {
+    // Save all tabs
+    Log.d(this.getClass().getName(), "final map size: " + map.size());
+
+    // Declare result
+    final Intent intent = new Intent();
+    intent.putExtra("map", map);
+    setResult(Activity.RESULT_OK, intent);
+    super.finish();
+  }
+
+  /**
+   * Override back to propagate settings. <br />
+   * FIXME: we should probably do better than that!
+   */
+  @Override
+  public void onBackPressed() {
+    super.onBackPressed();
+    finish();
+  }
 }
