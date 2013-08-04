@@ -6,7 +6,7 @@
     android:versionName="3.47" >
 
     <uses-sdk
-        android:minSdkVersion="9"
+        android:minSdkVersion="8"
         android:targetSdkVersion="17" />
 
     <!-- We need to read/write copied Websites to the SD card. -->
