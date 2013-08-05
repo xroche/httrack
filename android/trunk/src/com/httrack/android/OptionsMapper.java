@@ -195,20 +195,8 @@ public class OptionsMapper {
       new Pair<String, OptionMapper>("ProjectName", NoOpOption.INSTANCE),
       new Pair<String, OptionMapper>("Category", NoOpOption.INSTANCE),
       new Pair<String, OptionMapper>("CurrentUrl", StringSplit.INSTANCE),
-      new Pair<String, OptionMapper>("CurrentAction", new OptionMapper() {
-        @Override
-        public void emit(StringBuilder flags, List<String> commandline,
-            String value) {
-          // i continue an interrupted mirror using the cache (--continue)
-          // C create/use a cache for updates and retries (C0 no cache,C1 cache
-          // is prioritary,* C2 test update before) (--cache[=N])
-          if ("0".equals(value)) {
-            flags.append("iC1");
-          } else if ("1".equals(value)) {
-            flags.append("iC2");
-          }
-        }
-      }),
+      new Pair<String, OptionMapper>("CurrentAction",
+          new MultipleChoicesOption(new String[] { "iC1", "iC2" }, true)),
       new Pair<String, OptionMapper>("WildCardFilters", StringSplit.INSTANCE),
       new Pair<String, OptionMapper>("Depth", new SimpleOption("r")),
       new Pair<String, OptionMapper>("ExtDepth", new SimpleOption("%e")),
@@ -1324,8 +1312,8 @@ public class OptionsMapper {
         final OptionMapper map = fieldsNameToMapper.get(key);
         if (map != null) {
           map.emit(flags, list, value);
-          // Log.v(this.getClass().getName(), "option mapped: " + key + "=" +
-          // value + " => " + flags);
+          // Log.v(this.getClass().getName(), "option mapped: " + key + "="
+          // + value + " => " + flags);
         } else {
           Log.v(this.getClass().getName(), "option not mapped: " + key + "="
               + value);

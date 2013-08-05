@@ -139,5 +139,10 @@
     <string name="action_update">Update existing download</string>
     <string name="custom_build">Custom</string>
     <string name="custom_build_hint" formatted="false">%h%p/%n%q.%t</string>
+    <string name="help">Help</string>
+    <string name="title_activity_help">HelpActivity</string>
+    <string name="read_documentation">View Documentation</string>
+    <string name="browse_site">Browse HTTrack Website</string>
+    <string name="browse_forum">Browse HTTrack Forum</string>
 
 </resources>

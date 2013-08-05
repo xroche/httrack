@@ -145,7 +145,7 @@ public class CleanupActivity extends ListActivity {
   }
 
   /* Delete recursively a directory, or delete a file. */
-  private boolean deleteRecursively(final File file) {
+  public static boolean deleteRecursively(final File file) {
     // TODO: check if this is necessary (symbolic link handling to avoid
     // infinite loops)
     if (file.delete()) {

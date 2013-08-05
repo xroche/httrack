@@ -594,16 +594,19 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
       lien_n, lien_tot, stat_time, stats);
 }
 
-void Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
+jboolean Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
     jboolean force) {
+  jboolean stopped = JNI_FALSE;
   UNUSED(env);
   UNUSED(object);
   MUTEX_LOCK(global_lock);
   if (global_opt != NULL) {
+    stopped = JNI_TRUE;
     global_opt_stop = 1;
     hts_request_stop(global_opt, force);
   }
   MUTEX_UNLOCK(global_lock);
+  return stopped;
 }
 
 jint Java_com_httrack_android_jni_HTTrackLib_buildTopIndex(JNIEnv* env, jclass clazz,

@@ -22,14 +22,15 @@
                 android:layout_height="wrap_content" />
         </HorizontalScrollView>
 
+        <!--  Vertical scroll view. -->
         <ScrollView
-            android:id="@+id/scrollView1"
+            android:id="@+id/scrollView"
             android:layout_width="fill_parent"
-            android:layout_height="wrap_content" >
+            android:layout_height="fill_parent" >
 
             <FrameLayout
                 android:id="@android:id/tabcontent"
-                android:layout_width="fill_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content" >
             </FrameLayout>
         </ScrollView>

@@ -42,6 +42,10 @@
             android:label="@string/title_activity_options" >
         </activity>
         <activity
+            android:name="com.httrack.android.HelpActivity"
+            android:label="@string/title_activity_options" >
+        </activity>
+        <activity
             android:name="com.httrack.android.OptionsActivity$ScanRulesTab"
             android:label="@string/title_activity_options" >
         </activity>

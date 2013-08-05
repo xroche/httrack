@@ -68,8 +68,11 @@ public class HTTrackLib {
 
   /**
    * Stop the engine.
+   * 
+   * @return true if the engine was stopped (or at least a request was sent),
+   *         false if it has already stopped.
    */
-  public native void stop(boolean force);
+  public native boolean stop(boolean force);
 
   /**
    * Default constructor.

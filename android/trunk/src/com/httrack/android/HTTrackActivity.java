@@ -21,9 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package com.httrack.android;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,6 +53,7 @@ import android.os.Handler;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.text.Html;
 import android.util.Log;
@@ -60,6 +64,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.ProgressBar;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 public class HTTrackActivity extends Activity {
@@ -79,7 +84,8 @@ public class HTTrackActivity extends Activity {
   // Fields to restore/save state (Note: might be read-only fields)
   protected static final int fields[][] = { {},
       { R.id.fieldProjectName, R.id.fieldProjectCategory },
-      { R.id.fieldWebsiteURLs }, { R.id.fieldDisplay }, { R.id.fieldDisplay } };
+      { R.id.fieldWebsiteURLs, R.id.radioAction }, { R.id.fieldDisplay },
+      { R.id.fieldDisplay } };
 
   // Options mapper, containing all options
   protected final OptionsMapper mapper = new OptionsMapper();
@@ -96,12 +102,16 @@ public class HTTrackActivity extends Activity {
   // Handler to execute code in UI thread
   private Handler handlerUI = new Handler();
 
+  // Widget data exchange helper
+  private WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
+
   // Project settings
   protected String version;
   protected File rootPath;
   protected File httrackPath;
   protected File projectPath;
   protected boolean mirrorRefresh;
+  protected File rscPath;
 
   // Stats
   protected HTTrackStats lastStats;
@@ -130,9 +140,6 @@ public class HTTrackActivity extends Activity {
 
       // Fetch httrack engine version
       version = HTTrackLib.getVersion();
-
-      // Extract resources if necessary
-      getResourceFile();
     } catch (final RuntimeException re) {
       // Woops, something is not right here.
       errors += "\n\nERROR: " + re.getMessage();
@@ -148,6 +155,9 @@ public class HTTrackActivity extends Activity {
     httrackPath = new File(rootPath, "HTTrack");
     projectPath = new File(httrackPath, "Websites");
 
+    // Extract resources if necessary
+    rscPath = buildResourceFile();
+
     // Ensure users can see us
     HTTrackActivity.setFileReadWrite(httrackPath);
     HTTrackActivity.setFileReadWrite(projectPath);
@@ -162,10 +172,57 @@ public class HTTrackActivity extends Activity {
     }
   }
 
+  /* Install/Update time. */
+  private long installOrUpdateTime() {
+    ApplicationInfo appInfo = getApplicationInfo();
+    String appFile = appInfo.sourceDir;
+    long installed = new File(appFile).lastModified();
+    return installed;
+  }
+
   /** Get the resource directory. Create it if necessary. **/
-  private File getResourceFile() {
+  private File buildResourceFile() {
     final File rscPath = new File(httrackPath, "resources");
+    final File stampFile = new File(rscPath, "resources.stamp");
+    final long stamp = installOrUpdateTime();
+
+    // Check timestamp of resources. If the applicate has been updated,
+    // recreated cached resources.
+    if (rscPath.exists()) {
+      long diskStamp = 0;
+      try {
+        if (stampFile.exists()) {
+          final FileReader reader = new FileReader(stampFile);
+          final BufferedReader lreader = new BufferedReader(reader);
+          try {
+            diskStamp = Long.parseLong(lreader.readLine());
+          } catch (final NumberFormatException nfe) {
+            diskStamp = 0;
+          }
+          lreader.close();
+          reader.close();
+        }
+      } catch (IOException io) {
+        diskStamp = 0;
+      }
+      // Different one: wipe and recreate
+      if (stamp != diskStamp) {
+        Log.i(this.getClass().getName(),
+            "deleting old resources " + rscPath.getAbsolutePath()
+                + " (app_stamp=" + stamp + " != disk_stamp=" + diskStamp + ")");
+        CleanupActivity.deleteRecursively(rscPath);
+      } else {
+        Log.i(this.getClass().getName(),
+            "keeping resources " + rscPath.getAbsolutePath()
+                + " (app_stamp=disk_stamp=" + stamp + ")");
+      }
+    }
+
+    // Recreate resources ?
     if (!rscPath.exists()) {
+      Log.i(this.getClass().getName(),
+          "creating resources " + rscPath.getAbsolutePath() + " with stamp "
+              + stamp);
       if (HTTrackActivity.mkdirs(rscPath)) {
         try {
           final InputStream zipStream = getResources().openRawResource(
@@ -190,11 +247,28 @@ public class HTTrackActivity extends Activity {
           }
           file.close();
           zipStream.close();
+
+          // Write stamp
+          final FileWriter writer = new FileWriter(stampFile);
+          final BufferedWriter lwriter = new BufferedWriter(writer);
+          lwriter.write(Long.toString(stamp));
+          lwriter.close();
+          writer.close();
         } catch (final IOException io) {
-          rscPath.delete();
+          Log.w(this.getClass().getName(), "could not create resources", io);
+          CleanupActivity.deleteRecursively(rscPath);
         }
       }
     }
+    return rscPath;
+  }
+
+  /**
+   * Get the resource directory.
+   * 
+   * @return the resource directory
+   */
+  private File getResourceFile() {
     return rscPath;
   }
 
@@ -473,7 +547,10 @@ public class HTTrackActivity extends Activity {
 
         // Result
         if (code == 0) {
-          if (lastStats.errorsCount == 0) {
+          if (stopped) {
+            message = "<b>Interrupted</b>! (" + lastStats.errorsCount
+                + " errors)";
+          } else if (lastStats.errorsCount == 0) {
             message = "<b>Success</b>!";
           } else if (lastStats.filesWritten != 0) {
             message = "<b>Success</b>! (" + lastStats.errorsCount + " errors)";
@@ -530,7 +607,19 @@ public class HTTrackActivity extends Activity {
       synchronized (this) {
         stopped = true;
       }
-      engine.stop(true);
+      // Stop engine
+      final boolean stopSent = engine.stop(true);
+      // If not yet stopped, mark as dirty
+      // ("Continue an interrupted mirror ...")
+      try {
+        if (stopSent) {
+          setInterruptedProfile(true);
+        } else {
+          setInterruptedProfile(false);
+        }
+      } catch (final IOException io) {
+        Log.w(this.getClass().getName(), "could not lock file", io);
+      }
     }
 
     /**
@@ -695,6 +784,42 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Interrupted profile ?
+   * 
+   * @return true if the mirror was interrupted
+   */
+  protected boolean isInterruptedProfile() {
+    final File target = getTargetFile();
+    if (target != null) {
+      final File cache = new File(target, "hts-cache");
+      return new File(target, "hts-in_progress.lock").exists()
+          || new File(cache, "interrupted.lock").exists();
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Set the "interrupted" flag.
+   * 
+   * @param interrupted
+   *          Interrupted mirror ?
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected void setInterruptedProfile(boolean interrupted) throws IOException {
+    final File target = getTargetFile();
+    final File cache = new File(target, "hts-cache");
+    final File lock = new File(cache, "interrupted.lock");
+    if (interrupted) {
+      final FileWriter wr = new FileWriter(lock);
+      wr.close();
+    } else {
+      lock.delete();
+    }
+  }
+
+  /**
    * Get the profile target file for a given project.
    * 
    * @return The profile target file.
@@ -810,7 +935,16 @@ public class HTTrackActivity extends Activity {
       View.class.cast(this.findViewById(R.id.radioAction)).setEnabled(
           hasProfile);
       View.class.cast(this.findViewById(R.id.radioAction)).setVisibility(
-          hasProfile ? View.VISIBLE : View.INVISIBLE);
+          hasProfile ? View.VISIBLE : View.GONE);
+      if (hasProfile) {
+        // Update is the default unless something was broken
+        RadioGroup.class.cast(this.findViewById(R.id.radioAction)).check(
+            isInterruptedProfile() ? R.id.radioItemContinue
+                : R.id.radioItemUpdate);
+      } else {
+        // Reset
+        RadioGroup.class.cast(this.findViewById(R.id.radioAction)).check(-1);
+      }
       break;
     case R.layout.activity_mirror_progress:
       if (runner == null) {
@@ -860,8 +994,7 @@ public class HTTrackActivity extends Activity {
    * @return the associated text
    */
   private String getFieldText(int id) {
-    final TextView text = (TextView) this.findViewById(id);
-    return text.getText().toString();
+    return widgetDataExchange.getFieldText(id);
   }
 
   /**
@@ -873,8 +1006,7 @@ public class HTTrackActivity extends Activity {
    *          the associated text
    */
   private void setFieldText(int id, String value) {
-    final TextView text = (TextView) this.findViewById(id);
-    text.setText(value);
+    widgetDataExchange.setFieldText(id, value);
   }
 
   /**
@@ -1057,12 +1189,22 @@ public class HTTrackActivity extends Activity {
   }
 
   /** Browser a specific index. **/
-  private void browse(final File index) {
+  public static Intent getBrowseIntent(final File index) {
     if (index != null && index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
       // Without the MIME, Android tend to crash with a NPE (!)
       intent.setDataAndType(Uri.fromFile(index), "text/html");
+      return intent;
+    } else {
+      return null;
+    }
+  }
+
+  /** Browser a specific index. **/
+  private void browse(final File index) {
+    final Intent intent = getBrowseIntent(index);
+    if (intent != null) {
       startActivity(intent);
     }
   }
@@ -1093,7 +1235,7 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * "Browse Website"
+   * "Cleanup"
    */
   public void onCleanup(final View view) {
     final String[] names = getProjectNames();
@@ -1103,6 +1245,15 @@ public class HTTrackActivity extends Activity {
       intent.putExtra("projectNames", names);
       startActivity(intent);
     }
+  }
+
+  /**
+   * "Help"
+   */
+  public void onHelp(final View view) {
+    final Intent intent = new Intent(this, HelpActivity.class);
+    fillExtra(intent);
+    startActivity(intent);
   }
 
   @Override

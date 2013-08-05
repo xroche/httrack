@@ -48,4 +48,14 @@
         android:onClick="onCleanup"
         android:text="@string/cleanup_sites" />
 
+    <Button
+        android:id="@+id/buttonHelp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/buttonClear"
+        android:layout_alignBottom="@+id/buttonClear"
+        android:layout_toRightOf="@+id/buttonClear"
+        android:onClick="onHelp"
+        android:text="@string/help" />
+
 </RelativeLayout>
