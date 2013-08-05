@@ -22,12 +22,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 package com.httrack.android;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.net.URLDecoder;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
+import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 
@@ -86,6 +91,7 @@ public class OptionsMapper {
       new Pair<Integer, String>(R.id.checkHideQueryStrings, "NoQueryStrings"),
       new Pair<Integer, String>(R.id.checkDoNotPurge, "NoPurgeOldFiles"),
       new Pair<Integer, String>(R.id.radioBuild, "Build"),
+      new Pair<Integer, String>(R.id.editCustomBuild, "BuildString"),
 
       /* Browser ID */
       new Pair<Integer, String>(R.id.editBrowserIdentity, "UserID"),
@@ -119,8 +125,7 @@ public class OptionsMapper {
       /* Experts Only */
       new Pair<Integer, String>(R.id.checkUseCacheForUpdates, "Cache"),
       new Pair<Integer, String>(R.id.radioPrimaryScanRule, "PrimaryScan"),
-      new Pair<Integer, String>(R.id.textTravelMode, "Travel"),
-      new Pair<Integer, String>(R.id.radioTravelMode, "GlobalTravel"),
+      new Pair<Integer, String>(R.id.radioTravelMode, "Travel"),
       new Pair<Integer, String>(R.id.radioGlobalTravelMode, "GlobalTravel"),
       new Pair<Integer, String>(R.id.radioRewriteLinks, "RewriteLinks"),
       new Pair<Integer, String>(R.id.checkActivateDebugging, "Debugging"), /* FIXME */
@@ -163,11 +168,11 @@ public class OptionsMapper {
       new Pair<String, String>("Travel", "1"),
       new Pair<String, String>("GlobalTravel", "0"),
       new Pair<String, String>("RewriteLinks", "0"),
-      // new Pair<String, String>("BuildString", "%%h%%p/%%n%%q.%%t"),
+      new Pair<String, String>("BuildString", "%h%p/%n%q.%t"),
       new Pair<String, String>("UserID",
           "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"),
       new Pair<String, String>("Footer",
-          "<!-- Mirrored from %%s%%s by HTTrack Website Copier/3.x [XR&CO'2013], %%s -->"),
+          "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->"),
       new Pair<String, String>("MaxRate", "25000"),
       new Pair<String, String>(
           "WildCardFilters",
@@ -175,8 +180,111 @@ public class OptionsMapper {
   // new Pair<String, String>("CurrentAction", "0")
   };
 
+  // Special options to be handled/merged differently
+  protected final MaxSizeHandler maxSizeHandler = new MaxSizeHandler();
+  protected final HostControlHandler hostControlHandler = new HostControlHandler();
+  protected final DosIso9660Handler dosIso9660Handler = new DosIso9660Handler();
+  protected final BuildHandler buildHandler = new BuildHandler();
+  protected final ProxyHandler proxyHandler = new ProxyHandler();
+  protected final LogHandler logHandler = new LogHandler();
+  protected final PrimaryScanHandler primaryScanHandler = new PrimaryScanHandler();
+
+  // Fields mapper to httrack engine options
+  @SuppressWarnings("unchecked")
+  protected final Pair<String, OptionMapper> fieldsMapper[] = new Pair[] {
+      new Pair<String, OptionMapper>("ProjectName", NoOpOption.INSTANCE),
+      new Pair<String, OptionMapper>("Category", NoOpOption.INSTANCE),
+      new Pair<String, OptionMapper>("CurrentUrl", StringSplit.INSTANCE),
+      new Pair<String, OptionMapper>("CurrentAction", new OptionMapper() {
+        @Override
+        public void emit(StringBuilder flags, List<String> commandline,
+            String value) {
+          // i continue an interrupted mirror using the cache (--continue)
+          // C create/use a cache for updates and retries (C0 no cache,C1 cache
+          // is prioritary,* C2 test update before) (--cache[=N])
+          if ("0".equals(value)) {
+            flags.append("iC1");
+          } else if ("1".equals(value)) {
+            flags.append("iC2");
+          }
+        }
+      }),
+      new Pair<String, OptionMapper>("WildCardFilters", StringSplit.INSTANCE),
+      new Pair<String, OptionMapper>("Depth", new SimpleOption("r")),
+      new Pair<String, OptionMapper>("ExtDepth", new SimpleOption("%e")),
+      new Pair<String, OptionMapper>("MaxHtml", maxSizeHandler.getHtml()),
+      new Pair<String, OptionMapper>("MaxOther", maxSizeHandler.getNonHtml()),
+      new Pair<String, OptionMapper>("MaxAll", new SimpleOption("M")),
+      new Pair<String, OptionMapper>("MaxTime", new SimpleOption("E")),
+      new Pair<String, OptionMapper>("MaxRate", new SimpleOption("A")),
+      new Pair<String, OptionMapper>("MaxConn", new SimpleOption("%c")),
+      new Pair<String, OptionMapper>("MaxLinks", new SimpleOption("#L")),
+      new Pair<String, OptionMapper>("Sockets", new SimpleOption("c")),
+      new Pair<String, OptionMapper>("KeepAlive", new SimpleOption0("k")),
+      new Pair<String, OptionMapper>("TimeOut", new SimpleOption("T")),
+      new Pair<String, OptionMapper>("RemoveTimeout",
+          hostControlHandler.getTimeMapper()),
+      new Pair<String, OptionMapper>("RemoveRateout",
+          hostControlHandler.getRateMapper()),
+      new Pair<String, OptionMapper>("Retry", new SimpleOption("R")),
+      new Pair<String, OptionMapper>("RateOut", new SimpleOption("J")),
+      new Pair<String, OptionMapper>("ParseAll", new SimpleOption0("%P")),
+      new Pair<String, OptionMapper>("Near", new SimpleOptionFlag("n")),
+      new Pair<String, OptionMapper>("Test", new SimpleOptionFlag("t")),
+      new Pair<String, OptionMapper>("HTMLFirst",
+          primaryScanHandler.getHtmlFirstMapper()),
+      new Pair<String, OptionMapper>("Dos", dosIso9660Handler.getDosMapper()),
+      new Pair<String, OptionMapper>("Iso9660",
+          dosIso9660Handler.getIso9660Mapper()),
+      new Pair<String, OptionMapper>("NoErrorPages", new SimpleOptionFlag("o0")),
+      new Pair<String, OptionMapper>("NoExternalPages", new SimpleOptionFlag(
+          "x", true)),
+      new Pair<String, OptionMapper>("NoPwdInPages", new SimpleOptionFlag("%x")),
+      new Pair<String, OptionMapper>("NoQueryStrings", new SimpleOption0("%q")),
+      new Pair<String, OptionMapper>("NoPurgeOldFiles", new SimpleOptionFlag(
+          "X0")),
+      new Pair<String, OptionMapper>("Build", buildHandler.getTypeMapper()),
+      new Pair<String, OptionMapper>("BuildString",
+          buildHandler.getCustomMapper()),
+      new Pair<String, OptionMapper>("UserID", new ArgumentOption("-F")),
+      new Pair<String, OptionMapper>("Footer", new ArgumentOption("-%F")),
+      new Pair<String, OptionMapper>("Cookies",
+          new SimpleOptionFlag("b0", true)),
+      new Pair<String, OptionMapper>("CheckType", new SimpleOption("u")),
+      new Pair<String, OptionMapper>("ParseJava", new SimpleOptionFlag("j",
+          true)),
+      new Pair<String, OptionMapper>("FollowRobotsTxt", new SimpleOption("s")),
+      new Pair<String, OptionMapper>("UpdateHack", new SimpleOptionFlag("%s")),
+      new Pair<String, OptionMapper>("URLHack", new SimpleOption0("%u")),
+      new Pair<String, OptionMapper>("TolerantRequests", new SimpleOptionFlag(
+          "%B")),
+      new Pair<String, OptionMapper>("HTTP10", new SimpleOptionFlag("%h")),
+      new Pair<String, OptionMapper>("Proxy", proxyHandler.getAddressMapper()),
+      new Pair<String, OptionMapper>("Port", proxyHandler.getPortMapper()),
+      new Pair<String, OptionMapper>("UseHTTPProxyForFTP", new SimpleOption0(
+          "%f")),
+      new Pair<String, OptionMapper>("StoreAllInCache", new SimpleOptionFlag(
+          "k")),
+      new Pair<String, OptionMapper>("NoRecatch", new SimpleOptionFlag("%n")),
+      new Pair<String, OptionMapper>("Log", logHandler.getEnabledMapper()),
+      new Pair<String, OptionMapper>("LogType", logHandler.getTypeMapper()),
+      new Pair<String, OptionMapper>("Index", new SimpleOptionFlag("I0", true)),
+      new Pair<String, OptionMapper>("Cache", new SimpleOptionFlag("C0", true)), /* FIXME */
+      new Pair<String, OptionMapper>("PrimaryScan",
+          primaryScanHandler.getTypeMapper()),
+      new Pair<String, OptionMapper>("Travel", new MultipleChoicesOption(
+          new String[] { "S", "D", "U", "B" }, true)),
+      new Pair<String, OptionMapper>("GlobalTravel", new MultipleChoicesOption(
+          new String[] { "a", "d", "l", "e" }, true)),
+      new Pair<String, OptionMapper>("RewriteLinks", new MultipleChoicesOption(
+          new String[] { "K0", "K", "K3", "K4" }, true)),
+      new Pair<String, OptionMapper>("Debugging", new SimpleOptionFlag("%H")) };
+
   // Name-to-ID hash map
   protected static HashMap<String, Integer> fieldsNameToId = new HashMap<String, Integer>();
+
+  // String-to-OptionMapper map
+  protected HashMap<String, OptionMapper> fieldsNameToMapper = new HashMap<String, OptionMapper>();
 
   // The options mapping
   protected final SparseArraySerializable map = new SparseArraySerializable();
@@ -187,6 +295,769 @@ public class OptionsMapper {
     createFieldsNameToId();
   }
 
+  /**
+   * Options mapper interface.
+   */
+  public static interface OptionMapper {
+    /**
+     * Optional interface to OptionMapper allowing to execute post-action.
+     */
+    public static interface FinishMapper {
+      /**
+       * FinisExecute post-action
+       * 
+       * @param flags
+       *          the flags array
+       * @param commandline
+       *          the commandline array
+       */
+      public void finish(final StringBuilder flags,
+          final List<String> commandline);
+    }
+
+    /**
+     * Emit the option
+     * 
+     * @param flags
+     *          the flags array
+     * @param commandline
+     *          the commandline array
+     * @param value
+     *          the option value
+     */
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value);
+  }
+
+  /**
+   * No-op mapper.
+   */
+  public static class NoOpOption implements OptionMapper {
+    /**
+     * An instance of the NoOpOption class.
+     */
+    public static final NoOpOption INSTANCE = new NoOpOption();
+
+    @Override
+    public void emit(StringBuilder flags, List<String> commandline, String value) {
+    }
+  }
+
+  /**
+   * Split into string pieces.
+   */
+  public static class StringSplit implements OptionMapper {
+    /**
+     * An instance of the StringSplit class.
+     */
+    public static final StringSplit INSTANCE = new StringSplit();
+
+    @Override
+    public void emit(StringBuilder flags, List<String> commandline, String value) {
+      // URLs
+      for (final String s : cleanupString(value).trim().split("\\s+")) {
+        if (s.length() != 0) {
+          commandline.add(s);
+        }
+      }
+    }
+  }
+
+  /**
+   * Maximum size handler. Merge the two maximum size of html/non-html files
+   * options.
+   */
+  public static class MaxSizeHandler {
+    protected boolean finished = false;
+    protected int maxHtml = -1;
+    protected int maxNonHtml = -1;
+
+    /*
+     * Handle "abandon host if timeout"
+     */
+    private class Html implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          MaxSizeHandler.this.maxHtml = Integer.parseInt(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        MaxSizeHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Handle "abandon host if transfer rate too low"
+     */
+    private class NonHtml implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          MaxSizeHandler.this.maxNonHtml = Integer.parseInt(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        MaxSizeHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get the html size mapper
+     * 
+     * @return the html size mapper
+     */
+    public OptionMapper getHtml() {
+      return new Html();
+    }
+
+    /**
+     * Get the non-html size mapper
+     * 
+     * @return the non-html size mapper
+     */
+    public OptionMapper getNonHtml() {
+      return new NonHtml();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      // mN maximum file length for a non-html file (--max-files[=N])
+      // mN,N2 maximum file length for non html (N) and html (N2)
+      if (!finished) {
+        finished = true;
+        if (maxNonHtml != -1 || maxHtml != -1) {
+          flags.append("m");
+          if (maxNonHtml != -1) {
+            flags.append(maxNonHtml);
+          }
+          if (maxHtml != -1) {
+            flags.append(',');
+            flags.append(maxHtml);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Host control handler. Merge the two
+   * "abandon host if timeout/transfer rate too slow" options into a single one.
+   */
+  public static class HostControlHandler {
+    protected boolean finished = false;
+    protected int flag = 0;
+
+    /*
+     * Handle "abandon host if timeout"
+     */
+    private class Time implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if ("1".equals(value)) {
+          HostControlHandler.this.flag |= 1;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        HostControlHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Handle "abandon host if transfer rate too low"
+     */
+    private class Rate implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if ("1".equals(value)) {
+          HostControlHandler.this.flag |= 2;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        HostControlHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get the transfer rate mapper
+     * 
+     * @return the transfer rate mapper
+     */
+    public OptionMapper getRateMapper() {
+      return new Rate();
+    }
+
+    /**
+     * Get the timeout mapper
+     * 
+     * @return the timeout mapper
+     */
+    public OptionMapper getTimeMapper() {
+      return new Time();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        flags.append("H");
+        flags.append(flag);
+      }
+    }
+  }
+
+  /**
+   * DOS/ISO9660 flags.
+   */
+  public static class DosIso9660Handler {
+    protected boolean finished = false;
+    protected boolean dos = false;
+    protected boolean iso9660 = false;
+
+    /*
+     * Handle "abandon host if timeout"
+     */
+    private class Dos implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if ("1".equals(value)) {
+          DosIso9660Handler.this.dos = true;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        DosIso9660Handler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Handle "abandon host if transfer rate too low"
+     */
+    private class Iso9660 implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if ("1".equals(value)) {
+          DosIso9660Handler.this.iso9660 = true;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        DosIso9660Handler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get the dos flag mapper
+     * 
+     * @return the dos flag mapper
+     */
+    public OptionMapper getDosMapper() {
+      return new Dos();
+    }
+
+    /**
+     * Get the iso9660 flag mapper
+     * 
+     * @return the iso9660 flag mapper
+     */
+    public OptionMapper getIso9660Mapper() {
+      return new Iso9660();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        // Note: same logic (...) as WinHTTrack ; see WinHTTrack/Shell.cpp
+        if (dos || iso9660) {
+          flags.append("L");
+          if (dos) {
+            flags.append('0');
+          } else {
+            flags.append('2');
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Proxy settings handler.
+   */
+  public static class ProxyHandler {
+    protected boolean finished = false;
+    protected String address;
+    protected String port;
+
+    /*
+     * Build type.
+     */
+    private class Address implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          ProxyHandler.this.address = value;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        ProxyHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Custom build
+     */
+    private class Port implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          ProxyHandler.this.port = value;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        ProxyHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get address mapper
+     * 
+     * @return the address mapper
+     */
+    public OptionMapper getAddressMapper() {
+      return new Address();
+    }
+
+    /**
+     * Get the port mapper
+     * 
+     * @return the port build mapper
+     */
+    public OptionMapper getPortMapper() {
+      return new Port();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        if (address != null) {
+          commandline.add("-P");
+          commandline.add(address + ":"
+              + (port != null && port.length() != 0 ? port : "8080"));
+        }
+      }
+    }
+  }
+
+  /**
+   * Build structure handler.
+   */
+  public static class BuildHandler {
+    protected boolean finished = false;
+    protected int build;
+    protected String custom;
+
+    /*
+     * Build type.
+     */
+    private class Type implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          BuildHandler.this.build = Integer.parseInt(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        BuildHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Custom build
+     */
+    private class Custom implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          BuildHandler.this.custom = value;
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        BuildHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get type mapper
+     * 
+     * @return the type mapper
+     */
+    public OptionMapper getTypeMapper() {
+      return new Type();
+    }
+
+    /**
+     * Get the custom build mapper
+     * 
+     * @return the custom build mapper
+     */
+    public OptionMapper getCustomMapper() {
+      return new Custom();
+    }
+
+    /* Mapping to httrack build structure numbers. */
+    private static final int mapping[] = new int[] { 0, 1, 2, 3, 4, 5, 100,
+        101, 102, 103, 104, 105, 99, 199 };
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        if (build < mapping.length) {
+          flags.append('N');
+          flags.append(mapping[build]);
+        } else if (build == mapping.length) {
+          commandline.add("-N");
+          commandline.add(custom);
+        }
+      }
+    }
+  }
+
+  /**
+   * Log settings handler.
+   */
+  public static class LogHandler {
+    protected boolean finished = false;
+    protected boolean enabled;
+    protected int type;
+
+    /*
+     * Build type.
+     */
+    private class Type implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          LogHandler.this.type = Integer.parseInt(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        LogHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Custom build
+     */
+    private class Enabled implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          LogHandler.this.enabled = "1".equals(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        LogHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get address mapper
+     * 
+     * @return the address mapper
+     */
+    public OptionMapper getTypeMapper() {
+      return new Type();
+    }
+
+    /**
+     * Get the port mapper
+     * 
+     * @return the port build mapper
+     */
+    public OptionMapper getEnabledMapper() {
+      return new Enabled();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        if (enabled) {
+          switch (type) {
+          case 0:
+            break;
+          case 1:
+            flags.append('z');
+            break;
+          case 2:
+            flags.append('Z');
+            break;
+          }
+        } else {
+          flags.append('Q');
+        }
+      }
+    }
+  }
+
+  /**
+   * primary scan handler.
+   */
+  public static class PrimaryScanHandler {
+    protected boolean finished = false;
+    protected boolean htmlFirst;
+    protected int type;
+
+    /*
+     * Type.
+     */
+    private class Type implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          PrimaryScanHandler.this.type = Integer.parseInt(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        PrimaryScanHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Html first ?
+     */
+    private class HtmlFirst implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(StringBuilder flags, List<String> commandline,
+          String value) {
+        if (value != null && value.length() != 0) {
+          PrimaryScanHandler.this.htmlFirst = "1".equals(value);
+        }
+      }
+
+      @Override
+      public void finish(StringBuilder flags, List<String> commandline) {
+        PrimaryScanHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get address mapper
+     * 
+     * @return the address mapper
+     */
+    public OptionMapper getTypeMapper() {
+      return new Type();
+    }
+
+    /**
+     * Get the port mapper
+     * 
+     * @return the port build mapper
+     */
+    public OptionMapper getHtmlFirstMapper() {
+      return new HtmlFirst();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(StringBuilder flags, List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        switch (type) {
+        case 0:
+        case 1:
+        case 2:
+          flags.append('p');
+          flags.append(type);
+          break;
+        case 3:
+          flags.append('p');
+          if (!htmlFirst) {
+            flags.append(type);
+          } else {
+            flags.append('7');
+          }
+          break;
+        case 4:
+          flags.append('p');
+          flags.append('7');
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Simple option (typically one character and an option)
+   */
+  public static class SimpleOption implements OptionMapper {
+    protected final String option;
+
+    public SimpleOption(final String option) {
+      this.option = option;
+    }
+
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value) {
+      if (value != null && value.length() != 0) {
+        flags.append(option);
+        flags.append(value);
+      }
+    }
+  }
+
+  /**
+   * Argument option (<option> <value>)<br/>
+   * Example: -F "user-agent"
+   */
+  public static class ArgumentOption implements OptionMapper {
+    protected final String option;
+
+    public ArgumentOption(final String option) {
+      this.option = option;
+    }
+
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value) {
+      if (value != null && value.length() != 0) {
+        commandline.add(option);
+        commandline.add(value);
+      }
+    }
+  }
+
+  /**
+   * Option without any value, but with optional '0' disable flag. Example: -%k
+   * and -%k0
+   */
+  public static class SimpleOption0 implements OptionMapper {
+    protected final String option;
+
+    public SimpleOption0(final String option) {
+      this.option = option;
+    }
+
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value) {
+      if (value != null && value.length() != 0) {
+        flags.append(option);
+        if ("0".equals(value)) {
+          flags.append('0');
+        }
+      }
+    }
+  }
+
+  /**
+   * Option without any value. Example: -n or nothing
+   */
+  public static class SimpleOptionFlag implements OptionMapper {
+    protected final String option;
+    protected final boolean reverted;
+
+    public SimpleOptionFlag(final String option, final boolean reverted) {
+      this.option = option;
+      this.reverted = reverted;
+    }
+
+    public SimpleOptionFlag(final String option) {
+      this(option, false);
+    }
+
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value) {
+      if (value != null && value.length() != 0) {
+        if ((!reverted && "1".equals(value)) || (reverted && "0".equals(value))) {
+          flags.append(option);
+        }
+      }
+    }
+  }
+
+  /**
+   * Option without any value.
+   */
+  public static class MultipleChoicesOption implements OptionMapper {
+    protected final String[] choices;
+    protected final boolean asFlag;
+
+    public MultipleChoicesOption(final String[] choices, boolean asFlag) {
+      this.choices = choices;
+      this.asFlag = asFlag;
+    }
+
+    public void emit(final StringBuilder flags, final List<String> commandline,
+        final String value) {
+      if (value != null && value.length() != 0) {
+        final int choiceId = Integer.parseInt(value);
+        if (choiceId >= 0 && choiceId < choices.length) {
+          final String choice = choices[choiceId];
+          if (choice != null && choice.length() != 0) {
+            if (asFlag) {
+              flags.append(choice);
+            } else {
+              commandline.add(choice);
+            }
+          }
+        }
+      }
+    }
+  }
+
   /*
    * Build fieldsNameToId
    */
@@ -195,7 +1066,24 @@ public class OptionsMapper {
     for (final Pair<Integer, String> field : fieldsSerializer) {
       final int id = field.first;
       final String fkey = field.second;
+      if (fieldsNameToId.containsKey(fkey)) {
+        throw new RuntimeException("unexpected internal error with " + fkey);
+      }
       fieldsNameToId.put(fkey, id);
+    }
+  }
+
+  /*
+   * Build fieldsNameToMapper
+   */
+  private void createFieldsNameToMapper() {
+    for (final Pair<String, OptionMapper> field : fieldsMapper) {
+      final String id = field.first;
+      final OptionMapper fkey = field.second;
+      if (fieldsNameToMapper.containsKey(id)) {
+        throw new RuntimeException("unexpected internal error with " + id);
+      }
+      fieldsNameToMapper.put(id, fkey);
     }
   }
 
@@ -214,9 +1102,23 @@ public class OptionsMapper {
   }
 
   /**
+   * Cleanup a space-separated string.
+   * 
+   * @param s
+   *          The string
+   * @return the cleaned up string
+   */
+  public static String cleanupString(String s) {
+    return s.replaceAll("\\s+", " ").trim();
+  }
+
+  /**
    * Build a new options mapper.
    */
   public OptionsMapper() {
+    // Create fieldsNameToMapper
+    createFieldsNameToMapper();
+
     // Initialize default values for map
     initializeMap();
   }
@@ -254,6 +1156,73 @@ public class OptionsMapper {
   }
 
   /**
+   * Get URLs
+   * 
+   * @return the URLs
+   */
+  protected String getProjectUrl() {
+    return cleanupString(getMap(R.id.fieldWebsiteURLs));
+  }
+
+  /**
+   * Get the current project name
+   * 
+   * @return The current project name
+   */
+  public String getProjectName() {
+    return cleanupString(getMap(R.id.fieldProjectName));
+  }
+
+  /*
+   * winprofile.ini encoding. the encoding is a bit lame, but is compatible with
+   * WinHTTrack format.
+   */
+  private static String profileEncode(final String s) {
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < s.length(); i++) {
+      final char c = s.charAt(i);
+      if (c == '%') {
+        builder.append("%%");
+      } else if (c < 32) {
+        builder.append('%');
+        builder.append(String.format("%02x", c));
+      } else {
+        builder.append(c);
+      }
+    }
+    return builder.toString();
+  }
+
+  /*
+   * winprofile.ini decoding. the encoding is a bit lame, but is compatible with
+   * WinHTTrack format.
+   */
+  private static String profileDecode(final String s) {
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < s.length(); i++) {
+      final char c = s.charAt(i);
+      if (c == '%' && i + 1 < s.length()) {
+        final char d = s.charAt(i + 1);
+        if (d == '%') {
+          i++;
+          builder.append('%');
+        } else if (i + 2 < s.length()) {
+          try {
+            final int code = Integer.parseInt(s.substring(i + 1, i + 3), 16);
+            i += 2;
+            builder.append((char) code);
+          } catch (final NumberFormatException nfe) {
+
+          }
+        }
+      } else {
+        builder.append(c);
+      }
+    }
+    return builder.toString();
+  }
+
+  /**
    * Unserialize a specific profile from disk.
    * 
    * @param profile
@@ -282,8 +1251,8 @@ public class OptionsMapper {
         final int sep = line.indexOf('=');
         if (sep != -1) {
           final String key = line.substring(0, sep);
-          final String value = URLDecoder.decode(line.substring(sep + 1),
-              "UTF-8");
+          final String value = OptionsMapper.profileDecode(line
+              .substring(sep + 1));
           final Integer id = OptionsMapper.fieldsNameToId.get(key);
           if (id != null) {
             map.put(id, value);
@@ -297,6 +1266,37 @@ public class OptionsMapper {
   }
 
   /**
+   * Serialize settings on disk.
+   * 
+   * @param profile
+   *          The profile file.
+   * @throws UnsupportedEncodingException
+   *           Upon encoding error
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  public void serialize(final File profile)
+      throws UnsupportedEncodingException, IOException {
+    final FileWriter writer = new FileWriter(profile);
+    final BufferedWriter lwriter = new BufferedWriter(writer);
+    try {
+      for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
+        final String value = getMap(field.first);
+        final String key = field.second;
+        lwriter.write(key);
+        lwriter.write("=");
+        if (value != null) {
+          lwriter.write(OptionsMapper.profileEncode(value));
+        }
+        lwriter.write("\n");
+      }
+      lwriter.close();
+    } finally {
+      writer.close();
+    }
+  }
+
+  /**
    * Unserialize profile from disk.
    * 
    * @throws IOException
@@ -304,5 +1304,63 @@ public class OptionsMapper {
    */
   protected void unserialize(final File profile) throws IOException {
     unserialize(profile, map);
+  }
+
+  /**
+   * Build commandline arguments for the httrack engine, depending on current
+   * defined settings.
+   * 
+   * @return The commandline argument(s)
+   */
+  public List<String> buildCommandline() {
+    final StringBuilder flags = new StringBuilder("-");
+    final List<String> list = new ArrayList<String>();
+
+    // Map all options
+    for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
+      final String value = getMap(field.first);
+      final String key = field.second;
+      if (value != null) {
+        final OptionMapper map = fieldsNameToMapper.get(key);
+        if (map != null) {
+          map.emit(flags, list, value);
+          // Log.v(this.getClass().getName(), "option mapped: " + key + "=" +
+          // value + " => " + flags);
+        } else {
+          Log.v(this.getClass().getName(), "option not mapped: " + key + "="
+              + value);
+        }
+      }
+    }
+
+    // Call finish for special mappers
+    for (final OptionMapper map : fieldsNameToMapper.values()) {
+      if (map instanceof OptionMapper.FinishMapper) {
+        final OptionMapper.FinishMapper finish = OptionMapper.FinishMapper.class
+            .cast(map);
+        finish.finish(flags, list);
+        // Log.v(this.getClass().getName(), "finish: " +
+        // map.getClass().getName() + " => " + flags);
+      }
+    }
+
+    // Final args
+    final List<String> args = new ArrayList<String>();
+
+    // First option non-empty ?
+    if (flags.length() > 1) {
+      args.add(flags.toString());
+      Log.v(this.getClass().getName(), "flags: " + flags);
+    } else {
+      Log.v(this.getClass().getName(), "no flags");
+    }
+
+    // Add all other args
+    for (final String arg : list) {
+      args.add(arg);
+    }
+
+    // Return final args
+    return args;
   }
 }

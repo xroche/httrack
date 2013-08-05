@@ -62,6 +62,7 @@
     <string name="build_type_12">Html in site_name/html, images/other in site_name/xxx</string>
     <string name="build_type_13">All files in web/, with random names (gadget !)</string>
     <string name="build_type_14">All files in site_name/, with random names (gadget !)</string>
+    <string name="build_type_15">User-defined structure..</string>
     <string name="dos_names">DOS Names (8+3)</string>
     <string name="iso9660_names">ISO9660 Names</string>
     <string name="no_error_pages">No error pages</string>
@@ -136,4 +137,7 @@
     <string name="action_download">Download web site(s)</string>
     <string name="action_continue">Continue interrupted download</string>
     <string name="action_update">Update existing download</string>
+    <string name="custom_build">Custom</string>
+    <string name="custom_build_hint" formatted="false">%h%p/%n%q.%t</string>
+
 </resources>

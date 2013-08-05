@@ -266,7 +266,7 @@ public class OptionsActivity extends TabActivity {
       return new int[] { R.id.checkDosNames, R.id.checkIso9660,
           R.id.checkNoErrorPages, R.id.checkNoExternalPages,
           R.id.checkHidePasswords, R.id.checkHideQueryStrings,
-          R.id.checkDoNotPurge, R.id.radioBuild };
+          R.id.checkDoNotPurge, R.id.radioBuild, R.id.editCustomBuild };
     }
 
     @Override

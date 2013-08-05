@@ -60,84 +60,117 @@
             android:id="@+id/textBuild"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".30"
+            android:layout_weight=".20"
             android:text="@string/primary_scan_rule" />
 
         <RadioGroup
             android:id="@+id/radioBuild"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".70" >
+            android:layout_weight=".80" >
 
             <RadioButton
                 android:id="@+id/radioItemBuild1"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_1" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild2"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_2" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild3"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_3" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild4"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_4" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild5"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_5" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild6"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_6" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild7"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_7" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild8"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_8" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild9"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_9" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild10"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_10" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild11"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_11" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild12"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_12" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild13"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_13" />
 
             <RadioButton
                 android:id="@+id/radioItemBuild14"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/build_type_14" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+
+                <RadioButton
+                    android:id="@+id/radioItemBuild15"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/build_type_15" />
+
+                <EditText
+                    android:id="@+id/editCustomBuild"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight=".70"
+                    android:hint="@string/custom_build_hint"
+                    android:inputType="numberDecimal" />
+            </LinearLayout>
         </RadioGroup>
     </LinearLayout>
 

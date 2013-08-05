@@ -21,7 +21,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package com.httrack.android;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -33,7 +32,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -55,7 +53,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.text.Html;
 import android.util.Log;
-import android.util.Pair;
 import android.view.Menu;
 import android.view.View;
 import android.view.animation.Animation;
@@ -225,15 +222,6 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * Get the current project name
-   * 
-   * @return The current project name
-   */
-  protected String getProjectName() {
-    return cleanupString(getMap(R.id.fieldProjectName));
-  }
-
-  /**
    * Are there any projects yet ?
    * 
    * @return true if projects have been detected
@@ -300,7 +288,7 @@ public class HTTrackActivity extends Activity {
    * @return The destination directory.
    */
   protected File getTargetFile() {
-    final String name = getProjectName();
+    final String name = mapper.getProjectName();
     if (name != null && name.length() != 0) {
       return new File(projectPath, name);
     } else {
@@ -330,10 +318,6 @@ public class HTTrackActivity extends Activity {
   protected boolean hasTargetIndexFile() {
     final File index = getTargetIndexFile();
     return index != null && index.exists();
-  }
-
-  protected String getProjectUrl() {
-    return cleanupString(getMap(R.id.fieldWebsiteURLs));
   }
 
   /**
@@ -450,26 +434,18 @@ public class HTTrackActivity extends Activity {
         args.add("-@i4");
       }
 
-      // TEMPORARY SECURITY FIXME
-      args.add("--max-time");
-      args.add("3600");
-      args.add("--max-size");
-      args.add("10000000");
-      // TEMPORARY SECURITY FIXME
-
       // Target
       args.add("-O");
       args.add(target.getAbsolutePath());
 
-      // Add URLs
-      for (final String s : getProjectUrl().trim().split("\\s+")) {
-        if (s.length() != 0) {
-          args.add(s);
-        }
+      // Get args from mapper
+      for (final String cmd : mapper.buildCommandline()) {
+        args.add(cmd);
       }
 
-      // Final args
+      // Final args array
       final String[] cargs = args.toArray(new String[] {});
+      Log.v(this.getClass().getName(), "starting engine: " + printArray(cargs));
 
       // Fancy message
       handlerUI.post(new Runnable() {
@@ -768,23 +744,7 @@ public class HTTrackActivity extends Activity {
     HTTrackActivity.setFileReadWrite(cache);
 
     // Write settings
-    final FileWriter writer = new FileWriter(profile);
-    final BufferedWriter lwriter = new BufferedWriter(writer);
-    try {
-      for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
-        final String value = getMap(field.first);
-        final String key = field.second;
-        lwriter.write(key);
-        lwriter.write("=");
-        if (value != null) {
-          lwriter.write(URLEncoder.encode(value, "UTF-8"));
-        }
-        lwriter.write("\n");
-      }
-      lwriter.close();
-    } finally {
-      writer.close();
-    }
+    mapper.serialize(profile);
     HTTrackActivity.setFileReadWrite(profile);
   }
 
@@ -840,6 +800,7 @@ public class HTTrackActivity extends Activity {
       if (names != null) {
         final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
             .findViewById(R.id.fieldProjectName));
+        Log.v(this.getClass().getName(), "project names: " + printArray(names));
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
       }
@@ -917,17 +878,6 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
-   * Cleanup a space-separated string.
-   * 
-   * @param s
-   *          The string
-   * @return the cleaned up string
-   */
-  private String cleanupString(String s) {
-    return s.replaceAll("\\s+", " ").trim();
-  }
-
-  /**
    * Is this space-separated string non empty ?
    * 
    * @param s
@@ -935,7 +885,7 @@ public class HTTrackActivity extends Activity {
    * @return true if the string was not empty
    */
   private boolean isStringNonEmpty(String s) {
-    return cleanupString(s).length() != 0;
+    return OptionsMapper.cleanupString(s).length() != 0;
   }
 
   /**
@@ -1072,7 +1022,8 @@ public class HTTrackActivity extends Activity {
       if (resultCode == Activity.RESULT_OK) {
         // Load modified map
         mapper.getMap().unserialize(data.getParcelableExtra("map"));
-        Log.d(this.getClass().getName(), "received map size: " + mapper.getMap().size());
+        Log.d(this.getClass().getName(), "received map size: "
+            + mapper.getMap().size());
 
         // Load possibly modified field(s)
         loadPaneFields();

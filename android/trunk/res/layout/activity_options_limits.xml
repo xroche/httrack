@@ -26,7 +26,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="3"
+            android:hint="999"
             android:inputType="numberDecimal" >
 
             <requestFocus />
@@ -50,7 +50,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="2"
+            android:hint="0"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -71,7 +71,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="32000"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -92,7 +91,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="128000"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -113,7 +111,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="32000000"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -134,7 +131,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="3600"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -155,7 +151,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="50000"
+            android:hint="25000"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -176,7 +172,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="5"
+            android:hint="5.0"
             android:inputType="numberDecimal" />
     </LinearLayout>
 
@@ -197,7 +193,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".30"
-            android:hint="1000000"
+            android:hint="100000"
             android:inputType="numberDecimal" />
     </LinearLayout>
 

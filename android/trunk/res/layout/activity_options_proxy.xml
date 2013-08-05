@@ -38,14 +38,14 @@
             android:id="@+id/textProxyPort"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".80"
+            android:layout_weight=".70"
             android:text="@string/proxy_port" />
 
         <EditText
             android:id="@+id/editProxyPort"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight=".20"
+            android:layout_weight=".30"
             android:hint="@string/hint_proxy_port"
             android:inputType="numberDecimal" />
     </LinearLayout>
