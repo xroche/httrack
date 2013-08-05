@@ -1,0 +1,95 @@
+# sources and settings (do modify)
+HTTRACK_SVN=/temp/httrack-*
+ICONV_TAR=~/libiconv-1.14.tar.gz
+ANDROID_SDK=/home/${USER}/bin/android-ndk-r8e
+TMP_DIR=/tmp/build_httrack_android
+DEST_DIR=/tmp/arm-inst
+
+# cleanup
+rm -rf ${TMP_DIR} && cp -ax ${HTTRACK_SVN} ${TMP_DIR} && cd ${TMP_DIR}
+rm -rf ${DEST_DIR}
+
+# See <http://danilogiulianelli.blogspot.fr/2012/12/how-to-cross-compile-libiconv-for.html>
+# wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
+tar xf ${ICONV_TAR}
+cd libiconv-1.14/
+
+# patch iconv
+cat << EOF | patch -p0
+--- libcharset/lib/localcharset.c.orig  2011-02-28 23:43:35.000000000 +0100
++++ libcharset/lib/localcharset.c       2013-08-05 19:45:19.736877834 +0200
+@@ -45,7 +45,7 @@
+ # endif
+ #endif
+
+-#if !defined WIN32_NATIVE
++#if !defined(WIN32_NATIVE) && !defined(__ANDROID__)
+ # include <unistd.h>
+ # if HAVE_LANGINFO_CODESET
+ #  include <langinfo.h>
+@@ -361,7 +361,7 @@
+   const char *codeset;
+   const char *aliases;
+
+-#if !(defined WIN32_NATIVE || defined OS2)
++#if !(defined WIN32_NATIVE || defined OS2 || defined __ANDROID__)
+
+ # if HAVE_LANGINFO_CODESET
+EOF
+
+# create bootsrrap config.h
+./configure -host=arm-none-linux \
+ --enable-shared --disable-static \
+ --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
+ --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
+ --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
+CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib"
+
+# create Android mk
+mkdir jni
+cat << EOF > jni/Android.mk
+LOCAL_PATH := \$(call my-dir)
+include \$(CLEAR_VARS)
+TARGET_ARCH_ABI := armeabi-v7a
+LOCAL_MODULE    := iconv
+LOCAL_CFLAGS    := \
+    -Wno-multichar \
+    -D_ANDROID \
+    -DLIBDIR="\"c\"" \
+    -DLIBICONV_PLUG
+LOCAL_C_INCLUDES := \
+    .. \
+    ../include \
+    ../lib \
+    ../libcharset/include
+LOCAL_SRC_FILES := \
+    ../lib/iconv.c \
+    ../lib/relocatable.c \
+    ../libcharset/lib/localcharset.c
+include \$(BUILD_SHARED_LIBRARY)
+EOF
+
+# build libiconv
+cd jni
+${ANDROID_SDK}/ndk-build V=1 || exit 1
+cd ..
+mkdir -p ${DEST_DIR}/lib ${DEST_DIR}/include
+cp -ax obj/local/armeabi/libiconv.so ${DEST_DIR}/lib || exit 1
+cp -ax include/iconv.h ${DEST_DIR}/include || exit 1
+
+# build httrack
+cd ${TMP_DIR}
+./configure -host=arm-none-linux \
+ --prefix=${DEST_DIR} \
+ --enable-shared --disable-static \
+ --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
+ --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
+ --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
+ --disable-https \
+ CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
+ CFLAGS="-DANDROID -D_ANDROID -DLIBICONV_PLUG -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
+ && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
+ && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' src/Makefile \
+ && find . -name Makefile -exec sed -i -e "s/\(.*LDFLAGS = \)-version-info .*/\1 -avoid-version/" {} \; \
+ && make -j8 && make install DESTDIR=${DEST_DIR} \
+ && make install

@@ -13,34 +13,17 @@
 # limitations under the License.
 #
 
-# HTTrack library build: (TEMPORARY)
-#
-# rm -rf /tmp/httrack-3.47.19 && cp -ax ~/svn/httrack/trunk /tmp/httrack-3.47.19 && cd /tmp/httrack-3.47.19
-# rm -rf /tmp/arm-inst
-# ./configure -host=arm-none-linux \
-#  --prefix=/tmp/arm-inst \
-#  --enable-shared --disable-static \
-#  --with-sysroot=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm \
-#  --with-zlib=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr \
-#  --includedir=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/include \
-#  --disable-https \
-#  CC="/home/roche/bin/android-ndk-r8e/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm -I/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/include -L/home/roche/bin/android-ndk-r8e/platforms/android-5/arch-arm/usr/lib" \
-#  CFLAGS="-DHTS_USEICONV=0 -DANDROID -D_ANDROID" \
-#  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
-#  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' src/Makefile \
-#  && find . -name Makefile -exec sed -i -e "s/\(.*LDFLAGS = \)-version-info .*/\1 -avoid-version/" {} \; \
-#  && make -j8 && make install DESTDIR=/tmp/arm-inst \
-#  && make install
-
-# JNI library build:
-#
-# cd /cygdrive/c/Users/roche/android_workspace/HTTrack/jni
-# /cygdrive/c/Dev/android/android-ndk-r8e/ndk-build
+# HTTrack library build: see prebuild/build.txt
 
 LOCAL_PATH := $(call my-dir)
 
 ##$(shell (/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni))
 ##"C:\Program Files\cygwin\bin\bash.exe" --login -c "/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni"
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := libiconv
+LOCAL_SRC_FILES := ../prebuild/libiconv.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libhttrack
@@ -57,7 +40,7 @@ LOCAL_MODULE    := htslibjni
 LOCAL_SRC_FILES := htslibjni.c
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := libhttrack
-#LOCAL_SHARED_LIBRARIES := libhttrack libhtsjava
+#LOCAL_SHARED_LIBRARIES := libhttrack libhtsjava libiconv
 #LOCAL_LDLIBS := -lhttrack
 LOCAL_CFLAGS := -W -Wall -Wextra -Werror
 include $(BUILD_SHARED_LIBRARY)

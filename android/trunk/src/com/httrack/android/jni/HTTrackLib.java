@@ -91,7 +91,9 @@ public class HTTrackLib {
   protected static native int buildTopIndex(String path, String templatesPath);
 
   static {
+    System.loadLibrary("iconv");
     System.loadLibrary("httrack");
+    System.loadLibrary("htsjava");
     System.loadLibrary("htslibjni");
   }
 }
