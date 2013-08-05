@@ -1215,10 +1215,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
               com++;
             break;
           case 'm':
-            sscanf(com + 1, LLintP, &opt->maxfile_nonhtml);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
-            if (*(com + 1) == ',') {
+            // -m,10000 variant
+            if (*(com + 1) != ',') {
+              sscanf(com + 1, LLintP, &opt->maxfile_nonhtml);
+              while(isdigit((unsigned char) *(com + 1)))
+                com++;
+            }
+            if (*(com + 1) == ',' && isdigit((unsigned char) *(com + 2))) {
               com++;
               sscanf(com + 1, LLintP, &opt->maxfile_html);
               while(isdigit((unsigned char) *(com + 1)))
