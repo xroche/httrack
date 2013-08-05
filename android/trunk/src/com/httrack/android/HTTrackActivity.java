@@ -180,11 +180,27 @@ public class HTTrackActivity extends Activity {
     return installed;
   }
 
-  /** Get the resource directory. Create it if necessary. **/
-  private File buildResourceFile() {
+  /** Delete a previous version of the resources. **/
+  private void deleteOldResourceFile() {
     final File rscPath = new File(httrackPath, "resources");
+    if (rscPath.exists()) {
+      CleanupActivity.deleteRecursively(rscPath);
+    }
+  }
+
+  /**
+   * Get the resource directory. Create it if necessary. Resources are created
+   * in the dedicated cache, so that the files can be uninstalled upon
+   * application removal.
+   **/
+  private File buildResourceFile() {
+    final File cache = getExternalCacheDir();
+    final File rscPath = new File(cache, "resources");
     final File stampFile = new File(rscPath, "resources.stamp");
     final long stamp = installOrUpdateTime();
+
+    // Alpha releases created this
+    deleteOldResourceFile();
 
     // Check timestamp of resources. If the applicate has been updated,
     // recreated cached resources.
@@ -224,6 +240,8 @@ public class HTTrackActivity extends Activity {
           "creating resources " + rscPath.getAbsolutePath() + " with stamp "
               + stamp);
       if (HTTrackActivity.mkdirs(rscPath)) {
+        long totalSize = 0;
+        int totalFiles = 0;
         try {
           final InputStream zipStream = getResources().openRawResource(
               R.raw.resources);
@@ -240,13 +258,18 @@ public class HTTrackActivity extends Activity {
               int length;
               while ((length = file.read(bytes)) >= 0) {
                 writer.write(bytes, 0, length);
+                totalSize += length;
               }
               writer.close();
+              totalFiles++;
               dest.setLastModified(entry.getTime());
             }
           }
           file.close();
           zipStream.close();
+          Log.i(this.getClass().getName(),
+              "created resources " + rscPath.getAbsolutePath() + " ("
+                  + totalFiles + " files, " + totalSize + " bytes)");
 
           // Write stamp
           final FileWriter writer = new FileWriter(stampFile);
@@ -260,6 +283,8 @@ public class HTTrackActivity extends Activity {
         }
       }
     }
+    
+    // Return resources path
     return rscPath;
   }
 
