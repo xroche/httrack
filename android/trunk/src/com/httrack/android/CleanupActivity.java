@@ -113,7 +113,7 @@ public class CleanupActivity extends ListActivity {
       final SparseArray<String> projectMap = new SparseArray<String>();
       final File target = new File(projectRootFile, name);
       try {
-        HTTrackActivity.unserialize(HTTrackActivity.getProfileFile(target),
+        OptionsMapper.unserialize(HTTrackActivity.getProfileFile(target),
             projectMap);
         final String description = projectMap.get(R.id.fieldWebsiteURLs);
         map.put("description", description);
