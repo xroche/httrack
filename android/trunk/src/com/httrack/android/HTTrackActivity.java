@@ -116,15 +116,26 @@ public class HTTrackActivity extends Activity {
   // Stats
   protected HTTrackStats lastStats;
 
-  private static File getExternalStorage() throws IOException {
+  /* Get the root storage. */
+  private static File getExternalStorage() {
     final String state = Environment.getExternalStorageState();
-
     if (Environment.MEDIA_MOUNTED.equals(state)) {
-      return Environment.getExternalStorageDirectory();
-    } else if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
-      throw new IOException("read-only media");
+      return Environment
+          .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     } else {
-      throw new IOException("no storage media");
+      return Environment.getDataDirectory();
+    }
+  }
+
+  /* Check if the external storage is available. */
+  private static void checkExternalStorage() throws IOException {
+    final String state = Environment.getExternalStorageState();
+    if (!Environment.MEDIA_MOUNTED.equals(state)) {
+      if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+        throw new IOException("read-only media");
+      } else {
+        throw new IOException("no storage media");
+      }
     }
   }
 
@@ -145,13 +156,16 @@ public class HTTrackActivity extends Activity {
       errors += "\n\nERROR: " + re.getMessage();
     }
 
-    // Default target directory on external storage
+    // Check if an external storage is available
     try {
-      rootPath = getExternalStorage();
+      checkExternalStorage();
     } catch (final IOException e) {
-      errors += "\n\nWARNING: " + e.getMessage();
-      projectPath = Environment.getExternalStorageDirectory();
+      errors += "\n\nWARNING: " + e.getMessage()
+          + " ; HTTrack will probably not be able to download websites";
     }
+
+    // Default target directory on external storage
+    rootPath = getExternalStorage();
     httrackPath = new File(rootPath, "HTTrack");
     projectPath = new File(httrackPath, "Websites");
 
@@ -283,7 +297,7 @@ public class HTTrackActivity extends Activity {
         }
       }
     }
-    
+
     // Return resources path
     return rscPath;
   }
@@ -478,8 +492,8 @@ public class HTTrackActivity extends Activity {
    */
   protected static void emergencyDump(final Throwable e) {
     try {
-      final File dumpFile = new File(new File(Environment
-          .getExternalStorageDirectory().getPath(), "HTTrack"), "error.txt");
+      final File dumpFile = new File(new File(getExternalStorage(), "HTTrack"),
+          "error.txt");
       final FileWriter writer = new FileWriter(dumpFile);
       final PrintWriter print = new PrintWriter(writer);
       e.printStackTrace(print);
