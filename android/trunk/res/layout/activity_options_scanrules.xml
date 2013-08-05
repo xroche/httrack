@@ -1,51 +1,50 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:background="@drawable/bg_rings"
+    android:orientation="vertical"
     android:paddingBottom="@dimen/activity_vertical_margin"
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin" >
 
-    <TextView
-        android:id="@+id/textLinksDetails"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/buttonExclude"
-        android:layout_alignParentBottom="true"
-        android:text="@string/scan_rules_details"
-        android:textAppearance="?android:attr/textAppearanceSmall" />
+        android:orientation="horizontal"
+        android:visibility="gone" >
 
-    <Button
-        android:id="@+id/buttonExclude"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"
-        android:text="@string/exclude_links" />
+        <Button
+            android:id="@+id/buttonExclude"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left"
+            android:text="@string/exclude_links" />
 
-    <Button
-        android:id="@+id/buttonInclude"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/buttonExclude"
-        android:layout_alignBottom="@+id/buttonExclude"
-        android:layout_alignParentRight="true"
-        android:text="@string/include_links" />
+        <Button
+            android:id="@+id/buttonInclude"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:text="@string/include_links" />
+    </LinearLayout>
 
     <EditText
         android:id="@+id/editRules"
-        android:layout_width="wrap_content"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/textLinksDetails"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentRight="true"
-        android:layout_below="@+id/buttonExclude"
         android:hint="@string/hint_scan_rules"
         android:inputType="textMultiLine" >
 
         <requestFocus />
     </EditText>
 
-</RelativeLayout>
+    <TextView
+        android:id="@+id/textLinksDetails"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/scan_rules_details"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+</LinearLayout>
