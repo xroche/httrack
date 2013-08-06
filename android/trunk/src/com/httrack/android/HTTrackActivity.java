@@ -569,15 +569,6 @@ public class HTTrackActivity extends Activity {
       final String[] cargs = args.toArray(new String[] {});
       Log.v(this.getClass().getName(), "starting engine: " + printArray(cargs));
 
-      // Fancy message
-      handlerUI.post(new Runnable() {
-        @Override
-        public void run() {
-          final TextView fieldInprogress = (TextView) findViewById(R.id.fieldDisplay);
-          fieldInprogress.setText("Starting mirror:\n" + printArray(cargs));
-        }
-      });
-
       // Rock'in!
       String message = null;
       try {
@@ -1241,8 +1232,10 @@ public class HTTrackActivity extends Activity {
     if (index != null && index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
+      // Note: won't work if the project name has spaces :(
+      final Uri uri = Uri.fromFile(index);
       // Without the MIME, Android tend to crash with a NPE (!)
-      intent.setDataAndType(Uri.fromFile(index), "text/html");
+      intent.setDataAndType(uri, "text/html");
       return intent;
     } else {
       return null;
