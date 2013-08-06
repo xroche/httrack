@@ -58,6 +58,7 @@ import android.content.res.Configuration;
 import android.text.Html;
 import android.util.Log;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -76,10 +77,6 @@ public class HTTrackActivity extends Activity {
   // Special layout positions
   protected static final int LAYOUT_START = 0;
   protected static final int LAYOUT_FINISHED = 4;
-
-  // Corresponding menus
-  protected static final int menus[] = { R.menu.startup, R.menu.proj_name,
-      R.menu.proj_setup, R.menu.mirror_progress, R.menu.mirror_finished };
 
   // Fields to restore/save state (Note: might be read-only fields)
   protected static final int fields[][] = { {},
@@ -300,6 +297,18 @@ public class HTTrackActivity extends Activity {
 
     // Return resources path
     return rscPath;
+  }
+
+  /** Return a text resource as a string. **/
+  private String getTextResource(final int id) {
+    try {
+      final InputStream is = getResources().openRawResource(id);
+      byte[] b = new byte[is.available()];
+      is.read(b);
+      return new String(b, "UTF-8");
+    } catch (IOException io) {
+      return "resource not found";
+    }
   }
 
   /**
@@ -1142,7 +1151,7 @@ public class HTTrackActivity extends Activity {
   public boolean onCreateOptionsMenu(Menu menu) {
     // Inflate the menu; this adds items to the action bar if it is present.
     if (pane_id != -1) {
-      getMenuInflater().inflate(menus[pane_id], menu);
+      getMenuInflater().inflate(R.menu.menu, menu);
     }
     return true;
   }
@@ -1240,6 +1249,14 @@ public class HTTrackActivity extends Activity {
     }
   }
 
+  /** Browser a specific web page. **/
+  private void browse(final Uri uri) {
+    final Intent intent = new Intent();
+    intent.setAction(android.content.Intent.ACTION_VIEW);
+    intent.setData(uri);
+    startActivity(intent);
+  }
+
   /** Browser a specific index. **/
   private void browse(final File index) {
     final Intent intent = getBrowseIntent(index);
@@ -1286,17 +1303,35 @@ public class HTTrackActivity extends Activity {
     }
   }
 
-  /**
-   * "Help"
-   */
-  public void onHelp(final View view) {
-    final Intent intent = new Intent(this, HelpActivity.class);
-    fillExtra(intent);
-    startActivity(intent);
-  }
-
   @Override
   public void onConfigurationChanged(Configuration newConfig) {
     // TODO: handle orientation change ?
+  }
+
+  @Override
+  public boolean onOptionsItemSelected(final MenuItem item) {
+    // Handle item selection
+    switch (item.getItemId()) {
+    case R.id.action_about:
+      final String about = getTextResource(R.raw.about);
+      new AlertDialog.Builder(this).setTitle("About").setMessage(about).show();
+      break;
+    case R.id.action_license:
+      browse(new File(new File(getResourceFile(), "license"),
+          "gpl-3.0-standalone.html"));
+      break;
+    case R.id.action_forum:
+      browse(Uri.parse("http://forum.httrack.com/"));
+      break;
+    case R.id.action_website:
+      browse(Uri.parse("http://www.httrack.com/"));
+      break;
+    case R.id.action_help:
+      browse(new File(new File(getResourceFile(), "html"), "index.html"));
+      break;
+    default:
+      return super.onOptionsItemSelected(item);
+    }
+    return true;
   }
 }

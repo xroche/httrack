@@ -1,0 +1,24 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+
+    <item
+        android:id="@+id/action_help"
+        android:orderInCategory="100"
+        android:title="@string/action_help"/>
+    <item
+        android:id="@+id/action_website"
+        android:orderInCategory="200"
+        android:title="@string/action_website"/>
+    <item
+        android:id="@+id/action_forum"
+        android:orderInCategory="200"
+        android:title="@string/action_forum"/>
+    <item
+        android:id="@+id/action_license"
+        android:orderInCategory="300"
+        android:title="@string/action_license"/>
+    <item
+        android:id="@+id/action_about"
+        android:orderInCategory="300"
+        android:title="@string/action_about"/>
+
+</menu>

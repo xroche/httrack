@@ -144,5 +144,9 @@
     <string name="read_documentation">View Documentation</string>
     <string name="browse_site">Browse HTTrack Website</string>
     <string name="browse_forum">Browse HTTrack Forum</string>
-
-</resources>
+    <string name="action_help">View Documentation</string>
+    <string name="action_about">About HTTrack</string>
+    <string name="action_website">Go To HTTrack Website</string>
+    <string name="action_forum">Go To HTTrack Forum</string>
+    <string name="action_license">View License</string>
+</resources>

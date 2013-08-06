@@ -313,7 +313,7 @@ public class OptionsActivity extends TabActivity {
   @Override
   public boolean onCreateOptionsMenu(final Menu menu) {
     // Inflate the menu; this adds items to the action bar if it is present.
-    getMenuInflater().inflate(R.menu.options, menu);
+    getMenuInflater().inflate(R.menu.menu, menu);
     return true;
   }
 
