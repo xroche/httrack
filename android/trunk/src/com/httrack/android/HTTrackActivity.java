@@ -1232,7 +1232,8 @@ public class HTTrackActivity extends Activity {
     if (index != null && index.exists()) {
       final Intent intent = new Intent();
       intent.setAction(android.content.Intent.ACTION_VIEW);
-      // Note: won't work if the project name has spaces :(
+      // Note: won't work on certain Android releases if the project name has
+      // spaces :(
       final Uri uri = Uri.fromFile(index);
       // Without the MIME, Android tend to crash with a NPE (!)
       intent.setDataAndType(uri, "text/html");
