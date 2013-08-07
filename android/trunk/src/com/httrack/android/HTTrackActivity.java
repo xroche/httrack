@@ -555,6 +555,7 @@ public class HTTrackActivity extends FragmentActivity {
     public RunnerFragment() {
     }
 
+    @Override
     public void onCreate(final Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
 
@@ -562,9 +563,26 @@ public class HTTrackActivity extends FragmentActivity {
       setRetainInstance(true);
     }
 
+    @Override
+    public void onDestroy() {
+      // Ensure the running job is killed when the fragment is disposed
+      if (runner != null) {
+        if (!runner.isStopped()) {
+          if (runner.stopMirror()) {
+            runner.sendWarningNotification("Warning",
+                "HTTrack: mirror stopped!");
+          }
+        }
+      }
+      super.onDestroy();
+    }
+
     public void setParent(final HTTrackActivity parent) {
+      if (runner != null) {
+        throw new RuntimeException("can not attach twice");
+      }
       // Create and execute the background task.
-      this.runner = new Runner(parent);
+      runner = new Runner(parent);
       runner.execute();
     }
 
@@ -628,6 +646,14 @@ public class HTTrackActivity extends FragmentActivity {
      */
     public synchronized void detach() {
       this.parent = null;
+    }
+
+    /** Trunk to parent's sendWarningNotification(). **/
+    public synchronized void sendWarningNotification(final String title,
+        final String text) {
+      if (parent != null) {
+        parent.sendWarningNotification(title, text);
+      }
     }
 
     /* Background task. */
@@ -1569,7 +1595,7 @@ public class HTTrackActivity extends FragmentActivity {
     // Security
     if (runner != null) {
       sendWarningNotification("Warning",
-          "HTTrack: restore called while running!");
+          "HTTrack: restore called while running ignored!");
       return;
     }
 
@@ -1593,19 +1619,7 @@ public class HTTrackActivity extends FragmentActivity {
       // Set focus
       setCurrentFocusId(focus_ids);
 
-      sendWarningNotification("Warning", "HTTrack: restored session!");
+      // sendWarningNotification("Warning", "HTTrack: restored session!");
     }
-  }
-
-  @Override
-  protected void onDestroy() {
-    // Ensure engine is properly stopped
-    if (runner != null) {
-      // if (runner.stopMirror()) {
-      // sendWarningNotification("Warning", "HTTrack: mirror stopped!");
-      // }
-      // runner = null;
-    }
-    super.onDestroy();
   }
 }
