@@ -60,6 +60,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Configuration;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
@@ -117,6 +119,8 @@ public class HTTrackActivity extends FragmentActivity {
 
   // Project settings
   protected String version;
+  protected String versionFeatures;
+  protected int versionCode;
   protected File rootPath;
   protected File httrackPath;
   protected File projectPath;
@@ -157,9 +161,19 @@ public class HTTrackActivity extends FragmentActivity {
 
       // Fetch httrack engine version
       version = HTTrackLib.getVersion();
+      versionFeatures = HTTrackLib.getFeatures();
     } catch (final RuntimeException re) {
       // Woops, something is not right here.
       errors += "\n\nERROR: " + re.getMessage();
+    }
+
+    // Android package version code
+    try {
+      final PackageInfo info = getPackageManager().getPackageInfo(
+          getPackageName(), 0);
+      versionCode = info.versionCode;
+    } catch (NameNotFoundException e) {
+      errors += "\n\nERROR: " + e.getMessage();
     }
 
     // Check if an external storage is available
@@ -1120,10 +1134,16 @@ public class HTTrackActivity extends FragmentActivity {
       // Debugging and information.
       str.append("<br /><i>");
       if (version != null) {
-        str.append("<br />VERSION: ");
+        str.append("<br />Version: ");
+        // Library version
         str.append(version);
+        str.append(versionFeatures);
+        // Android version
+        str.append(" (Android version ");
+        str.append(versionCode);
+        str.append(")");
       }
-      str.append(" • PATH: ");
+      str.append(" • Path: ");
       str.append(projectPath.getAbsolutePath());
       str.append(" • IPv6: ");
       final InetAddress addrV6 = getIPv6Address();

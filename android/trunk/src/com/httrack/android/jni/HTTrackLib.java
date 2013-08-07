@@ -36,6 +36,13 @@ public class HTTrackLib {
   public static native String getVersion();
 
   /**
+   * Get the current library features, as a string of [+-]tag.
+   * 
+   * @return the current library features.
+   */
+  public static native String getFeatures();
+
+  /**
    * Initialize the httrack library. MUST be called once.
    */
   public static native void init();

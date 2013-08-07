@@ -310,6 +310,13 @@ jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env, jclass c
   return (*env)->NewStringUTF(env, version);
 }
 
+jstring Java_com_httrack_android_jni_HTTrackLib_getFeatures(JNIEnv* env, jclass clazz) {
+  const char *features = hts_is_available();
+  assert(features != NULL);
+  UNUSED(clazz);
+  return (*env)->NewStringUTF(env, features);
+}
+
 typedef struct jni_context_t {
   JNIEnv *env;
   /* HTTrackCallbacks object */
