@@ -56,10 +56,10 @@
 /* #undef HTS_LFS */
 
 /* Check for OpenSSL */
-#define HTS_USEOPENSSL 0
+#define HTS_USEOPENSSL 1
 
 /* Check for libiconv */
-/* #undef LIBICONV */
+#define LIBICONV 1
 
 /* Check for libsocket */
 /* #undef LIBSOCKET */

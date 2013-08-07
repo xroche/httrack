@@ -350,7 +350,7 @@ static jobject newStringSafe(JNIEnv *env, const char *s) {
 static jobject build_stats(jni_context_t *const t, httrackp * opt,
   lien_back * back, int back_max, int back_index, int lien_n,
   int lien_tot, int stat_time, hts_stat_struct * stats) {
-#define STATE_MAX 256
+#define STATE_MAX 32
   hts_state_t state[STATE_MAX];
   size_t index = 0;
 

@@ -87,6 +87,11 @@ extern char *hts_getCharsetFromMeta(const char *html, size_t size);
 extern int hts_isStringAscii(const char *s, size_t size);
 
 /**
+ * Is the given string an UTF-8 string ?
+ **/
+extern int hts_isStringUTF8(const char *s, size_t size);
+
+/**
  * Is the given charset the UTF-8 charset ?
  **/
 extern int hts_isCharsetUTF8(const char *charset);

@@ -1,16 +1,34 @@
 # sources and settings (do modify)
 HTTRACK_SVN=/temp/httrack-*
-ICONV_TAR=~/libiconv-1.14.tar.gz
+ICONV_TAR=/temp/android/libiconv-1.14.tar.gz
 ANDROID_SDK=/home/${USER}/bin/android-ndk-r8e
 TMP_DIR=/tmp/build_httrack_android
 DEST_DIR=/tmp/arm-inst
+# iconv and openSSL cache builds
+# tar cvfz iconv-openssl-android.tgz lib include
+BUILD_CACHE=/temp/android/iconv-openssl-android.tgz
 
 # cleanup
 rm -rf ${TMP_DIR} && cp -ax ${HTTRACK_SVN} ${TMP_DIR} && cd ${TMP_DIR}
 rm -rf ${DEST_DIR}
 
+# valid build cache ?
+if test -n "$BUILD_CACHE"; then
+if test -f "$BUILD_CACHE"; then
+mkdir -p ${DEST_DIR}
+cd ${DEST_DIR} || exit 1
+tar xf "$BUILD_CACHE" || exit 1
+else
+BUILD_CACHE=
+fi
+fi
+
+# build iconv and openSSL ?
+if ! test -n "$BUILD_CACHE"; then
+
 # See <http://danilogiulianelli.blogspot.fr/2012/12/how-to-cross-compile-libiconv-for.html>
 # wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
+cd ${TMP_DIR}
 tar xf ${ICONV_TAR}
 cd libiconv-1.14/
 
@@ -77,7 +95,23 @@ mkdir -p ${DEST_DIR}/lib ${DEST_DIR}/include
 cp -ax obj/local/armeabi/libiconv.so ${DEST_DIR}/lib || exit 1
 cp -ax include/iconv.h ${DEST_DIR}/include || exit 1
 
+# build openSSL
+# Thanks to the Guardian Project <http://guardianproject.info/> for the help
+git clone https://github.com/guardianproject/openssl-android.git
+cd openssl-android/
+${ANDROID_SDK}/ndk-build
+cp -ax libs/armeabi/libssl.so libs/armeabi/libcrypto.so ${DEST_DIR}/lib || exit 1
+cp -ax include/openssl ${DEST_DIR}/include || exit 1
+cd ..
+
+else
+
+echo "using pre-build binaries"
+
+fi
+
 # build httrack
+# no more --disable-https
 cd ${TMP_DIR}
 ./configure -host=arm-none-linux \
  --prefix=${DEST_DIR} \
@@ -85,7 +119,6 @@ cd ${TMP_DIR}
  --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
- --disable-https \
  CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
  CFLAGS="-DANDROID -D_ANDROID -DLIBICONV_PLUG -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \

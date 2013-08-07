@@ -92,6 +92,8 @@ public class HTTrackLib {
 
   static {
     System.loadLibrary("iconv");
+    System.loadLibrary("crypto");
+    System.loadLibrary("ssl");
     System.loadLibrary("httrack");
     System.loadLibrary("htsjava");
     System.loadLibrary("htslibjni");
