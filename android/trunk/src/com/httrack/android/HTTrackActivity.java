@@ -47,6 +47,7 @@ import com.httrack.android.jni.HTTrackStats;
 import com.httrack.android.jni.HTTrackStats.Element;
 
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -60,6 +61,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
 import android.text.Html;
 import android.util.Log;
 import android.view.Menu;
@@ -74,7 +78,7 @@ import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
-public class HTTrackActivity extends Activity {
+public class HTTrackActivity extends FragmentActivity {
   // Page layouts
   protected static final int layouts[] = { R.layout.activity_startup,
       R.layout.activity_proj_name, R.layout.activity_proj_setup,
@@ -100,7 +104,7 @@ public class HTTrackActivity extends Activity {
   protected static final int ACTIVITY_OPTIONS = 0;
 
   // Engine
-  protected Runner runner = null;
+  protected RunnerFragment runner = null;
 
   // Current pane id and context
   protected int pane_id = -1;
@@ -116,11 +120,7 @@ public class HTTrackActivity extends Activity {
   protected File rootPath;
   protected File httrackPath;
   protected File projectPath;
-  protected boolean mirrorRefresh;
   protected File rscPath;
-
-  // Stats
-  protected HTTrackStats lastStats;
 
   /* Get the root storage. */
   private static File getExternalStorage() {
@@ -353,6 +353,15 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * Trunk to mapper's buildCommandline()
+   * 
+   * @return
+   */
+  public synchronized List<String> buildCommandline() {
+    return mapper.buildCommandline();
+  }
+
+  /**
    * Are there any projects yet ?
    * 
    * @return true if projects have been detected
@@ -458,7 +467,7 @@ public class HTTrackActivity extends Activity {
    *          The string array
    * @return The pretty-printed value
    */
-  private String printArray(final String[] array) {
+  private static String printArray(final String[] array) {
     final StringBuilder builder = new StringBuilder();
     for (String s : array) {
       if (builder.length() != 0) {
@@ -526,7 +535,7 @@ public class HTTrackActivity extends Activity {
    * 
    * @return 1 upon success
    */
-  protected int buildTopIndex() {
+  protected synchronized int buildTopIndex() {
     // Build top index
     final File rsc = getResourceFile();
     if (rsc != null) {
@@ -537,24 +546,103 @@ public class HTTrackActivity extends Activity {
   }
 
   /**
+   * The runner fragment class.<br />
+   * Thanks to Alex Lockwood for the useful hints regarding fragments!
+   */
+  protected static class RunnerFragment extends Fragment {
+    protected Runner runner;
+
+    public RunnerFragment() {
+    }
+
+    public void onCreate(final Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+
+      // Retain this fragment across configuration changes.
+      setRetainInstance(true);
+    }
+
+    public void setParent(final HTTrackActivity parent) {
+      // Create and execute the background task.
+      this.runner = new Runner(parent);
+      runner.execute();
+    }
+
+    // Attach activity
+    @Override
+    public void onAttach(final Activity activity) {
+      super.onAttach(activity);
+      runner.setParent(HTTrackActivity.class.cast(activity));
+    }
+
+    // Detach activity
+    @Override
+    public void onDetach() {
+      super.onDetach();
+      runner.detach();
+    }
+
+    public boolean stopMirror() {
+      return runner.stopMirror();
+    }
+
+    public HTTrackStats getLastStats() {
+      return runner.getLastStats();
+    }
+  }
+
+  /**
    * Engine thread runner.
    */
-  protected class Runner extends Thread implements HTTrackCallbacks {
+  protected static class Runner extends AsyncTask<Void, Integer, Void>
+      implements HTTrackCallbacks {
     private final HTTrackLib engine = new HTTrackLib(this);
     private boolean stopped;
-    final StringBuilder str = new StringBuilder();
+    final private StringBuilder str = new StringBuilder();
+    private HTTrackActivity parent;
+    private boolean mirrorRefresh;
+    protected HTTrackStats lastStats;
 
+    /**
+     * Constructor.
+     * 
+     * @param parent
+     *          the parent activity.
+     */
+    public Runner(final HTTrackActivity parent) {
+      this.parent = parent;
+    }
+
+    /**
+     * Set the parent activity.
+     * 
+     * @param parent
+     *          the parent activity
+     */
+    public synchronized void setParent(final HTTrackActivity parent) {
+      this.parent = parent;
+    }
+
+    /**
+     * Detach a parent.
+     */
+    public synchronized void detach() {
+      this.parent = null;
+    }
+
+    /* Background task. */
     @Override
-    public void run() {
+    protected Void doInBackground(Void... arg0) {
       try {
         runInternal();
       } catch (final Throwable e) {
         HTTrackActivity.emergencyDump(e);
       }
+      return null;
     }
 
     protected void runInternal() {
-      final File target = getTargetFile();
+      final File target = parent.getTargetFile();
       final List<String> args = new ArrayList<String>();
 
       // Program name
@@ -570,13 +658,14 @@ public class HTTrackActivity extends Activity {
       args.add(target.getAbsolutePath());
 
       // Get args from mapper
-      for (final String cmd : mapper.buildCommandline()) {
+      for (final String cmd : parent.buildCommandline()) {
         args.add(cmd);
       }
 
       // Final args array
       final String[] cargs = args.toArray(new String[] {});
-      Log.v(this.getClass().getName(), "starting engine: " + printArray(cargs));
+      Log.v(this.getClass().getName(),
+          "starting engine: " + HTTrackActivity.printArray(cargs));
 
       // Rock'in!
       String message = null;
@@ -588,7 +677,7 @@ public class HTTrackActivity extends Activity {
         HTTrackActivity.setFileReadWrite(target);
 
         // Serialize settings
-        serialize();
+        parent.serialize();
 
         // Run engine
         final int code = engine.main(cargs);
@@ -620,7 +709,11 @@ public class HTTrackActivity extends Activity {
         }
 
         // Build top index
-        buildTopIndex();
+        synchronized (this) {
+          if (parent != null) {
+            parent.buildTopIndex();
+          }
+        }
       } catch (final IOException io) {
         message = io.getMessage();
       }
@@ -628,24 +721,34 @@ public class HTTrackActivity extends Activity {
       // Ensure we switch to the final pane
       final String displayMessage = "Mirror finished: " + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
-      handlerUI.post(new Runnable() {
-        @Override
-        public void run() {
-          // Final pane
-          setPane(LAYOUT_FINISHED);
+      synchronized (this) {
+        if (parent != null) {
+          parent.handlerUI.post(new Runnable() {
+            @Override
+            public void run() {
+              // Final pane
+              parent.setPane(LAYOUT_FINISHED);
 
-          // Fancy result message
-          if (displayMessage != null) {
-            TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(
-                Html.fromHtml(displayMessage));
-          }
-          if (errorsCount != 0) {
-            final Animation shake = AnimationUtils.loadAnimation(
-                HTTrackActivity.this, R.anim.scale);
-            findViewById(R.id.buttonLogs).startAnimation(shake);
-          }
+              // Fancy result message
+              if (displayMessage != null) {
+                final View view = parent.findViewById(R.id.fieldDisplay);
+                if (view != null) {
+                  TextView.class.cast(view).setText(
+                      Html.fromHtml(displayMessage));
+                }
+              }
+              if (errorsCount != 0) {
+                final View view = parent.findViewById(R.id.buttonLogs);
+                if (view != null) {
+                  final Animation shake = AnimationUtils.loadAnimation(parent,
+                      R.anim.scale);
+                  view.startAnimation(shake);
+                }
+              }
+            }
+          });
         }
-      });
+      }
     }
 
     /**
@@ -660,10 +763,16 @@ public class HTTrackActivity extends Activity {
       // If not yet stopped, mark as dirty
       // ("Continue an interrupted mirror ...")
       try {
-        if (stopSent) {
-          setInterruptedProfile(true);
-        } else {
-          setInterruptedProfile(false);
+        synchronized (this) {
+          if (parent != null) {
+            if (stopSent) {
+              parent.setInterruptedProfile(true);
+            } else {
+              parent.setInterruptedProfile(false);
+            }
+          } else {
+            throw new IOException("parent has been detached");
+          }
         }
       } catch (final IOException io) {
         Log.w(this.getClass().getName(), "could not lock file", io);
@@ -798,13 +907,28 @@ public class HTTrackActivity extends Activity {
       }
       final String message = str.toString();
       // Post refresh.
-      handlerUI.post(new Runnable() {
-        @Override
-        public void run() {
-          TextView.class.cast(findViewById(R.id.fieldDisplay)).setText(
-              Html.fromHtml(message));
+      synchronized (this) {
+        if (parent != null) {
+          parent.handlerUI.post(new Runnable() {
+            @Override
+            public void run() {
+              final View view = parent.findViewById(R.id.fieldDisplay);
+              if (view != null) {
+                TextView.class.cast(view).setText(Html.fromHtml(message));
+              }
+            }
+          });
         }
-      });
+      }
+    }
+
+    /**
+     * Get last statistics
+     * 
+     * @return last statistics (or @c null if none)
+     */
+    public synchronized HTTrackStats getLastStats() {
+      return lastStats;
     }
   }
 
@@ -856,7 +980,8 @@ public class HTTrackActivity extends Activity {
    * @throws IOException
    *           Upon I/O error.
    */
-  protected void setInterruptedProfile(boolean interrupted) throws IOException {
+  protected synchronized void setInterruptedProfile(boolean interrupted)
+      throws IOException {
     final File target = getTargetFile();
     final File cache = new File(target, "hts-cache");
     final File lock = new File(cache, "interrupted.lock");
@@ -901,7 +1026,7 @@ public class HTTrackActivity extends Activity {
    * @throws IOException
    *           Upon I/O error.
    */
-  protected void serialize() throws IOException {
+  protected synchronized void serialize() throws IOException {
     final File target = getTargetFile();
     final File profile = getProfileFile();
     final File cache = profile.getParentFile();
@@ -931,6 +1056,26 @@ public class HTTrackActivity extends Activity {
   protected void unserialize() throws IOException {
     final File profile = getProfileFile();
     mapper.unserialize(profile);
+  }
+
+  /**
+   * Start the runner
+   */
+  protected synchronized void startRunner() {
+    final String id = "runner_task";
+
+    // First attempt to reclaim a running one (orientation change)
+    if (runner == null) {
+      final FragmentManager fm = getSupportFragmentManager();
+      runner = (RunnerFragment) fm.findFragmentByTag(id);
+    }
+    // Then, create one if necessary
+    if (runner == null) {
+      final FragmentManager fm = getSupportFragmentManager();
+      runner = new RunnerFragment();
+      runner.setParent(this);
+      fm.beginTransaction().add(runner, id).commit();
+    }
   }
 
   /**
@@ -996,9 +1141,8 @@ public class HTTrackActivity extends Activity {
       }
       break;
     case R.layout.activity_mirror_progress:
-      if (runner == null) {
-        runner = new Runner();
-        runner.start();
+      startRunner();
+      if (runner != null) {
         ProgressBar.class.cast(findViewById(R.id.progressMirror))
             .setVisibility(View.VISIBLE);
       }
@@ -1014,8 +1158,11 @@ public class HTTrackActivity extends Activity {
           hasTargetIndexFile());
 
       // Final stats
-      if (lastStats != null && lastStats.errorsCount != 0) {
-        // TODO
+      if (runner != null) {
+        final HTTrackStats lastStats = runner.getLastStats();
+        if (lastStats != null && lastStats.errorsCount != 0) {
+          // TODO
+        }
       }
       break;
     }
@@ -1429,12 +1576,6 @@ public class HTTrackActivity extends Activity {
     // Switch pane id
     int id = savedInstanceState.getInt("pane_id");
 
-    // We were in the middle of a mirror, sheesh ...
-    if (id == LAYOUT_MIRROR_PROGRESS) {
-      // Go back to project setup
-      id = LAYOUT_PROJECT_SETUP;
-    }
-
     // Current focus
     final int[] focus_ids = savedInstanceState.getIntArray("focus_id");
 
@@ -1460,12 +1601,11 @@ public class HTTrackActivity extends Activity {
   protected void onDestroy() {
     // Ensure engine is properly stopped
     if (runner != null) {
-      if (runner.stopMirror()) {
-        sendWarningNotification("Warning", "HTTrack: mirror stopped!");
-      }
-      runner = null;
+      // if (runner.stopMirror()) {
+      // sendWarningNotification("Warning", "HTTrack: mirror stopped!");
+      // }
+      // runner = null;
     }
     super.onDestroy();
   }
-
 }
