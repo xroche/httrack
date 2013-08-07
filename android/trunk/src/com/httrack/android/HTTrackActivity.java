@@ -50,8 +50,13 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Parcelable;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
@@ -64,6 +69,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -76,6 +82,9 @@ public class HTTrackActivity extends Activity {
 
   // Special layout positions
   protected static final int LAYOUT_START = 0;
+  protected static final int LAYOUT_PROJECT_NAME = 1;
+  protected static final int LAYOUT_PROJECT_SETUP = 2;
+  protected static final int LAYOUT_MIRROR_PROGRESS = 3;
   protected static final int LAYOUT_FINISHED = 4;
 
   // Fields to restore/save state (Note: might be read-only fields)
@@ -642,7 +651,7 @@ public class HTTrackActivity extends Activity {
     /**
      * Stop the mirror.
      */
-    public void stopMirror() {
+    public boolean stopMirror() {
       synchronized (this) {
         stopped = true;
       }
@@ -659,6 +668,7 @@ public class HTTrackActivity extends Activity {
       } catch (final IOException io) {
         Log.w(this.getClass().getName(), "could not lock file", io);
       }
+      return stopSent;
     }
 
     /**
@@ -989,8 +999,6 @@ public class HTTrackActivity extends Activity {
       if (runner == null) {
         runner = new Runner();
         runner.start();
-        TextView.class.cast(findViewById(R.id.fieldDisplay))
-            .setText("Started!");
         ProgressBar.class.cast(findViewById(R.id.progressMirror))
             .setVisibility(View.VISIBLE);
       }
@@ -1018,11 +1026,11 @@ public class HTTrackActivity extends Activity {
    */
   protected void onFinish() {
     // FIXME TODO CRASHES!
-    runOnUiThread(new Runnable() {
-      public void run() {
-        finish();
-      }
-    });
+    // runOnUiThread(new Runnable() {
+    // public void run() {
+    // finish();
+    // }
+    // });
   }
 
   /**
@@ -1184,6 +1192,17 @@ public class HTTrackActivity extends Activity {
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
 
+  /** Restore a previously saved map context. **/
+  private void loadParcelable(final Parcelable data) {
+    // Load modified map
+    mapper.getMap().unserialize(data);
+    Log.d(this.getClass().getName(), "received map size: "
+        + mapper.getMap().size());
+
+    // Load possibly modified field(s)
+    loadPaneFields();
+  }
+
   @Override
   protected void onActivityResult(int requestCode, int resultCode,
       final Intent data) {
@@ -1192,12 +1211,7 @@ public class HTTrackActivity extends Activity {
     case ACTIVITY_OPTIONS:
       if (resultCode == Activity.RESULT_OK) {
         // Load modified map
-        mapper.getMap().unserialize(data.getParcelableExtra("map"));
-        Log.d(this.getClass().getName(), "received map size: "
-            + mapper.getMap().size());
-
-        // Load possibly modified field(s)
-        loadPaneFields();
+        loadParcelable(data.getParcelableExtra("map"));
       }
       break;
     }
@@ -1328,4 +1342,130 @@ public class HTTrackActivity extends Activity {
     }
     return true;
   }
+
+  /** Get current focus identifier. **/
+  protected int[] getCurrentFocusId() {
+    final View view = getCurrentFocus();
+    if (view != null) {
+      final int id = view.getId();
+      if (view instanceof EditText) {
+        final EditText edit = EditText.class.cast(view);
+        final int start = edit.getSelectionStart();
+        final int end = edit.getSelectionEnd();
+        return new int[] { id, start, end };
+      }
+      return new int[] { id };
+    } else {
+      return new int[] {};
+    }
+  }
+
+  /** Set current focus identifier. **/
+  private void setCurrentFocusId(final int ids[]) {
+    if (ids != null && ids.length != 0) {
+      final int id = ids[0];
+      final View view = findViewById(id);
+      if (view != null) {
+        view.requestFocus();
+        if (view instanceof EditText) {
+          final EditText edit = EditText.class.cast(view);
+          if (ids.length >= 3) {
+            final int start = ids[1];
+            final int end = ids[2];
+            edit.setSelection(start, end);
+          }
+        }
+      }
+    }
+  }
+
+  @Override
+  protected void onSaveInstanceState(final Bundle outState) {
+    super.onSaveInstanceState(outState);
+
+    // Save current state. There is no guarantee than the application is going
+    // to be killed/restored, however.
+
+    // Save current pane
+    savePaneFields();
+
+    // Save settings to bundle
+
+    // Map keys
+    outState.putParcelable("map", mapper.getMap());
+
+    // Current pane
+    outState.putInt("pane_id", pane_id);
+
+    // Current focus id
+    outState.putIntArray("focus_id", getCurrentFocusId());
+  }
+
+  /** Send a notification. **/
+  protected void sendWarningNotification(final String title, final String text) {
+    final String ns = Context.NOTIFICATION_SERVICE;
+    final NotificationManager manager = (NotificationManager) getSystemService(ns);
+    final int icon = R.drawable.ic_launcher;
+    final long when = System.currentTimeMillis();
+    final Notification notification = new Notification(icon, text, when);
+    final Context context = getApplicationContext();
+    final PendingIntent intent = PendingIntent.getActivity(this, 0,
+        getIntent(), 0);
+    notification.setLatestEventInfo(context, title, text, intent);
+    manager.notify(1, notification);
+  }
+
+  @Override
+  protected void onRestoreInstanceState(final Bundle savedInstanceState) {
+    super.onRestoreInstanceState(savedInstanceState);
+
+    // Security
+    if (runner != null) {
+      sendWarningNotification("Warning",
+          "HTTrack: restore called while running!");
+      return;
+    }
+
+    // Switch pane id
+    int id = savedInstanceState.getInt("pane_id");
+
+    // We were in the middle of a mirror, sheesh ...
+    if (id == LAYOUT_MIRROR_PROGRESS) {
+      // Go back to project setup
+      id = LAYOUT_PROJECT_SETUP;
+    }
+
+    // Current focus
+    final int[] focus_ids = savedInstanceState.getIntArray("focus_id");
+
+    // Load map
+    final Parcelable data = savedInstanceState.getParcelable("map");
+
+    // Load map
+    if (data != null) {
+      // Load map settings
+      loadParcelable(data);
+
+      // Switch pane id
+      setPane(id);
+
+      // Set focus
+      setCurrentFocusId(focus_ids);
+
+      sendWarningNotification("Warning", "HTTrack: restored session!");
+    }
+  }
+
+  @Override
+  protected void onDestroy() {
+    // Ensure engine is properly stopped
+    if (runner != null) {
+      if (runner.stopMirror()) {
+        sendWarningNotification("Warning", "HTTrack: mirror stopped!");
+      }
+      runner = null;
+    }
+    super.onDestroy();
+  }
+
 }
