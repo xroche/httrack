@@ -26,6 +26,16 @@ LOCAL_SRC_FILES := ../prebuild/libiconv.so
 include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
+LOCAL_MODULE    := libcrypto
+LOCAL_SRC_FILES := ../prebuild/libcrypto.so
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := libssl
+LOCAL_SRC_FILES := ../prebuild/libssl.so
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE    := libhttrack
 LOCAL_SRC_FILES := ../prebuild/libhttrack.so
 include $(PREBUILT_SHARED_LIBRARY)
