@@ -1600,7 +1600,7 @@ public class HTTrackActivity extends FragmentActivity {
     }
 
     // Switch pane id
-    int id = savedInstanceState.getInt("pane_id");
+    final int id = savedInstanceState.getInt("pane_id");
 
     // Current focus
     final int[] focus_ids = savedInstanceState.getIntArray("focus_id");
