@@ -19,13 +19,13 @@
         android:text="@string/mirror_in_progress" />
 
     <Button
-        android:id="@+id/buttonNext"
+        android:id="@+id/buttonStop"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignRight="@+id/fieldDisplay"
         android:layout_marginBottom="26dp"
-        android:onClick="onClickNext"
+        android:onClick="onClickStop"
         android:text="@string/interrupt" />
 
     <ProgressBar

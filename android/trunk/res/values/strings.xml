@@ -19,6 +19,7 @@
     <string name="hint_addresses">http://www.example.com/funny/</string>
     <string name="options">Options...</string>
     <string name="interrupt">Interrupt</string>
+    <string name="stop">Stop</string>
     <string name="mirror_in_progress">Mirror in progress</string>
     <string name="mirror_finished">Mirror is finished</string>
     <string name="exit">Exit</string>

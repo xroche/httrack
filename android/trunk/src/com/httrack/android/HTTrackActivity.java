@@ -114,6 +114,9 @@ public class HTTrackActivity extends FragmentActivity {
   // Handler to execute code in UI thread
   private Handler handlerUI = new Handler();
 
+  // Interrupt was requested
+  protected boolean interruptRequested;
+
   // Widget data exchange helper
   private WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
 
@@ -581,8 +584,8 @@ public class HTTrackActivity extends FragmentActivity {
     public void onDestroy() {
       // Ensure the running job is killed when the fragment is disposed
       if (runner != null) {
-        if (!runner.isStopped()) {
-          if (runner.stopMirror()) {
+        if (!runner.isEnded()) {
+          if (runner.stopMirror(true)) {
             runner.sendWarningNotification("Warning",
                 "HTTrack: mirror stopped!");
           }
@@ -614,8 +617,8 @@ public class HTTrackActivity extends FragmentActivity {
       runner.detach();
     }
 
-    public boolean stopMirror() {
-      return runner.stopMirror();
+    public boolean stopMirror(boolean force) {
+      return runner.stopMirror(force);
     }
 
     public HTTrackStats getLastStats() {
@@ -629,11 +632,13 @@ public class HTTrackActivity extends FragmentActivity {
   protected static class Runner extends AsyncTask<Void, Integer, Void>
       implements HTTrackCallbacks {
     private final HTTrackLib engine = new HTTrackLib(this);
-    private boolean stopped;
     final private StringBuilder str = new StringBuilder();
     private HTTrackActivity parent;
     private boolean mirrorRefresh;
     protected HTTrackStats lastStats;
+    private volatile boolean ended;
+    private volatile boolean interrupted;
+    private volatile boolean interruptedHard;
 
     /**
      * Constructor.
@@ -677,6 +682,8 @@ public class HTTrackActivity extends FragmentActivity {
         runInternal();
       } catch (final Throwable e) {
         HTTrackActivity.emergencyDump(e);
+      } finally {
+        ended = true;
       }
       return null;
     }
@@ -724,7 +731,7 @@ public class HTTrackActivity extends FragmentActivity {
 
         // Result
         if (code == 0) {
-          if (stopped) {
+          if (interrupted) {
             message = "<b>Interrupted</b>! (" + lastStats.errorsCount
                 + " errors)";
           } else if (lastStats.errorsCount == 0) {
@@ -794,12 +801,14 @@ public class HTTrackActivity extends FragmentActivity {
     /**
      * Stop the mirror.
      */
-    public boolean stopMirror() {
-      synchronized (this) {
-        stopped = true;
+    public boolean stopMirror(boolean force) {
+      // Set interrupted flags
+      interrupted = true;
+      if (force) {
+        interruptedHard = true;
       }
       // Stop engine
-      final boolean stopSent = engine.stop(true);
+      final boolean stopSent = engine.stop(force);
       // If not yet stopped, mark as dirty
       // ("Continue an interrupted mirror ...")
       try {
@@ -821,10 +830,17 @@ public class HTTrackActivity extends FragmentActivity {
     }
 
     /**
+     * Has the mirror been interrupted ?
+     */
+    public boolean isInterrupted() {
+      return interrupted;
+    }
+
+    /**
      * Has the mirror stopped ?
      */
-    public synchronized boolean isStopped() {
-      return stopped;
+    public boolean isEnded() {
+      return ended;
     }
 
     @Override
@@ -843,7 +859,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
 
       // Do not refresh GUI if stopped
-      if (isStopped()) {
+      if (interruptedHard) {
         return;
       }
 
@@ -1196,7 +1212,7 @@ public class HTTrackActivity extends FragmentActivity {
     case R.layout.activity_mirror_finished:
       // Ensure the engine has stopped running
       if (runner != null) {
-        runner.stopMirror();
+        runner.stopMirror(true);
       }
 
       // Enable browse button if index.html exists
@@ -1367,6 +1383,29 @@ public class HTTrackActivity extends FragmentActivity {
   public void onClickPrevious(final View view) {
     if (pane_id > 0) {
       setPane(pane_id - 1);
+    }
+  }
+
+  /**
+   * "Interrupt" or "Stop"
+   */
+  public void onClickStop(final View view) {
+    if (runner != null) {
+      // Soft interrupt
+      if (!interruptRequested) {
+        runner.stopMirror(false);
+        interruptRequested = true;
+        final TextView text = (TextView) this.findViewById(R.id.buttonStop);
+        // Change text to "Stop"
+        text.setText(getString(R.string.stop));
+        // Notice
+        sendWarningNotification("Notice",
+            "HTTrack: finishing pending transfers");
+      }
+      // Hard interrupt
+      else {
+        runner.stopMirror(true);
+      }
     }
   }
 

@@ -609,7 +609,9 @@ jboolean Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject objec
   MUTEX_LOCK(global_lock);
   if (global_opt != NULL) {
     stopped = JNI_TRUE;
-    global_opt_stop = 1;
+    if (force) {
+      global_opt_stop = 1;
+    }
     hts_request_stop(global_opt, force);
   }
   MUTEX_UNLOCK(global_lock);
