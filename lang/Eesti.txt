@@ -711,9 +711,9 @@ Log
 Window
 A&ken
 Help
-&Abi
+Abi
 Exit
-&Välju
+Välju
 Load default options
 Laadi vaikimisi seaded
 Save default options
