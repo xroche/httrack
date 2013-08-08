@@ -671,7 +671,7 @@ EI
 File
 &Tiedosto
 Options
-&Valinnat
+Valinnat
 Log
 &Loki
 Window
@@ -681,7 +681,7 @@ O&hje
 Pause transfer
 Pysäytä siirto
 Exit
-&Poistu
+Poistu
 Modify options
 &Muokkaa valintoja
 View log
@@ -713,7 +713,7 @@ Log
 Window
 &Ikkuna
 Help
-O&hje
+Ohje
 Exit
 &Poistu
 Load default options
