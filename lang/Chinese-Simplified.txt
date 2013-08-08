@@ -3,7 +3,7 @@ Chinese-Simplified
 LANGUAGE_FILE
 Chinese-Simplified
 LANGUAGE_ISO
-cs
+zh
 LANGUAGE_AUTHOR
 Brook Qin (brookqwr at sina.com) \r\n
 LANGUAGE_CHARSET

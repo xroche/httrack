@@ -3,7 +3,7 @@ Chinese-BIG5
 LANGUAGE_FILE
 Chinese-BIG5
 LANGUAGE_ISO
-ct
+zh_HK
 LANGUAGE_AUTHOR
 David Hing Cheong Hung (DAVEHUNG@mtr.com.hk)\r\n
 LANGUAGE_CHARSET
