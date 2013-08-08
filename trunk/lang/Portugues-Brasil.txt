@@ -3,7 +3,7 @@ Português-Brasil
 LANGUAGE_FILE
 Portugues-Brasil
 LANGUAGE_ISO
-pt
+pt_BR
 LANGUAGE_AUTHOR
 Paulo Neto (layoutbr at lexxa.com.br) \r\n
 LANGUAGE_CHARSET

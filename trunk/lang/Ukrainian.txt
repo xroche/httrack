@@ -3,7 +3,7 @@ Ukrainian
 LANGUAGE_FILE
 Ukrainian
 LANGUAGE_ISO
-ua
+uk
 LANGUAGE_AUTHOR
 Andrij Shevchuk (http://programy.com.ua, http://vic-info.com.ua) \r\n
 LANGUAGE_CHARSET

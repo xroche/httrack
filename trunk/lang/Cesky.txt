@@ -3,7 +3,7 @@ LANGUAGE_NAME
 LANGUAGE_FILE
 Cesky
 LANGUAGE_ISO
-cz
+cs
 LANGUAGE_AUTHOR
 Antonín Matìjèík (matejcik@volny.cz) \r \n
 LANGUAGE_CHARSET
