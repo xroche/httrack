@@ -715,7 +715,7 @@ Window
 Help
 Ohje
 Exit
-&Poistu
+Poistu
 Load default options
 &Lataa vakioasetukset
 Save default options
