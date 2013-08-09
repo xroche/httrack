@@ -26,7 +26,7 @@
         android:layout_marginTop="14dp"
         android:ems="10"
         android:hint="@string/hint_addresses"
-        android:inputType="textMultiLine" >
+        android:inputType="textMultiLine|textUri" >
 
         <requestFocus />
     </EditText>

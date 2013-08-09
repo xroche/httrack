@@ -766,7 +766,9 @@ public class HTTrackActivity extends FragmentActivity {
       }
 
       // Ensure we switch to the final pane
-      final String displayMessage = "Mirror finished: " + message;
+      final String displayMessage = (parent != null ? parent
+          .getString(R.string.mirror_finished) + ": " : "")
+          + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
       synchronized (this) {
         if (parent != null) {
@@ -863,107 +865,112 @@ public class HTTrackActivity extends FragmentActivity {
         return;
       }
 
-      // build stats infos
-      final String sep = " • ";
-      str.setLength(0);
-      str.append("<b>Bytes saved</b>: ");
-      str.append(stats.bytesWritten);
-      str.append(sep);
-      str.append("<b>Links scanned</b>: ");
-      str.append(stats.linksScanned);
-      str.append("/");
-      str.append(stats.linksTotal);
-      str.append(" (+");
-      str.append(stats.linksBackground);
-      str.append(")<br />");
-      /* */
-      str.append("<b>Time</b>: ");
-      str.append(stats.elapsedTime);
-      str.append(sep);
-      str.append("<b>Files written</b>: ");
-      str.append(stats.filesWritten);
-      str.append(" (+");
-      str.append(stats.filesWrittenBackground);
-      str.append(")<br />");
-      /* */
-      str.append("<b>Transfer rate</b>: ");
-      str.append(stats.transferRate);
-      str.append(" (");
-      str.append(stats.totalTransferRate);
-      str.append(")");
-      str.append(sep);
-      str.append("<b>Files updated</b>: ");
-      str.append(stats.filesUpdated);
-      str.append("<br />");
-      /* */
-      str.append("<b>Active connections</b>: ");
-      str.append(stats.socketsCount);
-      str.append(sep);
-      str.append("<b>Errors</b>:");
-      str.append(stats.errorsCount);
-      /* */
-      if (stats.elements != null && stats.elements.length != 0) {
-        str.append("<br />");
-        str.append("<i><br />");
-        int maxElts = 32; // limit the number of displayed items
-        for (final Element element : stats.elements) {
-          if (element == null || element.address == null
-              || element.filename == null) {
-            continue;
-          }
-          if (--maxElts == 0) {
-            break;
-          }
-
-          // url
-          final int max_len = 32;
-          final String s = element.address + element.filename;
-          // cut string if necessary
-          if (s.length() > max_len + 1) {
-            str.append(s.substring(0, max_len / 2));
-            str.append("…");
-            str.append(s.substring(s.length() - max_len / 2));
-          } else {
-            str.append(s);
-          }
-          str.append(" → ");
-
-          // state
-          switch (element.state) {
-          case Element.STATE_CONNECTING:
-            str.append("connecting");
-            break;
-          case Element.STATE_DNS:
-            str.append("dns");
-            break;
-          case Element.STATE_FTP:
-            str.append("ftp");
-            break;
-          case Element.STATE_READY:
-            str.append("ready");
-            break;
-          case Element.STATE_RECEIVE:
-            if (element.totalSize > 0) {
-              final long completion = (100 * element.size + element.totalSize / 2)
-                  / element.totalSize;
-              str.append(completion);
-              str.append("%");
-            } else {
-              str.append(element.size);
-              str.append("B");
-            }
-            break;
-          default:
-            str.append("???");
-            break;
-          }
-          str.append("<br />");
-        }
-        str.append("</i>");
-      }
-      final String message = str.toString();
-      // Post refresh.
       synchronized (this) {
+        if (parent == null) {
+          return;
+        }
+
+        // build stats infos
+        final String sep = " • ";
+        str.setLength(0);
+        str.append("<b>" + parent.getString(R.string.bytes_saved) + "</b>: ");
+        str.append(stats.bytesWritten);
+        str.append(sep);
+        str.append("<b>" + parent.getString(R.string.links_scanned) + "</b>: ");
+        str.append(stats.linksScanned);
+        str.append("/");
+        str.append(stats.linksTotal);
+        str.append(" (+");
+        str.append(stats.linksBackground);
+        str.append(")<br />");
+        /* */
+        str.append("<b>" + parent.getString(R.string.time) + "</b>: ");
+        str.append(stats.elapsedTime);
+        str.append(sep);
+        str.append("<b>" + parent.getString(R.string.files_written) + "</b>: ");
+        str.append(stats.filesWritten);
+        str.append(" (+");
+        str.append(stats.filesWrittenBackground);
+        str.append(")<br />");
+        /* */
+        str.append("<b>" + parent.getString(R.string.transfer_rate) + "</b>: ");
+        str.append(stats.transferRate);
+        str.append(" (");
+        str.append(stats.totalTransferRate);
+        str.append(")");
+        str.append(sep);
+        str.append("<b>" + parent.getString(R.string.files_updated) + "</b>: ");
+        str.append(stats.filesUpdated);
+        str.append("<br />");
+        /* */
+        str.append("<b>" + parent.getString(R.string.active_connections)
+            + "</b>: ");
+        str.append(stats.socketsCount);
+        str.append(sep);
+        str.append("<b>" + parent.getString(R.string.errors) + "</b>:");
+        str.append(stats.errorsCount);
+        /* */
+        if (stats.elements != null && stats.elements.length != 0) {
+          str.append("<br />");
+          str.append("<i><br />");
+          int maxElts = 32; // limit the number of displayed items
+          for (final Element element : stats.elements) {
+            if (element == null || element.address == null
+                || element.filename == null) {
+              continue;
+            }
+            if (--maxElts == 0) {
+              break;
+            }
+
+            // url
+            final int max_len = 32;
+            final String s = element.address + element.filename;
+            // cut string if necessary
+            if (s.length() > max_len + 1) {
+              str.append(s.substring(0, max_len / 2));
+              str.append("…");
+              str.append(s.substring(s.length() - max_len / 2));
+            } else {
+              str.append(s);
+            }
+            str.append(" → ");
+
+            // state
+            switch (element.state) {
+            case Element.STATE_CONNECTING:
+              str.append(parent.getString(R.string.connect));
+              break;
+            case Element.STATE_DNS:
+              str.append("dns");
+              break;
+            case Element.STATE_FTP:
+              str.append("ftp");
+              break;
+            case Element.STATE_READY:
+              str.append(parent.getString(R.string.ready));
+              break;
+            case Element.STATE_RECEIVE:
+              if (element.totalSize > 0) {
+                final long completion = (100 * element.size + element.totalSize / 2)
+                    / element.totalSize;
+                str.append(completion);
+                str.append("%");
+              } else {
+                str.append(element.size);
+                str.append("B");
+              }
+              break;
+            default:
+              str.append("???");
+              break;
+            }
+            str.append("<br />");
+          }
+          str.append("</i>");
+        }
+        final String message = str.toString();
+        // Post refresh.
         if (parent != null) {
           parent.handlerUI.post(new Runnable() {
             @Override
@@ -1144,7 +1151,9 @@ public class HTTrackActivity extends FragmentActivity {
           .findViewById(R.id.fieldDisplay));
 
       // Welcome message.
-      final String html = getString(R.string.welcome_message);
+      final String html = getString(R.string.welcome_message)
+          .replace("\n-", "\n•").replace("\n", "<br />")
+          .replace("HTTrack Website Copier", "<b>HTTrack Website Copier</b>");
       final StringBuilder str = new StringBuilder(html);
 
       // Debugging and information.
@@ -1397,10 +1406,10 @@ public class HTTrackActivity extends FragmentActivity {
         interruptRequested = true;
         final TextView text = (TextView) this.findViewById(R.id.buttonStop);
         // Change text to "Stop"
-        text.setText(getString(R.string.stop));
+        text.setText(getString(R.string.cancel));
         // Notice
-        sendWarningNotification("Notice",
-            "HTTrack: finishing pending transfers");
+        sendWarningNotification("Notice", "HTTrack: "
+            + getString(R.string.finishing_pending_transfers));
       }
       // Hard interrupt
       else {

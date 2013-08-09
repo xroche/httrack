@@ -18,7 +18,7 @@
     <string name="web_addresses">Web Addresses: (URL)</string>
     <string name="hint_addresses">http://www.example.com/funny/</string>
     <string name="options">Options</string>
-    <string name="interrupt">Cancel</string>
+    <string name="cancel">Cancel</string>
     <string name="stop">Exit</string>
     <string name="exit">Exit</string>
     <string name="show_logs">View log</string>
@@ -152,5 +152,18 @@
     <string name="browser_id">Browser ID</string>
     <string name="log_index_cache">Log, Index, Cache</string>
     <string name="experts_only">Experts Only</string>
+    <string name="bytes_saved">Bytes saved</string>
+    <string name="links_scanned">Links scanned</string>
+    <string name="time">Time</string>
+    <string name="files_written">Files written</string>
+    <string name="transfer_rate">Taux transfert</string>
+    <string name="files_updated">Files updated</string>
+    <string name="active_connections">Connections</string>
+    <string name="errors">Errors</string>
+    <string name="connect">connect</string>
+    <string name="ready">ready</string>
+    <string name="finishing_pending_transfers">Finishing pending transfers - Select [Cancel] to stop now!</string>
+    <string name="abort">ABORT</string>
+    <string name="mirror_finished">Site mirroring finished!</string>
 
 </resources>

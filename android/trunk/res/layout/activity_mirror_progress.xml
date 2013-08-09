@@ -25,7 +25,7 @@
         android:layout_alignRight="@+id/fieldDisplay"
         android:layout_marginBottom="26dp"
         android:onClick="onClickStop"
-        android:text="@string/interrupt" />
+        android:text="@string/abort" />
 
     <ProgressBar
         android:id="@+id/progressMirror"

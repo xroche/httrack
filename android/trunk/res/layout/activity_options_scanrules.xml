@@ -35,7 +35,7 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:hint="@string/hint_scan_rules"
-        android:inputType="textMultiLine" >
+        android:inputType="textMultiLine|none" >
 
         <requestFocus />
     </EditText>
