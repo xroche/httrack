@@ -78,7 +78,7 @@
     <string name="retries">Retries</string>
     <string name="min_transfer_rate">Min Transfer Rate (B/s)</string>
     <string name="remove_host_if_slow">Remove host if low</string>
-    <string name="browser_identity">Browser "Identity"</string>
+    <string name="browser_identity">Browser identity</string>
     <string name="html_footer">HTML footer</string>
     <string name="default_browser_id">Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)</string>
     <string name="default_html_footer" formatted="false">&lt;!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&amp;CO\'2013], %s --&gt;</string>
@@ -112,7 +112,7 @@
     <string name="verbosity_extended">extended</string>
     <string name="verbosity_debug">debug</string>
     <string name="use_cache_for_updates">Use a cache for updates</string>
-    <string name="primary_scan_rule">Primary Scan Rule (scan mode)</string>
+    <string name="primary_scan_rule">Primary Scan Rule</string>
     <string name="just_scan">Just scan</string>
     <string name="store_html_files">Store html files</string>
     <string name="store_non_html_files">Store non html files</string>
@@ -150,4 +150,13 @@
     <string name="action_website">Go To HTTrack Website</string>
     <string name="action_forum">Go To HTTrack Forum</string>
     <string name="action_license">View License</string>
+    <string name="scan_rules">Scan Rules</string>
+    <string name="limits">Limits</string>
+    <string name="flow_control">Flow Control</string>
+    <string name="links">Links</string>
+    <string name="build">Build</string>
+    <string name="browser_id">Browser ID</string>
+    <string name="log_index_cache">Log, Index, Cache</string>
+    <string name="experts_only">Experts Only</string>
+
 </resources>
