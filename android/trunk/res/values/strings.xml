@@ -29,7 +29,6 @@
     <string name="cleanup_sites">Delete…</string>
     <string name="delete">Delete</string>
     <string name="title_activity_options">Settings</string>
-    <string name="config_changes">orientation</string>
     <string name="exclude_links">Exclude link(s)…</string>
     <string name="include_links">Include link(s)…</string>
     <string name="scan_rules_details">Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi</string>
