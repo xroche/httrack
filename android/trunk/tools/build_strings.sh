@@ -26,7 +26,7 @@ if test $(head -9 $i | tail -1 | tr -d '\r') != "LANGUAGE_CHARSET"; then
 echo "bad file $i: LANGUAGE_CHARSET expected"
 exit 1
 fi
-iso=$(head -6 $i | tail -1 | tr -d '\r' | tr '-' '_' | sed -e 's/_/_r/')
+iso=$(head -6 $i | tail -1 | tr -d '\r' | tr '_' '-' | sed -e 's/-/-r/')
 cp=$(head -10 $i | tail -1 | tr -d '\r')
 #if test "$iso" = "en"; then
 #echo "skipped"
