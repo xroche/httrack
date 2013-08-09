@@ -66,7 +66,6 @@ done
 
 # map xml
 cat $2/values/strings.xml | tr -d '\r' | (
-echo "<!-- Generated file ($0), do NOT edit! Edit lang/*.txt files and re-run the script to regenerate XML files. -->"
 
 # <string name="options">Options...</string>
 while IFS= read -r l; do
@@ -85,9 +84,12 @@ echo -n "$v" | sed -e "s/'/\\\\'/g"
 echo -n "$l" | sed -e "s/\(.*\)>.*<\(.*\)/<\2/"
 echo
 else
-echo "<!-- $(echo "$l" | tr '<>' '[]' | tr -d '\r\n' | sed -e 's/--/- -/g') -->"
+echo "    <!-- $(echo "$l" | tr '<>' '[]' | tr -d '\r\n' | sed -e 's/--/- -/g') -->"
 fi
 else
+if $(echo "$l" | grep -q "<resources>"); then
+echo "<!-- Generated file ($0), do NOT edit! Edit lang/*.txt files and re-run the script to regenerate XML files. -->"
+fi
 echo "$l"
 fi
 done
