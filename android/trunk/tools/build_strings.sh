@@ -41,6 +41,7 @@ cat "$i" | \
 	iconv -f "$cp" -t "utf-8" \
 	| tr -d '\r' \
 	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
+	| sed -e 's/WinHTTrack/HTTrack/g' \
 	| (
 unset arr
 declare -A arr
