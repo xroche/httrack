@@ -137,7 +137,6 @@
     <string name="custom_build">Custom</string>
     <string name="custom_build_hint" formatted="false">%h%p/%n%q.%t</string>
     <string name="help">Help</string>
-    <string name="read_documentation">View Documentation</string>
     <string name="browse_site">Browse HTTrack Website</string>
     <string name="browse_forum">Browse HTTrack Forum</string>
     <string name="action_help">View Documentation</string>
