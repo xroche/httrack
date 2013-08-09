@@ -3,11 +3,11 @@
 
     <string name="app_name">HTTrack Website Copier</string>
     <string name="title_activity_startup">HTTrack Website Copier</string>
-    <string name="title_activity_cleanup">HTTrack - Cleanup</string>
+    <string name="title_activity_cleanup">Delete</string>
     <string name="action_settings">Options</string>
     <string name="welcome_message">Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
     <string name="tab_next">Next</string>
-    <string name="title_activity_proj_name">New Project</string>
+    <string name="title_activity_proj_name">New project...</string>
     <string name="project_name">Project name</string>
     <string name="projname_hint">My Website</string>
     <string name="project_category">Project category</string>
@@ -84,7 +84,7 @@
     <string name="accept_cookies">Accept cookies</string>
     <string name="check_document_type">Check document type</string>
     <string name="parse_java_files">Parse java files</string>
-    <string name="spider">Spider:</string>
+    <string name="spider">Spider</string>
     <string name="update_hack">Update hack (limit re-transfers)</string>
     <string name="url_hacks">URL hacks (join similar URLs)</string>
     <string name="tolerent_requests">Tolerant requests (for servers)</string>
@@ -95,8 +95,8 @@
     <string name="radio_spider_none">no robots.txt rules</string>
     <string name="radio_spider_except_wizard">robots.txt except wizard</string>
     <string name="radio_spider_always">follow robots.txt rules</string>
-    <string name="proxy">Proxy address:</string>
-    <string name="proxy_port">Proxy port:</string>
+    <string name="proxy">Proxy address</string>
+    <string name="proxy_port">Proxy port</string>
     <string name="hint_proxy_address">proxy.example.com</string>
     <string name="hint_proxy_port">8080</string>
     <string name="hint_browser_identity">Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)</string>
