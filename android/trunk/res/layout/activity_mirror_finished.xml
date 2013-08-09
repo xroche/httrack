@@ -16,8 +16,7 @@
         android:layout_above="@+id/buttonBrowse"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true"
-        android:text="@string/mirror_finished" />
+        android:layout_alignParentTop="true" />
 
     <Button
         android:id="@+id/buttonBrowse"

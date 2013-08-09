@@ -15,8 +15,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true"
-        android:text="@string/mirror_in_progress" />
+        android:layout_alignParentTop="true" />
 
     <Button
         android:id="@+id/buttonStop"

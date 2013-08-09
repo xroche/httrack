@@ -20,8 +20,6 @@
     <string name="options">Options</string>
     <string name="interrupt">Interrupt</string>
     <string name="stop">Stop</string>
-    <string name="mirror_in_progress">Mirror in progress</string>
-    <string name="mirror_finished">Mirror is finished</string>
     <string name="exit">Exit</string>
     <string name="show_logs">Show Logs</string>
     <string name="browse_website">Browse Website</string>
