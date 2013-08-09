@@ -5,9 +5,9 @@
     <string name="title_activity_startup">HTTrack Website Copier</string>
     <string name="title_activity_cleanup">Delete</string>
     <string name="action_settings">Options</string>
-    <string name="welcome_message">Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
+    <string name="welcome_message">Welcome to HTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
     <string name="tab_next">Next</string>
-    <string name="title_activity_proj_name">New project...</string>
+    <string name="title_activity_proj_name">New project</string>
     <string name="project_name">Project name</string>
     <string name="projname_hint">My Website</string>
     <string name="project_category">Project category</string>
@@ -17,7 +17,7 @@
     <string name="start">Start</string>
     <string name="web_addresses">Website URL(s)</string>
     <string name="hint_addresses">http://www.example.com/funny/</string>
-    <string name="options">Options...</string>
+    <string name="options">Options</string>
     <string name="interrupt">Interrupt</string>
     <string name="stop">Stop</string>
     <string name="mirror_in_progress">Mirror in progress</string>

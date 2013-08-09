@@ -36,10 +36,13 @@ dest=$2/values-${iso}
 mkdir -p $dest
 
 # read strings, converted to UTF-8, stripping CR,
+# removing : at the end
 # replacing real & by &amp; and stripping the other ones
+# and replacing WinHTTrack by HTTrack
 cat "$i" | \
 	iconv -f "$cp" -t "utf-8" \
 	| tr -d '\r' \
+	| sed -e 's/:$//' -e 's/\.\.\.$//g' -e 's/[[:space:]]*$//' \
 	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
 	| sed -e 's/WinHTTrack/HTTrack/g' \
 	| (
@@ -73,7 +76,7 @@ done
 # map xml
 cat $2/values/strings.xml | tr -d '\r' | (
 
-# <string name="options">Options...</string>
+# <string name="options">Options</string>
 while IFS= read -r l; do
 if $(echo "$l" | grep -q "<string"); then
 k="$(echo "$l" | cut -f2 -d'>' | cut -f1 -d'<')"
