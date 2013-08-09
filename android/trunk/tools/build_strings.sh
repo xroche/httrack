@@ -35,8 +35,13 @@ fi
 dest=$2/values-${iso}
 mkdir -p $dest
 
-# read strings
-cat "$i" | iconv -f "$cp" -t "utf-8" | tr -d '\r' | (
+# read strings, converted to UTF-8, stripping CR,
+# replacing real & by &amp; and stripping the other ones
+cat "$i" | \
+	iconv -f "$cp" -t "utf-8" \
+	| tr -d '\r' \
+	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
+	| (
 unset arr
 declare -A arr
 while IFS= read -r rk; do
