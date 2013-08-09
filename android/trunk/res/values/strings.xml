@@ -156,7 +156,7 @@
     <string name="links_scanned">Links scanned</string>
     <string name="time">Time</string>
     <string name="files_written">Files written</string>
-    <string name="transfer_rate">Taux transfert</string>
+    <string name="transfer_rate">Transfer rate</string>
     <string name="files_updated">Files updated</string>
     <string name="active_connections">Connections</string>
     <string name="errors">Errors</string>
