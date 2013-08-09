@@ -28,10 +28,10 @@ exit 1
 fi
 iso=$(head -6 $i | tail -1 | tr -d '\r' | tr '-' '_' | sed -e 's/_/_r/')
 cp=$(head -10 $i | tail -1 | tr -d '\r')
-if test "$iso" = "en"; then
-echo "skipped"
-continue;
-fi
+#if test "$iso" = "en"; then
+#echo "skipped"
+#continue;
+#fi
 dest=$2/values-${iso}
 mkdir -p $dest
 
@@ -42,7 +42,7 @@ mkdir -p $dest
 cat "$i" | \
 	iconv -f "$cp" -t "utf-8" \
 	| tr -d '\r' \
-	| sed -e 's/:$//' -e 's/\.\.\.$//g' -e 's/[[:space:]]*$//' \
+	| sed -e 's/:$//' -e 's/\* //g' -e 's/\.\.\.$//g' -e 's/\([[:space:]]\)[[:space:]]*/\1/g' -e 's/[[:space:]]*$//' \
 	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
 	| sed -e 's/WinHTTrack/HTTrack/g' \
 	| (
