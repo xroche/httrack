@@ -65,7 +65,7 @@ fi
 done
 
 # map xml
-cat $2/values/strings.xml | (
+cat $2/values/strings.xml | tr -d '\r' | (
 echo "<!-- Generated file ($0), do NOT edit! Edit lang/*.txt files and re-run the script to regenerate XML files. -->"
 
 # <string name="options">Options...</string>
