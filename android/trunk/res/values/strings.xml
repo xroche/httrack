@@ -5,7 +5,7 @@
     <string name="title_activity_startup">HTTrack Website Copier</string>
     <string name="title_activity_cleanup">HTTrack - Cleanup</string>
     <string name="action_settings">Options</string>
-    <string name="welcome_message">Welcome to &lt;b&gt;HTTrack Website Copier&lt;/b&gt;!&lt;br /&gt;Please click on the &lt;b&gt;NEXT&lt;/b&gt; button to&lt;br /&gt;&lt;br /&gt;- start a new project&lt;br /&gt;- or resume a partial download&lt;br /&gt;&lt;br /&gt;Click on the &lt;b&gt;BROWSE&lt;/b&gt; button to browse and manage existing sites.</string>
+    <string name="welcome_message">Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download</string>
     <string name="tab_next">Next</string>
     <string name="title_activity_proj_name">New Project</string>
     <string name="project_name">Project name</string>
