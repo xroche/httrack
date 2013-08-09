@@ -123,11 +123,11 @@ public class OptionsActivity extends TabActivity {
   @Retention(RetentionPolicy.RUNTIME)
   @Target(ElementType.TYPE)
   public static @interface Title {
-    String value();
+    int value();
 
   }
 
-  @Title("Scan Rules")
+  @Title(R.string.scan_rules)
   public static class ScanRulesTab extends Tab {
     @Override
     protected int[] getFields() {
@@ -141,7 +141,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Limits")
+  @Title(R.string.limits)
   public static class LimitsTab extends Tab {
     @Override
     protected int[] getFields() {
@@ -158,7 +158,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Flow Control")
+  @Title(R.string.flow_control)
   public static class FlowControlTab extends Tab {
     @Override
     protected int[] getFields() {
@@ -175,7 +175,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Links")
+  @Title(R.string.links)
   public static class LinksTab extends Tab {
     @Override
     protected int[] getFields() {
@@ -190,7 +190,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Build")
+  @Title(R.string.build)
   public static class BuildTab extends Tab {
     @Override
     protected int[] getFields() {
@@ -207,7 +207,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Browser ID")
+  @Title(R.string.browser_id)
   public static class BrowserId extends Tab {
     @Override
     protected int[] getFields() {
@@ -221,7 +221,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Spider")
+  @Title(R.string.spider)
   public static class Spider extends Tab {
     @Override
     protected int[] getFields() {
@@ -237,7 +237,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Proxy")
+  @Title(R.string.proxy)
   public static class Proxy extends Tab {
     @Override
     protected int[] getFields() {
@@ -252,7 +252,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Log, Index, Cache")
+  @Title(R.string.log_index_cache)
   public static class LogIndexCache extends Tab {
     @Override
     protected int[] getFields() {
@@ -268,7 +268,7 @@ public class OptionsActivity extends TabActivity {
     }
   }
 
-  @Title("Experts Only")
+  @Title(R.string.experts_only)
   public static class ExpertsOnly extends Tab {
     @Override
     protected int[] getFields() {
@@ -301,7 +301,8 @@ public class OptionsActivity extends TabActivity {
     for (final Class<? extends Tab> cls : tabClasses) {
       final Title title = Title.class.cast(cls.getAnnotation(Title.class));
       tabSpec.add(tabHost.newTabSpec(Integer.toString(tabSpec.size()))
-          .setIndicator(title.value()).setContent(new Intent(this, cls)));
+          .setIndicator(getString(title.value()))
+          .setContent(new Intent(this, cls)));
     }
 
     // Populate tab
