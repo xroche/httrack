@@ -96,9 +96,11 @@ public class CleanupActivity extends ListActivity {
 
     // Fetch args from parent
     final Bundle extras = getIntent().getExtras();
-    projectRootFile = File.class.cast(extras.get("rootFile"));
-    resourceFile = File.class.cast(extras.get("resourceFile"));
-    projects = (String[]) extras.get("projectNames");
+    projectRootFile = File.class.cast(extras
+        .get("com.httrack.android.rootFile"));
+    resourceFile = File.class.cast(extras
+        .get("com.httrack.android.resourceFile"));
+    projects = (String[]) extras.get("com.httrack.android.projectNames");
     if (projectRootFile == null || resourceFile == null || projects == null) {
       throw new RuntimeException("internal error");
     }

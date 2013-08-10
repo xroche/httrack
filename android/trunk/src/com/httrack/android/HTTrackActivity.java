@@ -66,6 +66,7 @@ import android.content.res.Configuration;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.app.NotificationCompat;
 import android.text.Html;
 import android.util.Log;
 import android.view.Menu;
@@ -153,7 +154,7 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   @Override
-  protected void onCreate(Bundle savedInstanceState) {
+  protected void onCreate(final Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
     // Attempt to load the native library.
@@ -206,6 +207,12 @@ public class HTTrackActivity extends FragmentActivity {
     if (errors != null) {
       final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
       text.append(errors);
+    }
+
+    // Load intent ? (example: shutdown phone, and power-it on during setup)
+    final Bundle extras = getIntent().getExtras();
+    if (extras != null) {
+      restoreInstanceState(extras);
     }
   }
 
@@ -586,8 +593,7 @@ public class HTTrackActivity extends FragmentActivity {
       if (runner != null) {
         if (!runner.isEnded()) {
           if (runner.stopMirror(true)) {
-            runner.sendWarningNotification("Warning",
-                "HTTrack: mirror stopped!");
+            runner.sendWarningNotification();
           }
         }
       }
@@ -668,10 +674,10 @@ public class HTTrackActivity extends FragmentActivity {
     }
 
     /** Trunk to parent's sendWarningNotification(). **/
-    public synchronized void sendWarningNotification(final String title,
-        final String text) {
+    public synchronized void sendWarningNotification() {
       if (parent != null) {
-        parent.sendWarningNotification(title, text);
+        parent.sendWarningNotification("Warning", "HTTrack: mirror '"
+            + parent.mapper.getProjectName() + "' stopped!");
       }
     }
 
@@ -770,34 +776,32 @@ public class HTTrackActivity extends FragmentActivity {
           .getString(R.string.mirror_finished) + ": " : "")
           + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
-      synchronized (this) {
-        if (parent != null) {
-          parent.handlerUI.post(new Runnable() {
-            @Override
-            public void run() {
-              // Final pane
-              parent.setPane(LAYOUT_FINISHED);
+      parent.handlerUI.post(new Runnable() {
+        @Override
+        public synchronized void run() {
+          if (parent != null) {
+            // Final pane
+            parent.setPane(LAYOUT_FINISHED);
 
-              // Fancy result message
-              if (displayMessage != null) {
-                final View view = parent.findViewById(R.id.fieldDisplay);
-                if (view != null) {
-                  TextView.class.cast(view).setText(
-                      Html.fromHtml(displayMessage));
-                }
-              }
-              if (errorsCount != 0) {
-                final View view = parent.findViewById(R.id.buttonLogs);
-                if (view != null) {
-                  final Animation shake = AnimationUtils.loadAnimation(parent,
-                      R.anim.scale);
-                  view.startAnimation(shake);
-                }
+            // Fancy result message
+            if (displayMessage != null) {
+              final View view = parent.findViewById(R.id.fieldDisplay);
+              if (view != null) {
+                TextView.class.cast(view)
+                    .setText(Html.fromHtml(displayMessage));
               }
             }
-          });
+            if (errorsCount != 0) {
+              final View view = parent.findViewById(R.id.buttonLogs);
+              if (view != null) {
+                final Animation shake = AnimationUtils.loadAnimation(parent,
+                    R.anim.scale);
+                view.startAnimation(shake);
+              }
+            }
+          }
         }
-      }
+      });
     }
 
     /**
@@ -974,10 +978,12 @@ public class HTTrackActivity extends FragmentActivity {
         if (parent != null) {
           parent.handlerUI.post(new Runnable() {
             @Override
-            public void run() {
-              final View view = parent.findViewById(R.id.fieldDisplay);
-              if (view != null) {
-                TextView.class.cast(view).setText(Html.fromHtml(message));
+            public synchronized void run() {
+              if (parent != null) {
+                final View view = parent.findViewById(R.id.fieldDisplay);
+                if (view != null) {
+                  TextView.class.cast(view).setText(Html.fromHtml(message));
+                }
               }
             }
           });
@@ -1442,7 +1448,7 @@ public class HTTrackActivity extends FragmentActivity {
         // Change text to "Stop"
         text.setText(getString(R.string.cancel));
         // Notice
-        sendWarningNotification("Notice", "HTTrack: "
+        sendNotification("Info", "HTTrack: "
             + getString(R.string.finishing_pending_transfers));
       }
       // Hard interrupt
@@ -1462,7 +1468,7 @@ public class HTTrackActivity extends FragmentActivity {
     // Then start new activity
     final Intent intent = new Intent(this, OptionsActivity.class);
     fillExtra(intent);
-    intent.putExtra("map", mapper.serialize());
+    intent.putExtra("com.httrack.android.map", mapper.serialize());
     Log.d(this.getClass().getName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
@@ -1485,7 +1491,7 @@ public class HTTrackActivity extends FragmentActivity {
     case ACTIVITY_OPTIONS:
       if (resultCode == Activity.RESULT_OK) {
         // Load modified map
-        loadParcelable(data.getParcelableExtra("map"));
+        loadParcelable(data.getParcelableExtra("com.httrack.android.map"));
       }
       break;
     }
@@ -1568,8 +1574,8 @@ public class HTTrackActivity extends FragmentActivity {
    *          The intent object
    */
   protected void fillExtra(final Intent intent) {
-    intent.putExtra("rootFile", getProjectRootFile());
-    intent.putExtra("resourceFile", getResourceFile());
+    intent.putExtra("com.httrack.android.rootFile", getProjectRootFile());
+    intent.putExtra("com.httrack.android.resourceFile", getResourceFile());
   }
 
   /**
@@ -1580,7 +1586,7 @@ public class HTTrackActivity extends FragmentActivity {
     if (names != null && names.length != 0) {
       final Intent intent = new Intent(this, CleanupActivity.class);
       fillExtra(intent);
-      intent.putExtra("projectNames", names);
+      intent.putExtra("com.httrack.android.projectNames", names);
       startActivity(intent);
     }
   }
@@ -1653,10 +1659,8 @@ public class HTTrackActivity extends FragmentActivity {
     }
   }
 
-  @Override
-  protected void onSaveInstanceState(final Bundle outState) {
-    super.onSaveInstanceState(outState);
-
+  /** Save instance state. **/
+  protected void saveInstanceState(final Bundle outState) {
     // Save current state. There is no guarantee than the application is going
     // to be killed/restored, however.
 
@@ -1665,28 +1669,89 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Save settings to bundle
 
+    // Version ID
+    outState.putInt("com.httrack.android.version", versionCode);
+
     // Map keys
-    outState.putParcelable("map", mapper.serialize());
+    outState.putParcelable("com.httrack.android.map", mapper.serialize());
 
     // Current pane
-    outState.putInt("pane_id", pane_id);
+    outState.putInt("com.httrack.android.pane_id", pane_id);
 
     // Current focus id
-    outState.putIntArray("focus_id", getCurrentFocusId());
+    outState.putIntArray("com.httrack.android.focus_id", getCurrentFocusId());
+  }
+
+  @Override
+  protected void onSaveInstanceState(final Bundle outState) {
+    super.onSaveInstanceState(outState);
+    saveInstanceState(outState);
   }
 
   /** Send a notification. **/
   protected void sendWarningNotification(final String title, final String text) {
-    final String ns = Context.NOTIFICATION_SERVICE;
-    final NotificationManager manager = (NotificationManager) getSystemService(ns);
-    final int icon = R.drawable.ic_launcher;
+    final Intent intent = new Intent(this, HTTrackActivity.class);
+    final Bundle extras = new Bundle();
+    saveInstanceState(extras);
+    intent.putExtras(extras);
+    sendNotification(intent, title, text);
+  }
+
+  /** Send a notification with a specific Intent. **/
+  protected void sendNotification(final Intent intent, final String title,
+      final String text) {
+
+    // Create notification
     final long when = System.currentTimeMillis();
-    final Notification notification = new Notification(icon, text, when);
-    final Context context = getApplicationContext();
-    final PendingIntent intent = PendingIntent.getActivity(this, 0,
-        getIntent(), 0);
-    notification.setLatestEventInfo(context, title, text, intent);
-    manager.notify(1, notification);
+    final PendingIntent pintent = PendingIntent.getActivity(this, 0, intent, 0);
+    final Notification notification = new NotificationCompat.Builder(this)
+        .setContentTitle(text).setContentText(title).setTicker(text)
+        .setSmallIcon(R.drawable.ic_launcher).setWhen(when)
+        .setContentInfo(getString(R.string.start)).setContentIntent(pintent)
+        .setAutoCancel(true).build();
+
+    // Send
+    final NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+    manager.notify(0, notification);
+  }
+
+  /** Send a notification with a blank Intent. **/
+  protected void sendNotification(final String title, final String text) {
+    sendNotification(new Intent(), title, text);
+  }
+
+  /** Restore a saved instance state. **/
+  protected void restoreInstanceState(final Bundle savedInstanceState) {
+    // Check version ID
+    final int version = savedInstanceState
+        .getInt("com.httrack.android.version");
+    if (version != versionCode) {
+      Log.d(this.getClass().getName(), "refused bundle version " + version);
+      return;
+    }
+
+    // Switch pane id
+    final int id = savedInstanceState.getInt("com.httrack.android.pane_id");
+
+    // Current focus
+    final int[] focus_ids = savedInstanceState
+        .getIntArray("com.httrack.android.focus_id");
+
+    // Load map
+    final Parcelable data = savedInstanceState
+        .getParcelable("com.httrack.android.map");
+
+    // Load map
+    if (data != null) {
+      // Load map settings
+      loadParcelable(data);
+
+      // Switch pane id (0 by default)
+      setPane(id);
+
+      // Set focus
+      setCurrentFocusId(focus_ids);
+    }
   }
 
   @Override
@@ -1695,33 +1760,12 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Security
     if (runner != null) {
-      sendWarningNotification("Warning",
+      sendNotification("Warning",
           "HTTrack: restore called while running ignored!");
       return;
     }
 
-    // Switch pane id
-    final int id = savedInstanceState.getInt("pane_id");
-
-    // Current focus
-    final int[] focus_ids = savedInstanceState.getIntArray("focus_id");
-
-    // Load map
-    final Parcelable data = savedInstanceState.getParcelable("map");
-
-    // Load map
-    if (data != null) {
-      // Load map settings
-      loadParcelable(data);
-
-      // Switch pane id
-      setPane(id);
-
-      // Set focus
-      setCurrentFocusId(focus_ids);
-
-      // sendWarningNotification("Warning", "HTTrack: restored session!");
-    }
+    restoreInstanceState(savedInstanceState);
   }
 
   @Override

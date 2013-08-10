@@ -290,7 +290,7 @@ public class OptionsActivity extends TabActivity {
     super.onCreate(savedInstanceState);
 
     // Load map
-    map.unserialize(getIntent().getParcelableExtra("map"));
+    map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
     Log.d(this.getClass().getName(), "map size: " + map.size());
 
     // Set view
@@ -339,7 +339,7 @@ public class OptionsActivity extends TabActivity {
 
     // Declare result
     final Intent intent = new Intent();
-    intent.putExtra("map", map);
+    intent.putExtra("com.httrack.android.map", map);
     setResult(Activity.RESULT_OK, intent);
     super.finish();
   }
