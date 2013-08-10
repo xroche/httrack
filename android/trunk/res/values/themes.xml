@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Fix Android bug <http://code.google.com/p/android/issues/detail?id=5237#c8> -->
+    <style name="Theme.Light.Fixed" parent="@android:style/Theme.Light">
+        <item name="android:autoCompleteTextViewStyle">@style/AutoCompleteTextViewLight</item>
+        <item name="android:dropDownItemStyle">@style/Widget.DropDownItemLight</item>
+    </style>
+
+</resources>
