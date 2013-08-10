@@ -23,7 +23,8 @@
         android:layout_marginLeft="23dp"
         android:layout_toRightOf="@+id/textLinksDetails"
         android:ems="10"
-        android:hint="@string/projname_hint" >
+        android:hint="@string/projname_hint"
+        android:textColor="@android:color/primary_text_light" >
 
         <requestFocus />
     </AutoCompleteTextView>

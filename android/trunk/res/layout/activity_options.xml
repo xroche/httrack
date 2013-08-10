@@ -22,7 +22,8 @@
                 android:layout_height="wrap_content" />
         </HorizontalScrollView>
 
-        <!--  Vertical scroll view. -->
+        <!-- Vertical scroll view. -->
+
         <ScrollView
             android:id="@+id/scrollView"
             android:layout_width="fill_parent"
