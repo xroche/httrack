@@ -1010,12 +1010,36 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
+   * Get the profile cache file for the current project.
+   * 
+   * @return The profile cache file.
+   */
+  protected File getCacheFile() {
+    final File target = getTargetFile();
+    if (target != null) {
+      return getCacheFile(target);
+    } else {
+      return null;
+    }
+  }
+
+  /**
    * Is there an existing profile yet ?
    * 
    * @return true if there is a winprofile.ini file
    */
   protected boolean hasProfileFile() {
     final File profile = getProfileFile();
+    return profile != null && profile.exists();
+  }
+
+  /**
+   * Is there an existing cache yet ?
+   * 
+   * @return true if there is a new.zip cache file
+   */
+  protected boolean hasCacheFile() {
+    final File profile = getCacheFile();
     return profile != null && profile.exists();
   }
 
@@ -1072,6 +1096,22 @@ public class HTTrackActivity extends FragmentActivity {
     }
   }
 
+  /**
+   * Get the cache file for a given project.
+   * 
+   * @return The profile target file.
+   * @param target
+   *          The project directory
+   * @return The cache file
+   */
+  protected static File getCacheFile(final File target) {
+    if (target != null) {
+      return new File(new File(target, "hts-cache"), "new.zip");
+    } else {
+      return null;
+    }
+  }
+
   /** Make directorie(s) if necessary. **/
   private static boolean mkdirs(final File target) {
     return target.mkdirs() || target.isDirectory();
@@ -1092,6 +1132,9 @@ public class HTTrackActivity extends FragmentActivity {
   protected synchronized void serialize() throws IOException {
     final File target = getTargetFile();
     final File profile = getProfileFile();
+    if (target == null || profile == null) {
+      throw new IOException("No project defined yet");
+    }
     final File cache = profile.getParentFile();
 
     // Validate path
@@ -1196,7 +1239,8 @@ public class HTTrackActivity extends FragmentActivity {
       }
       break;
     case R.layout.activity_proj_setup:
-      final boolean hasProfile = hasProfileFile();
+      // Existing cache ?
+      final boolean hasProfile = hasCacheFile();
       View.class.cast(this.findViewById(R.id.radioAction)).setEnabled(
           hasProfile);
       View.class.cast(this.findViewById(R.id.radioAction)).setVisibility(
@@ -1275,17 +1319,6 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
-   * Is this space-separated string non empty ?
-   * 
-   * @param s
-   *          The string
-   * @return true if the string was not empty
-   */
-  private boolean isStringNonEmpty(String s) {
-    return OptionsMapper.cleanupString(s).length() != 0;
-  }
-
-  /**
    * Validate the current pane
    * 
    * @return true if the current pane is valid
@@ -1294,7 +1327,7 @@ public class HTTrackActivity extends FragmentActivity {
     switch (pane_id) {
     case 1:
       final String name = getFieldText(R.id.fieldProjectName);
-      if (isStringNonEmpty(name)) {
+      if (OptionsMapper.isStringNonEmpty(name)) {
         // We need to put immediately the name in the map to be able to
         // unserialize.
         try {
@@ -1307,7 +1340,8 @@ public class HTTrackActivity extends FragmentActivity {
       }
       return false;
     case 2:
-      return isStringNonEmpty(getFieldText(R.id.fieldWebsiteURLs));
+      return OptionsMapper
+          .isStringNonEmpty(getFieldText(R.id.fieldWebsiteURLs));
     }
     return true;
   }
@@ -1428,17 +1462,16 @@ public class HTTrackActivity extends FragmentActivity {
     // Then start new activity
     final Intent intent = new Intent(this, OptionsActivity.class);
     fillExtra(intent);
-    intent.putExtra("map", mapper.getMap());
-    Log.d(this.getClass().getName(), "map size: " + mapper.getMap().size());
+    intent.putExtra("map", mapper.serialize());
+    Log.d(this.getClass().getName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
 
   /** Restore a previously saved map context. **/
   private void loadParcelable(final Parcelable data) {
     // Load modified map
-    mapper.getMap().unserialize(data);
-    Log.d(this.getClass().getName(), "received map size: "
-        + mapper.getMap().size());
+    mapper.unserialize(data);
+    Log.d(this.getClass().getName(), "received map size: " + mapper.size());
 
     // Load possibly modified field(s)
     loadPaneFields();
@@ -1633,7 +1666,7 @@ public class HTTrackActivity extends FragmentActivity {
     // Save settings to bundle
 
     // Map keys
-    outState.putParcelable("map", mapper.getMap());
+    outState.putParcelable("map", mapper.serialize());
 
     // Current pane
     outState.putInt("pane_id", pane_id);
@@ -1689,5 +1722,23 @@ public class HTTrackActivity extends FragmentActivity {
 
       // sendWarningNotification("Warning", "HTTrack: restored session!");
     }
+  }
+
+  @Override
+  public void onDestroy() {
+    // We are being destroyed... save profile ?
+    savePaneFields();
+    if (mapper.isDirty()
+        && OptionsMapper.isStringNonEmpty(mapper.getProjectName())
+        && OptionsMapper.isStringNonEmpty(mapper.getProjectUrl())) {
+      try {
+        serialize();
+        Log.d(this.getClass().getName(),
+            "saved profile for " + mapper.getProjectName());
+      } catch (IOException e) {
+        Log.d(this.getClass().getName(), "could not save profile", e);
+      }
+    }
+    super.onDestroy();
   }
 }

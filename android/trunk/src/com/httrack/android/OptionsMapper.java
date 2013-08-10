@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import android.os.Parcelable;
 import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
@@ -276,6 +277,9 @@ public class OptionsMapper {
 
   // The options mapping
   protected final SparseArraySerializable map = new SparseArraySerializable();
+
+  // Is the map dirty ?
+  protected boolean dirty;
 
   // Static initializer.
   static {
@@ -1097,7 +1101,19 @@ public class OptionsMapper {
    * @return the cleaned up string
    */
   public static String cleanupString(String s) {
-    return s.replaceAll("\\s+", " ").trim();
+    return s != null ? s.replaceAll("\\s+", " ").trim() : null;
+  }
+
+  /**
+   * Is this space-separated string non empty ?
+   * 
+   * @param s
+   *          The string
+   * @return true if the string was not empty
+   */
+  public static boolean isStringNonEmpty(String s) {
+    final String cleaned = cleanupString(s);
+    return cleaned != null && cleaned.length() != 0;
   }
 
   /**
@@ -1112,15 +1128,6 @@ public class OptionsMapper {
   }
 
   /**
-   * Return the underlying map.
-   * 
-   * @return The underlying map.
-   */
-  public SparseArraySerializable getMap() {
-    return map;
-  }
-
-  /**
    * Get a map value.
    * 
    * @param key
@@ -1129,6 +1136,10 @@ public class OptionsMapper {
    */
   public String getMap(int key) {
     return map.get(key);
+  }
+
+  private String nonNullString(final String s) {
+    return s != null ? s : "";
   }
 
   /**
@@ -1140,7 +1151,26 @@ public class OptionsMapper {
    *          The value
    */
   public void setMap(int key, final String value) {
+    if (!dirty) {
+      final String previous = map.get(key);
+      dirty = previous != value
+          && !nonNullString(previous).equals(nonNullString(value));
+      if (dirty) {
+        Log.d(this.getClass().getName(), "map set dirty: "
+            + OptionsMapper.fieldsNameToId.get(key) + "=" + value + " (was "
+            + previous + ")");
+      }
+    }
     map.put(key, value);
+  }
+
+  /**
+   * Return the underlying map size.
+   * 
+   * @return the underlying map size
+   */
+  public int size() {
+    return map.size();
   }
 
   /**
@@ -1221,7 +1251,7 @@ public class OptionsMapper {
    * @throws IOException
    *           Upon I/O error.
    */
-  protected static void unserialize(final File profile,
+  public static void unserialize(final File profile,
       final SparseArray<String> map) throws IOException {
     // Write settings
     if (!profile.exists()) {
@@ -1254,6 +1284,15 @@ public class OptionsMapper {
   }
 
   /**
+   * Is the map dirty ?
+   * 
+   * @return true if the map is dirty
+   */
+  public boolean isDirty() {
+    return dirty;
+  }
+
+  /**
    * Serialize settings on disk.
    * 
    * @param profile
@@ -1279,9 +1318,23 @@ public class OptionsMapper {
         lwriter.write("\n");
       }
       lwriter.close();
+      if (dirty) {
+        dirty = false;
+        Log.d(this.getClass().getName(),
+            "map set clean: serialize to file (sync'ed)");
+      }
     } finally {
       writer.close();
     }
+  }
+
+  /**
+   * Serialize the map
+   * 
+   * @return a Parcelable object
+   */
+  public Parcelable serialize() {
+    return map;
   }
 
   /**
@@ -1292,6 +1345,21 @@ public class OptionsMapper {
    */
   protected void unserialize(final File profile) throws IOException {
     unserialize(profile, map);
+    if (dirty) {
+      dirty = false;
+      Log.d(this.getClass().getName(),
+          "map set clean: unserialize from file (sync'ed)");
+    }
+  }
+
+  /**
+   * Unserialize object.
+   * 
+   * @param object
+   *          the Parcelable object
+   */
+  public void unserialize(final Parcelable object) {
+    map.unserialize(object);
   }
 
   /**
