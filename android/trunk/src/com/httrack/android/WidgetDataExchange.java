@@ -35,7 +35,7 @@ public class WidgetDataExchange {
 
   /**
    * Constructor.
-   * 
+   *
    * @param view
    *          The parent view.
    */
@@ -46,7 +46,7 @@ public class WidgetDataExchange {
   /*
    * Set text field.
    */
-  public void setFieldText(int id, String value) {
+  public void setFieldText(final int id, final String value) {
     final View view = parentView.findViewById(id);
     if (view == null) {
       throw new RuntimeException("no such view " + Integer.toString(id));
@@ -79,7 +79,7 @@ public class WidgetDataExchange {
   /*
    * Get field text
    */
-  public String getFieldText(int id) {
+  public String getFieldText(final int id) {
     final View view = parentView.findViewById(id);
     if (view == null) {
       throw new RuntimeException("no such view " + Integer.toString(id));

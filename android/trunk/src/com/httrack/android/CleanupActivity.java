@@ -29,8 +29,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import com.httrack.android.jni.HTTrackLib;
-
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.Context;
@@ -43,6 +41,8 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
+
+import com.httrack.android.jni.HTTrackLib;
 
 /**
  * Cleanup view.<br />
@@ -59,22 +59,22 @@ public class CleanupActivity extends ListActivity {
    * List adapter.
    */
   public class CleanupListAdapter extends SimpleAdapter {
-    private LayoutInflater inflater;
+    private final LayoutInflater inflater;
 
-    public CleanupListAdapter(Context context,
-        List<? extends Map<String, ?>> data, int resource, String[] from,
-        int[] to) {
+    public CleanupListAdapter(final Context context,
+        final List<? extends Map<String, ?>> data, final int resource, final String[] from,
+        final int[] to) {
       super(context, data, resource, from, to);
       inflater = LayoutInflater.from(context);
     }
 
     @Override
-    public Object getItem(int position) {
+    public Object getItem(final int position) {
       return super.getItem(position);
     }
 
     @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
+    public View getView(final int position, View convertView, final ViewGroup parent) {
       if (convertView == null) {
         convertView = inflater.inflate(R.layout.cleanup_item, null);
         final CheckBox cb = (CheckBox) convertView.findViewById(R.id.check);
@@ -107,7 +107,7 @@ public class CleanupActivity extends ListActivity {
 
     final ArrayList<HashMap<String, String>> listItem = new ArrayList<HashMap<String, String>>();
 
-    for (String name : projects) {
+    for (final String name : projects) {
       final HashMap<String, String> map = new HashMap<String, String>();
       map.put("name", name);
 
@@ -119,7 +119,7 @@ public class CleanupActivity extends ListActivity {
             projectMap);
         final String description = projectMap.get(R.id.fieldWebsiteURLs);
         map.put("description", description);
-      } catch (IOException e) {
+      } catch (final IOException e) {
         map.put("description", name);
       }
 
@@ -154,7 +154,7 @@ public class CleanupActivity extends ListActivity {
       return true;
     } else {
       if (file.isDirectory()) {
-        for (File child : file.listFiles()) {
+        for (final File child : file.listFiles()) {
           deleteRecursively(child);
         }
       }
@@ -206,7 +206,7 @@ public class CleanupActivity extends ListActivity {
                   + projectList)
           .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
             @Override
-            public void onClick(DialogInterface dialog, int which) {
+            public void onClick(final DialogInterface dialog, final int which) {
               deleteProjects();
             }
           }).setNegativeButton("No", null).show();

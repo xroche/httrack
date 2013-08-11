@@ -46,7 +46,7 @@ public class SparseArraySerializable extends SparseArray<String> implements
 
   /**
    * Merge an existing SparseArray
-   * 
+   *
    * @param other
    *          the other SparseArray
    */
@@ -61,7 +61,7 @@ public class SparseArraySerializable extends SparseArray<String> implements
 
   /**
    * Unserialize the sparse array.
-   * 
+   *
    * @param object
    *          The serialized object.
    */
@@ -81,7 +81,7 @@ public class SparseArraySerializable extends SparseArray<String> implements
   }
 
   @Override
-  public void writeToParcel(final Parcel dest, int flags) {
+  public void writeToParcel(final Parcel dest, final int flags) {
     final int size = size();
     dest.writeInt(size);
     for (int i = 0; i < size; i++) {
@@ -91,11 +91,13 @@ public class SparseArraySerializable extends SparseArray<String> implements
   }
 
   public static final Parcelable.Creator<SparseArraySerializable> CREATOR = new Parcelable.Creator<SparseArraySerializable>() {
+    @Override
     public SparseArraySerializable createFromParcel(final Parcel in) {
       return new SparseArraySerializable(in);
     }
 
-    public SparseArraySerializable[] newArray(int size) {
+    @Override
+    public SparseArraySerializable[] newArray(final int size) {
       return new SparseArraySerializable[size];
     }
   };

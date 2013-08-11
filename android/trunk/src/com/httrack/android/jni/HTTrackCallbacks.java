@@ -25,6 +25,6 @@ package com.httrack.android.jni;
  * HTTrack callbacks interface.
  **/
 public interface HTTrackCallbacks {
-	/** Refresh stats. **/
-	public void onRefresh(HTTrackStats stats);
+  /** Refresh stats. **/
+  public void onRefresh(HTTrackStats stats);
 }

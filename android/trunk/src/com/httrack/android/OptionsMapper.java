@@ -297,7 +297,7 @@ public class OptionsMapper {
     public static interface FinishMapper {
       /**
        * FinisExecute post-action
-       * 
+       *
        * @param flags
        *          the flags array
        * @param commandline
@@ -309,7 +309,7 @@ public class OptionsMapper {
 
     /**
      * Emit the option
-     * 
+     *
      * @param flags
      *          the flags array
      * @param commandline
@@ -331,7 +331,7 @@ public class OptionsMapper {
     public static final NoOpOption INSTANCE = new NoOpOption();
 
     @Override
-    public void emit(StringBuilder flags, List<String> commandline, String value) {
+    public void emit(final StringBuilder flags, final List<String> commandline, final String value) {
     }
   }
 
@@ -345,7 +345,7 @@ public class OptionsMapper {
     public static final StringSplit INSTANCE = new StringSplit();
 
     @Override
-    public void emit(StringBuilder flags, List<String> commandline, String value) {
+    public void emit(final StringBuilder flags, final List<String> commandline, final String value) {
       // URLs
       for (final String s : cleanupString(value).trim().split("\\s+")) {
         if (s.length() != 0) {
@@ -369,15 +369,15 @@ public class OptionsMapper {
      */
     private class Html implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           MaxSizeHandler.this.maxHtml = Integer.parseInt(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         MaxSizeHandler.this.finish(flags, commandline);
       }
     }
@@ -387,22 +387,22 @@ public class OptionsMapper {
      */
     private class NonHtml implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           MaxSizeHandler.this.maxNonHtml = Integer.parseInt(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         MaxSizeHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get the html size mapper
-     * 
+     *
      * @return the html size mapper
      */
     public OptionMapper getHtml() {
@@ -411,7 +411,7 @@ public class OptionsMapper {
 
     /**
      * Get the non-html size mapper
-     * 
+     *
      * @return the non-html size mapper
      */
     public OptionMapper getNonHtml() {
@@ -421,7 +421,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       // mN maximum file length for a non-html file (--max-files[=N])
       // mN,N2 maximum file length for non html (N) and html (N2)
       if (!finished) {
@@ -453,15 +453,15 @@ public class OptionsMapper {
      */
     private class Time implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if ("1".equals(value)) {
           HostControlHandler.this.flag |= 1;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         HostControlHandler.this.finish(flags, commandline);
       }
     }
@@ -471,22 +471,22 @@ public class OptionsMapper {
      */
     private class Rate implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if ("1".equals(value)) {
           HostControlHandler.this.flag |= 2;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         HostControlHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get the transfer rate mapper
-     * 
+     *
      * @return the transfer rate mapper
      */
     public OptionMapper getRateMapper() {
@@ -495,7 +495,7 @@ public class OptionsMapper {
 
     /**
      * Get the timeout mapper
-     * 
+     *
      * @return the timeout mapper
      */
     public OptionMapper getTimeMapper() {
@@ -505,7 +505,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         flags.append("H");
@@ -527,15 +527,15 @@ public class OptionsMapper {
      */
     private class Dos implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if ("1".equals(value)) {
           DosIso9660Handler.this.dos = true;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         DosIso9660Handler.this.finish(flags, commandline);
       }
     }
@@ -545,22 +545,22 @@ public class OptionsMapper {
      */
     private class Iso9660 implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if ("1".equals(value)) {
           DosIso9660Handler.this.iso9660 = true;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         DosIso9660Handler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get the dos flag mapper
-     * 
+     *
      * @return the dos flag mapper
      */
     public OptionMapper getDosMapper() {
@@ -569,7 +569,7 @@ public class OptionsMapper {
 
     /**
      * Get the iso9660 flag mapper
-     * 
+     *
      * @return the iso9660 flag mapper
      */
     public OptionMapper getIso9660Mapper() {
@@ -579,7 +579,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         // Note: same logic (...) as WinHTTrack ; see WinHTTrack/Shell.cpp
@@ -608,15 +608,15 @@ public class OptionsMapper {
      */
     private class Address implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           ProxyHandler.this.address = value;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         ProxyHandler.this.finish(flags, commandline);
       }
     }
@@ -626,22 +626,22 @@ public class OptionsMapper {
      */
     private class Port implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           ProxyHandler.this.port = value;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         ProxyHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get address mapper
-     * 
+     *
      * @return the address mapper
      */
     public OptionMapper getAddressMapper() {
@@ -650,7 +650,7 @@ public class OptionsMapper {
 
     /**
      * Get the port mapper
-     * 
+     *
      * @return the port build mapper
      */
     public OptionMapper getPortMapper() {
@@ -660,7 +660,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         if (address != null) {
@@ -685,15 +685,15 @@ public class OptionsMapper {
      */
     private class Type implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           BuildHandler.this.build = Integer.parseInt(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         BuildHandler.this.finish(flags, commandline);
       }
     }
@@ -703,22 +703,22 @@ public class OptionsMapper {
      */
     private class Custom implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           BuildHandler.this.custom = value;
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         BuildHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get type mapper
-     * 
+     *
      * @return the type mapper
      */
     public OptionMapper getTypeMapper() {
@@ -727,7 +727,7 @@ public class OptionsMapper {
 
     /**
      * Get the custom build mapper
-     * 
+     *
      * @return the custom build mapper
      */
     public OptionMapper getCustomMapper() {
@@ -741,7 +741,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         if (build < mapping.length) {
@@ -768,15 +768,15 @@ public class OptionsMapper {
      */
     private class Type implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           LogHandler.this.type = Integer.parseInt(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         LogHandler.this.finish(flags, commandline);
       }
     }
@@ -786,22 +786,22 @@ public class OptionsMapper {
      */
     private class Enabled implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           LogHandler.this.enabled = "1".equals(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         LogHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get address mapper
-     * 
+     *
      * @return the address mapper
      */
     public OptionMapper getTypeMapper() {
@@ -810,7 +810,7 @@ public class OptionsMapper {
 
     /**
      * Get the port mapper
-     * 
+     *
      * @return the port build mapper
      */
     public OptionMapper getEnabledMapper() {
@@ -820,7 +820,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         if (enabled) {
@@ -854,15 +854,15 @@ public class OptionsMapper {
      */
     private class Type implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           PrimaryScanHandler.this.type = Integer.parseInt(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         PrimaryScanHandler.this.finish(flags, commandline);
       }
     }
@@ -872,22 +872,22 @@ public class OptionsMapper {
      */
     private class HtmlFirst implements OptionMapper, OptionMapper.FinishMapper {
       @Override
-      public void emit(StringBuilder flags, List<String> commandline,
-          String value) {
+      public void emit(final StringBuilder flags, final List<String> commandline,
+          final String value) {
         if (value != null && value.length() != 0) {
           PrimaryScanHandler.this.htmlFirst = "1".equals(value);
         }
       }
 
       @Override
-      public void finish(StringBuilder flags, List<String> commandline) {
+      public void finish(final StringBuilder flags, final List<String> commandline) {
         PrimaryScanHandler.this.finish(flags, commandline);
       }
     }
 
     /**
      * Get address mapper
-     * 
+     *
      * @return the address mapper
      */
     public OptionMapper getTypeMapper() {
@@ -896,7 +896,7 @@ public class OptionsMapper {
 
     /**
      * Get the port mapper
-     * 
+     *
      * @return the port build mapper
      */
     public OptionMapper getHtmlFirstMapper() {
@@ -906,7 +906,7 @@ public class OptionsMapper {
     /*
      * Where we really emit the option
      */
-    private void finish(StringBuilder flags, List<String> commandline) {
+    private void finish(final StringBuilder flags, final List<String> commandline) {
       if (!finished) {
         finished = true;
         switch (type) {
@@ -943,6 +943,7 @@ public class OptionsMapper {
       this.option = option;
     }
 
+    @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       if (value != null && value.length() != 0) {
@@ -963,6 +964,7 @@ public class OptionsMapper {
       this.option = option;
     }
 
+    @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       if (value != null && value.length() != 0) {
@@ -983,6 +985,7 @@ public class OptionsMapper {
       this.option = option;
     }
 
+    @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       if (value != null && value.length() != 0) {
@@ -1010,6 +1013,7 @@ public class OptionsMapper {
       this(option, false);
     }
 
+    @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       if (value != null && value.length() != 0) {
@@ -1027,11 +1031,12 @@ public class OptionsMapper {
     protected final String[] choices;
     protected final boolean asFlag;
 
-    public MultipleChoicesOption(final String[] choices, boolean asFlag) {
+    public MultipleChoicesOption(final String[] choices, final boolean asFlag) {
       this.choices = choices;
       this.asFlag = asFlag;
     }
 
+    @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       if (value != null && value.length() != 0) {
@@ -1095,23 +1100,23 @@ public class OptionsMapper {
 
   /**
    * Cleanup a space-separated string.
-   * 
+   *
    * @param s
    *          The string
    * @return the cleaned up string
    */
-  public static String cleanupString(String s) {
+  public static String cleanupString(final String s) {
     return s != null ? s.replaceAll("\\s+", " ").trim() : null;
   }
 
   /**
    * Is this space-separated string non empty ?
-   * 
+   *
    * @param s
    *          The string
    * @return true if the string was not empty
    */
-  public static boolean isStringNonEmpty(String s) {
+  public static boolean isStringNonEmpty(final String s) {
     final String cleaned = cleanupString(s);
     return cleaned != null && cleaned.length() != 0;
   }
@@ -1129,12 +1134,12 @@ public class OptionsMapper {
 
   /**
    * Get a map value.
-   * 
+   *
    * @param key
    *          The key
    * @return The value
    */
-  public String getMap(int key) {
+  public String getMap(final int key) {
     return map.get(key);
   }
 
@@ -1157,13 +1162,13 @@ public class OptionsMapper {
 
   /**
    * Set a map value.
-   * 
+   *
    * @param key
    *          The key
    * @param value
    *          The value
    */
-  public void setMap(int key, final String value) {
+  public void setMap(final int key, final String value) {
     if (!dirty) {
       final String previous = map.get(key);
       dirty = previous != value
@@ -1179,7 +1184,7 @@ public class OptionsMapper {
 
   /**
    * Return the underlying map size.
-   * 
+   *
    * @return the underlying map size
    */
   public int size() {
@@ -1188,7 +1193,7 @@ public class OptionsMapper {
 
   /**
    * Get URLs
-   * 
+   *
    * @return the URLs
    */
   protected String getProjectUrl() {
@@ -1197,7 +1202,7 @@ public class OptionsMapper {
 
   /**
    * Get the current project name
-   * 
+   *
    * @return The current project name
    */
   public String getProjectName() {
@@ -1255,12 +1260,12 @@ public class OptionsMapper {
 
   /**
    * Unserialize a specific profile from disk.
-   * 
+   *
    * @param profile
    *          The profile file (winprofile.ini)
    * @param map
    *          The map to be filled
-   * 
+   *
    * @throws IOException
    *           Upon I/O error.
    */
@@ -1298,7 +1303,7 @@ public class OptionsMapper {
 
   /**
    * Is the map dirty ?
-   * 
+   *
    * @return true if the map is dirty
    */
   public boolean isDirty() {
@@ -1307,7 +1312,7 @@ public class OptionsMapper {
 
   /**
    * Serialize settings on disk.
-   * 
+   *
    * @param profile
    *          The profile file.
    * @throws UnsupportedEncodingException
@@ -1343,7 +1348,7 @@ public class OptionsMapper {
 
   /**
    * Serialize the map
-   * 
+   *
    * @return a Parcelable object
    */
   public Parcelable serialize() {
@@ -1352,7 +1357,7 @@ public class OptionsMapper {
 
   /**
    * Unserialize profile from disk.
-   * 
+   *
    * @throws IOException
    *           Upon I/O error.
    */
@@ -1367,7 +1372,7 @@ public class OptionsMapper {
 
   /**
    * Unserialize object.
-   * 
+   *
    * @param object
    *          the Parcelable object
    */
@@ -1378,7 +1383,7 @@ public class OptionsMapper {
   /**
    * Build commandline arguments for the httrack engine, depending on current
    * defined settings.
-   * 
+   *
    * @return The commandline argument(s)
    */
   public List<String> buildCommandline() {

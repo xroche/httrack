@@ -28,10 +28,10 @@ import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.os.Bundle;
 import android.app.Activity;
 import android.app.TabActivity;
 import android.content.Intent;
+import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.widget.TabHost;
@@ -58,7 +58,7 @@ public class OptionsActivity extends TabActivity {
    */
   public abstract static class Tab extends Activity {
     protected OptionsActivity parentOptions;
-    private WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
+    private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -71,7 +71,7 @@ public class OptionsActivity extends TabActivity {
 
     /**
      * List of fields.
-     * 
+     *
      * @return
      */
     protected int[] getFields() {
@@ -105,7 +105,7 @@ public class OptionsActivity extends TabActivity {
     }
 
     @Override
-    public void setContentView(int layoutResID) {
+    public void setContentView(final int layoutResID) {
       super.setContentView(layoutResID);
       load();
     }
@@ -321,14 +321,14 @@ public class OptionsActivity extends TabActivity {
   /*
    * Map getter.
    */
-  protected String getMap(int key) {
+  protected String getMap(final int key) {
     return map.get(key);
   }
 
   /*
    * Map setter.
    */
-  protected void setMap(int key, final String value) {
+  protected void setMap(final int key, final String value) {
     map.put(key, value);
   }
 

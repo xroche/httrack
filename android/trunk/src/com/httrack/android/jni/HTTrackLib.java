@@ -30,14 +30,14 @@ public class HTTrackLib {
 
   /**
    * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
-   * 
+   *
    * @return the current library version
    */
   public static native String getVersion();
 
   /**
    * Get the current library features, as a string of [+-]tag.
-   * 
+   *
    * @return the current library features.
    */
   public static native String getFeatures();
@@ -49,14 +49,14 @@ public class HTTrackLib {
 
   /**
    * Build the top-level index.
-   * 
+   *
    * @param path
    *          The target path;
    * @param templatesPath
    *          The templates path directory.
    * @return 1 upon success
    */
-  public static int buildTopIndex(File path, File templatesPath) {
+  public static int buildTopIndex(final File path, final File templatesPath) {
     final String p = path.getAbsolutePath() + "/";
     final String t = templatesPath.getAbsolutePath() + "/";
     return buildTopIndex(p, t);
@@ -64,7 +64,7 @@ public class HTTrackLib {
 
   /**
    * Start the engine.
-   * 
+   *
    * @param args
    *          main() arguments.
    * @return The exit code upon completion.
@@ -75,7 +75,7 @@ public class HTTrackLib {
 
   /**
    * Stop the engine.
-   * 
+   *
    * @return true if the engine was stopped (or at least a request was sent),
    *         false if it has already stopped.
    */
@@ -91,7 +91,7 @@ public class HTTrackLib {
   /**
    * Constructor with statistics support.
    */
-  public HTTrackLib(HTTrackCallbacks callbacks) {
+  public HTTrackLib(final HTTrackCallbacks callbacks) {
     this.callbacks = callbacks;
   }
 
