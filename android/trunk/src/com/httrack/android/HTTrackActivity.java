@@ -131,7 +131,9 @@ public class HTTrackActivity extends FragmentActivity {
   protected boolean interruptRequested;
 
   // Warn spaces in project name
+  protected static final int currentapiVersion = android.os.Build.VERSION.SDK_INT;
   protected boolean warnPreHoneycombSpaceIssue;
+  protected boolean switchEmptyProjectName;
 
   // Widget data exchange helper
   private WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
@@ -1290,42 +1292,59 @@ public class HTTrackActivity extends FragmentActivity {
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
 
+        // "Next" button is disabled if no project name is defined
+        switchEmptyProjectName = !OptionsMapper.isStringNonEmpty(mapper
+            .getProjectName());
+        View.class.cast(findViewById(R.id.buttonNext)).setEnabled(
+            !switchEmptyProjectName);
+
         /*
          * Prior to Honeycomb (TODO FIXME: check that), the android browser is
          * unable to browse local file:// pages embedding spaces (%20 or +)
          * Therefore, warn the user.
          */
-        final int currentapiVersion = android.os.Build.VERSION.SDK_INT;
-        if (currentapiVersion < VERSION_CODES.HONEYCOMB) {
-          warnPreHoneycombSpaceIssue = false;
-          name.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before,
-                int count) {
-              if (!warnPreHoneycombSpaceIssue) {
-                for (int i = start; i < start + count; i++) {
-                  if (s.charAt(i) == ' ') {
-                    showNotification(
-                        getString(R.string.warning_space_in_filename), true);
-                    warnPreHoneycombSpaceIssue = true;
-                    break;
-                  }
+        warnPreHoneycombSpaceIssue = currentapiVersion < VERSION_CODES.HONEYCOMB;
+
+        /* Add text watcher for the "Next" button. */
+        name.addTextChangedListener(new TextWatcher() {
+          @Override
+          public void onTextChanged(CharSequence s, int start, int before,
+              int count) {
+            // Warn when seeing space
+            if (warnPreHoneycombSpaceIssue) {
+              for (int i = start; i < start + count; i++) {
+                if (s.charAt(i) == ' ') {
+                  showNotification(
+                      getString(R.string.warning_space_in_filename), true);
+                  warnPreHoneycombSpaceIssue = false;
+                  break;
                 }
               }
             }
+          }
 
-            // NOOP
-            @Override
-            public void afterTextChanged(Editable s) {
+          @Override
+          public void afterTextChanged(Editable s) {
+            // Enable/disable next button
+            boolean empty = true;
+            for (int i = 0; i < s.length(); i++) {
+              if (Character.isLetterOrDigit(s.charAt(i))) {
+                empty = false;
+                break;
+              }
             }
+            if (empty != switchEmptyProjectName) {
+              switchEmptyProjectName = empty;
+              View.class.cast(findViewById(R.id.buttonNext)).setEnabled(!empty);
+            }
+          }
 
-            // NOOP
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count,
-                int after) {
-            }
-          });
-        }
+          // NOOP
+          @Override
+          public void beforeTextChanged(CharSequence s, int start, int count,
+              int after) {
+          }
+        });
       }
       break;
     case R.layout.activity_proj_setup:
