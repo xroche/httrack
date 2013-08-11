@@ -166,5 +166,5 @@
     <string name="warning_space_in_filename">Beware: you local browser might be unable to browse files with embedded filenames</string>
     <string name="no_index_html_in_xx">No \'index.html\' file in %s!</string>
     <string name="info_recreated_resources">Recreated HTTrack internal cached resources</string>
-    <string name="about_credits">\n(Please notify us of any bug or problem)\n\nDevelopment:\nInterface (Windows): Xavier Roche\nSpider: Xavier Roche\nJavaParserClasses: Yann Philippot\n\n(C)1998-2003 Xavier Roche and other contributors\nMANY THANKS for translation tips to:\nRobert Lagadec (rlagadec@yahoo.fr)</string>
+    <string name="about_credits">\n(Please notify us of any bug or problem)\n\nDevelopment:\nInterface (Windows): Xavier Roche\nSpider: Xavier Roche\nJavaParserClasses: Yann Philippot\n\n&#169;1998-2013 Xavier Roche and other contributors\nMANY THANKS for translation tips to:\nRobert Lagadec (rlagadec@yahoo.fr)</string>
 </resources>
