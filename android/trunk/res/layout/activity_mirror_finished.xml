@@ -28,20 +28,20 @@
             android:orientation="horizontal" >
 
             <Button
-                android:id="@+id/buttonBrowse"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="left"
-                android:onClick="onBrowse"
-                android:text="@string/browse_website" />
-
-            <Button
                 android:id="@+id/buttonLogs"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="right"
+                android:layout_gravity="left"
                 android:onClick="onShowLogs"
                 android:text="@string/show_logs" />
+
+            <Button
+                android:id="@+id/buttonBrowse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:onClick="onBrowse"
+                android:text="@string/browse_website" />
         </LinearLayout>
     </ScrollView>
 
