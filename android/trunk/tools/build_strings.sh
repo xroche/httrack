@@ -42,9 +42,11 @@ mkdir -p $dest
 cat "$i" | \
 	iconv -f "$cp" -t "utf-8" \
 	| tr -d '\r' \
+	| sed -e 's/\\r//g' \
 	| sed -e 's/:$//' -e 's/\* //g' -e 's/\.\.\.$//g' -e 's/\([[:space:]]\)[[:space:]]*/\1/g' -e 's/[[:space:]]*$//' \
 	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
 	| sed -e 's/WinHTTrack/HTTrack/g' \
+	| sed -e "s/1998-2003/1998-$(date +%Y)/g" \
 	| (
 unset arr
 declare -A arr
