@@ -485,6 +485,31 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
+   * Get the hts-log.txt for the current project.
+   * 
+   * @return The destination directory.
+   */
+  protected File getTargetLogFile() {
+    final File target = getTargetFile();
+    if (target != null && target.exists()) {
+      final File log = new File(target, "hts-log.txt");
+      return log;
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Check whether an hts-log.txt file is present for the current project.
+   * 
+   * @return true if an hts-log.txt file is present for the current project.
+   */
+  protected boolean hasTargetLogFile() {
+    final File index = getTargetLogFile();
+    return index != null && index.exists();
+  }
+
+  /**
    * Pretty-print a string array.
    * 
    * @param array
@@ -1278,8 +1303,21 @@ public class HTTrackActivity extends FragmentActivity {
       }
 
       // Enable browse button if index.html exists
-      View.class.cast(this.findViewById(R.id.buttonBrowse)).setEnabled(
-          hasTargetIndexFile());
+      final boolean hasIndex = hasTargetIndexFile();
+      View.class.cast(this.findViewById(R.id.buttonBrowse))
+          .setEnabled(hasIndex);
+      if (!hasIndex) {
+        Log.d(getClass().getName(), "no index found ("
+            + getTargetIndexFile().getAbsolutePath() + ")");
+      }
+
+      // Enable logs if present
+      final boolean hasLog = hasTargetLogFile();
+      View.class.cast(this.findViewById(R.id.buttonLogs)).setEnabled(hasLog);
+      if (!hasLog) {
+        Log.d(getClass().getName(), "no log found ("
+            + getTargetLogFile().getAbsolutePath() + ")");
+      }
 
       // Final stats
       if (runner != null) {
@@ -1344,7 +1382,7 @@ public class HTTrackActivity extends FragmentActivity {
           // unserialize.
           try {
             mapper.clear();
-            mapper.setMap(R.id.fieldProjectName, name);
+            setMap(R.id.fieldProjectName, name);
             unserialize();
           } catch (final IOException e) {
             // Ignore (if not found)
@@ -1509,22 +1547,17 @@ public class HTTrackActivity extends FragmentActivity {
    * "Show Logs"
    */
   public void onShowLogs(final View view) {
-    final File target = getTargetFile();
-
-    if (target != null && target.exists()) {
-      final File log = new File(target, "hts-log.txt");
-      if (log.exists()) {
-        FileInputStream rd;
-        try {
-          rd = new FileInputStream(log);
-          byte[] data = new byte[(int) log.length()];
-          rd.read(data);
-          rd.close();
-          final String logs = new String(data, "UTF-8");
-          new AlertDialog.Builder(this).setTitle("Logs").setMessage(logs)
-              .show();
-        } catch (final IOException e) {
-        }
+    final File log = getTargetLogFile();
+    if (log.exists()) {
+      FileInputStream rd;
+      try {
+        rd = new FileInputStream(log);
+        byte[] data = new byte[(int) log.length()];
+        rd.read(data);
+        rd.close();
+        final String logs = new String(data, "UTF-8");
+        new AlertDialog.Builder(this).setTitle("Logs").setMessage(logs).show();
+      } catch (final IOException e) {
       }
     }
   }
@@ -1699,7 +1732,7 @@ public class HTTrackActivity extends FragmentActivity {
   /** Send a notification. **/
   protected void sendAbortNotification(final String title, final String text) {
     // Continue an interrupted mirror
-    mapper.setMap(R.id.radioAction, "0");
+    setMap(R.id.radioAction, "0");
 
     // Build notification
     final Intent intent = new Intent(this, HTTrackActivity.class);
