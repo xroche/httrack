@@ -676,8 +676,11 @@ public class HTTrackActivity extends FragmentActivity {
     /** Trunk to parent's sendAbortNotification(). **/
     public synchronized void sendAbortNotification() {
       if (parent != null) {
-        parent.sendAbortNotification("Warning", "HTTrack: mirror '"
-            + parent.mapper.getProjectName() + "' stopped!");
+        parent
+            .sendAbortNotification(
+                "HTTrack: mirror '" + parent.mapper.getProjectName()
+                    + "' stopped!",
+                "Click on this notification to restart the interrupted mirror");
       }
     }
 
@@ -1710,7 +1713,7 @@ public class HTTrackActivity extends FragmentActivity {
     final long when = System.currentTimeMillis();
     final PendingIntent pintent = PendingIntent.getActivity(this, 0, intent, 0);
     final Notification notification = new NotificationCompat.Builder(this)
-        .setContentTitle(text).setContentText(title).setTicker(text)
+        .setContentTitle(title).setContentText(text).setTicker(title)
         .setSmallIcon(R.drawable.ic_launcher).setWhen(when)
         .setContentInfo(getString(R.string.start)).setContentIntent(pintent)
         .setAutoCancel(true).build();
@@ -1765,8 +1768,8 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Security
     if (runner != null) {
-      sendNotification("Warning",
-          "HTTrack: restore called while running ignored!");
+      sendNotification("HTTrack: restore called while running ignored!",
+          "Please report this warning to the developers");
       return;
     }
 
