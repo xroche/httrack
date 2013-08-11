@@ -98,11 +98,41 @@ public class HTTrackLib {
   protected static native int buildTopIndex(String path, String templatesPath);
 
   static {
-    System.loadLibrary("iconv");
+    /**
+     * Load needed native libraries. Remember that we do not have our library
+     * path in the standard library path, and therefore loading "htslibjni" will
+     * just fail because dependencies would not be found. Instead, we have to
+     * load in reverse order all dependencies, and only load the final JNI stub
+     * at the end. All libraries, except the final JNI stub, will be loaded
+     * without JNI_OnLoad() being called (because not present for obvious
+     * reasons), and this is perfectly fine.
+     */
+
+    /*
+     * Android seems to have both /system/lib/libcrypto.so and
+     * /system/lib/libssl.so, and Java loads them in priority when using
+     * System.loadLibrary(...) We should either ensure that the system libs are
+     * fine (they seems fine BTW) or explicitly load the
+     * application-cached-library using some dirty magic (ie. giving the
+     * explicit full path and .so) For now, we do not ship the libraries, which
+     * will spare some space, and hope the ABI won't change too much.
+     */
     System.loadLibrary("crypto");
     System.loadLibrary("ssl");
+
+    /** Iconv (Unicode). **/
+    System.loadLibrary("iconv");
+
+    /** HTTrack core engine. **/
     System.loadLibrary("httrack");
+
+    /**
+     * HTTrack Java plugin (note: dlopen()'ed by HTTrack, has symbol
+     * dependencies to libhttrack.so).
+     **/
     System.loadLibrary("htsjava");
+
+    /** HTTrack Android JNI layer. **/
     System.loadLibrary("htslibjni");
   }
 }

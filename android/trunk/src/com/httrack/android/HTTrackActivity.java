@@ -1334,21 +1334,26 @@ public class HTTrackActivity extends FragmentActivity {
    */
   protected boolean validatePane() {
     switch (pane_id) {
-    case 1:
+    case LAYOUT_PROJECT_NAME:
       final String name = getFieldText(R.id.fieldProjectName);
       if (OptionsMapper.isStringNonEmpty(name)) {
-        // We need to put immediately the name in the map to be able to
-        // unserialize.
-        try {
-          setMap(R.id.fieldProjectName, name);
-          unserialize();
-        } catch (final IOException e) {
-          // Ignore (if not found)
+        // Changed name ?
+        final String prevName = getMap(R.id.fieldProjectName);
+        if (prevName == null || !prevName.equals(name)) {
+          // We need to put immediately the name in the map to be able to
+          // unserialize.
+          try {
+            mapper.clear();
+            mapper.setMap(R.id.fieldProjectName, name);
+            unserialize();
+          } catch (final IOException e) {
+            // Ignore (if not found)
+          }
         }
         return true;
       }
       return false;
-    case 2:
+    case LAYOUT_PROJECT_SETUP:
       return OptionsMapper
           .isStringNonEmpty(getFieldText(R.id.fieldWebsiteURLs));
     }

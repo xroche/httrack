@@ -1143,6 +1143,14 @@ public class OptionsMapper {
   }
 
   /**
+   * Clear the map, wiping all keys/values.
+   */
+  public void clear() {
+    map.clear();
+    dirty = false;
+  }
+
+  /**
    * Set a map value.
    * 
    * @param key
