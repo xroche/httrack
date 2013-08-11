@@ -1700,8 +1700,11 @@ public class HTTrackActivity extends FragmentActivity {
     // Handle item selection
     switch (item.getItemId()) {
     case R.id.action_about:
-      final String about = getTextResource(R.raw.about);
-      new AlertDialog.Builder(this).setTitle("About").setMessage(about).show();
+      final String about = getString(R.string.about_credits);
+      final String about0 = getString(R.string.app_name);
+      final String aboutLegal = getTextResource(R.raw.legal);
+      new AlertDialog.Builder(this).setTitle("About")
+          .setMessage(about0 + "\n" + about + "\n\n" + aboutLegal).show();
       break;
     case R.id.action_license:
       browse(new File(new File(getResourceFile(), "license"),
