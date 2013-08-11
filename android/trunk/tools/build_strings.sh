@@ -74,7 +74,7 @@ fi
 done
 
 # map xml
-( cat $2/values/strings.xml && echo ) | tr -d '\r' | (
+( cat $2/values/strings.xml | sed -e "s/\\\\'/'/g" && echo ) | tr -d '\r' | (
 
 # <string name="options">Options</string>
 while IFS= read -r l; do
