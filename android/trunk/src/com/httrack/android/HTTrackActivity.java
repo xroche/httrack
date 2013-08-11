@@ -67,7 +67,9 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.NotificationCompat;
+import android.text.Editable;
 import android.text.Html;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -95,6 +97,15 @@ public class HTTrackActivity extends FragmentActivity {
   protected static final int LAYOUT_MIRROR_PROGRESS = 3;
   protected static final int LAYOUT_FINISHED = 4;
 
+  /*
+   * Build identifiers. See
+   * <http://developer.android.com/reference/android/os/Build
+   * .VERSION_CODES.html>
+   */
+  private static class VERSION_CODES {
+    protected static final int HONEYCOMB = 0x0000000b;
+  };
+
   // Fields to restore/save state (Note: might be read-only fields)
   protected static final int fields[][] = { {},
       { R.id.fieldProjectName, R.id.fieldProjectCategory },
@@ -118,6 +129,9 @@ public class HTTrackActivity extends FragmentActivity {
 
   // Interrupt was requested
   protected boolean interruptRequested;
+
+  // Warn spaces in project name
+  protected boolean warnPreHoneycombSpaceIssue;
 
   // Widget data exchange helper
   private WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
@@ -1269,11 +1283,49 @@ public class HTTrackActivity extends FragmentActivity {
     case R.layout.activity_proj_name:
       final String[] names = getProjectNames();
       if (names != null) {
+        /* Setup name selection adapter. */
         final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
             .findViewById(R.id.fieldProjectName));
         Log.v(this.getClass().getName(), "project names: " + printArray(names));
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
+
+        /*
+         * Prior to Honeycomb (TODO FIXME: check that), the android browser is
+         * unable to browse local file:// pages embedding spaces (%20 or +)
+         * Therefore, warn the user.
+         */
+        final int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+        if (currentapiVersion < VERSION_CODES.HONEYCOMB) {
+          warnPreHoneycombSpaceIssue = false;
+          name.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before,
+                int count) {
+              if (!warnPreHoneycombSpaceIssue) {
+                for (int i = start; i < start + count; i++) {
+                  if (s.charAt(i) == ' ') {
+                    showNotification(
+                        getString(R.string.warning_space_in_filename), true);
+                    warnPreHoneycombSpaceIssue = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // NOOP
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+
+            // NOOP
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count,
+                int after) {
+            }
+          });
+        }
       }
       break;
     case R.layout.activity_proj_setup:
@@ -1313,7 +1365,9 @@ public class HTTrackActivity extends FragmentActivity {
       if (!hasIndex) {
         Log.d(getClass().getName(), "no index found ("
             + getTargetIndexFile().getAbsolutePath() + ")");
-        showNotification("No index.html created for this project!");
+        final String warning = getString(R.string.no_index_html_in_xx).replace(
+            "%s", getTargetFile().getPath());
+        showNotification(warning);
       }
 
       // Enable logs if present
