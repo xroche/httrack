@@ -80,6 +80,7 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class HTTrackActivity extends FragmentActivity {
   // Page layouts
@@ -321,6 +322,9 @@ public class HTTrackActivity extends FragmentActivity {
           lwriter.write(Long.toString(stamp));
           lwriter.close();
           writer.close();
+
+          // Little info
+          showNotification("Recreated HTTrack internal cached resources");
         } catch (final IOException io) {
           Log.w(this.getClass().getName(), "could not create resources", io);
           CleanupActivity.deleteRecursively(rscPath);
@@ -1309,6 +1313,7 @@ public class HTTrackActivity extends FragmentActivity {
       if (!hasIndex) {
         Log.d(getClass().getName(), "no index found ("
             + getTargetIndexFile().getAbsolutePath() + ")");
+        showNotification("No index.html created for this project!");
       }
 
       // Enable logs if present
@@ -1494,8 +1499,8 @@ public class HTTrackActivity extends FragmentActivity {
         // Change text to "Stop"
         text.setText(getString(R.string.cancel));
         // Notice
-        sendNotification("Info", "HTTrack: "
-            + getString(R.string.finishing_pending_transfers));
+        showNotification("HTTrack: "
+            + getString(R.string.finishing_pending_transfers), true);
       }
       // Hard interrupt
       else {
@@ -1729,6 +1734,32 @@ public class HTTrackActivity extends FragmentActivity {
     saveInstanceState(outState);
   }
 
+  /**
+   * Display a notification ("toast")
+   * 
+   * @param message
+   *          The message to be shown.
+   * @param longDuration
+   *          Should the notification duration be long ?
+   */
+  protected void showNotification(final String message,
+      final boolean longDuration) {
+    final Context context = getApplicationContext();
+    final int duration = longDuration ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT;
+    final Toast toast = Toast.makeText(context, message, duration);
+    toast.show();
+  }
+
+  /**
+   * Display a short notification ("toast")
+   * 
+   * @param message
+   *          The message to be shown.
+   */
+  protected void showNotification(final String message) {
+    showNotification(message, false);
+  }
+
   /** Send a notification. **/
   protected void sendAbortNotification(final String title, final String text) {
     // Continue an interrupted mirror
@@ -1740,12 +1771,12 @@ public class HTTrackActivity extends FragmentActivity {
     saveInstanceState(extras);
 
     intent.putExtras(extras);
-    sendNotification(intent, title, text);
+    sendSystemNotification(intent, title, text);
   }
 
   /** Send a notification with a specific Intent. **/
-  protected void sendNotification(final Intent intent, final String title,
-      final String text) {
+  protected void sendSystemNotification(final Intent intent,
+      final String title, final String text) {
 
     // Create notification
     final long when = System.currentTimeMillis();
@@ -1762,8 +1793,8 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /** Send a notification with a blank Intent. **/
-  protected void sendNotification(final String title, final String text) {
-    sendNotification(new Intent(), title, text);
+  protected void sendSystemNotification(final String title, final String text) {
+    sendSystemNotification(new Intent(), title, text);
   }
 
   /** Restore a saved instance state. **/
@@ -1806,8 +1837,9 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Security
     if (runner != null) {
-      sendNotification("HTTrack: restore called while running ignored!",
-          "Please report this warning to the developers");
+      showNotification(
+          "HTTrack: restore called while running ignored! Please report this warning to the developers",
+          true);
       return;
     }
 
