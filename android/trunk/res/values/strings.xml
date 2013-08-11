@@ -165,6 +165,5 @@
     <string name="mirror_finished">Site mirroring finished!</string>
     <string name="warning_space_in_filename">Beware: you local browser might be unable to browse files with embedded filenames</string>
     <string name="no_index_html_in_xx">No \'index.html\' file in %s!</string>
-    <string name="no_log_files_in_xx">No log files in %s!</string>
-
-</resources>
+    <string name="info_recreated_resources">Recreated HTTrack internal cached resources</string>
+</resources>

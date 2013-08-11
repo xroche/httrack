@@ -338,7 +338,7 @@ public class HTTrackActivity extends FragmentActivity {
           writer.close();
 
           // Little info
-          showNotification("Recreated HTTrack internal cached resources");
+          showNotification(getString(R.string.info_recreated_resources));
         } catch (final IOException io) {
           Log.w(this.getClass().getName(), "could not create resources", io);
           CleanupActivity.deleteRecursively(rscPath);
@@ -1553,8 +1553,7 @@ public class HTTrackActivity extends FragmentActivity {
         // Change text to "Stop"
         text.setText(getString(R.string.cancel));
         // Notice
-        showNotification("HTTrack: "
-            + getString(R.string.finishing_pending_transfers), true);
+        showNotification(getString(R.string.finishing_pending_transfers), true);
       }
       // Hard interrupt
       else {
@@ -1892,7 +1891,7 @@ public class HTTrackActivity extends FragmentActivity {
     // Security
     if (runner != null) {
       showNotification(
-          "HTTrack: restore called while running ignored! Please report this warning to the developers",
+          "restore called while running ignored! please report this warning to the developers",
           true);
       return;
     }
