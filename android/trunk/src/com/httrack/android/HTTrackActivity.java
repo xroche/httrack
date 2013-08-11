@@ -1381,7 +1381,7 @@ public class HTTrackActivity extends FragmentActivity {
           // We need to put immediately the name in the map to be able to
           // unserialize.
           try {
-            mapper.clear();
+            mapper.resetMap();
             setMap(R.id.fieldProjectName, name);
             unserialize();
           } catch (final IOException e) {

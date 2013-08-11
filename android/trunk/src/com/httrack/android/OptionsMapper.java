@@ -1143,10 +1143,15 @@ public class OptionsMapper {
   }
 
   /**
-   * Clear the map, wiping all keys/values.
+   * Clear the map, wiping all keys/values, assigning default ones.
    */
-  public void clear() {
+  public void resetMap() {
+    // Clear everything
     map.clear();
+
+    // Initialize default values for map
+    initializeMap();
+
     dirty = false;
   }
 
