@@ -36,6 +36,10 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: Linux build cleanup (gentoo patches merge, lintian fixes et al.)
 + Fixed: Fixed div-by-zero when specifying more than 1000 connections per seconds (probably not very common)
 + Fixed: Mishandling of '+' in URLs introduced in 3.47-15 (sarclaudio)
++ Fixed: "Wildcard domains in cookies do not match" (alexei dot co at gmail dot com )
++ Fixed: buggy referer while parsing: the referer of all links in the page is the current page being parsed, NOT the parent page. (alexei dot com at gmail dot com)
++ Fixed: Russian translation fixes by Oleg Komarov (komoleg at mail dot ru)
++ New: Added .torrent => application/x-bittorrent built-in MIME type (alexei dot co at gmail dot com)
 
 3.46-1
 * New: Unicode filenames handling
