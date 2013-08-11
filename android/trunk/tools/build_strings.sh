@@ -47,6 +47,7 @@ cat "$i" | \
 	| sed -e 's/ & / @@amp@@ /g' -e 's/&//g' -e 's/@@amp@@/\&amp;/g' \
 	| sed -e 's/WinHTTrack/HTTrack/g' \
 	| sed -e "s/1998-2003/1998-$(date +%Y)/g" \
+	| sed -e "s/(C)/\&#169;/g" \
 	| (
 unset arr
 declare -A arr
