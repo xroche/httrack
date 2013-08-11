@@ -593,7 +593,7 @@ public class HTTrackActivity extends FragmentActivity {
       if (runner != null) {
         if (!runner.isEnded()) {
           if (runner.stopMirror(true)) {
-            runner.sendWarningNotification();
+            runner.sendAbortNotification();
           }
         }
       }
@@ -673,10 +673,10 @@ public class HTTrackActivity extends FragmentActivity {
       this.parent = null;
     }
 
-    /** Trunk to parent's sendWarningNotification(). **/
-    public synchronized void sendWarningNotification() {
+    /** Trunk to parent's sendAbortNotification(). **/
+    public synchronized void sendAbortNotification() {
       if (parent != null) {
-        parent.sendWarningNotification("Warning", "HTTrack: mirror '"
+        parent.sendAbortNotification("Warning", "HTTrack: mirror '"
             + parent.mapper.getProjectName() + "' stopped!");
       }
     }
@@ -1689,10 +1689,15 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /** Send a notification. **/
-  protected void sendWarningNotification(final String title, final String text) {
+  protected void sendAbortNotification(final String title, final String text) {
+    // Continue an interrupted mirror
+    mapper.setMap(R.id.radioAction, "0");
+
+    // Build notification
     final Intent intent = new Intent(this, HTTrackActivity.class);
     final Bundle extras = new Bundle();
     saveInstanceState(extras);
+
     intent.putExtras(extras);
     sendNotification(intent, title, text);
   }
