@@ -31,7 +31,9 @@ done
 	| sed -e 's/^\.$/@@NL@@/' \
 	| tr '\n' ' ' \
 	| sed -e 's/@@NL@@/\n\n/g' \
-	| sed -e 's/^[[:space:]]*//'
+	| sed -e 's/^[[:space:]]*//' \
+	| sed -e 's/[[:space:]]*$//'
+
 echo -e "(description provided by the Debian Description Translation Project)"
 echo
 
