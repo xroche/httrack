@@ -561,6 +561,8 @@ public class HTTrackActivity extends FragmentActivity {
         for (final Enumeration<InetAddress> addresses = iface
             .getInetAddresses(); addresses.hasMoreElements();) {
           final InetAddress address = addresses.nextElement();
+          Log.d(HTTrackActivity.class.getName(),
+              "seen interface: " + address.toString());
           if (address instanceof Inet6Address) {
             if (!address.isLoopbackAddress() && !address.isLinkLocalAddress()
                 && !address.isSiteLocalAddress()
@@ -571,6 +573,8 @@ public class HTTrackActivity extends FragmentActivity {
         }
       }
     } catch (final SocketException se) {
+      Log.w(HTTrackActivity.class.getName(), "could not enumerate interfaces",
+          se);
     }
     return null;
   }
