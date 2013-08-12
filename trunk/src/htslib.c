@@ -2274,7 +2274,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     if (!waitconnect) {
 #ifdef _WIN32
       unsigned long p = 1;      // non bloquant
-      if (ioctlsocket(soc, FIONBIO, &val)) {
+      if (ioctlsocket(soc, FIONBIO, &p)) {
         const int last_errno = WSAGetLastError();
         snprintf(retour->msg, sizeof(retour->msg),
                  "Non-blocking socket failed: %s", strerror(last_errno));
