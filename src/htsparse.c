@@ -295,7 +295,7 @@ Please visit our Website: http://www.httrack.com
     strcpybuff(liens[lien_tot]->fil,F); \
     strcpybuff(liens[lien_tot]->sav,S); \
     liens_record_sav_len(liens[lien_tot]); \
-    hash_write(hashptr,lien_tot,opt->urlhack);  \
+    hash_write(hashptr,lien_tot);  \
   } \
 }
 
@@ -3196,7 +3196,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         //
                         // On part de la fin et on essaye de se presser (économise temps machine)
                         {
-                          int i = hash_read(hash, save, "", 0, opt->urlhack);   // lecture type 0 (sav)
+                          int i = hash_read(hash, save, NULL, 0);   // lecture type 0 (sav)
 
                           if (i >= 0) {
                             if ((opt->debug > 1) && (opt->log != NULL)) {
@@ -3636,7 +3636,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                    liens[liens[ptr]->precedent]->adr,
                    liens[liens[ptr]->precedent]->fil, opt, liens, lien_tot,
                    sback, cache, hash, ptr, numero_passe, NULL) != -1) {
-                if (hash_read(hash, mov_sav, "", 0, 0) < 0) {   // n'existe pas déja
+                if (hash_read(hash, mov_sav, NULL, HASH_STRUCT_FILENAME) < 0) {   // n'existe pas déja
                   // enregistrer lien (MACRO) avec SAV IDENTIQUE
                   liens_record(mov_adr, mov_fil, liens[ptr]->sav, "", "");
                   //liens_record(mov_adr,mov_fil,mov_sav,"","");
@@ -4074,7 +4074,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         if (url_savename
             (add_adr, add_fil, add_sav, NULL, NULL, NULL, NULL, opt, liens,
              lien_tot, sback, cache, hash, ptr, numero_passe, NULL) != -1) {
-          if (hash_read(hash, add_sav, "", 0, 0) < 0) { // n'existe pas déja
+          if (hash_read(hash, add_sav, NULL, HASH_STRUCT_FILENAME) < 0) { // n'existe pas déja
             // enregistrer lien (MACRO)
             liens_record(add_adr, add_fil, add_sav, "", "");
             if (liens[lien_tot] != NULL) {      // OK, pas d'erreur
@@ -4624,7 +4624,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
       }
 
       /* Check if the file was recorded already (necessary for redirects) */
-      if (hash_read(hash, save, "", 0, opt->urlhack) >= 0) {
+      if (hash_read(hash, save, NULL, HASH_STRUCT_FILENAME) >= 0) {
         if (loops == 0) {       /* Should not happend */
           hts_log_print(opt, LOG_ERROR,
                         "Duplicate entry in hts_wait_delayed() cancelled: %s%s -> %s",

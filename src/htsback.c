@@ -2308,7 +2308,7 @@ static int slot_can_be_finalized(httrackp * opt, const lien_back * back) {
     && !may_be_hypertext_mime(opt, back->r.contenttype, back->url_fil)  // may NOT be parseable mime type
     /* Has not been added before the heap saw the link, or now exists on heap */
     && (!back->early_add
-        || hash_read(opt->hash, back->url_sav, "", 0, opt->urlhack) >= 0);
+        || hash_read(opt->hash, back->url_sav, NULL, HASH_STRUCT_FILENAME) >= 0);
 }
 
 void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
@@ -2330,7 +2330,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
         //}
         /* MANDATORY if we don't want back_fill() to endlessly put the same file on download! */
         {
-          int index = hash_read(opt->hash, back[i].url_sav, "", 0, opt->urlhack);       // lecture type 0 (sav)
+          int index = hash_read(opt->hash, back[i].url_sav, NULL, HASH_STRUCT_FILENAME );       // lecture type 0 (sav)
 
           if (index >= 0) {
             opt->liens[index]->pass2 = -1;        /* DONE! */

@@ -154,7 +154,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
 
   /* Already exists? Then, we know that we knew that this link had to be known */
   if (adr[0] != '\0' && fil[0] != '\0' && opt->hash != NULL
-      && hash_read(opt->hash, adr, fil, 1, opt->urlhack) >= 0) {
+      && hash_read(opt->hash, adr, fil, 1) >= 0) {
     return 0;                   /* Yokai */
   }
   // -------------------- PRELUDE OF PHASE 3-BIS --------------------

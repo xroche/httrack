@@ -267,6 +267,11 @@ struct hash_struct {
   inthash adrfil;
   /* Former address and path */
   inthash former_adrfil;
+  /** Buffers **/
+  int normalized;
+  char normfil[HTS_URLMAXSIZE * 2];
+  char normfil2[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
 };
 
 #ifndef HTS_DEF_FWSTRUCT_filecreate_params
