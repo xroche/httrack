@@ -136,7 +136,8 @@ public class HTTrackActivity extends FragmentActivity {
   protected boolean switchEmptyProjectName;
 
   // Widget data exchange helper
-  private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
+  private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(
+      this);
 
   // Project settings
   protected String version;
@@ -366,7 +367,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the resource directory.
-   *
+   * 
    * @return the resource directory
    */
   private File getResourceFile() {
@@ -375,7 +376,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get a map value.
-   *
+   * 
    * @param key
    *          The key
    * @return The value
@@ -386,7 +387,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Set a map value.
-   *
+   * 
    * @param key
    *          The key
    * @param value
@@ -398,7 +399,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Trunk to mapper's buildCommandline()
-   *
+   * 
    * @return
    */
   public synchronized List<String> buildCommandline() {
@@ -407,7 +408,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Are there any projects yet ?
-   *
+   * 
    * @return true if projects have been detected
    */
   protected boolean hasProjectNames() {
@@ -417,7 +418,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the root directory.
-   *
+   * 
    * @return The root directory.
    */
   protected File getProjectRootFile() {
@@ -426,7 +427,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the root index.html file.
-   *
+   * 
    * @return The root index.html file.
    */
   protected File getProjectRootIndexFile() {
@@ -436,7 +437,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * A top index is present.
-   *
+   * 
    * @return true if a top index.html is present
    */
   private boolean hasProjectRootIndexFile() {
@@ -445,7 +446,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Return the already downloaded project names.
-   *
+   * 
    * @return The list of project names.
    */
   protected String[] getProjectNames() {
@@ -468,7 +469,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the destination directory for the current project.
-   *
+   * 
    * @return The destination directory.
    */
   protected File getTargetFile() {
@@ -482,7 +483,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the index.htm for the current project.
-   *
+   * 
    * @return The destination directory.
    */
   protected File getTargetIndexFile() {
@@ -496,7 +497,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Check whether an index.html file is present for the current project.
-   *
+   * 
    * @return true if an index.html file is present for the current project.
    */
   protected boolean hasTargetIndexFile() {
@@ -506,7 +507,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the hts-log.txt for the current project.
-   *
+   * 
    * @return The destination directory.
    */
   protected File getTargetLogFile() {
@@ -521,7 +522,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Check whether an hts-log.txt file is present for the current project.
-   *
+   * 
    * @return true if an hts-log.txt file is present for the current project.
    */
   protected boolean hasTargetLogFile() {
@@ -531,7 +532,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Pretty-print a string array.
-   *
+   * 
    * @param array
    *          The string array
    * @return The pretty-printed value
@@ -549,7 +550,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Return the IPv6 address.
-   *
+   * 
    * @return The ipv6 address, or @c null if no IPv6 connectivity is available.
    */
   protected static InetAddress getIPv6Address() {
@@ -576,7 +577,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * is IPv6 available on this phone ?
-   *
+   * 
    * @return true if IPv6 is available on this phone
    */
   protected static boolean isIPv6Enabled() {
@@ -601,7 +602,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Build the top index.
-   *
+   * 
    * @return 1 upon success
    */
   protected synchronized int buildTopIndex() {
@@ -693,7 +694,7 @@ public class HTTrackActivity extends FragmentActivity {
 
     /**
      * Constructor.
-     *
+     * 
      * @param parent
      *          the parent activity.
      */
@@ -703,7 +704,7 @@ public class HTTrackActivity extends FragmentActivity {
 
     /**
      * Set the parent activity.
-     *
+     * 
      * @param parent
      *          the parent activity
      */
@@ -734,8 +735,9 @@ public class HTTrackActivity extends FragmentActivity {
     protected Void doInBackground(final Void... arg0) {
       try {
         runInternal();
-      } catch (final Throwable e) {
+      } catch (final RuntimeException e) {
         HTTrackActivity.emergencyDump(e);
+        throw e;
       } finally {
         ended = true;
       }
@@ -1041,7 +1043,7 @@ public class HTTrackActivity extends FragmentActivity {
 
     /**
      * Get last statistics
-     *
+     * 
      * @return last statistics (or @c null if none)
      */
     public synchronized HTTrackStats getLastStats() {
@@ -1051,7 +1053,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the profile target file for the current project.
-   *
+   * 
    * @return The profile target file.
    */
   protected File getProfileFile() {
@@ -1065,7 +1067,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the profile cache file for the current project.
-   *
+   * 
    * @return The profile cache file.
    */
   protected File getCacheFile() {
@@ -1079,7 +1081,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Is there an existing profile yet ?
-   *
+   * 
    * @return true if there is a winprofile.ini file
    */
   protected boolean hasProfileFile() {
@@ -1089,7 +1091,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Is there an existing cache yet ?
-   *
+   * 
    * @return true if there is a new.zip cache file
    */
   protected boolean hasCacheFile() {
@@ -1099,7 +1101,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Interrupted profile ?
-   *
+   * 
    * @return true if the mirror was interrupted
    */
   protected boolean isInterruptedProfile() {
@@ -1115,7 +1117,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Set the "interrupted" flag.
-   *
+   * 
    * @param interrupted
    *          Interrupted mirror ?
    * @throws IOException
@@ -1136,7 +1138,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the profile target file for a given project.
-   *
+   * 
    * @return The profile target file.
    * @param target
    *          The project directory
@@ -1152,7 +1154,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get the cache file for a given project.
-   *
+   * 
    * @return The profile target file.
    * @param target
    *          The project directory
@@ -1179,7 +1181,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Serialize current profile to disk.
-   *
+   * 
    * @throws IOException
    *           Upon I/O error.
    */
@@ -1209,7 +1211,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Unserialize profile from disk.
-   *
+   * 
    * @throws IOException
    *           Upon I/O error.
    */
@@ -1246,15 +1248,18 @@ public class HTTrackActivity extends FragmentActivity {
     case R.layout.activity_startup:
       final TextView text = TextView.class.cast(this
           .findViewById(R.id.fieldDisplay));
+      final TextView textDebug = TextView.class.cast(this
+          .findViewById(R.id.fieldDebug));
 
       // Welcome message.
       final String html = getString(R.string.welcome_message)
           .replace("\n-", "\n•").replace("\n", "<br />")
           .replace("HTTrack Website Copier", "<b>HTTrack Website Copier</b>");
-      final StringBuilder str = new StringBuilder(html);
+      text.setText(Html.fromHtml(html));
 
       // Debugging and information.
-      str.append("<br /><i>");
+      final StringBuilder str = new StringBuilder();
+      str.append("<i>");
       if (version != null) {
         str.append("<br />Version: ");
         // Library version
@@ -1272,7 +1277,7 @@ public class HTTrackActivity extends FragmentActivity {
       str.append(addrV6 != null ? ("YES (" + addrV6.getHostAddress() + ")")
           : "NO");
       str.append("</i>");
-      text.setText(Html.fromHtml(str.toString()));
+      textDebug.setText(Html.fromHtml(str.toString()));
 
       // Enable or disable browse & cleanup button depending on existing
       // project(s)
@@ -1308,8 +1313,8 @@ public class HTTrackActivity extends FragmentActivity {
         /* Add text watcher for the "Next" button. */
         name.addTextChangedListener(new TextWatcher() {
           @Override
-          public void onTextChanged(final CharSequence s, final int start, final int before,
-              final int count) {
+          public void onTextChanged(final CharSequence s, final int start,
+              final int before, final int count) {
             // Warn when seeing space
             if (warnPreHoneycombSpaceIssue) {
               for (int i = start; i < start + count; i++) {
@@ -1341,8 +1346,8 @@ public class HTTrackActivity extends FragmentActivity {
 
           // NOOP
           @Override
-          public void beforeTextChanged(final CharSequence s, final int start, final int count,
-              final int after) {
+          public void beforeTextChanged(final CharSequence s, final int start,
+              final int count, final int after) {
           }
         });
       }
@@ -1422,7 +1427,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Get a specific field text.
-   *
+   * 
    * @param id
    *          The field ID.
    * @return the associated text
@@ -1433,7 +1438,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Set a specific field text value.
-   *
+   * 
    * @param id
    *          The field ID.
    * @param value
@@ -1445,7 +1450,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Validate the current pane
-   *
+   * 
    * @return true if the current pane is valid
    */
   protected boolean validatePane() {
@@ -1479,7 +1484,7 @@ public class HTTrackActivity extends FragmentActivity {
   /**
    * Validate the current pane with visual effects on error. Thanks to Sushant
    * for the idea.
-   *
+   * 
    * @return true if the current pane is valid
    */
   protected boolean validatePaneWithEffects(final boolean next) {
@@ -1687,7 +1692,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Fill intent with common settings (project path, etc.).
-   *
+   * 
    * @param intent
    *          The intent object
    */
@@ -1811,7 +1816,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Display a notification ("toast")
-   *
+   * 
    * @param message
    *          The message to be shown.
    * @param longDuration
@@ -1827,7 +1832,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /**
    * Display a short notification ("toast")
-   *
+   * 
    * @param message
    *          The message to be shown.
    */
