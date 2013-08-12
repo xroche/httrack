@@ -187,6 +187,12 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     // On forme l'URL complète à partie de l'url actuelle
     // et du chemin actuel si besoin est.
 
+    // sanity check
+    if (origin_adr == NULL || origin_fil == NULL 
+      || *origin_adr == '\0' || *origin_fil == '\0') {
+      return -1;
+    }
+
     // copier adresse
     if (((int) strlen(origin_adr) < HTS_URLMAXSIZE)
         && ((int) strlen(origin_fil) < HTS_URLMAXSIZE)

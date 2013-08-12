@@ -229,7 +229,7 @@ strcpybuff(liens[lien_tot]->adr,A); \
 strcpybuff(liens[lien_tot]->fil,F); \
 strcpybuff(liens[lien_tot]->sav,S); \
 liens_record_sav_len(liens[lien_tot]); \
-hash_write(hashptr,lien_tot,NORM);  \
+hash_write(hashptr,lien_tot);  \
 } \
 }
 
@@ -449,7 +449,7 @@ int httpmirror(char *url1, httrackp * opt) {
   lien_tot = 0;
 
   // initialiser hachage
-  hash_init(&hash);
+  hash_init(&hash, opt->urlhack);
   // note: we need a cast because of the const
   hash.liens = (const lien_url **) liens;
 
@@ -3224,12 +3224,12 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
 
       // Why in hell did I do that ?
       //if (ok && liens[p]->sav != NULL && liens[p]->sav[0] != '\0' 
-      //  && hash_read(opt->hash,liens[p]->sav,"",0,opt->urlhack) >= 0)     // lookup in liens_record
+      //  && hash_read(opt->hash,liens[p]->sav,NULL,HASH_STRUCT_FILENAME ) >= 0)     // lookup in liens_record
       //{
       //  ok = 0;
       //}
       if (liens[p]->sav == NULL || liens[p]->sav[0] == '\0'
-          || hash_read(opt->hash, liens[p]->sav, "", 0, opt->urlhack) < 0) {
+          || hash_read(opt->hash, liens[p]->sav, NULL, HASH_STRUCT_FILENAME ) < 0) {
         ok = 0;
       }
       // note: si un backing est fini, il reste en mémoire jusqu'à ce que
@@ -3766,7 +3766,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             //
             // On part de la fin et on essaye de se presser (économise temps machine)
             {
-              int i = hash_read(hashptr, save, "", 0, opt->urlhack);    // lecture type 0 (sav)
+              int i = hash_read(hashptr, save, NULL, HASH_STRUCT_FILENAME );    // lecture type 0 (sav)
 
               if (i >= 0) {
                 liens[i]->depth = maximum(liens[i]->depth, prio_fix);

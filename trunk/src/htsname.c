@@ -267,12 +267,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (liens != NULL) {
     int i;
 
-    i = hash_read(hash, normadr, normfil, 1, opt->urlhack);     // recherche table 1 (adr+fil)
+    i = hash_read(hash, normadr, normfil, HASH_STRUCT_ADR_PATH);     // recherche table 1 (adr+fil)
     if (i >= 0) {               // ok, trouvé
       strcpybuff(save, liens[i]->sav);
       return 0;
     }
-    i = hash_read(hash, normadr, normfil, 2, opt->urlhack);     // recherche table 2 (former_adr+former_fil)
+    i = hash_read(hash, normadr, normfil, HASH_STRUCT_ORIGINAL_ADR_PATH);     // recherche table 2 (former_adr+former_fil)
     if (i >= 0) {               // ok, trouvé
       // copier location moved!
       strcpybuff(adr_complete, liens[i]->adr);
@@ -291,7 +291,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         fil_complete_patche[strlen(fil_complete_patche) - 1] = '\0';
       else
         strcatbuff(fil_complete_patche, "/");
-      i = hash_read(hash, normadr, fil_complete_patche, 2, opt->urlhack);       // recherche table 2 (former_adr+former_fil)
+      i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former_adr+former_fil)
       if (i >= 0) {
         // écraser fil et adr (pas former_fil?????)
         strcpybuff(adr_complete, liens[i]->adr);
@@ -1555,7 +1555,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       printf("\nStart search\n");
 #endif
 
-      i = hash_read(hash, save, "", 0, 0);      // lecture type 0 (sav)
+      i = hash_read(hash, save, NULL, HASH_STRUCT_FILENAME);      // lecture type 0 (sav)
       if (i >= 0) {
         int sameAdr = (strfield2(liens[i]->adr, normadr) != 0);
         int sameFil;
