@@ -131,10 +131,14 @@ static int key_adrfil_equals_generic(void *arg, const char *a_, const char *b_,
   // safety
   assertf(a_adr != NULL);
   assertf(b_adr != NULL);
+  assertf(a_fil != NULL);
+  assertf(b_fil != NULL);
 
   // skip scheme and authentication to the domain (possibly without www.)
   ja = normalized ? jump_normalized(a_adr) : jump_identification(a_adr);
   jb = normalized ? jump_normalized(b_adr) : jump_identification(b_adr);
+  assertf(ja != NULL);
+  assertf(jb != NULL);
   if (strcasecmp(ja, jb) != 0) {
     return 0;
   }
