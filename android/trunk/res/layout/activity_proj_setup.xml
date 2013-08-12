@@ -1,4 +1,4 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
@@ -10,79 +10,26 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".ProjSetupActivity" >
 
-    <ScrollView
-        android:id="@+id/scrollView"
+    <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical" >
 
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" >
-
-            <TextView
-                android:id="@+id/textLinksDetails"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/web_addresses" />
-
-            <EditText
-                android:id="@+id/fieldWebsiteURLs"
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/hint_addresses"
-                android:inputType="textMultiLine|textUri" >
-
-                <requestFocus />
-            </EditText>
-
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:gravity="right"
-                android:orientation="horizontal" >
-
-                <Button
-                    android:id="@+id/buttonOptions"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:onClick="onClickOptions"
-                    android:text="@string/options" />
-            </LinearLayout>
-
-            <RadioGroup
-                android:id="@+id/radioAction"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" >
-
-                <RadioButton
-                    android:id="@+id/radioItemContinue"
-                    android:layout_height="wrap_content"
-                    android:text="@string/action_continue" />
-
-                <RadioButton
-                    android:id="@+id/radioItemUpdate"
-                    android:layout_height="wrap_content"
-                    android:text="@string/action_update" />
-            </RadioGroup>
-        </LinearLayout>
-    </ScrollView>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:gravity="bottom"
-        android:orientation="horizontal" >
-
-        <Button
-            android:id="@+id/buttonPrevious"
+        <TextView
+            android:id="@+id/textLinksDetails"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:onClick="onClickPrevious"
-            android:text="@string/previous" />
+            android:text="@string/web_addresses" />
+
+        <EditText
+            android:id="@+id/fieldWebsiteURLs"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_addresses"
+            android:inputType="textMultiLine|textUri" >
+
+            <requestFocus />
+        </EditText>
 
         <LinearLayout
             android:layout_width="fill_parent"
@@ -91,13 +38,59 @@
             android:orientation="horizontal" >
 
             <Button
-                android:id="@+id/buttonNext"
+                android:id="@+id/buttonOptions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:onClick="onClickNext"
-                android:text="@string/start" />
+                android:onClick="onClickOptions"
+                android:text="@string/options" />
+        </LinearLayout>
+
+        <RadioGroup
+            android:id="@+id/radioAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" >
+
+            <RadioButton
+                android:id="@+id/radioItemContinue"
+                android:layout_height="wrap_content"
+                android:text="@string/action_continue" />
+
+            <RadioButton
+                android:id="@+id/radioItemUpdate"
+                android:layout_height="wrap_content"
+                android:text="@string/action_update" />
+        </RadioGroup>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:gravity="bottom"
+            android:orientation="horizontal" >
+
+            <Button
+                android:id="@+id/buttonPrevious"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:onClick="onClickPrevious"
+                android:text="@string/previous" />
+
+            <LinearLayout
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:gravity="right"
+                android:orientation="horizontal" >
+
+                <Button
+                    android:id="@+id/buttonNext"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:onClick="onClickNext"
+                    android:text="@string/start" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-</LinearLayout>
+</ScrollView>
