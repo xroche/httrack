@@ -17,7 +17,7 @@
 
     <ScrollView
         android:id="@+id/scrollView"
-        android:layout_width="wrap_content"
+        android:layout_width="fill_parent"
         android:layout_height="fill_parent"
         android:orientation="horizontal" >
 
@@ -35,13 +35,20 @@
                 android:onClick="onShowLogs"
                 android:text="@string/show_logs" />
 
-            <Button
-                android:id="@+id/buttonBrowse"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="right"
-                android:onClick="onBrowse"
-                android:text="@string/browse_website" />
+                android:gravity="right"
+                android:orientation="horizontal" >
+
+                <Button
+                    android:id="@+id/buttonBrowse"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:onClick="onBrowse"
+                    android:text="@string/browse_website" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 
