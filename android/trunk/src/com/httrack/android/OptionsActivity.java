@@ -189,6 +189,9 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     // Set view
     setContentView(R.layout.activity_options);
 
+    // Set Title
+    setTitle(R.string.options);
+
     // Create tabs
     createTabs();
   }
@@ -273,6 +276,21 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   }
 
   /*
+   * Return current title String ID for the activity view.
+   */
+  private int getCurrentActivityTitleId() {
+    if (activityClass == null) {
+      throw new RuntimeException("no current option selected");
+    }
+    final Title title = Title.class.cast(activityClass
+        .getAnnotation(Title.class));
+    if (title == null) {
+      throw new RuntimeException("no Title annotation");
+    }
+    return title.value();
+  }
+
+  /*
    * Return current field ID's for the activity view.
    */
   private int getCurrentActivityId() {
@@ -315,10 +333,18 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
   @Override
   public void onClick(View v) {
+    // Which button was clicked ?
     final Button cb = Button.class.cast(v);
+
+    // Fetch tag position
     final int position = Integer.parseInt(cb.getTag().toString());
+
+    // Pickup corresponding class
     activityClass = tabClasses[position];
+
+    // Set current view, current activity title, and load field(s)
     setContentView(getCurrentActivityId());
+    setTitle(getCurrentActivityTitleId());
     load();
   }
 }
