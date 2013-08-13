@@ -173,7 +173,11 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     for (int i = 0; i < tabClasses.length; i++) {
       final Class<?> cls = tabClasses[i];
       final Title title = Title.class.cast(cls.getAnnotation(Title.class));
-      final Button button = new Button(this);
+      // See
+      // <http://developer.android.com/guide/topics/ui/controls/button.html#Borderless>
+      // Added in API level 11
+      final Button button = android.os.Build.VERSION.SDK_INT >= 11 ? new Button(
+          this, null, android.R.attr.borderlessButtonStyle) : new Button(this);
       button.setText(title.value());
       button.setOnClickListener(this);
       button.setTag(i);
