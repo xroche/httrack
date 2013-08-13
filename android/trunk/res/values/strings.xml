@@ -172,5 +172,6 @@
     <string name="read_only_storage_media">Read-only media (SDCARD)</string>
     <string name="no_storage_media">No storage media (SDCARD)</string>
     <string name="may_not_download_until_problem_fixed">HTTrack may not be able to download websites until this problem is fixed</string>
+    <string name="click_on_notification_to_restart">Click on this notification to restart the interrupted mirror</string>
 
 </resources>
