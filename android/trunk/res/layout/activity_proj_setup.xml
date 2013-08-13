@@ -1,4 +1,4 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
@@ -10,62 +10,85 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".ProjSetupActivity" >
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical" >
 
-        <TextView
-            android:id="@+id/textLinksDetails"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/web_addresses" />
-
-        <EditText
-            android:id="@+id/fieldWebsiteURLs"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_addresses"
-            android:inputType="textMultiLine|textUri" >
-
-            <requestFocus />
-        </EditText>
-
         <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:gravity="right"
-            android:orientation="horizontal" >
+            android:orientation="vertical" >
 
-            <Button
-                android:id="@+id/buttonOptions"
+            <TextView
+                android:id="@+id/textLinksDetails"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:onClick="onClickOptions"
-                android:text="@string/options" />
+                android:text="@string/web_addresses" />
+
+            <EditText
+                android:id="@+id/fieldWebsiteURLs"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_addresses"
+                android:inputType="textMultiLine|textUri" >
+
+                <requestFocus />
+            </EditText>
+
+            <LinearLayout
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" >
+
+                <RadioGroup
+                    android:id="@+id/radioAction"
+                    android:layout_width="0dp"
+                    android:layout_weight="0.5"
+                    android:layout_height="wrap_content"
+                    android:gravity="left" >
+
+                    <RadioButton
+                        android:id="@+id/radioItemContinue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_continue" />
+
+                    <RadioButton
+                        android:id="@+id/radioItemUpdate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_update" />
+                </RadioGroup>
+
+                <LinearLayout
+                    android:layout_weight="0.5"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="right"
+                    android:orientation="horizontal" >
+
+                    <Button
+                        android:id="@+id/buttonOptions"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:onClick="onClickOptions"
+                        android:text="@string/options" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
+    </ScrollView>
 
-        <RadioGroup
-            android:id="@+id/radioAction"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
-
-            <RadioButton
-                android:id="@+id/radioItemContinue"
-                android:layout_height="wrap_content"
-                android:text="@string/action_continue" />
-
-            <RadioButton
-                android:id="@+id/radioItemUpdate"
-                android:layout_height="wrap_content"
-                android:text="@string/action_update" />
-        </RadioGroup>
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:gravity="bottom"
+        android:orientation="vertical" >
 
         <LinearLayout
             android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:gravity="bottom"
+            android:layout_height="wrap_content"
             android:orientation="horizontal" >
 
             <Button
@@ -93,4 +116,4 @@
         </LinearLayout>
     </LinearLayout>
 
-</ScrollView>
+</LinearLayout>
