@@ -43,7 +43,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* Our own assert version. */
 static void assert_failure(const char* exp, const char* file, int line) {
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
-  FILE *const dumpFile = fopen("/sdcard/HTTrack/error.txt", "wb");
+  FILE *const dumpFile = fopen("/mnt/sdcard/Download/HTTrack/error.txt", "wb");
   if (dumpFile != NULL) {
     fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
     fclose(dumpFile);
@@ -149,7 +149,9 @@ static jclass findClass(JNIEnv *env, const char *name) {
   /* "Note however that the jclass is a class reference and must be protected
    * with a call to NewGlobalRef " -- DARN! */
   if (localClass != NULL) {
-    return (*env)->NewGlobalRef(env, localClass);
+    jclass globalClass = (*env)->NewGlobalRef(env, localClass);
+    (*env)->DeleteLocalRef(env, localClass);
+    return globalClass;
   }
   return NULL;
 }
@@ -266,6 +268,7 @@ static void throwException(JNIEnv* env, const char *exception,
   jclass cls = (*env)->FindClass(env, exception);
   assert(cls != NULL);
   (*env)->ThrowNew(env, cls, getSafeCopy(message));
+  (*env)->DeleteLocalRef(env, cls);
 }
 
 static void throwRuntimeException(JNIEnv* env, const char *message) {
@@ -492,25 +495,26 @@ static jobject build_stats(jni_context_t *const t, httrackp * opt,
       }
       (*t->env)->SetObjectArrayElement(t->env, elements, i, element);
 
+      /* Set a string inside "element". */
+#define SET_ELEMENT_STRING(FIELD, STRING) do {                 \
+    jobject str_ = newStringSafe(t->env, STRING);              \
+    if (str_ != NULL) {                                        \
+      (*t->env)->SetObjectField(t->env, element, FIELD, str_); \
+      (*t->env)->DeleteLocalRef(t->env, str_);                 \
+    }                                                          \
+} while(0)
+
       /* Fill item */
-      (*t->env)->SetObjectField(t->env, element, field_elt_address,
-                                newStringSafe(t->env,
-                                              back[index].url_adr));
-      (*t->env)->SetObjectField(t->env, element, field_elt_path,
-                                newStringSafe(t->env,
-                                              back[index].url_fil));
-      (*t->env)->SetObjectField(t->env, element, field_elt_filename,
-                                newStringSafe(t->env,
-                                              back[index].url_sav));
+      SET_ELEMENT_STRING(field_elt_address, back[index].url_adr);
+      SET_ELEMENT_STRING(field_elt_path, back[index].url_fil);
+      SET_ELEMENT_STRING(field_elt_filename, back[index].url_sav);
       (*t->env)->SetBooleanField(t->env, element, field_elt_isUpdate,
                                  back[index].is_update != 0);
       (*t->env)->SetIntField(t->env, element, field_elt_state,
                              state[i].state);
       (*t->env)->SetIntField(t->env, element, field_elt_code,
                              back[index].r.statuscode);
-      (*t->env)->SetObjectField(t->env, element, field_elt_message,
-                                newStringSafe(t->env,
-                                              back[index].r.msg));
+      SET_ELEMENT_STRING(field_elt_message, back[index].r.msg);
       (*t->env)->SetBooleanField(t->env, element, field_elt_isNotModified,
                                  back[index].r.notmodified != 0);
       (*t->env)->SetBooleanField(t->env, element, field_elt_isCompressed,
@@ -519,13 +523,17 @@ static jobject build_stats(jni_context_t *const t, httrackp * opt,
                                  back[index].r.size);
       (*t->env)->SetLongField(t->env, element, field_elt_totalSize,
                                  back[index].r.totalsize);
-      (*t->env)->SetObjectField(t->env, element, field_elt_mime,
-                                newStringSafe(t->env,
-                                              back[index].r.contenttype));
-      (*t->env)->SetObjectField(t->env, element, field_elt_charset,
-                                newStringSafe(t->env,
-                                              back[index].r.charset));
+      SET_ELEMENT_STRING(field_elt_mime, back[index].r.contenttype);
+      SET_ELEMENT_STRING(field_elt_charset, back[index].r.charset);
+
+#undef SET_ELEMENT_STRING
+
+      /* Release local element reference. */
+      (*t->env)->DeleteLocalRef(t->env, element);
     }
+
+    /* Release local elements reference. */
+    (*t->env)->DeleteLocalRef(t->env, elements);
   }
 
   return ostats;
@@ -661,11 +669,13 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     if (global_opt == NULL) {
       /* Create array */
       for (i = 0; i < argc; i++) {
+        /* Note: a local reference is created here */
         jstring str = (jstring)(*env)->GetObjectArrayElement(env, stringArray,
             i);
         const char * const utf_string = (*env)->GetStringUTFChars(env, str, 0);
         argv[i] = strdup(utf_string != NULL ? utf_string : "");
         (*env)->ReleaseStringUTFChars(env, str, utf_string);
+        (*env)->DeleteLocalRef(env, str);
       }
       argv[i] = NULL;
 
