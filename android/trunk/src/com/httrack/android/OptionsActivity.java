@@ -30,7 +30,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -206,13 +205,6 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
     // Create tabs
     setViewMenu();
-  }
-
-  @Override
-  public boolean onCreateOptionsMenu(final Menu menu) {
-    // Inflate the menu; this adds items to the action bar if it is present.
-    getMenuInflater().inflate(R.menu.menu, menu);
-    return true;
   }
 
   /*
