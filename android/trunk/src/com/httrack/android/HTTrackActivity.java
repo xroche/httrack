@@ -159,16 +159,57 @@ public class HTTrackActivity extends FragmentActivity {
     }
   }
 
-  /* Check if the external storage is available. */
-  private static void checkExternalStorage() throws IOException {
+  /*
+   * (Re)Compute (external) storage pathes for downloaded websites.
+   */
+  private void computeStorageTarget() {
+    if (projectPath == null || !projectPath.exists()) {
+      rootPath = HTTrackActivity.getExternalStorage();
+      httrackPath = new File(rootPath, "HTTrack");
+      projectPath = new File(httrackPath, "Websites");
+    }
+  }
+
+  /*
+   * Check if the external storage is available, and if not, display a warning
+   * message.
+   * 
+   * @return true if the storage is suitable
+   */
+  private boolean warnIfExternalStorageUnsuitable() {
+    String message;
     final String state = Environment.getExternalStorageState();
-    if (!Environment.MEDIA_MOUNTED.equals(state)) {
-      if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
-        throw new IOException("read-only media");
+    if (Environment.MEDIA_MOUNTED.equals(state)) {
+      final File root = getProjectRootFile();
+      if (root == null) {
+        message = getString(R.string.could_not_get_external_directory);
+      } else if (!root.exists()) {
+        message = getString(R.string.could_not_write_to)
+            + root.getAbsolutePath();
       } else {
-        throw new IOException("no storage media");
+        return true;
+      }
+    } else {
+      if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+        message = getString(R.string.read_only_storage_media);
+      } else {
+        message = getString(R.string.no_storage_media);
       }
     }
+    showNotification(message + "\n"
+        + getString(R.string.will_not_continue_until_problem_fixed), true);
+    return false;
+  }
+
+  /*
+   * Ensure the "Websites" directory exists.
+   * 
+   * Note: calls computeStorageTarget().
+   */
+  protected boolean ensureExternalStorage() {
+    computeStorageTarget();
+    final File root = getProjectRootFile();
+    return root != null && mkdirs(root);
   }
 
   @Override
@@ -198,18 +239,11 @@ public class HTTrackActivity extends FragmentActivity {
       errors += "\n\nERROR: " + e.getMessage();
     }
 
-    // Check if an external storage is available
-    try {
-      checkExternalStorage();
-    } catch (final IOException e) {
-      errors += "\n\nWARNING: " + e.getMessage()
-          + " ; HTTrack will probably not be able to download websites";
-    }
+    // Compute target directory on external storage
+    ensureExternalStorage();
 
-    // Default target directory on external storage
-    rootPath = getExternalStorage();
-    httrackPath = new File(rootPath, "HTTrack");
-    projectPath = new File(httrackPath, "Websites");
+    // Check if an external storage is available
+    warnIfExternalStorageUnsuitable();
 
     // Extract resources if necessary
     rscPath = buildResourceFile();
@@ -1391,8 +1425,12 @@ public class HTTrackActivity extends FragmentActivity {
       View.class.cast(this.findViewById(R.id.buttonBrowse))
           .setEnabled(hasIndex);
       if (!hasIndex) {
-        Log.d(getClass().getName(), "no index found ("
-            + getTargetIndexFile().getAbsolutePath() + ")");
+        final File index = getTargetIndexFile();
+        Log.d(
+            getClass().getName(),
+            "no index found ("
+                + (index != null ? index.getAbsolutePath() : "unknown location")
+                + ")");
         final String warning = getString(R.string.no_index_html_in_xx).replace(
             "%s", getTargetFile().getPath());
         showNotification(warning);
@@ -1402,8 +1440,11 @@ public class HTTrackActivity extends FragmentActivity {
       final boolean hasLog = hasTargetLogFile();
       View.class.cast(this.findViewById(R.id.buttonLogs)).setEnabled(hasLog);
       if (!hasLog) {
-        Log.d(getClass().getName(), "no log found ("
-            + getTargetLogFile().getAbsolutePath() + ")");
+        final File log = getTargetLogFile();
+        Log.d(getClass().getName(),
+            "no log found ("
+                + (log != null ? log.getAbsolutePath() : "unknown location")
+                + ")");
       }
 
       // Final stats
@@ -1459,6 +1500,12 @@ public class HTTrackActivity extends FragmentActivity {
    */
   protected boolean validatePane() {
     switch (pane_id) {
+    case LAYOUT_START:
+      // Recompute storage target if necessary
+      ensureExternalStorage();
+
+      // Validate if we could create a "Websites" target
+      return warnIfExternalStorageUnsuitable();
     case LAYOUT_PROJECT_NAME:
       final String name = getFieldText(R.id.fieldProjectName);
       if (OptionsMapper.isStringNonEmpty(name)) {

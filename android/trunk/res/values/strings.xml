@@ -167,4 +167,10 @@
     <string name="no_index_html_in_xx">No \'index.html\' file in %s!</string>
     <string name="info_recreated_resources">Recreated HTTrack internal cached resources</string>
     <string name="about_credits">\n(Please notify us of any bug or problem)\n\nDevelopment:\nInterface (Windows): Xavier Roche\nSpider: Xavier Roche\nJavaParserClasses: Yann Philippot\n\n&#169;1998-2013 Xavier Roche and other contributors\nMANY THANKS for translation tips to:\nRobert Lagadec (rlagadec@yahoo.fr)</string>
-</resources>
+    <string name="could_not_get_external_directory">Could not get the system external storage directory</string>
+    <string name="could_not_write_to">Could not write to:</string>
+    <string name="read_only_storage_media">Read-only media (SDCARD)</string>
+    <string name="no_storage_media">No storage media (SDCARD)</string>
+    <string name="will_not_continue_until_problem_fixed">HTTrack will not be able to download websites until this problem is fixed</string>
+
+</resources>
