@@ -765,11 +765,7 @@ public class HTTrackActivity extends FragmentActivity {
     /** Trunk to parent's sendAbortNotification(). **/
     public synchronized void sendAbortNotification() {
       if (parent != null) {
-        parent
-            .sendAbortNotification(
-                "HTTrack: mirror '" + parent.mapper.getProjectName()
-                    + "' stopped!",
-                "Click on this notification to restart the interrupted mirror");
+        parent.sendAbortNotification();
       }
     }
 
@@ -1898,7 +1894,11 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /** Send a notification. **/
-  protected void sendAbortNotification(final String title, final String text) {
+  protected void sendAbortNotification() {
+    final String title = "HTTrack: mirror '" + mapper.getProjectName()
+        + "' stopped!";
+    final String text = getString(R.string.click_on_notification_to_restart);
+
     // Continue an interrupted mirror
     setMap(R.id.radioAction, "0");
 
