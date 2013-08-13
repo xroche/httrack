@@ -25,23 +25,20 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.ArrayList;
-import java.util.List;
 
 import android.app.Activity;
-import android.app.TabActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
-import android.widget.TabHost;
-import android.widget.TabHost.TabSpec;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
 
 /**
- * The tab host activity.<br />
- * Many thanks to Pierre-Emmanuel Mercier for his nice tutorial.
+ * The options activity.
  */
-public class OptionsActivity extends TabActivity {
+public class OptionsActivity extends Activity implements View.OnClickListener {
   /* List of all tabs. */
   @SuppressWarnings("unchecked")
   protected static Class<? extends Tab>[] tabClasses = new Class[] {
@@ -49,73 +46,20 @@ public class OptionsActivity extends TabActivity {
       LinksTab.class, BuildTab.class, BrowserId.class, Spider.class,
       Proxy.class, LogIndexCache.class, ExpertsOnly.class };
 
+  // The parent map
   protected final SparseArraySerializable map = new SparseArraySerializable();
-  private TabHost tabHost;
-  private final List<TabSpec> tabSpec = new ArrayList<TabSpec>();
+
+  // Widget data exchanger
+  private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(
+      this);
+
+  // Current activity class
+  protected Class<?> activityClass;
 
   /**
-   * The tab activit(ies) common class.
+   * The tab activit(ies) common interface.
    */
-  public abstract static class Tab extends Activity {
-    protected OptionsActivity parentOptions;
-    private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(
-        this);
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      parentOptions = OptionsActivity.class.cast(getParent());
-      if (parentOptions == null) {
-        throw new RuntimeException("tab has no parent!");
-      }
-    }
-
-    /**
-     * List of fields.
-     * 
-     * @return
-     */
-    protected int[] getFields() {
-      return new int[] {};
-    }
-
-    /*
-     * Load serialized field(s)
-     */
-    protected void load() {
-      final int[] fields = getFields();
-      Log.d(getClass().getSimpleName(), "loading " + fields.length + " fields");
-      for (final int field : fields) {
-        final String value = parentOptions.getMap(field);
-        if (value != null) {
-          widgetDataExchange.setFieldText(field, value);
-        }
-      }
-    }
-
-    /*
-     * Serialize and save field(s)
-     */
-    protected void save() {
-      final int[] fields = getFields();
-      Log.d(getClass().getSimpleName(), "saving " + fields.length + " fields");
-      for (final int field : fields) {
-        final String value = widgetDataExchange.getFieldText(field);
-        parentOptions.setMap(field, value);
-      }
-    }
-
-    @Override
-    public void setContentView(final int layoutResID) {
-      super.setContentView(layoutResID);
-      load();
-    }
-
-    @Override
-    public void finish() {
-      save();
-      super.finish();
-    }
+  public abstract static interface Tab {
   }
 
   /**
@@ -125,165 +69,128 @@ public class OptionsActivity extends TabActivity {
   @Target(ElementType.TYPE)
   public static @interface Title {
     int value();
+  }
 
+  /**
+   * Activity ID of a tab class.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.TYPE)
+  public static @interface ActivityId {
+    int value();
+  }
+
+  /**
+   * List of fields of a tab class.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.TYPE)
+  public static @interface Fields {
+    int[] value();
   }
 
   @Title(R.string.scan_rules)
-  public static class ScanRulesTab extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.editRules };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_scanrules);
-    }
+  @ActivityId(R.layout.activity_options_scanrules)
+  @Fields({ R.id.editRules })
+  public static class ScanRulesTab implements Tab {
   }
 
   @Title(R.string.limits)
-  public static class LimitsTab extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.editMaxDepth, R.id.editMaxExtDepth,
-          R.id.editMaxSizeHtml, R.id.editMaxSizeOther, R.id.editSiteSizeLimit,
-          R.id.editMaxTimeOverall, R.id.editMaxTransferRate,
-          R.id.editMaxConnectionsSecond, R.id.editMaxNumberLinks };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_limits);
-    }
+  @ActivityId(R.layout.activity_options_limits)
+  @Fields({ R.id.editMaxDepth, R.id.editMaxExtDepth, R.id.editMaxSizeHtml,
+      R.id.editMaxSizeOther, R.id.editSiteSizeLimit, R.id.editMaxTimeOverall,
+      R.id.editMaxTransferRate, R.id.editMaxConnectionsSecond,
+      R.id.editMaxNumberLinks })
+  public static class LimitsTab implements Tab {
   }
 
   @Title(R.string.flow_control)
-  public static class FlowControlTab extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.editNumberOfConnections,
-          R.id.checkPersistentConnections, R.id.editTimeout,
-          R.id.checkRemoveHostIfTimeout, R.id.editRetries,
-          R.id.editMinTransferRate, R.id.checkRemoveHostIfSlow };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_flowcontrol);
-    }
+  @ActivityId(R.layout.activity_options_flowcontrol)
+  @Fields({ R.id.editNumberOfConnections, R.id.checkPersistentConnections,
+      R.id.editTimeout, R.id.checkRemoveHostIfTimeout, R.id.editRetries,
+      R.id.editMinTransferRate, R.id.checkRemoveHostIfSlow })
+  public static class FlowControlTab implements Tab {
   }
 
   @Title(R.string.links)
-  public static class LinksTab extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.checkDetectAllLinks, R.id.checkGetNonHtmlNear,
-          R.id.checkTestAllLinks, R.id.checkGetHtmlFirst };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_links);
-    }
+  @ActivityId(R.layout.activity_options_links)
+  @Fields({ R.id.checkDetectAllLinks, R.id.checkGetNonHtmlNear,
+      R.id.checkTestAllLinks, R.id.checkGetHtmlFirst })
+  public static class LinksTab implements Tab {
   }
 
   @Title(R.string.build)
-  public static class BuildTab extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.checkDosNames, R.id.checkIso9660,
-          R.id.checkNoErrorPages, R.id.checkNoExternalPages,
-          R.id.checkHidePasswords, R.id.checkHideQueryStrings,
-          R.id.checkDoNotPurge, R.id.radioBuild, R.id.editCustomBuild };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_build);
-    }
+  @ActivityId(R.layout.activity_options_build)
+  @Fields({ R.id.checkDosNames, R.id.checkIso9660, R.id.checkNoErrorPages,
+      R.id.checkNoExternalPages, R.id.checkHidePasswords,
+      R.id.checkHideQueryStrings, R.id.checkDoNotPurge, R.id.radioBuild,
+      R.id.editCustomBuild })
+  public static class BuildTab implements Tab {
   }
 
   @Title(R.string.browser_id)
-  public static class BrowserId extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.editBrowserIdentity, R.id.editHtmlFooter };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_browserid);
-    }
+  @ActivityId(R.layout.activity_options_browserid)
+  @Fields({ R.id.editBrowserIdentity, R.id.editHtmlFooter })
+  public static class BrowserId implements Tab {
   }
 
   @Title(R.string.spider)
-  public static class Spider extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.checkAcceptCookies, R.id.radioCheckDocumentType,
-          R.id.checkParseJavaFiles, R.id.radioSpider, R.id.checkUpdateHacks,
-          R.id.checkUrlHacks, R.id.checkTolerentRequests, R.id.checkForceHttp10 };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_spider);
-    }
+  @ActivityId(R.layout.activity_options_spider)
+  @Fields({ R.id.checkAcceptCookies, R.id.radioCheckDocumentType,
+      R.id.checkParseJavaFiles, R.id.radioSpider, R.id.checkUpdateHacks,
+      R.id.checkUrlHacks, R.id.checkTolerentRequests, R.id.checkForceHttp10 })
+  public static class Spider implements Tab {
   }
 
   @Title(R.string.proxy)
-  public static class Proxy extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.editProxy, R.id.editProxyPort,
-          R.id.checkUseProxyForFtp };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_proxy);
-    }
+  @ActivityId(R.layout.activity_options_proxy)
+  @Fields({ R.id.editProxy, R.id.editProxyPort, R.id.checkUseProxyForFtp })
+  public static class Proxy implements Tab {
   }
 
   @Title(R.string.log_index_cache)
-  public static class LogIndexCache extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.checkStoreAllFilesInCache,
-          R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
-          R.id.radioVerbosity, R.id.checkUseIndex };
-    }
-
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_logindexcache);
-    }
+  @ActivityId(R.layout.activity_options_logindexcache)
+  @Fields({ R.id.checkStoreAllFilesInCache,
+      R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
+      R.id.radioVerbosity, R.id.checkUseIndex })
+  public static class LogIndexCache implements Tab {
   }
 
   @Title(R.string.experts_only)
-  public static class ExpertsOnly extends Tab {
-    @Override
-    protected int[] getFields() {
-      return new int[] { R.id.checkUseCacheForUpdates,
-          R.id.radioPrimaryScanRule, R.id.textTravelMode, R.id.radioTravelMode,
-          R.id.radioGlobalTravelMode, R.id.radioRewriteLinks,
-          R.id.checkActivateDebugging };
-    }
+  @ActivityId(R.layout.activity_options_expertsonly)
+  @Fields({ R.id.checkUseCacheForUpdates, R.id.radioPrimaryScanRule,
+      R.id.textTravelMode, R.id.radioTravelMode, R.id.radioGlobalTravelMode,
+      R.id.radioRewriteLinks, R.id.checkActivateDebugging })
+  public static class ExpertsOnly implements Tab {
+  }
 
-    @Override
-    protected void onCreate(final Bundle savedInstanceState) {
-      super.onCreate(savedInstanceState);
-      setContentView(R.layout.activity_options_expertsonly);
+  /*
+   * Create all tabs
+   */
+  private void createTabs() {
+    // Create tabs
+    final LinearLayout scroll = LinearLayout.class
+        .cast(findViewById(R.id.layout));
+    for (int i = 0; i < tabClasses.length; i++) {
+      final Class<?> cls = tabClasses[i];
+      final Title title = Title.class.cast(cls.getAnnotation(Title.class));
+      final Button button = new Button(this);
+      button.setText(title.value());
+      button.setOnClickListener(this);
+      button.setTag(i);
+      scroll.addView(button);
     }
+  }
+
+  /*
+   * Set the view to the menu view
+   */
+  private void setViewMenu() {
+    // Set view
+    setContentView(R.layout.activity_options);
+
+    // Create tabs
+    createTabs();
   }
 
   @Override
@@ -294,22 +201,8 @@ public class OptionsActivity extends TabActivity {
     map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
     Log.d(getClass().getSimpleName(), "map size: " + map.size());
 
-    // Set view
-    setContentView(R.layout.activity_options);
-
     // Create tabs
-    tabHost = getTabHost();
-    for (final Class<? extends Tab> cls : tabClasses) {
-      final Title title = Title.class.cast(cls.getAnnotation(Title.class));
-      tabSpec.add(tabHost.newTabSpec(Integer.toString(tabSpec.size()))
-          .setIndicator(getString(title.value()))
-          .setContent(new Intent(this, cls)));
-    }
-
-    // Populate tab
-    for (final TabSpec tab : tabSpec) {
-      tabHost.addTab(tab);
-    }
+    setViewMenu();
   }
 
   @Override
@@ -351,7 +244,81 @@ public class OptionsActivity extends TabActivity {
    */
   @Override
   public void onBackPressed() {
-    super.onBackPressed();
-    finish();
+    // Back from activity
+    if (activityClass == null) {
+      super.onBackPressed();
+      finish();
+    }
+    // Leave sub-activity
+    else {
+      save();
+      activityClass = null;
+      setViewMenu();
+    }
+  }
+
+  /*
+   * Return current field ID's for the activity view.
+   */
+  private int[] getCurrentFields() {
+    if (activityClass == null) {
+      throw new RuntimeException("no current option selected");
+    }
+    final Fields fields = Fields.class.cast(activityClass
+        .getAnnotation(Fields.class));
+    if (fields == null) {
+      throw new RuntimeException("no Fields annotation");
+    }
+    return fields.value();
+  }
+
+  /*
+   * Return current field ID's for the activity view.
+   */
+  private int getCurrentActivityId() {
+    if (activityClass == null) {
+      throw new RuntimeException("no current option selected");
+    }
+    final ActivityId activity = ActivityId.class.cast(activityClass
+        .getAnnotation(ActivityId.class));
+    if (activity == null) {
+      throw new RuntimeException("no ActivityId annotation");
+    }
+    return activity.value();
+  }
+
+  /*
+   * Load serialized field(s)
+   */
+  protected void load() {
+    final int[] fields = getCurrentFields();
+    Log.d(getClass().getSimpleName(), "loading " + fields.length + " fields");
+    for (final int field : fields) {
+      final String value = getMap(field);
+      if (value != null) {
+        widgetDataExchange.setFieldText(field, value);
+      }
+    }
+  }
+
+  /*
+   * Serialize and save field(s)
+   */
+  protected void save() {
+    final int[] fields = getCurrentFields();
+    Log.d(getClass().getSimpleName(), "saving " + fields.length + " fields");
+    for (final int field : fields) {
+      final String value = widgetDataExchange.getFieldText(field);
+      setMap(field, value);
+    }
+  }
+
+  @Override
+  public void onClick(View v) {
+    final Button cb = Button.class.cast(v);
+    final int position = Integer.parseInt(cb.getTag().toString());
+    activityClass = tabClasses[position];
+    setContentView(getCurrentActivityId());
+    load();
   }
 }

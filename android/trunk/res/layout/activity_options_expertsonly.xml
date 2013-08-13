@@ -1,189 +1,194 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:background="@color/transparent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
     android:paddingBottom="@dimen/activity_vertical_margin"
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin" >
 
-    <CheckBox
-        android:id="@+id/checkUseCacheForUpdates"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/use_cache_for_updates" />
-
     <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal" >
+        android:orientation="vertical" >
 
-        <TextView
-            android:id="@+id/textPrimaryScanRule"
-            android:layout_width="0dp"
+        <CheckBox
+            android:id="@+id/checkUseCacheForUpdates"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/primary_scan_rule" />
+            android:text="@string/use_cache_for_updates" />
 
-        <RadioGroup
-            android:id="@+id/radioPrimaryScanRule"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_weight=".70" >
+            android:orientation="horizontal" >
 
-            <RadioButton
-                android:id="@+id/radioItemJustScan"
+            <TextView
+                android:id="@+id/textPrimaryScanRule"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/just_scan" />
+                android:layout_weight=".30"
+                android:text="@string/primary_scan_rule" />
 
-            <RadioButton
-                android:id="@+id/radioItemStoreHtmlFiles"
+            <RadioGroup
+                android:id="@+id/radioPrimaryScanRule"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/store_html_files" />
+                android:layout_weight=".70" >
 
-            <RadioButton
-                android:id="@+id/radioItemStoreNonHtmlFiles"
-                android:layout_height="wrap_content"
-                android:text="@string/store_non_html_files" />
+                <RadioButton
+                    android:id="@+id/radioItemJustScan"
+                    android:layout_height="wrap_content"
+                    android:text="@string/just_scan" />
 
-            <RadioButton
-                android:id="@+id/radioItemStoreAllFiles"
-                android:layout_height="wrap_content"
-                android:text="@string/store_all_files" />
+                <RadioButton
+                    android:id="@+id/radioItemStoreHtmlFiles"
+                    android:layout_height="wrap_content"
+                    android:text="@string/store_html_files" />
 
-            <RadioButton
-                android:id="@+id/radioItemStoreHtmlFilesFirst"
+                <RadioButton
+                    android:id="@+id/radioItemStoreNonHtmlFiles"
+                    android:layout_height="wrap_content"
+                    android:text="@string/store_non_html_files" />
+
+                <RadioButton
+                    android:id="@+id/radioItemStoreAllFiles"
+                    android:layout_height="wrap_content"
+                    android:text="@string/store_all_files" />
+
+                <RadioButton
+                    android:id="@+id/radioItemStoreHtmlFilesFirst"
+                    android:layout_height="wrap_content"
+                    android:text="@string/store_html_files_first" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textTravelMode"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/store_html_files_first" />
-        </RadioGroup>
+                android:layout_weight=".30"
+                android:text="@string/travel_mode" />
+
+            <RadioGroup
+                android:id="@+id/radioTravelMode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70" >
+
+                <RadioButton
+                    android:id="@+id/radioItemStayInSameDirectory"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stay_in_same_directory" />
+
+                <RadioButton
+                    android:id="@+id/radioItemCanGoDown"
+                    android:layout_height="wrap_content"
+                    android:text="@string/can_go_down" />
+
+                <RadioButton
+                    android:id="@+id/radioItemCanGoUp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/can_go_up" />
+
+                <RadioButton
+                    android:id="@+id/radioItemCanGoUpDown"
+                    android:layout_height="wrap_content"
+                    android:text="@string/can_go_updown" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textGlobalTravelMode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:text="@string/global_travel_mode" />
+
+            <RadioGroup
+                android:id="@+id/radioGlobalTravelMode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70" >
+
+                <RadioButton
+                    android:id="@+id/radioItemStayOnSameAddress"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stay_on_same_address" />
+
+                <RadioButton
+                    android:id="@+id/radioItemStayOnSameDomain"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stay_on_same_domain" />
+
+                <RadioButton
+                    android:id="@+id/radioItemStayOnSameTld"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stay_on_same_tld" />
+
+                <RadioButton
+                    android:id="@+id/radioItemGoEverywhere"
+                    android:layout_height="wrap_content"
+                    android:text="@string/go_everywhere" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textRewriteLinks"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:text="@string/rewrite_links" />
+
+            <RadioGroup
+                android:id="@+id/radioRewriteLinks"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70" >
+
+                <RadioButton
+                    android:id="@+id/radioItemRewriteLink1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rewrite_links_1" />
+
+                <RadioButton
+                    android:id="@+id/radioItemRewriteLink2"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rewrite_links_2" />
+
+                <RadioButton
+                    android:id="@+id/radioItemRewriteLink3"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rewrite_links_3" />
+
+                <RadioButton
+                    android:id="@+id/radioItemRewriteLink4"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rewrite_links_4" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/checkActivateDebugging"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/activate_debugging" />
     </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textTravelMode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/travel_mode" />
-
-        <RadioGroup
-            android:id="@+id/radioTravelMode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70" >
-
-            <RadioButton
-                android:id="@+id/radioItemStayInSameDirectory"
-                android:layout_height="wrap_content"
-                android:text="@string/stay_in_same_directory" />
-
-            <RadioButton
-                android:id="@+id/radioItemCanGoDown"
-                android:layout_height="wrap_content"
-                android:text="@string/can_go_down" />
-
-            <RadioButton
-                android:id="@+id/radioItemCanGoUp"
-                android:layout_height="wrap_content"
-                android:text="@string/can_go_up" />
-
-            <RadioButton
-                android:id="@+id/radioItemCanGoUpDown"
-                android:layout_height="wrap_content"
-                android:text="@string/can_go_updown" />
-        </RadioGroup>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textGlobalTravelMode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/global_travel_mode" />
-
-        <RadioGroup
-            android:id="@+id/radioGlobalTravelMode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70" >
-
-            <RadioButton
-                android:id="@+id/radioItemStayOnSameAddress"
-                android:layout_height="wrap_content"
-                android:text="@string/stay_on_same_address" />
-
-            <RadioButton
-                android:id="@+id/radioItemStayOnSameDomain"
-                android:layout_height="wrap_content"
-                android:text="@string/stay_on_same_domain" />
-
-            <RadioButton
-                android:id="@+id/radioItemStayOnSameTld"
-                android:layout_height="wrap_content"
-                android:text="@string/stay_on_same_tld" />
-
-            <RadioButton
-                android:id="@+id/radioItemGoEverywhere"
-                android:layout_height="wrap_content"
-                android:text="@string/go_everywhere" />
-        </RadioGroup>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textRewriteLinks"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:text="@string/rewrite_links" />
-
-        <RadioGroup
-            android:id="@+id/radioRewriteLinks"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70" >
-
-            <RadioButton
-                android:id="@+id/radioItemRewriteLink1"
-                android:layout_height="wrap_content"
-                android:text="@string/rewrite_links_1" />
-
-            <RadioButton
-                android:id="@+id/radioItemRewriteLink2"
-                android:layout_height="wrap_content"
-                android:text="@string/rewrite_links_2" />
-
-            <RadioButton
-                android:id="@+id/radioItemRewriteLink3"
-                android:layout_height="wrap_content"
-                android:text="@string/rewrite_links_3" />
-
-            <RadioButton
-                android:id="@+id/radioItemRewriteLink4"
-                android:layout_height="wrap_content"
-                android:text="@string/rewrite_links_4" />
-        </RadioGroup>
-    </LinearLayout>
-
-    <CheckBox
-        android:id="@+id/checkActivateDebugging"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/activate_debugging" />
-
-</LinearLayout>
+</ScrollView>

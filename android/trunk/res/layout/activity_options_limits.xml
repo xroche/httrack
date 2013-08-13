@@ -1,8 +1,7 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:background="@color/transparent"
     android:orientation="vertical"
     android:paddingBottom="@dimen/activity_vertical_margin"
     android:paddingLeft="@dimen/activity_horizontal_margin"
@@ -12,189 +11,195 @@
     <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal" >
+        android:orientation="vertical" >
 
-        <TextView
-            android:id="@+id/textMaxDepth"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_depth" />
+            android:orientation="horizontal" >
 
-        <EditText
-            android:id="@+id/editMaxDepth"
-            android:layout_width="0dp"
+            <TextView
+                android:id="@+id/textMaxDepth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_depth" />
+
+            <EditText
+                android:id="@+id/editMaxDepth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:hint="999"
+                android:inputType="numberDecimal" >
+
+                <requestFocus />
+            </EditText>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:hint="999"
-            android:inputType="numberDecimal" >
+            android:orientation="horizontal" >
 
-            <requestFocus />
-        </EditText>
+            <TextView
+                android:id="@+id/textMaxExtDepth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_ext_depth" />
+
+            <EditText
+                android:id="@+id/editMaxExtDepth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:hint="0"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxSizeHtml"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/maxSizeHtml" />
+
+            <EditText
+                android:id="@+id/editMaxSizeHtml"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxSizeOther"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/maxSizeOther" />
+
+            <EditText
+                android:id="@+id/editMaxSizeOther"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textSiteSizeLimit"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/siteSizeLimit" />
+
+            <EditText
+                android:id="@+id/editSiteSizeLimit"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxTimeOverall"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_time_overall" />
+
+            <EditText
+                android:id="@+id/editMaxTimeOverall"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxTransferRate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_transfer_rate" />
+
+            <EditText
+                android:id="@+id/editMaxTransferRate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:hint="25000"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxConnectionsSecond"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_connections_seconds" />
+
+            <EditText
+                android:id="@+id/editMaxConnectionsSecond"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:hint="5.0"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/textMaxNumberLinks"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:text="@string/max_number_links" />
+
+            <EditText
+                android:id="@+id/editMaxNumberLinks"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:hint="100000"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
     </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxExtDepth"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_ext_depth" />
-
-        <EditText
-            android:id="@+id/editMaxExtDepth"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:hint="0"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxSizeHtml"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/maxSizeHtml" />
-
-        <EditText
-            android:id="@+id/editMaxSizeHtml"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxSizeOther"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/maxSizeOther" />
-
-        <EditText
-            android:id="@+id/editMaxSizeOther"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textSiteSizeLimit"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/siteSizeLimit" />
-
-        <EditText
-            android:id="@+id/editSiteSizeLimit"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxTimeOverall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_time_overall" />
-
-        <EditText
-            android:id="@+id/editMaxTimeOverall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxTransferRate"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_transfer_rate" />
-
-        <EditText
-            android:id="@+id/editMaxTransferRate"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:hint="25000"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxConnectionsSecond"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_connections_seconds" />
-
-        <EditText
-            android:id="@+id/editMaxConnectionsSecond"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:hint="5.0"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:id="@+id/textMaxNumberLinks"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".70"
-            android:text="@string/max_number_links" />
-
-        <EditText
-            android:id="@+id/editMaxNumberLinks"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight=".30"
-            android:hint="100000"
-            android:inputType="numberDecimal" />
-    </LinearLayout>
-
-</LinearLayout>
+</ScrollView>
