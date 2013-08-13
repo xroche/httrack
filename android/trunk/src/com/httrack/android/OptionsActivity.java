@@ -58,7 +58,8 @@ public class OptionsActivity extends TabActivity {
    */
   public abstract static class Tab extends Activity {
     protected OptionsActivity parentOptions;
-    private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(this);
+    private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(
+        this);
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -71,7 +72,7 @@ public class OptionsActivity extends TabActivity {
 
     /**
      * List of fields.
-     *
+     * 
      * @return
      */
     protected int[] getFields() {
@@ -83,7 +84,7 @@ public class OptionsActivity extends TabActivity {
      */
     protected void load() {
       final int[] fields = getFields();
-      Log.d(this.getClass().getName(), "loading " + fields.length + " fields");
+      Log.d(getClass().getSimpleName(), "loading " + fields.length + " fields");
       for (final int field : fields) {
         final String value = parentOptions.getMap(field);
         if (value != null) {
@@ -97,7 +98,7 @@ public class OptionsActivity extends TabActivity {
      */
     protected void save() {
       final int[] fields = getFields();
-      Log.d(this.getClass().getName(), "saving " + fields.length + " fields");
+      Log.d(getClass().getSimpleName(), "saving " + fields.length + " fields");
       for (final int field : fields) {
         final String value = widgetDataExchange.getFieldText(field);
         parentOptions.setMap(field, value);
@@ -291,7 +292,7 @@ public class OptionsActivity extends TabActivity {
 
     // Load map
     map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
-    Log.d(this.getClass().getName(), "map size: " + map.size());
+    Log.d(getClass().getSimpleName(), "map size: " + map.size());
 
     // Set view
     setContentView(R.layout.activity_options);
@@ -335,7 +336,7 @@ public class OptionsActivity extends TabActivity {
   @Override
   public void finish() {
     // Save all tabs
-    Log.d(this.getClass().getName(), "final map size: " + map.size());
+    Log.d(getClass().getSimpleName(), "final map size: " + map.size());
 
     // Declare result
     final Intent intent = new Intent();

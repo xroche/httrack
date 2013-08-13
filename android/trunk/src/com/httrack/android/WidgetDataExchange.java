@@ -35,7 +35,7 @@ public class WidgetDataExchange {
 
   /**
    * Constructor.
-   *
+   * 
    * @param view
    *          The parent view.
    */

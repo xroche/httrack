@@ -149,13 +149,14 @@ public class HTTrackActivity extends FragmentActivity {
   protected File rscPath;
 
   /* Get the root storage. */
-  private static File getExternalStorage() {
+  private File getExternalStorage() {
     final String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state)) {
       return Environment
           .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     } else {
-      return Environment.getDataDirectory();
+      // Fallback.
+      return getFilesDir();
     }
   }
 
@@ -164,7 +165,7 @@ public class HTTrackActivity extends FragmentActivity {
    */
   private void computeStorageTarget() {
     if (projectPath == null || !projectPath.exists()) {
-      rootPath = HTTrackActivity.getExternalStorage();
+      rootPath = getExternalStorage();
       httrackPath = new File(rootPath, "HTTrack");
       projectPath = new File(httrackPath, "Websites");
     }
@@ -173,10 +174,8 @@ public class HTTrackActivity extends FragmentActivity {
   /*
    * Check if the external storage is available, and if not, display a warning
    * message.
-   * 
-   * @return true if the storage is suitable
    */
-  private boolean warnIfExternalStorageUnsuitable() {
+  private void warnIfExternalStorageUnsuitable() {
     String message;
     final String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state)) {
@@ -187,7 +186,7 @@ public class HTTrackActivity extends FragmentActivity {
         message = getString(R.string.could_not_write_to)
             + root.getAbsolutePath();
       } else {
-        return true;
+        return;
       }
     } else {
       if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
@@ -197,8 +196,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
     }
     showNotification(message + "\n"
-        + getString(R.string.will_not_continue_until_problem_fixed), true);
-    return false;
+        + getString(R.string.may_not_download_until_problem_fixed), true);
   }
 
   /*
@@ -209,7 +207,14 @@ public class HTTrackActivity extends FragmentActivity {
   protected boolean ensureExternalStorage() {
     computeStorageTarget();
     final File root = getProjectRootFile();
-    return root != null && mkdirs(root);
+    if (root != null && mkdirs(root)) {
+      Log.d(getClass().getSimpleName(), "validated " + root.getAbsolutePath());
+      return true;
+    } else {
+      Log.d(getClass().getSimpleName(),
+          "could not create " + root.getAbsolutePath());
+      return false;
+    }
   }
 
   @Override
@@ -319,12 +324,12 @@ public class HTTrackActivity extends FragmentActivity {
       }
       // Different one: wipe and recreate
       if (stamp != diskStamp) {
-        Log.i(this.getClass().getName(),
+        Log.i(getClass().getSimpleName(),
             "deleting old resources " + rscPath.getAbsolutePath()
                 + " (app_stamp=" + stamp + " != disk_stamp=" + diskStamp + ")");
         CleanupActivity.deleteRecursively(rscPath);
       } else {
-        Log.i(this.getClass().getName(),
+        Log.i(getClass().getSimpleName(),
             "keeping resources " + rscPath.getAbsolutePath()
                 + " (app_stamp=disk_stamp=" + stamp + ")");
       }
@@ -332,7 +337,7 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Recreate resources ?
     if (!rscPath.exists()) {
-      Log.i(this.getClass().getName(),
+      Log.i(getClass().getSimpleName(),
           "creating resources " + rscPath.getAbsolutePath() + " with stamp "
               + stamp);
       if (HTTrackActivity.mkdirs(rscPath)) {
@@ -363,7 +368,7 @@ public class HTTrackActivity extends FragmentActivity {
           }
           file.close();
           zipStream.close();
-          Log.i(this.getClass().getName(),
+          Log.i(getClass().getSimpleName(),
               "created resources " + rscPath.getAbsolutePath() + " ("
                   + totalFiles + " files, " + totalSize + " bytes)");
 
@@ -377,7 +382,7 @@ public class HTTrackActivity extends FragmentActivity {
           // Little info
           showNotification(getString(R.string.info_recreated_resources));
         } catch (final IOException io) {
-          Log.w(this.getClass().getName(), "could not create resources", io);
+          Log.w(getClass().getSimpleName(), "could not create resources", io);
           CleanupActivity.deleteRecursively(rscPath);
         }
       }
@@ -595,8 +600,8 @@ public class HTTrackActivity extends FragmentActivity {
         for (final Enumeration<InetAddress> addresses = iface
             .getInetAddresses(); addresses.hasMoreElements();) {
           final InetAddress address = addresses.nextElement();
-          Log.d(HTTrackActivity.class.getName(),
-              "seen interface: " + address.toString());
+          Log.d(HTTrackActivity.class.getSimpleName(), "seen interface: "
+              + address.toString());
           if (address instanceof Inet6Address) {
             if (!address.isLoopbackAddress() && !address.isLinkLocalAddress()
                 && !address.isSiteLocalAddress()
@@ -607,8 +612,8 @@ public class HTTrackActivity extends FragmentActivity {
         }
       }
     } catch (final SocketException se) {
-      Log.w(HTTrackActivity.class.getName(), "could not enumerate interfaces",
-          se);
+      Log.w(HTTrackActivity.class.getSimpleName(),
+          "could not enumerate interfaces", se);
     }
     return null;
   }
@@ -627,8 +632,8 @@ public class HTTrackActivity extends FragmentActivity {
    */
   protected static void emergencyDump(final Throwable e) {
     try {
-      final File dumpFile = new File(new File(getExternalStorage(), "HTTrack"),
-          "error.txt");
+      final File dumpFile = new File(new File(
+          Environment.getExternalStorageState(), "HTTrack"), "error.txt");
       final FileWriter writer = new FileWriter(dumpFile);
       final PrintWriter print = new PrintWriter(writer);
       e.printStackTrace(print);
@@ -805,7 +810,7 @@ public class HTTrackActivity extends FragmentActivity {
 
       // Final args array
       final String[] cargs = args.toArray(new String[] {});
-      Log.v(this.getClass().getName(),
+      Log.v(getClass().getSimpleName(),
           "starting engine: " + HTTrackActivity.printArray(cargs));
 
       // Rock'in!
@@ -918,7 +923,7 @@ public class HTTrackActivity extends FragmentActivity {
           }
         }
       } catch (final IOException io) {
-        Log.w(this.getClass().getName(), "could not lock file", io);
+        Log.w(getClass().getSimpleName(), "could not lock file", io);
       }
       return stopSent;
     }
@@ -1331,7 +1336,7 @@ public class HTTrackActivity extends FragmentActivity {
         /* Setup name selection adapter. */
         final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
             .findViewById(R.id.fieldProjectName));
-        Log.v(this.getClass().getName(), "project names: " + printArray(names));
+        Log.v(getClass().getSimpleName(), "project names: " + printArray(names));
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
 
@@ -1426,11 +1431,9 @@ public class HTTrackActivity extends FragmentActivity {
           .setEnabled(hasIndex);
       if (!hasIndex) {
         final File index = getTargetIndexFile();
-        Log.d(
-            getClass().getName(),
-            "no index found ("
-                + (index != null ? index.getAbsolutePath() : "unknown location")
-                + ")");
+        Log.d(getClass().getSimpleName(), "no index found ("
+            + (index != null ? index.getAbsolutePath() : "unknown location")
+            + ")");
         final String warning = getString(R.string.no_index_html_in_xx).replace(
             "%s", getTargetFile().getPath());
         showNotification(warning);
@@ -1441,7 +1444,7 @@ public class HTTrackActivity extends FragmentActivity {
       View.class.cast(this.findViewById(R.id.buttonLogs)).setEnabled(hasLog);
       if (!hasLog) {
         final File log = getTargetLogFile();
-        Log.d(getClass().getName(),
+        Log.d(getClass().getSimpleName(),
             "no log found ("
                 + (log != null ? log.getAbsolutePath() : "unknown location")
                 + ")");
@@ -1502,10 +1505,11 @@ public class HTTrackActivity extends FragmentActivity {
     switch (pane_id) {
     case LAYOUT_START:
       // Recompute storage target if necessary
-      ensureExternalStorage();
-
-      // Validate if we could create a "Websites" target
-      return warnIfExternalStorageUnsuitable();
+      final boolean success = ensureExternalStorage();
+      // Warn if no sdcard
+      warnIfExternalStorageUnsuitable();
+      // Continue if we could have a place to write to (even if we warned)
+      return success;
     case LAYOUT_PROJECT_NAME:
       final String name = getFieldText(R.id.fieldProjectName);
       if (OptionsMapper.isStringNonEmpty(name)) {
@@ -1648,7 +1652,7 @@ public class HTTrackActivity extends FragmentActivity {
     final Intent intent = new Intent(this, OptionsActivity.class);
     fillExtra(intent);
     intent.putExtra("com.httrack.android.map", mapper.serialize());
-    Log.d(this.getClass().getName(), "map size: " + mapper.size());
+    Log.d(getClass().getSimpleName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
 
@@ -1656,7 +1660,7 @@ public class HTTrackActivity extends FragmentActivity {
   private void loadParcelable(final Parcelable data) {
     // Load modified map
     mapper.unserialize(data);
-    Log.d(this.getClass().getName(), "received map size: " + mapper.size());
+    Log.d(getClass().getSimpleName(), "received map size: " + mapper.size());
 
     // Load possibly modified field(s)
     loadPaneFields();
@@ -1934,7 +1938,7 @@ public class HTTrackActivity extends FragmentActivity {
     final int version = savedInstanceState
         .getInt("com.httrack.android.version");
     if (version != versionCode) {
-      Log.d(this.getClass().getName(), "refused bundle version " + version);
+      Log.d(getClass().getSimpleName(), "refused bundle version " + version);
       return;
     }
 
@@ -1986,10 +1990,10 @@ public class HTTrackActivity extends FragmentActivity {
         && OptionsMapper.isStringNonEmpty(mapper.getProjectUrl())) {
       try {
         serialize();
-        Log.d(this.getClass().getName(),
+        Log.d(getClass().getSimpleName(),
             "saved profile for " + mapper.getProjectName());
       } catch (final IOException e) {
-        Log.d(this.getClass().getName(), "could not save profile", e);
+        Log.d(getClass().getSimpleName(), "could not save profile", e);
       }
     }
     super.onDestroy();
