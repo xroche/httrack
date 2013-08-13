@@ -30,6 +30,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -173,14 +174,19 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     for (int i = 0; i < tabClasses.length; i++) {
       final Class<?> cls = tabClasses[i];
       final Title title = Title.class.cast(cls.getAnnotation(Title.class));
-      // See
+      // Create a flat button ; see
       // <http://developer.android.com/guide/topics/ui/controls/button.html#Borderless>
       // Added in API level 11
       final Button button = android.os.Build.VERSION.SDK_INT >= 11 ? new Button(
           this, null, android.R.attr.borderlessButtonStyle) : new Button(this);
+      // Left-aligned text
+      button.setGravity(Gravity.LEFT);
       button.setText(title.value());
+      // Set listener
       button.setOnClickListener(this);
+      // Set tag to our index
       button.setTag(i);
+      // And finally add button
       scroll.addView(button);
     }
   }
