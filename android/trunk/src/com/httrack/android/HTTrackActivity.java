@@ -869,32 +869,34 @@ public class HTTrackActivity extends FragmentActivity {
           .getString(R.string.mirror_finished) + ": " : "")
           + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
-      parent.handlerUI.post(new Runnable() {
-        @Override
-        public synchronized void run() {
-          if (parent != null) {
-            // Final pane
-            parent.setPane(LAYOUT_FINISHED);
+      if (parent != null) {
+        parent.handlerUI.post(new Runnable() {
+          @Override
+          public synchronized void run() {
+            if (parent != null) {
+              // Final pane
+              parent.setPane(LAYOUT_FINISHED);
 
-            // Fancy result message
-            if (displayMessage != null) {
-              final View view = parent.findViewById(R.id.fieldDisplay);
-              if (view != null) {
-                TextView.class.cast(view)
-                    .setText(Html.fromHtml(displayMessage));
+              // Fancy result message
+              if (displayMessage != null) {
+                final View view = parent.findViewById(R.id.fieldDisplay);
+                if (view != null) {
+                  TextView.class.cast(view).setText(
+                      Html.fromHtml(displayMessage));
+                }
               }
-            }
-            if (errorsCount != 0) {
-              final View view = parent.findViewById(R.id.buttonLogs);
-              if (view != null) {
-                final Animation shake = AnimationUtils.loadAnimation(parent,
-                    R.anim.scale);
-                view.startAnimation(shake);
+              if (errorsCount != 0) {
+                final View view = parent.findViewById(R.id.buttonLogs);
+                if (view != null) {
+                  final Animation shake = AnimationUtils.loadAnimation(parent,
+                      R.anim.scale);
+                  view.startAnimation(shake);
+                }
               }
             }
           }
-        }
-      });
+        });
+      }
     }
 
     /**
