@@ -646,7 +646,8 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     jobjectArray stringArray) {
   const int argc =
       object != NULL ? (*env)->GetArrayLength(env, stringArray) : 0;
-  char **argv = (char**) malloc((argc + 1) * sizeof(char*));
+  const size_t argv_size = (argc + 1) * sizeof(char*);
+  char **const argv = (char**) malloc(argv_size);
   if (argv != NULL) {
     int i;
     httrackp * opt = NULL;
@@ -711,13 +712,16 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
       }
       free(argv);
     } else {
-      throwRuntimeException(env, "not enough memory");
+      throwRuntimeException(env, "not enough native memory to create an httrack context");
     }
 
     /* Return exit code. */
     return code;
   } else {
-    throwRuntimeException(env, "not enough memory");
+    char format[256];
+    snprintf(format, sizeof(format), "not enough native memory (%d bytes)",
+             (int) argv_size);
+    throwRuntimeException(env, format);
     return -1;
   }
 }
