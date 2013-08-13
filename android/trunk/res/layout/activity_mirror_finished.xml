@@ -13,43 +13,37 @@
     <TextView
         android:id="@+id/fieldDisplay"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:text="@string/welcome_message" />
 
-    <ScrollView
-        android:id="@+id/scrollView"
+    <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
+        android:layout_gravity="bottom"
         android:orientation="horizontal" >
+
+        <Button
+            android:id="@+id/buttonLogs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left|bottom"
+            android:onClick="onShowLogs"
+            android:text="@string/show_logs" />
 
         <LinearLayout
             android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
+            android:layout_height="fill_parent"
+            android:gravity="right"
             android:orientation="horizontal" >
 
             <Button
-                android:id="@+id/buttonLogs"
+                android:id="@+id/buttonBrowse"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="left"
-                android:onClick="onShowLogs"
-                android:text="@string/show_logs" />
-
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:gravity="right"
-                android:orientation="horizontal" >
-
-                <Button
-                    android:id="@+id/buttonBrowse"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="right"
-                    android:onClick="onBrowse"
-                    android:text="@string/browse_website" />
-            </LinearLayout>
+                android:layout_gravity="right|bottom"
+                android:onClick="onBrowse"
+                android:text="@string/browse_website" />
         </LinearLayout>
-    </ScrollView>
+    </LinearLayout>
 
 </LinearLayout>

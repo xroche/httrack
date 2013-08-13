@@ -838,14 +838,7 @@ public class HTTrackActivity extends FragmentActivity {
                 + " errors, no files written)";
           }
           message += "<br /><br />Mirror copied in <i>"
-              + target.getAbsolutePath() + "</i>:";
-          message += "<br /><i>";
-          for (final String f : target.list()) {
-            message += f;
-            message += "<br />";
-          }
-          message += "</i>";
-
+              + target.getAbsolutePath() + "</i>";
         } else {
           message = "<b>Error</b> (<i>code " + code + "</i>)";
         }
