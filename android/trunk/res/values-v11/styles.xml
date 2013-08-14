@@ -3,8 +3,6 @@
     <!-- Application theme. -->
     <style name="AppBaseTheme" parent="@android:style/Theme.Holo.Light" />
 
-    <style name="AppTheme" parent="AppBaseTheme" />
-
     <!-- Custom styles -->
     <style name="ButtonStyle" parent="@android:attr/buttonStyle">
         <item name="android:background">?android:attr/selectableItemBackground</item>

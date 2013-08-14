@@ -30,13 +30,6 @@
             android:text="@string/app_name"
             android:textColor="@color/blue" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dip"
-            android:layout_marginLeft="4dip"
-            android:layout_marginRight="4dip"
-            android:background="?android:attr/dividerVertical" />
-
         <View style="@style/DividerLineHorizontal" />
 
         <LinearLayout
