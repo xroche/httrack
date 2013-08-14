@@ -70,7 +70,7 @@
             android:orientation="horizontal" >
 
             <LinearLayout
-                style="@style/BorderlessButtonCenter"
+                style="@style/BorderlessButtonLeft"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="0.3" >
@@ -85,8 +85,9 @@
             </LinearLayout>
 
             <View style="@style/DividerLineVertical" />
-            <LinearLayout
-                style="@style/BorderlessButtonCenter"
+
+            <LinearLayout
+                style="@style/BorderlessButtonRight"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="0.3" >
