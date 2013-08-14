@@ -190,12 +190,16 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       // Add separator
       if (borderless && i != 0) {
         final View line = new View(this, null, R.style.DividerLineHorizontal);
+        
+        // FIXME TODO: why in hell isn't my shiny style NOT working ?
         final LinearLayout.MarginLayoutParams layout = new LinearLayout.MarginLayoutParams(
             LayoutParams.FILL_PARENT, dpToPx(1));
         layout.bottomMargin = dpToPx(8);
         layout.topMargin = dpToPx(8);
         line.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, 1));
         line.setBackgroundColor(getResources().getColor(R.color.black));
+        
+        // Add line
         scroll.addView(line);
       }
 
