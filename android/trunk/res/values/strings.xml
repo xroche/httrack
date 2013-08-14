@@ -45,6 +45,7 @@
     <string name="get_non_html_near">Get non-HTML files related to a link, eg external .ZIP or pictures</string>
     <string name="test_all_links">Test all links (even forbidden ones)</string>
     <string name="get_html_first">Get HTML files first!</string>
+    <string name="local_structure_type">Structure type (how links are saved)</string>
     <string name="build_type_1">Site-structure (default)</string>
     <string name="build_type_2">Html in web/, images/other files in web/images/</string>
     <string name="build_type_3">Html in web/html, images/other in web/images</string>
@@ -176,4 +177,4 @@
     <string name="mirror_xxx_stopped">HTTrack: mirror \'%s\' stopped!</string>
     <string name="click_on_notification_to_restart">Click on this notification to restart the interrupted mirror</string>
     <string name="could_not_save_profile_xxx">HTTrack: could not save profile for \'%s\'!</string>
-</resources>
+    </resources>
