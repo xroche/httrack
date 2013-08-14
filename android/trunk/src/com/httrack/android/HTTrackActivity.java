@@ -381,6 +381,8 @@ public class HTTrackActivity extends FragmentActivity {
         } catch (final IOException io) {
           Log.w(getClass().getSimpleName(), "could not create resources", io);
           CleanupActivity.deleteRecursively(rscPath);
+          showNotification(getString(R.string.info_could_not_create_resources),
+              true);
         }
       }
     }
@@ -1885,8 +1887,8 @@ public class HTTrackActivity extends FragmentActivity {
 
   /** Send a notification. **/
   protected void sendAbortNotification() {
-    final String title = "HTTrack: mirror '" + mapper.getProjectName()
-        + "' stopped!";
+    final String title = getString(R.string.mirror_xxx_stopped).replace("%s",
+        mapper.getProjectName());
     final String text = getString(R.string.click_on_notification_to_restart);
 
     // Continue an interrupted mirror
@@ -1977,8 +1979,8 @@ public class HTTrackActivity extends FragmentActivity {
   public void onDestroy() {
     // We are being destroyed... save profile ?
     savePaneFields();
-    if (mapper.isDirty()
-        && OptionsMapper.isStringNonEmpty(mapper.getProjectName())
+    final String name = mapper.getProjectName();
+    if (mapper.isDirty() && OptionsMapper.isStringNonEmpty(name)
         && OptionsMapper.isStringNonEmpty(mapper.getProjectUrl())) {
       try {
         serialize();
@@ -1986,6 +1988,9 @@ public class HTTrackActivity extends FragmentActivity {
             "saved profile for " + mapper.getProjectName());
       } catch (final IOException e) {
         Log.d(getClass().getSimpleName(), "could not save profile", e);
+        final String title = getString(R.string.could_not_save_profile_xxx)
+            .replace("%s", name);
+        sendSystemNotification(title, e.getMessage());
       }
     }
     super.onDestroy();

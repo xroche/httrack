@@ -166,12 +166,14 @@
     <string name="warning_space_in_filename">Beware: you local browser might be unable to browse files with embedded filenames</string>
     <string name="no_index_html_in_xx">No \'index.html\' file in %s!</string>
     <string name="info_recreated_resources">Recreated HTTrack internal cached resources</string>
+    <string name="info_could_not_create_resources">Could not create internal cached resources</string>
     <string name="about_credits">\n(Please notify us of any bug or problem)\n\nDevelopment:\nInterface (Windows): Xavier Roche\nSpider: Xavier Roche\nJavaParserClasses: Yann Philippot\n\n&#169;1998-2013 Xavier Roche and other contributors\nMANY THANKS for translation tips to:\nRobert Lagadec (rlagadec@yahoo.fr)</string>
     <string name="could_not_get_external_directory">Could not get the system external storage directory</string>
     <string name="could_not_write_to">Could not write to:</string>
     <string name="read_only_storage_media">Read-only media (SDCARD)</string>
     <string name="no_storage_media">No storage media (SDCARD)</string>
     <string name="may_not_download_until_problem_fixed">HTTrack may not be able to download websites until this problem is fixed</string>
+    <string name="mirror_xxx_stopped">HTTrack: mirror \'%s\' stopped!</string>
     <string name="click_on_notification_to_restart">Click on this notification to restart the interrupted mirror</string>
-
-</resources>
+    <string name="could_not_save_profile_xxx">HTTrack: could not save profile for \'%s\'!</string>
+</resources>
