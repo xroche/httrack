@@ -1244,7 +1244,7 @@ public class OptionsMapper {
         builder.append("%%");
       } else if (c < 32) {
         builder.append('%');
-        builder.append(String.format("%02x", c));
+        builder.append(String.format("%02x", (int) c));
       } else {
         builder.append(c);
       }
