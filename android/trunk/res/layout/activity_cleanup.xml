@@ -11,10 +11,13 @@
 
     <Button
         android:id="@+id/buttonClear"
+        style="@style/ButtonStyle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="onClickDelete"
         android:text="@string/delete" />
+
+    <View style="@style/DividerLineHorizontal" />
 
     <ListView
         android:id="@android:id/list"

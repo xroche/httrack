@@ -1,18 +1,41 @@
 <resources>
 
-    <!--
-        Base application theme, dependent on API level. This theme is replaced
-        by AppBaseTheme from res/values-vXX/styles.xml on newer devices.    -->
-    <style name="AppBaseTheme" parent="@android:style/Theme.Holo.Light">
-        <!--
-            Theme customizations available in newer API levels can go in
-            res/values-vXX/styles.xml, while customizations related to
-            backward-compatibility can go here.        -->
+    <!-- Application theme. -->
+    <style name="AppBaseTheme" parent="@android:style/Theme.Holo.Light" />
+
+    <style name="AppTheme" parent="AppBaseTheme" />
+
+    <!-- Custom styles -->
+    <style name="ButtonStyle" parent="@android:attr/buttonStyle">
+        <item name="android:background">?android:attr/selectableItemBackground</item>
     </style>
 
-    <!-- Application theme. -->
-    <style name="AppTheme" parent="AppBaseTheme">
-        <!-- All customizations that are NOT specific to a particular API-level can go here. -->
+    <style name="DividerLineVertical">
+        <item name="android:layout_width">1dip</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:background">@color/black</item>
+    </style>
+
+    <style name="DividerLineHorizontal">
+        <item name="android:layout_height">1dip</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:background">@color/black</item>
+    </style>
+
+    <style name="BorderlessButtonLeft">
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="BorderlessButtonCenter">
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="BorderlessButtonRight">
+        <item name="android:gravity">center</item>
     </style>
 
 </resources>

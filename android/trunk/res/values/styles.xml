@@ -4,18 +4,12 @@
         Base application theme, dependent on API level. This theme is replaced
         by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
     -->
-    <style name="AppBaseTheme" parent="@style/Theme.Light.Fixed">
-        <!--
-            Theme customizations available in newer API levels can go in
-            res/values-vXX/styles.xml, while customizations related to
-            backward-compatibility can go here.
-        -->
-    </style>
+
 
     <!-- Application theme. -->
-    <style name="AppTheme" parent="AppBaseTheme">
-        <!-- All customizations that are NOT specific to a particular API-level can go here. -->
-    </style>
+    <style name="AppBaseTheme" parent="@style/Theme.Light.Fixed" />
+
+    <style name="AppTheme" parent="AppBaseTheme" />
 
     <!-- Fix Android bug <http://code.google.com/p/android/issues/detail?id=5237#c8> -->
     <style name="AutoCompleteTextViewLight" parent="@android:style/Widget.AutoCompleteTextView">
@@ -24,6 +18,31 @@
 
     <style name="Widget.DropDownItemLight" parent="@android:style/Widget.DropDownItem">
         <item name="android:textColor">@android:color/primary_text_light</item>
+    </style>
+
+    <!-- Custom styles -->
+    <style name="ButtonStyle" parent="@android:attr/buttonStyle" />
+
+    <style name="DividerLineVertical">
+        <item name="android:layout_width">0dip</item>
+        <item name="android:layout_height">0dip</item>
+    </style>
+
+    <style name="DividerLineHorizontal">
+        <item name="android:layout_height">0dip</item>
+        <item name="android:layout_width">0dip</item>
+    </style>
+
+    <style name="BorderlessButtonLeft">
+        <item name="android:gravity">left|center_vertical</item>
+    </style>
+
+    <style name="BorderlessButtonCenter">
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="BorderlessButtonRight">
+        <item name="android:gravity">right|center_vertical</item>
     </style>
 
 </resources>

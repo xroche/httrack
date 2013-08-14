@@ -18,30 +18,47 @@
     <LinearLayout
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
-        android:layout_gravity="bottom"
-        android:orientation="horizontal" >
+        android:gravity="bottom"
+        android:orientation="vertical" >
 
-        <Button
-            android:id="@+id/buttonLogs"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="left|bottom"
-            android:onClick="onShowLogs"
-            android:text="@string/show_logs" />
+        <View style="@style/DividerLineHorizontal" />
 
         <LinearLayout
             android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:gravity="right"
+            android:layout_height="wrap_content"
             android:orientation="horizontal" >
 
-            <Button
-                android:id="@+id/buttonBrowse"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                style="@style/BorderlessButtonLeft"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_gravity="right|bottom"
-                android:onClick="onBrowse"
-                android:text="@string/browse_website" />
+                android:layout_weight="0.3" >
+
+                <Button
+                    android:id="@+id/buttonLogs"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="onShowLogs"
+                    android:text="@string/show_logs" />
+            </LinearLayout>
+
+            <View style="@style/DividerLineVertical" />
+
+            <LinearLayout
+                style="@style/BorderlessButtonRight"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.3" >
+
+                <Button
+                    android:id="@+id/buttonBrowse"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="onBrowse"
+                    android:text="@string/browse_website" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

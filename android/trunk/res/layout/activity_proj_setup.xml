@@ -43,8 +43,8 @@
                 <RadioGroup
                     android:id="@+id/radioAction"
                     android:layout_width="0dp"
-                    android:layout_weight="0.5"
                     android:layout_height="wrap_content"
+                    android:layout_weight="0.5"
                     android:gravity="left" >
 
                     <RadioButton
@@ -61,14 +61,15 @@
                 </RadioGroup>
 
                 <LinearLayout
-                    android:layout_weight="0.5"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="0.5"
                     android:gravity="right"
                     android:orientation="horizontal" >
 
                     <Button
                         android:id="@+id/buttonOptions"
+                        style="@style/ButtonStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
@@ -85,27 +86,40 @@
         android:gravity="bottom"
         android:orientation="vertical" >
 
+        <View style="@style/DividerLineHorizontal" />
+
         <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal" >
 
-            <Button
-                android:id="@+id/buttonPrevious"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                style="@style/BorderlessButtonLeft"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:onClick="onClickPrevious"
-                android:text="@string/previous" />
+                android:layout_weight="0.5" >
+
+                <Button
+                    android:id="@+id/buttonPrevious"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:onClick="onClickPrevious"
+                    android:text="@string/previous" />
+            </LinearLayout>
+
+            <View style="@style/DividerLineVertical" />
 
             <LinearLayout
-                android:layout_width="fill_parent"
+                style="@style/BorderlessButtonRight"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="right"
-                android:orientation="horizontal" >
+                android:layout_weight="0.5" >
 
                 <Button
                     android:id="@+id/buttonNext"
+                    style="@style/ButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
