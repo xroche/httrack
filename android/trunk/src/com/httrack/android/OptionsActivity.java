@@ -180,7 +180,9 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       final Button button = android.os.Build.VERSION.SDK_INT >= 11 ? new Button(
           this, null, android.R.attr.borderlessButtonStyle) : new Button(this);
       // Left-aligned text
-      button.setGravity(Gravity.LEFT);
+      if (android.os.Build.VERSION.SDK_INT >= 11) {
+        button.setGravity(Gravity.LEFT);
+      }
       button.setText(title.value());
       // Set listener
       button.setOnClickListener(this);
