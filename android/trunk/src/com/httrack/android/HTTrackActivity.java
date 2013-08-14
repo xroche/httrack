@@ -222,7 +222,6 @@ public class HTTrackActivity extends FragmentActivity {
     super.onCreate(savedInstanceState);
 
     // Attempt to load the native library.
-    String errors = "";
     try {
       // Initialize
       HTTrackLib.init();
@@ -232,7 +231,9 @@ public class HTTrackActivity extends FragmentActivity {
       versionFeatures = HTTrackLib.getFeatures();
     } catch (final RuntimeException re) {
       // Woops, something is not right here.
-      errors += "\n\nERROR: " + re.getMessage();
+      new AlertDialog.Builder(this).setTitle("Fatal Error")
+          .setMessage(re.getMessage()).show();
+      throw re;
     }
 
     // Android package version code
@@ -241,7 +242,9 @@ public class HTTrackActivity extends FragmentActivity {
           getPackageName(), 0);
       versionCode = info.versionCode;
     } catch (final NameNotFoundException e) {
-      errors += "\n\nERROR: " + e.getMessage();
+      new AlertDialog.Builder(this).setTitle("Fatal Error")
+          .setMessage(e.getMessage()).show();
+      throw new RuntimeException(e);
     }
 
     // Compute target directory on external storage
@@ -259,12 +262,6 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Go to first pane now
     setPane(0);
-
-    // First pane text error
-    if (errors != null) {
-      final TextView text = (TextView) this.findViewById(R.id.fieldDisplay);
-      text.append(errors);
-    }
 
     // Load intent ? (example: shutdown phone, and power-it on during setup)
     final Bundle extras = getIntent().getExtras();
