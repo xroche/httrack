@@ -17,7 +17,7 @@
     </style>
 
     <style name="DividerLineHorizontal">
-        <item name="android:layout_height">1dip</item>
+        <item name="android:layout_height">1dp</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_marginBottom">8dp</item>
         <item name="android:layout_marginTop">8dp</item>

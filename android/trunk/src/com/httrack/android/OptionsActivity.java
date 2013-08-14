@@ -32,6 +32,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
@@ -165,29 +166,62 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   }
 
   /*
-   * Create all tabs
+   * Convert dp (Density-independent Pixels) to px (pixel)
+   */
+  private int dpToPx(final double dp) {
+    final float scale = getResources().getDisplayMetrics().density;
+    int px = (int) (dp * scale + 0.5f);
+    return px;
+  }
+
+  /*
+   * Create all tabs for main options menu.
    */
   private void createTabs() {
+    // Borderless buttons ?
+    final boolean borderless = android.os.Build.VERSION.SDK_INT >= 11;
+
     // Create tabs
     final LinearLayout scroll = LinearLayout.class
         .cast(findViewById(R.id.layout));
+
+    // Add all buttons linking to options
     for (int i = 0; i < tabClasses.length; i++) {
+      // Add separator
+      if (borderless && i != 0) {
+        final View line = new View(this, null, R.style.DividerLineHorizontal);
+        final LinearLayout.MarginLayoutParams layout = new LinearLayout.MarginLayoutParams(
+            LayoutParams.FILL_PARENT, dpToPx(1));
+        layout.bottomMargin = dpToPx(8);
+        layout.topMargin = dpToPx(8);
+        line.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, 1));
+        line.setBackgroundColor(getResources().getColor(R.color.black));
+        scroll.addView(line);
+      }
+
+      // Next tab class
       final Class<?> cls = tabClasses[i];
       final Title title = Title.class.cast(cls.getAnnotation(Title.class));
+
       // Create a flat button ; see
       // <http://developer.android.com/guide/topics/ui/controls/button.html#Borderless>
       // Added in API level 11
-      final Button button = android.os.Build.VERSION.SDK_INT >= 11 ? new Button(
-          this, null, android.R.attr.borderlessButtonStyle) : new Button(this);
-      // Left-aligned text
-      if (android.os.Build.VERSION.SDK_INT >= 11) {
+      final Button button = borderless ? new Button(this, null,
+          android.R.attr.borderlessButtonStyle) : new Button(this);
+      if (borderless) {
+        // Left-aligned text
         button.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
       }
+
+      // Title
       button.setText(title.value());
+
       // Set listener
       button.setOnClickListener(this);
+
       // Set tag to our index
       button.setTag(i);
+
       // And finally add button
       scroll.addView(button);
     }
