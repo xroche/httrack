@@ -88,7 +88,9 @@ v="${arr[$k]}"
 # try harder without punct
 if ! test -n "$v"; then
 k="$(echo "$k" | sed -e 's/[_]*$//')"
+if test -n "$k"; then
 v="${arr[$k]}"
+fi
 fi
 if test -n "$v"; then
 echo -n "$l" | sed -e "s/\(.*\)>.*<\(.*\)/\1>/"
