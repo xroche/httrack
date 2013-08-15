@@ -1869,7 +1869,7 @@ void lance(void) {
   if (strnotempty(LANGUAGE_ISO)) {
     ShellOptions->LINE += " -%l \"";
     ShellOptions->LINE += LANGUAGE_ISO;
-    if (LANGUAGE_ISO != "en")
+    if (strcmp(LANGUAGE_ISO, "en") != 0)
       ShellOptions->LINE += ", en";
     ShellOptions->LINE += ", *\"";
   }
@@ -1908,7 +1908,7 @@ void lance(void) {
   }
   
   // --assume
-  if (strnotempty(ShellOptions->buff_MIME)) {
+  if (ShellOptions->buff_MIME.GetLength() != 0) {
     ShellOptions->LINE += " ";
     ShellOptions->LINE += ShellOptions->buff_MIME ;
   }
