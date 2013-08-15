@@ -192,7 +192,7 @@ public:
     cookies, checktype, parsejava, Cache2, logtype, norecatch, 
     toler, updhack, urlhack, http10, waittime, maxtime, maxrate, 
     maxconn, maxlinks, hh, mm, ss, buff_filtres, buff_MIME, 
-    _RasString;
+    _RasString, accept_language, other_headers;
   CString LINE_back;
   RASDIALPARAMS _dial;
 };

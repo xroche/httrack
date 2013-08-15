@@ -28,6 +28,8 @@ COptionTab6::COptionTab6() : CPropertyPage(COptionTab6::IDD)
 	//{{AFX_DATA_INIT(COptionTab6)
 	m_user = _T("");
 	m_footer = _T("");
+	m_accept_language = _T("");
+	m_other_headers = _T("");
 	//}}AFX_DATA_INIT
 }
 
@@ -41,6 +43,8 @@ void COptionTab6::DoDataExchange(CDataExchange* pDX)
 	//{{AFX_DATA_MAP(COptionTab6)
 	DDX_CBString(pDX, IDC_user, m_user);
 	DDX_CBString(pDX, IDC_footer, m_footer);
+	DDX_CBString(pDX, IDC_accept_language, m_accept_language);
+	DDX_CBString(pDX, IDC_other_headers, m_other_headers);
 	//}}AFX_DATA_MAP
 }
 
@@ -63,6 +67,8 @@ BOOL COptionTab6::OnInitDialog()
   if (LANG_T(-1)) {    // Patcher en français
     SetDlgItemTextCP(this, IDC_STATIC_browsid,LANG(LANG_I43)); // "Identité");
     SetDlgItemTextCP(this, IDC_STATIC_footer,LANG(LANG_I43b));
+    SetDlgItemTextCP(this, IDC_STATIC_accept_language,LANG(LANG_I43c));
+    SetDlgItemTextCP(this, IDC_STATIC_other_headers,LANG(LANG_I43d));
   }
 	
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -110,6 +116,8 @@ char* COptionTab6::GetTip(int ID)
   switch(ID) {
     case IDC_user: return LANG(LANG_I23); break; // "Browser identity","Identité du browser"); break;
     case IDC_footer: return LANG(LANG_I23b); break;
+    case IDC_accept_language: return LANG(LANG_I23c); break;
+    case IDC_other_headers: return LANG(LANG_I23d); break;
   }
   return "";
 }

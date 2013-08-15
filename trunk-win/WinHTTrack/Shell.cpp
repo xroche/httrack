@@ -768,6 +768,18 @@ void compute_options() {
     ShellOptions->footer += "\"";
   } else ShellOptions->footer = "";
   
+  if(strcmp(maintab->m_option6.m_accept_language,"")!=0){
+    ShellOptions->accept_language = "\"";
+    ShellOptions->accept_language += maintab->m_option6.m_accept_language;
+    ShellOptions->accept_language += "\"";
+  } else ShellOptions->accept_language = "";
+
+  if(strcmp(maintab->m_option6.m_other_headers,"")!=0){
+    ShellOptions->other_headers = "\"";
+    ShellOptions->other_headers += maintab->m_option6.m_other_headers;
+    ShellOptions->other_headers += "\"";
+  } else ShellOptions->other_headers = "";
+
   if(strcmp(maintab->m_option4.m_retry,"")!=0){
     ShellOptions->retry = "R";
     ShellOptions->retry += maintab->m_option4.m_retry;
@@ -1858,6 +1870,8 @@ void lance(void) {
   
   if (strcmp(ShellOptions->user,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->user;}
   if (strcmp(ShellOptions->footer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->footer;}
+  if (strcmp(ShellOptions->accept_language,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%l";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->accept_language;}
+  if (strcmp(ShellOptions->other_headers,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%X";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->other_headers;}
   
   if ((int)ShellOptions->proxy.GetLength()>0) {
     ShellOptions->LINE += " -P ";
@@ -1866,13 +1880,13 @@ void lance(void) {
     ShellOptions->LINE += ShellOptions->port;
   }
   
-  if (strnotempty(LANGUAGE_ISO)) {
-    ShellOptions->LINE += " -%l \"";
-    ShellOptions->LINE += LANGUAGE_ISO;
-    if (strcmp(LANGUAGE_ISO, "en") != 0)
-      ShellOptions->LINE += ", en";
-    ShellOptions->LINE += ", *\"";
-  }
+  //if (strnotempty(LANGUAGE_ISO)) {
+  //  ShellOptions->LINE += " -%l \"";
+  //  ShellOptions->LINE += LANGUAGE_ISO;
+  //  if (strcmp(LANGUAGE_ISO, "en") != 0)
+  //    ShellOptions->LINE += ", en";
+  //  ShellOptions->LINE += ", *\"";
+  //}
   
   // mode spider, mettre après options
   if (ShellOptions->choixdeb[0]=='!') {
@@ -2432,6 +2446,8 @@ void Write_profile(CString path,int load_path) {
     MyWriteProfileString(path,strSection, "RateOut",maintab->m_option4.m_rate);
     MyWriteProfileString(path,strSection, "UserID",maintab->m_option6.m_user);
     MyWriteProfileString(path,strSection, "Footer",maintab->m_option6.m_footer);
+    MyWriteProfileString(path,strSection, "AcceptLanguage",maintab->m_option6.m_accept_language);
+    MyWriteProfileString(path,strSection, "OtherHeaders",maintab->m_option6.m_other_headers);
     MyWriteProfileString(path,strSection, "MaxRate",maintab->m_option5.m_maxrate);
     MyWriteProfileString(path,strSection, "WildCardFilters",maintab->m_option7.m_url2);
     MyWriteProfileString(path,strSection, "Proxy",maintab->m_option10.m_proxy);
@@ -2554,6 +2570,12 @@ void Write_profile(CString path,int load_path) {
     MyWriteProfileString(path,strSection, "UserID", st);
     maintab->m_option6.GetDlgItemText(IDC_footer,st);
     MyWriteProfileString(path,strSection, "Footer", st);
+    maintab->m_option6.GetDlgItemText(IDC_accept_language, st);
+    MyWriteProfileString(path,strSection, "AcceptLanguage", st);
+    maintab->m_option6.GetDlgItemText(IDC_other_headers, st);
+    // FIXME SHOULD BE MULTILINE!!
+    st.Replace("\n", " ");
+    MyWriteProfileString(path,strSection, "OtherHeaders", st);
     // 7
     maintab->m_option7.GetDlgItemText(IDC_URL2,st);
     MyWriteProfileString(path,strSection, "WildCardFilters", st);
@@ -2672,6 +2694,17 @@ void Read_profile(CString path,int load_path) {
       }
     }
   }
+
+  // Default browser language
+  CString default_lang = "";
+  if (strnotempty(LANGUAGE_ISO)) {
+    default_lang += LANGUAGE_ISO;
+    if (strcmp(LANGUAGE_ISO, "en") != 0)
+      default_lang += ", en";
+    default_lang += ", *";
+  } else {
+    default_lang = "en, *";
+  }
   
   // checkboxes
   maintab->m_option1.m_link      = MyGetProfileInt(path,strSection, "Near",0);
@@ -2726,6 +2759,10 @@ void Read_profile(CString path,int load_path) {
   maintab->m_option4.m_rate    =  MyGetProfileString(path,strSection, "RateOut");
   maintab->m_option6.m_user    =  MyGetProfileString(path,strSection, "UserID","Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
   maintab->m_option6.m_footer  =  MyGetProfileString(path,strSection, "Footer",HTS_DEFAULT_FOOTER);
+  maintab->m_option6.m_accept_language =
+                                  MyGetProfileString(path,strSection, "AcceptLanguage", default_lang);
+  maintab->m_option6.m_other_headers =
+                                  MyGetProfileString(path,strSection, "OtherHeaders");
   maintab->m_option5.m_maxrate =  MyGetProfileString(path,strSection, "MaxRate", "25000");
   maintab->m_option5.m_maxconn =  MyGetProfileString(path,strSection, "MaxConn");
   maintab->m_option5.m_maxlinks = MyGetProfileString(path,strSection, "MaxLinks");

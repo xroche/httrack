@@ -25,6 +25,8 @@ public:
 	enum { IDD = IDD_OPTION6 };
 	CString	m_user;
 	CString	m_footer;
+	CString	m_accept_language;
+	CString	m_other_headers;
 	//}}AFX_DATA
 
 

@@ -190,6 +190,7 @@
 #define IDC_footer                      1054
 #define IDC_suiv                        1055
 #define IDC_rate                        1055
+#define IDC_accept_language             1055
 #define IDC_niveau                      1056
 #define IDC_maxtime                     1056
 #define IDC_retry                       1057
@@ -408,7 +409,9 @@
 #define IDC_STATIC_finfo                1197
 #define IDC_STATIC_footer               1197
 #define IDC_STATIC_tip                  1198
+#define IDC_STATIC_accept_language      1198
 #define IDC_STATIC_answer               1199
+#define IDC_STATIC_other_headers        1199
 #define IDC_STATIC_travel               1200
 #define IDC_STATIC_mc                   1201
 #define IDC_STATIC_travel2              1201
@@ -499,6 +502,7 @@
 #define IDC_mime6                       1304
 #define IDC_mime7                       1305
 #define IDC_mime8                       1306
+#define IDC_other_headers               1306
 #define ID_MENUITEM32771                32771
 #define ID_MENUITEM32772                32772
 #define ID_EXIT                         32772
@@ -570,7 +574,7 @@
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        247
 #define _APS_NEXT_COMMAND_VALUE         32837
-#define _APS_NEXT_CONTROL_VALUE         1306
+#define _APS_NEXT_CONTROL_VALUE         1307
 #define _APS_NEXT_SYMED_VALUE           108
 #endif
 #endif
