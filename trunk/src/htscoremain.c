@@ -2182,6 +2182,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '~':        /* internal lib test */
+                HTS_PANIC_PRINTF
+                  ("Option #~ is disabled for security reasons");
                 //Disabled because choke on GCC 4.3 (toni from links2linux.de)
                 //{
                 //  char thisIsATestYouShouldSeeAnError[12];
@@ -2547,21 +2549,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '!':
-                if (na + 1 >= argc) {
-                  HTS_PANIC_PRINTF
-                    ("Option #! needs to be followed by a commandline");
-                  printf("Example: '-#!' 'echo hello'\n");
-                  htsmain_free();
-                  return -1;
-                } else {
-                  int code;
-
-                  if ((code = system(argv[na + 1])) != 0) {
-                    fprintf(stderr, "process returned error code %d\n", code);
-                  }
-                }
+                HTS_PANIC_PRINTF
+                  ("Option #! is disabled for security reasons");
                 htsmain_free();
-                return 0;
+                return -1;
                 break;
               case 'd':
                 opt->parsedebug = 1;
