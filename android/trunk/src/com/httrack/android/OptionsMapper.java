@@ -1118,7 +1118,8 @@ public class OptionsMapper {
         final List<String> commandline) {
       if (!finished) {
         finished = true;
-        if (ext.length() != 0 && mime.length() != 0) {
+        if (ext != null && mime != null && ext.length() != 0
+            && mime.length() != 0) {
           commandline.add("%A");
           commandline.add(ext + "=" + mime);
         }
