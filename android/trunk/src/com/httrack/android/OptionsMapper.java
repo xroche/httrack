@@ -1120,7 +1120,7 @@ public class OptionsMapper {
         finished = true;
         if (ext != null && mime != null && ext.length() != 0
             && mime.length() != 0) {
-          commandline.add("%A");
+          commandline.add("-%A");
           commandline.add(ext + "=" + mime);
         }
       }
