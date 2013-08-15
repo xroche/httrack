@@ -279,8 +279,8 @@ Please visit our Website: http://www.httrack.com
 #define maximum(A,B) ( (A) > (B) ? (A) : (B) )
 #define minimum(A,B) ( (A) < (B) ? (A) : (B) )
 
-/* chaine vide? */
-#define strnotempty(A) (((A)[0]!='\0') ? 1 : 0)
+/* chaine no empty ? (and not null) */
+#define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
 
 /* optimisation inline si possible */
 #ifdef __cplusplus
