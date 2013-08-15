@@ -45,7 +45,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   protected static Class<? extends Tab>[] tabClasses = new Class[] {
       ScanRulesTab.class, LimitsTab.class, FlowControlTab.class,
       LinksTab.class, BuildTab.class, BrowserId.class, Spider.class,
-      Proxy.class, LogIndexCache.class, ExpertsOnly.class };
+      Proxy.class, LogIndexCache.class, MimeDefs.class, ExpertsOnly.class };
 
   // The parent map
   protected final SparseArraySerializable map = new SparseArraySerializable();
@@ -156,6 +156,16 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
       R.id.radioVerbosity, R.id.checkUseIndex })
   public static class LogIndexCache implements Tab {
+  }
+
+  @Title(R.string.type_mime_associations)
+  @ActivityId(R.layout.activity_options_mimetypes)
+  @Fields({ R.id.editExtDef1, R.id.editMimeDef1, R.id.editExtDef2,
+      R.id.editMimeDef2, R.id.editExtDef3, R.id.editMimeDef3, R.id.editExtDef4,
+      R.id.editMimeDef4, R.id.editExtDef5, R.id.editMimeDef5, R.id.editExtDef6,
+      R.id.editMimeDef6, R.id.editExtDef7, R.id.editMimeDef7, R.id.editExtDef8,
+      R.id.editMimeDef8 })
+  public static class MimeDefs implements Tab {
   }
 
   @Title(R.string.experts_only)

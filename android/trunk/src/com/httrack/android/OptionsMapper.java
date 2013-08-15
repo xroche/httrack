@@ -126,6 +126,27 @@ public class OptionsMapper {
       new Pair<Integer, String>(R.id.radioVerbosity, "LogType"),
       new Pair<Integer, String>(R.id.checkUseIndex, "Index"),
 
+      /*
+       * Type/MIME associations (lame mapping, but compatible with the
+       * WinHTTrack one)
+       */
+      new Pair<Integer, String>(R.id.editExtDef1, "MIMEDefsExt1"),
+      new Pair<Integer, String>(R.id.editMimeDef1, "MIMEDefsMime1"),
+      new Pair<Integer, String>(R.id.editExtDef2, "MIMEDefsExt2"),
+      new Pair<Integer, String>(R.id.editMimeDef2, "MIMEDefsMime2"),
+      new Pair<Integer, String>(R.id.editExtDef3, "MIMEDefsExt3"),
+      new Pair<Integer, String>(R.id.editMimeDef3, "MIMEDefsMime3"),
+      new Pair<Integer, String>(R.id.editExtDef4, "MIMEDefsExt4"),
+      new Pair<Integer, String>(R.id.editMimeDef4, "MIMEDefsMime4"),
+      new Pair<Integer, String>(R.id.editExtDef5, "MIMEDefsExt5"),
+      new Pair<Integer, String>(R.id.editMimeDef5, "MIMEDefsMime5"),
+      new Pair<Integer, String>(R.id.editExtDef6, "MIMEDefsExt6"),
+      new Pair<Integer, String>(R.id.editMimeDef6, "MIMEDefsMime6"),
+      new Pair<Integer, String>(R.id.editExtDef7, "MIMEDefsExt7"),
+      new Pair<Integer, String>(R.id.editMimeDef7, "MIMEDefsMime7"),
+      new Pair<Integer, String>(R.id.editExtDef8, "MIMEDefsExt8"),
+      new Pair<Integer, String>(R.id.editMimeDef8, "MIMEDefsMime8"),
+
       /* Experts Only */
       new Pair<Integer, String>(R.id.checkUseCacheForUpdates, "Cache"),
       new Pair<Integer, String>(R.id.radioPrimaryScanRule, "PrimaryScan"),
@@ -194,6 +215,10 @@ public class OptionsMapper {
   protected final ProxyHandler proxyHandler = new ProxyHandler();
   protected final LogHandler logHandler = new LogHandler();
   protected final PrimaryScanHandler primaryScanHandler = new PrimaryScanHandler();
+  protected final MimeTypesHandler[] mimeTypesHandlers = new MimeTypesHandler[] {
+      new MimeTypesHandler(), new MimeTypesHandler(), new MimeTypesHandler(),
+      new MimeTypesHandler(), new MimeTypesHandler(), new MimeTypesHandler(),
+      new MimeTypesHandler(), new MimeTypesHandler() };
 
   // Fields mapper to httrack engine options
   @SuppressWarnings("unchecked")
@@ -275,7 +300,39 @@ public class OptionsMapper {
           new String[] { "a", "d", "l", "e" }, true)),
       new Pair<String, OptionMapper>("RewriteLinks", new MultipleChoicesOption(
           new String[] { "K0", "K", "K3", "K4" }, true)),
-      new Pair<String, OptionMapper>("Debugging", new SimpleOptionFlag("%H")) };
+      new Pair<String, OptionMapper>("Debugging", new SimpleOptionFlag("%H")),
+      new Pair<String, OptionMapper>("MIMEDefsExt1",
+          mimeTypesHandlers[0].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime1",
+          mimeTypesHandlers[0].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt2",
+          mimeTypesHandlers[1].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime2",
+          mimeTypesHandlers[1].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt3",
+          mimeTypesHandlers[2].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime3",
+          mimeTypesHandlers[2].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt4",
+          mimeTypesHandlers[3].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime4",
+          mimeTypesHandlers[3].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt5",
+          mimeTypesHandlers[4].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime5",
+          mimeTypesHandlers[4].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt6",
+          mimeTypesHandlers[5].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime6",
+          mimeTypesHandlers[5].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt7",
+          mimeTypesHandlers[6].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime7",
+          mimeTypesHandlers[6].getMimeMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsExt8",
+          mimeTypesHandlers[7].getExtMapper()),
+      new Pair<String, OptionMapper>("MIMEDefsMime8",
+          mimeTypesHandlers[7].getMimeMapper()) };
 
   // Name-to-ID hash map
   protected static HashMap<String, Integer> fieldsNameToId = new HashMap<String, Integer>();
@@ -985,6 +1042,85 @@ public class OptionsMapper {
           flags.append('p');
           flags.append('7');
           break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Log settings handler.
+   */
+  public static class MimeTypesHandler {
+    protected boolean finished = false;
+    protected String ext;
+    protected String mime;
+
+    /*
+     * Build type.
+     */
+    private class Ext implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(final StringBuilder flags,
+          final List<String> commandline, final String value) {
+        if (value != null && value.length() != 0) {
+          MimeTypesHandler.this.ext = value.trim();
+        }
+      }
+
+      @Override
+      public void finish(final StringBuilder flags,
+          final List<String> commandline) {
+        MimeTypesHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /*
+     * Custom build
+     */
+    private class Mime implements OptionMapper, OptionMapper.FinishMapper {
+      @Override
+      public void emit(final StringBuilder flags,
+          final List<String> commandline, final String value) {
+        if (value != null && value.length() != 0) {
+          MimeTypesHandler.this.mime = value.trim();
+        }
+      }
+
+      @Override
+      public void finish(final StringBuilder flags,
+          final List<String> commandline) {
+        MimeTypesHandler.this.finish(flags, commandline);
+      }
+    }
+
+    /**
+     * Get ext mapper
+     * 
+     * @return the ext mapper
+     */
+    public OptionMapper getExtMapper() {
+      return new Ext();
+    }
+
+    /**
+     * Get mime mapper
+     * 
+     * @return the mime mapper
+     */
+    public OptionMapper getMimeMapper() {
+      return new Mime();
+    }
+
+    /*
+     * Where we really emit the option
+     */
+    private void finish(final StringBuilder flags,
+        final List<String> commandline) {
+      if (!finished) {
+        finished = true;
+        if (ext.length() != 0 && mime.length() != 0) {
+          commandline.add("%A");
+          commandline.add(ext + "=" + mime);
         }
       }
     }

@@ -182,5 +182,11 @@
     <string name="other_headers">Additional HTTP Headers</string>
     <string name="hint_other_headers">X-Magic: 42</string>
     <string name="language_iso_code">LANGUAGE_ISO</string>
-    
+    <string name="hint_ext_def">doc,docx</string>
+    <string name="hint_mime_def">application/msword</string>
+    <string name="double_arrow">↔</string>
+    <string name="type_mime_associations">Type/MIME associations</string>
+    <string name="file_types">File types</string>
+    <string name="mime_identity">MIME identity</string>
+
 </resources>
