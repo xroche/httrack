@@ -87,6 +87,8 @@ extern httrackp *global_opt;
 #define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 
+#undef min
+#undef max
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
