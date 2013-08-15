@@ -939,14 +939,32 @@ Serveur arrêté
 A fatal error has occured during this mirror
 Une erreur critique est intervenue durant l'aspiration
 View Documentation
-
+Lire la documentation
 Go To HTTrack Website
-
+Visiter le site de HTTrack
 Go To HTTrack Forum
-
+Visiter le forum de HTTrack
 View License
-
+Lire la license
 Beware: you local browser might be unable to browse files with embedded filenames
-
+Attention: il se pourrait que votre navigateur soit incapable de lire les fichiers contenant des espaces
 Recreated HTTrack internal cached resources
-
+Cache des ressources interne recréé
+Could not create internal cached resources
+Impossible de créer le cache des ressources interne
+Could not get the system external storage directory
+Impossible de localuser le système de stockage externe
+Could not write to:
+Impossible d'écrire dans:
+Read-only media (SDCARD)
+Média en lecture seule (SDCARD)
+No storage media (SDCARD)
+Pas de média (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Il se peut que HTTrack soit incapable de télécharger des sites tant que ce problème n'est pas réglé
+HTTrack: mirror '%s' stopped!
+HTTrack: miroir '%s' stoppé!
+Click on this notification to restart the interrupted mirror
+Cliquez sur cette notification pour redémarrer la copie interrompue
+HTTrack: could not save profile for '%s'!
+HTTrack: impossible de sauver le profil pour '%s'

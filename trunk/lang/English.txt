@@ -950,3 +950,21 @@ Beware: you local browser might be unable to browse files with embedded filename
 Beware: you local browser might be unable to browse files with embedded filenames
 Recreated HTTrack internal cached resources
 Recreated HTTrack internal cached resources
+Could not create internal cached resources
+Could not create internal cached resources
+Could not get the system external storage directory
+Could not get the system external storage directory
+Could not write to:
+Could not write to:
+Read-only media (SDCARD)
+Read-only media (SDCARD)
+No storage media (SDCARD)
+No storage media (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+HTTrack may not be able to download websites until this problem is fixed
+HTTrack: mirror '%s' stopped!
+HTTrack: mirror '%s' stopped!
+Click on this notification to restart the interrupted mirror
+Click on this notification to restart the interrupted mirror
+HTTrack: could not save profile for '%s'!
+HTTrack: could not save profile for '%s'!
