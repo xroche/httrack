@@ -508,6 +508,10 @@ Identity
 Identification
 HTML footer
 En-tête HTML
+Language
+Langage
+Additional HTTP Headers
+En têtes HTTP additionnels
 N# connections
 Nombre de connexions
 Abandon host if error

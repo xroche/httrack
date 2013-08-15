@@ -566,6 +566,10 @@ LANG_I43
 Identity
 LANG_I43b
 HTML footer
+LANG_I43c
+Language
+LANG_I43d
+Additional HTTP Headers
 LANG_I44
 N# connections
 LANG_I45
