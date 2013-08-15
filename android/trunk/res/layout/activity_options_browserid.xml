@@ -53,6 +53,46 @@
                 android:layout_weight=".70"
                 android:hint="@string/hint_footer" />
         </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" >
+
+            <TextView
+                android:id="@+id/textAcceptLanguage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:text="@string/accept_language" />
+
+            <EditText
+                android:id="@+id/editAcceptLanguage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:hint="@string/hint_language" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content" >
+
+            <TextView
+                android:id="@+id/textOtherHeaders"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".30"
+                android:text="@string/other_headers" />
+
+            <EditText
+                android:id="@+id/editOtherHeaders"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight=".70"
+                android:hint="@string/hint_other_headers"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:lines="2" />
+        </LinearLayout>
     </LinearLayout>
 
 </ScrollView>

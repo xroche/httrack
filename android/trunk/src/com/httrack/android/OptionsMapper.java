@@ -97,6 +97,8 @@ public class OptionsMapper {
       /* Browser ID */
       new Pair<Integer, String>(R.id.editBrowserIdentity, "UserID"),
       new Pair<Integer, String>(R.id.editHtmlFooter, "Footer"),
+      new Pair<Integer, String>(R.id.editAcceptLanguage, "AcceptLanguage"),
+      new Pair<Integer, String>(R.id.editOtherHeaders, "OtherHeaders"),
 
       /* Spider */
       new Pair<Integer, String>(R.id.checkAcceptCookies, "Cookies"),
@@ -174,6 +176,8 @@ public class OptionsMapper {
           "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"),
       new Pair<String, String>("Footer",
           "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->"),
+      new Pair<String, String>("AcceptLanguage", "en,*"),
+      new Pair<String, String>("OtherHeaders", ""),
       new Pair<String, String>("MaxRate", "25000"),
       new Pair<String, String>(
           "WildCardFilters",
@@ -237,6 +241,9 @@ public class OptionsMapper {
           buildHandler.getCustomMapper()),
       new Pair<String, OptionMapper>("UserID", new ArgumentOption("-F")),
       new Pair<String, OptionMapper>("Footer", new ArgumentOption("-%F")),
+      new Pair<String, OptionMapper>("AcceptLanguage",
+          new ArgumentOption("-%l")),
+      new Pair<String, OptionMapper>("OtherHeaders", new StringSplit("-%X")),
       new Pair<String, OptionMapper>("Cookies",
           new SimpleOptionFlag("b0", true)),
       new Pair<String, OptionMapper>("CheckType", new SimpleOption("u")),
@@ -341,9 +348,29 @@ public class OptionsMapper {
    */
   public static class StringSplit implements OptionMapper {
     /**
-     * An instance of the StringSplit class.
+     * An instance of the basic StringSplit class.
      */
     public static final StringSplit INSTANCE = new StringSplit();
+
+    protected final String option;
+
+    /**
+     * Default constructor. Splits lines.
+     */
+    public StringSplit() {
+      this(null);
+    }
+
+    /**
+     * Option-enabled feature ; when an option before each splitted string is
+     * required.
+     * 
+     * @param option
+     *          The option
+     */
+    public StringSplit(final String option) {
+      this.option = option;
+    }
 
     @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
@@ -351,6 +378,9 @@ public class OptionsMapper {
       // URLs
       for (final String s : cleanupString(value).trim().split("\\s+")) {
         if (s.length() != 0) {
+          if (option != null) {
+            commandline.add(option);
+          }
           commandline.add(s);
         }
       }
