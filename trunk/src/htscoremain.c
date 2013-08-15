@@ -1712,7 +1712,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     htsmain_free();
                     return -1;
                   }
-                  StringCat(opt->accept, argv[na]);
+                  StringCopy(opt->accept, argv[na]);
                 }
                 break;
                 //
