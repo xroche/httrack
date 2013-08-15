@@ -930,3 +930,15 @@ Server terminated
 Serveur arrêté
 A fatal error has occured during this mirror
 Une erreur critique est intervenue durant l'aspiration
+View Documentation
+
+Go To HTTrack Website
+
+Go To HTTrack Forum
+
+View License
+
+Beware: you local browser might be unable to browse files with embedded filenames
+
+Recreated HTTrack internal cached resources
+

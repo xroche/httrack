@@ -930,3 +930,15 @@ Server terminated
 Server terminated
 A fatal error has occured during this mirror
 A fatal error has occured during this mirror
+View Documentation
+View Documentation
+Go To HTTrack Website
+Go To HTTrack Website
+Go To HTTrack Forum
+Go To HTTrack Forum
+View License
+View License
+Beware: you local browser might be unable to browse files with embedded filenames
+Beware: you local browser might be unable to browse files with embedded filenames
+Recreated HTTrack internal cached resources
+Recreated HTTrack internal cached resources
