@@ -365,6 +365,8 @@ struct httrackp {
   lien_url **liens;             // liens
   robots_wizard *robotsptr;     // robots ptr
   String lang_iso;              // en, fr ..
+  String accept;                // Accept:
+  String headers;               // Additional headers
   String mimedefs;              // ext1=mimetype1\next2=mimetype2..
   String mod_blacklist;         // (3.41)
   int convert_utf8;             // filenames UTF-8 conversion (3.46)

@@ -102,9 +102,9 @@ typedef struct htsrequest_proxy htsrequest_proxy;
 #endif
 struct htsrequest_proxy {
   int active;
-  char name[1024];
+  const char* name;
   int port;
-  char bindhost[256];           // bind this host
+  const char* bindhost;           // bind this host
 };
 
 #ifndef HTS_DEF_FWSTRUCT_htsrequest
@@ -118,10 +118,12 @@ struct htsrequest {
   short int range_used;         // Range utilisé
   short int nocompression;      // Pas de compression
   short int flush_garbage;      // recycled
-  char user_agent[128];
-  char referer[256];
-  char from[256];
-  char lang_iso[64];
+  const char* user_agent;
+  const char* referer;
+  const char* from;
+  const char* lang_iso;
+  const char* accept;
+  const char* headers;
   htsrequest_proxy proxy;       // proxy
 };
 
@@ -162,7 +164,7 @@ struct htsblk {
   SSL *ssl_con;                 // connection structure
 #endif
   char lastmodified[64];        // Last-Modified
-  char etag[64];                // Etag
+  char etag[256];               // Etag
   char cdispo[256];             // Content-Disposition coupé
   LLint crange;                 // Content-Range
   LLint crange_start;           // Content-Range

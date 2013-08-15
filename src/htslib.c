@@ -824,17 +824,56 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
   return soc;
 }
 
+/* Buffer printing */
+typedef struct buff_struct {
+  /** Buffer **/
+  char *buffer;
+  /** Buffer capacity in bytes **/
+  size_t capacity;
+  /** Buffer write position ; MUST point to a valid \0. **/
+  size_t pos;
+} buff_struct;
+
+static void print_buffer(buff_struct*const str, const char *format, ...)
+  HTS_PRINTF_FUN(2, 3);
+
+/* Prints on a static buffer. asserts in case of overflow. */
+static void print_buffer(buff_struct*const str, const char *format, ...) {
+  size_t result;
+  va_list args;
+  size_t remaining;
+  char *position;
+
+  /* Security check. */
+  assert(str != NULL);
+  assert(str->pos < str->capacity);
+
+  /* Print */
+  position = &str->buffer[str->pos];
+  remaining = str->capacity - str->pos;
+  va_start(args, format);
+  result = (size_t) vsnprintf(position, remaining, format, args);
+  va_end(args);
+  assertf(result < remaining);
+
+  /* Increment. */
+  str->pos += strlen(position);
+  assert(str->pos < str->capacity);
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
                   char *adr, char *fil, char *referer_adr, char *referer_fil,
                   htsblk * retour) {
-  char BIGSTK buff[8192];
+  char BIGSTK buffer_head_request[8192];
+  buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
   //int use_11=0;     // HTTP 1.1 utilisé
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   char *search_tag = NULL;
 
-  buff[0] = '\0';
+  // Initialize buffer
+  buffer_head_request[0] = '\0';
 
   // header Date
   //strcatbuff(buff,"Date: ");
@@ -861,18 +900,23 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 
           linput(fp, line, 1000);
           if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
-            int ret;
+            size_t ret;
             // selon que l'on a ou pas un proxy
-            if (retour->req.proxy.active)
-              sprintf(buff, "%s http://%s%s %s\r\n", method, adr, url,
+            if (retour->req.proxy.active) {
+              print_buffer(&bstr,
+                      "%s http://%s%s %s\r\n", method, adr, url,
                       protocol);
-            else
-              sprintf(buff, "%s %s %s\r\n", method, url, protocol);
+            } else {
+              print_buffer(&bstr,
+                       "%s %s %s\r\n", method, url, protocol);
+            }
             // lire le reste en brut
-            ret = fread(buff + strlen(buff), 8000 - strlen(buff), 1, fp);
-            if (ret < 0) {
+            ret = fread(&bstr.buffer[bstr.pos],
+                        bstr.capacity - bstr.pos, 1, fp);
+            if ((int) ret < 0) {
               return -1;
             }
+            bstr.pos += strlen(&bstr.buffer[bstr.pos]);
           }
           fclose(fp);
         }
@@ -881,17 +925,17 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
   }
   // Fin postfile
 
-  if (strnotempty(buff) == 0) { // PAS POSTFILE
+  if (bstr.pos == 0) { // PAS POSTFILE
     // Type de requète?
     if ((search_tag) && (mode == 0)) {
-      strcatbuff(buff, "POST ");
+      print_buffer(&bstr, "POST ");
     } else if (mode == 0) {     // GET
-      strcatbuff(buff, "GET ");
+      print_buffer(&bstr, "GET ");
     } else {                    // if (mode==1) {
       if (!retour->req.http11)  // forcer HTTP/1.0
-        strcatbuff(buff, "GET ");       // certains serveurs (cgi) buggent avec HEAD
+        print_buffer(&bstr, "GET ");       // certains serveurs (cgi) buggent avec HEAD
       else
-        strcatbuff(buff, "HEAD ");
+        print_buffer(&bstr, "HEAD ");
     }
 
     // si on gère un proxy, il faut une Absolute URI: on ajoute avant http://www.adr.dom
@@ -901,21 +945,21 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         printf("Proxy Use: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
-        strcatbuff(buff, "http://");
-        strcatbuff(buff, jump_identification(adr));
+        print_buffer(&bstr, "http://%s", jump_identification(adr));
       } else {                  // ftp:// en proxy http
 #if HDEBUG
         printf("Proxy Use for ftp: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
         direct_url = 1;         // ne pas analyser user/pass
-        strcatbuff(buff, adr);
+        print_buffer(&bstr, "%s", adr);
       }
     }
     // NOM DU FICHIER
     // on slash doit être présent en début, sinon attention aux bad request! (400)
     if (*fil != '/')
-      strcatbuff(buff, "/");
+      print_buffer(&bstr, "/");
+
     {
       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
@@ -925,21 +969,21 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
       else
         strcpybuff(tempo, fil);
       escape_check_url(tempo);
-      strcatbuff(buff, tempo);  // avec échappement
+      print_buffer(&bstr, "%s", tempo);  // avec échappement
     }
 
     // protocole
     if (!retour->req.http11) {  // forcer HTTP/1.0
       //use_11=0;
-      strcatbuff(buff, " HTTP/1.0\x0d\x0a");
+      print_buffer(&bstr, " HTTP/1.0\x0d\x0a");
     } else {                    // Requète 1.1
       //use_11=1;
-      strcatbuff(buff, " HTTP/1.1\x0d\x0a");
+      print_buffer(&bstr, " HTTP/1.1\x0d\x0a");
     }
 
     /* supplemental data */
     if (xsend)
-      strcatbuff(buff, xsend);  // éventuelles autres lignes
+      print_buffer(&bstr, "%s", xsend);  // éventuelles autres lignes
 
     // tester proxy authentication
     if (retour->req.proxy.active) {
@@ -955,9 +999,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), user_pass));
         code64((unsigned char *) user_pass, (int) strlen(user_pass),
                (unsigned char *) autorisation, 0);
-        strcatbuff(buff, "Proxy-Authorization: Basic ");
-        strcatbuff(buff, autorisation);
-        strcatbuff(buff, H_CRLF);
+        print_buffer(&bstr, "Proxy-Authorization: Basic %s"H_CRLF,
+                     autorisation);
 #if HDEBUG
         printf("Proxy-Authenticate, %s (code: %s)\n", user_pass, autorisation);
 #endif
@@ -973,30 +1016,22 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
                ||(strncmp(adr, "https://", 8) == 0)     /* or referer AND addresses are https */
           )
         ) {                     // PAS file://
-        strcatbuff(buff, "Referer: ");
-        strcatbuff(buff, "http://");
-        strcatbuff(buff, jump_identification(referer_adr));
-        strcatbuff(buff, referer_fil);
-        strcatbuff(buff, H_CRLF);
+        print_buffer(&bstr, "Referer: http://%s%s"H_CRLF,
+                     jump_identification(referer_adr), referer_fil);
       }
     }
     // HTTP field: referer
-    else if (retour->req.referer[0] != '\0') {
-      strcatbuff(buff, "Referer: ");
-      strcatbuff(buff, retour->req.referer);
-      strcatbuff(buff, H_CRLF);
+    else if (strnotempty(retour->req.referer)) {
+      print_buffer(&bstr, "Referer: %s"H_CRLF, retour->req.referer);
     }
     // POST?
     if (mode == 0) {            // GET!
       if (search_tag) {
-        char clen[256];
-
-        sprintf(clen, "Content-length: %d" H_CRLF,
+        print_buffer(&bstr, "Content-length: %d" H_CRLF,
                 (int) (strlen
                        (unescape_http
                         (OPT_GET_BUFF(opt),
                          search_tag + strlen(POSTTOK) + 1))));
-        strcatbuff(buff, clen);
       }
     }
     // gestion cookies?
@@ -1005,93 +1040,77 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
       char *b = cookie->data;
       int cook = 0;
       int max_cookies = 8;
-      size_t max_size = 2048;
 
-      max_size += strlen(buff);
       do {
         b = cookie_find(b, "", jump_identification(adr), fil);  // prochain cookie satisfaisant aux conditions
-        if (b) {
+        if (b != NULL) {
           max_cookies--;
           if (!cook) {
-            strcatbuff(buff, "Cookie: ");
-            strcatbuff(buff, "$Version=1; ");
+            print_buffer(&bstr, "Cookie: $Version=1; ");
             cook = 1;
           } else
-            strcatbuff(buff, "; ");
-          strcatbuff(buff, cookie_get(buffer, b, 5));
-          strcatbuff(buff, "=");
-          strcatbuff(buff, cookie_get(buffer, b, 6));
-          strcatbuff(buff, "; $Path=");
-          strcatbuff(buff, cookie_get(buffer, b, 2));
+            print_buffer(&bstr, "; ");
+          print_buffer(&bstr, "%s", cookie_get(buffer, b, 5));
+          print_buffer(&bstr, "=%s", cookie_get(buffer, b, 6));
+          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, b, 2));
           b = cookie_nextfield(b);
         }
-      } while((b) && (max_cookies > 0) && ((int) strlen(buff) < max_size));
+      } while(b != NULL && max_cookies > 0);
       if (cook) {               // on a envoyé un (ou plusieurs) cookie?
-        strcatbuff(buff, H_CRLF);
+        print_buffer(&bstr, H_CRLF);
 #if DEBUG_COOK
-        printf("Header:\n%s\n", buff);
+        printf("Header:\n%s\n", bstr.buffer);
 #endif
       }
     }
     // gérer le keep-alive (garder socket)
     if (retour->req.http11 && !retour->req.nokeepalive) {
-      strcatbuff(buff, "Connection: Keep-Alive" H_CRLF);
+      print_buffer(&bstr, "Connection: keep-alive" H_CRLF);
     } else {
-      strcatbuff(buff, "Connection: close" H_CRLF);
+      print_buffer(&bstr, "Connection: close" H_CRLF);
     }
 
     {
       char *real_adr = jump_identification(adr);
 
-      //if ((use_11) || (retour->user_agent_send)) {   // Pour le 1.1 on utilise un Host:
+      // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
-        //if (!retour->req.proxy.active) {
-        strcatbuff(buff, "Host: ");
-        strcatbuff(buff, real_adr);
-        strcatbuff(buff, H_CRLF);
-        //}
+        print_buffer(&bstr, "Host: %s"H_CRLF, real_adr);
       }
-      //}
 
       // HTTP field: from
-      if (retour->req.from[0] != '\0') {        // HTTP from
-        strcatbuff(buff, "From: ");
-        strcatbuff(buff, retour->req.from);
-        strcatbuff(buff, H_CRLF);
+      if (strnotempty(retour->req.from)) {        // HTTP from
+        print_buffer(&bstr, "From: %s" H_CRLF, retour->req.from);
       }
+
       // Présence d'un user-agent?
-      if (retour->req.user_agent_send) {        // ohh un user-agent
-        char s[256];
+      if (retour->req.user_agent_send
+          && strnotempty(retour->req.user_agent)) {
+        print_buffer(&bstr, "User-Agent: %s" H_CRLF, retour->req.user_agent);
+      }
 
-        // HyperTextSeeker/"HTSVERSION
-        sprintf(s, "User-Agent: %s" H_CRLF, retour->req.user_agent);
-        strcatbuff(buff, s);
+      // Accept
+      if (strnotempty(retour->req.accept)) {
+        print_buffer(&bstr, "Accept: %s" H_CRLF, retour->req.accept);
+      }
 
-        // pour les serveurs difficiles
-        strcatbuff(buff, "Accept: " "image/png, image/jpeg, image/pjpeg, image/x-xbitmap, image/svg+xml"        /* Accepted */
-                   ", " "image/gif;q=0.9"       /* also accepted but with lower preference */
-                   ", " "*/*;q=0.1"     /* also accepted but with even lower preference */
-                   H_CRLF);
-        if (strnotempty(retour->req.lang_iso)) {
-          strcatbuff(buff, "Accept-Language: ");
-          strcatbuff(buff, retour->req.lang_iso);
-          strcatbuff(buff, H_CRLF);
-        }
-        if (retour->req.http11) {
+      // Accept-language
+      if (strnotempty(retour->req.lang_iso)) {
+        print_buffer(&bstr, "Accept-Language: %s"H_CRLF, retour->req.lang_iso);
+      }
+
+      // Compression accepted ?
+      if (retour->req.http11) {
 #if HTS_USEZLIB
-          //strcatbuff(buff,"Accept-Encoding: gzip, deflate, compress, identity"H_CRLF);
-          if ((!retour->req.range_used)
-              && (!retour->req.nocompression))
-            strcatbuff(buff, "Accept-Encoding: " "gzip" /* gzip if the preffered encoding */
-                       ", " "identity;q=0.9" H_CRLF);
-          else
-            strcatbuff(buff, "Accept-Encoding: identity" H_CRLF);       /* no compression */
+        if ((!retour->req.range_used)
+            && (!retour->req.nocompression))
+          print_buffer(&bstr, "Accept-Encoding: " "gzip" /* gzip if the preffered encoding */
+                     ", " "identity;q=0.9" H_CRLF);
+        else
+          print_buffer(&bstr, "Accept-Encoding: identity" H_CRLF);       /* no compression */
 #else
-          strcatbuff(buff, "Accept-Encoding: identity" H_CRLF); /* no compression */
+        print_buffer(&bstr, "Accept-Encoding: identity" H_CRLF); /* no compression */
 #endif
-        }
-      } else {
-        strcatbuff(buff, "Accept: */*" H_CRLF); // le minimum
       }
 
       /* Authentification */
@@ -1119,23 +1138,25 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
           strcpybuff(autorisation, a);
         /* On a une autorisation a donner?  */
         if (strnotempty(autorisation)) {
-          strcatbuff(buff, "Authorization: Basic ");
-          strcatbuff(buff, autorisation);
-          strcatbuff(buff, H_CRLF);
+          print_buffer(&bstr, "Authorization: Basic %s"H_CRLF, autorisation);
         }
       }
 
     }
-    //strcatbuff(buff,"Accept-Language: en\n");
     //strcatbuff(buff,"Accept-Charset: iso-8859-1,*,utf-8\n");
 
+    // Custom header(s)
+    if (strnotempty(retour->req.headers)) {
+      print_buffer(&bstr, "%s", retour->req.headers);
+    }
+
     // CRLF de fin d'en tête
-    strcatbuff(buff, H_CRLF);
+    print_buffer(&bstr, H_CRLF);
 
     // données complémentaires?
     if (search_tag)
       if (mode == 0)            // GET!
-        strcatbuff(buff,
+        print_buffer(&bstr, "%s",
                    unescape_http(OPT_GET_BUFF(opt),
                                  search_tag + strlen(POSTTOK) + 1));
   }
@@ -1145,7 +1166,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
     if (ioinfo) {
       fprintf(ioinfo, "[%d] request for %s%s:\r\n", retour->debugid,
               jump_identification(adr), fil);
-      fprintfio(ioinfo, buff, "<<< ");
+      fprintfio(ioinfo, bstr.buffer, "<<< ");
       fprintf(ioinfo, "\r\n");
       fflush(ioinfo);
     }
@@ -1155,7 +1176,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
   // Callback
   {
     int test_head =
-      RUN_CALLBACK6(opt, sendhead, buff, adr, fil, referer_adr, referer_fil,
+      RUN_CALLBACK6(opt, sendhead, bstr.buffer, adr, fil, referer_adr, referer_fil,
                     retour);
     if (test_head != 1) {
       deletesoc_r(retour);
@@ -1166,14 +1187,14 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 
   // Envoi
   HTS_STAT.last_request = mtime_local();
-  if (sendc(retour, buff) < 0) {        // ERREUR, socket rompue?...
-    //if (sendc(retour->soc,buff) != strlen(buff)) {  // ERREUR, socket rompue?...
+  if (sendc(retour, bstr.buffer) < 0) {        // ERREUR, socket rompue?...
     deletesoc_r(retour);        // fermer tout de même
     // et tenter de reconnecter
 
     strcpybuff(retour->msg, "Write error");
     retour->soc = INVALID_SOCKET;
   }
+
   // RX'98
   return 0;
 }
@@ -2240,7 +2261,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
       return INVALID_SOCKET;    // erreur création socket impossible
     }
     // bind this address
-    if (retour != NULL && retour->req.proxy.bindhost[0] != 0) {
+    if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
       t_fullhostent bind_buffer;
       const char *error = "unknown error";
 
@@ -5500,6 +5521,9 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->convert_utf8 = 1;        // convert html to UTF-8
   StringCopy(opt->filelist, "");
   StringCopy(opt->lang_iso, "en, *");
+  StringCopy(opt->accept,
+    "text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/svg+xml,image/gif;q=0.9,*/*;q=0.1");
+  StringCopy(opt->headers, "");
   StringCopy(opt->mimedefs, "\n");      // aucun filtre mime (\n IMPORTANT)
   StringClear(opt->mod_blacklist);
   //

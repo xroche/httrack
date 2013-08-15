@@ -1680,7 +1680,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 }
                 break;
                 //
-              case 'l':
+              case 'l': // Accept-language
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF
                     ("Option %l needs to be followed by a blank space, and an ISO language code");
@@ -1695,6 +1695,47 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   StringCopy(opt->lang_iso, argv[na]);
+                }
+                break;
+                //
+              case 'a':  // Accept
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF
+                    ("Option %a needs to be followed by a blank space, and a list of formats");
+                  printf("Example: -%%a \"text/html,*/*;q=0.1\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (strlen(argv[na]) >= 256) {
+                    HTS_PANIC_PRINTF("Accept list string too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCat(opt->accept, argv[na]);
+                }
+                break;
+                //
+              case 'X':  // HTTP header line
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF
+                    ("Option %X needs to be followed by a blank space, and a raw HTTP header line");
+                  printf("Example: -%%X \"X-Magic: 42\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (argv[na][0] == '\0') {
+                    HTS_PANIC_PRINTF("Empty string given");
+                    htsmain_free();
+                    return -1;
+                  } else if (strlen(argv[na]) >= 256) {
+                    HTS_PANIC_PRINTF("Header line string too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCat(opt->headers, argv[na]);
+                  StringCat(opt->headers, "\r\n");  /* separator */
                 }
                 break;
                 //
