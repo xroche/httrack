@@ -91,7 +91,6 @@ static inthash_keys key_adrfil_hashes_generic(void *arg, const char *value_,
                                               const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const lien_url*const lien = (lien_url*) value_;
-  int i;
   const char *const adr = !former ? lien->adr : lien->former_adr;
   const char *const fil = !former ? lien->fil : lien->former_fil;
   const char *const adr_norm = adr != NULL ? 
@@ -107,7 +106,7 @@ static inthash_keys key_adrfil_hashes_generic(void *arg, const char *value_,
   if (hash->normalized) {
     fil_normalized(fil, &hash->normfil[strlen(hash->normfil)]);
   } else {
-    strcpy(&hash->normfil[i], fil);
+    strcpy(&hash->normfil[strlen(hash->normfil)], fil);
   }
 
   // hash
