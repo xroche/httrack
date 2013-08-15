@@ -508,6 +508,10 @@ Identity
 Identity
 HTML footer
 HTML footer
+Language
+Language
+Additional HTTP Headers
+Additional HTTP Headers
 N# connections
 N# connections
 Abandon host if error
