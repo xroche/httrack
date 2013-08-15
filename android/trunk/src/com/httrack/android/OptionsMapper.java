@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import android.content.Context;
 import android.os.Parcelable;
 import android.util.Log;
 import android.util.Pair;
@@ -287,6 +288,9 @@ public class OptionsMapper {
 
   // Is the map dirty ?
   protected boolean dirty;
+
+  // Current context
+  protected Context context;
 
   // Static initializer.
   static {
@@ -1138,9 +1142,20 @@ public class OptionsMapper {
   }
 
   /*
+   * Map special values, depending on the context.
+   */
+  private void setDynamicDefaults() {
+    if (context != null) {
+      map.put(fieldsNameToId.get("AcceptLanguage"),
+          context.getString(R.string.language_iso_code) + ",*");
+    }
+  }
+
+  /*
    * Fill the map with default values
    */
   private void initializeMap() {
+    map.clear();
     for (final Pair<String, String> field : fieldsDefaults) {
       final Integer id = fieldsNameToId.get(field.first);
       if (id == null) {
@@ -1149,6 +1164,7 @@ public class OptionsMapper {
       }
       map.put(id, field.second);
     }
+    setDynamicDefaults();
   }
 
   /**
@@ -1176,13 +1192,35 @@ public class OptionsMapper {
 
   /**
    * Build a new options mapper.
+   * 
+   * @param context
+   *          Attached context.
    */
-  public OptionsMapper() {
+  public OptionsMapper(final Context context) {
+    setContext(context);
+
     // Create fieldsNameToMapper
     createFieldsNameToMapper();
 
     // Initialize default values for map
     initializeMap();
+  }
+
+  /**
+   * Build a new options mapper.
+   */
+  public OptionsMapper() {
+    this(null);
+  }
+
+  /**
+   * Set the context.
+   * 
+   * @param context
+   *          The context
+   */
+  public void setContext(final Context context) {
+    this.context = context;
   }
 
   /**

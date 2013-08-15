@@ -181,5 +181,6 @@
     <string name="hint_language">en,fr,ja</string>
     <string name="other_headers">Additional HTTP Headers</string>
     <string name="hint_other_headers">X-Magic: 42</string>
-
+    <string name="language_iso_code">LANGUAGE_ISO</string>
+    
 </resources>

@@ -260,6 +260,10 @@ public class HTTrackActivity extends FragmentActivity {
     HTTrackActivity.setFileReadWrite(httrackPath);
     HTTrackActivity.setFileReadWrite(projectPath);
 
+    // Clear map (useful to get dynamic fields)
+    mapper.setContext(this);
+    mapper.resetMap();
+
     // Go to first pane now
     setPane(0);
 
