@@ -177,7 +177,7 @@
     <string name="mirror_xxx_stopped">HTTrack: mirror \'%s\' stopped!</string>
     <string name="click_on_notification_to_restart">Click on this notification to restart the interrupted mirror</string>
     <string name="could_not_save_profile_xxx">HTTrack: could not save profile for \'%s\'!</string>
-    <string name="accept_language">Language</string>
+    <string name="accept_language">Languages</string>
     <string name="hint_language">en,fr,ja</string>
     <string name="other_headers">Additional HTTP Headers</string>
     <string name="hint_other_headers">X-Magic: 42</string>
