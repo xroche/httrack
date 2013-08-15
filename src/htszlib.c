@@ -54,13 +54,14 @@ Please visit our Website: http://www.httrack.com
 /* Note: utf-8 */
 int hts_zunpack(char *filename, char *newfile) {
   int ret = -1;
-  char catbuff[CATBUFF_SIZE];
 
   if (filename != NULL && newfile != NULL) {
     if (filename[0] && newfile[0]) {
+      char catbuff[CATBUFF_SIZE];
       FILE *const in = FOPEN(fconv(catbuff, filename), "rb");
-      const int fd_in = in != NULL ? fileno(in) : -1;
-      gzFile gz = gzdopen(fd_in, "rb");
+      const int fd = in != NULL ? fileno(in) : -1;
+      // Note: we must dup to be able to flose cleanly.
+      gzFile gz = fd != -1 ? gzdopen(dup(fd), "rb") : NULL;
 
       if (gz) {
         FILE *const fpout = FOPEN(fconv(catbuff, newfile), "wb");
