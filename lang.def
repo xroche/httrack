@@ -478,6 +478,10 @@ LANG_I23
 Browser identity
 LANG_I23b
 Comment to be placed in each HTML file
+LANG_I23c
+Languages accepted by the browser
+LANG_I23d
+Additional HTTP headers to be sent in each requests
 LANG_I24
 Back to starting page
 LANG_I25
@@ -567,7 +571,7 @@ Identity
 LANG_I43b
 HTML footer
 LANG_I43c
-Language
+Languages
 LANG_I43d
 Additional HTTP Headers
 LANG_I44

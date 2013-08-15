@@ -420,6 +420,10 @@ Browser identity
 Identifiants du Navigateur Internet
 Comment to be placed in each HTML file
 Commentaire de page placé dans chaque fichier HTML
+Languages accepted by the browser
+Langues acceptée par le navigateur
+Additional HTTP headers to be sent in each requests
+En-têtes HTTP additionnels à envoyer dans chaque requête
 Back to starting page
 Retour à la page de démarrage
 Save current preferences as default values
@@ -508,8 +512,8 @@ Identity
 Identification
 HTML footer
 En-tête HTML
-Language
-Langage
+Languages
+Langues
 Additional HTTP Headers
 En têtes HTTP additionnels
 N# connections

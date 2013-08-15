@@ -420,6 +420,10 @@ Browser identity
 Browser identity
 Comment to be placed in each HTML file
 Comment to be placed in each HTML file
+Languages accepted by the browser
+Languages accepted by the browser
+Additional HTTP headers to be sent in each requests
+Additional HTTP headers to be sent in each requests
 Back to starting page
 Back to starting page
 Save current preferences as default values
@@ -508,8 +512,8 @@ Identity
 Identity
 HTML footer
 HTML footer
-Language
-Language
+Languages
+Languages
 Additional HTTP Headers
 Additional HTTP Headers
 N# connections
