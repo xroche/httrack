@@ -125,6 +125,8 @@ const char *hts_optalias[][4] = {
   {"list", "-%L", "param1", ""},
   {"urllist", "-%S", "param1", ""},
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
+  {"accept", "-%a", "param1", ""},
+  {"headers", "-%X", "param1", ""},
   {"structure", "-N", "param", ""}, {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},

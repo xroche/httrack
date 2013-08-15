@@ -830,16 +830,18 @@ int httpmirror(char *url1, httrackp * opt) {
     // recopier proxy
     if ((r.req.proxy.active = opt->proxy.active)) {
       if (StringBuff(opt->proxy.bindhost) != NULL)
-        strcpybuff(r.req.proxy.bindhost, StringBuff(opt->proxy.bindhost));
+        r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
       if (StringBuff(opt->proxy.name) != NULL)
-        strcpybuff(r.req.proxy.name, StringBuff(opt->proxy.name));
+        r.req.proxy.name = StringBuff(opt->proxy.name);
       r.req.proxy.port = opt->proxy.port;
     }
     // et user-agent
-    strcpy(r.req.user_agent, StringBuff(opt->user_agent));
-    strcpy(r.req.referer, StringBuff(opt->referer));
-    strcpy(r.req.from, StringBuff(opt->from));
-    strcpy(r.req.lang_iso, StringBuff(opt->lang_iso));
+    r.req.user_agent = StringBuff(opt->user_agent);
+    r.req.referer = StringBuff(opt->referer);
+    r.req.from = StringBuff(opt->from);
+    r.req.lang_iso = StringBuff(opt->lang_iso);
+    r.req.accept = StringBuff(opt->accept);
+    r.req.headers = StringBuff(opt->headers);
     r.req.user_agent_send = opt->user_agent_send;
 
     if (!error) {

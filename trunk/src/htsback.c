@@ -1917,17 +1917,18 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
       // recopier proxy
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
         if (StringBuff(opt->proxy.bindhost) != NULL)
-          strcpybuff(back[p].r.req.proxy.bindhost,
-                     StringBuff(opt->proxy.bindhost));
+          back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
         if (StringBuff(opt->proxy.name) != NULL)
-          strcpybuff(back[p].r.req.proxy.name, StringBuff(opt->proxy.name));
+          back[p].r.req.proxy.name = StringBuff(opt->proxy.name);
         back[p].r.req.proxy.port = opt->proxy.port;
       }
       // et user-agent
-      strcpy(back[p].r.req.user_agent, StringBuff(opt->user_agent));
-      strcpy(back[p].r.req.referer, StringBuff(opt->referer));
-      strcpy(back[p].r.req.from, StringBuff(opt->from));
-      strcpy(back[p].r.req.lang_iso, StringBuff(opt->lang_iso));
+      back[p].r.req.user_agent = StringBuff(opt->user_agent);
+      back[p].r.req.referer = StringBuff(opt->referer);
+      back[p].r.req.from = StringBuff(opt->from);
+      back[p].r.req.lang_iso = StringBuff(opt->lang_iso);
+      back[p].r.req.accept = StringBuff(opt->accept);
+      back[p].r.req.headers = StringBuff(opt->headers);
       back[p].r.req.user_agent_send = opt->user_agent_send;
       // et http11
       back[p].r.req.http11 = back[p].http11;
@@ -2231,6 +2232,7 @@ void back_solve(httrackp * opt, lien_back * back) {
       a = back->url_adr;
     else
       a = back->r.req.proxy.name;
+    assertf(a != NULL);
     a = jump_protocol(a);
     if (!hts_dnstest(opt, a)) { // non encore testé!..
       // inscire en thread
