@@ -484,7 +484,7 @@
 				OutputFile="c:\temp\httrack\WinHTTrack.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz;C:\Dev\openssl\lib\out32dll;C:\temp\Debuglib"
+				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\debug_libz;C:\Dev\openssl\lib\out32dll;C:\temp\Debuglib"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="c:\temp\VCDebug/WinHTTrack.pdb"
 				GenerateMapFile="true"
@@ -586,7 +586,7 @@
 				OutputFile="c:\temp\httrack64\WinHTTrack.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz64;C:\Dev\openssl\lib\out32dll;C:\temp\Debuglib"
+				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\debug_libz64;C:\Dev\openssl\lib\out32dll;C:\temp\Debuglib"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="c:\temp\VCDebug64/WinHTTrack.pdb"
 				GenerateMapFile="true"
@@ -1832,10 +1832,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\htsinthash.h"
-				>
-			</File>
-			<File
 				RelativePath="..\htsmd5.c"
 				>
 			</File>
@@ -2471,76 +2467,6 @@
 			</File>
 			<File
 				RelativePath="..\md5.c"
-				>
-				<FileConfiguration
-					Name="Debug release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="0"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-						BrowseInformation="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug release|x64"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="0"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-						BrowseInformation="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="2"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|x64"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="2"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="0"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-						BasicRuntimeChecks="3"
-						BrowseInformation="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|x64"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						Optimization="0"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-						BasicRuntimeChecks="3"
-						BrowseInformation="1"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\md5.h"
 				>
 			</File>
 			<File
