@@ -707,7 +707,7 @@ public class HTTrackActivity extends FragmentActivity {
       super.onAttach(activity);
       final HTTrackActivity parent = HTTrackActivity.class.cast(activity);
       // We expect the runner not to be null at this point.
-      if (runner == null) {
+      if (runner != null) {
         runner.setParent(parent);
       } else {
         // We have to create the runner. Should not happen ?
