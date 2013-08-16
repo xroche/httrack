@@ -705,7 +705,24 @@ public class HTTrackActivity extends FragmentActivity {
     @Override
     public void onAttach(final Activity activity) {
       super.onAttach(activity);
-      runner.setParent(HTTrackActivity.class.cast(activity));
+      final HTTrackActivity parent = HTTrackActivity.class.cast(activity);
+      // We expect the runner not to be null at this point.
+      if (runner == null) {
+        runner.setParent(parent);
+      } else {
+        // We have to create the runner. Should not happen ?
+        Throwable trace;
+        try {
+          throw new RuntimeException();
+        } catch (final RuntimeException re) {
+          trace = re;
+        }
+        Log.w(
+            this.getClass().getSimpleName(),
+            "empty fragment attached to an activity, creating the associated runner",
+            trace);
+        setParent(parent);
+      }
     }
 
     // Detach activity
