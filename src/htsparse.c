@@ -3745,48 +3745,47 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       ) {                       // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
       if (fexist_utf8(liens[ptr]->sav)) {
         remove(liens[ptr]->sav);        // Eliminer
-        if (!fexist_utf8(liens[ptr]->sav)) {    // Bien éliminé? (sinon on boucle..)
-#if HDEBUG
-          printf("Partial content NOT up-to-date, reget all file for %s\n",
-                 liens[ptr]->sav);
-#endif
-          hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
-                        r->msg, urladr, urlfil);
-          // enregistrer le MEME lien (MACRO)
-          liens_record(liens[ptr]->adr, liens[ptr]->fil, liens[ptr]->sav, "",
-                       "");
-          if (liens[lien_tot] != NULL) {        // OK, pas d'erreur
-            liens[lien_tot]->testmode = liens[ptr]->testmode;   // mode test?
-            liens[lien_tot]->link_import = 0;   // pas mode import
-            liens[lien_tot]->depth = liens[ptr]->depth;
-            liens[lien_tot]->pass2 = max(liens[ptr]->pass2, numero_passe);
-            liens[lien_tot]->retry = liens[ptr]->retry;
-            liens[lien_tot]->premier = liens[ptr]->premier;
-            liens[lien_tot]->precedent = ptr;
-            lien_tot++;
-            //
-            // canceller lien actuel
-            error = 1;
-            strcpybuff(liens[ptr]->adr, "!");   // caractère bidon (invalide hash)
-            //
-          } else {              // oups erreur, plus de mémoire!!
-            printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-            hts_log_print(opt, LOG_PANIC,
-                          "Not enough memory, can not re-allocate %d bytes",
-                          (int) ((add_tab_alloc + 1) * sizeof(lien_url)));
-            //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
-            XH_uninit;          // désallocation mémoire & buffers
-            return 0;
-          }
-        } else {
-          hts_log_print(opt, LOG_ERROR, "Can not remove old file %s", urlfil);
-          error = 1;
-        }
       } else {
         hts_log_print(opt, LOG_WARNING,
                       "Unexpected 412/416 error (%s) for %s%s, '%s' could not be found on disk",
                       r->msg, urladr, urlfil,
                       liens[ptr]->sav != NULL ? liens[ptr]->sav : "");
+      }
+      if (!fexist_utf8(liens[ptr]->sav)) {    // Bien éliminé? (sinon on boucle..)
+#if HDEBUG
+        printf("Partial content NOT up-to-date, reget all file for %s\n",
+               liens[ptr]->sav);
+#endif
+        hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
+                      r->msg, urladr, urlfil);
+        // enregistrer le MEME lien (MACRO)
+        liens_record(liens[ptr]->adr, liens[ptr]->fil, liens[ptr]->sav, "",
+                     "");
+        if (liens[lien_tot] != NULL) {        // OK, pas d'erreur
+          liens[lien_tot]->testmode = liens[ptr]->testmode;   // mode test?
+          liens[lien_tot]->link_import = 0;   // pas mode import
+          liens[lien_tot]->depth = liens[ptr]->depth;
+          liens[lien_tot]->pass2 = max(liens[ptr]->pass2, numero_passe);
+          liens[lien_tot]->retry = liens[ptr]->retry;
+          liens[lien_tot]->premier = liens[ptr]->premier;
+          liens[lien_tot]->precedent = ptr;
+          lien_tot++;
+          //
+          // canceller lien actuel
+          error = 1;
+          strcpybuff(liens[ptr]->adr, "!");   // caractère bidon (invalide hash)
+          //
+        } else {              // oups erreur, plus de mémoire!!
+          printf("PANIC! : Not enough memory [%d]\n", __LINE__);
+          hts_log_print(opt, LOG_PANIC,
+                        "Not enough memory, can not re-allocate %d bytes",
+                        (int) ((add_tab_alloc + 1) * sizeof(lien_url)));
+          //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+          XH_uninit;          // désallocation mémoire & buffers
+          return 0;
+        }
+      } else {
+        hts_log_print(opt, LOG_ERROR, "Can not remove old file %s", urlfil);
         error = 1;
       }
 
