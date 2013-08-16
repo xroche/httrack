@@ -1785,7 +1785,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
       }
       /* Not in cache ; maybe in temporary cache ? Warning: non-movable "url_sav" */
       else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
-        const long file_size = fsize_utf8(itemback->url_sav);
+        const off_t file_size = fsize_utf8(itemback->url_sav);
 
         /* Found file on disk */
         if (file_size > 0) {
@@ -1820,7 +1820,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
       }
       /* Not in cache or temporary cache ; found on disk ? (hack) */
       else if (fexist_utf8(save)) {
-        off_t sz = fsize_utf8(save);
+        const off_t sz = fsize_utf8(save);
 
         // Bon, là il est possible que le fichier ait été partiellement transféré
         // (s'il l'avait été en totalité il aurait été inscrit dans le cache ET existerait sur disque)
