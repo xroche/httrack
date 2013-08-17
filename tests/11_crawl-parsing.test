@@ -34,3 +34,12 @@ bash crawl-test.sh --errors 0 --files 6 \
 	--found "ut.httrack.com/parsing/foo barae52.html" \
 	--found "ut.httrack.com/parsing/foo bar7b30.html" \
 	httrack http://ut.httrack.com/parsing/escaping.html
+
+# handling of # encoded in filename
+# see http://code.google.com/p/httrack/issues/detail?id=25
+bash crawl-test.sh --errors 2 --files 4 \
+	--found "ut.httrack.com/parsing/escaping2.html" \
+	--found "ut.httrack.com/parsing/++foo++bar++plus++.html" \
+	--found "ut.httrack.com/parsing/foo#bar#.html" \
+	--found "ut.httrack.com/parsing/foo bar.html" \
+	httrack http://ut.httrack.com/parsing/escaping2.html

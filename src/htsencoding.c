@@ -204,7 +204,8 @@ int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
   return hts_unescapeEntitiesWithCharset(src, dest, max, "UTF-8");
 }
 
-int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
+int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
+                           const int flags) {
   size_t i, j, lastI, lastJ, k, utfBufferJ, utfBufferSize;
   int seenQuery = 0;
   char utfBuffer[32];
@@ -239,7 +240,10 @@ int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
         cUtf = (unsigned char) ec;
 
         /* Shortcut for ASCII (do not unescape non-printable) */
-        if ((unsigned char) ec < 0x80 && (unsigned char) ec >= 32) {
+        if (
+            (cUtf < 0x80 && cUtf >= 32)
+            && ( flags & UNESCAPE_URL_NO_ASCII ) == 0
+            ) {
           /* Rollback new write position and character */
           j = lastJ;
           c = ec;
@@ -251,7 +255,7 @@ int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
     /* ASCII (and not in %xx) */
     else if (cUtf < 0x80 && i != lastI + 1) {
       k = 0;  /* cancel any sequence */
-      if (!seenQuery && c == '?') {
+      if (c == '?' && !seenQuery) {
         seenQuery = 1;
       }
     }
@@ -315,4 +319,8 @@ int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
   dest[j] = '\0';
 
   return 0;
+}
+
+int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
+  return hts_unescapeUrlSpecial(src, dest, max, 0);
 }

@@ -2100,18 +2100,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   const int hasCharset = charset != NULL 
                     && *charset != '\0';
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
-                  char *const a = strchr(lien, '?');
 
                   // cut query string
-                  if (a != NULL) {
-                    strcpybuff(query, a);
-                    *a = '\0';
-                  } else {
-                    query[0] = '\0';
+                  {
+                    char *const a = strchr(lien, '?');
+                    if (a != NULL) {
+                      strcpybuff(query, a);
+                      *a = '\0';
+                    } else {
+                      query[0] = '\0';
+                    }
                   }
 
                   // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
-                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1));     /* note: '%' is still escaped */
+                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1 | 2));     /* note: '%' is still escaped */
 
                   // Force to encode non-printable chars (should never happend)
                   escape_remove_control(lien);
@@ -2149,7 +2151,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // Decode remaining %XX high characters with UTF-8 
                   // but only when this leads to valid UTF-8.
                   // Otherwise, leave them unescaped.
-                  if (hts_unescapeUrl(lien, catbuff, sizeof(catbuff)) == 0) {
+                  if (hts_unescapeUrlSpecial(lien, catbuff, sizeof(catbuff),
+                                             UNESCAPE_URL_NO_ASCII) == 0) {
                     strcpybuff(lien, catbuff);
                   } else {
                     hts_log_print(opt, LOG_WARNING,
@@ -3745,48 +3748,47 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       ) {                       // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
       if (fexist_utf8(liens[ptr]->sav)) {
         remove(liens[ptr]->sav);        // Eliminer
-        if (!fexist_utf8(liens[ptr]->sav)) {    // Bien éliminé? (sinon on boucle..)
-#if HDEBUG
-          printf("Partial content NOT up-to-date, reget all file for %s\n",
-                 liens[ptr]->sav);
-#endif
-          hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
-                        r->msg, urladr, urlfil);
-          // enregistrer le MEME lien (MACRO)
-          liens_record(liens[ptr]->adr, liens[ptr]->fil, liens[ptr]->sav, "",
-                       "");
-          if (liens[lien_tot] != NULL) {        // OK, pas d'erreur
-            liens[lien_tot]->testmode = liens[ptr]->testmode;   // mode test?
-            liens[lien_tot]->link_import = 0;   // pas mode import
-            liens[lien_tot]->depth = liens[ptr]->depth;
-            liens[lien_tot]->pass2 = max(liens[ptr]->pass2, numero_passe);
-            liens[lien_tot]->retry = liens[ptr]->retry;
-            liens[lien_tot]->premier = liens[ptr]->premier;
-            liens[lien_tot]->precedent = ptr;
-            lien_tot++;
-            //
-            // canceller lien actuel
-            error = 1;
-            strcpybuff(liens[ptr]->adr, "!");   // caractère bidon (invalide hash)
-            //
-          } else {              // oups erreur, plus de mémoire!!
-            printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-            hts_log_print(opt, LOG_PANIC,
-                          "Not enough memory, can not re-allocate %d bytes",
-                          (int) ((add_tab_alloc + 1) * sizeof(lien_url)));
-            //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
-            XH_uninit;          // désallocation mémoire & buffers
-            return 0;
-          }
-        } else {
-          hts_log_print(opt, LOG_ERROR, "Can not remove old file %s", urlfil);
-          error = 1;
-        }
       } else {
         hts_log_print(opt, LOG_WARNING,
                       "Unexpected 412/416 error (%s) for %s%s, '%s' could not be found on disk",
                       r->msg, urladr, urlfil,
                       liens[ptr]->sav != NULL ? liens[ptr]->sav : "");
+      }
+      if (!fexist_utf8(liens[ptr]->sav)) {    // Bien éliminé? (sinon on boucle..)
+#if HDEBUG
+        printf("Partial content NOT up-to-date, reget all file for %s\n",
+               liens[ptr]->sav);
+#endif
+        hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
+                      r->msg, urladr, urlfil);
+        // enregistrer le MEME lien (MACRO)
+        liens_record(liens[ptr]->adr, liens[ptr]->fil, liens[ptr]->sav, "",
+                     "");
+        if (liens[lien_tot] != NULL) {        // OK, pas d'erreur
+          liens[lien_tot]->testmode = liens[ptr]->testmode;   // mode test?
+          liens[lien_tot]->link_import = 0;   // pas mode import
+          liens[lien_tot]->depth = liens[ptr]->depth;
+          liens[lien_tot]->pass2 = max(liens[ptr]->pass2, numero_passe);
+          liens[lien_tot]->retry = liens[ptr]->retry;
+          liens[lien_tot]->premier = liens[ptr]->premier;
+          liens[lien_tot]->precedent = ptr;
+          lien_tot++;
+          //
+          // canceller lien actuel
+          error = 1;
+          strcpybuff(liens[ptr]->adr, "!");   // caractère bidon (invalide hash)
+          //
+        } else {              // oups erreur, plus de mémoire!!
+          printf("PANIC! : Not enough memory [%d]\n", __LINE__);
+          hts_log_print(opt, LOG_PANIC,
+                        "Not enough memory, can not re-allocate %d bytes",
+                        (int) ((add_tab_alloc + 1) * sizeof(lien_url)));
+          //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
+          XH_uninit;          // désallocation mémoire & buffers
+          return 0;
+        }
+      } else {
+        hts_log_print(opt, LOG_ERROR, "Can not remove old file %s", urlfil);
         error = 1;
       }
 
