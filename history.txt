@@ -40,6 +40,8 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: buggy referer while parsing: the referer of all links in the page is the current page being parsed, NOT the parent page. (alexei dot com at gmail dot com)
 + Fixed: Russian translation fixes by Oleg Komarov (komoleg at mail dot ru)
 + New: Added .torrent => application/x-bittorrent built-in MIME type (alexei dot co at gmail dot com)
++ Fixed: unable to download an URL whose filename embeds special characters such as # (lugusto)
++ New: Croatian translation by Dominko Aždajić
 
 3.46-1
 * New: Unicode filenames handling
