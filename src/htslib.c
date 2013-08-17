@@ -3934,7 +3934,7 @@ void hts_lowcase(char *s) {
 }
 
 // remplacer un caractère d'une chaîne dans une autre
-static HTS_INLINE void hts_replace(char *s, char from, char to) {
+HTS_INLINE void hts_replace(char *s, char from, char to) {
   char *a;
 
   while((a = strchr(s, from)) != NULL) {
