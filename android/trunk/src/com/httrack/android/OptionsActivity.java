@@ -277,6 +277,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       final ViewGroup leftContainer = ViewGroup.class
           .cast(findViewById(R.id.left));
       getLayoutInflater().inflate(R.layout.activity_options, leftContainer);
+
       // setPane(0);
     }
 

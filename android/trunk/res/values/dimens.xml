@@ -6,4 +6,10 @@
     <!-- Borderless buttons -->
     <dimen name="divider_line_thickness">0dip</dimen>
 
+    <!-- Borders for use for phones (for tablets, zero margin) -->
+    <dimen name="activity_horizontal_margin_phone_only">@dimen/activity_horizontal_margin</dimen>
+    <dimen name="activity_vertical_margin_phone_only">@dimen/activity_horizontal_margin</dimen>
+    <dimen name="activity_horizontal_margin_tablet_only">0dp</dimen>
+    <dimen name="activity_vertical_margin_tablet_only">0dp</dimen>
+    
 </resources>

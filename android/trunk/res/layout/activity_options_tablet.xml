@@ -13,15 +13,16 @@
         android:id="@+id/left"
         android:layout_width="0dp"
         android:layout_height="fill_parent"
-        android:layout_weight="0.3"
-        android:orientation="horizontal" >
+        android:layout_weight="0.4"
+        android:orientation="horizontal"
+        android:paddingRight="@dimen/activity_horizontal_margin_tablet_only" >
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/right"
         android:layout_width="0dp"
         android:layout_height="fill_parent"
-        android:layout_weight="0.7"
+        android:layout_weight="0.6"
         android:orientation="horizontal" >
     </LinearLayout>
 
