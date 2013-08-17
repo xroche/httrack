@@ -29,9 +29,11 @@ import java.lang.annotation.Target;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -56,6 +58,9 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
   // Current activity class
   protected Class<?> activityClass;
+
+  // use large screen ? (tablets)
+  protected boolean isLargeScreen;
 
   /**
    * The tab activit(ies) common interface.
@@ -186,6 +191,18 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   }
 
   /*
+   * Is the screen larger than <width>x<height> ?
+   */
+  private boolean isScreenLargerThan(final int width, final int height) {
+    final DisplayMetrics displaymetrics = new DisplayMetrics();
+    getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
+    final int w = displaymetrics.widthPixels;
+    final int h = displaymetrics.heightPixels;
+    Log.d(getClass().getSimpleName(), "current screen: " + w + "x" + h);
+    return w >= width && h >= height;
+  }
+
+  /*
    * Create all tabs for main options menu.
    */
   private void createTabs() {
@@ -207,7 +224,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
             LayoutParams.FILL_PARENT, dpToPx(1));
         layout.bottomMargin = dpToPx(8);
         layout.topMargin = dpToPx(8);
-        line.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, 1));
+        line.setLayoutParams(layout);
         line.setBackgroundColor(getResources().getColor(R.color.black));
 
         // Add line
@@ -246,11 +263,22 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
    * Set the view to the menu view
    */
   private void setViewMenu() {
-    // Set view
-    setContentView(R.layout.activity_options);
+    if (!isLargeScreen) {
+      // Set view
+      setContentView(R.layout.activity_options);
 
-    // Set Title
-    setTitle(R.string.options);
+      // Set Title
+      setTitle(R.string.options);
+    } else {
+      // Set view
+      setContentView(R.layout.activity_options_tablet);
+
+      // Create left menu
+      final ViewGroup leftContainer = ViewGroup.class
+          .cast(findViewById(R.id.left));
+      getLayoutInflater().inflate(R.layout.activity_options, leftContainer);
+      // setPane(0);
+    }
 
     // Create tabs
     createTabs();
@@ -259,6 +287,10 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
+    // Large screen ? Enable special tablet features in such case...
+    // "xlarge screens are at least 960dp x 720dp"
+    isLargeScreen = isScreenLargerThan(960, 720);
 
     // Load map
     map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
@@ -301,7 +333,10 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Override
   public void onBackPressed() {
     // Back from activity
-    if (activityClass == null) {
+    if (isLargeScreen || activityClass == null) {
+      if (isLargeScreen) {
+        save();
+      }
       super.onBackPressed();
       finish();
     }
@@ -384,6 +419,53 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     }
   }
 
+  /*
+   * Close the right pane in "tablet" view.
+   */
+  protected void closeRightPane() {
+    // Remove right view ?
+    if (isLargeScreen && activityClass != null) {
+      final ViewGroup group = ViewGroup.class.cast(findViewById(R.id.right));
+      save();
+      group.removeAllViews();
+      activityClass = null;
+    }
+  }
+
+  /*
+   * Set pane #N (0..nb_panes).
+   */
+  protected void setPane(final int position) {
+    // Close right pane if necessary
+    closeRightPane();
+
+    // Remove right view ?
+    if (isLargeScreen && activityClass != null) {
+      final ViewGroup group = ViewGroup.class.cast(findViewById(R.id.right));
+      save();
+      group.removeAllViews();
+      activityClass = null;
+    }
+
+    // Pickup corresponding class
+    activityClass = tabClasses[position];
+
+    // Set current view, current activity title, and load field(s)
+    if (!isLargeScreen) {
+      setContentView(getCurrentActivityId());
+    } else {
+      final ViewGroup rightContainer = ViewGroup.class
+          .cast(findViewById(R.id.right));
+      getLayoutInflater().inflate(getCurrentActivityId(), rightContainer);
+    }
+
+    // Set new title
+    setTitle(getCurrentActivityTitleId());
+
+    // Load fields
+    load();
+  }
+
   @Override
   public void onClick(View v) {
     // Which button was clicked ?
@@ -392,12 +474,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     // Fetch tag position
     final int position = Integer.parseInt(cb.getTag().toString());
 
-    // Pickup corresponding class
-    activityClass = tabClasses[position];
-
-    // Set current view, current activity title, and load field(s)
-    setContentView(getCurrentActivityId());
-    setTitle(getCurrentActivityTitleId());
-    load();
+    // Set pane
+    setPane(position);
   }
 }
