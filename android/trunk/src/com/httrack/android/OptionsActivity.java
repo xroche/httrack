@@ -290,7 +290,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
     // Large screen ? Enable special tablet features in such case...
     // "xlarge screens are at least 960dp x 720dp"
-    isLargeScreen = isScreenLargerThan(960, 720);
+    isLargeScreen = isScreenLargerThan(800, 480);
 
     // Load map
     map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
