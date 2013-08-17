@@ -3069,10 +3069,10 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
             if (((strchr(argv[i], ' ') != NULL)
                  || (strchr(argv[i], '"') != NULL)
                  || (strchr(argv[i], '\\') != NULL)) && (argv[i][0] != '"')) {
-              int j;
+              size_t j;
 
               fprintf(fp, "\"");
-              for(j = 0; j < (int) strlen(argv[i]); j++) {
+              for(j = 0; argv[i][j] != '\0'; j++) {
                 if (argv[i][j] == 34)
                   fprintf(fp, "\\\"");
                 else if (argv[i][j] == '\\')

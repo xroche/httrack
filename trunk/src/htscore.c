@@ -2904,16 +2904,16 @@ void usercommand(httrackp * opt, int _exe, const char *_cmd, const char *file,
 }
 void usercommand_exe(const char *cmd, const char *file) {
   char BIGSTK temp[8192];
-  char c[2] = "";
-  int i;
+  size_t i;
 
   temp[0] = '\0';
   //
-  for(i = 0; i < (int) strlen(cmd); i++) {
+  for(i = 0; cmd[i] != '\0'; i++) {
     if ((cmd[i] == '$') && (cmd[i + 1] == '0')) {
       strcatbuff(temp, file);
       i++;
     } else {
+      char c[2];
       c[0] = cmd[i];
       c[1] = '\0';
       strcatbuff(temp, c);

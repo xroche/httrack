@@ -198,11 +198,12 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
           char BIGSTK url_fil[HTS_URLMAXSIZE * 2];
 
           // méthode en majuscule
-          int i, r = 0;
+          size_t i;
+          int r = 0;
 
           url_adr[0] = url_fil[0] = '\0';
           //
-          for(i = 0; i < (int) strlen(method); i++) {
+          for(i = 0; method[i] != '\0'; i++) {
             if ((method[i] >= 'a') && (method[i] <= 'z'))
               method[i] -= ('a' - 'A');
           }

@@ -273,9 +273,9 @@ static int ehex(char *s) {
 }
 
 HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
-  int i;
+  size_t i;
 
-  for(i = 0; i < (int) strlen(s); i++) {
+  for(i = 0; i < s[i] != '\0'; i++) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, '%');
@@ -294,10 +294,10 @@ HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
 }
 
 HTS_UNUSED static void unescapeini(char *s, String * tempo) {
-  int i;
+  size_t i;
   char lastc = 0;
 
-  for(i = 0; i < (int) strlen(s); i++) {
+  for(i = 0; s[i] != '\0'; i++) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, lastc = '%');
