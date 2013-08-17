@@ -42,6 +42,14 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /**
+ * Flags for hts_unescapeUrlSpecial().
+ **/
+typedef enum unescapeFlags {
+  /** Do not decode ASCII. **/
+  UNESCAPE_URL_NO_ASCII = 1
+} unescapeFlags;
+
+/**
  * Unescape HTML entities (as per HTML 4.0 Specification)
  * and replace them in-place by their UTF-8 equivalents.
  * Note: source and destination may be the same, and the destination only
@@ -70,5 +78,17 @@ extern int hts_unescapeEntitiesWithCharset(const char *src,
  * Returns 0 upon success, -1 upon overflow or error.
  **/
 extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
+
+/**
+ * Unescape an URL-encoded string. The implicit charset is UTF-8.
+ * In case of UTF-8 decoding error inside URL-encoded characters,
+ * the characters are left undecoded.
+ * "flags" is a mask composed of UNESCAPE_URL_XXX constants.
+ * Note: source and destination MUST NOT be the same.
+ * Returns 0 upon success, -1 upon overflow or error.
+ **/
+extern int hts_unescapeUrlSpecial(const char *src,
+                                  char *dest, const size_t max,
+                                  int flags);
 
 #endif

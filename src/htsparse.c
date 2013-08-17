@@ -2100,18 +2100,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   const int hasCharset = charset != NULL 
                     && *charset != '\0';
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
-                  char *const a = strchr(lien, '?');
 
                   // cut query string
-                  if (a != NULL) {
-                    strcpybuff(query, a);
-                    *a = '\0';
-                  } else {
-                    query[0] = '\0';
+                  {
+                    char *const a = strchr(lien, '?');
+                    if (a != NULL) {
+                      strcpybuff(query, a);
+                      *a = '\0';
+                    } else {
+                      query[0] = '\0';
+                    }
                   }
 
                   // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
-                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1));     /* note: '%' is still escaped */
+                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1 | 2));     /* note: '%' is still escaped */
 
                   // Force to encode non-printable chars (should never happend)
                   escape_remove_control(lien);
@@ -2149,7 +2151,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // Decode remaining %XX high characters with UTF-8 
                   // but only when this leads to valid UTF-8.
                   // Otherwise, leave them unescaped.
-                  if (hts_unescapeUrl(lien, catbuff, sizeof(catbuff)) == 0) {
+                  if (hts_unescapeUrlSpecial(lien, catbuff, sizeof(catbuff),
+                                             UNESCAPE_URL_NO_ASCII) == 0) {
                     strcpybuff(lien, catbuff);
                   } else {
                     hts_log_print(opt, LOG_WARNING,
