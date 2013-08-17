@@ -1181,7 +1181,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       }
       break;
     case 99:{                  // 'codé' .. c'est un gadget
-        int i;
+        size_t i;
         int j;
         char *a;
         char C[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
@@ -1191,10 +1191,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         unsigned int s = 0;
 
         L = (int) strlen(C);
-        for(i = 0; i < (int) strlen(fil_complete); i++) {
+        for(i = 0; fil_complete[i] != '\0'; i++) {
           s += (unsigned int) fil_complete[i];
         }
-        for(i = 0; i < (int) strlen(adr_complete); i++) {
+        for(i = 0; adr_complete[i] != '\0'; i++) {
           s += (unsigned int) adr_complete[i];
         }
         srand(s);

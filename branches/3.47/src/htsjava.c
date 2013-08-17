@@ -485,7 +485,7 @@ static int tris(httrackp * opt, char *buffer) {
 static char *printname(char rname[1024], char name[1024]) {
   char *p;
   char *p1;
-  int j;
+  size_t j;
 
   rname[0] = '\0';
   //
@@ -497,7 +497,7 @@ static char *printname(char rname[1024], char name[1024]) {
   p += 2;
   //rname=(char*)calloct(strlen(name)+8,sizeof(char));
   p1 = rname;
-  for(j = 0; j < (int) strlen(name); j++, p++) {
+  for(j = 0; name[j] != '\0'; j++, p++) {
     if (*p == '/')
       *p1 = '.';
     if (*p == ';') {
