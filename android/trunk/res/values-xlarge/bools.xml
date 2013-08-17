@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Note: this file is only used for compatibility reasons for Android < 3.0. -->
+    <bool name="isTablet">true</bool>
+</resources>

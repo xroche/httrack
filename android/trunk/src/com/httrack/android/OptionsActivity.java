@@ -60,7 +60,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   protected Class<?> activityClass;
 
   // use large screen ? (tablets)
-  protected boolean isLargeScreen;
+  protected boolean isTabletMode;
 
   /**
    * The tab activit(ies) common interface.
@@ -263,7 +263,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
    * Set the view to the menu view
    */
   private void setViewMenu() {
-    if (!isLargeScreen) {
+    if (!isTabletMode) {
       // Set view
       setContentView(R.layout.activity_options);
 
@@ -290,7 +290,13 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
     // Large screen ? Enable special tablet features in such case...
     // "xlarge screens are at least 960dp x 720dp"
-    isLargeScreen = isScreenLargerThan(800, 480);
+    isTabletMode = getResources().getBoolean(R.bool.isTablet)
+        && isScreenLargerThan(800, 480);
+    if (isTabletMode) {
+      Log.d(getClass().getSimpleName(), "tablet mode detected");
+    } else {
+      Log.d(getClass().getSimpleName(), "phone mode detected");
+    }
 
     // Load map
     map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
@@ -333,8 +339,8 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Override
   public void onBackPressed() {
     // Back from activity
-    if (isLargeScreen || activityClass == null) {
-      if (isLargeScreen) {
+    if (isTabletMode || activityClass == null) {
+      if (isTabletMode) {
         save();
       }
       super.onBackPressed();
@@ -424,7 +430,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
    */
   protected void closeRightPane() {
     // Remove right view ?
-    if (isLargeScreen && activityClass != null) {
+    if (isTabletMode && activityClass != null) {
       final ViewGroup group = ViewGroup.class.cast(findViewById(R.id.right));
       save();
       group.removeAllViews();
@@ -440,7 +446,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     closeRightPane();
 
     // Remove right view ?
-    if (isLargeScreen && activityClass != null) {
+    if (isTabletMode && activityClass != null) {
       final ViewGroup group = ViewGroup.class.cast(findViewById(R.id.right));
       save();
       group.removeAllViews();
@@ -451,7 +457,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     activityClass = tabClasses[position];
 
     // Set current view, current activity title, and load field(s)
-    if (!isLargeScreen) {
+    if (!isTabletMode) {
       setContentView(getCurrentActivityId());
     } else {
       final ViewGroup rightContainer = ViewGroup.class
