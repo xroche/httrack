@@ -2456,7 +2456,7 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
     fil_simplifie(fil);
   } else {                      // localhost file://
     const char *p;
-    int i;
+    size_t i;
     char *a;
 
     p = url + pos;
@@ -2475,7 +2475,7 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
     if (a)
       *a = '\0';                /* couper query (inutile pour file:// lors de la requête) */
     // filtrer les \\ -> / pour les fichiers DOS
-    for(i = 0; i < (int) strlen(fil); i++)
+    for(i = 0; fil[i] != '\0'; i++)
       if (fil[i] == '\\')
         fil[i] = '/';
   }
@@ -3658,18 +3658,28 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
   *b++ = '\0';
 }
 
-static int ehexh(char c) {
-  if ((c >= '0') && (c <= '9'))
+// return the hex character value, or -1 on error.
+static HTS_INLINE int ehexh(const char c) {
+  if (c >= '0' && c <= '9')
     return c - '0';
-  if ((c >= 'a') && (c <= 'f'))
-    c -= ('a' - 'A');
-  if ((c >= 'A') && (c <= 'F'))
+  else if (c >= 'a' && c <= 'f')
+    return (c - 'a' + 10);
+  else if (c >= 'A' && c <= 'F')
     return (c - 'A' + 10);
-  return 0;
+  else
+    return -1;
 }
 
-static int ehex(const char *s) {
-  return 16 * ehexh(*s) + ehexh(*(s + 1));
+// return the two-hex character value, or -1 on error.
+static HTS_INLINE int ehex(const char *s) {
+  const int c1 = ehexh(s[0]);
+  if (c1 >= 0) {
+    const int c2 = ehexh(s[1]);
+    if (c2 >= 0) {
+      return 16*c1 + c2;
+    }
+  }
+  return -1;
 }
 
 void unescape_amp(char *s) {
@@ -3678,23 +3688,17 @@ void unescape_amp(char *s) {
   }
 }
 
-// remplacer %20 par ' ', | par : etc..
+// remplacer %20 par ' ', etc..
 // buffer MAX 1Ko
 HTSEXT_API char *unescape_http(char *catbuff, const char *s) {
-  int i, j = 0;
+  size_t i, j;
 
-  for(i = 0; i < (int) strlen(s); i++) {
-    if (s[i] == '%') {
-      i++;
-      catbuff[j++] = (char) ehex(s + i);
-      i++;                      // sauter 2 caractères finalement
+  for(i = 0, j = 0; s[i] != '\0'; i++) {
+    int h;
+    if (s[i] == '%' && (h = ehex(&s[i + 1])) >= 0) {
+      catbuff[j++] = (char) h;
+      i += 2;
     }
-    /*
-       NON a cause de trucs comme /home/0,1837,1|7|1173|Content,00.html
-       else if (s[i]=='|') {                     // exemple: file:///C|Program%20Files...
-       tempo[j++]=':';
-       }
-     */
     else
       catbuff[j++] = s[i];
   }
@@ -3705,37 +3709,30 @@ HTSEXT_API char *unescape_http(char *catbuff, const char *s) {
 // unescape in URL/URI ONLY what has to be escaped, to form a standard URL/URI
 // DOES NOT DECODE %25 (part of CHAR_DELIM)
 HTSEXT_API char *unescape_http_unharm(char *catbuff, const char *s, int no_high) {
-  int i, j = 0;
+  size_t i, j;
 
-  for(i = 0; i < (int) strlen(s); i++) {
+  for(i = 0, j = 0; s[i] != '\0'; i++) {
     if (s[i] == '%') {
-      int nchar = (char) ehex(s + i + 1);
+      const int nchar = ehex(&s[i + 1]);
 
-      int test = ((  CHAR_RESERVED(nchar) && nchar != '+')        /* %2B => + (not in query!) */
-                  || CHAR_DELIM(nchar)
-                  || CHAR_UNWISE(nchar)
-                  || CHAR_LOW(nchar)    /* CHAR_SPECIAL */
-                  || CHAR_XXAVOID(nchar)
-                  || ((no_high)
-                      && CHAR_HIG(nchar)
-                  )
-        );
+      const int test = 
+        ( CHAR_RESERVED(nchar) && nchar != '+' )        /* %2B => + (not in query!) */
+        || CHAR_DELIM(nchar)
+        || CHAR_UNWISE(nchar)
+        || CHAR_LOW(nchar)    /* CHAR_SPECIAL */
+        || CHAR_XXAVOID(nchar)
+        || ( no_high && CHAR_HIG(nchar) )
+        ;
 
-      if (!test) {
-        catbuff[j++] = (char) ehex(s + i + 1);
+      if (!test && nchar >= 0) {  /* can safely unescape */
+        catbuff[j++] = (char) nchar;
         i += 2;
       } else {
         catbuff[j++] = '%';
       }
-    }
-    /*
-       NON a cause de trucs comme /home/0,1837,1|7|1173|Content,00.html
-       else if (s[i]=='|') {                     // exemple: file:///C|Program%20Files...
-       tempo[j++]=':';
-       }
-     */
-    else
+    } else {
       catbuff[j++] = s[i];
+    }
   }
   catbuff[j++] = '\0';
   return catbuff;
@@ -3929,15 +3926,15 @@ char *convtolower(char *catbuff, const char *a) {
 
 // conversion en minuscules
 void hts_lowcase(char *s) {
-  int i;
+  size_t i;
 
-  for(i = 0; i < (int) strlen(s); i++)
+  for(i = 0; s[i] != '\0'; i++)
     if ((s[i] >= 'A') && (s[i] <= 'Z'))
       s[i] += ('a' - 'A');
 }
 
 // remplacer un caractère d'une chaîne dans une autre
-HTS_INLINE void hts_replace(char *s, char from, char to) {
+static HTS_INLINE void hts_replace(char *s, char from, char to) {
   char *a;
 
   while((a = strchr(s, from)) != NULL) {
@@ -3951,7 +3948,7 @@ HTS_INLINE void hts_replace(char *s, char from, char to) {
   #define  is_realspace(c) (strchr(" \x0d\x0a\x09\x0c",c)!=NULL)
 */
 /*
-HTS_INLINE int is_space(char c) {
+static HTS_INLINE int is_space(char c) {
   if (c==' ')  return 1;  // spc
   if (c=='"')  return 1;  // quote
   if (c==10)   return 1;  // lf
@@ -3965,7 +3962,7 @@ HTS_INLINE int is_space(char c) {
 
 // caractère espace, CR, LF, TAB
 /*
-HTS_INLINE int is_realspace(char c) {
+static HTS_INLINE int is_realspace(char c) {
   if (c==' ')  return 1;  // spc
   if (c==10)   return 1;  // lf
   if (c==13)   return 1;  // cr
@@ -4882,8 +4879,8 @@ t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) 
 }
 
 #else
-HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, char *iadr,
-                                        t_fullhostent * buffer) {
+static HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, char *iadr,
+                                               t_fullhostent * buffer) {
   t_hostent *retour;
 
 #if HTS_WIDE_DEBUG
