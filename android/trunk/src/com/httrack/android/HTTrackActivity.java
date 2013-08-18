@@ -164,6 +164,13 @@ public class HTTrackActivity extends FragmentActivity {
     }
   }
 
+  /* Get the default root external storage. */
+  private File getDefaultHTTrackPath() {
+    final File rootPath = getExternalStorage();
+    final File httrackPath = new File(rootPath, "HTTrack");
+    return new File(httrackPath, "Websites");
+  }
+
   /*
    * (Re)Compute (external) storage pathes for downloaded websites.
    */
@@ -173,9 +180,7 @@ public class HTTrackActivity extends FragmentActivity {
     if (base != null) {
       projectPath = new File(base);
     } else if (projectPath == null || !projectPath.exists()) {
-      final File rootPath = getExternalStorage();
-      final File httrackPath = new File(rootPath, "HTTrack");
-      projectPath = new File(httrackPath, "Websites");
+      projectPath = getDefaultHTTrackPath();
     }
 
     // Change ?
@@ -227,7 +232,7 @@ public class HTTrackActivity extends FragmentActivity {
       if (root == null) {
         message = getString(R.string.could_not_get_external_directory);
       } else if (!root.exists()) {
-        message = getString(R.string.could_not_write_to)
+        message = getString(R.string.could_not_write_to) + " "
             + root.getAbsolutePath();
       } else {
         return;
@@ -1546,13 +1551,18 @@ public class HTTrackActivity extends FragmentActivity {
   protected boolean validatePane() {
     switch (pane_id) {
     case LAYOUT_START:
-      // Recompute storage target if necessary
-      final boolean success = ensureExternalStorage();
       // Warn if no sdcard
       warnIfExternalStorageUnsuitable();
-      // Continue if we could have a place to write to (even if we warned)
-      return success;
+      break;
     case LAYOUT_PROJECT_NAME:
+      // Recompute storage target if necessary
+      if (!ensureExternalStorage()) {
+        warnIfExternalStorageUnsuitable();
+        return false;
+      }
+      // Continue if we could have a place to write to (even if we warned)
+
+      // Check project name
       final String name = getFieldText(R.id.fieldProjectName);
       if (OptionsMapper.isStringNonEmpty(name)) {
         // Changed name ?
@@ -1668,6 +1678,8 @@ public class HTTrackActivity extends FragmentActivity {
     // Start new activity
     final Intent intent = new Intent(this, FileChooserActivity.class);
     fillExtra(intent);
+    intent.putExtra("com.httrack.android.defaultHTTrackPath",
+        getDefaultHTTrackPath());
     startActivityForResult(intent, ACTIVITY_FILE_CHOOSER);
   }
 

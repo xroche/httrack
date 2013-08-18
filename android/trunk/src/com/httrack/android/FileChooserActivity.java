@@ -23,6 +23,7 @@ public class FileChooserActivity extends Activity implements
   protected static final boolean borderless = android.os.Build.VERSION.SDK_INT >= 11;
 
   protected File projectRootFile;
+  protected File defaultRootFile;
   protected final List<Pair<String, File>> files = new ArrayList<Pair<String, File>>();
 
   // Handler to execute code in UI thread
@@ -48,8 +49,8 @@ public class FileChooserActivity extends Activity implements
     base.setSelection(path.length());
 
     // List directory
-    final File[] list = projectRootFile != null ? projectRootFile.listFiles()
-        : null;
+    final File[] list = projectRootFile != null && projectRootFile.exists() ? projectRootFile
+        .listFiles() : defaultRootFile.listFiles();
     if (list != null) {
       files.clear();
       final File parent = projectRootFile.getParentFile();
@@ -125,7 +126,9 @@ public class FileChooserActivity extends Activity implements
     final Bundle extras = getIntent().getExtras();
     projectRootFile = File.class.cast(extras
         .get("com.httrack.android.rootFile"));
-    if (projectRootFile == null) {
+    defaultRootFile = File.class.cast(extras
+        .get("com.httrack.android.defaultHTTrackPath"));
+    if (projectRootFile == null || defaultRootFile == null) {
       throw new RuntimeException("internal error");
     }
 
