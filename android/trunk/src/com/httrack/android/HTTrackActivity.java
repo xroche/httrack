@@ -48,6 +48,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -97,6 +98,10 @@ public class HTTrackActivity extends FragmentActivity {
   protected static final int LAYOUT_MIRROR_PROGRESS = 3;
   protected static final int LAYOUT_FINISHED = 4;
 
+  // Preferences
+  protected static final String PREFS_NAME = "HTTrackPreferences";
+  protected static final String BASE_NAME = "BasePath";
+
   /*
    * Build identifiers. See
    * <http://developer.android.com/reference/android/os/Build
@@ -108,7 +113,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   // Fields to restore/save state (Note: might be read-only fields)
   protected static final int fields[][] = { {},
-      { R.id.fieldProjectName, R.id.fieldProjectCategory },
+      { R.id.fieldProjectName, R.id.fieldProjectCategory, R.id.fieldBasePath },
       { R.id.fieldWebsiteURLs, R.id.radioAction }, { R.id.fieldDisplay },
       { R.id.fieldDisplay } };
 
@@ -117,6 +122,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   // Activity identifier when using startActivityForResult()
   protected static final int ACTIVITY_OPTIONS = 0;
+  protected static final int ACTIVITY_FILE_CHOOSER = 1;
 
   // Engine
   protected RunnerFragment runner = null;
@@ -143,8 +149,6 @@ public class HTTrackActivity extends FragmentActivity {
   protected String version;
   protected String versionFeatures;
   protected int versionCode;
-  protected File rootPath;
-  protected File httrackPath;
   protected File projectPath;
   protected File rscPath;
 
@@ -164,10 +168,50 @@ public class HTTrackActivity extends FragmentActivity {
    * (Re)Compute (external) storage pathes for downloaded websites.
    */
   private void computeStorageTarget() {
-    if (projectPath == null || !projectPath.exists()) {
-      rootPath = getExternalStorage();
-      httrackPath = new File(rootPath, "HTTrack");
+    final SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+    final String base = settings.getString(BASE_NAME, null);
+    if (base != null) {
+      projectPath = new File(base);
+    } else if (projectPath == null || !projectPath.exists()) {
+      final File rootPath = getExternalStorage();
+      final File httrackPath = new File(rootPath, "HTTrack");
       projectPath = new File(httrackPath, "Websites");
+    }
+
+    // Change ?
+    final View view = findViewById(R.id.fieldBasePath);
+    if (view != null) {
+      TextView.class.cast(view).setText(projectPath.getAbsolutePath());
+    }
+  }
+
+  /*
+   * Set the base path.
+   */
+  private void setBasePath(final String path) {
+    final SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+    final SharedPreferences.Editor editor = settings.edit();
+    editor.putString(BASE_NAME, path);
+    editor.commit();
+    // Load it
+    computeStorageTarget();
+    refreshprojectNameSuggests();
+  }
+
+  /*
+   * Refresh project name suggest.
+   */
+  private void refreshprojectNameSuggests() {
+    final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
+        .findViewById(R.id.fieldProjectName));
+    if (name != null) {
+      /* Setup name selection adapter. */
+      final String[] names = getProjectNames();
+      if (names != null) {
+        Log.v(getClass().getSimpleName(), "project names: " + printArray(names));
+        name.setAdapter(new ArrayAdapter<String>(this,
+            android.R.layout.simple_dropdown_item_1line, names));
+      }
     }
   }
 
@@ -257,8 +301,7 @@ public class HTTrackActivity extends FragmentActivity {
     rscPath = buildResourceFile();
 
     // Ensure users can see us
-    HTTrackActivity.setFileReadWrite(httrackPath);
-    HTTrackActivity.setFileReadWrite(projectPath);
+    HTTrackActivity.setFileReadWrite(getProjectRootFile());
 
     // Clear map (useful to get dynamic fields)
     mapper.setContext(this);
@@ -282,14 +325,6 @@ public class HTTrackActivity extends FragmentActivity {
     return installed;
   }
 
-  /** Delete a previous version of the resources. **/
-  private void deleteOldResourceFile() {
-    final File rscPath = new File(httrackPath, "resources");
-    if (rscPath.exists()) {
-      CleanupActivity.deleteRecursively(rscPath);
-    }
-  }
-
   /**
    * Get the resource directory. Create it if necessary. Resources are created
    * in the dedicated cache, so that the files can be uninstalled upon
@@ -300,9 +335,6 @@ public class HTTrackActivity extends FragmentActivity {
     final File rscPath = new File(cache, "resources");
     final File stampFile = new File(rscPath, "resources.stamp");
     final long stamp = installOrUpdateTime();
-
-    // Alpha releases created this
-    deleteOldResourceFile();
 
     // Check timestamp of resources. If the applicate has been updated,
     // recreated cached resources.
@@ -517,7 +549,7 @@ public class HTTrackActivity extends FragmentActivity {
   protected File getTargetFile() {
     final String name = mapper.getProjectName();
     if (name != null && name.length() != 0) {
-      return new File(projectPath, name);
+      return new File(getProjectRootFile(), name);
     } else {
       return null;
     }
@@ -1325,7 +1357,7 @@ public class HTTrackActivity extends FragmentActivity {
         str.append(")");
       }
       str.append(" • Path: ");
-      str.append(projectPath.getAbsolutePath());
+      str.append(getProjectRootFile().getAbsolutePath());
       str.append(" • IPv6: ");
       final InetAddress addrV6 = getIPv6Address();
       str.append(addrV6 != null ? ("YES (" + addrV6.getHostAddress() + ")")
@@ -1342,69 +1374,68 @@ public class HTTrackActivity extends FragmentActivity {
 
       break;
     case R.layout.activity_proj_name:
-      final String[] names = getProjectNames();
-      if (names != null) {
-        /* Setup name selection adapter. */
-        final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
-            .findViewById(R.id.fieldProjectName));
-        Log.v(getClass().getSimpleName(), "project names: " + printArray(names));
-        name.setAdapter(new ArrayAdapter<String>(this,
-            android.R.layout.simple_dropdown_item_1line, names));
+      // Refresh suggest
+      refreshprojectNameSuggests();
 
-        // "Next" button is disabled if no project name is defined
-        switchEmptyProjectName = !OptionsMapper.isStringNonEmpty(mapper
-            .getProjectName());
-        View.class.cast(findViewById(R.id.buttonNext)).setEnabled(
-            !switchEmptyProjectName);
+      /* Base path */
+      TextView.class.cast(findViewById(R.id.fieldBasePath)).setText(
+          getProjectRootFile().getAbsolutePath());
 
-        /*
-         * Prior to Honeycomb (TODO FIXME: check that), the android browser is
-         * unable to browse local file:// pages embedding spaces (%20 or +)
-         * Therefore, warn the user.
-         */
-        warnPreHoneycombSpaceIssue = currentapiVersion < VERSION_CODES.HONEYCOMB;
+      // "Next" button is disabled if no project name is defined
+      switchEmptyProjectName = !OptionsMapper.isStringNonEmpty(mapper
+          .getProjectName());
+      View.class.cast(findViewById(R.id.buttonNext)).setEnabled(
+          !switchEmptyProjectName);
 
-        /* Add text watcher for the "Next" button. */
-        name.addTextChangedListener(new TextWatcher() {
-          @Override
-          public void onTextChanged(final CharSequence s, final int start,
-              final int before, final int count) {
-            // Warn when seeing space
-            if (warnPreHoneycombSpaceIssue) {
-              for (int i = start; i < start + count; i++) {
-                if (s.charAt(i) == ' ') {
-                  showNotification(
-                      getString(R.string.warning_space_in_filename), true);
-                  warnPreHoneycombSpaceIssue = false;
-                  break;
-                }
-              }
-            }
-          }
+      /*
+       * Prior to Honeycomb (TODO FIXME: check that), the android browser is
+       * unable to browse local file:// pages embedding spaces (%20 or +)
+       * Therefore, warn the user.
+       */
+      warnPreHoneycombSpaceIssue = currentapiVersion < VERSION_CODES.HONEYCOMB;
 
-          @Override
-          public void afterTextChanged(final Editable s) {
-            // Enable/disable next button
-            boolean empty = true;
-            for (int i = 0; i < s.length(); i++) {
-              if (Character.isLetterOrDigit(s.charAt(i))) {
-                empty = false;
+      /* Add text watcher for the "Next" button. */
+      final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
+          .findViewById(R.id.fieldProjectName));
+      name.addTextChangedListener(new TextWatcher() {
+        @Override
+        public void onTextChanged(final CharSequence s, final int start,
+            final int before, final int count) {
+          // Warn when seeing space
+          if (warnPreHoneycombSpaceIssue) {
+            for (int i = start; i < start + count; i++) {
+              if (s.charAt(i) == ' ') {
+                showNotification(getString(R.string.warning_space_in_filename),
+                    true);
+                warnPreHoneycombSpaceIssue = false;
                 break;
               }
             }
-            if (empty != switchEmptyProjectName) {
-              switchEmptyProjectName = empty;
-              View.class.cast(findViewById(R.id.buttonNext)).setEnabled(!empty);
+          }
+        }
+
+        @Override
+        public void afterTextChanged(final Editable s) {
+          // Enable/disable next button
+          boolean empty = true;
+          for (int i = 0; i < s.length(); i++) {
+            if (Character.isLetterOrDigit(s.charAt(i))) {
+              empty = false;
+              break;
             }
           }
-
-          // NOOP
-          @Override
-          public void beforeTextChanged(final CharSequence s, final int start,
-              final int count, final int after) {
+          if (empty != switchEmptyProjectName) {
+            switchEmptyProjectName = empty;
+            View.class.cast(findViewById(R.id.buttonNext)).setEnabled(!empty);
           }
-        });
-      }
+        }
+
+        // NOOP
+        @Override
+        public void beforeTextChanged(final CharSequence s, final int start,
+            final int count, final int after) {
+        }
+      });
       break;
     case R.layout.activity_proj_setup:
       // Existing cache ?
@@ -1631,6 +1662,16 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
+   * Change base path
+   */
+  public void onClickBasePath(final View view) {
+    // Start new activity
+    final Intent intent = new Intent(this, FileChooserActivity.class);
+    fillExtra(intent);
+    startActivityForResult(intent, ACTIVITY_FILE_CHOOSER);
+  }
+
+  /**
    * "Interrupt" or "Stop"
    */
   public void onClickStop(final View view) {
@@ -1686,6 +1727,13 @@ public class HTTrackActivity extends FragmentActivity {
       if (resultCode == Activity.RESULT_OK) {
         // Load modified map
         loadParcelable(data.getParcelableExtra("com.httrack.android.map"));
+      }
+      break;
+    case ACTIVITY_FILE_CHOOSER:
+      if (resultCode == Activity.RESULT_OK) {
+        // Load modified map
+        final String path = data.getStringExtra("com.httrack.android.rootFile");
+        setBasePath(path);
       }
       break;
     }

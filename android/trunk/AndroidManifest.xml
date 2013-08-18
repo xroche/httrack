@@ -86,6 +86,10 @@
             android:name="com.httrack.android.OptionsActivity$ExpertsOnly"
             android:label="@string/title_activity_options" >
         </activity>
+        <activity
+            android:name="com.httrack.android.FileChooserActivity"
+            android:label="@string/title_activity_file_chooser" >
+        </activity>
     </application>
 
 </manifest>

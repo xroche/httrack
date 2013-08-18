@@ -174,7 +174,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="0dp"
                         android:layout_weight=".70"
-                        android:hint="@string/custom_build_hint" />
+                        android:hint="@string/custom_build_hint"
+                        android:inputType="textNoSuggestions" />
                 </LinearLayout>
             </RadioGroup>
         </LinearLayout>

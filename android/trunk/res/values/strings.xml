@@ -192,5 +192,9 @@
     <string name="hint_default_referer">http://www.example.com/</string>
     <string name="use_word_index">Make a word database</string>
     <string name="use_mail_index">Build a mail archive</string>
+    <string name="base_path">Base path</string>
+    <string name="title_activity_file_chooser">FileChooserActivity</string>
+    <string name="apply_base_path">Save prefs</string>
+    <string name="ellipsis">…</string>
 
 </resources>
