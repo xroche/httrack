@@ -802,6 +802,18 @@ public class HTTrackActivity extends FragmentActivity {
     private volatile boolean interrupted;
     private volatile boolean interruptedHard;
 
+    // Copy of parent strings.
+    private String string_bytes_saved;
+    private String string_links_scanned;
+    private String string_time;
+    private String string_files_written;
+    private String string_transfer_rate;
+    private String string_files_updated;
+    private String string_active_connections;
+    private String string_errors;
+    private String string_connect;
+    private String string_ready;
+
     /**
      * Constructor.
      * 
@@ -820,6 +832,18 @@ public class HTTrackActivity extends FragmentActivity {
      */
     public synchronized void setParent(final HTTrackActivity parent) {
       this.parent = parent;
+
+      // Cache localized strings
+      string_bytes_saved = parent.getString(R.string.bytes_saved);
+      string_links_scanned = parent.getString(R.string.links_scanned);
+      string_time = parent.getString(R.string.time);
+      string_files_written = parent.getString(R.string.files_written);
+      string_transfer_rate = parent.getString(R.string.transfer_rate);
+      string_files_updated = parent.getString(R.string.files_updated);
+      string_active_connections = parent.getString(R.string.active_connections);
+      string_errors = parent.getString(R.string.errors);
+      string_connect = parent.getString(R.string.connect);
+      string_ready = parent.getString(R.string.ready);
     }
 
     /**
@@ -911,11 +935,7 @@ public class HTTrackActivity extends FragmentActivity {
         }
 
         // Build top index
-        synchronized (this) {
-          if (parent != null) {
-            parent.buildTopIndex();
-          }
-        }
+        buildTopIndex();
       } catch (final IOException io) {
         message = io.getMessage();
       }
@@ -925,33 +945,50 @@ public class HTTrackActivity extends FragmentActivity {
           .getString(R.string.mirror_finished) + ": " : "")
           + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
-      if (parent != null) {
-        parent.handlerUI.post(new Runnable() {
-          @Override
-          public synchronized void run() {
-            if (parent != null) {
-              // Final pane
-              parent.setPane(LAYOUT_FINISHED);
+      displayFinishedPanel(displayMessage, errorsCount);
+    }
 
-              // Fancy result message
-              if (displayMessage != null) {
-                final View view = parent.findViewById(R.id.fieldDisplay);
-                if (view != null) {
-                  TextView.class.cast(view).setText(
-                      Html.fromHtml(displayMessage));
-                }
-              }
-              if (errorsCount != 0) {
-                final View view = parent.findViewById(R.id.buttonLogs);
-                if (view != null) {
-                  final Animation shake = AnimationUtils.loadAnimation(parent,
-                      R.anim.scale);
-                  view.startAnimation(shake);
-                }
-              }
-            }
-          }
-        });
+    /*
+     * Trunk to parent.buildTopIndex().
+     */
+    private synchronized void buildTopIndex() {
+      if (parent != null) {
+        parent.buildTopIndex();
+      }
+    }
+
+    /*
+     * Trunk to parent.displayFinishedPanel().
+     */
+    private synchronized void displayFinishedPanel(final String displayMessage,
+        final long errorsCount) {
+      if (parent != null) {
+        parent.displayFinishedPanel(displayMessage, errorsCount);
+      }
+    }
+
+    /*
+     * Trunk to parent.setInterruptedProfile().
+     */
+    private synchronized void setInterruptedProfile(final boolean interrupted)
+        throws IOException {
+      if (parent != null) {
+        if (interrupted) {
+          parent.setInterruptedProfile(true);
+        } else {
+          parent.setInterruptedProfile(false);
+        }
+      } else {
+        throw new IOException("parent has been detached");
+      }
+    }
+
+    /*
+     * Trunk to parent.setProgressLines().
+     */
+    private synchronized void setProgressLines(final String[] lines) {
+      if (parent != null) {
+        parent.setProgressLines(lines);
       }
     }
 
@@ -969,17 +1006,7 @@ public class HTTrackActivity extends FragmentActivity {
       // If not yet stopped, mark as dirty
       // ("Continue an interrupted mirror ...")
       try {
-        synchronized (this) {
-          if (parent != null) {
-            if (stopSent) {
-              parent.setInterruptedProfile(true);
-            } else {
-              parent.setInterruptedProfile(false);
-            }
-          } else {
-            throw new IOException("parent has been detached");
-          }
-        }
+        setInterruptedProfile(stopSent);
       } catch (final IOException io) {
         Log.w(getClass().getSimpleName(), "could not lock file", io);
       }
@@ -1024,117 +1051,127 @@ public class HTTrackActivity extends FragmentActivity {
         if (parent == null) {
           return;
         }
+      }
 
-        // build stats infos
-        final String sep = " • ";
-        str.setLength(0);
-        str.append("<b>" + parent.getString(R.string.bytes_saved) + "</b>: ");
-        str.append(stats.bytesWritten);
-        str.append(sep);
-        str.append("<b>" + parent.getString(R.string.links_scanned) + "</b>: ");
-        str.append(stats.linksScanned);
-        str.append("/");
-        str.append(stats.linksTotal);
-        str.append(" (+");
-        str.append(stats.linksBackground);
-        str.append(")<br />");
-        /* */
-        str.append("<b>" + parent.getString(R.string.time) + "</b>: ");
-        str.append(stats.elapsedTime);
-        str.append(sep);
-        str.append("<b>" + parent.getString(R.string.files_written) + "</b>: ");
-        str.append(stats.filesWritten);
-        str.append(" (+");
-        str.append(stats.filesWrittenBackground);
-        str.append(")<br />");
-        /* */
-        str.append("<b>" + parent.getString(R.string.transfer_rate) + "</b>: ");
-        str.append(stats.transferRate);
-        str.append(" (");
-        str.append(stats.totalTransferRate);
-        str.append(")");
-        str.append(sep);
-        str.append("<b>" + parent.getString(R.string.files_updated) + "</b>: ");
-        str.append(stats.filesUpdated);
+      // build stats infos
+      final String sep = " • ";
+      str.setLength(0);
+      str.append("<b>");
+      str.append(string_bytes_saved);
+      str.append("</b>: ");
+      str.append(stats.bytesWritten);
+      str.append(sep);
+      str.append("<b>");
+      str.append(string_links_scanned);
+      str.append("</b>: ");
+      str.append(stats.linksScanned);
+      str.append("/");
+      str.append(stats.linksTotal);
+      str.append(" (+");
+      str.append(stats.linksBackground);
+      str.append(")<br />");
+      /* */
+      str.append("<b>");
+      str.append(string_time);
+      str.append("</b>: ");
+      str.append(stats.elapsedTime);
+      str.append(sep);
+      str.append("<b>");
+      str.append(string_files_written);
+      str.append("</b>: ");
+      str.append(stats.filesWritten);
+      str.append(" (+");
+      str.append(stats.filesWrittenBackground);
+      str.append(")<br />");
+      /* */
+      str.append("<b>");
+      str.append(string_transfer_rate);
+      str.append("</b>: ");
+      str.append(stats.transferRate);
+      str.append(" (");
+      str.append(stats.totalTransferRate);
+      str.append(")");
+      str.append(sep);
+      str.append("<b>");
+      str.append(string_files_updated);
+      str.append("</b>: ");
+      str.append(stats.filesUpdated);
+      str.append("<br />");
+      /* */
+      str.append("<b>");
+      str.append(string_active_connections);
+      str.append("</b>: ");
+      str.append(stats.socketsCount);
+      str.append(sep);
+      str.append("<b>");
+      str.append(string_errors);
+      str.append("</b>:");
+      str.append(stats.errorsCount);
+      /* */
+      if (stats.elements != null && stats.elements.length != 0) {
         str.append("<br />");
-        /* */
-        str.append("<b>" + parent.getString(R.string.active_connections)
-            + "</b>: ");
-        str.append(stats.socketsCount);
-        str.append(sep);
-        str.append("<b>" + parent.getString(R.string.errors) + "</b>:");
-        str.append(stats.errorsCount);
-        /* */
-        if (stats.elements != null && stats.elements.length != 0) {
-          str.append("<br />");
-          str.append("<br />");
+        str.append("<br />");
 
-          int maxElts = 32; // limit the number of displayed items
-          for (final Element element : stats.elements) {
-            if (element == null || element.address == null
-                || element.filename == null) {
-              continue;
-            }
-            if (--maxElts == 0) {
-              break;
-            }
-
-            // URL
-            str.append("<i>");
-            str.append(element.address);
-            str.append(element.path);
-            str.append("</i>");
-            str.append(" → ");
-
-            // state
-            switch (element.state) {
-            case Element.STATE_CONNECTING:
-              str.append(parent.getString(R.string.connect));
-              break;
-            case Element.STATE_DNS:
-              str.append("dns");
-              break;
-            case Element.STATE_FTP:
-              str.append("ftp");
-              break;
-            case Element.STATE_READY:
-              str.append("<b>");
-              str.append(parent.getString(R.string.ready));
-              str.append("</b>");
-              break;
-            case Element.STATE_RECEIVE:
-              if (element.totalSize > 0) {
-                final long completion = (100 * element.size + element.totalSize / 2)
-                    / element.totalSize;
-                str.append(completion);
-                str.append("%");
-              } else {
-                str.append(element.size);
-                str.append("B");
-              }
-              break;
-            default:
-              str.append("???");
-              break;
-            }
-
-            // Next line
-            str.append("<br />");
+        int maxElts = 32; // limit the number of displayed items
+        for (final Element element : stats.elements) {
+          if (element == null || element.address == null
+              || element.filename == null) {
+            continue;
           }
-        }
-        final String message = str.toString();
-        // Post refresh.
-        if (parent != null) {
-          parent.handlerUI.post(new Runnable() {
-            @Override
-            public synchronized void run() {
-              if (parent != null) {
-                parent.setProgressLines(message);
-              }
+          if (--maxElts == 0) {
+            break;
+          }
+
+          // URL
+          str.append("<i>");
+          str.append(element.address);
+          str.append(element.path);
+          str.append("</i>");
+          str.append(" → ");
+
+          // state
+          switch (element.state) {
+          case Element.STATE_CONNECTING:
+            str.append(string_connect);
+            break;
+          case Element.STATE_DNS:
+            str.append("dns");
+            break;
+          case Element.STATE_FTP:
+            str.append("ftp");
+            break;
+          case Element.STATE_READY:
+            str.append("<b>");
+            str.append(string_ready);
+            str.append("</b>");
+            break;
+          case Element.STATE_RECEIVE:
+            if (element.totalSize > 0) {
+              final long completion = (100 * element.size + element.totalSize / 2)
+                  / element.totalSize;
+              str.append(completion);
+              str.append("%");
+            } else {
+              str.append(element.size);
+              str.append("B");
             }
-          });
+            break;
+          default:
+            str.append("???");
+            break;
+          }
+
+          // Next line
+          str.append("<br />");
         }
       }
+
+      // Final string
+      final String message = str.toString();
+      final String[] lines = brHtmlPattern.split(message);
+
+      // Post refresh.
+      setProgressLines(lines);
     }
 
     /**
@@ -1578,9 +1615,21 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /*
-   * Set the "progress" layout lines.
+   * Set the "progress" layout lines. To be run in any thread.
    */
-  private void setProgressLines(final String linesBuffer) {
+  protected void setProgressLines(final String[] lines) {
+    handlerUI.post(new Runnable() {
+      @Override
+      public void run() {
+        setProgressLinesInternal(lines);
+      }
+    });
+  }
+
+  /*
+   * Set the "progress" layout lines. Must be run in the GUI thread.
+   */
+  private void setProgressLinesInternal(final String[] lines) {
     // Get line divider position of the bottom coordinate
     final View lineDivider = findViewById(R.id.buttonStop);
     final int[] textPosition = new int[2];
@@ -1589,7 +1638,6 @@ public class HTTrackActivity extends FragmentActivity {
     final int lineYTopPosition = linePosition[1];
 
     // Explode lines
-    final String[] lines = brHtmlPattern.split(linesBuffer);
     final LinearLayout layout = LinearLayout.class
         .cast(findViewById(R.id.layout));
 
@@ -1624,6 +1672,36 @@ public class HTTrackActivity extends FragmentActivity {
         text.setText(Html.fromHtml("&nbsp;"));
       }
     }
+  }
+
+  /*
+   * Display the final "finished" panel.
+   */
+  protected void displayFinishedPanel(final String displayMessage,
+      final long errorsCount) {
+    handlerUI.post(new Runnable() {
+      @Override
+      public void run() {
+        // Final pane
+        setPane(LAYOUT_FINISHED);
+
+        // Fancy result message
+        if (displayMessage != null) {
+          final View view = findViewById(R.id.fieldDisplay);
+          if (view != null) {
+            TextView.class.cast(view).setText(Html.fromHtml(displayMessage));
+          }
+        }
+        if (errorsCount != 0) {
+          final View view = findViewById(R.id.buttonLogs);
+          if (view != null) {
+            final Animation shake = AnimationUtils.loadAnimation(
+                HTTrackActivity.this, R.anim.scale);
+            view.startAnimation(shake);
+          }
+        }
+      }
+    });
   }
 
   /**
