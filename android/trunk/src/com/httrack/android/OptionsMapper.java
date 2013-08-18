@@ -31,6 +31,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import android.content.Context;
 import android.os.Parcelable;
@@ -100,6 +101,7 @@ public class OptionsMapper {
       new Pair<Integer, String>(R.id.editHtmlFooter, "Footer"),
       new Pair<Integer, String>(R.id.editAcceptLanguage, "AcceptLanguage"),
       new Pair<Integer, String>(R.id.editOtherHeaders, "OtherHeaders"),
+      new Pair<Integer, String>(R.id.editDefaultReferer, "DefaultReferer"),
 
       /* Spider */
       new Pair<Integer, String>(R.id.checkAcceptCookies, "Cookies"),
@@ -125,6 +127,8 @@ public class OptionsMapper {
       /* FIXME with Log */
       new Pair<Integer, String>(R.id.radioVerbosity, "LogType"),
       new Pair<Integer, String>(R.id.checkUseIndex, "Index"),
+      new Pair<Integer, String>(R.id.checkUseWordIndex, "WordIndex"),
+      new Pair<Integer, String>(R.id.checkUseMailIndex, "MailIndex"),
 
       /*
        * Type/MIME associations (lame mapping, but compatible with the
@@ -168,6 +172,8 @@ public class OptionsMapper {
       new Pair<String, String>("NoRecatch", "0"),
       new Pair<String, String>("Dos", "0"),
       new Pair<String, String>("Index", "1"),
+      new Pair<String, String>("WordIndex", "0"),
+      new Pair<String, String>("MailIndex", "0"),
       new Pair<String, String>("Log", "1"),
       new Pair<String, String>("RemoveTimeout", "0"),
       new Pair<String, String>("RemoveRateout", "0"),
@@ -200,6 +206,7 @@ public class OptionsMapper {
           "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->"),
       new Pair<String, String>("AcceptLanguage", "en,*"),
       new Pair<String, String>("OtherHeaders", ""),
+      new Pair<String, String>("DefaultReferer", ""),
       new Pair<String, String>("MaxRate", "25000"),
       new Pair<String, String>(
           "WildCardFilters",
@@ -269,7 +276,10 @@ public class OptionsMapper {
       new Pair<String, OptionMapper>("Footer", new ArgumentOption("-%F")),
       new Pair<String, OptionMapper>("AcceptLanguage",
           new ArgumentOption("-%l")),
-      new Pair<String, OptionMapper>("OtherHeaders", new StringSplit("-%X")),
+      new Pair<String, OptionMapper>("OtherHeaders", new StringSplit(
+          Pattern.quote("\n"), "-%X")),
+      new Pair<String, OptionMapper>("DefaultReferer",
+          new ArgumentOption("-%R")),
       new Pair<String, OptionMapper>("Cookies",
           new SimpleOptionFlag("b0", true)),
       new Pair<String, OptionMapper>("CheckType", new SimpleOption("u")),
@@ -291,6 +301,8 @@ public class OptionsMapper {
       new Pair<String, OptionMapper>("Log", logHandler.getEnabledMapper()),
       new Pair<String, OptionMapper>("LogType", logHandler.getTypeMapper()),
       new Pair<String, OptionMapper>("Index", new SimpleOptionFlag("I0", true)),
+      new Pair<String, OptionMapper>("WordIndex", new SimpleOptionFlag("%I")),
+      new Pair<String, OptionMapper>("MailIndex", new SimpleOptionFlag("%M")),
       new Pair<String, OptionMapper>("Cache", new SimpleOptionFlag("C0", true)), /* FIXME */
       new Pair<String, OptionMapper>("PrimaryScan",
           primaryScanHandler.getTypeMapper()),
@@ -414,6 +426,7 @@ public class OptionsMapper {
     public static final StringSplit INSTANCE = new StringSplit();
 
     protected final String option;
+    protected final String split;
 
     /**
      * Default constructor. Splits lines.
@@ -428,16 +441,31 @@ public class OptionsMapper {
      * 
      * @param option
      *          The option
+     * @param split
+     *          The split regexp
+     */
+    public StringSplit(final String split, final String option) {
+      this.split = split;
+      this.option = option;
+    }
+
+    /**
+     * Option-enabled feature ; when an option before each splitted string is
+     * required.
+     * 
+     * @param option
+     *          The option
      */
     public StringSplit(final String option) {
-      this.option = option;
+      this("\\s+", option);
     }
 
     @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
       // URLs
-      for (final String s : cleanupString(value).trim().split("\\s+")) {
+      for (String s : cleanupString(value).trim().split(split)) {
+        s = s.trim();
         if (s.length() != 0) {
           if (option != null) {
             commandline.add(option);

@@ -188,5 +188,10 @@
     <string name="type_mime_associations">Type/MIME associations</string>
     <string name="file_types">File types</string>
     <string name="mime_identity">MIME identity</string>
+    <string name="default_referer">Default referer URL</string>
+    <string name="build_mail_archive">Build a mail archive</string>
+    <string name="hint_default_referer">http://www.example.com/</string>
+    <string name="use_word_index">Make a word database</string>
+    <string name="use_mail_index">Build a mail archive</string>
 
 </resources>

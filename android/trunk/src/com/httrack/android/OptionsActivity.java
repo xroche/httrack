@@ -137,7 +137,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Title(R.string.browser_id)
   @ActivityId(R.layout.activity_options_browserid)
   @Fields({ R.id.editBrowserIdentity, R.id.editHtmlFooter,
-      R.id.editAcceptLanguage, R.id.editOtherHeaders })
+      R.id.editAcceptLanguage, R.id.editOtherHeaders, R.id.editDefaultReferer })
   public static class BrowserId implements Tab {
   }
 
@@ -159,7 +159,8 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @ActivityId(R.layout.activity_options_logindexcache)
   @Fields({ R.id.checkStoreAllFilesInCache,
       R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
-      R.id.radioVerbosity, R.id.checkUseIndex })
+      R.id.radioVerbosity, R.id.checkUseIndex, R.id.checkUseWordIndex,
+      R.id.checkUseMailIndex })
   public static class LogIndexCache implements Tab {
   }
 

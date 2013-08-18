@@ -65,6 +65,18 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/use_index" />
+
+        <CheckBox
+            android:id="@+id/checkUseWordIndex"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/use_word_index" />
+
+        <CheckBox
+            android:id="@+id/checkUseMailIndex"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/use_mail_index" />
     </LinearLayout>
 
 </ScrollView>
