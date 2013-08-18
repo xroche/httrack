@@ -1581,12 +1581,12 @@ public class HTTrackActivity extends FragmentActivity {
     final String[] lines = linesBuffer.split(Pattern.quote("<br />"));
     final LinearLayout layout = LinearLayout.class
         .cast(findViewById(R.id.layout));
-    final int currSize = layout.getChildCount();
 
     // Remove any additional lines
     removeLinesFromLayout(layout, lines.length);
 
     // Add lines while we can
+    final int currSize = layout.getChildCount();
     for (int i = 0; i < lines.length; i++) {
       // Fetch or create next layout line.
       final TextView text = i < currSize ? TextView.class.cast(layout
