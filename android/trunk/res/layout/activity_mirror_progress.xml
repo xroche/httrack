@@ -26,6 +26,13 @@
         android:layout_alignLeft="@+id/layout"
         android:layout_alignParentBottom="true" />
 
+    <View
+        android:id="@+id/divideLine"
+        style="@style/DividerLineHorizontal"
+        android:layout_above="@+id/buttonStop"
+        android:layout_alignRight="@+id/buttonStop"
+        android:layout_marginBottom="8dp" />
+
     <Button
         android:id="@+id/buttonStop"
         style="@style/ButtonStyle"
@@ -35,11 +42,5 @@
         android:layout_alignRight="@+id/layout"
         android:onClick="onClickStop"
         android:text="@string/abort" />
-
-    <View
-        style="@style/DividerLineHorizontal"
-        android:layout_above="@+id/buttonStop"
-        android:layout_alignRight="@+id/buttonStop"
-        android:layout_marginBottom="8dp" />
 
 </RelativeLayout>

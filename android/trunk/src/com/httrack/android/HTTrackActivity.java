@@ -1538,30 +1538,75 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /*
+   * Add an empty TextView to "in progress" window.
+   */
+  private TextView addEmptyLineToLayout(final LinearLayout layout) {
+    final TextView text = new TextView(this);
+
+    // Span to the width
+    text.setWidth(LayoutParams.FILL_PARENT);
+    text.setHeight(LayoutParams.WRAP_CONTENT);
+
+    // Single line, with optional ellipsis (...) on the middle
+    text.setSingleLine();
+    text.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+    layout.addView(text);
+
+    // Return new widget
+    return text;
+  }
+
+  /*
+   * Remove lines from the "in progress" window.
+   */
+  private void removeLinesFromLayout(final LinearLayout layout,
+      final int fromPosition) {
+    if (fromPosition < layout.getChildCount()) {
+      layout.removeViews(fromPosition, layout.getChildCount() - fromPosition);
+    }
+  }
+
+  /*
    * Set the "progress" layout lines.
    */
   private void setProgressLines(final String linesBuffer) {
+    // Get line divider position of the bottom coordinate
+    final View lineDivider = findViewById(R.id.buttonStop);
+    final int[] textPosition = new int[2];
+    final int[] linePosition = new int[2];
+    lineDivider.getLocationInWindow(linePosition);
+    final int lineYTopPosition = linePosition[1];
+
+    // Explode lines
     final String[] lines = linesBuffer.split(Pattern.quote("<br />"));
     final LinearLayout layout = LinearLayout.class
         .cast(findViewById(R.id.layout));
     final int currSize = layout.getChildCount();
+
+    // Remove any additional lines
+    removeLinesFromLayout(layout, lines.length);
+
+    // Add lines while we can
     for (int i = 0; i < lines.length; i++) {
-      TextView text;
-      if (i < currSize) {
-        text = TextView.class.cast(layout.getChildAt(i));
-        text.setWidth(LayoutParams.FILL_PARENT);
-        text.setHeight(LayoutParams.WRAP_CONTENT);
-        text.setEllipsize(TextUtils.TruncateAt.MIDDLE);
-        text.setSingleLine();
-      } else {
-        text = new TextView(this);
-        layout.addView(text);
+      // Fetch or create next layout line.
+      final TextView text = i < currSize ? TextView.class.cast(layout
+          .getChildAt(i)) : addEmptyLineToLayout(layout);
+
+      // Stop adding lines if overlapping to the end of the screen
+      text.getLocationInWindow(textPosition);
+      final int height = text.getHeight();
+      final int textYBottomPosition = textPosition[1] + height;
+      if (textYBottomPosition >= lineYTopPosition) {
+        // Then cut everything remaining
+        removeLinesFromLayout(layout, i);
+
+        // Stop here
+        break;
       }
+
+      // Set text (html-formatted) for this line
       final String line = lines[i];
       text.setText(Html.fromHtml(line));
-    }
-    if (lines.length < currSize) {
-      layout.removeViews(lines.length, currSize - lines.length);
     }
   }
 
