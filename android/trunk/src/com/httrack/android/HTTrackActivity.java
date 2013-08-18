@@ -1356,8 +1356,8 @@ public class HTTrackActivity extends FragmentActivity {
         str.append(versionCode);
         str.append(")");
       }
-      str.append(" • Path: ");
-      str.append(getProjectRootFile().getAbsolutePath());
+      // str.append(" • Path: ");
+      // str.append(getProjectRootFile().getAbsolutePath());
       str.append(" • IPv6: ");
       final InetAddress addrV6 = getIPv6Address();
       str.append(addrV6 != null ? ("YES (" + addrV6.getHostAddress() + ")")
