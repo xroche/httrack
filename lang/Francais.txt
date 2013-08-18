@@ -968,3 +968,11 @@ Click on this notification to restart the interrupted mirror
 Cliquez sur cette notification pour redémarrer la copie interrompue
 HTTrack: could not save profile for '%s'!
 HTTrack: impossible de sauver le profil pour '%s'
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Construire une archive email complète (MHT/EML) au format RFC822
+HTTP referer to be sent for initial URLs
+Champ HTTP referer a envoyer pour les URL initiales
+Build a mail archive
+Construire une archive mail
+Default referer URL
+Champ referer par défaut
