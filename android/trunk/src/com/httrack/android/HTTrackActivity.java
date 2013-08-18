@@ -536,9 +536,9 @@ public class HTTrackActivity extends FragmentActivity {
    * @return The list of project names.
    */
   protected String[] getProjectNames() {
-    final List<String> list = new ArrayList<String>();
     final File dir = getProjectRootFile();
-    if (dir.exists() && dir.isDirectory()) {
+    if (dir != null && dir.exists() && dir.isDirectory()) {
+      final List<String> list = new ArrayList<String>();
       final File[] listFiles = dir.listFiles();
       if (list != null) {
         for (final File item : listFiles) {
