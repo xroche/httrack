@@ -2958,6 +2958,16 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
           fopen(fconcat
                 (OPT_GET_BUFF(opt), StringBuff(opt->path_html), "index.mht"),
                 "wb");
+        (void) unlink(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
+                              "index.eml"));
+        if (symlink("index.mht",
+                    fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
+                            "index.eml")) != 0) {
+          if (errno != EPERM) {
+            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+              "could not create symbolic link from index.mht to index.eml");
+          }
+        }
         if (opt->state.mimefp != NULL) {
           char BIGSTK rndtmp[1024], currtime[256];
 
