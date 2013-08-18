@@ -30,6 +30,7 @@ COptionTab6::COptionTab6() : CPropertyPage(COptionTab6::IDD)
 	m_footer = _T("");
 	m_accept_language = _T("");
 	m_other_headers = _T("");
+	m_default_referer = _T("");
 	//}}AFX_DATA_INIT
 }
 
@@ -43,8 +44,9 @@ void COptionTab6::DoDataExchange(CDataExchange* pDX)
 	//{{AFX_DATA_MAP(COptionTab6)
 	DDX_CBString(pDX, IDC_user, m_user);
 	DDX_CBString(pDX, IDC_footer, m_footer);
-	DDX_CBString(pDX, IDC_accept_language, m_accept_language);
-	DDX_CBString(pDX, IDC_other_headers, m_other_headers);
+	DDX_Text(pDX, IDC_accept_language, m_accept_language);
+	DDX_Text(pDX, IDC_other_headers, m_other_headers);
+	DDX_Text(pDX, IDC_default_referer, m_default_referer);
 	//}}AFX_DATA_MAP
 }
 
@@ -69,6 +71,7 @@ BOOL COptionTab6::OnInitDialog()
     SetDlgItemTextCP(this, IDC_STATIC_footer,LANG(LANG_I43b));
     SetDlgItemTextCP(this, IDC_STATIC_accept_language,LANG(LANG_I43c));
     SetDlgItemTextCP(this, IDC_STATIC_other_headers,LANG(LANG_I43d));
+    SetDlgItemTextCP(this, IDC_STATIC_default_referer,LANG(LANG_I43e));
   }
 	
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -118,6 +121,7 @@ char* COptionTab6::GetTip(int ID)
     case IDC_footer: return LANG(LANG_I23b); break;
     case IDC_accept_language: return LANG(LANG_I23c); break;
     case IDC_other_headers: return LANG(LANG_I23d); break;
+    case IDC_default_referer: return LANG(LANG_I23e); break;
   }
   return "";
 }

@@ -32,6 +32,7 @@ COptionTab9::COptionTab9() : CPropertyPage(COptionTab9::IDD)
 	m_logtype = -1;
 	m_norecatch = FALSE;
 	m_index2 = FALSE;
+	m_index_mail = FALSE;
 	//}}AFX_DATA_INIT
 }
 
@@ -49,6 +50,7 @@ void COptionTab9::DoDataExchange(CDataExchange* pDX)
 	DDX_CBIndex(pDX, IDC_logtype, m_logtype);
 	DDX_Check(pDX, IDC_norecatch, m_norecatch);
 	DDX_Check(pDX, IDC_index2, m_index2);
+	DDX_Check(pDX, IDC_index_mail, m_index_mail);
 	//}}AFX_DATA_MAP
 }
 
@@ -70,6 +72,7 @@ BOOL COptionTab9::OnInitDialog()
   if (LANG_T(-1)) {    // Patcher en français
     SetDlgItemTextCP(this, IDC_index,LANG(LANG_I35)); // "Faire un index");
     SetDlgItemTextCP(this, IDC_index2,LANG(LANG_I35b));
+    SetDlgItemTextCP(this, IDC_index_mail,LANG(LANG_I35c));
     SetDlgItemTextCP(this, IDC_logf,LANG(LANG_I36)); // "Fichiers d'audit");
     SetDlgItemTextCP(this, IDC_Cache2,LANG(LANG_I61));
     SetDlgItemTextCP(this, IDC_norecatch,LANG(LANG_I34b));
@@ -81,6 +84,7 @@ BOOL COptionTab9::OnInitDialog()
     GetDlgItem(IDC_norecatch)->ModifyStyle(0,WS_DISABLED);
     GetDlgItem(IDC_index)   ->ModifyStyle(0,WS_DISABLED);
     GetDlgItem(IDC_index2)  ->ModifyStyle(0,WS_DISABLED);
+    GetDlgItem(IDC_index_mail)->ModifyStyle(0,WS_DISABLED);
     GetDlgItem(IDC_logf)    ->ModifyStyle(0,WS_DISABLED);
     GetDlgItem(IDC_Cache2)  ->ModifyStyle(0,WS_DISABLED);
     GetDlgItem(IDC_logtype) ->ModifyStyle(0,WS_DISABLED);
@@ -88,6 +92,7 @@ BOOL COptionTab9::OnInitDialog()
     GetDlgItem(IDC_norecatch)->ModifyStyle(WS_DISABLED,0);
     GetDlgItem(IDC_index)   ->ModifyStyle(WS_DISABLED,0);
     GetDlgItem(IDC_index2)  ->ModifyStyle(WS_DISABLED,0);
+    GetDlgItem(IDC_index_mail)->ModifyStyle(WS_DISABLED,0);
     GetDlgItem(IDC_logf)    ->ModifyStyle(WS_DISABLED,0);
     GetDlgItem(IDC_Cache2)  ->ModifyStyle(WS_DISABLED,0);
     GetDlgItem(IDC_logtype) ->ModifyStyle(WS_DISABLED,0);
@@ -140,6 +145,7 @@ char* COptionTab9::GetTip(int ID)
     case IDC_norecatch: return LANG(LANG_I5b); break;
     case IDC_index:   return LANG(LANG_I6); break; // "Create a start page","Générer une page de départ"); break;
     case IDC_index2:   return LANG(LANG_I6b); break; // "Create a start page","Générer une page de départ"); break;
+    case IDC_index_mail:return LANG(LANG_I6c); break;
     case IDC_logf:    return LANG(LANG_I7); break; // "Create log files for error and info report","Générer des fichiers d'audit pour les erreurs et les messages"); break;
     case IDC_Cache2:  return LANG(LANG_I1e); break;
     case IDC_logtype: return LANG(LANG_I1f); break;

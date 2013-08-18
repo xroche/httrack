@@ -30,6 +30,7 @@ public:
 	int		m_logtype;
 	BOOL	m_norecatch;
 	BOOL	m_index2;
+	BOOL	m_index_mail;
 	//}}AFX_DATA
 
 

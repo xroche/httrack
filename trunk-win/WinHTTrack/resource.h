@@ -148,6 +148,7 @@
 #define IDC_index2                      1026
 #define IDC_GOUP                        1027
 #define IDC_projcateg                   1027
+#define IDC_index_mail                  1027
 #define IDC_Cache                       1029
 #define IDC_dos                         1030
 #define IDC_Cache2                      1030
@@ -413,6 +414,7 @@
 #define IDC_STATIC_answer               1199
 #define IDC_STATIC_other_headers        1199
 #define IDC_STATIC_travel               1200
+#define IDC_STATIC_default_referer      1200
 #define IDC_STATIC_mc                   1201
 #define IDC_STATIC_travel2              1201
 #define IDC_STATIC_mintr                1202
@@ -503,6 +505,7 @@
 #define IDC_mime7                       1305
 #define IDC_mime8                       1306
 #define IDC_other_headers               1306
+#define IDC_default_referer             1308
 #define ID_MENUITEM32771                32771
 #define ID_MENUITEM32772                32772
 #define ID_EXIT                         32772
@@ -574,7 +577,7 @@
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        247
 #define _APS_NEXT_COMMAND_VALUE         32837
-#define _APS_NEXT_CONTROL_VALUE         1307
+#define _APS_NEXT_CONTROL_VALUE         1309
 #define _APS_NEXT_SYMED_VALUE           108
 #endif
 #endif

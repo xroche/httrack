@@ -596,6 +596,7 @@ void compute_options() {
   
   if(!maintab->m_option9.m_index) ShellOptions->index = "I0"; else ShellOptions->index = ""; 
   if(!maintab->m_option9.m_index2) ShellOptions->index2 = "%I0"; else ShellOptions->index2 = "%I"; 
+  if(!maintab->m_option9.m_index_mail) ShellOptions->index_mail = ""; else ShellOptions->index_mail = "%M"; 
   if(maintab->m_option2.m_dos) 
     ShellOptions->dos = "L0"; 
   else if(maintab->m_option2.m_iso9660) 
@@ -779,6 +780,12 @@ void compute_options() {
     ShellOptions->other_headers += maintab->m_option6.m_other_headers;
     ShellOptions->other_headers += "\"";
   } else ShellOptions->other_headers = "";
+
+  if(strcmp(maintab->m_option6.m_default_referer,"")!=0){
+    ShellOptions->default_referer = "\"";
+    ShellOptions->default_referer += maintab->m_option6.m_default_referer;
+    ShellOptions->default_referer += "\"";
+  } else ShellOptions->default_referer = "";
 
   if(strcmp(maintab->m_option4.m_retry,"")!=0){
     ShellOptions->retry = "R";
@@ -1846,6 +1853,7 @@ void lance(void) {
   ShellOptions->LINE += ShellOptions->dos;
   ShellOptions->LINE += ShellOptions->index;
   ShellOptions->LINE += ShellOptions->index2;
+  ShellOptions->LINE += ShellOptions->index_mail;
   ShellOptions->LINE += ShellOptions->htmlfirst;
   ShellOptions->LINE += ShellOptions->filtre;
   ShellOptions->LINE += ShellOptions->max;
@@ -1872,6 +1880,7 @@ void lance(void) {
   if (strcmp(ShellOptions->footer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->footer;}
   if (strcmp(ShellOptions->accept_language,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%l";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->accept_language;}
   if (strcmp(ShellOptions->other_headers,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%X";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->other_headers;}
+  if (strcmp(ShellOptions->default_referer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%R";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->default_referer;}
   
   if ((int)ShellOptions->proxy.GetLength()>0) {
     ShellOptions->LINE += " -P ";
@@ -2403,6 +2412,7 @@ void Write_profile(CString path,int load_path) {
       );
     MyWriteProfileInt(path,strSection, "Index",maintab->m_option9.m_index);
     MyWriteProfileInt(path,strSection, "WordIndex",maintab->m_option9.m_index2);
+    MyWriteProfileInt(path,strSection, "MailIndex",maintab->m_option9.m_index_mail);
     MyWriteProfileInt(path,strSection, "Log",maintab->m_option9.m_logf);
     MyWriteProfileInt(path,strSection, "RemoveTimeout",maintab->m_option4.m_remt);
     MyWriteProfileInt(path,strSection, "RemoveRateout",maintab->m_option4.m_rems);
@@ -2448,6 +2458,7 @@ void Write_profile(CString path,int load_path) {
     MyWriteProfileString(path,strSection, "Footer",maintab->m_option6.m_footer);
     MyWriteProfileString(path,strSection, "AcceptLanguage",maintab->m_option6.m_accept_language);
     MyWriteProfileString(path,strSection, "OtherHeaders",maintab->m_option6.m_other_headers);
+    MyWriteProfileString(path,strSection, "DefaultReferer",maintab->m_option6.m_default_referer);
     MyWriteProfileString(path,strSection, "MaxRate",maintab->m_option5.m_maxrate);
     MyWriteProfileString(path,strSection, "WildCardFilters",maintab->m_option7.m_url2);
     MyWriteProfileString(path,strSection, "Proxy",maintab->m_option10.m_proxy);
@@ -2499,6 +2510,8 @@ void Write_profile(CString path,int load_path) {
     MyWriteProfileInt(path,strSection,"Index", n);
     n=maintab->m_option2.IsDlgButtonChecked(IDC_index2);
     MyWriteProfileInt(path,strSection,"WordIndex", n);
+    n=maintab->m_option2.IsDlgButtonChecked(IDC_index_mail);
+    MyWriteProfileInt(path,strSection,"MailIndex", n);
     n=maintab->m_option2.IsDlgButtonChecked(IDC_logf);
     MyWriteProfileInt(path,strSection,"Log", n);
     n=maintab->m_option2.IsDlgButtonChecked(IDC_errpage);
@@ -2576,6 +2589,8 @@ void Write_profile(CString path,int load_path) {
     // FIXME SHOULD BE MULTILINE!!
     st.Replace("\n", " ");
     MyWriteProfileString(path,strSection, "OtherHeaders", st);
+    maintab->m_option6.GetDlgItemText(IDC_default_referer, st);
+    MyWriteProfileString(path,strSection, "DefaultReferer", st);
     // 7
     maintab->m_option7.GetDlgItemText(IDC_URL2,st);
     MyWriteProfileString(path,strSection, "WildCardFilters", st);
@@ -2717,6 +2732,7 @@ void Read_profile(CString path,int load_path) {
   maintab->m_option2.m_iso9660   = ((MyGetProfileInt(path,strSection, "Dos",0) & 2)>>1);
   maintab->m_option9.m_index     = MyGetProfileInt(path,strSection, "Index",1);
   maintab->m_option9.m_index2    = MyGetProfileInt(path,strSection, "WordIndex",0);
+  maintab->m_option9.m_index_mail= MyGetProfileInt(path,strSection, "MailIndex",0);
   maintab->m_option9.m_logf      = MyGetProfileInt(path,strSection, "Log",1);
   maintab->m_option4.m_remt      = MyGetProfileInt(path,strSection, "RemoveTimeout",0);
   maintab->m_option4.m_rems      = MyGetProfileInt(path,strSection, "RemoveRateout",0);
@@ -2763,6 +2779,8 @@ void Read_profile(CString path,int load_path) {
                                   MyGetProfileString(path,strSection, "AcceptLanguage", default_lang);
   maintab->m_option6.m_other_headers =
                                   MyGetProfileString(path,strSection, "OtherHeaders");
+  maintab->m_option6.m_default_referer =
+                                  MyGetProfileString(path,strSection, "DefaultReferer");
   maintab->m_option5.m_maxrate =  MyGetProfileString(path,strSection, "MaxRate", "25000");
   maintab->m_option5.m_maxconn =  MyGetProfileString(path,strSection, "MaxConn");
   maintab->m_option5.m_maxlinks = MyGetProfileString(path,strSection, "MaxLinks");

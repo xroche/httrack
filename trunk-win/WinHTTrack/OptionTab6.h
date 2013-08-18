@@ -27,6 +27,7 @@ public:
 	CString	m_footer;
 	CString	m_accept_language;
 	CString	m_other_headers;
+	CString	m_default_referer;
 	//}}AFX_DATA
 
 

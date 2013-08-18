@@ -186,13 +186,13 @@ public:
   CString LINE, url, filelist, proxy, proxyftp, port, depth, 
     extdepth, get, where, meth, maxfile, max, frag, 
     conn, tog, cache, robots, choixdeb, build, filtre, htmlfirst, 
-    index, index2, dos, time, rate, hostquit, ka, 
+    index, index2, index_mail, dos, time, rate, hostquit, ka, 
     user, footer, log, testall, parseall, link, path, 
     retry, errpage, external, nopurge, hidepwd, hidequery, 
     cookies, checktype, parsejava, Cache2, logtype, norecatch, 
     toler, updhack, urlhack, http10, waittime, maxtime, maxrate, 
     maxconn, maxlinks, hh, mm, ss, buff_filtres, buff_MIME, 
-    _RasString, accept_language, other_headers;
+    _RasString, accept_language, other_headers, default_referer;
   CString LINE_back;
   RASDIALPARAMS _dial;
 };
