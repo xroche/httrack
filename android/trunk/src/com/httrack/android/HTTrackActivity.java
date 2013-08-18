@@ -539,12 +539,15 @@ public class HTTrackActivity extends FragmentActivity {
     final List<String> list = new ArrayList<String>();
     final File dir = getProjectRootFile();
     if (dir.exists() && dir.isDirectory()) {
-      for (final File item : dir.listFiles()) {
-        if (item.isDirectory()) {
-          final File profile = new File(new File(item, "hts-cache"),
-              "winprofile.ini");
-          if (profile.exists() && profile.isFile()) {
-            list.add(item.getName());
+      final File[] listFiles = dir.listFiles();
+      if (list != null) {
+        for (final File item : listFiles) {
+          if (item.isDirectory()) {
+            final File profile = new File(new File(item, "hts-cache"),
+                "winprofile.ini");
+            if (profile.exists() && profile.isFile()) {
+              list.add(item.getName());
+            }
           }
         }
       }
