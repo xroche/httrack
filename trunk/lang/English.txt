@@ -372,6 +372,8 @@ Create a Start Page
 Create a Start Page
 Create a word database of all html pages
 Create a word database of all html pages
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
 Create error logging and report files
 Create error logging and report files
 Generate DOS 8-3 filenames ONLY
@@ -424,6 +426,8 @@ Languages accepted by the browser
 Languages accepted by the browser
 Additional HTTP headers to be sent in each requests
 Additional HTTP headers to be sent in each requests
+HTTP referer to be sent for initial URLs
+HTTP referer to be sent for initial URLs
 Back to starting page
 Back to starting page
 Save current preferences as default values
@@ -484,6 +488,8 @@ Make an index
 Make an index
 Make a word database
 Make a word database
+Build a mail archive
+Build a mail archive
 Log files
 Log files
 DOS names (8+3)
@@ -516,6 +522,8 @@ Languages
 Languages
 Additional HTTP Headers
 Additional HTTP Headers
+Default referer URL
+Default referer URL
 N# connections
 N# connections
 Abandon host if error

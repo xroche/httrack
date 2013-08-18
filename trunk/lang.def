@@ -430,6 +430,8 @@ LANG_I6
 Create a Start Page
 LANG_I6b
 Create a word database of all html pages
+LANG_I6c
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
 LANG_I7
 Create error logging and report files
 LANG_I8
@@ -482,6 +484,8 @@ LANG_I23c
 Languages accepted by the browser
 LANG_I23d
 Additional HTTP headers to be sent in each requests
+LANG_I23e
+HTTP referer to be sent for initial URLs
 LANG_I24
 Back to starting page
 LANG_I25
@@ -542,6 +546,8 @@ LANG_I35
 Make an index
 LANG_I35b
 Make a word database
+LANG_I35c
+Build a mail archive
 LANG_I36
 Log files
 LANG_I37
@@ -574,6 +580,8 @@ LANG_I43c
 Languages
 LANG_I43d
 Additional HTTP Headers
+LANG_I43e
+Default referer URL
 LANG_I44
 N# connections
 LANG_I45
