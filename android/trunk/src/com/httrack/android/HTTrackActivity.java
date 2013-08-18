@@ -38,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -65,16 +66,19 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.NotificationCompat;
 import android.text.Editable;
 import android.text.Html;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup.LayoutParams;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -114,8 +118,7 @@ public class HTTrackActivity extends FragmentActivity {
   // Fields to restore/save state (Note: might be read-only fields)
   protected static final int fields[][] = { {},
       { R.id.fieldProjectName, R.id.fieldProjectCategory, R.id.fieldBasePath },
-      { R.id.fieldWebsiteURLs, R.id.radioAction }, { R.id.fieldDisplay },
-      { R.id.fieldDisplay } };
+      { R.id.fieldWebsiteURLs, R.id.radioAction }, {}, { R.id.fieldDisplay } };
 
   // Options mapper, containing all options
   protected final OptionsMapper mapper = new OptionsMapper();
@@ -1068,17 +1071,9 @@ public class HTTrackActivity extends FragmentActivity {
               break;
             }
 
-            // url
-            final int max_len = 32;
-            final String s = element.address + element.filename;
-            // cut string if necessary
-            if (s.length() > max_len + 1) {
-              str.append(s.substring(0, max_len / 2));
-              str.append("…");
-              str.append(s.substring(s.length() - max_len / 2));
-            } else {
-              str.append(s);
-            }
+            // URL
+            str.append(element.address);
+            str.append(element.path);
             str.append(" → ");
 
             // state
@@ -1093,7 +1088,9 @@ public class HTTrackActivity extends FragmentActivity {
               str.append("ftp");
               break;
             case Element.STATE_READY:
+              str.append("<b>");
               str.append(parent.getString(R.string.ready));
+              str.append("</b>");
               break;
             case Element.STATE_RECEIVE:
               if (element.totalSize > 0) {
@@ -1121,10 +1118,7 @@ public class HTTrackActivity extends FragmentActivity {
             @Override
             public synchronized void run() {
               if (parent != null) {
-                final View view = parent.findViewById(R.id.fieldDisplay);
-                if (view != null) {
-                  TextView.class.cast(view).setText(Html.fromHtml(message));
-                }
+                parent.setProgressLines(message);
               }
             }
           });
@@ -1541,6 +1535,34 @@ public class HTTrackActivity extends FragmentActivity {
    */
   private void setFieldText(final int id, final String value) {
     widgetDataExchange.setFieldText(id, value);
+  }
+
+  /*
+   * Set the "progress" layout lines.
+   */
+  private void setProgressLines(final String linesBuffer) {
+    final String[] lines = linesBuffer.split(Pattern.quote("<br />"));
+    final LinearLayout layout = LinearLayout.class
+        .cast(findViewById(R.id.layout));
+    final int currSize = layout.getChildCount();
+    for (int i = 0; i < lines.length; i++) {
+      TextView text;
+      if (i < currSize) {
+        text = TextView.class.cast(layout.getChildAt(i));
+        text.setWidth(LayoutParams.FILL_PARENT);
+        text.setHeight(LayoutParams.WRAP_CONTENT);
+        text.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        text.setSingleLine();
+      } else {
+        text = new TextView(this);
+        layout.addView(text);
+      }
+      final String line = lines[i];
+      text.setText(Html.fromHtml(line));
+    }
+    if (lines.length < currSize) {
+      layout.removeViews(lines.length, currSize - lines.length);
+    }
   }
 
   /**
