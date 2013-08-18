@@ -18,9 +18,13 @@
         android:orientation="vertical" >
     </LinearLayout>
 
-    <View
-        style="@style/DividerLineHorizontal"
-        android:layout_alignTop="@+id/buttonStop" />
+    <ProgressBar
+        android:id="@+id/progressMirror"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/layout"
+        android:layout_alignParentBottom="true" />
 
     <Button
         android:id="@+id/buttonStop"
@@ -32,12 +36,10 @@
         android:onClick="onClickStop"
         android:text="@string/abort" />
 
-    <ProgressBar
-        android:id="@+id/progressMirror"
-        style="?android:attr/progressBarStyleSmall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/layout"
-        android:layout_alignParentBottom="true" />
+    <View
+        style="@style/DividerLineHorizontal"
+        android:layout_above="@+id/buttonStop"
+        android:layout_alignRight="@+id/buttonStop"
+        android:layout_marginBottom="8dp" />
 
 </RelativeLayout>
