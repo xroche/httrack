@@ -540,7 +540,7 @@ public class HTTrackActivity extends FragmentActivity {
     if (dir != null && dir.exists() && dir.isDirectory()) {
       final List<String> list = new ArrayList<String>();
       final File[] listFiles = dir.listFiles();
-      if (list != null) {
+      if (listFiles != null) {
         for (final File item : listFiles) {
           if (item.isDirectory()) {
             final File profile = new File(new File(item, "hts-cache"),
