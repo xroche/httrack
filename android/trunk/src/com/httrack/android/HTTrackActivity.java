@@ -106,6 +106,10 @@ public class HTTrackActivity extends FragmentActivity {
   protected static final String PREFS_NAME = "HTTrackPreferences";
   protected static final String BASE_NAME = "BasePath";
 
+  // <br /> Pattern
+  protected static final Pattern brHtmlPattern = Pattern.compile(Pattern
+      .quote("<br />"));
+
   /*
    * Build identifiers. See
    * <http://developer.android.com/reference/android/os/Build
@@ -1060,7 +1064,8 @@ public class HTTrackActivity extends FragmentActivity {
         /* */
         if (stats.elements != null && stats.elements.length != 0) {
           str.append("<br />");
-          str.append("<i><br />");
+          str.append("<br />");
+
           int maxElts = 32; // limit the number of displayed items
           for (final Element element : stats.elements) {
             if (element == null || element.address == null
@@ -1072,8 +1077,10 @@ public class HTTrackActivity extends FragmentActivity {
             }
 
             // URL
+            str.append("<i>");
             str.append(element.address);
             str.append(element.path);
+            str.append("</i>");
             str.append(" → ");
 
             // state
@@ -1107,9 +1114,10 @@ public class HTTrackActivity extends FragmentActivity {
               str.append("???");
               break;
             }
+
+            // Next line
             str.append("<br />");
           }
-          str.append("</i>");
         }
         final String message = str.toString();
         // Post refresh.
@@ -1578,7 +1586,7 @@ public class HTTrackActivity extends FragmentActivity {
     final int lineYTopPosition = linePosition[1];
 
     // Explode lines
-    final String[] lines = linesBuffer.split(Pattern.quote("<br />"));
+    final String[] lines = brHtmlPattern.split(linesBuffer);
     final LinearLayout layout = LinearLayout.class
         .cast(findViewById(R.id.layout));
 
@@ -1605,8 +1613,13 @@ public class HTTrackActivity extends FragmentActivity {
       }
 
       // Set text (html-formatted) for this line
-      final String line = lines[i];
-      text.setText(Html.fromHtml(line));
+      final String line = lines[i].trim();
+      if (line.length() != 0) {
+        text.setText(Html.fromHtml(line));
+      } else {
+        // Otherwise Android 3.0 does not insert any blank line
+        text.setText(Html.fromHtml("&nbsp;"));
+      }
     }
   }
 
