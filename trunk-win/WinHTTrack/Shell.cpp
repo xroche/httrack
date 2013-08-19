@@ -474,14 +474,15 @@ void CShellApp::OptPannel() {
 }
 
 
-#define ADD_MIME_IN_COPT(A) \
+#define ADD_MIME_IN_COPT(A) do { \
   if(strlen(maintab->m_option11.m_ext##A)+strlen(maintab->m_option11.m_mime##A)) { \
-  ShellOptions->buff_MIME += "--assume "; \
+  ShellOptions->buff_MIME += "--assume\n"; \
   ShellOptions->buff_MIME += maintab->m_option11.m_ext##A; \
   ShellOptions->buff_MIME += "="; \
   ShellOptions->buff_MIME += maintab->m_option11.m_mime##A; \
-  ShellOptions->buff_MIME += " "; \
+  ShellOptions->buff_MIME += "\n"; \
   } \
+} while(0)
   
 // parser maintab et calculer options
 void compute_options() { 
@@ -797,26 +798,26 @@ void compute_options() {
   
   // MIME
   ShellOptions->buff_MIME = "";
-  ADD_MIME_IN_COPT(1)
-    ADD_MIME_IN_COPT(2)
-    ADD_MIME_IN_COPT(3)
-    ADD_MIME_IN_COPT(4)
-    ADD_MIME_IN_COPT(5)
-    ADD_MIME_IN_COPT(6)
-    ADD_MIME_IN_COPT(7)
-    ADD_MIME_IN_COPT(8)
-    
-    /* autres options: RAS */
-    if (dialog2->m_rasdisc)
-      disconnect=1;     /* déconnexion à la fin */
-    else
-      disconnect=0;
+  ADD_MIME_IN_COPT(1);
+  ADD_MIME_IN_COPT(2);
+  ADD_MIME_IN_COPT(3);
+  ADD_MIME_IN_COPT(4);
+  ADD_MIME_IN_COPT(5);
+  ADD_MIME_IN_COPT(6);
+  ADD_MIME_IN_COPT(7);
+  ADD_MIME_IN_COPT(8);
 
-    /* autres options: Shutdown */
-    if (dialog2->m_rasshut)
-      shutdown_pc=1;     /* étendre à la fin */
-    else
-      shutdown_pc=0;
+  /* autres options: RAS */
+  if (dialog2->m_rasdisc)
+    disconnect=1;     /* déconnexion à la fin */
+  else
+    disconnect=0;
+
+  /* autres options: Shutdown */
+  if (dialog2->m_rasshut)
+    shutdown_pc=1;     /* étendre à la fin */
+  else
+    shutdown_pc=0;
 }
 
 /* From MSDN: */
@@ -1760,6 +1761,15 @@ void __cdecl RunBackRobot(void* al_p) {
     WHTT_UNLOCK();
     htsthread_wait_n(1);
     hts_uninit();
+
+    // Cleanup argv
+    if (argv != NULL) {
+      for(int i = 0 ; argv[i] != NULL ; i++) {
+        freet(argv[i]);
+        argv[i] = NULL;
+      }
+      freet(argv);
+    }
 }
 #endif
 
@@ -1786,6 +1796,50 @@ CString change(char* chaine,char c) {
   return chaine1;
 }
 
+class SeparatorComparator {
+public:
+  inline virtual bool isSeparator(const char c) const = 0;
+};
+
+class SpaceSeparatorComparator: public SeparatorComparator {
+public:
+  inline bool isSeparator(const char c) const {
+    return c == ' ' || c == '\t' || c == '\n';
+  }
+};
+
+class EOLSeparatorComparator: public SeparatorComparator {
+public:
+  inline bool isSeparator(const char c) const {
+    return c == '\n';
+  }
+};
+
+static const SpaceSeparatorComparator instSpaceSeparatorComparator;
+static const EOLSeparatorComparator instEOLSeparatorComparator;
+
+static void splitStringInArray(CSimpleArray<CString> &args, 
+                               const CString &str, 
+                               const SeparatorComparator &comp=instEOLSeparatorComparator,
+                               const CString &separator=CString()) {
+  const int size = str.GetLength();
+  int i, last;
+  for(i = 0, last = 0 ; i <= size; i++) {
+    if (i == size || comp.isSeparator(str[i])) {
+      if (last != i) {
+        CString sub = str.Mid(last, i - last);
+        sub.Trim(_T(" \t\r\n"));
+        if (sub.GetLength() != 0) {
+          if (separator.GetLength() !=0) {
+            args.Add(separator);
+          }
+          args.Add(sub);
+        }
+      }
+      last = i + 1;
+    }
+  }
+}
 
 // Lancement
 void lance(void) {
@@ -1796,206 +1850,180 @@ void lance(void) {
   int i =0;
 	char catbuff[CATBUFF_SIZE], catbuff2[CATBUFF_SIZE];
 
-  //
+  CSimpleArray<CString> args;
+  CString single;
+
   if (fp_debug) {
     fprintf(fp_debug,"Building command line\r\n");
     fflush(fp_debug);
   }
-  //
-  ShellOptions->LINE = "";
-  ShellOptions->LINE = "-";
+
+
+  // Single command (compacted)
+  single = "-";
+  args.Add("--dummy");   // room for single command flags
   if (ShellOptions->choixdeb[0]!='W')
-    ShellOptions->LINE += "q";         // quiet
+    single += "q";         // quiet
   
   if (ShellOptions->choixdeb[0]=='/')
-    ShellOptions->LINE += "i";
+    single += "i";
   else if (ShellOptions->choixdeb[0]!='!')
-    ShellOptions->LINE += ShellOptions->choixdeb;
+    single += ShellOptions->choixdeb;
+
   // option de profondeur
   if(strcmp(ShellOptions->depth,"")!=0) { 
-    ShellOptions->LINE += "r";
-    ShellOptions->LINE += ShellOptions->depth;
+    single += "r";
+    single += ShellOptions->depth;
   }
   if(strcmp(ShellOptions->extdepth,"")!=0) { 
-    ShellOptions->LINE += "%e";
-    ShellOptions->LINE += ShellOptions->extdepth;
+    single += "%e";
+    single += ShellOptions->extdepth;
   }
-  if(strcmp(ShellOptions->cache,"")!=0) ShellOptions->LINE += ShellOptions->cache;
-  if(strcmp(ShellOptions->norecatch,"")!=0) ShellOptions->LINE += ShellOptions->norecatch;
-  if(strcmp(ShellOptions->testall,"")!=0) ShellOptions->LINE += ShellOptions->testall;
-  if(strcmp(ShellOptions->parseall,"")!=0) ShellOptions->LINE += ShellOptions->parseall;
-  if(strcmp(ShellOptions->link,"")!=0) ShellOptions->LINE += ShellOptions->link;
-  if(strcmp(ShellOptions->external,"")!=0) ShellOptions->LINE += ShellOptions->external;
-  if(strcmp(ShellOptions->nopurge,"")!=0) ShellOptions->LINE += ShellOptions->nopurge;
-  if(strcmp(ShellOptions->hidepwd,"")!=0) ShellOptions->LINE += ShellOptions->hidepwd;
-  if(strcmp(ShellOptions->hidequery,"")!=0) ShellOptions->LINE += ShellOptions->hidequery;
-  if(strcmp(ShellOptions->robots,"")!=0) ShellOptions->LINE += ShellOptions->robots;
-  if(strcmp(ShellOptions->cookies,"")!=0) ShellOptions->LINE += ShellOptions->cookies;
-  if(strcmp(ShellOptions->checktype,"")!=0) ShellOptions->LINE += ShellOptions->checktype;
-  if(strcmp(ShellOptions->parsejava,"")!=0) ShellOptions->LINE += ShellOptions->parsejava;
-  if(strcmp(ShellOptions->Cache2,"")!=0) ShellOptions->LINE += ShellOptions->Cache2;
-  if(strcmp(ShellOptions->logtype,"")!=0) ShellOptions->LINE += ShellOptions->logtype;
-  if (ShellOptions->http10.GetLength()) ShellOptions->LINE += ShellOptions->http10;
-  if (ShellOptions->toler.GetLength()) ShellOptions->LINE += ShellOptions->toler;
-  if (ShellOptions->updhack.GetLength()) ShellOptions->LINE += ShellOptions->updhack;
-  if (ShellOptions->urlhack.GetLength()) ShellOptions->LINE += ShellOptions->urlhack;
+  single += ShellOptions->cache;
+  single += ShellOptions->norecatch;
+  single += ShellOptions->testall;
+  single += ShellOptions->parseall;
+  single += ShellOptions->link;
+  single += ShellOptions->external;
+  single += ShellOptions->nopurge;
+  single += ShellOptions->hidepwd;
+  single += ShellOptions->hidequery;
+  single += ShellOptions->robots;
+  single += ShellOptions->cookies;
+  single += ShellOptions->checktype;
+  single += ShellOptions->parsejava;
+  single += ShellOptions->Cache2;
+  single += ShellOptions->logtype;
+  single += ShellOptions->http10;
+  single += ShellOptions->toler;
+  single += ShellOptions->updhack;
+  single += ShellOptions->urlhack;
   
   // si get, ne pas faire
   if (strcmp(ShellOptions->choixdeb,"g")!=0) {
     if(ShellOptions->build[0]=='-') {
-      ShellOptions->LINE += " ";
-      ShellOptions->LINE += ShellOptions->build;
-      ShellOptions->LINE += " -";
-    } else if (strcmp(ShellOptions->build,"")!=0) ShellOptions->LINE += ShellOptions->build;
+      args.Add(ShellOptions->build);
+    } else {
+      single += ShellOptions->build;
+    }
   }
-  ShellOptions->LINE += ShellOptions->dos;
-  ShellOptions->LINE += ShellOptions->index;
-  ShellOptions->LINE += ShellOptions->index2;
-  ShellOptions->LINE += ShellOptions->index_mail;
-  ShellOptions->LINE += ShellOptions->htmlfirst;
-  ShellOptions->LINE += ShellOptions->filtre;
-  ShellOptions->LINE += ShellOptions->max;
-  ShellOptions->LINE += ShellOptions->frag;
-  ShellOptions->LINE += ShellOptions->maxfile;
-  ShellOptions->LINE += ShellOptions->conn;
-  ShellOptions->LINE += ShellOptions->time;
-  ShellOptions->LINE += ShellOptions->rate;
-  ShellOptions->LINE += ShellOptions->retry;
-  ShellOptions->LINE += ShellOptions->hostquit;
-  ShellOptions->LINE += ShellOptions->ka;
-  ShellOptions->LINE += ShellOptions->log;
-  ShellOptions->LINE += ShellOptions->errpage;
+  single += ShellOptions->dos;
+  single += ShellOptions->index;
+  single += ShellOptions->index2;
+  single += ShellOptions->index_mail;
+  single += ShellOptions->htmlfirst;
+  single += ShellOptions->filtre;
+  single += ShellOptions->max;
+  single += ShellOptions->frag;
+  single += ShellOptions->maxfile;
+  single += ShellOptions->conn;
+  single += ShellOptions->time;
+  single += ShellOptions->rate;
+  single += ShellOptions->retry;
+  single += ShellOptions->hostquit;
+  single += ShellOptions->ka;
+  single += ShellOptions->log;
+  single += ShellOptions->errpage;
   //-->
-  ShellOptions->LINE += ShellOptions->waittime;
-  ShellOptions->LINE += ShellOptions->maxtime;
-  ShellOptions->LINE += ShellOptions->maxrate;
-  ShellOptions->LINE += ShellOptions->maxconn;
-  ShellOptions->LINE += ShellOptions->maxlinks;
-  ShellOptions->LINE += ShellOptions->proxyftp;  
-  ShellOptions->LINE += "#f";  // flush
+  single += ShellOptions->waittime;
+  single += ShellOptions->maxtime;
+  single += ShellOptions->maxrate;
+  single += ShellOptions->maxconn;
+  single += ShellOptions->maxlinks;
+  single += ShellOptions->proxyftp;  
+  single += "#f";  // flush
   
-  if (strcmp(ShellOptions->user,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->user;}
-  if (strcmp(ShellOptions->footer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->footer;}
-  if (strcmp(ShellOptions->accept_language,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%l";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->accept_language;}
-  if (strcmp(ShellOptions->default_referer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%R";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->default_referer;}
+  if (ShellOptions->user.GetLength() != 0) {
+    args.Add("-F");
+    args.Add(ShellOptions->user);
+  }
+
+  if (ShellOptions->footer.GetLength() != 0) {
+    args.Add("-%F");
+    args.Add(ShellOptions->footer);
+  }
+
+  if (ShellOptions->accept_language.GetLength() != 0) {
+    args.Add("-%l");
+    args.Add(ShellOptions->accept_language);
+  }
+
+  if (ShellOptions->default_referer.GetLength() != 0) {
+    args.Add("-%R");
+    args.Add(ShellOptions->default_referer);
+  }
 
   // Explode \n in other_headers
   if (ShellOptions->other_headers.GetLength() != 0) {
-    const int size = ShellOptions->other_headers.GetLength();
-    int i, last;
-    for(i = 0, last = 0 ; i <= size; i++) {
-      if (i == size || ShellOptions->other_headers[i] == '\n') {
-        if (last != i) {
-          CString str = ShellOptions->other_headers.Mid(last, i - last);
-          str.Trim();
-          if (str.GetLength() != 0) {
-            ShellOptions->LINE += " ";
-            ShellOptions->LINE += "-%X";
-            ShellOptions->LINE += " ";
-            ShellOptions->LINE += "\"";
-            ShellOptions->LINE += str;
-            ShellOptions->LINE += "\"";
-          }
-        }
-        last = i + 1;
-      }
-    }
+    splitStringInArray(args, ShellOptions->other_headers, instEOLSeparatorComparator, "-%X");
   }
 
   if ((int)ShellOptions->proxy.GetLength()>0) {
-    ShellOptions->LINE += " -P ";
-    ShellOptions->LINE += ShellOptions->proxy;
-    ShellOptions->LINE += ":";
-    ShellOptions->LINE += ShellOptions->port;
+    args.Add("-P");
+    args.Add(ShellOptions->proxy + ":" + ShellOptions->port);
   }
-  
-  //if (strnotempty(LANGUAGE_ISO)) {
-  //  ShellOptions->LINE += " -%l \"";
-  //  ShellOptions->LINE += LANGUAGE_ISO;
-  //  if (strcmp(LANGUAGE_ISO, "en") != 0)
-  //    ShellOptions->LINE += ", en";
-  //  ShellOptions->LINE += ", *\"";
-  //}
   
   // mode spider, mettre après options
   if (ShellOptions->choixdeb[0]=='!') {
-    ShellOptions->LINE += " --testlinks";
+    args.Add("--testlinks");
   } else if (ShellOptions->choixdeb[0]=='Y') {
-    ShellOptions->LINE += " --mirrorlinks";
+    args.Add("--mirrorlinks");
   }
   
   // URLs!!
-  ShellOptions->LINE += " ";
-  ShellOptions->LINE += ShellOptions->url;
+  if (ShellOptions->url.GetLength() != 0) {
+    splitStringInArray(args, ShellOptions->url, instSpaceSeparatorComparator);
+  }
   
   // file list
   if ((int) ShellOptions->filelist.GetLength()>0) {
-    ShellOptions->LINE += " -%L \"";
-    ShellOptions->LINE += ShellOptions->filelist;
-    ShellOptions->LINE += "\"";
+    args.Add("-%L");
+    args.Add(ShellOptions->filelist);
   }
   
   // chemins
   if(ShellOptions->path != "") {
-    ShellOptions->LINE += " ";
-    ShellOptions->LINE += "-O1";
-    ShellOptions->LINE += " ";
-    ShellOptions->LINE += ShellOptions->path;
+    args.Add("-O1");
+    args.Add(ShellOptions->path);
   }
   
   // buffer -> les + et -
-  if(strcmp(ShellOptions->buff_filtres,"")!=0) {
-    //if(strcmp(diafiltre.m_url2 ,"")!=0) {
-    ShellOptions->LINE += " ";
-    ShellOptions->LINE += ShellOptions->buff_filtres ;
+  if(ShellOptions->buff_filtres.GetLength() != 0) {
+    splitStringInArray(args, ShellOptions->buff_filtres, instSpaceSeparatorComparator);
   }
   
   // --assume
   if (ShellOptions->buff_MIME.GetLength() != 0) {
-    ShellOptions->LINE += " ";
-    ShellOptions->LINE += ShellOptions->buff_MIME ;
+    splitStringInArray(args, ShellOptions->buff_MIME, instEOLSeparatorComparator);
   }
+
+  // initial flags
+  args.SetAtIndex(0, single);
   
   // ---
   
-  //
-  if (fp_debug) {
-    fprintf(fp_debug,"Cleaning up command line and counting parameters\r\n");
-    fflush(fp_debug);
+  ShellOptions->LINE_back = "winhttrack ";
+
+  // Split into argc/argv
+  argvAlloc = 1 + args.GetSize() + 1;
+  argv = (char**) malloct(argvAlloc * sizeof(char*));
+  argv[0] = strdupt("winhttrack");
+  for(int i = 0; i < args.GetSize(); i++) {
+    argv[i + 1] = strdupt((const char*) args[i]);
+
+    // For debugging only
+    ShellOptions->LINE_back += ' ';
+    const bool quote = args[i].Find('"') >= 0;
+    if (quote) {
+      ShellOptions->LINE_back += '"';
+    }
+    ShellOptions->LINE_back += args[i];
+    if (quote) {
+      ShellOptions->LINE_back += '"';
+    }
   }
-  //
-  // épurer cr,lf,tab - double espace -> espace
-  {
-    char *dest = ShellOptions->LINE.GetBuffer(0);
-    char *a;
-    while(a=strchr(dest,9)) *a=' ';
-    while(a=strchr(dest,10)) *a=' ';
-    while(a=strchr(dest,13)) *a=' ';
-	ShellOptions->LINE.ReleaseBuffer();
-  }
-  
-  ShellOptions->LINE_back = ShellOptions->LINE;
-  
-  // couper en morceaux
-  {
-    char* p=ShellOptions->LINE.GetBuffer(0);
-    argv = (char**) malloct(argvAlloc * sizeof(char*));
-    argv[0]="winhttrack";
-    do {
-      if (argc >= argvAlloc) {
-        argvAlloc *= 2;
-        argv = (char**) realloct(argv, argvAlloc * sizeof(char*));
-        assertf(argv != NULL);
-      }
-      argv[argc++]=p;
-      p=next_token(p,0);    // prochain token
-      if (p) {
-        *p=0;    // octet nul (tableau)
-        p++;
-      }            
-    } while(p!=NULL);
-  }
-  
+  argv[argc = args.GetSize() + 1] = NULL;
+
   //
   if (fp_debug) {
     fprintf(fp_debug,"Checking doit.log\r\n");
@@ -2156,10 +2184,6 @@ void lance(void) {
   }
   else {
   }
-
-  if (argv != NULL)
-    freet(argv);
-  
 }
 
 // int LANG_T(int);

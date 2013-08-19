@@ -183,7 +183,7 @@ BOOL LaunchMirror();
 /* Class */
 class CShellOptions {
 public:
-  CString LINE, url, filelist, proxy, proxyftp, port, depth, 
+  CString url, filelist, proxy, proxyftp, port, depth, 
     extdepth, get, where, meth, maxfile, max, frag, 
     conn, tog, cache, robots, choixdeb, build, filtre, htmlfirst, 
     index, index2, index_mail, dos, time, rate, hostquit, ka, 
