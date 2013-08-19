@@ -4052,9 +4052,8 @@ int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize) 
   if (size_to_test >= 0) {
 
     /* Interdiction taille par le wizard? */
-    if (hts_testlinksize
-        (opt, eback->url_adr, eback->url_fil,
-         eback->r.totalsize / 1024) == -1) {
+    if (hts_testlinksize(opt, eback->url_adr, eback->url_fil,
+                         size_to_test / 1024) == -1) {
       return 0;                 /* interdit */
     }
 
