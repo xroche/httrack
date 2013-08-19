@@ -776,9 +776,7 @@ void compute_options() {
   } else ShellOptions->accept_language = "";
 
   if(strcmp(maintab->m_option6.m_other_headers,"")!=0){
-    ShellOptions->other_headers = "\"";
     ShellOptions->other_headers += maintab->m_option6.m_other_headers;
-    ShellOptions->other_headers += "\"";
   } else ShellOptions->other_headers = "";
 
   if(strcmp(maintab->m_option6.m_default_referer,"")!=0){
@@ -1797,7 +1795,7 @@ void lance(void) {
   int g=0;
   int i =0;
 	char catbuff[CATBUFF_SIZE], catbuff2[CATBUFF_SIZE];
-  
+
   //
   if (fp_debug) {
     fprintf(fp_debug,"Building command line\r\n");
@@ -1879,9 +1877,31 @@ void lance(void) {
   if (strcmp(ShellOptions->user,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->user;}
   if (strcmp(ShellOptions->footer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%F";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->footer;}
   if (strcmp(ShellOptions->accept_language,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%l";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->accept_language;}
-  if (strcmp(ShellOptions->other_headers,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%X";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->other_headers;}
   if (strcmp(ShellOptions->default_referer,"")!=0) {ShellOptions->LINE += " ";ShellOptions->LINE += "-%R";ShellOptions->LINE += " ";ShellOptions->LINE += ShellOptions->default_referer;}
-  
+
+  // Explode \n in other_headers
+  if (ShellOptions->other_headers.GetLength() != 0) {
+    const int size = ShellOptions->other_headers.GetLength();
+    int i, last;
+    for(i = 0, last = 0 ; i <= size; i++) {
+      if (i == size || ShellOptions->other_headers[i] == '\n') {
+        if (last != i) {
+          CString str = ShellOptions->other_headers.Mid(last, i - last);
+          str.Trim();
+          if (str.GetLength() != 0) {
+            ShellOptions->LINE += " ";
+            ShellOptions->LINE += "-%X";
+            ShellOptions->LINE += " ";
+            ShellOptions->LINE += "\"";
+            ShellOptions->LINE += str;
+            ShellOptions->LINE += "\"";
+          }
+        }
+        last = i + 1;
+      }
+    }
+  }
+
   if ((int)ShellOptions->proxy.GetLength()>0) {
     ShellOptions->LINE += " -P ";
     ShellOptions->LINE += ShellOptions->proxy;
