@@ -654,8 +654,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_buildTopIndex(JNIEnv* env, jclass c
   UNUSED(clazz);
 }
 
-jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
-    jobjectArray stringArray) {
+jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
   const int argc =
       object != NULL ? (*env)->GetArrayLength(env, stringArray) : 0;
   const size_t argv_size = (argc + 1) * sizeof(char*);
@@ -693,19 +692,9 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
 
     if (opt != NULL) {
       const hts_stat_struct* stats;
-      int fatal = 0;
 
       /* Rock'in! */
-      COFFEE_TRY() {
-        code = hts_main2(argc, argv, opt);
-      } COFFEE_CATCH() {
-        const char*const message = native_code_crash_handler_get_message();
-        throwRuntimeException(env, message);
-        fatal = 1;
-      } COFFEE_END();
-      if (fatal) {
-        return -1;
-      }
+      code = hts_main2(argc, argv, opt);
 
       /* Fetch last stats before cleaning up */
       stats = hts_get_stats(opt);
@@ -748,4 +737,16 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     throwRuntimeException(env, format);
     return -1;
   }
+}
+
+jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
+    jobjectArray stringArray) {
+  COFFEE_TRY() {
+    const jint code = HTTrackLib_main(env, object, stringArray);
+    return code;
+  } COFFEE_CATCH() {
+    const char*const message = native_code_crash_handler_get_message();
+    throwRuntimeException(env, message);
+  } COFFEE_END();
+  return -1;
 }
