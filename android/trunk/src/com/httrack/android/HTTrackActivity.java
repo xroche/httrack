@@ -875,34 +875,38 @@ public class HTTrackActivity extends FragmentActivity {
     }
 
     protected void runInternal() {
-      final File target = parent.getTargetFile();
-      final List<String> args = new ArrayList<String>();
-
-      // Program name
-      args.add("httrack");
-
-      // If IPv6 is not available, do not use it.
-      if (!isIPv6Enabled()) {
-        args.add("-@i4");
-      }
-
-      // Target
-      args.add("-O");
-      args.add(target.getAbsolutePath());
-
-      // Get args from mapper
-      for (final String cmd : parent.buildCommandline()) {
-        args.add(cmd);
-      }
-
-      // Final args array
-      final String[] cargs = args.toArray(new String[] {});
-      Log.v(getClass().getSimpleName(),
-          "starting engine: " + HTTrackActivity.printArray(cargs));
-
       // Rock'in!
       String message = null;
       try {
+        final File target = parent.getTargetFile();
+        if (target == null) {
+          throw new IOException("no project name defined!");
+        }
+
+        final List<String> args = new ArrayList<String>();
+
+        // Program name
+        args.add("httrack");
+
+        // If IPv6 is not available, do not use it.
+        if (!isIPv6Enabled()) {
+          args.add("-@i4");
+        }
+
+        // Target
+        args.add("-O");
+        args.add(target.getAbsolutePath());
+
+        // Get args from mapper
+        for (final String cmd : parent.buildCommandline()) {
+          args.add(cmd);
+        }
+
+        // Final args array
+        final String[] cargs = args.toArray(new String[] {});
+        Log.v(getClass().getSimpleName(),
+            "starting engine: " + HTTrackActivity.printArray(cargs));
+
         // Validate path
         if (!HTTrackActivity.mkdirs(target)) {
           throw new IOException("Unable to create " + target.getAbsolutePath());
