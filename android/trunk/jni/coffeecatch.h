@@ -76,7 +76,7 @@
 #include <unwind.h>
 #endif
 
-#if 01
+#if ( defined(NDK_DEBUG) && ( NDK_DEBUG == 1 ) )
 #define DEBUG(A) do { A; } while(0)
 #define FD_ERRNO 2
 static void print(const char *const s) {
