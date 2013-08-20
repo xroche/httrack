@@ -34,11 +34,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "htsdefines.h"
 #include "htscore.h"
 
+#include "coffeecatch.h"
+
 /* fine-grained stats */
 #define GENERATE_FINE_STATS 1
 
 /* redirect stdio on a log file ? */
-#define REDIRECT_STDIO_LOG_FILE 1
+#define REDIRECT_STDIO_LOG_FILE
 
 /* Our own assert version. */
 static void assert_failure(const char* exp, const char* file, int line) {
@@ -285,13 +287,15 @@ static void throwNPException(JNIEnv* env, const char *message) {
 
 void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jclass clazz) {
   /* redirect stdout and stderr to a log file for debugging purpose */
-#if REDIRECT_STDIO_LOG_FILE
-  FILE *const log = fopen("/sdcard/HTTrack/log.txt", "wb");
+#ifdef REDIRECT_STDIO_LOG_FILE
+  FILE *const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
   if (log != NULL) {
-    const int fd = fileno(log);
+    const int fd = dup(fileno(log));
     if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
       assert(! "could not redirect stdin/stdout");
     }
+    fclose(log);
+    fprintf(stderr, "started stdio logging in file\n");
   }
 #endif
 
@@ -689,9 +693,19 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
 
     if (opt != NULL) {
       const hts_stat_struct* stats;
+      int fatal = 0;
 
       /* Rock'in! */
-      code = hts_main2(argc, argv, opt);
+      COFFEE_TRY() {
+        code = hts_main2(argc, argv, opt);
+      } COFFEE_CATCH() {
+        const char*const message = native_code_crash_handler_get_message();
+        throwRuntimeException(env, message);
+        fatal = 1;
+      } COFFEE_END();
+      if (fatal) {
+        return -1;
+      }
 
       /* Fetch last stats before cleaning up */
       stats = hts_get_stats(opt);
