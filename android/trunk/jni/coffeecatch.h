@@ -19,7 +19,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-/* CoffeeCatch, tiny native signal handler/catcher for JNI code.
+/* CoffeeCatch, a tiny native signal handler/catcher for JNI code.
  * (especially for Android/Dalvik)
  *
  * Copyright (c) 2013, Xavier Roche (http://www.httrack.com/)
