@@ -190,6 +190,12 @@ static UNUSED void try_jump_to_userland(const int code, siginfo_t *const si,
   }
 }
 
+static UNUSED void start_alarm() {
+  /* Ensure we do not deadlock. Default of ALRM is to die.
+   * (signal() and alarm() are signal-safe) */
+  (void) alarm(30);
+}
+
 /* Internal signal pass-through. Allows to peek the "real" crash before
  * calling the Java handler. Remember than Java needs many of the signals
  * (for the JIT, for test-free NullPointerException handling, etc.)
@@ -200,15 +206,22 @@ static UNUSED void signal_handler_pass(const int code, siginfo_t *const si,
                                        void *const sc) {
   DEBUG(print("caught signal\n"));
 
+  /* Call the "real" Java handler for JIT and internals. */
+  call_old_signal_handler(code, si, sc);
+
+  /* Still here ?
+   * FIXME TODO: This is the Dalvik behavior - but is it the SunJVM one ? */
+
+  /* Ensure we do not deadlock. Default of ALRM is to die.
+   * (signal() and alarm() are signal-safe) */
+  signal(code, SIG_DFL);
+  start_alarm();
+
   /* Take note of the signal. */
   native_code_s.code = code;
   native_code_s.si = *si;
 
-  /* Call the "real" Java handler for JIT and internals. */
-  call_old_signal_handler(code, si, sc);
-
-  /* Still here ? Then back to the future.
-   * FIXME TODO: This is the Dalvik behavior - but is it the SunJVM one ? */
+  /* Back to the future. */
   try_jump_to_userland(code, si, sc);
 
   /* Nope. (abort() is signal-safe) */
@@ -228,7 +241,7 @@ static UNUSED void signal_handler(const int code, siginfo_t *const si,
   /* Ensure we do not deadlock. Default of ALRM is to die.
    * (signal() and alarm() are signal-safe) */
   signal(code, SIG_DFL);
-  (void) alarm(30);
+  start_alarm();
 
   /* Take note (real "abort()") */
   native_code_s.code = code;
@@ -237,8 +250,10 @@ static UNUSED void signal_handler(const int code, siginfo_t *const si,
 #ifdef USE_UNWIND
   /* Frame buffer initial position. */
   native_code_s.frames_size = 0;
+
   /* Skip us and the caller. */
   native_code_s.frames_skip = 2;
+
   /* Unwind frames (equivalent to backtrace()) */
   _Unwind_Backtrace(unwind, &native_code_s);
 #endif
