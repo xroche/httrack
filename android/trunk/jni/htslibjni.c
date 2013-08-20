@@ -34,7 +34,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "htsdefines.h"
 #include "htscore.h"
 
+#define USE_COFFEECATCH
+
+#ifdef USE_COFFEECATCH
 #include "coffeecatch.h"
+#endif
 
 /* fine-grained stats */
 #define GENERATE_FINE_STATS 1
@@ -741,6 +745,7 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
 
 jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     jobjectArray stringArray) {
+#ifdef USE_COFFEECATCH
   COFFEE_TRY() {
     const jint code = HTTrackLib_main(env, object, stringArray);
     return code;
@@ -750,4 +755,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     /* Do not cleanup. */
     return -1;
   } COFFEE_END();
+#else
+  return HTTrackLib_main(env, object, stringArray);
+#endif
 }
