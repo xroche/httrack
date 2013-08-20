@@ -2605,6 +2605,15 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
 
+#ifdef HTS_CRASH_TEST
+              case 'c':  /* crash test */
+                {
+                  char *const ptr = (char*) (uintptr_t) 0x42;
+                  (*ptr)++;
+                }
+                break;
+#endif
+
               default:
                 printf("Internal option %c not recognized\n", *com);
                 break;
