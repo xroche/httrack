@@ -21,7 +21,7 @@
  * COFFEE_TRY() {
  *   call_some_native_function()
  * } COFFEE_CATCH() {
- *   const char*const message = native_code_crash_handler_get_message();
+ *   const char*const message = coffeecatch_get_message();
  *   jclass cls = (*env)->FindClass(env, "java/lang/RuntimeException");
  *   (*env)->ThrowNew(env, cls, strdup(message));
  * } COFFEE_END();
@@ -39,6 +39,9 @@
  * The signal handlers had to be written with caution, because the virtual
  * machine might be using signals (including SEGV) to handle JIT compiler,
  * and some clever optimizations (such as NullPointerException handling)
+ * We are using several signal-unsafe functions, namely:
+ * - siglongjmp() to return to userland
+ * - pthread_getspecific() to get thread-specific setup
  *
  * License:
  *
@@ -68,6 +71,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <assert.h>
 #include <signal.h>
 #include <setjmp.h>
@@ -75,7 +79,10 @@
 #ifdef USE_UNWIND
 #include <unwind.h>
 #endif
+#include <pthread.h>
+#include <dlfcn.h>
 
+#define NDK_DEBUG 1
 #if ( defined(NDK_DEBUG) && ( NDK_DEBUG == 1 ) )
 #define DEBUG(A) do { A; } while(0)
 #define FD_ERRNO 2
@@ -86,11 +93,12 @@ static void print(const char *const s) {
   (void) write(FD_ERRNO, s, count);
 }
 #else
+#error error
 #define DEBUG(A)
 #endif
 
 /* Alternative stack size. */
-#define SIG_STACK_BUFFER_SIZE 32768
+#define SIG_STACK_BUFFER_SIZE SIGSTKSZ
 
 #ifdef USE_UNWIND
 /* Number of backtraces to get. */
@@ -105,28 +113,51 @@ static const int native_sig_catch[SIG_CATCH_COUNT + 1]
 /* Maximum value of a caught signal. */
 #define SIG_NUMBER_MAX 32
 
-/* Crash handler structure. */
-typedef struct native_code_handler_struct {
-  /* Restore point. */
-  sigjmp_buf env;
+/* Taken from richard.quirk's header file. */
+#ifndef ucontext_h_seen
+#define ucontext_h_seen
 
-  /* Restore point is defined. */
-  int env_set;
+#include <asm/sigcontext.h>       /* for sigcontext */
+#include <asm/signal.h>           /* for stack_t */
+
+typedef struct ucontext {
+  unsigned long uc_flags;
+  struct ucontext *uc_link;
+  stack_t uc_stack;
+  struct sigcontext uc_mcontext;
+  unsigned long uc_sigmask;
+} ucontext_t;
+
+#endif
+
+/* Process-wide crash handler structure. */
+typedef struct native_code_global_struct {
+  /* Initialized. */
+  int initialized;
+
+  /* Lock. */
+  pthread_mutex_t mutex;
 
   /* Backup of sigaction. */
-  struct sigaction sa_old[SIG_NUMBER_MAX];
-  struct sigaction sa;
-  struct sigaction sa_pass;
+  struct sigaction *sa_old;
+} native_code_global_struct;
+#define NATIVE_CODE_GLOBAL_INITIALIZER { 0, PTHREAD_MUTEX_INITIALIZER, NULL }
+
+/* Thread-specific crash handler structure. */
+typedef struct native_code_handler_struct {
+  /* Restore point context. */
+  sigjmp_buf ctx;
+  int ctx_is_set;
 
   /* Alternate stack. */
-  stack_t stack;
-  stack_t stack_old;
   char *stack_buffer;
   size_t stack_buffer_size;
+  stack_t stack_old;
 
   /* Signal code and info. */
   int code;
   siginfo_t si;
+  ucontext_t uc;
 
   /* Uwind context. */
 #ifdef USE_UNWIND
@@ -137,18 +168,26 @@ typedef struct native_code_handler_struct {
 } native_code_handler_struct;
 
 /* Global crash handler structure. */
-static native_code_handler_struct native_code_s;
+static native_code_global_struct native_code_g =
+  NATIVE_CODE_GLOBAL_INITIALIZER;
+
+/* Thread variable holding context. */
+pthread_key_t native_code_thread;
 
 #ifdef USE_UNWIND
 
 /* Unwind callback */
-static UNUSED _Unwind_Reason_Code unwind(struct _Unwind_Context* context, void* arg) {
+static UNUSED _Unwind_Reason_Code coffeecatch_unwind_callback(struct _Unwind_Context* context, void* arg) {
   native_code_handler_struct *const s = (native_code_handler_struct*) arg;
 
   const uintptr_t ip = _Unwind_GetIP(context);
+
+  DEBUG(print("called unwind callback\n"));
+
   if (ip != 0x0) {
     if (s->frames_skip == 0) {
-      s->frames[s->frames_size++] = ip;
+      s->frames[s->frames_size] = ip;
+      s->frames_size++;
     } else {
       s->frames_skip--;
     }
@@ -157,43 +196,115 @@ static UNUSED _Unwind_Reason_Code unwind(struct _Unwind_Context* context, void* 
   if (s->frames_size == BACKTRACE_FRAMES_MAX) {
     return _URC_END_OF_STACK;
   } else {
-    return _URC_NO_REASON;
+    return _URC_OK;
   }
 }
 
 #endif
 
 /* Call the old handler. */
-static UNUSED void call_old_signal_handler(const int code, siginfo_t *const si,
-                                           void * const sc) {
+static UNUSED void coffeecatch_call_old_signal_handler(const int code, siginfo_t *const si,
+                                                       void * const sc) {
   /* Call the "real" Java handler for JIT and internals. */
   if (code >= 0 && code < SIG_NUMBER_MAX) {
-    if (native_code_s.sa_old[code].sa_sigaction != NULL) {
-      native_code_s.sa_old[code].sa_sigaction(code, si, sc);
-    } else if (native_code_s.sa_old[code].sa_handler != NULL) {
-      native_code_s.sa_old[code].sa_handler(code);
+    if (native_code_g.sa_old[code].sa_sigaction != NULL) {
+      native_code_g.sa_old[code].sa_sigaction(code, si, sc);
+    } else if (native_code_g.sa_old[code].sa_handler != NULL) {
+      native_code_g.sa_old[code].sa_handler(code);
     }
   }
 }
 
-/* Try to jump to userland. */
-static UNUSED void try_jump_to_userland(const int code, siginfo_t *const si,
-                                        void * const sc) {
-  (void) si;
-  (void) sc;
-
-  /* Back to the future. */
-  if (native_code_s.env_set) {
-    DEBUG(print("calling siglongjmp()\n"));
-    native_code_s.env_set = 0;
-    siglongjmp(native_code_s.env, code);
+/* Unflag "on stack" */
+void coffeecatch_revert_alternate_stack() {
+  stack_t ss;
+  if (sigaltstack(NULL, &ss) == 0) {
+    ss.ss_flags &= ~SS_ONSTACK;
+    sigaltstack (&ss, NULL);
   }
 }
 
-static UNUSED void start_alarm() {
+/* Try to jump to userland. */
+static UNUSED void coffeecatch_try_jump_userland(native_code_handler_struct*
+                                                 const t,
+                                                 const int code,
+                                                 siginfo_t *const si,
+                                                 void * const sc) {
+  (void) si; /* UNUSED */
+  (void) sc; /* UNUSED */
+
+  /* Valid context ? */
+  if (t != NULL && t->ctx_is_set) {
+    DEBUG(print("calling siglongjmp()\n"));
+
+    /* Invalidate the context */
+    t->ctx_is_set = 0;
+
+    /* We need to revert the alternate stack before jumping. */
+    coffeecatch_revert_alternate_stack();
+
+    /*
+     * Note on async-signal-safety of siglongjmp() [POSIX] :
+     * "Note that longjmp() and siglongjmp() are not in the list of
+     * async-signal-safe functions. This is because the code executing after
+     * longjmp() and siglongjmp() can call any unsafe functions with the same
+     * danger as calling those unsafe functions directly from the signal
+     * handler. Applications that use longjmp() and siglongjmp() from within
+     * signal handlers require rigorous protection in order to be portable.
+     * Many of the other functions that are excluded from the list are
+     * traditionally implemented using either malloc() or free() functions or
+     * the standard I/O library, both of which traditionally use data
+     * structures in a non-async-signal-safe manner. Since any combination of
+     * different functions using a common data structure can cause
+     * async-signal-safety problems, this volume of POSIX.1-2008 does not
+     * define the behavior when any unsafe function is called in a signal
+     * handler that interrupts an unsafe function."
+     */
+    siglongjmp(t->ctx, code);
+  }
+}
+
+static UNUSED void coffeecatch_start_alarm(void) {
   /* Ensure we do not deadlock. Default of ALRM is to die.
    * (signal() and alarm() are signal-safe) */
   (void) alarm(30);
+}
+
+/* Copy context infos (signal code, etc.) */
+static void coffeecatch_copy_context(native_code_handler_struct *const t,
+                                     const int code, siginfo_t *const si,
+                                     void *const sc) {
+  t->code = code;
+  t->si = *si;
+  if (sc != NULL) {
+    ucontext_t *const uc = (ucontext_t*) sc;
+    t->uc = *uc;
+  } else {
+    memset(&t->uc, 0, sizeof(t->uc));
+  }
+
+#ifdef USE_UNWIND
+  /* Frame buffer initial position. */
+  t->frames_size = 0;
+
+  /* Skip us and the caller. */
+  t->frames_skip = 2;
+
+  /* Unwind frames (equivalent to backtrace()) */
+  _Unwind_Backtrace(coffeecatch_unwind_callback, t);
+
+  if (t->frames_size != 0)
+    DEBUG(print("called unwind()\n"));
+  else
+    DEBUG(print("called unwind(), but no traces\n"));
+#endif
+}
+
+/* Return the thread-specific native_code_handler_struct structure, or
+ * @c null if no such structure is available. */
+static native_code_handler_struct* coffeecatch_get(void) {
+  return (native_code_handler_struct*)
+      pthread_getspecific(native_code_thread);
 }
 
 /* Internal signal pass-through. Allows to peek the "real" crash before
@@ -202,12 +313,14 @@ static UNUSED void start_alarm() {
  * We record the siginfo_t context in this function each time it is being
  * called, to be able to know what error caused an issue.
  */
-static UNUSED void signal_handler_pass(const int code, siginfo_t *const si,
-                                       void *const sc) {
+static UNUSED void coffeecatch_signal_pass(const int code, siginfo_t *const si,
+                                           void *const sc) {
+  native_code_handler_struct *t;
+
   DEBUG(print("caught signal\n"));
 
   /* Call the "real" Java handler for JIT and internals. */
-  call_old_signal_handler(code, si, sc);
+  coffeecatch_call_old_signal_handler(code, si, sc);
 
   /* Still here ?
    * FIXME TODO: This is the Dalvik behavior - but is it the SunJVM one ? */
@@ -215,55 +328,52 @@ static UNUSED void signal_handler_pass(const int code, siginfo_t *const si,
   /* Ensure we do not deadlock. Default of ALRM is to die.
    * (signal() and alarm() are signal-safe) */
   signal(code, SIG_DFL);
-  start_alarm();
+  coffeecatch_start_alarm();
 
-  /* Take note of the signal. */
-  native_code_s.code = code;
-  native_code_s.si = *si;
+  /* Available context ? */
+  t = coffeecatch_get();
+  if (t != NULL) {
+    /* Take note of the signal. */
+    coffeecatch_copy_context(t, code, si, sc);
 
-  /* Back to the future. */
-  try_jump_to_userland(code, si, sc);
+    /* Back to the future. */
+    coffeecatch_try_jump_userland(t, code, si, sc);
+  }
 
   /* Nope. (abort() is signal-safe) */
   DEBUG(print("calling abort()\n"));
+  signal(SIGABRT, SIG_DFL);
   abort();
 }
 
 /* Internal crash handler for abort(). Java calls abort() if its signal handler
  * could not resolve the signal ; thus calling us through this handler. */
-static UNUSED void signal_handler(const int code, siginfo_t *const si,
-                                  void *const sc) {
-  /* Unused */
-  (void) sc;
+static UNUSED void coffeecatch_signal_abort(const int code, siginfo_t *const si,
+                                            void *const sc) {
+  native_code_handler_struct *t;
+
+  (void) sc; /* UNUSED */
 
   DEBUG(print("caught abort\n"));
 
   /* Ensure we do not deadlock. Default of ALRM is to die.
    * (signal() and alarm() are signal-safe) */
   signal(code, SIG_DFL);
-  start_alarm();
+  coffeecatch_start_alarm();
 
-  /* Take note (real "abort()") */
-  native_code_s.code = code;
-  native_code_s.si = *si;
+  /* Available context ? */
+  t = coffeecatch_get();
+  if (t != NULL) {
+    /* Take note (real "abort()") */
+    coffeecatch_copy_context(t, code, si, sc);
 
-#ifdef USE_UNWIND
-  /* Frame buffer initial position. */
-  native_code_s.frames_size = 0;
-
-  /* Skip us and the caller. */
-  native_code_s.frames_skip = 2;
-
-  /* Unwind frames (equivalent to backtrace()) */
-  _Unwind_Backtrace(unwind, &native_code_s);
-#endif
-
-  /* Back to the future. */
-  try_jump_to_userland(code, si, sc);
+    /* Back to the future. */
+    coffeecatch_try_jump_userland(t, code, si, sc);
+  }
 
   /* No such restore point, call old signal handler then. */
   DEBUG(print("calling old signal handler\n"));
-  call_old_signal_handler(code, si, sc);
+  coffeecatch_call_old_signal_handler(code, si, sc);
 
   /* Nope. (abort() is signal-safe) */
   DEBUG(print("calling abort()\n"));
@@ -271,114 +381,198 @@ static UNUSED void signal_handler(const int code, siginfo_t *const si,
 }
 
 /**
- * Setup a crash handler for the current thread.
+ * Acquire the crash handler for the current thread.
+ * The coffeecatch_handler_cleanup() must be called to release allocated
+ * resources.
  **/
-static UNUSED int native_code_crash_handler_setup() {
-  size_t i;
+static UNUSED int coffeecatch_handler_setup(int setup_thread) {
+  DEBUG(print("setup for a new handler\n"));
 
-  DEBUG(print("installing handlers\n"));
-
-  /* Cleanup structure */
-  memset(&native_code_s, 0, sizeof(native_code_s));
-  native_code_s.stack_buffer_size = SIG_STACK_BUFFER_SIZE;
-  native_code_s.stack_buffer = malloc(native_code_s.stack_buffer_size);
-  if (native_code_s.stack_buffer == NULL) {
-    return -1;
+  /* Initialize globals. */
+  if (pthread_mutex_lock(&native_code_g.mutex) != 0) {
+    assert(! "pthread_mutex_lock() failed");
   }
-  
-  /* Setup handler structure. */
-  sigemptyset(&native_code_s.sa.sa_mask);
-  sigemptyset(&native_code_s.sa_pass.sa_mask);
-  native_code_s.sa.sa_sigaction = signal_handler;
-  native_code_s.sa_pass.sa_sigaction = signal_handler_pass;
-  native_code_s.sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-  native_code_s.sa_pass.sa_flags = SA_SIGINFO | SA_ONSTACK;
+  if (native_code_g.initialized++ == 0) {
+    size_t i;
+    struct sigaction sa_abort;
+    struct sigaction sa_pass;
 
-  /* Setup alternative stack. */
-  native_code_s.stack.ss_sp = native_code_s.stack_buffer;
-  native_code_s.stack.ss_size = native_code_s.stack_buffer_size;
-  native_code_s.stack.ss_flags = 0;
+    DEBUG(print("installing global signal handlers\n"));
 
-  /* Install alternative stack. This is thread-safe
-   * (but for now with a static buffer) */
-  if (sigaltstack(&native_code_s.stack, &native_code_s.stack_old) != 0) {
-    return -1;
-  }
-  
-  /* Setup signal handlers for SIGABRT (Java calls abort()) and others.
-   * This is obviously making this function not thread-safe as handlers are
-   * process-wide. */
-  for(i = 0; native_sig_catch[i] != 0; i++) {
-    const int sig = native_sig_catch[i];
-    const struct sigaction *const action =
-      sig == SIGABRT ? &native_code_s.sa : &native_code_s.sa_pass;
-    assert(sig < SIG_NUMBER_MAX);
-    if (sigaction(sig, action, &native_code_s.sa_old[sig]) != 0) {
+    /* Setup handler structure. */
+    memset(&sa_abort, 0, sizeof(sa_abort));
+    sigemptyset(&sa_abort.sa_mask);
+    sa_abort.sa_sigaction = coffeecatch_signal_abort;
+    sa_abort.sa_flags = SA_SIGINFO /*| SA_ONSTACK*/;
+
+    memset(&sa_pass, 0, sizeof(sa_pass));
+    sigemptyset(&sa_pass.sa_mask);
+    sa_pass.sa_sigaction = coffeecatch_signal_pass;
+    sa_pass.sa_flags = SA_SIGINFO /*| SA_ONSTACK*/;
+
+    /* Allocate */
+    native_code_g.sa_old = calloc(sizeof(struct sigaction), SIG_NUMBER_MAX);
+    if (native_code_g.sa_old == NULL) {
       return -1;
     }
-  }
-  
-  DEBUG(print("installed handlers\n"));
 
-  /* So far so good */
+    /* Setup signal handlers for SIGABRT (Java calls abort()) and others. **/
+    for(i = 0; native_sig_catch[i] != 0; i++) {
+      const int sig = native_sig_catch[i];
+      const struct sigaction *const action =
+        sig == SIGABRT ? &sa_abort : &sa_pass;
+      assert(sig < SIG_NUMBER_MAX);
+      if (sigaction(sig, action, &native_code_g.sa_old[sig]) != 0) {
+        return -1;
+      }
+    }
+
+    /* Initialize thread var. */
+    if (pthread_key_create(&native_code_thread, NULL) != 0) {
+      return -1;
+    }
+
+    DEBUG(print("installed global signal handlers\n"));
+  }
+  if (pthread_mutex_unlock(&native_code_g.mutex) != 0) {
+    assert(! "pthread_mutex_unlock() failed");
+  }
+
+  /* Initialize locals. */
+  if (setup_thread && coffeecatch_get() == NULL) {
+    stack_t stack;
+    native_code_handler_struct *const t =
+      calloc(sizeof(native_code_handler_struct), 1);
+
+    DEBUG(print("installing thread alternative stack\n"));
+
+    /* Initialize structure */
+    t->stack_buffer_size = SIG_STACK_BUFFER_SIZE;
+    t->stack_buffer = malloc(t->stack_buffer_size);
+    if (t->stack_buffer == NULL) {
+      return -1;
+    }
+  
+    /* Setup alternative stack. */
+    memset(&stack, 0, sizeof(stack));
+    stack.ss_sp = t->stack_buffer;
+    stack.ss_size = t->stack_buffer_size;
+    stack.ss_flags = 0;
+
+    /* Install alternative stack. This is thread-safe
+     * (but for now with a static buffer) */
+    if (sigaltstack(&stack, &t->stack_old) != 0) {
+      return -1;
+    }
+
+    /* Set thread-specific value. */
+    if (pthread_setspecific(native_code_thread, t) != 0) {
+      assert(! "pthread_setspecific() failed");
+    }
+
+    DEBUG(print("installed thread alternative stack\n"));
+  }
+
   return 0;
 }
 
 /**
- * Remove the crash handler previously setup by the
- * native_code_crash_handler_setup() function.
+ * Release the resources allocated by a previous call to
+ * coffeecatch_handler_setup().
+ * This function must be called as many times as
+ * coffeecatch_handler_setup() was called to fully release allocated
+ * resources.
  **/
-static UNUSED int native_code_crash_handler_cleanup() {
-  size_t i;
+static UNUSED int coffeecatch_handler_cleanup(void) {
+  /* Cleanup locals. */
+  native_code_handler_struct *const t = coffeecatch_get();
+  if (t != NULL) {
+    DEBUG(print("removing thread alternative stack\n"));
 
-  DEBUG(print("removing handlers\n"));
+    /* Erase thread-specific value now (detach). */
+    if (pthread_setspecific(native_code_thread, NULL) != 0) {
+      assert(! "pthread_setspecific() failed");
+    }
 
-  /* Restore signal handler. */
-  for(i = 0; native_sig_catch[i] != 0; i++) {
-    const int sig = native_sig_catch[i];
-    assert(sig < SIG_NUMBER_MAX);
-    if (sigaction(sig, &native_code_s.sa_old[sig], NULL) != 0) {
+    /* Restore previous alternative stack. */
+    if (sigaltstack(&t->stack_old, NULL) != 0) {
       return -1;
     }
+
+    /* Free alternative stack */
+    if (t->stack_buffer != NULL) {
+      free(t->stack_buffer);
+      t->stack_buffer = NULL;
+      t->stack_buffer_size = 0;
+    }
+
+    /* Free structure. */
+    free(t);
+
+    DEBUG(print("removed thread alternative stack\n"));
   }
 
-  /* Restore previous alternative stack. */
-  if (sigaltstack(&native_code_s.stack_old, NULL) != 0) {
-    return -1;
+  /* Cleanup globals. */
+  if (pthread_mutex_lock(&native_code_g.mutex) != 0) {
+    assert(! "pthread_mutex_lock() failed");
+  }
+  assert(native_code_g.initialized != 0);
+  if (--native_code_g.initialized == 0) {
+    size_t i;
+
+    DEBUG(print("removing global signal handlers\n"));
+
+    /* Restore signal handler. */
+    for(i = 0; native_sig_catch[i] != 0; i++) {
+      const int sig = native_sig_catch[i];
+      assert(sig < SIG_NUMBER_MAX);
+      if (sigaction(sig, &native_code_g.sa_old[sig], NULL) != 0) {
+        return -1;
+      }
+    }
+
+    /* Initialize thread var. */
+    if (pthread_key_delete(native_code_thread) != 0) {
+      assert(! "pthread_key_delete() failed");
+    }
+
+    DEBUG(print("removed global signal handlers\n"));
+  }
+  if (pthread_mutex_unlock(&native_code_g.mutex) != 0) {
+    assert(! "pthread_mutex_unlock() failed");
   }
 
-  /* Free alternative stack */
-  if (native_code_s.stack_buffer != NULL) {
-    free(native_code_s.stack_buffer);
-    native_code_s.stack_buffer = NULL;
-    native_code_s.stack_buffer_size = 0;
-  }
-  
-  DEBUG(print("removed handlers\n"));
-
-  /* So far so good */
   return 0;
 }
 
 /**
  * Get the signal associated with the crash.
  */
-static UNUSED int native_code_crash_handler_get_signal() {
-  return native_code_s.code;
+static UNUSED int coffeecatch_get_signal() {
+  const native_code_handler_struct* const t = coffeecatch_get();
+  if (t != NULL) {
+    return t->code;
+  } else {
+    return -1;
+  }
 }
 
 /**
  * Get the native context associated with the crash.
  */
-static UNUSED siginfo_t* native_code_crash_handler_get_info() {
-  return &native_code_s.si;
+static UNUSED siginfo_t* coffeecatch_get_info() {
+  native_code_handler_struct* const t = coffeecatch_get();
+  if (t != NULL) {
+    return &t->si;
+  } else {
+    return NULL;
+  }
 }
 
 /* Signal descriptions.
    See <http://pubs.opengroup.org/onlinepubs/009696699/basedefs/signal.h.html>
 */
-static UNUSED const char* native_code_crash_handler_desc_sig(int sig,
-                                                             int code) {
+static UNUSED const char* coffeecatch_desc_sig(int sig, int code) {
   switch(sig) {
   case SIGILL:
     switch(code) {
@@ -555,20 +749,56 @@ static UNUSED const char* native_code_crash_handler_desc_sig(int sig,
 }
 
 /**
+ * Get the backtrace size. Returns 0 if no backtrace is available.
+ */
+static UNUSED size_t coffeecatch_get_backtrace_size(void) {
+#ifdef USE_UNWIND
+  const native_code_handler_struct* const t = coffeecatch_get();
+  if (t != NULL) {
+    return t->frames_size;
+  } else {
+    return 0;
+  }
+#else
+  return 0;
+#endif
+}
+
+/**
+ * Get the <index>th element of the backtrace, or 0 upon error.
+ */
+static UNUSED uintptr_t coffeecatch_get_backtrace(ssize_t index) {
+#ifdef USE_UNWIND
+  const native_code_handler_struct* const t = coffeecatch_get();
+  if (t != NULL) {
+    if (index < 0) {
+      index = t->frames_size + index;
+    }
+    if (index >= 0 && (size_t) index < t->frames_size) {
+      return t->frames[index];
+    }
+  }
+#else
+  (void) index;
+#endif
+  return 0;
+}
+
+/**
  * Get the full error message associated with the crash.
  */
-static UNUSED const char* native_code_crash_handler_get_message() {
-  char *const buffer = native_code_s.stack_buffer;
-  const size_t buffer_len = native_code_s.stack_buffer_size;
+static UNUSED const char* coffeecatch_get_message() {
+  const native_code_handler_struct* const t = coffeecatch_get();
+  char *const buffer = t->stack_buffer;
+  const size_t buffer_len = t->stack_buffer_size;
   size_t buffer_offs = 0;
 
   const char*const posix_desc =
-    native_code_crash_handler_desc_sig(native_code_s.si.si_signo,
-                                       native_code_s.si.si_code);
+    coffeecatch_desc_sig(t->si.si_signo, t->si.si_code);
 
   /* Signal */
   snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "signal %d",
-           native_code_s.si.si_signo);
+           t->si.si_signo);
   buffer_offs += strlen(&buffer[buffer_offs]);
 
   /* Description */
@@ -576,19 +806,18 @@ static UNUSED const char* native_code_crash_handler_get_message() {
   buffer_offs += strlen(&buffer[buffer_offs]);
 
   /* Address of faulting instruction */
-  if (native_code_s.si.si_signo == SIGILL
-      || native_code_s.si.si_signo == SIGSEGV) {
+  if (t->si.si_signo == SIGILL || t->si.si_signo == SIGSEGV) {
     snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-             " at address %p", native_code_s.si.si_addr);
+             " at address %p", t->si.si_addr);
     buffer_offs += strlen(&buffer[buffer_offs]);
   }
 
-  /* [POSIX] If non-zero, an errno value associated with  this signal,
+  /* [POSIX] If non-zero, an errno value associated with this signal,
      as defined in <errno.h>. */
-  if (native_code_s.si.si_errno != 0) {
+  if (t->si.si_errno != 0) {
     snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, ": ");
     buffer_offs += strlen(&buffer[buffer_offs]);
-    if (strerror_r(native_code_s.si.si_errno, &buffer[buffer_offs],
+    if (strerror_r(t->si.si_errno, &buffer[buffer_offs],
                    buffer_len - buffer_offs) == 0) {
       snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "unknown error");
       buffer_offs += strlen(&buffer[buffer_offs]);
@@ -596,26 +825,66 @@ static UNUSED const char* native_code_crash_handler_get_message() {
   }
 
   /* Sending process ID. */
-  if (native_code_s.si.si_pid != 0) {
+  if (t->si.si_pid != 0) {
     snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-             " (sent by pid %d)", (int) native_code_s.si.si_pid);
+             " (sent by pid %d)", (int) t->si.si_pid);
+    buffer_offs += strlen(&buffer[buffer_offs]);
+  }
+
+  /* Faulting program counter location. */
+  if (t->uc.uc_mcontext.arm_pc != 0) {
+    Dl_info info;
+    void *const addr = (void*) t->uc.uc_mcontext.arm_pc;
+    /* dladdr() returns 0 on error, and nonzero on success. */
+    if (dladdr(addr, &info) != 0 && info.dli_sname != NULL) {
+      void *const near = info.dli_saddr;
+      const int offs = (int) ( (uintptr_t)  addr - (uintptr_t) near );
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+               " [at %s:%s+0x%x]",
+               info.dli_fname, info.dli_sname, offs);
+    } else {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+               " [at %p]", addr);
+    }
     buffer_offs += strlen(&buffer[buffer_offs]);
   }
 
   /* Return string. */
   buffer[buffer_offs] = '\0';
-  return native_code_s.stack_buffer;
+  return t->stack_buffer;
+}
+
+/**
+ * Calls coffeecatch_handler_setup(1) to setup a crash handler, and return
+ * a pointer to the creatednative_code_handler_struct structure.
+ */
+static UNUSED native_code_handler_struct* coffeecatch_handler(void) {
+  if (coffeecatch_handler_setup(1) == 0) {
+    native_code_handler_struct *const t = coffeecatch_get();
+    assert(t != NULL);
+    t->ctx_is_set = 1;
+    return t;
+  } else {
+    assert(! "could not setup handlers");
+    return NULL;
+  }
+}
+
+/**
+ * Calls coffeecatch_handler_cleanup()
+ */
+static UNUSED void coffeecatch_cleanup(void) {
+  native_code_handler_struct *const t = coffeecatch_get();
+  assert(t != NULL);
+  t->ctx_is_set = 0;
+  coffeecatch_handler_cleanup();
 }
 
 /* Pseudo-TRY/CATCH definitions. */
 
-#define COFFEE_TRY() do {                     \
-  native_code_crash_handler_setup();          \
-  native_code_s.env_set = 1;                  \
-  if (sigsetjmp(native_code_s.env, 0) == 0)
+#define COFFEE_TRY()                          \
+  if (sigsetjmp(coffeecatch_handler()->ctx, 1) == 0)
 #define COFFEE_CATCH() else
-#define COFFEE_END()                          \
-  native_code_crash_handler_cleanup();        \
-} while(0)
+#define COFFEE_END() coffeecatch_cleanup()
 
 #undef UNUSED

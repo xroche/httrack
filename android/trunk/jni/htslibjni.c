@@ -750,7 +750,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     const jint code = HTTrackLib_main(env, object, stringArray);
     return code;
   } COFFEE_CATCH() {
-    const char*const message = native_code_crash_handler_get_message();
+    const char*const message = coffeecatch_get_message();
     throwRuntimeException(env, message);
     /* Do not cleanup. */
     return -1;
