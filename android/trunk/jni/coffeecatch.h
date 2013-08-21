@@ -82,7 +82,7 @@
 #include <pthread.h>
 #include <dlfcn.h>
 
-#define NDK_DEBUG 1
+/*#define NDK_DEBUG 1*/
 #if ( defined(NDK_DEBUG) && ( NDK_DEBUG == 1 ) )
 #define DEBUG(A) do { A; } while(0)
 #define FD_ERRNO 2
@@ -93,7 +93,6 @@ static void print(const char *const s) {
   (void) write(FD_ERRNO, s, count);
 }
 #else
-#error error
 #define DEBUG(A)
 #endif
 
