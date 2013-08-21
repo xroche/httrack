@@ -380,18 +380,8 @@ static UNUSED void coffeecatch_signal_abort(const int code, siginfo_t *const si,
   abort();
 }
 
-/**
- * Acquire the crash handler for the current thread.
- * The coffeecatch_handler_cleanup() must be called to release allocated
- * resources.
- **/
-static UNUSED int coffeecatch_handler_setup(int setup_thread) {
-  DEBUG(print("setup for a new handler\n"));
-
-  /* Initialize globals. */
-  if (pthread_mutex_lock(&native_code_g.mutex) != 0) {
-    assert(! "pthread_mutex_lock() failed");
-  }
+/* Internal globals initialization. */
+static UNUSED int coffeecatch_handler_setup_global(void) {
   if (native_code_g.initialized++ == 0) {
     size_t i;
     struct sigaction sa_abort;
@@ -403,12 +393,12 @@ static UNUSED int coffeecatch_handler_setup(int setup_thread) {
     memset(&sa_abort, 0, sizeof(sa_abort));
     sigemptyset(&sa_abort.sa_mask);
     sa_abort.sa_sigaction = coffeecatch_signal_abort;
-    sa_abort.sa_flags = SA_SIGINFO /*| SA_ONSTACK*/;
+    sa_abort.sa_flags = SA_SIGINFO | SA_ONSTACK;
 
     memset(&sa_pass, 0, sizeof(sa_pass));
     sigemptyset(&sa_pass.sa_mask);
     sa_pass.sa_sigaction = coffeecatch_signal_pass;
-    sa_pass.sa_flags = SA_SIGINFO /*| SA_ONSTACK*/;
+    sa_pass.sa_flags = SA_SIGINFO | SA_ONSTACK;
 
     /* Allocate */
     native_code_g.sa_old = calloc(sizeof(struct sigaction), SIG_NUMBER_MAX);
@@ -417,10 +407,10 @@ static UNUSED int coffeecatch_handler_setup(int setup_thread) {
     }
 
     /* Setup signal handlers for SIGABRT (Java calls abort()) and others. **/
-    for(i = 0; native_sig_catch[i] != 0; i++) {
+    for (i = 0; native_sig_catch[i] != 0; i++) {
       const int sig = native_sig_catch[i];
-      const struct sigaction *const action =
-        sig == SIGABRT ? &sa_abort : &sa_pass;
+      const struct sigaction * const action =
+          sig == SIGABRT ? &sa_abort : &sa_pass;
       assert(sig < SIG_NUMBER_MAX);
       if (sigaction(sig, action, &native_code_g.sa_old[sig]) != 0) {
         return -1;
@@ -434,8 +424,33 @@ static UNUSED int coffeecatch_handler_setup(int setup_thread) {
 
     DEBUG(print("installed global signal handlers\n"));
   }
+
+  /* OK. */
+  return 0;
+}
+
+/**
+ * Acquire the crash handler for the current thread.
+ * The coffeecatch_handler_cleanup() must be called to release allocated
+ * resources.
+ **/
+static UNUSED int coffeecatch_handler_setup(int setup_thread) {
+  int code;
+
+  DEBUG(print("setup for a new handler\n"));
+
+  /* Initialize globals. */
+  if (pthread_mutex_lock(&native_code_g.mutex) != 0) {
+    return -1;
+  }
+  code = coffeecatch_handler_setup_global();
   if (pthread_mutex_unlock(&native_code_g.mutex) != 0) {
-    assert(! "pthread_mutex_unlock() failed");
+    return -1;
+  }
+
+  /* Global initialization failed. */
+  if (code != 0) {
+    return -1;
   }
 
   /* Initialize locals. */
@@ -467,12 +482,13 @@ static UNUSED int coffeecatch_handler_setup(int setup_thread) {
 
     /* Set thread-specific value. */
     if (pthread_setspecific(native_code_thread, t) != 0) {
-      assert(! "pthread_setspecific() failed");
+      return -1;
     }
 
     DEBUG(print("installed thread alternative stack\n"));
   }
 
+  /* OK. */
   return 0;
 }
 
@@ -788,85 +804,99 @@ static UNUSED uintptr_t coffeecatch_get_backtrace(ssize_t index) {
  * Get the full error message associated with the crash.
  */
 static UNUSED const char* coffeecatch_get_message() {
+  const int error = errno;
   const native_code_handler_struct* const t = coffeecatch_get();
-  char *const buffer = t->stack_buffer;
-  const size_t buffer_len = t->stack_buffer_size;
-  size_t buffer_offs = 0;
 
-  const char*const posix_desc =
-    coffeecatch_desc_sig(t->si.si_signo, t->si.si_code);
+  /* Found valid handler. */
+  if (t != NULL) {
+    char * const buffer = t->stack_buffer;
+    const size_t buffer_len = t->stack_buffer_size;
+    size_t buffer_offs = 0;
 
-  /* Signal */
-  snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "signal %d",
-           t->si.si_signo);
-  buffer_offs += strlen(&buffer[buffer_offs]);
+    const char* const posix_desc = coffeecatch_desc_sig(t->si.si_signo,
+        t->si.si_code);
 
-  /* Description */
-  snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " (%s)", posix_desc);
-  buffer_offs += strlen(&buffer[buffer_offs]);
-
-  /* Address of faulting instruction */
-  if (t->si.si_signo == SIGILL || t->si.si_signo == SIGSEGV) {
-    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-             " at address %p", t->si.si_addr);
+    /* Signal */
+    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "signal %d",
+        t->si.si_signo);
     buffer_offs += strlen(&buffer[buffer_offs]);
-  }
 
-  /* [POSIX] If non-zero, an errno value associated with this signal,
-     as defined in <errno.h>. */
-  if (t->si.si_errno != 0) {
-    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, ": ");
+    /* Description */
+    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " (%s)",
+        posix_desc);
     buffer_offs += strlen(&buffer[buffer_offs]);
-    if (strerror_r(t->si.si_errno, &buffer[buffer_offs],
-                   buffer_len - buffer_offs) == 0) {
-      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "unknown error");
+
+    /* Address of faulting instruction */
+    if (t->si.si_signo == SIGILL || t->si.si_signo == SIGSEGV) {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " at address %p",
+          t->si.si_addr);
       buffer_offs += strlen(&buffer[buffer_offs]);
     }
-  }
 
-  /* Sending process ID. */
-  if (t->si.si_pid != 0) {
-    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-             " (sent by pid %d)", (int) t->si.si_pid);
-    buffer_offs += strlen(&buffer[buffer_offs]);
-  }
-
-  /* Faulting program counter location. */
-  if (t->uc.uc_mcontext.arm_pc != 0) {
-    Dl_info info;
-    void *const addr = (void*) t->uc.uc_mcontext.arm_pc;
-    /* dladdr() returns 0 on error, and nonzero on success. */
-    if (dladdr(addr, &info) != 0 && info.dli_sname != NULL) {
-      void *const near = info.dli_saddr;
-      const int offs = (int) ( (uintptr_t)  addr - (uintptr_t) near );
-      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-               " [at %s:%s+0x%x]",
-               info.dli_fname, info.dli_sname, offs);
-    } else {
-      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-               " [at %p]", addr);
+    /* [POSIX] If non-zero, an errno value associated with this signal,
+     as defined in <errno.h>. */
+    if (t->si.si_errno != 0) {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, ": ");
+      buffer_offs += strlen(&buffer[buffer_offs]);
+      if (strerror_r(t->si.si_errno, &buffer[buffer_offs],
+          buffer_len - buffer_offs) == 0) {
+        snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+            "unknown error");
+        buffer_offs += strlen(&buffer[buffer_offs]);
+      }
     }
-    buffer_offs += strlen(&buffer[buffer_offs]);
-  }
 
-  /* Return string. */
-  buffer[buffer_offs] = '\0';
-  return t->stack_buffer;
+    /* Sending process ID. */
+    if (t->si.si_pid != 0) {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+          " (sent by pid %d)", (int) t->si.si_pid);
+      buffer_offs += strlen(&buffer[buffer_offs]);
+    }
+
+    /* Faulting program counter location. */
+    if (t->uc.uc_mcontext.arm_pc != 0) {
+      Dl_info info;
+      void * const addr = (void*) t->uc.uc_mcontext.arm_pc;
+      /* dladdr() returns 0 on error, and nonzero on success. */
+      if (dladdr(addr, &info) != 0 && info.dli_sname != NULL) {
+        void * const near = info.dli_saddr;
+        const int offs = (int) ((uintptr_t) addr - (uintptr_t) near);
+        snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+            " [at %s:%s+0x%x]", info.dli_fname, info.dli_sname, offs);
+      } else {
+        snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " [at %p]",
+            addr);
+      }
+      buffer_offs += strlen(&buffer[buffer_offs]);
+    }
+    /* Return string. */
+    buffer[buffer_offs] = '\0';
+    return t->stack_buffer;
+  } else {
+    /* Static buffer in case of emergency */
+    static char buffer[256];
+    const int code = strerror_r(error, &buffer[0], sizeof(buffer));
+    errno = error;
+    if (code == 0) {
+      return buffer;
+    } else {
+      return "unknown error during crash handler setup";
+    }
+  }
 }
 
 /**
- * Calls coffeecatch_handler_setup(1) to setup a crash handler, and return
- * a pointer to the creatednative_code_handler_struct structure.
+ * Calls coffeecatch_handler_setup(1) to setup a crash handler, mark the
+ * context as valid, and return 0 upon success.
  */
-static UNUSED native_code_handler_struct* coffeecatch_handler(void) {
+static UNUSED int coffeecatch_handler_setup_and_mark(void) {
   if (coffeecatch_handler_setup(1) == 0) {
     native_code_handler_struct *const t = coffeecatch_get();
     assert(t != NULL);
     t->ctx_is_set = 1;
-    return t;
+    return 0;
   } else {
-    assert(! "could not setup handlers");
-    return NULL;
+    return -1;
   }
 }
 
@@ -882,8 +912,9 @@ static UNUSED void coffeecatch_cleanup(void) {
 
 /* Pseudo-TRY/CATCH definitions. */
 
-#define COFFEE_TRY()                          \
-  if (sigsetjmp(coffeecatch_handler()->ctx, 1) == 0)
+#define COFFEE_TRY()                                \
+  if (coffeecatch_handler_setup_and_mark() == 0     \
+      && sigsetjmp(coffeecatch_get()->ctx, 1) == 0)
 #define COFFEE_CATCH() else
 #define COFFEE_END() coffeecatch_cleanup()
 
