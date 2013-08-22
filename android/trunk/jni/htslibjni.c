@@ -746,15 +746,14 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
 jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     jobjectArray stringArray) {
 #ifdef USE_COFFEECATCH
+  volatile jint code = -1;
   COFFEE_TRY() {
-    const jint code = HTTrackLib_main(env, object, stringArray);
-    return code;
+    code = HTTrackLib_main(env, object, stringArray);
   } COFFEE_CATCH() {
     const char*const message = coffeecatch_get_message();
     throwRuntimeException(env, message);
-    /* Do not cleanup. */
-    return -1;
   } COFFEE_END();
+  return code;
 #else
   return HTTrackLib_main(env, object, stringArray);
 #endif

@@ -17,9 +17,6 @@
 
 LOCAL_PATH := $(call my-dir)
 
-##$(shell (/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni))
-##"C:\Program Files\cygwin\bin\bash.exe" --login -c "/cygdrive/c/Dev/android/android-ndk-r8e/ndk-build -C /cygdrive/c/Users/roche/android_workspace/HTTrack/jni"
-
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libiconv
 LOCAL_SRC_FILES := ../prebuild/libiconv.so
@@ -57,7 +54,7 @@ include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := htslibjni
-LOCAL_SRC_FILES := htslibjni.c
+LOCAL_SRC_FILES := htslibjni.c coffeecatch.c
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := libhttrack
 LOCAL_CFLAGS := -W -Wall -Wextra -Werror
