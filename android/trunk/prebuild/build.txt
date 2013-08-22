@@ -5,8 +5,12 @@ ANDROID_SDK=/home/${USER}/bin/android-ndk-r8e
 TMP_DIR=/tmp/build_httrack_android
 DEST_DIR=/tmp/arm-inst
 # iconv and openSSL cache builds
+# rm -rf lib/*httrack* &&
 # tar cvfz iconv-openssl-android.tgz lib include
 BUILD_CACHE=/temp/android/iconv-openssl-android.tgz
+
+# setup
+objcopy=${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/arm-linux-androideabi/bin/objcopy
 
 # cleanup
 rm -rf ${TMP_DIR} && cp -ax ${HTTRACK_SVN} ${TMP_DIR} && cd ${TMP_DIR}
@@ -71,6 +75,7 @@ include \$(CLEAR_VARS)
 TARGET_ARCH_ABI := armeabi-v7a
 LOCAL_MODULE    := iconv
 LOCAL_CFLAGS    := \
+    -O3 \
     -Wno-multichar \
     -D_ANDROID \
     -DLIBDIR="\"c\"" \
@@ -120,9 +125,21 @@ cd ${TMP_DIR}
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
  CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
- CFLAGS="-DANDROID -D_ANDROID -DLIBICONV_PLUG -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
+ CFLAGS="-O3 -g3 -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' src/Makefile \
  && find . -name Makefile -exec sed -i -e "s/\(.*LDFLAGS = \)-version-info .*/\1 -avoid-version/" {} \; \
  && make -j8 && make install DESTDIR=${DEST_DIR} \
  && make install
+
+# split debugging information so that we can addr2line later
+# example: 
+# arm-linux-androideabi-addr2line -C -f -e libhttrack.so 00066c78
+(
+cd ${DEST_DIR}/lib
+${objcopy} --only-keep-debug libhttrack.so libhttrack.dbg
+${objcopy} --strip-debug libhttrack.so
+${objcopy} --remove-section .gnu_debuglink libhttrack.so
+${objcopy} --add-gnu-debuglink=libhttrack.dbg libhttrack.so
+)
+
