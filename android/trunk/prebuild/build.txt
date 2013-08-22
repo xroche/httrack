@@ -5,7 +5,7 @@ ANDROID_SDK=/home/${USER}/bin/android-ndk-r8e
 TMP_DIR=/tmp/build_httrack_android
 DEST_DIR=/tmp/arm-inst
 # iconv and openSSL cache builds
-# rm -rf lib/*httrack* &&
+# rm -rf lib/*httrack* lib/libhtsjava.* &&
 # tar cvfz iconv-openssl-android.tgz lib include
 BUILD_CACHE=/temp/android/iconv-openssl-android.tgz
 
@@ -75,7 +75,7 @@ include \$(CLEAR_VARS)
 TARGET_ARCH_ABI := armeabi-v7a
 LOCAL_MODULE    := iconv
 LOCAL_CFLAGS    := \
-    -O3 \
+    -O3 -g3 \
     -Wno-multichar \
     -D_ANDROID \
     -DLIBDIR="\"c\"" \
@@ -137,9 +137,13 @@ cd ${TMP_DIR}
 # arm-linux-androideabi-addr2line -C -f -e libhttrack.so 00066c78
 (
 cd ${DEST_DIR}/lib
-${objcopy} --only-keep-debug libhttrack.so libhttrack.dbg
-${objcopy} --strip-debug libhttrack.so
-${objcopy} --remove-section .gnu_debuglink libhttrack.so
-${objcopy} --add-gnu-debuglink=libhttrack.dbg libhttrack.so
+for i in libhttrack libhtsjava libiconv ; do
+	${objcopy} --only-keep-debug ${i}.so ${i}.dbg
+	${objcopy} --strip-debug ${i}.so
+	${objcopy} --remove-section .gnu_debuglink ${i}.so
+	${objcopy} --add-gnu-debuglink=${i}.dbg ${i}.so
+done
+rm *.la
+rm -rf httrack
 )
 
