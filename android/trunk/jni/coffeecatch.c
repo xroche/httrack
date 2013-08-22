@@ -34,6 +34,7 @@
 #include <signal.h>
 #include <setjmp.h>
 #define UNUSED __attribute__ ((unused))
+#undef USE_UNWIND
 #ifdef USE_UNWIND
 #include <unwind.h>
 #endif
