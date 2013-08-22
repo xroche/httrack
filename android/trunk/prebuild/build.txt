@@ -8,6 +8,7 @@ DEST_DIR=/tmp/arm-inst
 # rm -rf lib/*httrack* lib/libhtsjava.* &&
 # tar cvfz iconv-openssl-android.tgz lib include
 BUILD_CACHE=/temp/android/iconv-openssl-android.tgz
+SAVE_BUILD=/temp/android/builds
 
 # setup
 objcopy=${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/arm-linux-androideabi/bin/objcopy
@@ -137,11 +138,20 @@ cd ${TMP_DIR}
 # arm-linux-androideabi-addr2line -C -f -e libhttrack.so 00066c78
 (
 cd ${DEST_DIR}/lib
+if test -n "$SAVE_BUILD"; then
+	md5="$(md5sum libhttrack.so  | cut -f1 -d' ')"
+	dest="${SAVE_BUILD}/${md5}"
+	mkdir -p "$dest"
+	echo "$md5" > libhttrack.so.md5.txt
+fi
 for i in libhttrack libhtsjava libiconv ; do
 	${objcopy} --only-keep-debug ${i}.so ${i}.dbg
 	${objcopy} --strip-debug ${i}.so
 	${objcopy} --remove-section .gnu_debuglink ${i}.so
 	${objcopy} --add-gnu-debuglink=${i}.dbg ${i}.so
+	if test -n "$SAVE_BUILD"; then
+		cp -ax ${i}.* "${dest}/"
+	fi
 done
 rm *.la
 rm -rf httrack
