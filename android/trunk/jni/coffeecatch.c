@@ -36,7 +36,6 @@
 #include <signal.h>
 #include <setjmp.h>
 #define UNUSED __attribute__ ((unused))
-#undef USE_UNWIND
 #ifdef USE_UNWIND
 #include <unwind.h>
 #endif
@@ -822,7 +821,7 @@ const char* coffeecatch_get_message() {
     }
 
     /* Sending process ID. */
-    if (t->si.si_pid != 0) {
+    if (t->si.si_signo == SIGCHLD && t->si.si_pid != 0) {
       snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
                " (sent by pid %d)", (int) t->si.si_pid);
       buffer_offs += strlen(&buffer[buffer_offs]);
