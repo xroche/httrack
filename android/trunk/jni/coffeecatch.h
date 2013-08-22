@@ -146,7 +146,9 @@ extern int coffeecatch_get_signal(void);
 
 /**
  * Get the full error message associated with the crash.
- * This function can only be called inside a COFFEE_CATCH() block.
+ * This function can only be called inside a COFFEE_CATCH() block, and the
+ * returned pointer is only valid within this block. (you may want to copy
+ * the string in a static buffer, or use strdup())
  */
 const char* coffeecatch_get_message(void);
 
