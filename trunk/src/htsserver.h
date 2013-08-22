@@ -275,7 +275,7 @@ static int ehex(char *s) {
 HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
   size_t i;
 
-  for(i = 0; i < s[i] != '\0'; i++) {
+  for(i = 0; s[i] != '\0'; i++) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, '%');
