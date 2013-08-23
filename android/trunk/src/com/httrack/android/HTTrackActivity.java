@@ -720,7 +720,6 @@ public class HTTrackActivity extends FragmentActivity {
    */
   protected static class RunnerFragment extends Fragment {
     protected Runner runner;
-    HTTrackContext context;
 
     public RunnerFragment() {
     }
@@ -753,14 +752,6 @@ public class HTTrackActivity extends FragmentActivity {
       // Create and execute the background task.
       runner = new Runner(parent);
       runner.execute();
-    }
-
-    public void setContext(final HTTrackContext context) {
-      this.context = context;
-    }
-
-    public HTTrackContext getContext() {
-      return context;
     }
 
     // Attach activity
