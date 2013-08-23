@@ -667,6 +667,7 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
     int i;
     httrackp * opt = NULL;
     int code = -1;
+    int already_running = 0;
     struct jni_context_t t;
     t.env = env;
     t.callbacks = (*env)->GetObjectField(env, object, field_callbacks);
@@ -691,6 +692,8 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
       global_opt = opt;
       global_opt_stop = 0;
       CHAIN_FUNCTION(opt, loop, htsshow_loop, &t);
+    } else {
+      already_running = 1;
     }
     MUTEX_UNLOCK(global_lock);
 
@@ -729,7 +732,11 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
       }
       free(argv);
     } else {
-      throwRuntimeException(env, "not enough native memory to create an httrack context");
+      if (already_running) {
+        throwRuntimeException(env, "an instance of httrack is already running");
+      } else {
+        throwRuntimeException(env, "not enough native memory to create an httrack context");
+      }
     }
 
     /* Return exit code. */
