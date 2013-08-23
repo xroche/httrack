@@ -132,8 +132,12 @@ public class HTTrackActivity extends FragmentActivity {
   protected String sessionID = "runner_task" + "_"
       + Long.toString(System.nanoTime());
 
-  // Context
-  protected HTTrackContext context = new HTTrackContext();
+  // Project path
+  protected File projectPath;
+  protected File rscPath;
+
+  // Options mapper, containing all options
+  protected final OptionsMapper mapper = new OptionsMapper();
 
   // Engine
   protected RunnerFragment runner = null;
@@ -188,18 +192,16 @@ public class HTTrackActivity extends FragmentActivity {
     final String base = settings.getString(BASE_NAME, null);
     if (base != null) {
       final File path = new File(base);
-      context.setProjectPath(path);
-    } else if (context.getProjectPath() == null
-        || !context.getProjectPath().exists()) {
+      projectPath = path;
+    } else if (projectPath == null || !projectPath.exists()) {
       final File path = getDefaultHTTrackPath();
-      context.setProjectPath(path);
+      projectPath = path;
     }
 
     // Change ?
     final View view = findViewById(R.id.fieldBasePath);
     if (view != null) {
-      TextView.class.cast(view).setText(
-          context.getProjectPath().getAbsolutePath());
+      TextView.class.cast(view).setText(projectPath.getAbsolutePath());
     }
   }
 
@@ -316,14 +318,14 @@ public class HTTrackActivity extends FragmentActivity {
     warnIfExternalStorageUnsuitable();
 
     // Extract resources if necessary
-    context.setRscPath(buildResourceFile());
+    rscPath = buildResourceFile();
 
     // Ensure users can see us
     HTTrackActivity.setFileReadWrite(getProjectRootFile());
 
     // Clear map (useful to get dynamic fields)
-    context.getMapper().setContext(this);
-    context.getMapper().resetMap();
+    mapper.setContext(this);
+    mapper.resetMap();
 
     // Go to first pane now
     setPane(0);
@@ -463,7 +465,7 @@ public class HTTrackActivity extends FragmentActivity {
    * @return the resource directory
    */
   private File getResourceFile() {
-    return context.getRscPath();
+    return rscPath;
   }
 
   /**
@@ -474,7 +476,7 @@ public class HTTrackActivity extends FragmentActivity {
    * @return The value
    */
   public String getMap(final int key) {
-    return context.getMapper().getMap(key);
+    return mapper.getMap(key);
   }
 
   /**
@@ -486,7 +488,7 @@ public class HTTrackActivity extends FragmentActivity {
    *          The value
    */
   public void setMap(final int key, final String value) {
-    context.getMapper().setMap(key, value);
+    mapper.setMap(key, value);
   }
 
   /**
@@ -495,7 +497,7 @@ public class HTTrackActivity extends FragmentActivity {
    * @return
    */
   public synchronized List<String> buildCommandline() {
-    return context.getMapper().buildCommandline();
+    return mapper.buildCommandline();
   }
 
   /**
@@ -514,7 +516,7 @@ public class HTTrackActivity extends FragmentActivity {
    * @return The root directory.
    */
   protected File getProjectRootFile() {
-    return context.projectPath;
+    return projectPath;
   }
 
   /**
@@ -568,7 +570,7 @@ public class HTTrackActivity extends FragmentActivity {
    * @return The destination directory.
    */
   protected File getTargetFile() {
-    final String name = context.getMapper().getProjectName();
+    final String name = mapper.getProjectName();
     if (name != null && name.length() != 0) {
       return new File(getProjectRootFile(), name);
     } else {
@@ -1351,7 +1353,7 @@ public class HTTrackActivity extends FragmentActivity {
     HTTrackActivity.setFileReadWrite(cache);
 
     // Write settings
-    context.getMapper().serialize(profile);
+    mapper.serialize(profile);
     HTTrackActivity.setFileReadWrite(profile);
   }
 
@@ -1363,7 +1365,7 @@ public class HTTrackActivity extends FragmentActivity {
    */
   protected void unserialize() throws IOException {
     final File profile = getProfileFile();
-    context.getMapper().unserialize(profile);
+    mapper.unserialize(profile);
   }
 
   /**
@@ -1441,8 +1443,8 @@ public class HTTrackActivity extends FragmentActivity {
           getProjectRootFile().getAbsolutePath());
 
       // "Next" button is disabled if no project name is defined
-      switchEmptyProjectName = !OptionsMapper.isStringNonEmpty(context
-          .getMapper().getProjectName());
+      switchEmptyProjectName = !OptionsMapper.isStringNonEmpty(mapper
+          .getProjectName());
       View.class.cast(findViewById(R.id.buttonNext)).setEnabled(
           !switchEmptyProjectName);
 
@@ -1744,7 +1746,7 @@ public class HTTrackActivity extends FragmentActivity {
           // We need to put immediately the name in the map to be able to
           // unserialize.
           try {
-            context.getMapper().resetMap();
+            mapper.resetMap();
             setMap(R.id.fieldProjectName, name);
             unserialize();
           } catch (final IOException e) {
@@ -1888,17 +1890,16 @@ public class HTTrackActivity extends FragmentActivity {
     // Then start new activity
     final Intent intent = new Intent(this, OptionsActivity.class);
     fillExtra(intent);
-    intent.putExtra("com.httrack.android.map", context.getMapper().serialize());
-    Log.d(getClass().getSimpleName(), "map size: " + context.getMapper().size());
+    intent.putExtra("com.httrack.android.map", mapper.serialize());
+    Log.d(getClass().getSimpleName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
 
   /** Restore a previously saved map context. **/
   private void loadParcelable(final Parcelable data) {
     // Load modified map
-    context.getMapper().unserialize(data);
-    Log.d(getClass().getSimpleName(), "received map size: "
-        + context.getMapper().size());
+    mapper.unserialize(data);
+    Log.d(getClass().getSimpleName(), "received map size: " + mapper.size());
 
     // Load possibly modified field(s)
     loadPaneFields();
@@ -2102,8 +2103,7 @@ public class HTTrackActivity extends FragmentActivity {
     outState.putInt("com.httrack.android.version", versionCode);
 
     // Map keys
-    outState.putParcelable("com.httrack.android.map", context.getMapper()
-        .serialize());
+    outState.putParcelable("com.httrack.android.map", mapper.serialize());
 
     // Current pane
     outState.putInt("com.httrack.android.pane_id", pane_id);
@@ -2147,7 +2147,7 @@ public class HTTrackActivity extends FragmentActivity {
   /** Send a notification. **/
   protected void sendAbortNotification() {
     final String title = getString(R.string.mirror_xxx_stopped).replace("%s",
-        context.getMapper().getProjectName());
+        mapper.getProjectName());
     final String text = getString(R.string.click_on_notification_to_restart);
 
     // Continue an interrupted mirror
@@ -2241,13 +2241,13 @@ public class HTTrackActivity extends FragmentActivity {
   public void onDestroy() {
     // We are being destroyed... save profile ?
     savePaneFields();
-    final String name = context.getMapper().getProjectName();
-    if (context.getMapper().isDirty() && OptionsMapper.isStringNonEmpty(name)
-        && OptionsMapper.isStringNonEmpty(context.getMapper().getProjectUrl())) {
+    final String name = mapper.getProjectName();
+    if (mapper.isDirty() && OptionsMapper.isStringNonEmpty(name)
+        && OptionsMapper.isStringNonEmpty(mapper.getProjectUrl())) {
       try {
         serialize();
-        Log.d(getClass().getSimpleName(), "saved profile for "
-            + context.getMapper().getProjectName());
+        Log.d(getClass().getSimpleName(),
+            "saved profile for " + mapper.getProjectName());
       } catch (final IOException e) {
         Log.d(getClass().getSimpleName(), "could not save profile", e);
         final String title = getString(R.string.could_not_save_profile_xxx)
