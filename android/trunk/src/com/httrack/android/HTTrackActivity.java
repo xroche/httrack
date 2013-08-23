@@ -2246,7 +2246,7 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Send
     final NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-    manager.notify(0, notification);
+    manager.notify((int) System.currentTimeMillis(), notification);
   }
 
   /** Send a notification with a blank Intent. **/
