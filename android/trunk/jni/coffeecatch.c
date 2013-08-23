@@ -774,6 +774,21 @@ static uintptr_t coffeecatch_get_pc_from_ucontext(const ucontext_t *uc) {
 #endif
 }
 
+/* Is this module name look like a DLL ?
+   FIXME: find a better way to do that...  */
+static int coffeecatch_is_dll(const char *name) {
+  size_t i;
+  for(i = 0; name[i] != '\0'; i++) {
+    if (name[i + 0] == '.' &&
+        name[i + 1] == 's' &&
+        name[i + 2] == 'o' &&
+        ( name[i + 3] == '\0' || name[i + 3] == '.') ) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 /**
  * Get the full error message associated with the crash.
  */
@@ -837,14 +852,18 @@ const char* coffeecatch_get_message() {
         const int offs = (int) ((uintptr_t) addr - (uintptr_t) near);
         const void* addr_rel = (void*) (uintptr_t)
             ((uintptr_t) addr - (uintptr_t) info.dli_fbase);
+        /* We need the absolute address for the main module (?).
+           TODO FIXME to be investigated. */
+        const void* addr_to_use = coffeecatch_is_dll(info.dli_fname)
+          ? addr_rel : addr;
         if (info.dli_sname != NULL) {
-            snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-                             " [at %s:%p (%s+0x%x)]", info.dli_fname,
-                             addr_rel, info.dli_sname, offs);
+          snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+                           " [at %s:%p (%s+0x%x)]", info.dli_fname,
+                           addr_to_use, info.dli_sname, offs);
         } else {
-            snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
-                             " [at %s:%p]", info.dli_fname,
-                             addr_rel);
+          snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+                           " [at %s:%p]", info.dli_fname,
+                           addr_to_use);
         }
       } else {
         snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " [at %p]",
