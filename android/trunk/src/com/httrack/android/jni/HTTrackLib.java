@@ -25,31 +25,29 @@ import java.io.File;
 import java.io.IOException;
 
 public class HTTrackLib {
+  /** Opaque native context. **/
+  private long nativeObject;
+
   /** Statistics. **/
   protected final HTTrackCallbacks callbacks;
 
   /**
    * Get the current library version, as MAJOR.MINOR.SUBRELEASE string.
-   *
+   * 
    * @return the current library version
    */
   public static native String getVersion();
 
   /**
    * Get the current library features, as a string of [+-]tag.
-   *
+   * 
    * @return the current library features.
    */
   public static native String getFeatures();
 
   /**
-   * Initialize the httrack library. MUST be called once.
-   */
-  public static native void init();
-
-  /**
    * Build the top-level index.
-   *
+   * 
    * @param path
    *          The target path;
    * @param templatesPath
@@ -64,7 +62,7 @@ public class HTTrackLib {
 
   /**
    * Start the engine.
-   *
+   * 
    * @param args
    *          main() arguments.
    * @return The exit code upon completion.
@@ -75,7 +73,7 @@ public class HTTrackLib {
 
   /**
    * Stop the engine.
-   *
+   * 
    * @return true if the engine was stopped (or at least a request was sent),
    *         false if it has already stopped.
    */
@@ -92,8 +90,24 @@ public class HTTrackLib {
    * Constructor with statistics support.
    */
   public HTTrackLib(final HTTrackCallbacks callbacks) {
+    init();
     this.callbacks = callbacks;
   }
+
+  @Override
+  public void finalize() {
+    free();
+  }
+
+  /*
+   * Initialize.
+   */
+  protected native void init();
+
+  /*
+   * Free.
+   */
+  protected native void free();
 
   protected static native int buildTopIndex(String path, String templatesPath);
 

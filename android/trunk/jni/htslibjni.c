@@ -59,9 +59,12 @@ static void assert_failure(const char* exp, const char* file, int line) {
 #undef assert
 #define assert(EXP) (void)( (EXP) || (assert_failure(#EXP, __FILE__, __LINE__), 0) )
 
-static httrackp * global_opt = NULL;
-static int global_opt_stop = 0;
-static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
+/** Context for HTTrackLib. **/
+typedef struct HTTrackLib_context {
+  pthread_mutex_t lock;
+  httrackp * opt;
+  int stop;
+} HTTrackLib_context;
 
 #define MUTEX_LOCK(MUTEX) do {                  \
     if (pthread_mutex_lock(&MUTEX) != 0) {      \
@@ -92,6 +95,7 @@ static jmethodID meth_HTTrackCallbacks_onRefresh = NULL;
 
 /* The stats field */
 static jfieldID field_callbacks = NULL;
+static jfieldID field_nativeObject = NULL;
 
 /* The elements field */
 static jfieldID field_elements = NULL;
@@ -210,6 +214,10 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
                                          "Lcom/httrack/android/jni/HTTrackCallbacks;");
   assert(field_callbacks != NULL);
 
+  /* The "nativeObject" opaque object. */
+  field_nativeObject = (*u.env)->GetFieldID(u.env, cls_HTTrackLib, "nativeObject", "J");
+  assert(field_nativeObject != NULL);
+
   /* Load HTTrackStats fields ids. */
 #define DECLARE_FIELD(NAME) do {                                 \
   field_ ##NAME = (*u.env)->GetFieldID(u.env, cls_HTTrackStats,  \
@@ -234,6 +242,22 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   LIST_OF_FIELDS_ELT();
 #undef DECLARE_FIELD
 
+  /* Initialize engine. */
+  hts_init();
+
+  /* redirect stdout and stderr to a log file for debugging purpose */
+#ifdef REDIRECT_STDIO_LOG_FILE
+  FILE * const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
+  if (log != NULL) {
+    const int fd = dup(fileno(log));
+    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
+      assert(!"could not redirect stdin/stdout");
+    }
+    fclose(log);
+    fprintf(stderr, "started stdio logging in file\n");
+  }
+#endif
+
   /* Java VM 1.6 */
   return JNI_VERSION_1_6;
 }
@@ -253,6 +277,16 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
   releaseClass(u.env, &cls_HTTrackCallbacks);
   releaseClass(u.env, &cls_HTTrackStats);
   releaseClass(u.env, &cls_HTTrackStats_Element);
+}
+
+static void setNativeOpt(JNIEnv* env, jobject object, HTTrackLib_context *opt) {
+  (*env)->SetLongField(env, object, field_nativeObject,
+      (jlong) (uintptr_t) (void*) opt);
+}
+
+static HTTrackLib_context* getNativeOpt(JNIEnv* env, jobject object) {
+  return (HTTrackLib_context*) (void*) (uintptr_t)
+      (*env)->GetLongField(env, object, field_nativeObject);
 }
 
 /* FIXME -- This is dirty... we are supposed to keep the error message. */
@@ -289,31 +323,6 @@ static void throwNPException(JNIEnv* env, const char *message) {
   throwException(env, "java/lang/NullPointerException", message);
 }
 
-void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jclass clazz) {
-  /* redirect stdout and stderr to a log file for debugging purpose */
-#ifdef REDIRECT_STDIO_LOG_FILE
-  FILE *const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
-  if (log != NULL) {
-    const int fd = dup(fileno(log));
-    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
-      assert(! "could not redirect stdin/stdout");
-    }
-    fclose(log);
-    fprintf(stderr, "started stdio logging in file\n");
-  }
-#endif
-
-  /* created files shall be seen by users */
-  umask(S_IWOTH);
-
-  /* initialize library */
-  assert(cls_HTTrackLib != NULL);
-  hts_init();
-
-  UNUSED(env);
-  UNUSED(clazz);
-}
-
 jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env, jclass clazz) {
   const char *version = hts_version();
   assert(version != NULL);
@@ -332,6 +341,8 @@ typedef struct jni_context_t {
   JNIEnv *env;
   /* HTTrackCallbacks object */
   jobject callbacks; 
+  /* Context */
+  HTTrackLib_context *context;
 } jni_context_t;
 
 typedef enum hts_state_id_t {
@@ -363,6 +374,32 @@ static jobject newStringSafe(JNIEnv *env, const char *s) {
     return str;
   }
   return NULL;
+}
+
+void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jobject object) {
+  HTTrackLib_context *const context = (HTTrackLib_context*)
+      calloc(sizeof(HTTrackLib_context), 1);
+  if (context == NULL) {
+    throwRuntimeException(env, "memory exhausted");
+    return;
+  }
+  pthread_mutex_init(&context->lock, NULL);
+  context->opt = NULL;
+  context->stop = 0;
+  setNativeOpt(env, object, context);
+}
+
+void Java_com_httrack_android_jni_HTTrackLib_free(JNIEnv* env, jobject object) {
+  HTTrackLib_context *const context = getNativeOpt(env, object);
+  if (context != NULL) {
+    setNativeOpt(env, object, NULL);
+    pthread_mutex_destroy(&context->lock);
+    if (context->opt != NULL) {
+      hts_free_opt(context->opt);
+      context->opt = NULL;
+    }
+    free(context);
+  }
 }
 
 static jobject build_stats(jni_context_t *const t, httrackp * opt,
@@ -608,7 +645,7 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
   jni_context_t *const t = (jni_context_t*) arg;
 
   /* exit now */
-  if (global_opt_stop) {
+  if (t->context->stop) {
     return 0;
   }
 
@@ -619,18 +656,23 @@ static int htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
 
 jboolean Java_com_httrack_android_jni_HTTrackLib_stop(JNIEnv* env, jobject object,
     jboolean force) {
+  HTTrackLib_context *const context = getNativeOpt(env, object);
   jboolean stopped = JNI_FALSE;
-  UNUSED(env);
-  UNUSED(object);
-  MUTEX_LOCK(global_lock);
-  if (global_opt != NULL) {
+
+  if (context == NULL) {
+    throwRuntimeException(env, "null context");
+  }
+
+  MUTEX_LOCK(context->lock);
+  if (context->opt != NULL) {
     stopped = JNI_TRUE;
     if (force) {
-      global_opt_stop = 1;
+      context->stop = 1;
     }
-    hts_request_stop(global_opt, force);
+    hts_request_stop(context->opt, force);
   }
-  MUTEX_UNLOCK(global_lock);
+  MUTEX_UNLOCK(context->lock);
+
   return stopped;
 }
 
@@ -659,22 +701,23 @@ jint Java_com_httrack_android_jni_HTTrackLib_buildTopIndex(JNIEnv* env, jclass c
 }
 
 jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
+  HTTrackLib_context *const context = getNativeOpt(env, object);
   const int argc =
       object != NULL ? (*env)->GetArrayLength(env, stringArray) : 0;
   const size_t argv_size = (argc + 1) * sizeof(char*);
   char **const argv = (char**) malloc(argv_size);
   if (argv != NULL) {
     int i;
-    httrackp * opt = NULL;
     int code = -1;
     int already_running = 0;
     struct jni_context_t t;
     t.env = env;
     t.callbacks = (*env)->GetObjectField(env, object, field_callbacks);
+    t.context = context;
 
     /* Create options and reference it */
-    MUTEX_LOCK(global_lock);
-    if (global_opt == NULL) {
+    MUTEX_LOCK(context->lock);
+    if (context->opt == NULL) {
       /* Create array */
       for (i = 0; i < argc; i++) {
         /* Note: a local reference is created here */
@@ -688,43 +731,42 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
       argv[i] = NULL;
 
       /* Create opt tab */
-      opt = hts_create_opt();
-      global_opt = opt;
-      global_opt_stop = 0;
-      CHAIN_FUNCTION(opt, loop, htsshow_loop, &t);
+      context->opt = hts_create_opt();
+      context->stop = 0;
+      CHAIN_FUNCTION(context->opt, loop, htsshow_loop, &t);
     } else {
       already_running = 1;
     }
-    MUTEX_UNLOCK(global_lock);
+    MUTEX_UNLOCK(context->lock);
 
-    if (opt != NULL) {
+    if (context->opt != NULL) {
       const hts_stat_struct* stats;
 
       /* Rock'in! */
-      code = hts_main2(argc, argv, opt);
+      code = hts_main2(argc, argv, context->opt);
 
       /* Fetch last stats before cleaning up */
-      stats = hts_get_stats(opt);
+      stats = hts_get_stats(context->opt);
       assert(stats != NULL);
       fprintf(stderr, "status code %d, %d errors, %d warnings\n",
           code, stats->stat_errors, stats->stat_warnings);
-      (void) htsshow_loop_internal(&t, opt, NULL, 0, -1, 0, 0, 0,
+      (void) htsshow_loop_internal(&t, context->opt, NULL, 0, -1, 0, 0, 0,
           (hts_stat_struct*) stats);
 
       /* Raise error if suitable */
       if (code == -1) {
-        const char *message = hts_errmsg(opt);
+        const char *message = hts_errmsg(context->opt);
         if (message != NULL && *message != '\0') {
           throwIOException(env, message);
         }
       }
 
       /* Unreference global option tab */
-      MUTEX_LOCK(global_lock);
-      hts_free_opt(opt);
-      global_opt = NULL;
-      global_opt_stop = 0;
-      MUTEX_UNLOCK(global_lock);
+      MUTEX_LOCK(context->lock);
+      hts_free_opt(context->opt);
+      context->opt = NULL;
+      context->stop = 0;
+      MUTEX_UNLOCK(context->lock);
 
       /* Cleanup */
       for (i = 0; i < argc; i++) {

@@ -30,13 +30,16 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -110,6 +113,9 @@ public class HTTrackActivity extends FragmentActivity {
   protected static final Pattern brHtmlPattern = Pattern.compile(Pattern
       .quote("<br />"));
 
+  // Running instances of HTTrack (based on winprofile.ini path)
+  protected static final HashSet<String> runningInstances = new HashSet<String>();
+
   /*
    * Build identifiers. See
    * <http://developer.android.com/reference/android/os/Build
@@ -144,6 +150,9 @@ public class HTTrackActivity extends FragmentActivity {
 
   // Current pane id and context
   protected int pane_id = -1;
+
+  // "Project name" pane is dirty
+  protected boolean dirtyNamePane;
 
   // Handler to execute code in UI thread
   private final Handler handlerUI = new Handler();
@@ -287,9 +296,6 @@ public class HTTrackActivity extends FragmentActivity {
 
     // Attempt to load the native library.
     try {
-      // Initialize
-      HTTrackLib.init();
-
       // Fetch httrack engine version
       version = HTTrackLib.getVersion();
       versionFeatures = HTTrackLib.getFeatures();
@@ -885,7 +891,11 @@ public class HTTrackActivity extends FragmentActivity {
     protected void runInternal() {
       // Rock'in!
       String message = null;
+      FileOutputStream outLock = null;
+      FileLock lock = null;
+      File profile = null;
       try {
+        // Sanity checks
         if (parent == null) {
           throw new IOException("no parent!");
         }
@@ -894,6 +904,30 @@ public class HTTrackActivity extends FragmentActivity {
           throw new IOException("no project name defined!");
         }
 
+        // Validate path
+        if (!HTTrackActivity.mkdirs(target)) {
+          throw new IOException("Unable to create " + target.getAbsolutePath());
+        }
+        HTTrackActivity.setFileReadWrite(target);
+
+        // Inter-thread locking
+        profile = parent.createProfileDirectory();
+        synchronized (runningInstances) {
+          if (runningInstances.contains(profile.getAbsolutePath())) {
+            throw new IOException("This project is already in progress");
+          }
+          runningInstances.add(profile.getAbsolutePath());
+        }
+
+        // Lock winprofile.ini by opening it in append mode, and requesting an
+        // exclusive lock
+        outLock = new FileOutputStream(profile, true);
+        lock = outLock.getChannel().tryLock();
+        if (lock == null) {
+          throw new IOException("This project is already in progress");
+        }
+
+        // Args list
         final List<String> args = new ArrayList<String>();
 
         // Program name
@@ -918,14 +952,8 @@ public class HTTrackActivity extends FragmentActivity {
         Log.v(getClass().getSimpleName(),
             "starting engine: " + HTTrackActivity.printArray(cargs));
 
-        // Validate path
-        if (!HTTrackActivity.mkdirs(target)) {
-          throw new IOException("Unable to create " + target.getAbsolutePath());
-        }
-        HTTrackActivity.setFileReadWrite(target);
-
         // Serialize settings
-        parent.serialize();
+        parent.serialize(outLock);
 
         // Run engine
         final int code = engine.main(cargs);
@@ -953,6 +981,21 @@ public class HTTrackActivity extends FragmentActivity {
         buildTopIndex();
       } catch (final IOException io) {
         message = io.getMessage();
+      } finally {
+        // Release inter-thread lock
+        if (profile != null) {
+          synchronized (runningInstances) {
+            runningInstances.remove(profile.getAbsolutePath());
+          }
+        }
+        // Release lock
+        if (lock != null) {
+          try {
+            lock.release();
+            outLock.close();
+          } catch (IOException io) {
+          }
+        }
       }
 
       // Ensure we switch to the final pane
@@ -1328,12 +1371,13 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
-   * Serialize current profile to disk.
+   * Create the profile directory.
    * 
+   * @return The profile file to be created
    * @throws IOException
-   *           Upon I/O error.
+   *           Upon error
    */
-  protected synchronized void serialize() throws IOException {
+  protected synchronized File createProfileDirectory() throws IOException {
     final File target = getTargetFile();
     final File profile = getProfileFile();
     if (target == null || profile == null) {
@@ -1352,9 +1396,32 @@ public class HTTrackActivity extends FragmentActivity {
     HTTrackActivity.setFileReadWrite(target);
     HTTrackActivity.setFileReadWrite(cache);
 
+    return profile;
+  }
+
+  /**
+   * Serialize current profile to disk.
+   * 
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected synchronized void serialize() throws IOException {
     // Write settings
+    final File profile = createProfileDirectory();
     mapper.serialize(profile);
     HTTrackActivity.setFileReadWrite(profile);
+  }
+
+  /**
+   * Serialize current profile to an existing OutputStream.
+   * 
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  protected synchronized void serialize(final OutputStream os)
+      throws IOException {
+    mapper.serialize(os);
+    os.flush();
   }
 
   /**
@@ -1742,7 +1809,7 @@ public class HTTrackActivity extends FragmentActivity {
       if (OptionsMapper.isStringNonEmpty(name)) {
         // Changed name ?
         final String prevName = getMap(R.id.fieldProjectName);
-        if (prevName == null || !prevName.equals(name)) {
+        if (prevName == null || !prevName.equals(name) || dirtyNamePane) {
           // We need to put immediately the name in the map to be able to
           // unserialize.
           try {
@@ -1751,6 +1818,8 @@ public class HTTrackActivity extends FragmentActivity {
             unserialize();
           } catch (final IOException e) {
             // Ignore (if not found)
+          } finally {
+            dirtyNamePane = false;
           }
         }
         return true;
@@ -2219,6 +2288,12 @@ public class HTTrackActivity extends FragmentActivity {
 
       // Set focus
       setCurrentFocusId(focus_ids);
+
+      // Special case: we're on the project name pane - load it if no settings
+      // are defined.
+      if (id == LAYOUT_PROJECT_NAME) {
+        dirtyNamePane = true;
+      }
     }
   }
 

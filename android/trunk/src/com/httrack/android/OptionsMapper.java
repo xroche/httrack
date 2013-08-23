@@ -24,9 +24,11 @@ package com.httrack.android;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -1589,16 +1591,16 @@ public class OptionsMapper {
   /**
    * Serialize settings on disk.
    * 
-   * @param profile
-   *          The profile file.
+   * @param fos
+   *          The Output Stream.
    * @throws UnsupportedEncodingException
    *           Upon encoding error
    * @throws IOException
    *           Upon I/O error.
    */
-  public void serialize(final File profile)
+  public void serialize(final OutputStream fos)
       throws UnsupportedEncodingException, IOException {
-    final FileWriter writer = new FileWriter(profile);
+    final OutputStreamWriter writer = new OutputStreamWriter(fos);
     final BufferedWriter lwriter = new BufferedWriter(writer);
     try {
       for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
@@ -1619,6 +1621,26 @@ public class OptionsMapper {
       }
     } finally {
       writer.close();
+    }
+  }
+
+  /**
+   * Serialize settings on disk.
+   * 
+   * @param profile
+   *          The profile file.
+   * @throws UnsupportedEncodingException
+   *           Upon encoding error
+   * @throws IOException
+   *           Upon I/O error.
+   */
+  public void serialize(final File profile)
+      throws UnsupportedEncodingException, IOException {
+    final FileOutputStream fos = new FileOutputStream(profile);
+    try {
+      serialize(fos);
+    } finally {
+      fos.close();
     }
   }
 
