@@ -1367,6 +1367,7 @@ public class HTTrackActivity extends FragmentActivity {
     if (runner == null) {
       final FragmentManager fm = getSupportFragmentManager();
       runner = (RunnerFragment) fm.findFragmentByTag(id);
+      runner.setParent(this);
     }
     // Then, create one if necessary
     if (runner == null) {

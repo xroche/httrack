@@ -52,6 +52,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight=".30"
                 android:hint="@string/hint_proxy_port"
+		android:digits="@string/latin_digits_list"
                 android:inputType="numberDecimal" />
         </LinearLayout>
 

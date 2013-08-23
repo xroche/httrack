@@ -196,5 +196,6 @@
     <string name="title_activity_file_chooser">FileChooserActivity</string>
     <string name="apply_base_path">Save prefs</string>
     <string name="ellipsis">…</string>
+    <string name="latin_digits_list">0123456789</string>
 
 </resources>

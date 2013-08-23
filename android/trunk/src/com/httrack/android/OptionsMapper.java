@@ -352,6 +352,9 @@ public class OptionsMapper {
   // String-to-OptionMapper map
   protected HashMap<String, OptionMapper> fieldsNameToMapper = new HashMap<String, OptionMapper>();
 
+  // Pure digits (0..9) pattern.
+  protected static Pattern patternDigits = Pattern.compile("^[0-9]+$");
+
   // The options mapping
   protected final SparseArraySerializable map = new SparseArraySerializable();
 
@@ -492,7 +495,7 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0) {
+        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
           MaxSizeHandler.this.maxHtml = Integer.parseInt(value);
         }
       }
@@ -511,7 +514,7 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0) {
+        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
           MaxSizeHandler.this.maxNonHtml = Integer.parseInt(value);
         }
       }
@@ -820,7 +823,7 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0) {
+        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
           BuildHandler.this.build = Integer.parseInt(value);
         }
       }
@@ -906,7 +909,7 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0) {
+        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
           LogHandler.this.type = Integer.parseInt(value);
         }
       }
@@ -995,7 +998,7 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0) {
+        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
           PrimaryScanHandler.this.type = Integer.parseInt(value);
         }
       }
@@ -1261,7 +1264,7 @@ public class OptionsMapper {
     @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
-      if (value != null && value.length() != 0) {
+      if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
         final int choiceId = Integer.parseInt(value);
         if (choiceId >= 0 && choiceId < choices.length) {
           final String choice = choices[choiceId];
@@ -1489,22 +1492,31 @@ public class OptionsMapper {
    * winprofile.ini decoding. the encoding is a bit lame, but is compatible with
    * WinHTTrack format.
    */
-  private static String profileDecode(final String s) {
+  private static String profileDecode(final String s) throws IOException {
     final StringBuilder builder = new StringBuilder();
     for (int i = 0; i < s.length(); i++) {
       final char c = s.charAt(i);
-      if (c == '%' && i + 1 < s.length()) {
+      if ((int) c < 32 && c != '\t' && c != '\r' && c != '\n') {
+        throw new IOException("invalid control character");
+      }
+      if (c == '%') {
+        if (i + 1 >= s.length()) {
+          throw new IOException("invalid escaped sequence (% at end of line)");
+        }
         final char d = s.charAt(i + 1);
         if (d == '%') {
           i++;
           builder.append('%');
-        } else if (i + 2 < s.length()) {
+        } else {
+          if (i + 2 >= s.length()) {
+            throw new IOException("invalid escaped sequence (truncated %)");
+          }
           try {
             final int code = Integer.parseInt(s.substring(i + 1, i + 3), 16);
             i += 2;
             builder.append((char) code);
           } catch (final NumberFormatException nfe) {
-
+            throw new IOException("invalid escaped sequence (invalid % number)", nfe);
           }
         }
       } else {
