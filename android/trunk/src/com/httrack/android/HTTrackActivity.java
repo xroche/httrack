@@ -878,6 +878,9 @@ public class HTTrackActivity extends FragmentActivity {
       // Rock'in!
       String message = null;
       try {
+        if (parent == null) {
+          throw new IOException("no parent!");
+        }
         final File target = parent.getTargetFile();
         if (target == null) {
           throw new IOException("no project name defined!");
@@ -1367,7 +1370,7 @@ public class HTTrackActivity extends FragmentActivity {
     if (runner == null) {
       final FragmentManager fm = getSupportFragmentManager();
       runner = (RunnerFragment) fm.findFragmentByTag(id);
-      runner.setParent(this);
+      // onAttach() should be called.
     }
     // Then, create one if necessary
     if (runner == null) {
