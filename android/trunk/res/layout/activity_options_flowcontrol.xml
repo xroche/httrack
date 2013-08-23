@@ -30,8 +30,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".30"
+                android:digits="@string/latin_digits_list"
                 android:hint="8"
-		android:digits="@string/latin_digits_list"
                 android:inputType="numberDecimal" >
 
                 <requestFocus />
@@ -62,8 +62,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".30"
+                android:digits="@string/latin_digits_list"
                 android:hint="120"
-		android:digits="@string/latin_digits_list"
                 android:inputType="numberDecimal" />
         </LinearLayout>
 
@@ -91,8 +91,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".30"
+                android:digits="@string/latin_digits_list"
                 android:hint="2"
-		android:digits="@string/latin_digits_list"
                 android:inputType="numberDecimal" />
         </LinearLayout>
 
@@ -113,7 +113,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".30"
-		android:digits="@string/latin_digits_list"
+                android:digits="@string/latin_digits_list"
                 android:inputType="numberDecimal" />
         </LinearLayout>
 

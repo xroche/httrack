@@ -495,7 +495,8 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+        if (value != null && value.length() != 0
+            && patternDigits.matcher(value).matches()) {
           MaxSizeHandler.this.maxHtml = Integer.parseInt(value);
         }
       }
@@ -514,7 +515,8 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+        if (value != null && value.length() != 0
+            && patternDigits.matcher(value).matches()) {
           MaxSizeHandler.this.maxNonHtml = Integer.parseInt(value);
         }
       }
@@ -823,7 +825,8 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+        if (value != null && value.length() != 0
+            && patternDigits.matcher(value).matches()) {
           BuildHandler.this.build = Integer.parseInt(value);
         }
       }
@@ -909,7 +912,8 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+        if (value != null && value.length() != 0
+            && patternDigits.matcher(value).matches()) {
           LogHandler.this.type = Integer.parseInt(value);
         }
       }
@@ -998,7 +1002,8 @@ public class OptionsMapper {
       @Override
       public void emit(final StringBuilder flags,
           final List<String> commandline, final String value) {
-        if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+        if (value != null && value.length() != 0
+            && patternDigits.matcher(value).matches()) {
           PrimaryScanHandler.this.type = Integer.parseInt(value);
         }
       }
@@ -1264,7 +1269,8 @@ public class OptionsMapper {
     @Override
     public void emit(final StringBuilder flags, final List<String> commandline,
         final String value) {
-      if (value != null && value.length() != 0 && patternDigits.matcher(value).matches()) {
+      if (value != null && value.length() != 0
+          && patternDigits.matcher(value).matches()) {
         final int choiceId = Integer.parseInt(value);
         if (choiceId >= 0 && choiceId < choices.length) {
           final String choice = choices[choiceId];
@@ -1516,7 +1522,9 @@ public class OptionsMapper {
             i += 2;
             builder.append((char) code);
           } catch (final NumberFormatException nfe) {
-            throw new IOException("invalid escaped sequence (invalid % number)", nfe);
+            throw new IOException(
+                "invalid escaped sequence (invalid % number): "
+                    + nfe.getMessage());
           }
         }
       } else {
