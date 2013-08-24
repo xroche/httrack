@@ -152,6 +152,19 @@ extern int coffeecatch_get_signal(void);
  */
 const char* coffeecatch_get_message(void);
 
+/**
+ * Raise an abort() signal in the current thread. If the current code section
+ * is protected, the 'exp', 'file' and 'line' information are stored for
+ * further audit.
+ */
+extern void coffeecatch_abort(const char* exp, const char* file, int line);
+
+/**
+ * Assertion check. If the expression is false, an abort() signal is raised
+ * using coffeecatch_abort().
+ */
+#define coffeecatch_assert(EXP) (void)( (EXP) || (coffeecatch_abort(#EXP, __FILE__, __LINE__), 0) )
+
 /** Internal functions & definitions, not to be used directly. **/
 #include <setjmp.h>
 extern int coffeecatch_setup(void);

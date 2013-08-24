@@ -125,6 +125,11 @@ typedef struct native_code_handler_struct {
   size_t frames_size;
   size_t frames_skip;
 #endif
+
+  /* Custom assertion failures. */
+  const char *expression;
+  const char *file;
+  int line;
 } native_code_handler_struct;
 
 /* Global crash handler structure. */
@@ -805,21 +810,36 @@ const char* coffeecatch_get_message() {
     const char* const posix_desc =
       coffeecatch_desc_sig(t->si.si_signo, t->si.si_code);
 
-    /* Signal */
-    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "signal %d",
-             t->si.si_signo);
-    buffer_offs += strlen(&buffer[buffer_offs]);
-
-    /* Description */
-    snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " (%s)",
-             posix_desc);
-    buffer_offs += strlen(&buffer[buffer_offs]);
-
-    /* Address of faulting instruction */
-    if (t->si.si_signo == SIGILL || t->si.si_signo == SIGSEGV) {
-      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " at address %p",
-               t->si.si_addr);
+    /* Assertion failure ? */
+    if ((t->code == SIGABRT
+#ifdef __ANDROID__
+        /* See Android BUG #16672:
+         * "C assert() failure causes SIGSEGV when it should cause SIGABRT" */
+        || (t->code == SIGSEGV && (uintptr_t) t->si.si_addr == 0xdeadbaad)
+#endif
+        ) && t->expression != NULL) {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs,
+          "assertion '%s' failed at %s:%d",
+          t->expression, t->file, t->line);
       buffer_offs += strlen(&buffer[buffer_offs]);
+    }
+    /* Signal */
+    else {
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, "signal %d",
+               t->si.si_signo);
+      buffer_offs += strlen(&buffer[buffer_offs]);
+
+      /* Description */
+      snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " (%s)",
+               posix_desc);
+      buffer_offs += strlen(&buffer[buffer_offs]);
+
+      /* Address of faulting instruction */
+      if (t->si.si_signo == SIGILL || t->si.si_signo == SIGSEGV) {
+        snprintf(&buffer[buffer_offs], buffer_len - buffer_offs, " at address %p",
+                 t->si.si_addr);
+        buffer_offs += strlen(&buffer[buffer_offs]);
+      }
     }
 
     /* [POSIX] If non-zero, an errno value associated with this signal,
@@ -920,6 +940,16 @@ sigjmp_buf* coffeecatch_get_ctx() {
   native_code_handler_struct* t = coffeecatch_get();
   assert(t != NULL);
   return &t->ctx;
+}
+
+void coffeecatch_abort(const char* exp, const char* file, int line) {
+  native_code_handler_struct *const t = coffeecatch_get();
+  if (t != NULL) {
+    t->expression = exp;
+    t->file = file;
+    t->line = line;
+  }
+  abort();
 }
 
 #undef UNUSED
