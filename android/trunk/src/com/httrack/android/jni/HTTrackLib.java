@@ -102,7 +102,12 @@ public class HTTrackLib {
   /*
    * Initialize.
    */
-  protected native void init();
+  protected native void init() throws RuntimeException;
+
+  /*
+   * Static initialization.
+   */
+  private native static void initStatic() throws RuntimeException;
 
   /*
    * Free.
@@ -148,5 +153,8 @@ public class HTTrackLib {
 
     /** HTTrack Android JNI layer. **/
     System.loadLibrary("htslibjni");
+
+    /** Static initialization. Throws RuntimeException upon error. **/
+    initStatic();
   }
 }

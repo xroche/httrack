@@ -295,16 +295,9 @@ public class HTTrackActivity extends FragmentActivity {
     super.onCreate(savedInstanceState);
 
     // Attempt to load the native library.
-    try {
-      // Fetch httrack engine version
-      version = HTTrackLib.getVersion();
-      versionFeatures = HTTrackLib.getFeatures();
-    } catch (final RuntimeException re) {
-      // Woops, something is not right here.
-      new AlertDialog.Builder(this).setTitle("Fatal Error")
-          .setMessage(re.getMessage()).show();
-      throw re;
-    }
+    // Fetch httrack engine version
+    version = HTTrackLib.getVersion();
+    versionFeatures = HTTrackLib.getFeatures();
 
     // Android package version code
     try {
@@ -312,8 +305,6 @@ public class HTTrackActivity extends FragmentActivity {
           getPackageName(), 0);
       versionCode = info.versionCode;
     } catch (final NameNotFoundException e) {
-      new AlertDialog.Builder(this).setTitle("Fatal Error")
-          .setMessage(e.getMessage()).show();
       throw new RuntimeException(e);
     }
 
