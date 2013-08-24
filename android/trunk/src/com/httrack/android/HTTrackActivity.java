@@ -821,6 +821,7 @@ public class HTTrackActivity extends FragmentActivity {
     private final HTTrackLib engine = new HTTrackLib(this);
     final private StringBuilder str = new StringBuilder();
     private HTTrackActivity parent;
+    private final List<Runnable> pendingParentActions = new ArrayList<Runnable>();
     private boolean mirrorRefresh;
     protected HTTrackStats lastStats;
     private volatile boolean ended;
@@ -840,6 +841,7 @@ public class HTTrackActivity extends FragmentActivity {
     private String string_ready;
     private String string_creating_project;
     private String string_starting_mirror;
+    private String string_mirror_finished;
 
     /**
      * Constructor.
@@ -885,6 +887,15 @@ public class HTTrackActivity extends FragmentActivity {
       string_ready = getParentString(R.string.ready);
       string_creating_project = getParentString(R.string.creating_project);
       string_starting_mirror = getParentString(R.string.starting_mirror);
+      string_mirror_finished = getParentString(R.string.mirror_finished);
+
+      // Execute pending actions now we are attached
+      if (pendingParentActions.size() != 0) {
+        for (final Runnable run : pendingParentActions) {
+          run.run();
+        }
+        pendingParentActions.clear();
+      }
     }
 
     /**
@@ -1025,9 +1036,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
 
       // Ensure we switch to the final pane
-      final String displayMessage = (parent != null ? parent
-          .getString(R.string.mirror_finished) + ": " : "")
-          + message;
+      final String displayMessage = string_mirror_finished + ": " + message;
       final long errorsCount = lastStats != null ? lastStats.errorsCount : 0;
       displayFinishedPanel(displayMessage, errorsCount);
     }
@@ -1038,6 +1047,13 @@ public class HTTrackActivity extends FragmentActivity {
     private synchronized void buildTopIndex() {
       if (parent != null) {
         parent.buildTopIndex();
+      } else {
+        pendingParentActions.add(new Runnable() {
+          @Override
+          public void run() {
+            parent.buildTopIndex();
+          }
+        });
       }
     }
 
@@ -1048,6 +1064,13 @@ public class HTTrackActivity extends FragmentActivity {
         final long errorsCount) {
       if (parent != null) {
         parent.displayFinishedPanel(displayMessage, errorsCount);
+      } else {
+        pendingParentActions.add(new Runnable() {
+          @Override
+          public void run() {
+            parent.displayFinishedPanel(displayMessage, errorsCount);
+          }
+        });
       }
     }
 
