@@ -220,6 +220,12 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   }
   UNUSED(reserved);
 
+  /**
+   * Note: we're not doing much here, because we do not have any clear
+   * guarantee over what is safe inside the JNI_OnLoad() handler (throwing
+   * exceptions ?). The static initializer will do the real job later.
+   */
+
   /* Java VM 1.6 */
   return JNI_VERSION_1_6;
 }
