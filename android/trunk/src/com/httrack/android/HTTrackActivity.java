@@ -818,6 +818,8 @@ public class HTTrackActivity extends FragmentActivity {
     private String string_errors;
     private String string_connect;
     private String string_ready;
+    private String creating_project;
+    private String starting_mirror;
 
     /**
      * Constructor.
@@ -849,6 +851,8 @@ public class HTTrackActivity extends FragmentActivity {
       string_errors = parent.getString(R.string.errors);
       string_connect = parent.getString(R.string.connect);
       string_ready = parent.getString(R.string.ready);
+      creating_project = parent.getString(R.string.creating_project);
+      starting_mirror = parent.getString(R.string.starting_mirror);
     }
 
     /**
@@ -894,6 +898,9 @@ public class HTTrackActivity extends FragmentActivity {
         if (target == null) {
           throw new IOException("no project name defined!");
         }
+
+        // Progress info for slow phones
+        setProgressLines(new String[] { creating_project });
 
         // Validate path
         if (!HTTrackActivity.mkdirs(target)) {
@@ -945,6 +952,9 @@ public class HTTrackActivity extends FragmentActivity {
 
         // Serialize settings
         parent.serialize(outLock);
+
+        // Progress info for slow phones
+        setProgressLines(new String[] { starting_mirror });
 
         // Run engine
         final int code = engine.main(cargs);
@@ -1574,6 +1584,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
       break;
     case R.layout.activity_mirror_progress:
+      setProgressLines(new String[] { getString(R.string.starting_worker_thread) });
       startRunner();
       if (runner != null) {
         ProgressBar.class.cast(findViewById(R.id.progressMirror))

@@ -197,5 +197,8 @@
     <string name="apply_base_path">Save prefs</string>
     <string name="ellipsis">…</string>
     <string name="latin_digits_list">0123456789</string>
+    <string name="starting_worker_thread">Starting worker thread…</string>
+    <string name="creating_project">Creating the project…</string>
+    <string name="starting_mirror">Starting the mirror…</string>
 
 </resources>
