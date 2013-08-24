@@ -137,7 +137,7 @@ static native_code_global_struct native_code_g =
   NATIVE_CODE_GLOBAL_INITIALIZER;
 
 /* Thread variable holding context. */
-static pthread_key_t native_code_thread;
+pthread_key_t native_code_thread;
 
 #ifdef USE_UNWIND
 
@@ -439,8 +439,7 @@ static int coffeecatch_handler_setup(int setup_thread) {
     stack.ss_size = t->stack_buffer_size;
     stack.ss_flags = 0;
 
-    /* Install alternative stack. This is thread-safe
-     * (but for now with a static buffer) */
+    /* Install alternative stack. This is thread-safe */
     if (sigaltstack(&stack, &t->stack_old) != 0) {
       return -1;
     }
@@ -776,6 +775,7 @@ static uintptr_t coffeecatch_get_pc_from_ucontext(const ucontext_t *uc) {
 #elif (defined(__i386))
   return uc->uc_mcontext.gregs[REG_EIP];
 #else
+#error "Architecture is unknown, please report me!"
 #endif
 }
 
