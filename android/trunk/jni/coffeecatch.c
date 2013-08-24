@@ -137,7 +137,7 @@ static native_code_global_struct native_code_g =
   NATIVE_CODE_GLOBAL_INITIALIZER;
 
 /* Thread variable holding context. */
-pthread_key_t native_code_thread;
+static pthread_key_t native_code_thread;
 
 #ifdef USE_UNWIND
 
