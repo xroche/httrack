@@ -187,110 +187,8 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   }
   UNUSED(reserved);
 
-  /* HTTrackLib class */
-  cls_HTTrackLib = findClass(u.env, "com/httrack/android/jni/HTTrackLib");
-  assert(cls_HTTrackLib != NULL);
-  cls_HTTrackCallbacks = findClass(u.env, "com/httrack/android/jni/HTTrackCallbacks");
-  assert(cls_HTTrackCallbacks != NULL);
-  cls_HTTrackStats = findClass(u.env, "com/httrack/android/jni/HTTrackStats");
-  assert(cls_HTTrackStats != NULL);
-  cls_HTTrackStats_Element = findClass(u.env, "com/httrack/android/jni/HTTrackStats$Element");
-  assert(cls_HTTrackStats_Element != NULL);
-
-  /* "Note that jfieldIDs and jmethodIDs are opaque types, not object
-   * references, and should not be passed to NewGlobalRef" */
-
-  /* Constructors */
-  cons_HTTrackStats = (*u.env)->GetMethodID(u.env, cls_HTTrackStats, "<init>", "()V");
-  assert(cons_HTTrackStats != NULL);
-  cons_HTTrackStats_Element =
-    (*u.env)->GetMethodID(u.env, cls_HTTrackStats_Element, "<init>", "()V");
-  assert(cons_HTTrackStats_Element != NULL);
-
-  /* Methods */
-  meth_HTTrackCallbacks_onRefresh =
-    (*u.env)->GetMethodID(u.env, cls_HTTrackCallbacks, "onRefresh",
-                          "(Lcom/httrack/android/jni/HTTrackStats;)V");
-  assert(meth_HTTrackCallbacks_onRefresh != NULL);
-
-  /* The "callbacks" field */
-  field_callbacks = (*u.env)->GetFieldID(u.env, cls_HTTrackLib, "callbacks",
-                                         "Lcom/httrack/android/jni/HTTrackCallbacks;");
-  assert(field_callbacks != NULL);
-
-  /* The "nativeObject" opaque object. */
-  field_nativeObject = (*u.env)->GetFieldID(u.env, cls_HTTrackLib, "nativeObject", "J");
-  assert(field_nativeObject != NULL);
-
-  /* Load HTTrackStats fields ids. */
-#define DECLARE_FIELD(NAME) do {                                 \
-  field_ ##NAME = (*u.env)->GetFieldID(u.env, cls_HTTrackStats,  \
-                                       #NAME, "J");              \
-  assert(field_ ##NAME != NULL);                                 \
-} while(0)
-  LIST_OF_FIELDS();
-#undef DECLARE_FIELD
-
-  /* The elements array */
-  field_elements = (*u.env)->GetFieldID(u.env, cls_HTTrackStats, "elements",
-                                        "[Lcom/httrack/android/jni/HTTrackStats$Element;");
-  assert(field_elements != NULL);
-
-  /* Load HTTrackStats fields (element) ids. */
-#define DECLARE_FIELD(TYPE, NAME) do {                         \
-  field_elt_ ##NAME = (*u.env)->GetFieldID(u.env,              \
-                                           cls_HTTrackStats_Element,   \
-                                           #NAME, TYPE);       \
-  assert(field_elt_ ##NAME != NULL);                           \
-} while(0)
-  LIST_OF_FIELDS_ELT();
-#undef DECLARE_FIELD
-
-  /* Initialize engine. */
-  hts_init();
-
-  /* redirect stdout and stderr to a log file for debugging purpose */
-#ifdef REDIRECT_STDIO_LOG_FILE
-  FILE * const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
-  if (log != NULL) {
-    const int fd = dup(fileno(log));
-    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
-      assert(!"could not redirect stdin/stdout");
-    }
-    fclose(log);
-    fprintf(stderr, "started stdio logging in file\n");
-  }
-#endif
-
   /* Java VM 1.6 */
   return JNI_VERSION_1_6;
-}
-
-/* note: never called on Android */
-void JNI_OnUnload(JavaVM *vm, void *reserved) {
-  union {
-    void *ptr;
-    JNIEnv *env;
-  } u;
-  UNUSED(reserved);
-
-  if ((*vm)->GetEnv(vm, &u.ptr, JNI_VERSION_1_6) != JNI_OK) {
-    return ;
-  }
-  releaseClass(u.env, &cls_HTTrackLib);
-  releaseClass(u.env, &cls_HTTrackCallbacks);
-  releaseClass(u.env, &cls_HTTrackStats);
-  releaseClass(u.env, &cls_HTTrackStats_Element);
-}
-
-static void setNativeOpt(JNIEnv* env, jobject object, HTTrackLib_context *opt) {
-  (*env)->SetLongField(env, object, field_nativeObject,
-      (jlong) (uintptr_t) (void*) opt);
-}
-
-static HTTrackLib_context* getNativeOpt(JNIEnv* env, jobject object) {
-  return (HTTrackLib_context*) (void*) (uintptr_t)
-      (*env)->GetLongField(env, object, field_nativeObject);
 }
 
 /* FIXME -- This is dirty... we are supposed to keep the error message. */
@@ -325,6 +223,131 @@ static void throwIOException(JNIEnv* env, const char *message) {
 
 static void throwNPException(JNIEnv* env, const char *message) {
   throwException(env, "java/lang/NullPointerException", message);
+}
+
+/* Static initialization. */
+void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass clazz) {
+#define L_(X) #X
+#define L(X) L_(X)
+#define ASSERT_THROWS(EXP)                                          \
+  do {                                                              \
+    if (!(EXP)) {                                                   \
+      throwRuntimeException(env,                                    \
+          "assertion '" #EXP "' failed at " __FILE__ L(__LINE__));  \
+      return ;                                                      \
+    }                                                               \
+  } while(0)
+
+  /* UNUSED */
+  (void) clazz;
+
+  /* HTTrackLib class */
+  cls_HTTrackLib = findClass(env, "com/httrack/android/jni/HTTrackLib");
+  ASSERT_THROWS(cls_HTTrackLib != NULL);
+  cls_HTTrackCallbacks = findClass(env, "com/httrack/android/jni/HTTrackCallbacks");
+  ASSERT_THROWS(cls_HTTrackCallbacks != NULL);
+  cls_HTTrackStats = findClass(env, "com/httrack/android/jni/HTTrackStats");
+  ASSERT_THROWS(cls_HTTrackStats != NULL);
+  cls_HTTrackStats_Element = findClass(env, "com/httrack/android/jni/HTTrackStats$Element");
+  ASSERT_THROWS(cls_HTTrackStats_Element != NULL);
+
+  /* "Note that jfieldIDs and jmethodIDs are opaque types, not object
+   * references, and should not be passed to NewGlobalRef" */
+
+  /* Constructors */
+  cons_HTTrackStats = (*env)->GetMethodID(env, cls_HTTrackStats, "<init>", "()V");
+  ASSERT_THROWS(cons_HTTrackStats != NULL);
+  cons_HTTrackStats_Element =
+    (*env)->GetMethodID(env, cls_HTTrackStats_Element, "<init>", "()V");
+  ASSERT_THROWS(cons_HTTrackStats_Element != NULL);
+
+  /* Methods */
+  meth_HTTrackCallbacks_onRefresh =
+    (*env)->GetMethodID(env, cls_HTTrackCallbacks, "onRefresh",
+                        "(Lcom/httrack/android/jni/HTTrackStats;)V");
+  ASSERT_THROWS(meth_HTTrackCallbacks_onRefresh != NULL);
+
+  /* The "callbacks" field */
+  field_callbacks = (*env)->GetFieldID(env, cls_HTTrackLib, "callbacks",
+                                       "Lcom/httrack/android/jni/HTTrackCallbacks;");
+  ASSERT_THROWS(field_callbacks != NULL);
+
+  /* The "nativeObject" opaque object. */
+  field_nativeObject = (*env)->GetFieldID(env, cls_HTTrackLib, "nativeObject", "J");
+  ASSERT_THROWS(field_nativeObject != NULL);
+
+  /* Load HTTrackStats fields ids. */
+#define DECLARE_FIELD(NAME) do {                                 \
+  field_ ##NAME = (*env)->GetFieldID(env, cls_HTTrackStats,      \
+                                     #NAME, "J");                \
+  ASSERT_THROWS(field_ ##NAME != NULL);                          \
+} while(0)
+  LIST_OF_FIELDS();
+#undef DECLARE_FIELD
+
+  /* The elements array */
+  field_elements = (*env)->GetFieldID(env, cls_HTTrackStats, "elements",
+                                      "[Lcom/httrack/android/jni/HTTrackStats$Element;");
+  ASSERT_THROWS(field_elements != NULL);
+
+  /* Load HTTrackStats fields (element) ids. */
+#define DECLARE_FIELD(TYPE, NAME) do {                               \
+  field_elt_ ##NAME = (*env)->GetFieldID(env,                        \
+                                         cls_HTTrackStats_Element,   \
+                                         #NAME, TYPE);               \
+  ASSERT_THROWS(field_elt_ ##NAME != NULL);                          \
+} while(0)
+  LIST_OF_FIELDS_ELT();
+#undef DECLARE_FIELD
+
+  /* Initialize engine. */
+  if (hts_init() != 1) {
+    ASSERT_THROWS(! "hts_init() failed");
+  }
+
+  /* redirect stdout and stderr to a log file for debugging purpose */
+#ifdef REDIRECT_STDIO_LOG_FILE
+  FILE * const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
+  if (log != NULL) {
+    const int fd = dup(fileno(log));
+    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
+      ASSERT_THROWS(!"could not redirect stdin/stdout");
+    }
+    fclose(log);
+    fprintf(stderr, "started stdio logging in file\n");
+  }
+#endif
+
+#undef ASSERT_THROWS
+#undef L
+#undef L_
+}
+
+/* note: never called on Android */
+void JNI_OnUnload(JavaVM *vm, void *reserved) {
+  union {
+    void *ptr;
+    JNIEnv *env;
+  } u;
+  UNUSED(reserved);
+
+  if ((*vm)->GetEnv(vm, &u.ptr, JNI_VERSION_1_6) != JNI_OK) {
+    return ;
+  }
+  releaseClass(u.env, &cls_HTTrackLib);
+  releaseClass(u.env, &cls_HTTrackCallbacks);
+  releaseClass(u.env, &cls_HTTrackStats);
+  releaseClass(u.env, &cls_HTTrackStats_Element);
+}
+
+static void setNativeOpt(JNIEnv* env, jobject object, HTTrackLib_context *opt) {
+  (*env)->SetLongField(env, object, field_nativeObject,
+      (jlong) (uintptr_t) (void*) opt);
+}
+
+static HTTrackLib_context* getNativeOpt(JNIEnv* env, jobject object) {
+  return (HTTrackLib_context*) (void*) (uintptr_t)
+      (*env)->GetLongField(env, object, field_nativeObject);
 }
 
 jstring Java_com_httrack_android_jni_HTTrackLib_getVersion(JNIEnv* env, jclass clazz) {
