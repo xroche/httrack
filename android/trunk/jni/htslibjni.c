@@ -54,7 +54,11 @@ static void assert_failure(const char* exp, const char* file, int line) {
     fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
     fclose(dumpFile);
   }
+#ifdef USE_COFFEECATCH
+  coffeecatch_abort(exp, file, line);
+#else
   abort();
+#endif
 }
 #undef assert
 #define assert(EXP) (void)( (EXP) || (assert_failure(#EXP, __FILE__, __LINE__), 0) )
