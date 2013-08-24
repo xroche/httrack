@@ -84,6 +84,39 @@ typedef struct HTTrackLib_context {
 
 #define UNUSED(VAR) (void) VAR
 
+/**
+ * Thread-specific context.
+ */
+typedef struct thread_context_t {
+  char *buffer;
+  size_t capa;
+} thread_context_t;
+
+/* Thread variable holding context. */
+static pthread_key_t thread_variables;
+
+static void thread_variables_dtor(void *arg) {
+  thread_context_t *const context = (thread_context_t*) arg;
+  if (context != NULL) {
+    if (context->buffer != NULL) {
+      free(context->buffer);
+      context->buffer = NULL;
+    }
+    free(context);
+  }
+}
+
+static thread_context_t* thread_get_variables(void) {
+  void *arg = pthread_getspecific(thread_variables);
+  if (arg == NULL) {
+    arg = calloc(sizeof(thread_context_t), 1);
+    if (pthread_setspecific(thread_variables, arg) != 0) {
+      assert(! "pthread_setspecific() failed");
+    }
+  }
+  return (thread_context_t*) arg;
+}
+
 /* HTTrackLib global class pointer. */
 static jclass cls_HTTrackLib = NULL;
 static jclass cls_HTTrackCallbacks = NULL;
@@ -191,18 +224,21 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   return JNI_VERSION_1_6;
 }
 
-/* FIXME -- This is dirty... we are supposed to keep the error message. */
+/* We are supposed to keep the error message string when throwing an
+ * exception, because Java does not copy it and just keeps the UTF-8 buffer
+ * reference. We do it thread-safely at least, but every new exception is
+ * crushing the buffer. */
 static char *getSafeCopy(const char *message) {
-  static char *buffer = NULL;
-  static size_t capa = 0;
   const size_t size = strlen(message) + 1;
-  if (capa < size) {
-    for(capa = 16 ; capa < size ; capa <<= 1) ;
-    buffer = realloc(buffer, capa);
-    assert(buffer != NULL);
+  thread_context_t*const context = thread_get_variables();
+
+  if (context->capa < size) {
+    for(context->capa = 16 ; context->capa < size ; context->capa <<= 1) ;
+    context->buffer = realloc(context->buffer, context->capa);
+    assert(context->buffer != NULL);
   }
-  strcpy(buffer, message);
-  return buffer;
+  strcpy(context->buffer, message);
+  return context->buffer;
 }
 
 static void throwException(JNIEnv* env, const char *exception,
@@ -240,6 +276,11 @@ void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass claz
 
   /* UNUSED */
   (void) clazz;
+
+  /* Initialize thread variables. */
+  if (pthread_key_create(&thread_variables, thread_variables_dtor) != 0) {
+    assert(! "pthread_key_create() failed");
+  }
 
   /* HTTrackLib class */
   cls_HTTrackLib = findClass(env, "com/httrack/android/jni/HTTrackLib");
@@ -338,6 +379,8 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
   releaseClass(u.env, &cls_HTTrackCallbacks);
   releaseClass(u.env, &cls_HTTrackStats);
   releaseClass(u.env, &cls_HTTrackStats_Element);
+
+  pthread_key_delete(thread_variables);
 }
 
 static void setNativeOpt(JNIEnv* env, jobject object, HTTrackLib_context *opt) {
