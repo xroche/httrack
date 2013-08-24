@@ -174,6 +174,26 @@ public class HTTrackActivity extends FragmentActivity {
   protected String versionFeatures;
   protected int versionCode;
 
+  /*
+   * Mark this profile as in use.
+   */
+  protected static synchronized void markRunningInstance(final File profile)
+      throws IOException {
+    if (runningInstances.contains(profile.getAbsolutePath())) {
+      throw new IOException("This project is already in progress");
+    }
+    runningInstances.add(profile.getAbsolutePath());
+  }
+
+  /*
+   * Mark this profile as not in use.
+   */
+  protected static synchronized void clearRunningInstance(final File profile) {
+    synchronized (runningInstances) {
+      runningInstances.remove(profile.getAbsolutePath());
+    }
+  }
+
   /* Get the root storage. */
   private File getExternalStorage() {
     final String state = Environment.getExternalStorageState();
@@ -818,8 +838,8 @@ public class HTTrackActivity extends FragmentActivity {
     private String string_errors;
     private String string_connect;
     private String string_ready;
-    private String creating_project;
-    private String starting_mirror;
+    private String string_creating_project;
+    private String string_starting_mirror;
 
     /**
      * Constructor.
@@ -828,7 +848,19 @@ public class HTTrackActivity extends FragmentActivity {
      *          the parent activity.
      */
     public Runner(final HTTrackActivity parent) {
-      this.parent = parent;
+      setParent(parent);
+    }
+
+    /* Get a string from parent. */
+    private String getParentString(final int id) {
+      if (parent == null) {
+        throw new NullPointerException("parent is null");
+      }
+      final String s = parent.getString(id);
+      if (s == null) {
+        throw new NullPointerException("null string #" + id);
+      }
+      return s;
     }
 
     /**
@@ -841,18 +873,18 @@ public class HTTrackActivity extends FragmentActivity {
       this.parent = parent;
 
       // Cache localized strings
-      string_bytes_saved = parent.getString(R.string.bytes_saved);
-      string_links_scanned = parent.getString(R.string.links_scanned);
-      string_time = parent.getString(R.string.time);
-      string_files_written = parent.getString(R.string.files_written);
-      string_transfer_rate = parent.getString(R.string.transfer_rate);
-      string_files_updated = parent.getString(R.string.files_updated);
-      string_active_connections = parent.getString(R.string.active_connections);
-      string_errors = parent.getString(R.string.errors);
-      string_connect = parent.getString(R.string.connect);
-      string_ready = parent.getString(R.string.ready);
-      creating_project = parent.getString(R.string.creating_project);
-      starting_mirror = parent.getString(R.string.starting_mirror);
+      string_bytes_saved = getParentString(R.string.bytes_saved);
+      string_links_scanned = getParentString(R.string.links_scanned);
+      string_time = getParentString(R.string.time);
+      string_files_written = getParentString(R.string.files_written);
+      string_transfer_rate = getParentString(R.string.transfer_rate);
+      string_files_updated = getParentString(R.string.files_updated);
+      string_active_connections = getParentString(R.string.active_connections);
+      string_errors = getParentString(R.string.errors);
+      string_connect = getParentString(R.string.connect);
+      string_ready = getParentString(R.string.ready);
+      string_creating_project = getParentString(R.string.creating_project);
+      string_starting_mirror = getParentString(R.string.starting_mirror);
     }
 
     /**
@@ -900,7 +932,7 @@ public class HTTrackActivity extends FragmentActivity {
         }
 
         // Progress info for slow phones
-        setProgressLines(new String[] { creating_project });
+        setProgressLines(new String[] { string_creating_project });
 
         // Validate path
         if (!HTTrackActivity.mkdirs(target)) {
@@ -910,12 +942,7 @@ public class HTTrackActivity extends FragmentActivity {
 
         // Inter-thread locking
         profile = parent.createProfileDirectory();
-        synchronized (runningInstances) {
-          if (runningInstances.contains(profile.getAbsolutePath())) {
-            throw new IOException("This project is already in progress");
-          }
-          runningInstances.add(profile.getAbsolutePath());
-        }
+        markRunningInstance(profile);
 
         // Lock winprofile.ini by opening it in append mode, and requesting an
         // exclusive lock
@@ -954,7 +981,7 @@ public class HTTrackActivity extends FragmentActivity {
         parent.serialize(outLock);
 
         // Progress info for slow phones
-        setProgressLines(new String[] { starting_mirror });
+        setProgressLines(new String[] { string_starting_mirror });
 
         // Run engine
         final int code = engine.main(cargs);
@@ -985,9 +1012,7 @@ public class HTTrackActivity extends FragmentActivity {
       } finally {
         // Release inter-thread lock
         if (profile != null) {
-          synchronized (runningInstances) {
-            runningInstances.remove(profile.getAbsolutePath());
-          }
+          clearRunningInstance(profile);
         }
         // Release lock
         if (lock != null) {
@@ -1584,7 +1609,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
       break;
     case R.layout.activity_mirror_progress:
-      setProgressLines(new String[] { getString(R.string.starting_worker_thread) });
+      setProgressLinesInternal(new String[] { getString(R.string.starting_worker_thread) });
       startRunner();
       if (runner != null) {
         ProgressBar.class.cast(findViewById(R.id.progressMirror))
