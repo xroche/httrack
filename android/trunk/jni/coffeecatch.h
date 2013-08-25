@@ -17,6 +17,11 @@
  * signal handlers (ie. the library is installing its own signal handlers on
  * top of the existing ones).
  *
+ * You must build all your libraries with `-funwind-tables', to get proper
+ * unwinding information on all binaries. On Android, this can be achieved
+ * by using this line in the Android.mk file in each library block:
+ *   LOCAL_CFLAGS := -funwind-tables
+ *
  * Example:
  *
  * COFFEE_TRY() {

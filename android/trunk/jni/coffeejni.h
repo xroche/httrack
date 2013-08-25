@@ -46,6 +46,11 @@ extern "C" {
  * It is advised to enclose the complete CODE_TO_BE_EXECUTED block in a
  * dedicated function declared extern or __attribute__ ((noinline)).
  *
+ * You must build all your libraries with `-funwind-tables', to get proper
+ * unwinding information on all binaries. On Android, this can be achieved
+ * by using this line in the Android.mk file in each library block:
+ *   LOCAL_CFLAGS := -funwind-tables
+ *
  * Example:
  *
  * void my_native_function(JNIEnv* env, jobject object, jint *retcode) {
