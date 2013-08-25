@@ -54,8 +54,8 @@ include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := htslibjni
-LOCAL_SRC_FILES := htslibjni.c coffeecatch.c
+LOCAL_SRC_FILES := htslibjni.c coffeecatch.c coffeejni.c
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := libhttrack
-LOCAL_CFLAGS := -W -Wall -Wextra -Werror
+LOCAL_CFLAGS := -O3 -g -funwind-tables -fasynchronous-unwind-tables -Wl,-O1 -Wl,--no-merge-exidx-entries -W -Wall -Wextra -Werror
 include $(BUILD_SHARED_LIBRARY)

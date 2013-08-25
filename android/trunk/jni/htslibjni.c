@@ -38,6 +38,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifdef USE_COFFEECATCH
 #include "coffeecatch.h"
+#include "coffeejni.h"
 #endif
 
 /* fine-grained stats */
@@ -872,12 +873,7 @@ jint Java_com_httrack_android_jni_HTTrackLib_main(JNIEnv* env, jobject object,
     jobjectArray stringArray) {
 #ifdef USE_COFFEECATCH
   volatile jint code = -1;
-  COFFEE_TRY() {
-    code = HTTrackLib_main(env, object, stringArray);
-  } COFFEE_CATCH() {
-    const char*const message = coffeecatch_get_message();
-    throwRuntimeException(env, message);
-  } COFFEE_END();
+  COFFEE_TRY_JNI(env, code = HTTrackLib_main(env, object, stringArray));
   return code;
 #else
   return HTTrackLib_main(env, object, stringArray);
