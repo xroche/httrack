@@ -36,8 +36,8 @@ extern "C" {
 
 /**
  * Setup crash handler to enter in a protected section. If a recognized signal
- * is received in this section, an appropriate native Java RuntimeException
- * will be raised.
+ * is received in this section, an appropriate native Java Error will be
+ * raised.
  *
  * You can not exit the protected section block CODE_TO_BE_EXECUTED, using 
  * statements such as "return", because the cleanup code would not be

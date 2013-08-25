@@ -66,11 +66,40 @@ static char* bt_addr(uintptr_t addr) {
   return strdup(buffer);
 }
 
+#define IS_VALID_CLASS_CHAR(C) ( \
+  ((C) >= 'a' && (C) <= 'z')     \
+  || ((C) >= 'A' && (C) <= 'Z')  \
+  || ((C) >= '0' && (C) <= '9')  \
+  || (C) == '_'                  \
+  )
+
+static char* bt_module(const char *module) {
+  if (module != NULL) {
+    size_t i;
+    char *copy;
+    if (*module == '/') {
+      module++;
+    }
+    copy = strdup(module);
+    /* Pseudo-java-class. */
+    for(i = 0; copy[i] != '\0'; i++) {
+      if (copy[i] == '/') {
+        copy[i] = '.';
+      } else if (!IS_VALID_CLASS_CHAR(copy[i])) {
+        copy[i] = '_';
+      }
+    }
+    return copy;
+  } else {
+    return "<unknown>";
+  }
+}
+
 static void bt_fun(void *arg, const char *module, uintptr_t addr, 
                    const char *function, uintptr_t offset) {
   t_bt_fun *const t = (t_bt_fun*) arg;
   JNIEnv*const env = t->env;
-  jstring declaringClass = (*env)->NewStringUTF(env, module != NULL ? strdup(module) : "<unknown>");
+  jstring declaringClass = (*env)->NewStringUTF(env, bt_module(module));
   jstring methodName = (*env)->NewStringUTF(env, bt_addr(addr));
   jstring fileName = (*env)->NewStringUTF(env, bt_print(function, offset));
   const int lineNumber = function != NULL ? 0 : -2;  /* "-2" is "inside JNI code" */
@@ -83,7 +112,7 @@ static void bt_fun(void *arg, const char *module, uintptr_t addr,
 }
 
 void coffeecatch_throw_exception(JNIEnv* env) {
-  jclass cls = (*env)->FindClass(env, "java/lang/RuntimeException");
+  jclass cls = (*env)->FindClass(env, "java/lang/Error");
   jclass cls_ste = (*env)->FindClass(env, "java/lang/StackTraceElement");
 
   jmethodID cons = (*env)->GetMethodID(env, cls, "<init>", "(Ljava/lang/String;)V");
