@@ -73,6 +73,8 @@
 #ifndef COFFEECATCH_H
 #define COFFEECATCH_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
