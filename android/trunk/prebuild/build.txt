@@ -66,7 +66,7 @@ EOF
  --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
-CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib"
+CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib"
 
 # create Android mk
 mkdir jni
@@ -125,8 +125,9 @@ cd ${TMP_DIR}
  --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
- CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
- CFLAGS="-O3 -g3 -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
+ CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
+ CFLAGS="-O3 -g3 -funwind-tables -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
+ LDFLAGS="-Wl,-O1" \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' src/Makefile \
  && find . -name Makefile -exec sed -i -e "s/\(.*LDFLAGS = \)-version-info .*/\1 -avoid-version/" {} \; \
@@ -156,4 +157,3 @@ done
 rm *.la
 rm -rf httrack
 )
-
