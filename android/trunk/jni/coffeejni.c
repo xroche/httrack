@@ -130,7 +130,7 @@ void coffeecatch_throw_exception(JNIEnv* env) {
   jthrowable exception;
 
   /* Add pseudo-stack trace. */
-  const size_t bt_size = coffeecatch_get_backtrace_size();
+  const ssize_t bt_size = coffeecatch_get_backtrace_size();
 
   assert(cls != NULL);
   assert(cls_ste != NULL);
@@ -143,7 +143,7 @@ void coffeecatch_throw_exception(JNIEnv* env) {
   assert(str != NULL);
 
   /* Can we produce a stack trace ? */
-  if (bt_size != 0) {
+  if (bt_size > 0) {
     /* Create secondary exception. */
     jthrowable cause = (jthrowable) (*env)->NewObject(env, cls, cons, str);
 
