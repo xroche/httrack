@@ -105,6 +105,19 @@ extern int IPV6_resolver;
   } \
 } while(0)
 
+#ifdef HTS_CRASH_TEST
+static __attribute__ ((noinline)) void fourty_two(void) {
+  char *const ptr = (char*) (uintptr_t) 0x42;
+  (*ptr)++;
+}
+static __attribute__ ((noinline)) void do_really_crash(void) {
+  fourty_two();
+}
+static __attribute__ ((noinline)) void do_crash(void) {
+  do_really_crash();
+}
+#endif
+
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
   int ret = hts_main2(argc, argv, opt);
@@ -2607,10 +2620,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 
 #ifdef HTS_CRASH_TEST
               case 'c':  /* crash test */
-                {
-                  char *const ptr = (char*) (uintptr_t) 0x42;
-                  (*ptr)++;
-                }
+                do_crash();
                 break;
 #endif
 
