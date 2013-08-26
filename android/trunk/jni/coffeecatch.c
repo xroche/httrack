@@ -47,8 +47,6 @@
 #include <dlfcn.h>
 #include "coffeecatch.h"
 
-#define UNUSED __attribute__ ((unused))
-
 #define NDK_DEBUG 1
 #if ( defined(NDK_DEBUG) && ( NDK_DEBUG == 1 ) )
 #define DEBUG(A) do { A; } while(0)
@@ -177,7 +175,7 @@ pthread_key_t native_code_thread;
 
 #if (defined(USE_UNWIND) && !defined(USE_CORKSCREW))
 /* Unwind callback */
-static UNUSED _Unwind_Reason_Code
+static _Unwind_Reason_Code
 coffeecatch_unwind_callback(struct _Unwind_Context* context, void* arg) {
   native_code_handler_struct *const s = (native_code_handler_struct*) arg;
 
@@ -273,7 +271,7 @@ static void coffeecatch_backtrace_symbols(const backtrace_frame_t* backtrace,
 #endif
 
 /* Call the old handler. */
-static UNUSED void coffeecatch_call_old_signal_handler(const int code, siginfo_t *const si,
+static void coffeecatch_call_old_signal_handler(const int code, siginfo_t *const si,
                                                        void * const sc) {
   /* Call the "real" Java handler for JIT and internals. */
   if (code >= 0 && code < SIG_NUMBER_MAX) {
@@ -295,7 +293,7 @@ static void coffeecatch_revert_alternate_stack(void) {
 }
 
 /* Try to jump to userland. */
-static UNUSED void coffeecatch_try_jump_userland(native_code_handler_struct*
+static void coffeecatch_try_jump_userland(native_code_handler_struct*
                                                  const t,
                                                  const int code,
                                                  siginfo_t *const si,
@@ -334,7 +332,7 @@ static UNUSED void coffeecatch_try_jump_userland(native_code_handler_struct*
   }
 }
 
-static UNUSED void coffeecatch_start_alarm(void) {
+static void coffeecatch_start_alarm(void) {
   /* Ensure we do not deadlock. Default of ALRM is to die.
    * (signal() and alarm() are signal-safe) */
   (void) alarm(30);
@@ -379,7 +377,7 @@ static void coffeecatch_copy_context(native_code_handler_struct *const t,
 
 /* Return the thread-specific native_code_handler_struct structure, or
  * @c null if no such structure is available. */
-static UNUSED native_code_handler_struct* coffeecatch_get() {
+static native_code_handler_struct* coffeecatch_get() {
   return (native_code_handler_struct*)
       pthread_getspecific(native_code_thread);
 }
@@ -390,7 +388,7 @@ static UNUSED native_code_handler_struct* coffeecatch_get() {
  * We record the siginfo_t context in this function each time it is being
  * called, to be able to know what error caused an issue.
  */
-static UNUSED void coffeecatch_signal_pass(const int code, siginfo_t *const si,
+static void coffeecatch_signal_pass(const int code, siginfo_t *const si,
                                            void *const sc) {
   native_code_handler_struct *t;
 
@@ -425,7 +423,7 @@ static UNUSED void coffeecatch_signal_pass(const int code, siginfo_t *const si,
 
 /* Internal crash handler for abort(). Java calls abort() if its signal handler
  * could not resolve the signal ; thus calling us through this handler. */
-static UNUSED void coffeecatch_signal_abort(const int code, siginfo_t *const si,
+static void coffeecatch_signal_abort(const int code, siginfo_t *const si,
                                             void *const sc) {
   native_code_handler_struct *t;
 
@@ -458,7 +456,7 @@ static UNUSED void coffeecatch_signal_abort(const int code, siginfo_t *const si,
 }
 
 /* Internal globals initialization. */
-static UNUSED int coffeecatch_handler_setup_global(void) {
+static int coffeecatch_handler_setup_global(void) {
   if (native_code_g.initialized++ == 0) {
     size_t i;
     struct sigaction sa_abort;
@@ -649,22 +647,10 @@ int coffeecatch_get_signal() {
   }
 }
 
-/**
- * Get the native context associated with the crash.
- */
-static UNUSED siginfo_t* coffeecatch_get_info() {
-  native_code_handler_struct* const t = coffeecatch_get();
-  if (t != NULL) {
-    return &t->si;
-  } else {
-    return NULL;
-  }
-}
-
 /* Signal descriptions.
    See <http://pubs.opengroup.org/onlinepubs/009696699/basedefs/signal.h.html>
 */
-static UNUSED const char* coffeecatch_desc_sig(int sig, int code) {
+static const char* coffeecatch_desc_sig(int sig, int code) {
   switch(sig) {
   case SIGILL:
     switch(code) {
@@ -1147,5 +1133,3 @@ void coffeecatch_abort(const char* exp, const char* file, int line) {
   }
   abort();
 }
-
-#undef UNUSED
