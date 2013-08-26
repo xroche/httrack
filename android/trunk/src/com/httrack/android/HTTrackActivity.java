@@ -151,6 +151,12 @@ public class HTTrackActivity extends FragmentActivity {
   // Current pane id and context
   protected int pane_id = -1;
 
+  // Is the application "started" ? (ie. visible to user)
+  protected volatile boolean started;
+
+  // Is the application paused (pending visible state) ?
+  protected volatile boolean paused;
+
   // "Project name" pane is dirty
   protected boolean dirtyNamePane;
 
@@ -312,6 +318,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
+    Log.d(getClass().getSimpleName(), "onCreate");
     super.onCreate(savedInstanceState);
 
     // Attempt to load the native library.
@@ -1831,6 +1838,16 @@ public class HTTrackActivity extends FragmentActivity {
             view.startAnimation(shake);
           }
         }
+        /* If not visible, send a notification. */
+        if (!started) {
+          final String name = mapper.getProjectName();
+          final String finished = getString(R.string.mirror_finished);
+          ;
+          /* FIXME TODO check intent */
+          final Intent current = getCurrentIntentReference();
+          sendSystemNotification(current, finished + ": " + name,
+              Html.fromHtml(displayMessage));
+        }
       }
     });
   }
@@ -2027,6 +2044,7 @@ public class HTTrackActivity extends FragmentActivity {
   @Override
   protected void onActivityResult(final int requestCode, final int resultCode,
       final Intent data) {
+    Log.d(getClass().getSimpleName(), "onActivityResult");
     super.onActivityResult(requestCode, resultCode, data);
     switch (requestCode) {
     case ACTIVITY_OPTIONS:
@@ -2136,6 +2154,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   @Override
   public void onConfigurationChanged(final Configuration newConfig) {
+    Log.d(getClass().getSimpleName(), "onConfigurationChanged");
     // TODO: handle orientation change ?
   }
 
@@ -2233,6 +2252,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   @Override
   protected void onSaveInstanceState(final Bundle outState) {
+    Log.d(getClass().getSimpleName(), "onSaveInstanceState");
     super.onSaveInstanceState(outState);
     saveInstanceState(outState);
   }
@@ -2263,6 +2283,14 @@ public class HTTrackActivity extends FragmentActivity {
     showNotification(message, false);
   }
 
+  /** Get a pointer to the current activity. **/
+  protected Intent getCurrentIntentReference() {
+    Intent intent = new Intent(getApplicationContext(), this.getClass());
+    intent.setAction("android.intent.action.MAIN");
+    intent.addCategory("android.intent.category.LAUNCHER");
+    return intent;
+  }
+
   /** Send a notification. **/
   protected void sendAbortNotification() {
     final String title = getString(R.string.mirror_xxx_stopped).replace("%s",
@@ -2283,7 +2311,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   /** Send a notification with a specific Intent. **/
   protected void sendSystemNotification(final Intent intent,
-      final String title, final String text) {
+      final CharSequence title, final CharSequence text) {
 
     // Create notification
     final long when = System.currentTimeMillis();
@@ -2300,7 +2328,8 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /** Send a notification with a blank Intent. **/
-  protected void sendSystemNotification(final String title, final String text) {
+  protected void sendSystemNotification(final CharSequence title,
+      final CharSequence text) {
     sendSystemNotification(new Intent(), title, text);
   }
 
@@ -2349,6 +2378,7 @@ public class HTTrackActivity extends FragmentActivity {
 
   @Override
   protected void onRestoreInstanceState(final Bundle savedInstanceState) {
+    Log.d(getClass().getSimpleName(), "onRestoreInstanceState");
     super.onRestoreInstanceState(savedInstanceState);
 
     // Security
@@ -2363,7 +2393,36 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   @Override
+  protected void onPause() {
+    Log.d(getClass().getSimpleName(), "onPause");
+    super.onPause();
+    paused = true;
+  }
+
+  @Override
+  protected void onResume() {
+    Log.d(getClass().getSimpleName(), "onResume");
+    super.onResume();
+    paused = false;
+  }
+
+  @Override
+  protected void onStart() {
+    Log.d(getClass().getSimpleName(), "onStart");
+    super.onStart();
+    started = true;
+  }
+
+  @Override
+  protected void onStop() {
+    Log.d(getClass().getSimpleName(), "onStop");
+    super.onStop();
+    started = false;
+  }
+
+  @Override
   public void onDestroy() {
+    Log.d(getClass().getSimpleName(), "onDestroy");
     // We are being destroyed... save profile ?
     savePaneFields();
     final String name = mapper.getProjectName();
