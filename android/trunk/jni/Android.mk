@@ -57,5 +57,5 @@ LOCAL_MODULE    := htslibjni
 LOCAL_SRC_FILES := htslibjni.c coffeecatch.c coffeejni.c
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := libhttrack
-LOCAL_CFLAGS := -O3 -g -funwind-tables -Wl,-O1 -W -Wall -Wextra -Werror
+LOCAL_CFLAGS := -O3 -g -funwind-tables -Wl,--no-merge-exidx-entries -Wl,-O1 -W -Wall -Wextra -Werror
 include $(BUILD_SHARED_LIBRARY)
