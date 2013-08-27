@@ -342,13 +342,13 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   public void onBackPressed() {
     // Back from activity
     if (isTabletMode || activityClass == null) {
-      if (isTabletMode) {
+      if (isTabletMode && activityClass != null) {
         save();
       }
       super.onBackPressed();
       finish();
     }
-    // Leave sub-activity
+    // Leave sub-activity (activityClass != null)
     else {
       save();
       activityClass = null;
