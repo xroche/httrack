@@ -77,6 +77,8 @@ TARGET_ARCH_ABI := armeabi-v7a
 LOCAL_MODULE    := iconv
 LOCAL_CFLAGS    := \
     -O3 -g3 \
+    -funwind-tables \
+    -Wl,--no-merge-exidx-entries \
     -Wno-multichar \
     -D_ANDROID \
     -DLIBDIR="\"c\"" \
@@ -126,7 +128,7 @@ cd ${TMP_DIR}
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
  CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
- CFLAGS="-O3 -g3 -funwind-tables -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
+ CFLAGS="-O3 -g3 -funwind-tables -Wl,--no-merge-exidx-entries -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
  LDFLAGS="-Wl,-O1" \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' src/Makefile \
