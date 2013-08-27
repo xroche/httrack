@@ -47,7 +47,7 @@
 #include <dlfcn.h>
 #include "coffeecatch.h"
 
-#define NDK_DEBUG 1
+/*#define NDK_DEBUG 1*/
 #if ( defined(NDK_DEBUG) && ( NDK_DEBUG == 1 ) )
 #define DEBUG(A) do { A; } while(0)
 #define FD_ERRNO 2
