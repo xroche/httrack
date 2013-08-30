@@ -345,17 +345,6 @@ static void coffeecatch_mark_alarm(native_code_handler_struct *const t) {
   t->alarm = 1;
 }
 
-int coffeecatch_cancel_pending_alarm() {
-  native_code_handler_struct *const t = coffeecatch_get();
-  if (t != NULL && t->alarm) {
-    t->alarm = 0;
-    /* "If seconds is 0, a pending alarm request, if any, is canceled." */
-    alarm(0);
-    return 0;
-  }
-  return -1;
-}
-
 /* Copy context infos (signal code, etc.) */
 static void coffeecatch_copy_context(native_code_handler_struct *const t,
                                      const int code, siginfo_t *const si,
@@ -398,6 +387,17 @@ static void coffeecatch_copy_context(native_code_handler_struct *const t,
 static native_code_handler_struct* coffeecatch_get() {
   return (native_code_handler_struct*)
       pthread_getspecific(native_code_thread);
+}
+
+int coffeecatch_cancel_pending_alarm() {
+  native_code_handler_struct *const t = coffeecatch_get();
+  if (t != NULL && t->alarm) {
+    t->alarm = 0;
+    /* "If seconds is 0, a pending alarm request, if any, is canceled." */
+    alarm(0);
+    return 0;
+  }
+  return -1;
 }
 
 /* Internal signal pass-through. Allows to peek the "real" crash before
