@@ -197,6 +197,14 @@ extern void coffeecatch_get_backtrace_info(void (*fun)(void *arg,
                                            const char *function,
                                            uintptr_t offset), void *arg);
 
+/**
+ * Cancel any pending alarm() triggered after a signal was caught.
+ * Calling this function is dangerous, because it exposes the process to
+ * a possible deadlock if the signal was caught due to internal low-level
+ * library error (mutex being in a locked state, for example).
+ */
+extern int coffeecatch_cancel_pending_alarm(void)
+
 /** Internal functions & definitions, not to be used directly. **/
 #include <setjmp.h>
 extern int coffeecatch_setup(void);
