@@ -15,25 +15,25 @@
 
         <CheckBox
             android:id="@+id/checkDetectAllLinks"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/detect_all_links" />
 
         <CheckBox
             android:id="@+id/checkGetNonHtmlNear"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/get_non_html_near" />
 
         <CheckBox
             android:id="@+id/checkTestAllLinks"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/test_all_links" />
 
         <CheckBox
             android:id="@+id/checkGetHtmlFirst"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/get_html_first" />
     </LinearLayout>

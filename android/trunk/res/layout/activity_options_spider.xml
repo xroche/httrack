@@ -15,7 +15,7 @@
 
         <CheckBox
             android:id="@+id/checkAcceptCookies"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/accept_cookies" />
@@ -57,7 +57,7 @@
 
         <CheckBox
             android:id="@+id/checkParseJavaFiles"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/parse_java_files" />
@@ -99,28 +99,28 @@
 
         <CheckBox
             android:id="@+id/checkUpdateHacks"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/update_hack" />
 
         <CheckBox
             android:id="@+id/checkUrlHacks"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/url_hacks" />
 
         <CheckBox
             android:id="@+id/checkTolerentRequests"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/tolerent_requests" />
 
         <CheckBox
             android:id="@+id/checkForceHttp10"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             android:text="@string/force_http_10" />

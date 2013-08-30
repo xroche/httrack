@@ -204,8 +204,12 @@ public class HTTrackActivity extends FragmentActivity {
   private File getExternalStorage() {
     final String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state)) {
-      return Environment
-          .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+      if (android.os.Build.VERSION.SDK_INT >= 8) {
+        return Environment
+            .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+      } else {
+        return Environment.getExternalStorageDirectory();
+      }
     } else {
       // Fallback.
       return getFilesDir();
@@ -375,7 +379,8 @@ public class HTTrackActivity extends FragmentActivity {
    * application removal.
    **/
   private File buildResourceFile() {
-    final File cache = getExternalCacheDir();
+    final File cache = android.os.Build.VERSION.SDK_INT >= 8 ? getExternalCacheDir()
+        : getCacheDir();
     final File rscPath = new File(cache, "resources");
     final File stampFile = new File(rscPath, "resources.stamp");
     final long stamp = installOrUpdateTime();
@@ -1842,7 +1847,6 @@ public class HTTrackActivity extends FragmentActivity {
         if (!started) {
           final String name = mapper.getProjectName();
           final String finished = getString(R.string.mirror_finished);
-          ;
           /* FIXME TODO check intent */
           final Intent current = getCurrentIntentReference();
           sendSystemNotification(current, finished + ": " + name,

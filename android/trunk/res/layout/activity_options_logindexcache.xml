@@ -15,13 +15,13 @@
 
         <CheckBox
             android:id="@+id/checkStoreAllFilesInCache"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/store_all_files_in_cache" />
 
         <CheckBox
             android:id="@+id/checkDoNotRedownloadLocallErasedFiles"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/do_not_redownload_locally_erased_files" />
 
@@ -62,19 +62,19 @@
 
         <CheckBox
             android:id="@+id/checkUseIndex"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/use_index" />
 
         <CheckBox
             android:id="@+id/checkUseWordIndex"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/use_word_index" />
 
         <CheckBox
             android:id="@+id/checkUseMailIndex"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/use_mail_index" />
     </LinearLayout>

@@ -15,7 +15,7 @@
 
         <CheckBox
             android:id="@+id/checkUseCacheForUpdates"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/use_cache_for_updates" />
 
@@ -186,7 +186,7 @@
 
         <CheckBox
             android:id="@+id/checkActivateDebugging"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/activate_debugging" />
     </LinearLayout>

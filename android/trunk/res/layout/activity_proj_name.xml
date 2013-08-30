@@ -32,7 +32,7 @@
                 android:hint="@string/projname_hint"
                 android:textColor="@android:color/primary_text_light" >
 
-                <requestFocus android:layout_width="match_parent" />
+                <requestFocus android:layout_width="fill_parent" />
             </AutoCompleteTextView>
         </TableRow>
 

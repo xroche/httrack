@@ -16,43 +16,43 @@
 
         <CheckBox
             android:id="@+id/checkDosNames"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/dos_names" />
 
         <CheckBox
             android:id="@+id/checkIso9660"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/iso9660_names" />
 
         <CheckBox
             android:id="@+id/checkNoErrorPages"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/no_error_pages" />
 
         <CheckBox
             android:id="@+id/checkNoExternalPages"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/no_external_pages" />
 
         <CheckBox
             android:id="@+id/checkHidePasswords"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/hide_passwords" />
 
         <CheckBox
             android:id="@+id/checkHideQueryStrings"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/hide_query_strings" />
 
         <CheckBox
             android:id="@+id/checkDoNotPurge"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:text="@string/do_not_purge_old_files" />
 
