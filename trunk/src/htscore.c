@@ -2960,6 +2960,7 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
                 "wb");
         (void) unlink(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
                               "index.eml"));
+#ifndef _WIN32
         if (symlink("index.mht",
                     fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
                             "index.eml")) != 0) {
@@ -2968,6 +2969,7 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
               "could not create symbolic link from index.mht to index.eml");
           }
         }
+#endif
         if (opt->state.mimefp != NULL) {
           char BIGSTK rndtmp[1024], currtime[256];
 
