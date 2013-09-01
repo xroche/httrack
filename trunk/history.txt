@@ -34,6 +34,7 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: more windows-specific fixes regarding 260-character path limit
 + Fixed: escaping issue in top index
 + Fixed: Linux build cleanup (gentoo patches merge, lintian fixes et al.)
++ Fixed: content-disposition NOT taken in account (Stephan Matthiesen)
 
 3.46-1
 * New: Unicode filenames handling
