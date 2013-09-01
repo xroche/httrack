@@ -444,7 +444,23 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           // note: if savename_delayed is enabled, the naming will be temporary (and slightly invalid!)
           // note: if we are about to stop (opt->state.stop), back_add() will fail later
           else if (opt->savename_delayed != 0 && !opt->state.stop) {
-            if (mime_type != NULL) {
+            // Check if the file is ready in backing. We basically take the same logic as later.
+            // FIXME: we should cleanup and factorize this unholy mess
+            if (headers != NULL && headers->status >= 0) {
+              if (strnotempty(headers->r.cdispo)) {        /* filename given */
+                ext_chg = 2;      /* change filename */
+                strcpybuff(ext, headers->r.cdispo);
+              } else if (!may_unknown2(opt, headers->r.contenttype, headers->url_fil)) {    // on peut patcher à priori? (pas interdit ou pas de type)
+                char s[16];
+                s[0] = '\0';
+                give_mimext(s, headers->r.contenttype);    // obtenir extension
+                if (strnotempty(s) > 0) { // on a reconnu l'extension
+                  ext_chg = 1;
+                  strcpybuff(ext, s);
+                }
+              }
+            }
+            else if (mime_type != NULL) {
               ext[0] = '\0';
               if (*mime_type) {
                 give_mimext(ext, mime_type);
