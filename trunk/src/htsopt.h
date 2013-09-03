@@ -289,6 +289,7 @@ struct httrackp {
   int depth;                    // nombre de niveaux de récursion
   int extdepth;                 // nombre de niveaux de récursion à l'éxtérieur
   int urlmode;                  // liens relatifs etc   
+  int no_type_change;           // do not change file type according to MIME
   int debug;                    // mode débug log
   int getmode;                  // sauver html, images..
   FILE *log;                    // fichier log

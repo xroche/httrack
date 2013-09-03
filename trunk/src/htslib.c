@@ -5464,6 +5464,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->extdepth = 0;            // mais pas à l'extérieur
   opt->seeker = 1;              // down 
   opt->urlmode = 2;             // relatif par défaut
+  opt->no_type_change = 0;      // change file types
   opt->debug = 0;               // pas de débug en plus
   opt->getmode = 3;             // linear scan
   opt->maxsite = -1;            // taille max site (aucune)
