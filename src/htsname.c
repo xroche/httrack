@@ -764,7 +764,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
   // Changer extension?
   // par exemple, php3 sera sauvé en html, cgi en html ou gif, xbm etc.. selon les cas
-  if (ext_chg) {                // changer ext
+  if (ext_chg && !opt->no_type_change) {                // changer ext
     char *a = fil + strlen(fil) - 1;
 
     if ((opt->debug > 1) && (opt->log != NULL)) {

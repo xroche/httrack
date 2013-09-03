@@ -1919,6 +1919,11 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 }
                 break;
 
+              case 't':        /* do not change type (ending) of filenames according to the MIME type */
+                opt->no_type_change = 1;
+                if (*(com+1)=='0') { opt->no_type_change = 0; com++; }
+                break;
+
               default:{
                   char s[HTS_CDLMAXSIZE + 256];
 
