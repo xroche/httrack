@@ -2142,20 +2142,17 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
 #if USE_BEGINTHREAD
 // lancement multithread du robot
 typedef struct {
-  char iadr_p[HTS_URLMAXSIZE];
   httrackp *opt;
+  char iadr_p[HTS_URLMAXSIZE];
 } HostlookupStruct;
 void Hostlookup(void *pP) {
-  HostlookupStruct *str = (HostlookupStruct *) pP;
+  HostlookupStruct *const str = (HostlookupStruct *) pP;
   httrackp *const opt = str->opt;
   char iadr[256];
   t_hostent *hp;
   t_fullhostent fullhostent_buffer;
 
   // recopier (après id:pass)
-#if DEBUGDNS
-  printf("resolv in background: %s\n", jump_identification(iadr_p));
-#endif
   strcpybuff(iadr, jump_identification(str->iadr_p));
   // couper éventuel :
   {
@@ -2168,50 +2165,36 @@ void Hostlookup(void *pP) {
   // resolve
   hp = vxgethostbyname(iadr, &fullhostent_buffer);
 
+  hts_mutexlock(&opt->state.lock);
+
   // found
   if (hp != NULL) {
     t_dnscache *cache;
-    int error_found = 0;
 
-    hts_mutexlock(&opt->state.lock);
+    hts_log_print(opt, LOG_DEBUG, "successfully resolved: %s", iadr);
 
-    for(cache = _hts_cache(opt); cache->n != NULL; cache = cache->n) {
+    for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
       if (strcmp(cache->iadr, iadr) == 0) {
-        error_found = 1;
+        break;
       }
     }
-    if (strcmp(cache->iadr, iadr) == 0) {
-      error_found = 1;
-    }
 
-    if (!error_found) {
-      // en gros copie de hts_gethostbyname sans le return
-      cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
-      if (cache->n != NULL) {
-        strcpybuff(cache->n->iadr, iadr);
-        cache->n->host_length = 0;        /* pour le moment rien */
-        cache->n->n = NULL;
-
-        cache->n->host_length = -1;
-        memset(cache->n->host_addr, 0, sizeof(cache->n->host_addr));
-        memcpy(cache->n->host_addr, hp->h_addr, hp->h_length);
-        cache->n->host_length = hp->h_length;
-      }
+    if (cache != NULL && cache->host_length == 0) {
+      memset(cache->host_addr, 0, sizeof(cache->host_addr));
+      memcpy(cache->host_addr, hp->h_addr, hp->h_length);
+      cache->host_length = hp->h_length;
+      hts_log_print(opt, LOG_DEBUG, "saved resolved host: %s", iadr);
     } else {
-#if DEBUGDNS
-      printf("aborting resolv for %s (found)\n", iadr);
-#endif
+      hts_log_print(opt, LOG_DEBUG, "could not save resolved host: %s", iadr);
     }
-
-    hts_mutexrelease(&opt->state.lock);
   }
 
-  freet(pP);
+  assertf(opt->state.dns_cache_nthreads > 0);
+  opt->state.dns_cache_nthreads--;
 
-#if DEBUGDNS
-  printf("quitting resolv for %s (result: %d)\n", iadr,
-         (cache->n != NULL) ? cache->n->host_length : (-999));
-#endif
+  hts_mutexrelease(&opt->state.lock);
+
+  freet(pP);
 }
 #endif
 
@@ -2236,31 +2219,17 @@ void back_solve(httrackp * opt, lien_back * back) {
       a = back->r.req.proxy.name;
     assertf(a != NULL);
     a = jump_protocol(a);
-    if (!hts_dnstest(opt, a)) { // non encore testé!..
-      // inscire en thread
-#ifdef _WIN32
-      // Windows
-#if USE_BEGINTHREAD
+    if (hts_dnstest(opt, a, 1) == 2) { // non encore testé!..
+      hts_log_print(opt, LOG_DEBUG, "resolving in background: %s", a);
       {
         HostlookupStruct *str =
           (HostlookupStruct *) malloct(sizeof(HostlookupStruct));
-        if (str) {
+        if (str != NULL) {
           strcpybuff(str->iadr_p, a);
           str->opt = opt;
           hts_newthread(Hostlookup, str);
         }
       }
-#endif
-#else
-#if USE_BEGINTHREAD
-      char *p = calloct(strlen(a) + 2, 1);
-
-      if (p) {
-        strcpybuff(p, a);
-        hts_newthread(Hostlookup, p);
-      }
-#endif
-#endif
     }
   }
 }
@@ -2275,9 +2244,9 @@ int host_wait(httrackp * opt, lien_back * back) {
     ) {
     //## if (back->url_adr[0]!=lOCAL_CHAR) {
     if (!(back->r.req.proxy.active)) {
-      return (hts_dnstest(opt, back->url_adr));
+      return (hts_dnstest(opt, back->url_adr, 0));
     } else {
-      return (hts_dnstest(opt, back->r.req.proxy.name));
+      return (hts_dnstest(opt, back->r.req.proxy.name, 0));
     }
   } else
     return 1;                   // prêt, fichier local

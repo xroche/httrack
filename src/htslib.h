@@ -301,7 +301,7 @@ int ftp_available(void);
 
 #if HTS_DNSCACHE
 void hts_cache_free(t_dnscache * cache);
-int hts_dnstest(httrackp * opt, const char *_iadr);
+int hts_dnstest(httrackp * opt, const char *_iadr, int add);
 t_dnscache *_hts_cache(httrackp * opt);
 #endif
 

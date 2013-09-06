@@ -4641,12 +4641,12 @@ static t_hostent *hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * ret
 }
 
 // tester si iadr a déja été testé (ou en cours de test)
-// 0 non encore
+// 0 non encore (en cours)
 // 1 ok
 // 2 non présent
-int hts_dnstest(httrackp * opt, const char *_iadr) {
+int hts_dnstest(httrackp * opt, const char *_iadr, int add) {
   int ret = 2;
-  t_dnscache *cache;
+  t_dnscache *cache, *tail;
   char iadr[HTS_URLMAXSIZE * 2];
 
   // sauter user:pass@ éventuel
@@ -4667,10 +4667,28 @@ int hts_dnstest(httrackp * opt, const char *_iadr) {
     return 1;
 
   hts_mutexlock(&opt->state.lock);
-  for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
+  for(cache = tail = _hts_cache(opt); cache != NULL; cache = cache->n) {
+    tail = cache;
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
-      ret = 1;
+      ret = cache->host_length != 0 ? 1 : 0;
       break;
+    }
+  }
+  // Add empty entry ?
+  if (ret == 2 && add) {
+    assertf(tail != NULL);
+    assertf(tail->n == NULL);
+    if (opt->state.dns_cache_nthreads < 16) {
+      opt->state.dns_cache_nthreads++;
+      tail->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
+      if (tail->n != NULL) {
+        strcpybuff(tail->n->iadr, iadr);
+        tail->n->host_length = 0;        /* pour le moment rien */
+        tail->n->n = NULL;
+      }
+    } else {
+      hts_log_print(opt, LOG_DEBUG, "too many threads, not adding another dns resolution in background");
+      ret = 0;
     }
   }
   hts_mutexrelease(&opt->state.lock);
