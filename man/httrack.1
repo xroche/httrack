@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "May 2013" "httrack website copier"
+.TH httrack 1 "HTTrack version 3.47-21 (compiled Jul  5 2013)" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -46,7 +46,7 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B \-cN, \-\-sockets[=N] 
 ] [ 
-.B \-TN, \-\-timeout 
+.B \-TN, \-\-timeout[=N] 
 ] [ 
 .B \-RN, \-\-retries[=N] 
 ] [ 
@@ -264,7 +264,7 @@ maximum mms stream download time in seconds (60=1 minute, 3600=1 hour) (\-\-max\
 .IP \-cN
 number of multiple connections (*c8) (\-\-sockets[=N])
 .IP \-TN
-timeout, number of seconds after a non\-responding link is shutdown (\-\-timeout)
+timeout, number of seconds after a non\-responding link is shutdown (\-\-timeout[=N])
 .IP \-RN
 number of retries, in case of timeout or non\-fatal errors (*R1) (\-\-retries[=N])
 .IP \-JN
