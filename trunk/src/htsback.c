@@ -2219,6 +2219,8 @@ void Hostlookup(void *pP) {
 // si c'est un fichier, la résolution est immédiate
 // idem pour ftp://
 void back_solve(httrackp * opt, lien_back * back) {
+  assertf(opt != NULL);
+  assertf(back != NULL);
   if ((!strfield(back->url_adr, "file://"))
       && !strfield(back->url_adr, "ftp://")
 #if HTS_USEMMS
