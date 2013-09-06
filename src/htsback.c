@@ -2147,10 +2147,10 @@ typedef struct {
 } HostlookupStruct;
 void Hostlookup(void *pP) {
   HostlookupStruct *str = (HostlookupStruct *) pP;
+  httrackp *const opt = str->opt;
   char iadr[256];
-  t_dnscache *cache = _hts_cache(str->opt);     // adresse du cache
   t_hostent *hp;
-  int error_found = 0;
+  t_fullhostent fullhostent_buffer;
 
   // recopier (après id:pass)
 #if DEBUGDNS
@@ -2164,49 +2164,49 @@ void Hostlookup(void *pP) {
     if ((a = jump_toport(iadr)))
       *a = '\0';                // get rid of it
   }
-  freet(pP);
 
-  hts_mutexlock(&dns_lock);
+  // resolve
+  hp = vxgethostbyname(iadr, &fullhostent_buffer);
 
-  while(cache->n) {
+  // found
+  if (hp != NULL) {
+    t_dnscache *cache;
+    int error_found = 0;
+
+    hts_mutexlock(&opt->state.lock);
+
+    for(cache = _hts_cache(opt); cache->n != NULL; cache = cache->n) {
+      if (strcmp(cache->iadr, iadr) == 0) {
+        error_found = 1;
+      }
+    }
     if (strcmp(cache->iadr, iadr) == 0) {
       error_found = 1;
     }
-    cache = cache->n;           // calculer queue
-  }
-  if (strcmp(cache->iadr, iadr) == 0) {
-    error_found = 1;
-  }
 
-  if (!error_found) {
-    // en gros copie de hts_gethostbyname sans le return
-    cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
-    if (cache->n != NULL) {
-      t_fullhostent fullhostent_buffer;
+    if (!error_found) {
+      // en gros copie de hts_gethostbyname sans le return
+      cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
+      if (cache->n != NULL) {
+        strcpybuff(cache->n->iadr, iadr);
+        cache->n->host_length = 0;        /* pour le moment rien */
+        cache->n->n = NULL;
 
-      strcpybuff(cache->n->iadr, iadr);
-      cache->n->host_length = 0;        /* pour le moment rien */
-      cache->n->n = NULL;
-
-      /* resolve */
-#if DEBUGDNS
-      printf("gethostbyname() in progress for %s\n", iadr);
-#endif
-      cache->n->host_length = -1;
-      memset(cache->n->host_addr, 0, sizeof(cache->n->host_addr));
-      hp = vxgethostbyname(iadr, &fullhostent_buffer);
-      if (hp != NULL) {
+        cache->n->host_length = -1;
+        memset(cache->n->host_addr, 0, sizeof(cache->n->host_addr));
         memcpy(cache->n->host_addr, hp->h_addr, hp->h_length);
         cache->n->host_length = hp->h_length;
       }
-    }
-  } else {
+    } else {
 #if DEBUGDNS
-    printf("aborting resolv for %s (found)\n", iadr);
+      printf("aborting resolv for %s (found)\n", iadr);
 #endif
+    }
+
+    hts_mutexrelease(&opt->state.lock);
   }
 
-  hts_mutexrelease(&dns_lock);
+  freet(pP);
 
 #if DEBUGDNS
   printf("quitting resolv for %s (result: %d)\n", iadr,
@@ -2250,9 +2250,6 @@ void back_solve(httrackp * opt, lien_back * back) {
           hts_newthread(Hostlookup, str);
         }
       }
-#else
-      /*t_hostent* h= */
-      /*hts_gethostbyname(a); */// calcul
 #endif
 #else
 #if USE_BEGINTHREAD
@@ -2262,10 +2259,6 @@ void back_solve(httrackp * opt, lien_back * back) {
         strcpybuff(p, a);
         hts_newthread(Hostlookup, p);
       }
-#else
-      // Sous Unix, le gethostbyname() est bloquant..
-      /*t_hostent* h= */
-      /*hts_gethostbyname(a); */// calcul
 #endif
 #endif
     }
