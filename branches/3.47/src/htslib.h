@@ -216,18 +216,16 @@ struct OLD_htsblk {
 typedef struct t_dnscache t_dnscache;
 #endif
 struct t_dnscache {
-  char iadr[1024];
   struct t_dnscache *n;
-  char host_addr[HTS_MAXADDRLEN];       // 4 octets (v4), ou 16 octets (v6)
   int host_length;              // 4 normalement - ==0  alors en cours de résolution
+  char host_addr[HTS_MAXADDRLEN];       // 4 octets (v4), ou 16 octets (v6)
   // ou >16 si sockaddr
   //                 ==-1 alors erreur (host n'éxiste pas)
+  char iadr[1024];
 };
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-
-extern htsmutex dns_lock;
 
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
@@ -298,12 +296,11 @@ HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
 HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
 HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
 #endif
-t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour);
 int ftp_available(void);
 
 #if HTS_DNSCACHE
 void hts_cache_free(t_dnscache * cache);
-int hts_dnstest(httrackp * opt, const char *_iadr);
+int hts_dnstest(httrackp * opt, const char *_iadr, int add);
 t_dnscache *_hts_cache(httrackp * opt);
 #endif
 
