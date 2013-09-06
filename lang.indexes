@@ -1,8 +1,9 @@
 bg:27
 es:3
-cz:21
-ct:14
-cs:13
+cs:21
+zh_tw:14
+zh:13
+hr:29
 da:15
 de:4
 et:16
@@ -11,13 +12,13 @@ fi:28
 fr:2
 el:26
 it:9
-jp:19
+ja:19
 mk:18
 hu:11
 nl:5
 no:23
 pl:6
-pt:12
+pt_br:12
 pt:7
 ro:25
 ru:8
@@ -25,5 +26,4 @@ sk:20
 si:24
 sv:17
 tr:10
-ua:22
-hr:29
+uk:22
