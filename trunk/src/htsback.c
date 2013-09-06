@@ -2150,6 +2150,7 @@ void Hostlookup(void *pP) {
   httrackp *const opt = str->opt;
   char iadr[256];
   t_hostent *hp;
+  t_dnscache *cache;
   t_fullhostent fullhostent_buffer;
 
   // recopier (après id:pass)
@@ -2167,26 +2168,26 @@ void Hostlookup(void *pP) {
 
   hts_mutexlock(&opt->state.lock);
 
-  // found
-  if (hp != NULL) {
-    t_dnscache *cache;
+  hts_log_print(opt, LOG_DEBUG, "finished resolved: %s", iadr);
 
-    hts_log_print(opt, LOG_DEBUG, "successfully resolved: %s", iadr);
-
-    for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
-      if (strcmp(cache->iadr, iadr) == 0) {
-        break;
-      }
+  for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
+    if (strcmp(cache->iadr, iadr) == 0) {
+      break;
     }
+  }
 
-    if (cache != NULL && cache->host_length == 0) {
+  if (cache != NULL && cache->host_length == 0) {
+    if (hp != NULL) {
       memset(cache->host_addr, 0, sizeof(cache->host_addr));
       memcpy(cache->host_addr, hp->h_addr, hp->h_length);
       cache->host_length = hp->h_length;
       hts_log_print(opt, LOG_DEBUG, "saved resolved host: %s", iadr);
     } else {
-      hts_log_print(opt, LOG_DEBUG, "could not save resolved host: %s", iadr);
+      cache->host_length = -1;
+      hts_log_print(opt, LOG_DEBUG, "saved negative resolved host: %s", iadr);
     }
+  } else {
+    hts_log_print(opt, LOG_DEBUG, "could not save resolved host: %s", iadr);
   }
 
   assertf(opt->state.dns_cache_nthreads > 0);
