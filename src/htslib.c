@@ -4628,7 +4628,7 @@ t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
   t_hostent *ret = NULL;
 
   hts_mutexlock(&dns_lock);
-  for(;;) {
+  for(; cache != NULL; cache = cache->n) {
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         if (retour->h_addr_list[0])
@@ -4644,13 +4644,6 @@ t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
       }
       ret = retour;
       break;
-    } else {                    // on a pas encore trouvé
-      if (cache->n != NULL) {   // chercher encore
-        cache = cache->n;       // suivant!
-      } else {
-        ret = NULL;
-        break;
-      }
     }
   }
   hts_mutexrelease(&dns_lock);
@@ -4662,8 +4655,8 @@ t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
 // 1 ok
 // 2 non présent
 int hts_dnstest(httrackp * opt, const char *_iadr) {
-  int ret = 0;
-  t_dnscache *cache = _hts_cache(opt);  // adresse du cache 
+  int ret = 2;
+  t_dnscache *cache;
   char iadr[HTS_URLMAXSIZE * 2];
 
   // sauter user:pass@ éventuel
@@ -4684,17 +4677,10 @@ int hts_dnstest(httrackp * opt, const char *_iadr) {
     return 1;
 
   hts_mutexlock(&dns_lock);
-  for(;;) {
+  for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       ret = 1;
       break;
-    } else {                    // on a pas encore trouvé
-      if (cache->n != NULL) {   // chercher encore
-        cache = cache->n;       // suivant!
-      } else {
-        ret = 2;                // non présent        
-        break;
-      }
     }
   }
   hts_mutexrelease(&dns_lock);
@@ -4826,10 +4812,8 @@ t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer,
     else
       return NULL;              // entrée erronée (erreur DNS) dans le DNS
   } else {                      // non présent dans le cache dns, tester
-    t_dnscache *c = cache;
-
-    while(c->n)
-      c = c->n;                 // calculer queue
+    // find queue
+    for(; cache->n != NULL; cache = cache->n) ;
 
 #if HTS_WIDE_DEBUG
     DEBUG_W("gethostbyname\n");
