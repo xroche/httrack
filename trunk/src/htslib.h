@@ -229,8 +229,6 @@ struct t_dnscache {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
-extern htsmutex dns_lock;
-
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 
@@ -299,7 +297,6 @@ HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
 HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
 HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
 #endif
-t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour);
 int ftp_available(void);
 
 #if HTS_DNSCACHE

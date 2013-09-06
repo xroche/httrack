@@ -4616,18 +4616,11 @@ void hts_cache_free(t_dnscache * cache) {
 // plus prudent quand plusieurs threads peuvent écrire dedans..
 // -1: status? 0: libérer 1:locker
 
-/* 
-  Simple lock for cache
-*/
-htsmutex dns_lock = HTSMUTEX_INIT;
-
+// MUST BE LOCKED
 // routine pour le cache - retour optionnel à donner à chaque fois
 // NULL: nom non encore testé dans le cache
 // si h_length==0 alors le nom n'existe pas dans le dns
-t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
-  t_hostent *ret = NULL;
-
-  hts_mutexlock(&dns_lock);
+static t_hostent *hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
   for(; cache != NULL; cache = cache->n) {
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
@@ -4635,19 +4628,16 @@ t_hostent *_hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
           memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
         retour->h_length = cache->host_length;
       } else if (cache->host_length == 0) {     // en cours
-        ret = NULL;
-        break;
+        return NULL;
       } else {                  // erreur dans le dns, déja vérifié
         if (retour->h_addr_list[0])
           retour->h_addr_list[0][0] = '\0';
         retour->h_length = 0;   // erreur, n'existe pas
       }
-      ret = retour;
-      break;
+      return retour;
     }
   }
-  hts_mutexrelease(&dns_lock);
-  return ret;
+  return NULL;
 }
 
 // tester si iadr a déja été testé (ou en cours de test)
@@ -4676,14 +4666,14 @@ int hts_dnstest(httrackp * opt, const char *_iadr) {
 #endif
     return 1;
 
-  hts_mutexlock(&dns_lock);
+  hts_mutexlock(&opt->state.lock);
   for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       ret = 1;
       break;
     }
   }
-  hts_mutexrelease(&dns_lock);
+  hts_mutexrelease(&opt->state.lock);
   return ret;
 }
 
@@ -4774,8 +4764,9 @@ HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
   return vxgethostbyname2(hostname, v_buffer, NULL);
 }
 
+// Needs locking
 // cache dns interne à HTS // ** FREE A FAIRE sur la chaine
-t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
+static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
@@ -4793,19 +4784,8 @@ t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer,
       *a = '\0';
   }
 
-  // effacer structure de retour, créer nouvelle
-  /*
-     memset(&host, 0, sizeof(t_hostent));  
-     host.h_addr_list=he;
-     he[0]=NULL;
-     he[1]=NULL;  
-     host.h_length=0;  
-   */
-  cache->iadr[0] = '*';
-  cache->iadr[1] = '\0';
-
   /* get IP from the dns cache */
-  hp = _hts_ghbn(cache, iadr, &buffer->hp);
+  hp = hts_ghbn(cache, iadr, &buffer->hp);
   if (hp) {
     if (hp->h_length > 0)
       return hp;
@@ -4858,6 +4838,14 @@ t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer,
       return hp;
     }
   }                             // retour hp du cache
+}
+
+t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
+  t_hostent *ret;
+  hts_mutexlock(&opt->state.lock);
+  ret = hts_gethostbyname_(opt, _iadr, v_buffer, error);
+  hts_mutexrelease(&opt->state.lock);
+  return ret;
 }
 
 t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) {
