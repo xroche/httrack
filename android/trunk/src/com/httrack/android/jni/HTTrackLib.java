@@ -121,10 +121,10 @@ public class HTTrackLib {
      * Load needed native libraries. Remember that we do not have our library
      * path in the standard library path, and therefore loading "htslibjni" will
      * just fail because dependencies would not be found. Instead, we have to
-     * load in reverse order all dependencies, and only load the final JNI stub
-     * at the end. All libraries, except the final JNI stub, will be loaded
-     * without JNI_OnLoad() being called (because not present for obvious
-     * reasons), and this is perfectly fine.
+     * load in reverse topological order all dependencies, and only load the
+     * final JNI stub at the end. All libraries, except the final JNI stub, will
+     * be loaded without JNI_OnLoad() being called (because not present for
+     * obvious reasons), and this is perfectly fine.
      */
 
     /*
