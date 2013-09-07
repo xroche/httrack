@@ -349,13 +349,13 @@ public class OptionsMapper {
           mimeTypesHandlers[7].getMimeMapper()) };
 
   // Name-to-ID hash map
-  protected static HashMap<String, Integer> fieldsNameToId = new HashMap<String, Integer>();
+  protected static final HashMap<String, Integer> fieldsNameToId = new HashMap<String, Integer>();
 
   // String-to-OptionMapper map
-  protected HashMap<String, OptionMapper> fieldsNameToMapper = new HashMap<String, OptionMapper>();
+  protected final HashMap<String, OptionMapper> fieldsNameToMapper = new HashMap<String, OptionMapper>();
 
   // Pure digits (0..9) pattern.
-  protected static Pattern patternDigits = Pattern.compile("^[0-9]+$");
+  protected static final Pattern patternDigits = Pattern.compile("^[0-9]+$");
 
   // The options mapping
   protected final SparseArraySerializable map = new SparseArraySerializable();
