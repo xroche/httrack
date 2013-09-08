@@ -200,5 +200,8 @@
     <string name="starting_worker_thread">Starting worker thread…</string>
     <string name="creating_project">Creating the project…</string>
     <string name="starting_mirror">Starting the mirror…</string>
+    <string name="load_default">Load default options</string>
+    <string name="save_default">Save default options</string>
+    <string name="reset_default">Reset to default options</string>
 
 </resources>

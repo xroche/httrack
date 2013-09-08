@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Parcelable;
 import android.util.Log;
 import android.util.Pair;
@@ -46,6 +47,9 @@ import android.util.SparseArray;
  * them.
  */
 public class OptionsMapper {
+  protected static final String PREFS_NAME = "HTTrackDefaultSettings";
+  protected static final String BASE_NAME = "BasePath";
+
   // Fields used in serialization
   // note: names tend to match the Windows winprofile.ini version
   @SuppressWarnings("unchecked")
@@ -1330,7 +1334,7 @@ public class OptionsMapper {
   /*
    * Fill the map with default values
    */
-  private void initializeMap() {
+  protected static void initializeMap(final SparseArraySerializable map) {
     map.clear();
     for (final Pair<String, String> field : fieldsDefaults) {
       final Integer id = fieldsNameToId.get(field.first);
@@ -1340,6 +1344,13 @@ public class OptionsMapper {
       }
       map.put(id, field.second);
     }
+  }
+
+  /*
+   * Fill the map with default values
+   */
+  public void initializeMap() {
+    initializeMap(map);
     setDynamicDefaults();
   }
 
@@ -1423,6 +1434,9 @@ public class OptionsMapper {
 
     // Initialize default values for map
     initializeMap();
+
+    // Load default preferences if any
+    loadDefaultPreferences();
 
     dirty = false;
   }
@@ -1676,6 +1690,41 @@ public class OptionsMapper {
    */
   public void unserialize(final Parcelable object) {
     map.unserialize(object);
+  }
+
+  /*
+   * Load default preferences.
+   */
+  public void loadDefaultPreferences() {
+    if (context != null) {
+      final SharedPreferences settings = context.getSharedPreferences(
+          PREFS_NAME, 0);
+      initializeMap();
+      for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
+        final String key = field.second;
+        final String value = settings.getString(key, null);
+        if (value != null) {
+          setMap(field.first, value);
+        }
+      }
+    }
+  }
+
+  /*
+   * Save default preferences.
+   */
+  public void saveDefaultPreferences() {
+    if (context != null) {
+      final SharedPreferences settings = context.getSharedPreferences(
+          PREFS_NAME, 0);
+      final SharedPreferences.Editor editor = settings.edit();
+      for (final Pair<Integer, String> field : OptionsMapper.fieldsSerializer) {
+        final String value = getMap(field.first);
+        final String key = field.second;
+        editor.putString(key, value);
+      }
+      editor.commit();
+    }
   }
 
   /**

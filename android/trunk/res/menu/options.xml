@@ -1,0 +1,16 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+
+    <item
+        android:id="@+id/action_load_default"
+        android:orderInCategory="100"
+        android:title="@string/load_default"/>
+    <item
+        android:id="@+id/action_save_default"
+        android:orderInCategory="100"
+        android:title="@string/save_default"/>
+    <item
+        android:id="@+id/action_reset_default"
+        android:orderInCategory="100"
+        android:title="@string/reset_default"/>
+
+</menu>

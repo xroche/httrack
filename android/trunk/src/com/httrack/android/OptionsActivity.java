@@ -32,6 +32,8 @@ import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
@@ -50,7 +52,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       Proxy.class, LogIndexCache.class, MimeDefs.class, ExpertsOnly.class };
 
   // The parent map
-  protected final SparseArraySerializable map = new SparseArraySerializable();
+  protected final OptionsMapper mapper = new OptionsMapper();
 
   // Widget data exchanger
   private final WidgetDataExchange widgetDataExchange = new WidgetDataExchange(
@@ -300,9 +302,14 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       Log.d(getClass().getSimpleName(), "phone mode detected");
     }
 
+    // Set map context
+    mapper.setContext(this);
+    mapper.resetMap();
+
     // Load map
-    map.unserialize(getIntent().getParcelableExtra("com.httrack.android.map"));
-    Log.d(getClass().getSimpleName(), "map size: " + map.size());
+    mapper.unserialize(getIntent()
+        .getParcelableExtra("com.httrack.android.map"));
+    Log.d(getClass().getSimpleName(), "map size: " + mapper.size());
 
     // Create tabs
     setViewMenu();
@@ -312,24 +319,24 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
    * Map getter.
    */
   protected String getMap(final int key) {
-    return map.get(key);
+    return mapper.getMap(key);
   }
 
   /*
    * Map setter.
    */
   protected void setMap(final int key, final String value) {
-    map.put(key, value);
+    mapper.setMap(key, value);
   }
 
   @Override
   public void finish() {
     // Save all tabs
-    Log.d(getClass().getSimpleName(), "final map size: " + map.size());
+    Log.d(getClass().getSimpleName(), "final map size: " + mapper.size());
 
     // Declare result
     final Intent intent = new Intent();
-    intent.putExtra("com.httrack.android.map", map);
+    intent.putExtra("com.httrack.android.map", mapper.serialize());
     setResult(Activity.RESULT_OK, intent);
     super.finish();
   }
@@ -428,6 +435,24 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   }
 
   /*
+   * Load if there is a pane active.
+   */
+  protected void loadIfNeeded() {
+    if (activityClass != null) {
+      load();
+    }
+  }
+
+  /*
+   * Save if there is a pane active.
+   */
+  protected void saveIfNeeded() {
+    if (activityClass != null) {
+      save();
+    }
+  }
+
+  /*
    * Close the right pane in "tablet" view.
    */
   protected void closeRightPane() {
@@ -485,4 +510,36 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     // Set pane
     setPane(position);
   }
+
+  // Menu.
+
+  @Override
+  public boolean onCreateOptionsMenu(final Menu menu) {
+    // Inflate the menu; this adds items to the action bar if it is present.
+    getMenuInflater().inflate(R.menu.options, menu);
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected(final MenuItem item) {
+    // Handle item selection
+    switch (item.getItemId()) {
+    case R.id.action_load_default:
+      mapper.loadDefaultPreferences();
+      loadIfNeeded();
+      break;
+    case R.id.action_save_default:
+      saveIfNeeded();
+      mapper.saveDefaultPreferences();
+      break;
+    case R.id.action_reset_default:
+      mapper.initializeMap();
+      loadIfNeeded();
+      break;
+    default:
+      return super.onOptionsItemSelected(item);
+    }
+    return true;
+  }
+
 }
