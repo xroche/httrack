@@ -729,7 +729,7 @@ Utiliser les options par défaut
 Save default options
 Enregistrer en tant qu'options par défaut
 Reset to default options
-Charger les options par défaut
+Initialiser les options par défaut
 Load options...
 Charger les options
 Save options as...
