@@ -5,6 +5,6 @@ Categories=Network;
 Terminal=false
 Name=Browse Mirrored Websites
 Comment=Browse Websites Mirrored by WebHTTrack
-Keywords=browse mirrored
+Keywords=browse mirrored;
 Exec=webhttrack browse
 Icon=httrack
