@@ -1727,6 +1727,19 @@ public class OptionsMapper {
     }
   }
 
+  /*
+   * Reset default preferences.
+   */
+  public void resetDefaultPreferences() {
+    if (context != null) {
+      final SharedPreferences settings = context.getSharedPreferences(
+          PREFS_NAME, 0);
+      final SharedPreferences.Editor editor = settings.edit();
+      editor.clear();
+      editor.commit();
+    }
+  }
+
   /**
    * Build commandline arguments for the httrack engine, depending on current
    * defined settings.

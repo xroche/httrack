@@ -533,6 +533,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       mapper.saveDefaultPreferences();
       break;
     case R.id.action_reset_default:
+      mapper.resetDefaultPreferences();
       mapper.initializeMap();
       loadIfNeeded();
       break;
