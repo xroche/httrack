@@ -141,13 +141,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
   // the parametres
   int httrack_logmode = 3;      // ONE log file
 
-#ifndef _WIN32
-#ifndef HTS_DO_NOT_USE_UID
-  int switch_uid = -1, switch_gid = -1; /* setuid/setgid */
-#endif
-  int switch_chroot = 0;        /* chroot ? */
-#endif
-  //
   ensureUrlCapacity(url, url_sz, 65536);
 
   // Create options
@@ -1775,42 +1768,14 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 _DEBUG_HEAD = 1;
                 break;
               case 'O':
-#ifdef _WIN32
                 printf
-                  ("Warning option -%%O has no effect in this system (chroot)\n");
-#else
-                switch_chroot = 1;
-#endif
+                  ("Warning option -%%O is no longer supported\n");
                 break;
-              case 'U':        // setuid
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
-                  HTS_PANIC_PRINTF
-                    ("Option %U needs to be followed by a blank space, and a username");
-                  printf("Example: -%%U smith\n");
-                  htsmain_free();
-                  return -1;
-                } else {
-                  na++;
-#ifdef _WIN32
-                  printf
-                    ("Warning option -%%U has no effect on this system (setuid)\n");
-#else
-#ifndef HTS_DO_NOT_USE_UID
-                  /* Change the user id and gid */
-                  {
-                    struct passwd *userdef = getpwnam((const char *) argv[na]);
-
-                    if (userdef) {      /* we'll have to switch the user id */
-                      switch_gid = userdef->pw_gid;
-                      switch_uid = userdef->pw_uid;
-                    }
-                  }
-#else
-                  printf
-                    ("Warning option -%%U has no effect with this compiled version (setuid)\n");
-#endif
-#endif
-                }
+              case 'U':        // setuid ; removed because insane
+                HTS_PANIC_PRINTF
+                  ("Option %U is no longer supported");
+                htsmain_free();
+                return -1;
                 break;
 
               case 'W':        // Wrapper callback
@@ -2754,80 +2719,14 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 #ifdef _WIN32
 #else
 #ifndef HTS_DO_NOT_USE_UID
-  /* Chroot - xxc */
-  if (switch_chroot) {
-    uid_t userid = getuid();
-
-    //struct passwd* userdef=getpwuid(userid);
-    //if (userdef) {
-    if (!userid) {
-      //if (strcmp(userdef->pw_name,"root")==0) {
-      char BIGSTK rpath[1024];
-
-      //printf("html=%s log=%s\n",StringBuff(opt->path_html),StringBuff(opt->path_log));    // xxc
-      if ((StringBuff(opt->path_html)[0]) && (StringBuff(opt->path_log)[0])) {
-        const char *a = StringBuff(opt->path_html), *b =
-          StringBuff(opt->path_log), *c = NULL, *d = NULL;
-        c = a;
-        d = b;
-        while((*a) && (*a == *b)) {
-          if (*a == '/') {
-            c = a;
-            d = b;
-          }
-          a++;
-          b++;
-        }
-
-        rpath[0] = '\0';
-        if (c != StringBuff(opt->path_html)) {
-          if (StringBuff(opt->path_html)[0] != '/')
-            strcatbuff(rpath, "./");
-          strncatbuff(rpath, StringBuff(opt->path_html),
-                      (int) (c - StringBuff(opt->path_html)));
-        }
-        StringCopyOverlapped(opt->path_html, c);
-        StringCopyOverlapped(opt->path_log, d);
-      } else {
-        strcpybuff(rpath, "./");
-        StringCopy(opt->path_html, "/");
-        StringCopy(opt->path_log, "/");
-      }
-      if (rpath[0]) {
-        printf("[changing root path to %s (path_data=%s,path_log=%s)]\n", rpath,
-               StringBuff(opt->path_html), StringBuff(opt->path_log));
-        if (chroot(rpath)) {
-          printf("ERROR! Can not chroot to %s!\n", rpath);
-          return -1;
-        }
-        if (chdir("/")) {       /* new root */
-          printf("ERROR! Can not chdir to %s!\n", rpath);
-          return -1;
-        }
-      } else
-        printf("WARNING: chroot not possible with these paths\n");
-    }
-    //}
-  }
-
-  /* Setuid */
-  if (switch_uid >= 0) {
-    printf("[setting user/group to %d/%d]\n", switch_uid, switch_gid);
-    if (setgid(switch_gid))
-      printf("WARNING! Can not setgid to %d!\n", switch_gid);
-    if (setuid(switch_uid))
-      printf("WARNING! Can not setuid to %d!\n", switch_uid);
-  }
-
-  /* Final check */
+  /* Check we do not run as r00t */
   {
     uid_t userid = getuid();
 
-    if (!userid) {              /* running as r00t */
+    if (userid == 0) {              /* running as r00t */
       printf("WARNING! You are running this program as root!\n");
       printf
-        ("It might be a good idea to use the -%%U option to change the userid:\n");
-      printf("Example: -%%U smith\n\n");
+        ("It might be a good idea to run as a different user\n");
     }
   }
 #endif
