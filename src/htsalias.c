@@ -88,7 +88,6 @@ void hts_lowcase(char *s);
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
   {"path", "-O", "param1", "output path"},
-  {"chroot", "-%O", "param1", "default top path"},
   {"mirror", "-w", "single", ""},
   {"mirror-wizard", "-W", "single", ""},
   {"get-files", "-g", "single", ""},
@@ -212,7 +211,6 @@ const char *hts_optalias[][4] = {
   {"debug-xfrstats", "-#T", "single", ""},
   {"advanced-wait", "-#u", "single", ""},
   {"debug-ratestats", "-#Z", "single", ""},
-  {"exec", "-#!", "param1", ""},
   {"fast-engine", "-#X", "single", "Enable fast routines"},
   {"debug-overflows", "-#X0", "single", "Attempt to detect buffer overflows"},
   {"debug-cache", "-#C", "param1", "List files in the cache"},
@@ -256,10 +254,6 @@ const char *hts_optalias[][4] = {
 
   /* URLs */
   {"add", "", "param0", "add URLs"},
-  /* */
-
-  /* Specific */
-  {"user", "-%U", "param1", "output path"},
   /* */
 
   /* Internal */
