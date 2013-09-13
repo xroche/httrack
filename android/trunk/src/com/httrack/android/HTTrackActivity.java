@@ -1666,8 +1666,15 @@ public class HTTrackActivity extends FragmentActivity {
         Log.d(getClass().getSimpleName(), "no index found ("
             + (index != null ? index.getAbsolutePath() : "unknown location")
             + ")");
-        final String warning = getString(R.string.no_index_html_in_xx).replace(
-            "%s", getTargetFile().getPath());
+        final String template = getString(R.string.no_index_html_in_xx);
+        if (template == null) {
+          throw new RuntimeException("R.string.no_index_html_in_xx is null");
+        }
+        final File target = getTargetFile();
+        if (target == null) {
+          throw new RuntimeException("target is null");
+        }
+        final String warning = template.replace("%s", target.getPath());
         showNotification(warning);
       }
 
