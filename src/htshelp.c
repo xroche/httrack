@@ -488,10 +488,6 @@ void help(char *app, int more) {
   infomsg(" %cN maximum number of connections/seconds (*%c10)");
   infomsg
     ("  GN pause transfer if N bytes reached, and wait until lock file is deleted");
-#if HTS_USEMMS
-  infomsg
-    (" %mN maximum mms stream download time in seconds (60=1 minute, 3600=1 hour)");
-#endif
   infomsg("");
   infomsg("Flow control:");
   infomsg("  cN number of multiple connections (*c8)");

@@ -174,11 +174,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   // FIXME - temporary fix for image/svg+xml (svg)
   // "IN XML" (html like, in fact :) )
   else if ((strfield2(mime, "image/svg+xml"))
-           || (strfield2(mime, "image/svg-xml"))
-#if HTS_USEMMS
-           || strfield2(mime, "video/x-ms-asf")
-#endif
-    ) {
+           || (strfield2(mime, "image/svg-xml"))) {
     inscript = 0;
   } else if ((strfield2(mime, "application/x-javascript"))
              || (strfield2(mime, "text/css"))

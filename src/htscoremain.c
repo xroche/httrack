@@ -1549,13 +1549,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   com++;
                 }
                 break;
-#if HTS_USEMMS
-              case 'm':
-                sscanf(com + 1, "%d", &opt->mms_maxtime);
-                while(isdigit((unsigned char) *(com + 1)))
-                  com++;
-                break;
-#endif
               case 'w':        // disable specific plugin
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF

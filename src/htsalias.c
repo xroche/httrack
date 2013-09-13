@@ -101,7 +101,6 @@ const char *hts_optalias[][4] = {
   {"max-files", "-m", "param", ""},
   {"max-size", "-M", "param", ""},
   {"max-time", "-E", "param", ""},
-  {"max-mms-time", "-%m", "param", ""},
   {"max-rate", "-A", "param", ""},
   {"max-pause", "-G", "param", ""},
   {"sockets", "-c", "param", "number of simultaneous connections allowed"},

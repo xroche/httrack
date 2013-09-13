@@ -616,12 +616,6 @@ HTS_STATIC int strcmpnocase(char *a, char *b) {
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
 
-#if HTS_USEMMS
-#define OPT_MMS(a) (strfield2((a), "video/x-ms-asf") != 0)
-#else
-#define OPT_MMS(a) (0)
-#endif
-
 #define is_html_mime_type(a) \
   ( (strfield2((a),"text/html")!=0)\
   || (strfield2((a),"application/xhtml+xml")!=0) \
@@ -642,7 +636,6 @@ HTS_STATIC int strcmpnocase(char *a, char *b) {
      (strfield2((a),"audio/x-pn-realaudio")!=0) \
      || (strfield2((a),"audio/x-mpegurl")!=0) \
      /*|| (strfield2((a),"text/xml")!=0) || (strfield2((a),"application/xml")!=0) : TODO: content check */ \
-     || OPT_MMS(a) \
   )
 
 /* Library internal definictions */

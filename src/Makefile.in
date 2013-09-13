@@ -15,8 +15,6 @@
 
 @SET_MAKE@
 
-#SUBDIRS = swf
-
 
 
 
@@ -118,7 +116,7 @@ am_libhttrack_la_OBJECTS = htscore.lo htsparse.lo htsback.lo \
 	htsrobots.lo htstools.lo htswizard.lo htsalias.lo htsthread.lo \
 	htsindex.lo htsbauth.lo htsmd5.lo htszlib.lo htswrap.lo \
 	htsmodules.lo htscharset.lo punycode.lo htsencoding.lo md5.lo \
-	htsmms.lo ioapi.lo mztools.lo unzip.lo zip.lo error.lo mms.lo
+	ioapi.lo mztools.lo unzip.lo zip.lo
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 libhttrack_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -346,9 +344,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsmd5.c htszlib.c htswrap.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c \
 	md5.c \
-	htsmms.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
-	mmsrip/error.c mmsrip/mms.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
@@ -360,9 +356,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsstrings.h httrack-library.h htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh \
 	md5.h \
-	htsmms.h \
-	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
-	mmsrip/error.h mmsrip/mms.h
+	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
@@ -373,13 +367,6 @@ EXTRA_DIST = httrack.h webhttrack \
 		minizip/ChangeLogUnzip \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
-		mmsrip/common.h \
-		mmsrip/main.c \
-		mmsrip/COPYING \
-		mmsrip/AUTHORS \
-		mmsrip/NEWS \
-		mmsrip/README \
-		mmsrip/ChangeLog \
 		proxy/AUTHORS \
 		proxy/COPYING \
 		proxy/changelog.txt \
@@ -555,7 +542,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/error.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsalias.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsback.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsbauth.Plo@am__quote@
@@ -574,7 +560,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsjava.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htslib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsmd5.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsmms.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsmodules.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsname.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsparse.Plo@am__quote@
@@ -589,7 +574,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ioapi.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md5.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mms.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mztools.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsinthash.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsmd5.Po@am__quote@
@@ -653,20 +637,6 @@ zip.lo: minizip/zip.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='zip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
-
-error.lo: mmsrip/error.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT error.lo -MD -MP -MF $(DEPDIR)/error.Tpo -c -o error.lo `test -f 'mmsrip/error.c' || echo '$(srcdir)/'`mmsrip/error.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/error.Tpo $(DEPDIR)/error.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mmsrip/error.c' object='error.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o error.lo `test -f 'mmsrip/error.c' || echo '$(srcdir)/'`mmsrip/error.c
-
-mms.lo: mmsrip/mms.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mms.lo -MD -MP -MF $(DEPDIR)/mms.Tpo -c -o mms.lo `test -f 'mmsrip/mms.c' || echo '$(srcdir)/'`mmsrip/mms.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/mms.Tpo $(DEPDIR)/mms.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mmsrip/mms.c' object='mms.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mms.lo `test -f 'mmsrip/mms.c' || echo '$(srcdir)/'`mmsrip/mms.c
 
 proxytrack-main.o: proxy/main.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-main.o -MD -MP -MF $(DEPDIR)/proxytrack-main.Tpo -c -o proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c

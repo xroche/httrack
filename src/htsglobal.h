@@ -197,11 +197,6 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USEOPENSSL 1
 #endif
 
-// utiliser mms://?
-#ifndef HTS_USEMMS
-#define HTS_USEMMS 1
-#endif
-
 #ifndef HTS_DLOPEN
 #define HTS_DLOPEN 1
 #endif

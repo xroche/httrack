@@ -1038,7 +1038,7 @@ int httpmirror(char *url1, httrackp * opt) {
             if ((is_hypertext_mime(opt, r.contenttype, urlfil))
 
                 /* Is HTML or Js, .. */
-                /* NO - real media is real media, and mms is mms, not HTML */
+                /* NO - real media is real media, not HTML */
                 /*|| (may_be_hypertext_mime(r.contenttype, urlfil) && (r.adr) ) */
                 /* Is real media, .. */
               ) {
@@ -3580,11 +3580,6 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxtime > -1)
     to->maxtime = from->maxtime;
-
-#if HTS_USEMMS
-  if (from->mms_maxtime > -1)
-    to->mms_maxtime = from->mms_maxtime;
-#endif
 
   if (from->maxrate > -1)
     to->maxrate = from->maxrate;
