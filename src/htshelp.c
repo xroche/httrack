@@ -1,12 +1,12 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 3
-of the License, or any later version.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -14,8 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 Important notes:
 
@@ -148,7 +147,7 @@ void help_wizard(httrackp * opt) {
   printf("\n");
   printf("Welcome to HTTrack Website Copier (Offline Browser) " HTTRACK_VERSION
          "%s\n", hts_get_version_info(opt));
-  printf("Copyright (C) Xavier Roche and other contributors\n");
+  printf("Copyright (C) 1998-2013 Xavier Roche and other contributors\n");
 #ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");
@@ -768,7 +767,7 @@ void help(char *app, int more) {
   sprintf(info, "HTTrack version " HTTRACK_VERSION "%s (compiled " __DATE__ ")",
           hts_is_available());
   infomsg(info);
-  infomsg("Copyright (C) Xavier Roche and other contributors");
+  infomsg("Copyright (C) 1998-2013 Xavier Roche and other contributors");
 #ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
 #endif
