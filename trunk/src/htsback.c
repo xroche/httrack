@@ -62,10 +62,6 @@ Please visit our Website: http://www.httrack.com
 #else
 #endif
 
-#if HTS_USEMMS
-#include "htsmms.h"
-#endif
-
 #define VT_CLREOL       "\33[K"
 
 /* Slot operations */
@@ -1956,26 +1952,6 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
           return 0;
         }
       }
-#if HTS_USEMMS
-      else if (strfield(back[p].url_adr, "mms://")) {
-        MMSDownloadStruct str;
-
-        if (back[p].testmode) {
-          hts_log_print(opt, LOG_DEBUG,
-                        "error: forbidden test with mms link for back_add");
-          return -1;            // erreur pas de test permis
-        }
-        if (back[p].r.req.proxy.active) {
-          hts_log_print(opt, LOG_WARNING,
-                        "warning: direct connection for mms links (proxy settings ignored)");
-        }
-        back[p].status = STATUS_FTP_TRANSFER;   // connexion externe
-        str.pBack = &back[p];
-        str.pOpt = opt;
-        launch_mms(&str);
-        return 0;
-      }
-#endif
 #if HTS_USEOPENSSL
       else if (strfield(back[p].url_adr, "https://")) {     // let's rock
         back[p].r.ssl = 1;
@@ -2206,9 +2182,6 @@ void back_solve(httrackp * opt, lien_back * back) {
   assertf(back != NULL);
   if ((!strfield(back->url_adr, "file://"))
       && !strfield(back->url_adr, "ftp://")
-#if HTS_USEMMS
-      && !strfield(back->url_adr, "mms://")
-#endif
     ) {
     //## if (back->url_adr[0]!=lOCAL_CHAR) {  // qq chose à préparer
     const char *a;
@@ -2238,9 +2211,6 @@ void back_solve(httrackp * opt, lien_back * back) {
 int host_wait(httrackp * opt, lien_back * back) {
   if ((!strfield(back->url_adr, "file://"))
       && (!strfield(back->url_adr, "ftp://"))
-#if HTS_USEMMS
-      && (!strfield(back->url_adr, "mms://"))
-#endif
     ) {
     //## if (back->url_adr[0]!=lOCAL_CHAR) {
     if (!(back->r.req.proxy.active)) {

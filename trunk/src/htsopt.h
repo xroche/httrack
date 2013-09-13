@@ -307,7 +307,6 @@ struct httrackp {
   int rateout;                  // nombre d'octets minium pour le transfert
   int maxtime;                  // temps max en secondes
   int maxrate;                  // taux de transfert max
-  int mms_maxtime;              // max duration of a mms file
   float maxconn;                // nombre max de connexions/s
   int waittime;                 // démarrage programmé
   int cache;                    // génération d'un cache

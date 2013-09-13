@@ -161,12 +161,6 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     } else {
       ok = -2;                  // non supporté
     }
-#if HTS_USEMMS
-  } else if (strfield(lien, "mms://")) {
-    if (ident_url_absolute(lien, adr, fil) == -1) {
-      ok = -1;                  // erreur URL
-    }
-#endif
 #if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
     // Note: ftp:foobar.gif is not valid
@@ -177,9 +171,6 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   } else if ((scheme) && ((!strfield(lien, "http:"))
                           && (!strfield(lien, "https:"))
                           && (!strfield(lien, "ftp:"))
-#if HTS_USEMMS
-                          && (!strfield(lien, "mms:"))
-#endif
              )) {
     ok = -1;                    // unknown scheme
   } else {                      // c'est un lien relatif
@@ -209,12 +200,6 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
         lien += 4;
         strcpybuff(adr, "ftp://");      // même adresse forcée en ftp
         strcatbuff(adr, jump_protocol(origin_adr));
-#if HTS_USEMMS
-      } else if (strfield(lien, "mms:")) {
-        lien += 4;
-        strcpybuff(adr, "mms://");      // même adresse forcée en ftp
-        strcatbuff(adr, jump_protocol(origin_adr));
-#endif
       } else {
         strcpybuff(adr, origin_adr);    // même adresse ; et même éventuel protocole
       }

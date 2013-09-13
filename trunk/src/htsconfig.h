@@ -51,9 +51,6 @@ Please visit our Website: http://www.httrack.com
 // nom par défaut pour / en ftp
 #define DEFAULT_FTP "index.txt"
 
-// nom par défaut pour / en mms
-#define DEFAULT_MMS "default.avi"
-
 // extension par défaut pour fichiers n'en ayant pas
 #define DEFAULT_EXT       ".html"
 #define DEFAULT_EXT_SHORT ".htm"

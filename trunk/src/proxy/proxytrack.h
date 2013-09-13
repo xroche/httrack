@@ -175,8 +175,6 @@ HTS_UNUSED static const char *jump_protocol(const char *source) {
     source += p;
   else if ((p = strfield(source, "file:")))
     source += p;
-  else if ((p = strfield(source, "mms:")))
-    source += p;
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;

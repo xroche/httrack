@@ -1,5 +1,3 @@
-#SUBDIRS = swf
-
 DevIncludesdir = $(includedir)/httrack
 DevIncludes_DATA = \
 	httrack-library.h \
@@ -49,9 +47,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsmd5.c htszlib.c htswrap.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c \
 	md5.c \
-	htsmms.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
-	mmsrip/error.c mmsrip/mms.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
@@ -63,9 +59,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsstrings.h httrack-library.h htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh \
 	md5.h \
-	htsmms.h \
-	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h \
-	mmsrip/error.h mmsrip/mms.h
+	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 
@@ -77,13 +71,6 @@ EXTRA_DIST = httrack.h webhttrack \
 		minizip/ChangeLogUnzip \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
-		mmsrip/common.h \
-		mmsrip/main.c \
-		mmsrip/COPYING \
-		mmsrip/AUTHORS \
-		mmsrip/NEWS \
-		mmsrip/README \
-		mmsrip/ChangeLog \
 		proxy/AUTHORS \
 		proxy/COPYING \
 		proxy/changelog.txt \

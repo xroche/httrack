@@ -2409,10 +2409,6 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
   } else if ((pos = strfield(url, "https:"))) {     // HTTPS
     strcpybuff(adr, "https://");
 #endif
-#if HTS_USEMMS
-  } else if ((pos = strfield(url, "mms:"))) {   // mms
-    strcpybuff(adr, "mms://");
-#endif
   } else if (scheme) {
     return -1;                  // erreur non reconnu
   } else
@@ -3590,10 +3586,6 @@ HTS_INLINE char *jump_protocol(const char *source) {
     source += p;
   else if ((p = strfield(source, "file:")))
     source += p;
-#if HTS_USEMMS
-  else if ((p = strfield(source, "mms:")))
-    source += p;
-#endif
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
@@ -5537,9 +5529,6 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->maxcache = 1048576 * 32; // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
   opt->maxtime = -1;            // temps max en secondes
-#if HTS_USEMMS
-  opt->mms_maxtime = 60 * 3600; // max time for mms streams (one hour)
-#endif
   opt->maxrate = 25000;         // taux maxi
   opt->maxconn = 5.0;           // nombre connexions/s
   opt->waittime = -1;           // wait until.. hh*3600+mm*60+ss

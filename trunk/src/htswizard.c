@@ -842,11 +842,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
   if (just_test_it) {
     if (forbidden_url == 1) {
       if (opt->travel & 256) {  // tester tout de même
-        if (strfield(adr, "ftp://") == 0
-#if HTS_USEMMS
-            && strfield(adr, "mms://") == 0
-#endif
-          ) {                   // PAS ftp!
+        if (strfield(adr, "ftp://") == 0) {                   // PAS ftp!
           forbidden_url = 1;    // oui oui toujours interdit (note: sert à rien car ==1 mais c pour comprendre)
           *just_test_it = 1;    // mais on teste
           hts_log_print(opt, LOG_DEBUG, "Testing link %s%s", adr, fil);

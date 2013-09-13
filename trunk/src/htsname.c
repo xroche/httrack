@@ -159,9 +159,9 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */
   char BIGSTK normadr_[HTS_URLMAXSIZE * 2], normfil_[HTS_URLMAXSIZE * 2];
   enum { PROTOCOL_HTTP, PROTOCOL_HTTPS, PROTOCOL_FTP, PROTOCOL_FILE,
-      PROTOCOL_MMS, PROTOCOL_UNKNOWN };
+      PROTOCOL_UNKNOWN };
   static const char *protocol_str[] =
-    { "http", "https", "ftp", "file", "mms", "unknown" };
+    { "http", "https", "ftp", "file", "unknown" };
   int protocol = PROTOCOL_HTTP;
   const char *const adr = jump_identification(adr_complete);
   char *fil = fil_complete;
@@ -223,8 +223,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     protocol = PROTOCOL_FTP;
   } else if (strfield(adr_complete, "file:")) {
     protocol = PROTOCOL_FILE;
-  } else if (strfield(adr_complete, "mms:")) {
-    protocol = PROTOCOL_MMS;
   } else {
     protocol = PROTOCOL_HTTP;
   }
@@ -325,33 +323,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       "could not URL-decode string '%s'", fil);
   }
 
-#if HTS_USEMMS
-  /* .asx hack */
-  if (headers != NULL && headers->r.cdispo[0] != 0
-      && strfield(headers->r.contenttype, "video/")
-      && strfield2(get_ext(OPT_GET_BUFF(opt), headers->r.cdispo), "asx") == 0) {
-    ext_chg = 1;
-    strcpybuff(ext, "asx");
-  } else if (headers != NULL && headers->r.contenttype[0] != 0
-             && strfield2(headers->r.contenttype, "video/x-ms-asf")) {
-    char *exts = get_ext(OPT_GET_BUFF(opt), headers->url_fil);
-
-    if (strfield2(exts, "wmv") == 0) {
-      ext_chg = 1;
-      strcpybuff(ext, "wmv");
-    } else if (strfield2(exts, "asf") == 0) {
-      ext_chg = 1;
-      strcpybuff(ext, "asf");
-    } else if (strfield2(exts, "avi") == 0) {
-      ext_chg = 1;
-      strcpybuff(ext, "avi");
-    } else if (strfield2(exts, "asx") == 0) {
-      ext_chg = 1;
-      strcpybuff(ext, "asx");
-    }
-  }
-#endif
-
   /* replace shtml to html.. */
   if (opt->savename_delayed == 2)
     is_html = -1;               /* ALWAYS delay type */
@@ -390,9 +361,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
     if (protocol != PROTOCOL_FILE
         && protocol != PROTOCOL_FTP
-#if HTS_USEMMS
-        && protocol != PROTOCOL_MMS
-#endif
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
       if (!((opt->check_type == 1) && (fil[strlen(fil) - 1] == '/')))   // slash doit être html?
@@ -602,9 +570,6 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
                               // ftp: stop!
                               if (strfield(mov_url, "ftp://")
-#if HTS_USEMMS
-                                  || strfield(mov_url, "mms://")
-#endif
                                 ) {     // ftp, ok on arrête
                                 has_been_moved = 1;
                                 back_maydelete(opt, cache, sback, b);   // ok
@@ -745,15 +710,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   // Donner nom par défaut?
   if (fil[strlen(fil) - 1] == '/') {
     if (!strfield(adr_complete, "ftp://")
-#if HTS_USEMMS
-        && !strfield(adr_complete, "mms://")
-#endif
       ) {
       strcatbuff(fil, DEFAULT_HTML);    // nommer page par défaut!!
-#if HTS_USEMMS
-    } else if (strfield(adr_complete, "mms://")) {
-      strcatbuff(fil, DEFAULT_MMS);
-#endif
     } else {
       if (!opt->proxy.active)
         strcatbuff(fil, DEFAULT_FTP);   // nommer page par défaut (texte)

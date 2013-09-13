@@ -1701,9 +1701,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       || (strfield(tempo, "https:")
                                       )
 #endif
-#if HTS_USEMMS
-                                      || strfield(tempo, "mms:")
-#endif
                                     )   // ok pas de problème
                                     url_ok = 1;
                                   else if (tempo[strlen(tempo) - 1] == '/') {   // un slash: ok..
@@ -3230,9 +3227,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (!just_test_it) {
                             if ((!strfield(adr, "ftp://"))      // non ftp
                                 && (!strfield(adr, "file://"))
-#if HTS_USEMMS
-                                && (!strfield(adr, "mms://"))
-#endif
                               ) {       // non file
                               if (opt->robots) {        // récupérer robots
                                 if (ishtml(opt, fil) != 0) {    // pas la peine pour des fichiers isolés
@@ -4842,11 +4836,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
                   }
 
                   // ftp: stop!
-                  if (strfield(mov_url, "ftp://")
-#if HTS_USEMMS
-                      || strfield(mov_url, "mms://")
-#endif
-                    ) {
+                  if (strfield(mov_url, "ftp://")) {
                     strcpybuff(adr, mov_adr);
                     strcpybuff(fil, mov_fil);
                     break;
