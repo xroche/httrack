@@ -42,9 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #ifdef _WIN32
  // pour read
-#ifndef  _WIN32_WCE
 #include <io.h>
-#endif
  // pour FindFirstFile
 #include <winbase.h>
 #else

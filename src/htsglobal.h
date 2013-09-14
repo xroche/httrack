@@ -42,18 +42,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_LIB_VERSION  "2.0"
 
 #ifndef HTS_NOINCLUDES
-#ifndef _WIN32_WCE
 #include <stdio.h>
 #include <stdlib.h>
-#else
-#include <stdio.h>
-#include <stdlib.h>
-#ifdef HTS_CECOMPAT
-#include "cecompat.h"
-#else
-#include "celib.h"
-#endif
-#endif
 #endif
 
 // Définition plate-forme
@@ -70,9 +60,6 @@ Please visit our Website: http://www.httrack.com
 // config.h
 #ifdef _WIN32
 
-// WIN32
-#ifndef _WIN32_WCE
-
 /*
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
@@ -87,39 +74,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
 #define S_ISDIR(m) ((m) & _S_IFDIR)
-#endif
-
-#else
-
-// Win32CE
-//#pragma runtime_checks( "s", restore )
-#define HTS_SPARE_MEMORY 1
-#define HTS_ALIGN 8
-#define BIGSTK static
-#undef DLLIB                    // LoadLibrary(libssl) crashes
-#define NOSTRDEBUG 1
-#undef HTS_MAKE_KEYWORD_INDEX
-#ifdef HTS_CECOMPAT
-#define HTS_DO_NOT_USE_FTIME 1
-/*
-#undef HAVE_SYS_STAT_H
-#undef HAVE_SYS_TYPES_H
-*/
-#else
-#undef HTS_DO_NOT_USE_FTIME
-/*
-#define HAVE_SYS_STAT_H 1
-#define HAVE_SYS_TYPES_H 1
-*/
-#endif
-
-#define HTS_DLOPEN 0
-#undef HTS_INET6
-#ifndef S_ISREG
-#define S_ISREG(m) ((m) & _S_IFREG)
-
-#endif
-
 #endif
 
 #else

@@ -572,13 +572,11 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
 /* Get home directory, '.' if failed */
 /* example: /home/smith */
 char *hts_gethome(void) {
-#ifndef _WIN32_WCE
   char *home = getenv("HOME");
 
   if (home)
     return home;
   else
-#endif
     return ".";
 }
 

@@ -876,14 +876,12 @@ static void sig_leave(int code) {
 
 static void signal_handlers(void) {
 #ifdef _WIN32
-#ifndef  _WIN32_WCE
 #if 0                           /* BUG366763 */
   signal(SIGINT, sig_ask);      // ^C
 #else
   signal(SIGINT, sig_leave);    // ^C
 #endif
   signal(SIGTERM, sig_finish);  // kill <process>
-#endif
 #else
 #if 0                           /* BUG366763 */
   signal(SIGHUP, sig_back);     // close window

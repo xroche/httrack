@@ -35,9 +35,7 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#ifndef  _WIN32_WCE
 #include <fcntl.h>
-#endif
 #include <ctype.h>
 
 /* File defs */

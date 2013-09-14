@@ -40,7 +40,6 @@ Please visit our Website: http://www.httrack.com
 #include <winsock2.h>
 #else
 
-#ifndef _WIN32_WCE
 #undef HTS_USESCOPEID
 #define WIN32_LEAN_AND_MEAN
 // KB955045 (http://support.microsoft.com/kb/955045)
@@ -52,10 +51,6 @@ Please visit our Website: http://www.httrack.com
 #include <Wspiapi.h>
 //#include <winsock2.h>
 //#include <tpipv6.h>
-#else
-#include <winsock2.h>
-#include <socket.h>
-#endif
 
 #endif
 

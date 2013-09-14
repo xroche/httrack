@@ -49,9 +49,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef _WIN32
 #ifndef __cplusplus
 // DOS
-#ifndef  _WIN32_WCE
 #include <process.h>            /* _beginthread, _endthread */
-#endif
 #endif
 #endif
 

@@ -37,12 +37,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 
-#ifdef _WIN32_WCE
-#ifndef HTS_CECOMPAT
-#pragma comment(lib, "celib.lib")       //link with celib
-#endif
-#endif
-
 /* specific definitions */
 #include "htsbase.h"
 #include "htsnet.h"
@@ -56,9 +50,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 
 #ifdef _WIN32
-#ifndef  _WIN32_WCE
 #include <direct.h>
-#endif
 #else
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -78,31 +70,17 @@ static long int  timezone = 0;
 #endif
 #include <stdarg.h>
 
-#ifndef  _WIN32_WCE
 #include <sys/timeb.h>
 #include <fcntl.h>
-#else
-#ifndef HTS_CECOMPAT
-#include <sys/timeb.h>
-#endif
-#endif /* _WIN32_WCE */
 
 // pour utimbuf
 #ifdef _WIN32
-#ifndef _WIN32_WCE
 #include <sys/utime.h>
-#else
-#ifndef HTS_CECOMPAT
-#include <sys/utime.h>
-#endif
-#endif
 #else
 #include <utime.h>
 #endif /* _WIN32 */
 
-#ifndef _WIN32_WCE
 #include <sys/stat.h>
-#endif
 /* END specific definitions */
 
 // Debugging
@@ -610,10 +588,6 @@ char *antislash(char *catbuff, const char *s) {
     *a = '\\';
   return catbuff;
 }
-#endif
-
-#ifdef _WIN32_WCE
-char cwd[MAX_PATH + 1] = "";
 #endif
 
 // Initialize a htsblk structure
@@ -5122,11 +5096,7 @@ static FILE *hts_dgb_(void) {
     if ((hts_dgb_init & 0x80) == 0) {
       hts_dgb_init_fp = stderr;
     } else {
-#ifdef _WIN32_WCE
-      hts_dgb_init_fp = fopen("\\Temp\\hts-debug.txt", "wb");
-#else
       hts_dgb_init_fp = FOPEN("hts-debug.txt", "wb");
-#endif
       if (hts_dgb_init_fp != NULL) {
         fprintf(hts_dgb_init_fp, "* Creating file\r\n");
       }
@@ -5175,12 +5145,6 @@ HTSEXT_API int hts_init(void) {
   }
 
   hts_debug_log_print("entering hts_init()");   /* debug */
-
-#ifdef _WIN32_WCE
-#ifndef HTS_CECOMPAT
-  xceinit(L"");
-#endif
-#endif
 
   /* Init threads (lazy init) */
   htsthread_init();

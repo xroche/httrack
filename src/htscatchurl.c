@@ -40,9 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
-#ifndef  _WIN32_WCE
 #include <fcntl.h>
-#endif
 #ifdef _WIN32
 #else
 #include <arpa/inet.h>

@@ -111,7 +111,6 @@ extern "C" {
   extern HTSEXT_API t_abortLog abortLog__;
 #define abortLog(a) abortLog__(a, __FILE__, __LINE__)
 #define _ ,
-#ifndef _WIN32_WCE
 #define abortLogFmt(a) do { \
   FILE* fp = fopen("CRASH.TXT", "wb"); \
   if (!fp) fp = fopen("/tmp/CRASH.TXT", "wb"); \
@@ -128,11 +127,6 @@ extern "C" {
     fclose(fp); \
   } \
 } while(0)
-#else
-#define abortLogFmt(a) do { \
-  XCEShowMessageA("HTTrack " HTTRACK_VERSIONID " closed at '" __FILE__ "', line %d\r\nReason:\r\n%s\r\n", __LINE__, a); \
-} while(0)
-#endif
 
 #define assertf(exp) do { \
   if (! ( exp ) ) { \

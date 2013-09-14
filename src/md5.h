@@ -21,9 +21,6 @@ struct MD5Context {
   unsigned char in[64];
   uint32 buf[4];
   uint32 bits[2];
-#ifdef _WIN32_WCE
-  uint32 pad[2];
-#endif
   int doByteReverse;
 };
 
