@@ -460,9 +460,6 @@ void help(char *app, int more) {
   infomsg("General options:");
   infomsg
     ("  O  path for mirror/logfiles+cache (-O path_mirror[,path_cache_and_logfiles])");
-#ifndef _WIN32
-  infomsg(" %O  chroot path to, must be r00t (-%O root_path)");
-#endif
   infomsg("");
   infomsg("Action options:");
   infomsg("  w *mirror web sites");
@@ -629,7 +626,6 @@ void help(char *app, int more) {
   infomsg(" #T  generate transfer ops. log every minutes");
   infomsg(" #u  wait time");
   infomsg(" #Z  generate transfer rate statictics every minutes");
-  infomsg(" #!  execute a shell command (-#! \"echo hello\")");
   infomsg("");
   infomsg
     ("Dangerous options: (do NOT use unless you exactly know what you are doing)");
@@ -641,7 +637,6 @@ void help(char *app, int more) {
   infomsg("Command-line specific options:");
   infomsg
     ("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
-  infomsg(" %U run the engine with another id when called as root (-%U smith)");
   infomsg
     (" %W use an external library function as a wrapper (-%W myfoo.so[,myparameters])");
   /* infomsg(" %O do a chroot before setuid"); */
