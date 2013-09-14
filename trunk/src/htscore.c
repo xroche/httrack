@@ -33,9 +33,7 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#ifndef  _WIN32_WCE
 #include <fcntl.h>
-#endif
 #include <ctype.h>
 
 /* File defs */
@@ -3293,11 +3291,7 @@ int read_stdin(char *s, int max) {
 
 #ifdef _WIN32
 int check_stdin(void) {
-#ifndef _WIN32_WCE
   return (_kbhit());
-#else
-  return 0;
-#endif
 }
 #else
 int check_flot(T_SOC s) {

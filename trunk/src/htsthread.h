@@ -39,11 +39,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 #ifdef _WIN32
 #include "windows.h"
-#ifdef _WIN32_WCE
-#ifndef HTS_CECOMPAT
-#include "cethread.h"
-#endif
-#endif
 #endif
 #ifndef USE_BEGINTHREAD
 #error needs USE_BEGINTHREAD

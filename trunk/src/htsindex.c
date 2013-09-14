@@ -119,13 +119,11 @@ int hts_primindex_words = 0;
 */
 void index_init(const char *indexpath) {
 #if HTS_MAKE_KEYWORD_INDEX
-#ifndef _WIN32_WCE
   /* remove(concat(indexpath,"index.txt")); */
   hts_index_init = 1;
   hts_primindex_size = 0;
   hts_primindex_words = 0;
   fp_tmpproject = tmpfile();
-#endif
 #endif
 }
 

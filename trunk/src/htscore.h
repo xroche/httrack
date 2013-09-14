@@ -42,12 +42,8 @@ Please visit our Website: http://www.httrack.com
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
-#ifndef  _WIN32_WCE
 #include <conio.h>
-#endif
-#ifndef  _WIN32_WCE
 #include <direct.h>
-#endif
 #else
 #ifndef _WIN32
 #include <unistd.h>

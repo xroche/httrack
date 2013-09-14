@@ -688,31 +688,6 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
 
 #endif
 
-#ifdef _WIN32_WCE_XXC
-extern char cwd[MAX_PATH + 1];
-HTS_STATIC char *getcwd_ce(char *buffer, int maxlen) {
-  TCHAR fileUnc[MAX_PATH + 1];
-  char *plast;
-
-  if (cwd[0] == 0) {
-    GetModuleFileName(NULL, fileUnc, MAX_PATH);
-    WideCharToMultiByte(CP_ACP, 0, fileUnc, -1, cwd, MAX_PATH, NULL, NULL);
-    plast = strrchr(cwd, '\\');
-    if (plast)
-      *plast = 0;
-    /* Special trick to keep start menu clean... */
-    if (_stricmp(cwd, "\\windows\\start menu") == 0)
-      strcpy(cwd, "\\Apps");
-  }
-  if (buffer)
-    strncpy(buffer, cwd, maxlen);
-  return cwd;
-}
-
-#undef getcwd
-#define getcwd getcwd_ce
-#endif
-
 /* dirent() compatibility */
 #ifdef _WIN32
 #define HTS_DIRENT_SIZE 256
