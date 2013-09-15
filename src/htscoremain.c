@@ -1165,6 +1165,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
             //
           case 'Q':
             httrack_logmode = 0;
+            opt->debug = LOG_NOTICE;
             break;
           case 'v':
             httrack_logmode = 1;
@@ -1385,17 +1386,17 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'z':
-            if (opt->debug >= 2) {
-              opt->debug = 3;  /* -Zz */
+            if (opt->debug > LOG_INFO) {
+              opt->debug = LOG_DEBUG;  /* -Zz */
             } else {
-              opt->debug = 1;
+              opt->debug = LOG_INFO;
             }
             break;              // petit debug
           case 'Z':
-            if (opt->debug >= 1) {
-              opt->debug = 3;  /* -Zz */
+            if (opt->debug >= LOG_DEBUG) {
+              opt->debug = LOG_TRACE;  /* -Zz */
             } else {
-              opt->debug = 2;
+              opt->debug = LOG_DEBUG;
             }
             break;              // GROS debug
             //

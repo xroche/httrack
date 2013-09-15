@@ -536,7 +536,7 @@ int httpmirror(char *url1, httrackp * opt) {
                      __LINE__);
               hts_log_print(opt, LOG_PANIC,
                             "Too many filters, giving up..(>%d)", filptr);
-              hts_log_print(opt, LOG_INFO,
+              hts_log_print(opt, LOG_NOTICE,
                             "To avoid that: use #F option for more filters (example: -#F5000)");
               XH_extuninit;
               return 0;
@@ -615,7 +615,7 @@ int httpmirror(char *url1, httrackp * opt) {
           }
         }
         // fclose(fp);
-        hts_log_print(opt, LOG_INFO, "%d links added from %s", n,
+        hts_log_print(opt, LOG_NOTICE, "%d links added from %s", n,
                       StringBuff(opt->filelist));
 
         // Free buffer
@@ -1710,7 +1710,7 @@ int httpmirror(char *url1, httrackp * opt) {
                       }
 #ifdef IGNORE_RESTRICTIVE_ROBOTS
                       else {
-                        hts_log_print(opt, LOG_INFO,
+                        hts_log_print(opt, LOG_NOTICE,
                                       "Note: %s robots.txt rules are too restrictive, ignoring /",
                                       urladr);
                       }
@@ -1724,7 +1724,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
                               urladr, infobuff);
-                hts_log_print(opt, LOG_INFO,
+                hts_log_print(opt, LOG_NOTICE,
                               "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",
                               urladr, infobuff);
               }
@@ -1974,7 +1974,7 @@ int httpmirror(char *url1, httrackp * opt) {
   if ((HTS_STAT.stat_files <= 0)
       && (HTS_STAT.HTS_TOTAL_RECV < 32768)      /* should be fine */
     ) {
-    hts_log_print(opt, LOG_INFO,
+    hts_log_print(opt, LOG_NOTICE,
                   "No data seems to have been transferred during this session! : restoring previous one!");
     XH_uninit;
     if ((fexist
