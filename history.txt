@@ -45,6 +45,9 @@ This file lists all changes and fixes that have been made for HTTrack.
 + Fixed: url-escaping regression introduced in the previous subrelease
 + Fixed: content-disposition NOT taken in account (Stephan Matthiesen)
 + Fixed: buggy DNS cache leading to random crashes
++ Fixed: fixed logging not displaying robots.txt rules limits by default
++ Fixed: license year and GPL link, libtool fixes (cicku)
++ Fixed: Keywords field in desktop files (Sebastian Pipping)
 
 3.46-1
 * New: Unicode filenames handling
