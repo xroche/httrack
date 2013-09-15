@@ -232,9 +232,15 @@ if (hpsize == sizeof(struct sockaddr_in6)) { \
 
 /* Get dotted address */
 #define SOCaddr_inetntoa(namebuf, namebuflen, ss, sslen) do { \
-(namebuf)[0]='\0'; \
-getnameinfo((struct sockaddr *)&(ss), sslen, \
-            (namebuf), namebuflen, NULL, 0, NI_NUMERICHOST); \
+  char *pos_; \
+  (namebuf)[0]='\0'; \
+  getnameinfo((struct sockaddr *)&(ss), sslen, \
+              (namebuf), namebuflen, NULL, 0, NI_NUMERICHOST); \
+  /* remove scope id */ \
+  pos_ = strrchr(namebuf, '%'); \
+  if (pos_ != NULL) { \
+    *pos_ = '\0'; \
+  } \
 } while(0)
 
 /* Get protocol ID */
