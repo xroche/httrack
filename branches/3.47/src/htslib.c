@@ -5342,28 +5342,22 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...)
     va_list args;
     const int save_errno = errno;
     const char *s_type = "unknown";
+    const int level = type & 0xff;
 
-    switch (type & 0xff) {
-    case LOG_DEBUG:
-      // check verbosity
-      if (opt->debug < 2) {
+    // Check log level
+    if (opt->debug < level) {
         return;
-      }
+    }
+
+    // Dispatch
+    switch (level) {
+    case LOG_DEBUG:
       s_type = "debug";
       break;
     case LOG_INFO:
-      // check verbosity
-      if (opt->debug < 1) {
-        return;
-      }
       s_type = "info";
       break;
     case LOG_NOTICE:
-      // check verbosity
-      if (opt->debug < 1) {
-        return;
-      }
-      /* nobreak; */
     case LOG_WARNING:
       s_type = "warning";
       break;
@@ -5519,7 +5513,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->extdepth = 0;            // mais pas à l'extérieur
   opt->seeker = 1;              // down 
   opt->urlmode = 2;             // relatif par défaut
-  opt->debug = 0;               // pas de débug en plus
+  opt->debug = LOG_NOTICE;      // small log
   opt->getmode = 3;             // linear scan
   opt->maxsite = -1;            // taille max site (aucune)
   opt->maxfile_nonhtml = -1;    // taille max fichier non html
