@@ -1,3 +1,33 @@
+httrack (3.47.27-1) unstable; urgency=low
+
+  * Updated to 3.47.27 (3.47-27)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 15 Sep 2013 10:59:50 +0200
+
+httrack (3.47.26-1) unstable; urgency=low
+
+  * Updated to 3.47.26 (3.47-26)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 06 Sep 2013 21:51:28 +0200
+
+httrack (3.47.25-1) unstable; urgency=low
+
+  * Updated to 3.47.25 (3.47-25)
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 01 Sep 2013 16:47:55 +0200
+
+httrack (3.47.24-1) unstable; urgency=low
+
+  * Updated to 3.47.24 (3.47-24)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 23 Aug 2013 09:45:34 +0200
+
+httrack (3.47.23-1) unstable; urgency=low
+
+  * Updated to 3.47.23 (3.47-23)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 17 Aug 2013 12:15:37 +0200
+
 httrack (3.47.22-1) unstable; urgency=low
 
   * Updated to 3.47.22 (3.47-22)
