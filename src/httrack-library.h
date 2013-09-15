@@ -46,12 +46,12 @@ typedef struct strc_int2bytes2 strc_int2bytes2;
 #ifndef HTS_DEF_DEFSTRUCT_hts_log_type
 #define HTS_DEF_DEFSTRUCT_hts_log_type
 typedef enum hts_log_type {
-  LOG_DEBUG,
-  LOG_INFO,
-  LOG_NOTICE,
-  LOG_WARNING,
-  LOG_ERROR,
   LOG_PANIC,
+  LOG_ERROR,
+  LOG_WARNING,
+  LOG_NOTICE,
+  LOG_INFO,
+  LOG_DEBUG,
   LOG_ERRNO = 1 << 8
 } hts_log_type;
 #endif

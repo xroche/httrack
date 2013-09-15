@@ -208,13 +208,13 @@ static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
             freet(itemback);
             itemback = NULL;
           }
-          hts_log_print(opt, LOG_INFO | LOG_ERRNO,
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "engine: warning: unserialize error for %s%s (%s)", adr,
                         fil, sav);
         }
         fclose(fp);
       } else {
-        hts_log_print(opt, LOG_INFO | LOG_ERRNO,
+        hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                       "engine: warning: unserialize error for %s%s (%s), file disappeared",
                       adr, fil, sav);
       }
@@ -237,7 +237,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
           back_set_locked(sback, q);    /* locked */
           return q;
         } else {
-          hts_log_print(opt, LOG_INFO,
+          hts_log_print(opt, LOG_WARNING,
                         "engine: warning: unserialize error for %s%s (%s): no more space to wakeup frozen slots",
                         adr, fil, sav);
         }
@@ -306,7 +306,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
           }
           /* Security check */
           if (fexist_utf8(filename)) {
-            hts_log_print(opt, LOG_INFO,
+            hts_log_print(opt, LOG_WARNING,
                           "engine: warning: temporary file %s already exists",
                           filename);
           }
@@ -319,13 +319,13 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
               nclean++;
               back_clear_entry(&back[i]);       /* entry is now recycled */
             } else {
-              hts_log_print(opt, LOG_INFO | LOG_ERRNO,
+              hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                             "engine: warning: serialize error for %s%s to %s: write error",
                             back[i].url_adr, back[i].url_fil, filename);
             }
             fclose(fp);
           } else {
-            hts_log_print(opt, LOG_INFO | LOG_ERRNO,
+            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                           "engine: warning: serialize error for %s%s to %s: open error (%s, %s)",
                           back[i].url_adr, back[i].url_fil, filename,
                           dir_exists(filename) ? "directory exists" :
@@ -336,7 +336,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
           if (filename != NULL)
             free(filename);
         } else {
-          hts_log_print(opt, LOG_INFO | LOG_ERRNO,
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "engine: warning: serialize error for %s%s to %s: memory full",
                         back[i].url_adr, back[i].url_fil, filename);
         }
