@@ -250,7 +250,12 @@ void htspe_init(void) {
        "If this parameter is an empty string (""), the call removes the 
        current directory from the default DLL search order" */
     if (!SetDllDirectory("")) {
-      assertf(!"SetDllDirectory failed");
+      const DWORD dwVersion = GetVersion();
+      const DWORD dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
+      /* Do no choke on NT or 98SE with KernelEx NT API (James Blough) */
+      if (dwMajorVersion >= 5) {
+        assertf(!"SetDllDirectory failed");
+      }
     }
 #endif
 
