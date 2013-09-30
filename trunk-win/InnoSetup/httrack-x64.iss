@@ -1,8 +1,8 @@
 ; HTTrack Website Copier - x64 edition
 
 [Setup]
-AppVerName=WinHTTrack Website Copier 3.47-19 (x64)
-AppVersion=3.47.19
+AppVerName=WinHTTrack Website Copier 3.47-27 (x64)
+AppVersion=3.47.27
 AppName=WinHTTrack Website Copier
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -18,7 +18,7 @@ AllowNoIcons=yes
 ;AlwaysCreateUninstallIcon=yes
 LicenseFile=O:\HTTrackFiles\setup_license.txt
 ; uncomment the following line if you want your installation to run on NT 3.51 too.
-MinVersion=4,4
+;MinVersion=4,4
 ;;AdminPrivilegesRequired=no
 AppMutex=WinHTTrack_RUN
 OutputBaseFilename=httrack_x64
@@ -27,6 +27,11 @@ SetupIconFile=C:\Dev\WinHTTrack\res\Shell.ico
 UninstallIconFile=C:\Dev\WinHTTrack\res\Shell.ico
 ;DiskSpanning=yes
 ;DiskSize=1048576
+SignedUninstaller=yes
+; Tools/Configure Sign Tools.../Add:
+; Name of the sign tool: signtool
+; Command of the sign tool: "C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe" $p
+SignTool=signtool sign /f $qZ:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx$q /d $qHTTrack Website Copier Installer$q $f
 
 [Tasks]
 Name: "regfiles"; Description: "Register WinHTTrack file types and program setup"; GroupDescription: "Setup:"; MinVersion: 4,4
