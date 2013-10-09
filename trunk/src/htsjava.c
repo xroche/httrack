@@ -446,12 +446,14 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
 static unsigned short int readshort(FILE * fp) {
   unsigned short int valint;
 
-  fread(&valint, sizeof(valint), 1, fp);
-
-  if (reverse_endian())
-    return hts_swap16(valint);
-  else
-    return valint;
+  if (fread(&valint, sizeof(valint), 1, fp) == 1) {
+    if (reverse_endian())
+      return hts_swap16(valint);
+    else
+      return valint;
+  } else {
+    return 0;
+  }
 
 }
 
