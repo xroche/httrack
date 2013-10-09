@@ -816,7 +816,7 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
     }
     MUTEX_UNLOCK(context->lock);
 
-    if (context->opt != NULL) {
+    if (context->opt != NULL && !already_running) {
       const hts_stat_struct* stats;
 
       /* Rock'in! */
