@@ -27,7 +27,7 @@ SignedUninstaller=yes
 ; Tools/Configure Sign Tools.../Add:
 ; Name of the sign tool: signtool
 ; Command of the sign tool: "C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe" $p
-SignTool=signtool sign /f $qZ:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx$q /d $qHTTrack Website Copier Installer$q $f
+SignTool=signtool sign /f $qZ:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx$q /d $qHTTrack Website Copier Installer$q /t http://timestamp.verisign.com/scripts/timstamp.dll $f
 
 [Tasks]
 Name: "regfiles"; Description: "Register WinHTTrack file types and program setup"; GroupDescription: "Setup:"; MinVersion: 4,4
