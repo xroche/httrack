@@ -1671,11 +1671,10 @@ public class HTTrackActivity extends FragmentActivity {
           throw new RuntimeException("R.string.no_index_html_in_xx is null");
         }
         final File target = getTargetFile();
-        if (target == null) {
-          throw new RuntimeException("target is null");
+        if (target != null) {
+          final String warning = template.replace("%s", target.getPath());
+          showNotification(warning);
         }
-        final String warning = template.replace("%s", target.getPath());
-        showNotification(warning);
       }
 
       // Enable logs if present
