@@ -1,3 +1,11 @@
+httrack (3.47.27-3) unstable; urgency=low
+
+  * Do not depend on automake1.9 but on automake instead
+    see: http://lists.debian.org/debian-devel/2013/05/msg01459.html
+    closes:#724390
+
+ -- Xavier Roche <roche@proliant.localnet>  Thu, 26 Sep 2013 20:09:12 +0200
+
 httrack (3.47.27-1) unstable; urgency=low
 
   * Updated to 3.47.27 (3.47-27)
