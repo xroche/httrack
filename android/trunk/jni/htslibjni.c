@@ -839,11 +839,12 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
       }
 
       /* Unreference global option tab */
-      MUTEX_LOCK(context->lock);
+      /* Nope - do this at destructor time */
+      /*MUTEX_LOCK(context->lock);
       hts_free_opt(context->opt);
       context->opt = NULL;
       context->stop = 0;
-      MUTEX_UNLOCK(context->lock);
+      MUTEX_UNLOCK(context->lock);*/
 
       /* Cleanup */
       for (i = 0; i < argc; i++) {
