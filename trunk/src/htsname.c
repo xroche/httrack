@@ -146,10 +146,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers) {
   char catbuff[CATBUFF_SIZE];
-  const char *mime_type = (headers
-                           && !HTTP_IS_REDIRECT(headers->r.
-                                                statuscode)) ? headers->r.
-    contenttype : NULL;
+  const int is_redirect = headers != NULL && HTTP_IS_REDIRECT(headers->r.statuscode);
+  const char *mime_type = headers != NULL && !is_redirect ? headers->r.contenttype : NULL;
   /*const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ? headers->r.contenttype : NULL; */
   lien_back *const back = sback->lnk;
 
@@ -374,14 +372,16 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
             s[0] = '\0';
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
                           adr_complete, fil_complete);
-            if (strnotempty(r.cdispo)) {        /* filename given */
-              ext_chg = 2;      /* change filename */
-              strcpybuff(ext, r.cdispo);
-            } else if (!may_unknown2(opt, r.contenttype, fil)) {        // on peut patcher à priori?
-              give_mimext(s, r.contenttype);    // obtenir extension
-              if (strnotempty(s) > 0) { // on a reconnu l'extension
-                ext_chg = 1;
-                strcpybuff(ext, s);
+            if (!HTTP_IS_REDIRECT(r.statuscode)) {
+              if (strnotempty(r.cdispo)) {        /* filename given */
+                ext_chg = 2;      /* change filename */
+                strcpybuff(ext, r.cdispo);
+              } else if (!may_unknown2(opt, r.contenttype, fil)) {        // on peut patcher à priori?
+                give_mimext(s, r.contenttype);    // obtenir extension
+                if (strnotempty(s) > 0) { // on a reconnu l'extension
+                  ext_chg = 1;
+                  strcpybuff(ext, s);
+                }
               }
             }
 #ifdef DEFAULT_BIN_EXT
@@ -413,7 +413,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           else if (opt->savename_delayed != 0 && !opt->state.stop) {
             // Check if the file is ready in backing. We basically take the same logic as later.
             // FIXME: we should cleanup and factorize this unholy mess
-            if (headers != NULL && headers->status >= 0) {
+            if (headers != NULL && headers->status >= 0 && !is_redirect) {
               if (strnotempty(headers->r.cdispo)) {        /* filename given */
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, headers->r.cdispo);
