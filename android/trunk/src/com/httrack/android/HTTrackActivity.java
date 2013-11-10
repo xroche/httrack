@@ -72,6 +72,7 @@ import android.text.Html;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -133,6 +134,7 @@ public class HTTrackActivity extends FragmentActivity {
   // Activity identifier when using startActivityForResult()
   protected static final int ACTIVITY_OPTIONS = 0;
   protected static final int ACTIVITY_FILE_CHOOSER = 1;
+  protected static final int ACTIVITY_PROJECT_NAME_CHOOSER = 2;
 
   // Process unique session ID for the fragment identifier
   protected String sessionID = "runner_task" + "_"
@@ -271,6 +273,26 @@ public class HTTrackActivity extends FragmentActivity {
         name.setAdapter(new ArrayAdapter<String>(this,
             android.R.layout.simple_dropdown_item_1line, names));
       }
+    }
+  }
+  
+  /**
+   * Return the project category of a given project.
+   * 
+   * @param projectName
+   * @return the project category, or @c null if none (or there is no such
+   *         project)
+   */
+  private String getProjectCategory(final String projectName) {
+    final SparseArray<String> projectMap = new SparseArray<String>();
+    final File target = new File(getProjectRootFile(), projectName);
+    try {
+      OptionsMapper.unserialize(HTTrackActivity.getProfileFile(target),
+          projectMap);
+      final String description = projectMap.get(R.id.fieldProjectCategory);
+      return description;
+    } catch (final IOException e) {
+      return null;
     }
   }
 
@@ -1617,6 +1639,11 @@ public class HTTrackActivity extends FragmentActivity {
             switchEmptyProjectName = empty;
             View.class.cast(findViewById(R.id.buttonNext)).setEnabled(!empty);
           }
+
+          // (re) Set category
+          final String category = getProjectCategory(s.toString());
+          TextView.class.cast(findViewById(R.id.fieldProjectCategory)).setText(
+              category != null ? category : "");
         }
 
         // NOOP
@@ -2040,6 +2067,21 @@ public class HTTrackActivity extends FragmentActivity {
     Log.d(getClass().getSimpleName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
+  
+  /**
+   * Project name "..." button.
+   */
+  public void onClickMoreProjectName(final View view) {
+    final String[] names = getProjectNames();
+    if (names != null && names.length != 0) {
+      final Intent intent = new Intent(this, CleanupActivity.class);
+      fillExtra(intent);
+      intent.putExtra("com.httrack.android.projectNames", names);
+      intent.putExtra("com.httrack.android.action",
+          CleanupActivity.ACTION_SELECT);
+      startActivityForResult(intent, ACTIVITY_PROJECT_NAME_CHOOSER);
+    }
+  }
 
   /** Restore a previously saved map context. **/
   private void loadParcelable(final Parcelable data) {
@@ -2068,6 +2110,16 @@ public class HTTrackActivity extends FragmentActivity {
         // Load modified map
         final String path = data.getStringExtra("com.httrack.android.rootFile");
         setBasePath(path);
+      }
+      break;
+    case ACTIVITY_PROJECT_NAME_CHOOSER:
+      if (resultCode == Activity.RESULT_OK) {
+        final String projectName = data.getStringExtra("com.httrack.android.projectName");
+        final EditText name = EditText.class.cast(this
+            .findViewById(R.id.fieldProjectName));
+        name.setText(projectName);
+        name.setSelection(projectName.length());
+        name.requestFocus();
       }
       break;
     }
@@ -2158,6 +2210,8 @@ public class HTTrackActivity extends FragmentActivity {
       final Intent intent = new Intent(this, CleanupActivity.class);
       fillExtra(intent);
       intent.putExtra("com.httrack.android.projectNames", names);
+      intent.putExtra("com.httrack.android.action",
+          CleanupActivity.ACTION_CLEANUP);
       startActivity(intent);
     }
   }

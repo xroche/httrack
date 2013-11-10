@@ -25,15 +25,31 @@
                 android:paddingRight="@dimen/activity_horizontal_margin"
                 android:text="@string/project_name" />
 
-            <AutoCompleteTextView
-                android:id="@+id/fieldProjectName"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:hint="@string/projname_hint"
-                android:textColor="@android:color/primary_text_light" >
+                android:gravity="left"
+                android:orientation="horizontal" >
 
-                <requestFocus android:layout_width="fill_parent" />
-            </AutoCompleteTextView>
+                <AutoCompleteTextView
+                    android:id="@+id/fieldProjectName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/projname_hint"
+                    android:textColor="@android:color/primary_text_light" >
+
+                    <requestFocus android:layout_width="fill_parent" />
+                </AutoCompleteTextView>
+
+                <Button
+                    android:id="@+id/buttonMoreProjectName"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:onClick="onClickMoreProjectName"
+                    android:text="@string/ellipsis" />
+            </LinearLayout>
         </TableRow>
 
         <TableRow
@@ -48,11 +64,18 @@
                 android:paddingRight="@dimen/activity_horizontal_margin"
                 android:text="@string/project_category" />
 
-            <EditText
-                android:id="@+id/fieldProjectCategory"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:hint="@string/hint_category" />
+                android:gravity="left"
+                android:orientation="horizontal" >
+
+                <EditText
+                    android:id="@+id/fieldProjectCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_category" />
+            </LinearLayout>
         </TableRow>
 
         <TableRow

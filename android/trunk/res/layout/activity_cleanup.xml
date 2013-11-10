@@ -17,7 +17,9 @@
         android:onClick="onClickDelete"
         android:text="@string/delete" />
 
-    <View style="@style/DividerLineHorizontal" />
+    <View
+        android:id="@+id/horizontalLine"
+        style="@style/DividerLineHorizontal" />
 
     <ListView
         android:id="@android:id/list"

@@ -29,10 +29,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
@@ -53,7 +55,11 @@ public class CleanupActivity extends ListActivity {
   private File projectRootFile;
   private File resourceFile;
   private String[] projects;
+  private int action;
   private final HashSet<Integer> toBeDeleted = new HashSet<Integer>();
+
+  public static final int ACTION_CLEANUP = 1;
+  public static final int ACTION_SELECT = 2;
 
   /**
    * List adapter.
@@ -101,9 +107,17 @@ public class CleanupActivity extends ListActivity {
     resourceFile = File.class.cast(extras
         .get("com.httrack.android.resourceFile"));
     projects = (String[]) extras.get("com.httrack.android.projectNames");
-    if (projectRootFile == null || resourceFile == null || projects == null) {
+    action = extras.getInt("com.httrack.android.action");
+
+    if (projectRootFile == null || resourceFile == null || projects == null
+        || action == 0) {
       throw new RuntimeException("internal error");
     }
+    
+    // Visibility of "delete" and its hline.
+    final int state = action == ACTION_CLEANUP ? View.VISIBLE : View.GONE;
+    findViewById(R.id.buttonClear).setVisibility(state);
+    findViewById(R.id.horizontalLine).setVisibility(state);
 
     final ArrayList<HashMap<String, String>> listItem = new ArrayList<HashMap<String, String>>();
 
@@ -137,12 +151,23 @@ public class CleanupActivity extends ListActivity {
     final CheckBox cb = (CheckBox) v;
     final int position = Integer.parseInt(cb.getTag().toString());
     final View o = list.getChildAt(position).findViewById(R.id.blocCheck);
-    if (cb.isChecked()) {
-      o.setBackgroundResource(R.color.transparent_red);
-      toBeDeleted.add(position);
-    } else {
-      o.setBackgroundResource(R.color.transparent);
-      toBeDeleted.remove(position);
+
+    if (action == ACTION_CLEANUP) {
+      if (cb.isChecked()) {
+        o.setBackgroundResource(R.color.transparent_red);
+        toBeDeleted.add(position);
+      } else {
+        o.setBackgroundResource(R.color.transparent);
+        toBeDeleted.remove(position);
+      }
+    } else if (action == ACTION_SELECT) {
+      // Push result
+      final Intent intent = new Intent();
+      intent.putExtra("com.httrack.android.projectName", projects[position]);
+      setResult(Activity.RESULT_OK, intent);
+
+      // Finish activity
+      finish();
     }
   }
 
@@ -191,25 +216,27 @@ public class CleanupActivity extends ListActivity {
   }
 
   public void onClickDelete(final View v) {
-    String projectList = "";
-    for (final int position : toBeDeleted) {
-      final String name = projects[position];
-      projectList += "\n";
-      projectList += name;
-    }
-    if (projectList.length() != 0) {
-      new AlertDialog.Builder(this)
-          .setIcon(android.R.drawable.ic_dialog_alert)
-          .setTitle("Delete Projects")
-          .setMessage(
-              "Are you sure you want to delete selected projects ?"
-                  + projectList)
-          .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(final DialogInterface dialog, final int which) {
-              deleteProjects();
-            }
-          }).setNegativeButton("No", null).show();
+    if (action == ACTION_CLEANUP) {
+      String projectList = "";
+      for (final int position : toBeDeleted) {
+        final String name = projects[position];
+        projectList += "\n";
+        projectList += name;
+      }
+      if (projectList.length() != 0) {
+        new AlertDialog.Builder(this)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setTitle("Delete Projects")
+            .setMessage(
+                "Are you sure you want to delete selected projects ?"
+                    + projectList)
+            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+              @Override
+              public void onClick(final DialogInterface dialog, final int which) {
+                deleteProjects();
+              }
+            }).setNegativeButton("No", null).show();
+      }
     }
   }
 }
