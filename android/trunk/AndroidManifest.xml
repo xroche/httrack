@@ -2,12 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.httrack.android"
     android:installLocation="auto"
-    android:versionCode="48"
-    android:versionName="3.47.99.48" >
+    android:versionCode="49"
+    android:versionName="3.47.99.49" >
 
     <uses-sdk
         android:minSdkVersion="8"
-        android:targetSdkVersion="18" />
+        android:targetSdkVersion="19" />
 
     <!-- We need to read/write copied Websites to the SD card. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
