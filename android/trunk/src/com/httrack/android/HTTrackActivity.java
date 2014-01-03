@@ -2505,4 +2505,17 @@ public class HTTrackActivity extends FragmentActivity {
     }
     super.onDestroy();
   }
+
+  private void goToHome() {
+    final Intent intent = new Intent(Intent.ACTION_MAIN);
+    intent.addCategory(Intent.CATEGORY_HOME);
+    startActivity(intent);
+  }
+
+  @Override
+  public void onBackPressed() {
+    // Do not go home, or our fragment will die.
+    // super.onBackPressed();
+    goToHome();
+  }
 }
