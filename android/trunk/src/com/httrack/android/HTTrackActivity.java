@@ -275,7 +275,7 @@ public class HTTrackActivity extends FragmentActivity {
       }
     }
   }
-  
+
   /**
    * Return the project category of a given project.
    * 
@@ -2067,7 +2067,7 @@ public class HTTrackActivity extends FragmentActivity {
     Log.d(getClass().getSimpleName(), "map size: " + mapper.size());
     startActivityForResult(intent, ACTIVITY_OPTIONS);
   }
-  
+
   /**
    * Project name "..." button.
    */
@@ -2114,7 +2114,8 @@ public class HTTrackActivity extends FragmentActivity {
       break;
     case ACTIVITY_PROJECT_NAME_CHOOSER:
       if (resultCode == Activity.RESULT_OK) {
-        final String projectName = data.getStringExtra("com.httrack.android.projectName");
+        final String projectName = data
+            .getStringExtra("com.httrack.android.projectName");
         final EditText name = EditText.class.cast(this
             .findViewById(R.id.fieldProjectName));
         name.setText(projectName);
