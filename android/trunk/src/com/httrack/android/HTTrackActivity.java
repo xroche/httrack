@@ -2506,6 +2506,7 @@ public class HTTrackActivity extends FragmentActivity {
     super.onDestroy();
   }
 
+  /** Navigate back to home, without killing us. **/
   private void goToHome() {
     final Intent intent = new Intent(Intent.ACTION_MAIN);
     intent.addCategory(Intent.CATEGORY_HOME);
@@ -2514,8 +2515,12 @@ public class HTTrackActivity extends FragmentActivity {
 
   @Override
   public void onBackPressed() {
-    // Do not go home, or our fragment will die.
-    // super.onBackPressed();
-    goToHome();
+    // Downloading data
+    if (pane_id == LAYOUT_MIRROR_PROGRESS) {
+      // Do not go home, or our fragment will die.
+      goToHome();
+    } else {
+      super.onBackPressed();
+    }
   }
 }
