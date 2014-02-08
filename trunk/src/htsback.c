@@ -2896,6 +2896,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                               "* * Fatal write error, giving up");
                               }
                               back[i].r.is_write = 0;   // erreur, abandonner
+                              back[i].status = STATUS_READY;      // terminé
+                              back_set_finished(sback, i);
+                              if (back[i].r.soc != INVALID_SOCKET) {
+                                deletehttp(&back[i].r);
+                                back[i].r.soc = INVALID_SOCKET;
+                              }
                             } else {
 #ifndef _WIN32
                               chmod(back[i].url_sav, HTS_ACCESS_FILE);

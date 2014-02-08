@@ -700,8 +700,6 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
       soc = INVALID_SOCKET;
       if (retour->totalsize < 0)
         strcpybuff(retour->msg, "Unable to open local file");
-      else if (retour->totalsize == 0)
-        strcpybuff(retour->msg, "File empty");
       else {
         // Note: On passe par un FILE* (plus propre)
         //soc=open(fil,O_RDONLY,0);    // en lecture seule!
@@ -4351,7 +4349,7 @@ off_t fsize(const char *s) {
 
   if (!strnotempty(s))          // nom vide: erreur
     return -1;
-  if (stat(s, &st) == 0) {
+  if (stat(s, &st) == 0 && S_ISREG(st.st_mode)) {
     return st.st_size;
   } else {
     return -1;
@@ -4365,7 +4363,7 @@ off_t fsize_utf8(const char *s) {
 
   if (!strnotempty(s))          // nom vide: erreur
     return -1;
-  if (STAT(s, &st) == 0) {
+  if (STAT(s, &st) == 0 && S_ISREG(st.st_mode)) {
     return st.st_size;
   } else {
     return -1;
@@ -4500,9 +4498,11 @@ int hts_read(htsblk * r, char *buff, int size) {
 #if HTS_WIDE_DEBUG
     DEBUG_W("read(%p, %d, %d)\n" _(void *)buff _(int) size _(int) r->fp);
 #endif
-    if (r->fp)
+    if (r->fp) {
       retour = (int) fread(buff, 1, size, r->fp);
-    else
+      if (retour == 0)  // can happen with directories (!)
+        retour = READ_ERROR;
+    } else
       retour = READ_ERROR;
   } else {
 #if HTS_WIDE_DEBUG
