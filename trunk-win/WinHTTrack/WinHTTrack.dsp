@@ -54,7 +54,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /subsystem:windows /machine:I386
-# ADD LINK32 wsock32.lib libhttrack.lib /nologo /subsystem:windows /machine:I386 /out:"L:\HTTrack\httrack\WinHTTrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll" /libpath:"C:\temp\Releaselib"
+# ADD LINK32 wsock32.lib libhttrack.lib /nologo /subsystem:windows /machine:I386 /out:"O:\HTTrack\httrack\WinHTTrack.exe" /libpath:"C:\Dev\openssl\lib" /libpath:"C:\Dev\zlib\dll32" /libpath:"C:\Dev\openssl\lib\out32dll" /libpath:"C:\temp\Releaselib"
 
 !ELSEIF  "$(CFG)" == "WinHTTrack - Win32 Debug"
 

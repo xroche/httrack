@@ -55,7 +55,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="2"
 				RuntimeTypeInfo="true"
@@ -155,7 +155,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="2"
 				RuntimeTypeInfo="true"
@@ -256,7 +256,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -315,6 +315,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe&quot; sign /f &quot;Z:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx&quot; /t http://timestamp.verisign.com/scripts/timstamp.dll $(TargetPath)&#x0D;&#x0A;"
 			/>
 		</Configuration>
 		<Configuration
@@ -354,7 +355,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -413,6 +414,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe&quot; sign /f &quot;Z:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx&quot; /t http://timestamp.verisign.com/scripts/timstamp.dll $(TargetPath)&#x0D;&#x0A;"
 			/>
 		</Configuration>
 		<Configuration
@@ -450,7 +452,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOW;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -552,7 +554,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
-				AdditionalIncludeDirectories="..\;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
+				AdditionalIncludeDirectories="..\httrack;&quot;C:\Dev\openssl-1.0.1e\include&quot;"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -1828,11 +1830,11 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\htsinthash.c"
+				RelativePath="..\httrack\htsinthash.c"
 				>
 			</File>
 			<File
-				RelativePath="..\htsmd5.c"
+				RelativePath="..\httrack\htsmd5.c"
 				>
 			</File>
 			<File
@@ -2466,7 +2468,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\md5.c"
+				RelativePath="..\httrack\md5.c"
 				>
 			</File>
 			<File

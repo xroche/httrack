@@ -635,7 +635,7 @@ void Cinprogress::OnModifyOpt()
     opt->timeout = -1;
     opt->rateout = -1;
     opt->maxtime = -1;
-		opt->mms_maxtime = -1;
+		//opt->mms_maxtime = -1;
     opt->maxrate = -1;
     StringClear(opt->user_agent);
     opt->retry = -1;
