@@ -2112,66 +2112,6 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
 }
 
 #if HTS_XGETHOST
-#if USE_BEGINTHREAD
-// lancement multithread du robot
-typedef struct {
-  httrackp *opt;
-  char iadr_p[HTS_URLMAXSIZE];
-} HostlookupStruct;
-void Hostlookup(void *pP) {
-  HostlookupStruct *const str = (HostlookupStruct *) pP;
-  httrackp *const opt = str->opt;
-  char iadr[256];
-  t_hostent *hp;
-  t_dnscache *cache;
-  t_fullhostent fullhostent_buffer;
-
-  // recopier (après id:pass)
-  strcpybuff(iadr, jump_identification(str->iadr_p));
-  // couper éventuel :
-  {
-    char *a;
-
-    if ((a = jump_toport(iadr)))
-      *a = '\0';                // get rid of it
-  }
-
-  // resolve
-  hp = vxgethostbyname(iadr, &fullhostent_buffer);
-
-  hts_mutexlock(&opt->state.lock);
-
-  hts_log_print(opt, LOG_DEBUG, "finished resolved: %s", iadr);
-
-  for(cache = _hts_cache(opt); cache != NULL; cache = cache->n) {
-    if (strcmp(cache->iadr, iadr) == 0) {
-      break;
-    }
-  }
-
-  if (cache != NULL && cache->host_length == 0) {
-    if (hp != NULL) {
-      memset(cache->host_addr, 0, sizeof(cache->host_addr));
-      memcpy(cache->host_addr, hp->h_addr, hp->h_length);
-      cache->host_length = hp->h_length;
-      hts_log_print(opt, LOG_DEBUG, "saved resolved host: %s", iadr);
-    } else {
-      cache->host_length = -1;
-      hts_log_print(opt, LOG_DEBUG, "saved negative resolved host: %s", iadr);
-    }
-  } else {
-    hts_log_print(opt, LOG_DEBUG, "could not save resolved host: %s", iadr);
-  }
-
-  assertf(opt->state.dns_cache_nthreads > 0);
-  opt->state.dns_cache_nthreads--;
-
-  hts_mutexrelease(&opt->state.lock);
-
-  freet(pP);
-}
-#endif
-
 // attendre que le host (ou celui du proxy) ait été résolu
 // si c'est un fichier, la résolution est immédiate
 // idem pour ftp://
@@ -2181,7 +2121,6 @@ void back_solve(httrackp * opt, lien_back * back) {
   if ((!strfield(back->url_adr, "file://"))
       && !strfield(back->url_adr, "ftp://")
     ) {
-    //## if (back->url_adr[0]!=lOCAL_CHAR) {  // qq chose à préparer
     const char *a;
 
     if (!(back->r.req.proxy.active))
@@ -2190,34 +2129,22 @@ void back_solve(httrackp * opt, lien_back * back) {
       a = back->r.req.proxy.name;
     assertf(a != NULL);
     a = jump_protocol(a);
-    if (hts_dnstest(opt, a, 1) == 2) { // non encore testé!..
-      hts_log_print(opt, LOG_DEBUG, "resolving in background: %s", a);
-      {
-        HostlookupStruct *str =
-          (HostlookupStruct *) malloct(sizeof(HostlookupStruct));
-        if (str != NULL) {
-          strcpybuff(str->iadr_p, a);
-          str->opt = opt;
-          hts_newthread(Hostlookup, str);
-        }
-      }
+    if (check_hostname_dns(a)) {
+      hts_log_print(opt, LOG_DEBUG, "resolved: %s", a);
+    } else {
+      hts_log_print(opt, LOG_DEBUG, "failed to resolve: %s", a);
     }
+    //if (hts_dnstest(opt, a, 1) == 2) { // non encore testé!..
+    //  hts_log_print(opt, LOG_DEBUG, "resolving in background: %s", a);
+    //}
   }
 }
 
 // détermine si le host a pu être résolu
 int host_wait(httrackp * opt, lien_back * back) {
-  if ((!strfield(back->url_adr, "file://"))
-      && (!strfield(back->url_adr, "ftp://"))
-    ) {
-    //## if (back->url_adr[0]!=lOCAL_CHAR) {
-    if (!(back->r.req.proxy.active)) {
-      return (hts_dnstest(opt, back->url_adr, 0));
-    } else {
-      return (hts_dnstest(opt, back->r.req.proxy.name, 0));
-    }
-  } else
-    return 1;                   // prêt, fichier local
+  // Always synchronous. No more background DNS resolution
+  // (does not really improve performances)
+  return 1;
 }
 #endif
 

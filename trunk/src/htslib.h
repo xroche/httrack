@@ -295,12 +295,12 @@ HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
 #ifndef HTTRACK_DEFLIB
 HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
 HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
+HTSEXT_API int check_hostname_dns(char *hostname);
 #endif
 int ftp_available(void);
 
 #if HTS_DNSCACHE
 void hts_cache_free(t_dnscache * cache);
-int hts_dnstest(httrackp * opt, const char *_iadr, int add);
 t_dnscache *_hts_cache(httrackp * opt);
 #endif
 

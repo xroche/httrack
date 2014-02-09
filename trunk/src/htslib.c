@@ -4605,61 +4605,6 @@ static t_hostent *hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * ret
   return NULL;
 }
 
-// tester si iadr a déja été testé (ou en cours de test)
-// 0 non encore (en cours)
-// 1 ok
-// 2 non présent
-int hts_dnstest(httrackp * opt, const char *_iadr, int add) {
-  int ret = 2;
-  t_dnscache *cache, *tail;
-  char iadr[HTS_URLMAXSIZE * 2];
-
-  // sauter user:pass@ éventuel
-  strcpybuff(iadr, jump_identification(_iadr));
-  // couper éventuel :
-  {
-    char *a;
-
-    if ((a = jump_toport(iadr)))
-      *a = '\0';
-  }
-
-#ifdef _WIN32
-  if (inet_addr(iadr) != INADDR_NONE)   // numérique
-#else
-  if (inet_addr(iadr) != (in_addr_t) - 1)       // numérique
-#endif
-    return 1;
-
-  hts_mutexlock(&opt->state.lock);
-  for(cache = tail = _hts_cache(opt); cache != NULL; cache = cache->n) {
-    tail = cache;
-    if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
-      ret = cache->host_length != 0 ? 1 : 0;
-      break;
-    }
-  }
-  // Add empty entry ?
-  if (ret == 2 && add) {
-    assertf(tail != NULL);
-    assertf(tail->n == NULL);
-    if (opt->state.dns_cache_nthreads < 16) {
-      opt->state.dns_cache_nthreads++;
-      tail->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
-      if (tail->n != NULL) {
-        strcpybuff(tail->n->iadr, iadr);
-        tail->n->host_length = 0;        /* pour le moment rien */
-        tail->n->n = NULL;
-      }
-    } else {
-      hts_log_print(opt, LOG_DEBUG, "too many threads, not adding another dns resolution in background");
-      ret = 0;
-    }
-  }
-  hts_mutexrelease(&opt->state.lock);
-  return ret;
-}
-
 HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error) {
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
 
@@ -4745,6 +4690,11 @@ HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const cha
 
 HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
   return vxgethostbyname2(hostname, v_buffer, NULL);
+}
+
+HTSEXT_API int check_hostname_dns(char *hostname) {
+  t_fullhostent buffer;
+  return vxgethostbyname(hostname, &buffer) != NULL;
 }
 
 // Needs locking
