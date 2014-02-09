@@ -138,12 +138,6 @@ int host_wait(httrackp * opt, lien_back * sback);
 int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 int back_checkmirror(httrackp * opt);
 
-#if HTS_XGETHOST
-#if USE_BEGINTHREAD
-void Hostlookup(void *iadr_p);
-#endif
-#endif
-
 #endif
 
 #endif
