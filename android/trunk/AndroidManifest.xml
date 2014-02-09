@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.httrack.android"
     android:installLocation="auto"
-    android:versionCode="51"
-    android:versionName="3.47.99.51" >
+    android:versionCode="52"
+    android:versionName="3.47.99.52" >
 
     <uses-sdk
         android:minSdkVersion="8"
