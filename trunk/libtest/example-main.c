@@ -26,7 +26,7 @@
 #include "htsdefines.h"
 
 /* Local definitions */
-#include "example.h"
+#include "example-main.h"
 
 /*
  * Name:           main
