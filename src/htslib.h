@@ -571,6 +571,7 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
   || (code) == 302               \
   || (code) == 303               \
   || (code) == 307               \
+  || (code) == 308               \
   )
 #define HTTP_IS_NOTMODIFIED(code) ( \
      (code) == 304               \
