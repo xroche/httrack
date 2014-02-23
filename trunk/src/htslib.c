@@ -4554,26 +4554,25 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // 'capsule' contenant uniquement le cache
 t_dnscache *_hts_cache(httrackp * opt) {
+  assert(opt != NULL);
   if (opt->state.dns_cache == NULL) {
     opt->state.dns_cache = (t_dnscache *) malloct(sizeof(t_dnscache));
     memset(opt->state.dns_cache, 0, sizeof(t_dnscache));
   }
+  assert(opt->state.dns_cache != NULL);
   return opt->state.dns_cache;
 }
 
-// free the cache
-static void hts_cache_free_(t_dnscache * cache) {
-  if (cache != NULL) {
-    if (cache->n != NULL) {
-      hts_cache_free_(cache->n);
+// Free DNS cache.
+void hts_cache_free(t_dnscache *const root) {
+  if (root != NULL) {
+    t_dnscache *cache;
+    for(cache = root; cache != NULL; ) {
+      t_dnscache *const next = cache->n;
+      cache->n = NULL;
+      freet(cache);
+      cache = next;
     }
-    freet(cache);
-  }
-}
-void hts_cache_free(t_dnscache * cache) {
-  if (cache != NULL && cache->n != NULL) {
-    hts_cache_free_(cache->n);
-    cache->n = NULL;
   }
 }
 
@@ -4585,8 +4584,10 @@ void hts_cache_free(t_dnscache * cache) {
 // routine pour le cache - retour optionnel à donner à chaque fois
 // NULL: nom non encore testé dans le cache
 // si h_length==0 alors le nom n'existe pas dans le dns
-static t_hostent *hts_ghbn(t_dnscache * cache, const char *iadr, t_hostent * retour) {
+static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_hostent *retour) {
   for(; cache != NULL; cache = cache->n) {
+    assert(cache != NULL);
+    assert(iadr != NULL);
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         if (retour->h_addr_list[0])
@@ -4704,6 +4705,10 @@ static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
   t_hostent *hp;
+
+  assert(opt != NULL);
+  assert(_iadr != NULL);
+  assert(v_buffer != NULL);
 
   /* Clear */
   fullhostent_init(buffer);
@@ -5502,8 +5507,9 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
 
     /* Cache */
     if (opt->state.dns_cache != NULL) {
-      hts_cache_free(opt->state.dns_cache);
+      t_dnscache *const root = opt->state.dns_cache;
       opt->state.dns_cache = NULL;
+      hts_cache_free(root);
     }
 
     /* Cancel chain */
