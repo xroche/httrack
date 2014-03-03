@@ -40,6 +40,10 @@
 #include <assert.h>
 #include <signal.h>
 #include <setjmp.h>
+#if defined(__ANDROID__) && !defined(__BIONIC_HAVE_UCONTEXT_T) && \
+    defined(__arm__) && !defined(__BIONIC_HAVE_STRUCT_SIGCONTEXT)
+#include <asm/sigcontext.h>
+#endif 
 #if (defined(USE_UNWIND) && !defined(USE_CORKSCREW))
 #include <unwind.h>
 #endif
