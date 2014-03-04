@@ -240,7 +240,8 @@ UINT hts_getCodepage(const char *name) {
   return 0;
 }
 
-static char *strndup(const char *s, size_t size) {
+/* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
+static char *hts_stringMemCopy(const char *s, size_t size) {
   char *dest = malloc(size + 1);
 
   if (dest != NULL) {
@@ -307,11 +308,11 @@ char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
 char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
   /* Empty string ? */
   if (size == 0) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Already UTF-8 ? */
   if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Other (valid) charset */
   else if (cp != 0) {
@@ -334,11 +335,11 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
 char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
   /* Empty string ? */
   if (size == 0) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Already UTF-8 ? */
   if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Other (valid) charset */
   else if (cp != 0) {
@@ -433,7 +434,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
   }
   /* Already on correct charset ? */
   if (hts_equalsAlphanum(from, to)) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
 #ifndef DISABLE_ICONV
   /* Find codepage */
@@ -512,7 +513,7 @@ char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Find codepage */
   else {
@@ -527,7 +528,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
-    return strndup(s, size);
+    return hts_stringMemCopy(s, size);
   }
   /* Find codepage */
   else {
