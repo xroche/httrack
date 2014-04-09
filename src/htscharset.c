@@ -71,6 +71,18 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
 #undef IS_ALNUM
 #undef CHAR_LOWER
 
+/* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
+static char *hts_stringMemCopy(const char *s, size_t size) {
+  char *dest = malloc(size + 1);
+
+  if (dest != NULL) {
+    memcpy(dest, s, size);
+    dest[size] = '\0';
+    return dest;
+  }
+  return NULL;
+}
+
 #ifdef _WIN32
 
 typedef struct wincodepage_t wincodepage_t;
@@ -238,18 +250,6 @@ UINT hts_getCodepage(const char *name) {
 
   /* Not found */
   return 0;
-}
-
-/* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
-static char *hts_stringMemCopy(const char *s, size_t size) {
-  char *dest = malloc(size + 1);
-
-  if (dest != NULL) {
-    memcpy(dest, s, size);
-    dest[size] = '\0';
-    return dest;
-  }
-  return NULL;
 }
 
 LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
