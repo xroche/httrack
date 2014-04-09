@@ -4,24 +4,7 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.48-1
-+ New: improved hashtables to speedup large mirrors
-+ New: added unit tests
-+ New: Added %a option, allowing to define the "Accept:" header line.
-+ New: Added %X option, to define additional request header lines.
-+ New: Added option '-%t', preserving the original file type (which may produce non-browseable file locally)
-+ Fixed: remove scope id (% character) in dotted address resolution (especially for catchurl proxy)
-+ Fixed: build fixes, including for Android, non-SSL releases
-+ Fixed: buggy keep-alive handling, leading to waste connections
-+ Fixed: removed chroot and setuid features (this is definitely not our business)
-+ Fixed: removed MMS (Microsoft Media Server) ripping code (mmsrip) (dead protocol, unmaintained code, licensing issues)
-+ Fixed: type mishandling when processing a redirect (such as a .PDF redirecting to another .PDF, with a text/html type tagged in the redirect message)
-+ Fixed: infinite loop when attempting to download a file:/// directory on Unix (gp)<br/>
-+ Fixed: removed background DNS resolution, prone to bugs
-+ Fixed: do not choke on Windows 2000 because of missing SetDllDirectory() (Andy Hewitt)
-+ Fixed: %h custom build structure parameter not taken in account (William Clark)
-
-3.47-27
+3.47-24
 + New: support for IDNA / RFC 3492 (punycode) handling
 + New: openssl is no longer dynamically probed at stratup, but dynamically linked
 + Fixed: random closing of files/sockets, leading to "zip_zipWriteInFileInZip_failed" assertion, "bogus state" messages, or random garbage in downloaded files
