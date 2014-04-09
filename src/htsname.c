@@ -965,6 +965,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
             /* release */
             RELEASE_ADR();
           }
+          b += strlen(b);       // pointer à la fin
           break;
         case 'H':              // host, raw (old mode)
           *b = '\0';
