@@ -5151,7 +5151,7 @@ HTSEXT_API int hts_init(void) {
     if (ssl_vulnerable(version)) {
       fprintf(stderr,
               "SSLeay_version(SSLEAY_VERSION) == '%s'\n", version);
-      abortLog("unable to initialize TLS: SSLeay_version(SSLEAY_VERSION) == '%s': OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)", version);
+      abortLog("unable to initialize TLS: OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)");
       assertf("OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)" == NULL);
     }
 
