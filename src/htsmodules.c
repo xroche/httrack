@@ -233,11 +233,6 @@ void *getFunctionPtr(void *handle, const char *fncname_) {
   return NULL;
 }
 
-void *ssl_handle = NULL;
-
-#ifdef _WIN32
-void *ssl_handle_2 = NULL;
-#endif
 void htspe_init(void) {
   static int initOk = 0;
 
@@ -278,15 +273,6 @@ void htspe_init(void) {
 }
 
 void htspe_uninit(void) {
-#ifdef _WIN32
-  CloseHandle(ssl_handle);
-  CloseHandle(ssl_handle_2);
-  ssl_handle = NULL;
-  ssl_handle_2 = NULL;
-#else
-  dlclose(ssl_handle);
-  ssl_handle = NULL;
-#endif
 }
 
 static void htspe_log(htsmoduleStruct * str, const char *msg) {
