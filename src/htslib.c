@@ -5080,6 +5080,19 @@ HTSEXT_API const char* hts_version(void) {
   return HTTRACK_VERSIONID;
 }
 
+static int ssl_vulnerable(const char *version) {
+  static const char *const match = "OpenSSL 1.0.1";
+  const size_t match_len = strlen(match);
+  if (version != NULL && strncmp(version, match, match_len) == 0) {
+    // CVE-2014-0160
+    // "OpenSSL 1.0.1g 7 Apr 2014"
+    const char minor = version[match_len];
+    return minor == ' ' || ( minor >= 'a' && minor <= 'f' );
+  } else {
+    return 0;
+  }
+}
+
 static int hts_init_ok = 0;
 HTSEXT_API int hts_init(void) {
   const char *dbg_env;
@@ -5128,11 +5141,20 @@ HTSEXT_API int hts_init(void) {
      Initialize the OpensSSL library
    */
   if (!openssl_ctx) {
+    const char *version;
+
     SSL_load_error_strings();
     SSL_library_init();
-    ///if (SSL_load_error_strings)  SSL_load_error_strings();
-    //if (ERR_load_crypto_strings) ERR_load_crypto_strings();
-    // if (ERR_load_SSL_strings)    ERR_load_SSL_strings(); ???!!!
+
+    // Check CVE-2014-0160.
+    version = SSLeay_version(SSLEAY_VERSION);
+    if (ssl_vulnerable(version)) {
+      fprintf(stderr,
+              "SSLeay_version(SSLEAY_VERSION) == '%s'\n", version);
+      abortLog("unable to initialize TLS: SSLeay_version(SSLEAY_VERSION) == '%s': OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)", version);
+      assertf("OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)" == NULL);
+    }
+
     // OpenSSL_add_all_algorithms();
     openssl_ctx = SSL_CTX_new(SSLv23_client_method());
     if (!openssl_ctx) {
