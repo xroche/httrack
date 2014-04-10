@@ -5087,7 +5087,12 @@ static int ssl_vulnerable(const char *version) {
     // CVE-2014-0160
     // "OpenSSL 1.0.1g 7 Apr 2014"
     const char minor = version[match_len];
-    return minor == ' ' || ( minor >= 'a' && minor <= 'f' );
+    return minor == ' ' 
+      || (
+        ( minor >= 'a' && minor <= 'f' )
+        // do not choke on Debian flavors, for example
+        && version[match_len + 1] == ' '
+      );
   } else {
     return 0;
   }
