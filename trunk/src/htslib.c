@@ -5081,21 +5081,17 @@ HTSEXT_API const char* hts_version(void) {
 }
 
 static int ssl_vulnerable(const char *version) {
+#ifdef _WIN32
   static const char *const match = "OpenSSL 1.0.1";
   const size_t match_len = strlen(match);
   if (version != NULL && strncmp(version, match, match_len) == 0) {
     // CVE-2014-0160
     // "OpenSSL 1.0.1g 7 Apr 2014"
     const char minor = version[match_len];
-    return minor == ' ' 
-      || (
-        ( minor >= 'a' && minor <= 'f' )
-        // do not choke on Debian flavors, for example
-        && version[match_len + 1] == ' '
-      );
-  } else {
-    return 0;
+    return minor == ' ' || ( minor >= 'a' && minor <= 'f' );
   }
+#endif
+  return 0;
 }
 
 static int hts_init_ok = 0;
