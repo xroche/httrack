@@ -518,38 +518,38 @@ BEGIN
     CONTROL         "Remove host if low",IDC_rems,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,130,109,183,10
 END
 
-IDD_OPTION5 DIALOGEX 0, 0, 220, 198
+IDD_OPTION5 DIALOGEX 0, 0, 251, 198
 STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
 CAPTION "Limits"
 FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     LTEXT           "Maximum mirroring depth:",IDC_infodepth,16,15,129,11
-    COMBOBOX        IDC_depth,151,15,41,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_depth,151,15,59,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Maximum external depth:",IDC_infodepth2,16,30,129,11
-    COMBOBOX        IDC_depth2,151,30,41,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_depth2,151,30,59,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Max size of any HTML file (B)",IDC_STATIC_autre,16,45,129,8
-    EDITTEXT        IDC_maxhtml,151,45,41,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,200,45,8,8
+    EDITTEXT        IDC_maxhtml,151,45,59,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,222,45,8,8
     LTEXT           "Max size of any non-HTML file",IDC_STATIC_autre2,16,60,129,8
-    EDITTEXT        IDC_othermax,151,60,41,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,200,60,8,8
+    EDITTEXT        IDC_othermax,151,60,59,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,222,60,8,8
     LTEXT           "Site size limit (B)",IDC_STATIC_sitesize,16,75,129,8,0,WS_EX_TRANSPARENT
-    EDITTEXT        IDC_sizemax,151,75,41,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,200,75,8,8
+    EDITTEXT        IDC_sizemax,151,75,59,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,222,75,8,8
     LTEXT           "Pause after downloading..",IDC_STATIC_pausebytes,16,90,126,8,0,WS_EX_TRANSPARENT
-    EDITTEXT        IDC_pausebytes,151,90,41,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,200,90,8,8
+    EDITTEXT        IDC_pausebytes,151,90,59,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "B",IDC_STATIC,222,90,8,8
     LTEXT           "Max time overall (s)",IDC_STATIC_tempmax,16,115,129,8
-    COMBOBOX        IDC_maxtime,151,115,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "s",IDC_STATIC,200,115,8,8
+    COMBOBOX        IDC_maxtime,151,115,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "s",IDC_STATIC,222,115,8,8
     LTEXT           "Max transfer rate (B/s)",IDC_STATIC_ratemax,16,130,129,8
-    COMBOBOX        IDC_maxrate,151,130,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "B/s",IDC_STATIC,200,130,17,8
+    COMBOBOX        IDC_maxrate,151,130,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "B/s",IDC_STATIC,222,130,17,8
     LTEXT           "Max connections / seconds",IDC_STATIC_maxconn,16,155,129,8
-    COMBOBOX        IDC_maxconn,151,155,41,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "cnx/s",IDC_STATIC,200,155,17,8
+    COMBOBOX        IDC_maxconn,151,155,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "cnx/s",IDC_STATIC,222,155,17,8
     LTEXT           "Maximum number of links",IDC_STATIC_maxlinks,16,180,129,8
-    COMBOBOX        IDC_maxlinks,151,179,64,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_maxlinks,151,179,83,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_OPTION6 DIALOG  0, 0, 309, 114
@@ -1049,12 +1049,13 @@ BEGIN
 
     IDD_OPTION5, DIALOG
     BEGIN
+        RIGHTMARGIN, 228
         VERTGUIDE, 16
         VERTGUIDE, 145
         VERTGUIDE, 151
-        VERTGUIDE, 192
-        VERTGUIDE, 200
-        VERTGUIDE, 215
+        VERTGUIDE, 210
+        VERTGUIDE, 222
+        VERTGUIDE, 234
         HORZGUIDE, 15
         HORZGUIDE, 30
         HORZGUIDE, 45
