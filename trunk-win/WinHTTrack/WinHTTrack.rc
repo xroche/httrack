@@ -518,7 +518,7 @@ BEGIN
     CONTROL         "Remove host if low",IDC_rems,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,130,109,183,10
 END
 
-IDD_OPTION5 DIALOGEX 0, 0, 251, 198
+IDD_OPTION5 DIALOGEX 0, 0, 260, 198
 STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
 CAPTION "Limits"
 FONT 8, "MS Sans Serif", 0, 0, 0x1
@@ -529,38 +529,44 @@ BEGIN
     COMBOBOX        IDC_depth2,151,30,59,56,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Max size of any HTML file (B)",IDC_STATIC_autre,16,45,129,8
     EDITTEXT        IDC_maxhtml,151,45,59,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,222,45,8,8
+    LTEXT           "B",IDC_STATIC,217,45,29,8
     LTEXT           "Max size of any non-HTML file",IDC_STATIC_autre2,16,60,129,8
     EDITTEXT        IDC_othermax,151,60,59,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,222,60,8,8
+    LTEXT           "B",IDC_STATIC,217,60,29,8
     LTEXT           "Site size limit (B)",IDC_STATIC_sitesize,16,75,129,8,0,WS_EX_TRANSPARENT
     EDITTEXT        IDC_sizemax,151,75,59,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,222,75,8,8
+    LTEXT           "B",IDC_STATIC,217,75,29,8
     LTEXT           "Pause after downloading..",IDC_STATIC_pausebytes,16,90,126,8,0,WS_EX_TRANSPARENT
     EDITTEXT        IDC_pausebytes,151,90,59,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "B",IDC_STATIC,222,90,8,8
+    LTEXT           "B",IDC_STATIC,217,90,29,8
     LTEXT           "Max time overall (s)",IDC_STATIC_tempmax,16,115,129,8
     COMBOBOX        IDC_maxtime,151,115,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "s",IDC_STATIC,222,115,8,8
+    LTEXT           "s",IDC_STATIC,217,115,29,8
     LTEXT           "Max transfer rate (B/s)",IDC_STATIC_ratemax,16,130,129,8
     COMBOBOX        IDC_maxrate,151,130,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "B/s",IDC_STATIC,222,130,17,8
+    LTEXT           "B/s",IDC_STATIC,217,130,29,8
     LTEXT           "Max connections / seconds",IDC_STATIC_maxconn,16,155,129,8
     COMBOBOX        IDC_maxconn,151,155,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "cnx/s",IDC_STATIC,222,155,17,8
+    LTEXT           "cnx/s",IDC_STATIC,217,155,29,8
     LTEXT           "Maximum number of links",IDC_STATIC_maxlinks,16,180,129,8
-    COMBOBOX        IDC_maxlinks,151,179,83,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_maxlinks,151,180,59,54,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
 END
 
-IDD_OPTION6 DIALOG  0, 0, 309, 114
+IDD_OPTION6 DIALOGEX 0, 0, 309, 179
 STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
 CAPTION "Browser ID"
-FONT 8, "MS Sans Serif"
+FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     COMBOBOX        IDC_user,115,16,180,89,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Browser ""Identity""",IDC_STATIC_browsid,16,16,94,8
     LTEXT           "HTML footer",IDC_STATIC_footer,16,35,94,8
     COMBOBOX        IDC_footer,115,35,180,89,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Language",IDC_STATIC_accept_language,16,54,94,8
+    LTEXT           "Additional HTTP Headers",IDC_STATIC_other_headers,16,72,94,8
+    EDITTEXT        IDC_other_headers,115,72,180,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+    LTEXT           "Default referer URL",IDC_STATIC_default_referer,16,108,94,8
+    EDITTEXT        IDC_default_referer,115,108,180,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_accept_language,115,54,180,12,ES_AUTOHSCROLL
 END
 
 IDD_OPTION1 DIALOG  0, 0, 325, 105
@@ -626,10 +632,10 @@ BEGIN
     CONTROL         "Force old HTTP/1.0 requests (no 1.1)",IDC_http10,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,125,237,9
 END
 
-IDD_OPTION9 DIALOG  0, 0, 325, 112
+IDD_OPTION9 DIALOGEX 0, 0, 325, 143
 STYLE DS_SETFONT | WS_CHILD | WS_DISABLED | WS_CAPTION | WS_SYSMENU
 CAPTION "Log, Index, Cache"
-FONT 8, "MS Sans Serif"
+FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     CONTROL         "Store ALL files in cache",IDC_Cache2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,16,305,9
     CONTROL         "Do not re-download locally erased files",IDC_norecatch,
@@ -638,6 +644,7 @@ BEGIN
     COMBOBOX        IDC_logtype,175,64,105,56,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Make an index",IDC_index,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,80,304,9
     CONTROL         "Make a word database",IDC_index2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,96,304,9
+    CONTROL         "Build a mail archive",IDC_index_mail,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,112,306,9
 END
 
 IDD_OPTION10 DIALOG  0, 0, 309, 61
@@ -1049,13 +1056,13 @@ BEGIN
 
     IDD_OPTION5, DIALOG
     BEGIN
-        RIGHTMARGIN, 228
+        RIGHTMARGIN, 252
         VERTGUIDE, 16
         VERTGUIDE, 145
         VERTGUIDE, 151
         VERTGUIDE, 210
-        VERTGUIDE, 222
-        VERTGUIDE, 234
+        VERTGUIDE, 217
+        VERTGUIDE, 246
         HORZGUIDE, 15
         HORZGUIDE, 30
         HORZGUIDE, 45
@@ -1077,8 +1084,13 @@ BEGIN
         VERTGUIDE, 110
         VERTGUIDE, 115
         VERTGUIDE, 295
+        BOTTOMMARGIN, 144
         HORZGUIDE, 16
         HORZGUIDE, 35
+        HORZGUIDE, 54
+        HORZGUIDE, 72
+        HORZGUIDE, 108
+        HORZGUIDE, 120
     END
 
     IDD_OPTION1, DIALOG
@@ -1147,12 +1159,14 @@ BEGIN
         VERTGUIDE, 16
         VERTGUIDE, 175
         VERTGUIDE, 280
+        BOTTOMMARGIN, 130
         HORZGUIDE, 16
         HORZGUIDE, 32
         HORZGUIDE, 48
         HORZGUIDE, 64
         HORZGUIDE, 80
         HORZGUIDE, 96
+        HORZGUIDE, 112
     END
 
     IDD_OPTION10, DIALOG
@@ -1493,8 +1507,8 @@ BEGIN
 0x3633, 0x3030, "\000" 
     IDC_maxtime, 0x403, 5, 0
 0x3237, 0x3030, "\000" 
-    IDC_maxrate, 0x403, 1, 0
-"\000" 
+    IDC_maxrate, 0x403, 2, 0
+0x0020, 
     IDC_maxrate, 0x403, 3, 0
 0x3031, "\000" 
     IDC_maxrate, 0x403, 3, 0
@@ -1508,9 +1522,13 @@ BEGIN
     IDC_maxrate, 0x403, 5, 0
 0x3035, 0x3030, "\000" 
     IDC_maxrate, 0x403, 6, 0
-0x3032, 0x3030, 0x0030, 
+0x3532, 0x3030, 0x0030, 
     IDC_maxrate, 0x403, 6, 0
 0x3035, 0x3030, 0x0030, 
+    IDC_maxrate, 0x403, 7, 0
+0x3031, 0x3030, 0x3030, "\000" 
+    IDC_maxrate, 0x403, 7, 0
+0x3532, 0x3030, 0x3030, "\000" 
     IDC_maxconn, 0x403, 1, 0
 "\000" 
     IDC_maxconn, 0x403, 6, 0
