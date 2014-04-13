@@ -1,0 +1,477 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Offline Browser</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h2 align="center"><em>Filters: Advanced</em></h2>
+
+<br>
+
+See also: The <a href="faq.html#VF1">FAQ</a><br>
+
+<br>
+
+    <i>You have to know that once you have defined
+    starts links, the default mode is to mirror these links - i.e. if one of your start page is
+    www.someweb.com/test/index.html, all links starting with www.someweb.com/test/ will be
+    accepted. But links directly in www.someweb.com/.. will not be accepted, however, because
+    they are in a higher strcuture. This prevent HTTrack from mirroring the whole site. (All
+    files in structure levels equal or lower than the primary links will be retrieved.)<br>
+    </i>
+    <br>
+    <b>But</b> you may want to download files that are not directly in the subfolders, or on the 
+    contrary refuse files of a particular type. That is the purpose of filters.
+    <br>
+
+<p>    
+    <h4>Scan rules based on URL or extension (e.g. accept or refuse all .zip or .gif files)</h4>
+</p>    
+    
+    To accept a family of links (for example, all links with a specific name or type), you just have to add 
+    an authorization filter, like <b><tt>+*.gif</tt></b>. The pattern is a plus (this one: <b><tt>+</tt></b>),
+    followed by a pattern composed of letters and wildcards (this one: <b><tt>*</tt></b>). 
+    <br><br>
+    To forbide a family of links, define
+    an authorization filter, like <b><tt>-*.gif</tt></b>. The pattern is a dash (this one: <b><tt>-</tt></b>),
+    followed by a the same kind of pattern as for the authorization filter.
+    <br><br>
+    Example: +*.gif will accept all files finished by .gif<br>
+    Example: -*.gif will refuse all files finished by .gif<br>
+    <br>
+    
+<p>    
+    <h4>Scan rules based on size (e.g. accept or refuse files bigger/smaller than a certain size)</h4>
+</p>    
+
+    Once a link is scheduled for download, you can still refuse it (i.e. abort the download) by checking its 
+    size to ensure that you won't reach a defined limit.
+    
+    Example: You may want to accept all files on the domain www.example.com, using '+www.example.com/*', 
+    including gif files inside this domain and outside (eternal images), but not take to large images, 
+    or too small ones (thumbnails)<br>
+    Excluding gif images smaller than 5KB and images larger than 100KB is therefore a good option;
+    +www.example.com +*.gif -*.gif*[<5] -*.gif*[>100] 
+    
+    <br>
+    
+    Important notice: size scan rules are checked <font color=red><b>after</b></font> the link was scheduled for download, 
+    allowing to abort the connection. 
+
+
+<p>    
+    <h4>Scan rules based on MIME types (e.g. accept or refuse all files of type audio/mp3)</h4>
+</p>    
+    
+    Once a link is scheduled for download, you can still refuse it (i.e. abort the download) by matching its MIME 
+    type against certain patterns.
+    
+    Example: You may want to accept all files on the domain www.example.com, using '+www.example.com/*', and
+    exclude all gif files, using '-*.gif'. But some dynamic scripts (such as www.example.com/dynamic.php) can
+    both generate html content, or image data content, depending on the context. Excluding this script, using
+    the scan rule '-www.example.com/dynamic.php', is therefore not a good solution.
+    
+    <br>
+    The only reliable way in such cases is to exclude the specific mime type 'image/gif', using the scan rule
+    syntax:<br>
+    -mime:image/gif
+    <br>
+    
+    Important notice: MIME types scan rules are <font color=red><b>only</b></font> checked against links that were
+    scheduled for download, i.e. links <b>already authorized</b> by url scan rules. 
+    Hence, using '+mime:image/gif' will only be a hint to accept images that were already authorized, 
+    if previous MIME scan rules excluded them - such as in '-mime:*/* +mime:text/html +mime:image/gif'
+    
+    <br>
+
+    <br>
+    <h3>Scan rules patterns:</h3>
+
+<p>    
+    <h4>1.a. Scan rules based on URL or extension</h4>
+</p>    
+
+    <br>
+    Filters are analyzed by HTTrack from the first filter to the last one. The complete URL
+    name is compared to filters defined by the user or added automatically by HTTrack. <br><br>
+    A scan rule has an higher priority is it is declared later - hierarchy is important: <br>
+
+    <br>
+    <table BORDER="1" CELLPADDING="2">
+    <tr><td nowrap>
+    <tt>+*.gif -image*.gif</tt>
+    </td><td>
+    Will accept all gif files BUT image1.gif,imageblue.gif,imagery.gif and so on
+    </tr>
+    <tr><td nowrap>
+    <tt>-image*.gif +*.gif</tt>
+    </td><td>
+    Will accept all gif files, because the second pattern is prioritary (because it is defined AFTER the first one)
+    </tr>
+    </table>
+    <br>
+
+    Note: these scan rules can be mixed with scan rules based on size (see 1.b)<br>
+
+    <br>
+    We saw that patterns are composed of letters and wildcards (<b><tt>*</tt></b>), as in */image*.gif
+
+    <p align="JUSTIFY"><br>
+    Special wild cards can be used for specific characters: (*[..])</p>
+    <table BORDER="1" CELLPADDING="2">
+      <tr>
+        <td nowrap><tt>*</tt></td>
+        <td>any characters (the most commonly used)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[file] or *[name]</tt></td>
+        <td>any filename or name, e.g. not /,? and ; characters</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[path]</tt></td>
+        <td>any path (and filename), e.g. not ? and ; characters</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[a,z,e,r,t,y]</tt></td>
+        <td>any letters among a,z,e,r,t,y</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[a-z]</tt></td>
+        <td>any letters</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[0-9,a,z,e,r,t,y]</tt></td>
+        <td>any characters among 0..9 and a,z,e,r,t,y</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[\*]</tt></td>
+        <td>the * character</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[\\]</tt></td>
+        <td>the \ character</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[\[\]]</tt></td>
+        <td>the [ or ] character</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[]</tt></td>
+        <td>no characters must be present after</a></td>
+      </tr>
+    </table>
+
+
+    <p align="JUSTIFY"><br>
+    Here are some examples of filters: (that can be generated automatically using the
+    interface)</p>
+    <table BORDER="1" CELLPADDING="2">
+      <tr>
+        <td nowrap><tt>www.thisweb.com* </tt></td>
+        <td>This will refuse/accept this web site (all links located in it will be rejected)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*.com/*</tt></td>
+        <td>This will refuse/accept all links that contains .com in them</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*cgi-bin* </tt></td>
+        <td>This will refuse/accept all links that contains cgi-bin in them</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>www.*[path].com/*[path].zip </tt></td>
+        <td>This will refuse/accept all zip files in .com addresses</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*someweb*/*.tar*</tt></td>
+        <td>This will refuse/accept all tar (or tar.gz etc.) files in hosts containing someweb</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*/*somepage*</tt></td>
+        <td>This will refuse/accept all links containing somepage (but not in the address)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*.html</tt></td>
+        <td>This will refuse/accept all html files. <br>
+        Warning! With this filter you will accept ALL html files, even those in other addresses.
+        (causing a global (!) web mirror..) Use www.someweb.com/*.html to accept all html files from
+        a web.</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*.html*[]</tt></td>
+        <td>Identical to <tt>*.html</tt>, but the link must not have any supplemental characters
+        at the end (links with parameters, like <tt>www.someweb.com/index.html?page=10</tt>, will be
+        refused)</td>
+      </tr>
+    </table>
+
+<p>    
+    <h4>1.b. Scan rules based on size</h4>
+</p>    
+
+    <br>
+    Filters are analyzed by HTTrack from the first filter to the last one. The sizes
+    are compared against scan rules defined by the user.<br><br>
+    A scan rule has an higher priority is it is declared later - hierarchy is important.<br>
+    
+    Note: scan rules based on size can be mixed with regular URL patterns<br>
+
+    <p align="JUSTIFY"><br>
+    Size patterns:</p>
+    <table BORDER="1" CELLPADDING="2">
+      <tr>
+        <td nowrap><tt>*[&lt;NN]</tt></td>
+        <td>the file size must be smaller than NN KB
+        <br>(note: this may cause broken files during the download)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[&gt;NN]</tt></td>
+        <td>the file size must be greater than NN KB
+        <br>(note: this may cause broken files during the download)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>*[&lt;NN&gt;MM]</tt></td>
+        <td>the file size must be smaller than NN KB and greater than MM KB
+        <br>(note: this may cause broken files during the download)</td>
+      </tr>
+    </table>
+
+    <p align="JUSTIFY"><br>
+    Here are some examples of filters: (that can be generated automatically using the
+    interface)</p>
+    <table BORDER="1" CELLPADDING="2">
+      <tr>
+        <td nowrap><tt>-*[&lt;10]</tt></td>
+        <td>the file will be forbidden if its size is smaller than 10 KB</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-*[&gt;50]</tt></td>
+        <td>the file will be forbidden if its size is greater than 50 KB</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-*[&lt;10] -*[&gt;50]</tt></td>
+        <td>the file will be forbidden if if its size is smaller than 10 KB <b>or</b> greater than 50 KB</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>+*[&lt;80&gt;1]</tt></td>
+        <td>the file will be accepted if if its size is smaller than 80 KB <b>and</b> greater than 1 KB</td>
+      </tr>
+    </table>
+
+
+<p>    
+    <h4>2. Scan rules based on MIME types</h4>
+</p>    
+
+    <br>
+    Filters are analyzed by HTTrack from the first filter to the last one. The complete MIME
+    type is compared against scan rules defined by the user.<br><br>
+    A scan rule has an higher priority is it is declared later - hierarchy is important<br>
+
+    Note: scan rules based on MIME types can <b>NOT</b> be mixed with regular URL patterns or size patterns within the same rule, but you can use both of them in distinct ones<br>
+
+    <p align="JUSTIFY"><br>
+    Here are some examples of filters: (that can be generated automatically using the
+    interface)</p>
+    <table BORDER="1" CELLPADDING="2">
+      <tr>
+        <td nowrap><tt>-mime:application/octet-stream</tt></td>
+        <td>This will refuse all links of type 'application/octet-stream' that were already scheduled for download
+        (i.e. the download will be aborted)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-mime:application/*</tt></td>
+        <td>This will refuse all links of type begining with 'application/' that were already scheduled for download
+        (i.e. the download will be aborted)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-mime:application/* +mime:application/pdf</tt></td>
+        <td>This will refuse all links of type begining with 'application/' that were already scheduled for download, except for 'application/pdf' ones
+        (i.e. all other 'application/' link download will be aborted)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-mime:video/*</tt></td>
+        <td>This will refuse all video links that were already scheduled for download
+        (i.e. all other 'application/' link download will be aborted)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-mime:video/* -mime:audio/*</tt></td>
+        <td>This will refuse all audio and video links that were already scheduled for download
+        (i.e. all other 'application/' link download will be aborted)</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>-mime:*/* +mime:text/html +mime:image/*</tt></td>
+        <td>This will refuse all links that were already scheduled for download, except html pages, and images
+        (i.e. all other link download will be aborted). Note that this is a very unefficient way of filtering
+        files, as aborted downloads will generate useless requests to the server. You are strongly advised to
+        use additional URL scan rules</td>
+      </tr>
+    </table>
+      
+<p>    
+    <h4>2. Scan rules based on URL or size, and scan rules based on MIME types interactions</h4>
+</p>    
+
+    You must use scan rules based on MIME types very carefully, or you will end up with an imcomplete
+    mirror, or create an unefficient download session (generating costly and useless requests to the server)
+    <br>
+
+    <p align="JUSTIFY"><br>
+    Here are some examples of good/bad scan rules interactions:</p>
+    <table BORDER="1" CELLPADDING="1">
+      <tr>
+        <td>Purpose</td>
+        <td>Method</td>
+        <td>Result</td>
+      </tr>
+      <!-- -->
+      <tr>
+        <td rowspan=2>Download all html and images on www.example.com</td>
+        <td bgcolor="#55ff55"><tt>-*<br /> +www.example.com/*.html<br /> +www.example.com/*.php<br /> +www.example.com/*.asp<br /> +www.example.com/*.gif <br />+www.example.com/*.jpg <br />+www.example.com/*.png<br /> -mime:*/* +mime:text/html +mime:image/*</tt></td>
+        <td>Good: efficient download</td>
+      </tr>
+      <tr>
+        <td bgcolor="#FF5555"><tt>-*<br />+www.example.com/*<br />-mime:*/* +mime:text/html +mime:image/*</tt></td>    
+        <td>Bad: many aborted downloads, leading to poor performances and server load</td>
+      </tr>
+      <!-- -->
+      <tr>
+        <td rowspan=2>Download only html on www.example.com, plus ZIP files</td>
+        <td bgcolor="#55ff55"><tt>-*<br /> +www.example.com/*.html<br />+www.example.com/somedynamicscript.php<br />+www.example.com/*.zip<br>-mime:* +mime:text/html +mime:application/zip</tt></td>
+        <td>Good: ZIP files will be downloaded, even those generated by 'somedynamicscript.php'</td>
+      </tr>
+      <tr>
+        <td bgcolor="#FF5555"><tt>-*<br /> +www.example.com/*.html<br>-mime:* +mime:text/html +mime:application/zip</tt></td>
+        <td>Bad: ZIP files will never be scheduled for download, and hence the zip mime scan rule will never be used</td>
+      </tr>
+      <!-- -->
+      <tr>
+        <td rowspan=2>Download all html, and images smaller than 100KB on www.example.com</td>
+        <td bgcolor="#55ff55"><tt>-*<br /> +www.example.com/*.html<br /> +www.example.com/*.php<br /> +www.example.com/*.asp<br /> +www.example.com/*.gif*[<100] <br />+www.example.com/*.jpg*[<100] <br />+www.example.com/*.png*[<100]<br /> -mime:*/* +mime:text/html +mime:image/*</tt></td>
+        <td>Good: efficient download</td>
+      </tr>
+      <tr>
+        <td bgcolor="#FF5555"><tt>-*<br />+www.example.com/**[<100]<br />-mime:*/* +mime:text/html +mime:image/*</tt></td>    
+        <td>Bad: many aborted downloads, leading to poor performances and server load</td>
+      </tr>
+    </table>
+
+<br>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+
