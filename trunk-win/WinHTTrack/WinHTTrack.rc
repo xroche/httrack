@@ -606,7 +606,7 @@ CAPTION "Scan Rules"
 FONT 8, "MS Sans Serif"
 BEGIN
     LTEXT           "Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi",IDC_STATIC_finfo,16,7,289,53
-    CONTROL         "gif, jpg, png, tif, bmp",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,65,74,10
+    CONTROL         "gif, jpg, jpeg, png, tif, bmp",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,65,74,10
     CONTROL         "zip, tar, tgz, gz, rar..",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,95,65,71,10
     CONTROL         "mov, mpg, mpeg, avi, asf, mp3..",IDC_CHECK3,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,175,65,109,10
     EDITTEXT        IDC_URL2,104,80,205,65,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL

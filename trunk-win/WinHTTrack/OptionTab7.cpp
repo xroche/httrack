@@ -326,7 +326,7 @@ void COptionTab7::EnsureIncluded(BOOL state, CString filter)  {
 
 void COptionTab7::OnCheck1() 
 {
-  EnsureIncluded(this->IsDlgButtonChecked(IDC_CHECK1),"+*.gif +*.jpg +*.png +*.tif +*.bmp");
+  EnsureIncluded(this->IsDlgButtonChecked(IDC_CHECK1),"+*.gif +*.jpg +*.jpeg +*.png +*.tif +*.bmp");
 }
 
 void COptionTab7::OnCheck2() 

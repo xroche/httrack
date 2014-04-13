@@ -2830,7 +2830,7 @@ void Read_profile(CString path,int load_path) {
   maintab->m_option5.m_maxlinks = MyGetProfileString(path,strSection, "MaxLinks");
   
   // 7
-  maintab->m_option7.m_url2 = MyGetProfileString(path,strSection, "WildCardFilters","+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar");
+  maintab->m_option7.m_url2 = MyGetProfileString(path,strSection, "WildCardFilters","+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar");
   
   // 10
   maintab->m_option10.m_proxy   = MyGetProfileString(path,strSection, "Proxy");
