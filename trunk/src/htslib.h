@@ -293,9 +293,9 @@ HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
 HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
                                         void *v_buffer);
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
-HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
-HTSEXT_API int check_hostname_dns(char *hostname);
+HTSEXT_API t_hostent *vxgethostbyname2(const char *hostname, void *v_buffer, const char **error);
+HTSEXT_API t_hostent *vxgethostbyname(const char *hostname, void *v_buffer);
+HTSEXT_API int check_hostname_dns(const char *hostname);
 #endif
 int ftp_available(void);
 
