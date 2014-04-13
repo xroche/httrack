@@ -4,7 +4,9 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.48-1
+3.48-3
++ Fixed: buggy option pannels
++ New: Enforce check against CVE-2014-0160
 + New: improved hashtables to speedup large mirrors
 + New: added unit tests
 + New: Added %a option, allowing to define the "Accept:" header line.
