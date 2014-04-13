@@ -2834,7 +2834,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               chmod(back[i].url_sav, HTS_ACCESS_FILE);
 #endif
                               /* create a temporary reference file in case of broken mirror */
-                              if (back[i].r.out != NULL) {
+                              if (back[i].r.out != NULL && opt->cache != 0) {
                                 if (back_serialize_ref(opt, &back[i]) != 0) {
                                   hts_log_print(opt, LOG_WARNING,
                                                 "Could not create temporary reference file for %s%s",
@@ -3657,7 +3657,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                         back[i].url_sav, 0, 1,
                                         back[i].r.notmodified);
                             back[i].r.out = FOPEN(fconv(catbuff, back[i].url_sav), "ab");       // append
-                            if (back[i].r.out) {
+                            if (back[i].r.out && opt->cache != 0) {
                               back[i].r.is_write = 1;   // écrire
                               back[i].r.size = sz;      // déja écrit
                               back[i].r.statuscode = HTTP_OK;   // Forcer 'OK'
