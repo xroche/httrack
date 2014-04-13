@@ -55,6 +55,7 @@ clean:
 	dh_testroot
 	rm -f build-stamp configure-stamp
 	dh_auto_clean
+	dh_autoreconf_clean
 	dh_clean
 
 install: build
