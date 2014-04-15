@@ -10,6 +10,15 @@ httrack (3.48.2-1) unstable; urgency=low
 
  -- Xavier Roche <xavier@debian.org>  Thu, 10 Apr 2014 18:30:08 +0200
 
+httrack (3.48.1-2) unstable; urgency=low
+
+  * Fixed removal of .a files even on architectures where .a are libraries
+    closes:#744594
+    Enable verosity of unit tests
+    Call dh_autoreconf_clean before dh_clean
+
+ -- Xavier Roche <roche@proliant.localnet>  Tue, 15 Apr 2014 21:02:14 +0200
+
 httrack (3.48.1-1) unstable; urgency=low
 
   * Updated to 3.48.1 (3.48-1)
