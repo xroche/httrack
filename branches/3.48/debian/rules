@@ -23,6 +23,11 @@ ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
 	INSTALL_PROGRAM += -s
 endif
 
+# as suggested by Simon McVittie
+# (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=744380)
+override_dh_auto_test:
+	VERBOSE=1 dh_auto_test
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
