@@ -32,7 +32,7 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 
-	autoreconf -v -i
+	dh_autoreconf
 	# note: dpkg-buildflags to be removed when compat=9
 	dh_auto_configure -- --enable-online-unit-tests=auto $(shell dpkg-buildflags --export=configure)
 
