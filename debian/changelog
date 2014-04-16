@@ -10,6 +10,12 @@ httrack (3.48.2-1) unstable; urgency=low
 
  -- Xavier Roche <xavier@debian.org>  Thu, 10 Apr 2014 18:30:08 +0200
 
+httrack (3.48.1-5) unstable; urgency=low
+
+  * Really call dh_autoreconf, fix configure dependencies.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 16 Apr 2014 14:46:20 +0200
+
 httrack (3.48.1-4) unstable; urgency=low
 
   * Cleanup in dependencies
