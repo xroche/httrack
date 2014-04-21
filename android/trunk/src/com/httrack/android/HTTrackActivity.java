@@ -2192,6 +2192,22 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /**
+   * "New project"
+   */
+  public void onNewProject(final View view) {
+    final Intent intent = getIntent();
+    finish();
+    startActivity(intent);
+  }
+
+  /**
+   * "Exit"
+   */
+  public void onExit(final View view) {
+    finish();
+  }
+  
+  /**
    * Fill intent with common settings (project path, etc.).
    * 
    * @param intent

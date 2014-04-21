@@ -59,6 +59,23 @@
                     android:onClick="onBrowse"
                     android:text="@string/browse_website" />
             </LinearLayout>
+
+            <View style="@style/DividerLineVertical" />
+
+            <LinearLayout
+                style="@style/BorderlessButtonRight"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.3" >
+
+                <Button
+                    android:id="@+id/buttonNewProject"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:onClick="onNewProject"
+                    android:text="@string/title_activity_proj_name" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
