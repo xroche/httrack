@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -147,7 +147,7 @@ void help_wizard(httrackp * opt) {
   printf("\n");
   printf("Welcome to HTTrack Website Copier (Offline Browser) " HTTRACK_VERSION
          "%s\n", hts_get_version_info(opt));
-  printf("Copyright (C) 1998-2013 Xavier Roche and other contributors\n");
+  printf("Copyright (C) 1998-2014 Xavier Roche and other contributors\n");
 #ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");
@@ -758,7 +758,7 @@ void help(char *app, int more) {
   sprintf(info, "HTTrack version " HTTRACK_VERSION "%s",
           hts_is_available());
   infomsg(info);
-  infomsg("Copyright (C) 1998-2013 Xavier Roche and other contributors");
+  infomsg("Copyright (C) 1998-2014 Xavier Roche and other contributors");
 #ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
 #endif
