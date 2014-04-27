@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -381,7 +381,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     initStrElt initStr[] = {
       {"user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"},
       {"footer",
-       "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->"},
+       "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2014], %s -->"},
       {"url2", "+*.png +*.gif +*.jpg +*.css +*.js -ad.doubleclick.net/*"},
       {NULL, NULL}
     };

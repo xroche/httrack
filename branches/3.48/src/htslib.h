@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -293,9 +293,9 @@ HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
 HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
                                         void *v_buffer);
 #ifndef HTTRACK_DEFLIB
-HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error);
-HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer);
-HTSEXT_API int check_hostname_dns(char *hostname);
+HTSEXT_API t_hostent *vxgethostbyname2(const char *hostname, void *v_buffer, const char **error);
+HTSEXT_API t_hostent *vxgethostbyname(const char *hostname, void *v_buffer);
+HTSEXT_API int check_hostname_dns(const char *hostname);
 #endif
 int ftp_available(void);
 
