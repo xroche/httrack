@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,20 +37,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsalias.h"
 #include "htsglobal.h"
-
-void linput(FILE * fp, char *s, int max);
-void hts_lowcase(char *s);
+#include "htslib.h"
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
-// #define is_realspace(c) (strchr(" \x0d\x0a\x09\x0b\x0c",(c))!=NULL)
-#define is_realspace(c) ( \
-	   (c) == ' '				\
-	|| (c) == '\x09'		\
-	|| (c) == '\x0a'		\
-	|| (c) == '\x0b'		\
-	|| (c) == '\x0c'		\
-	|| (c) == '\x0d'		\
-)
 
 // COPY OF cmdl_ins in htsmain.c
 // Insert a command in the argc/argv

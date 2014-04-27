@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -726,9 +726,9 @@ static unsigned int nlz8(unsigned char x) {
 */
 #define ADD_SEQ(UC, BITS, EMITTER) do {                                 \
     /* number of data bits in first octet */                            \
-    const int bits = BITS % 6;                                          \
+    const unsigned int bits = BITS % 6;                                 \
     /* shift for first octet */                                         \
-    const int shift0 = BITS - bits;                                     \
+    const unsigned int shift0 = BITS - bits;                            \
     /* first octet */                                                   \
     const unsigned char lead =                                          \
       /* leading bits */                                                \

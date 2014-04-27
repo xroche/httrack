@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2013 Xavier Roche and other contributors
+Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -4606,7 +4606,8 @@ static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_ho
   return NULL;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error) {
+HTSEXT_API t_hostent *vxgethostbyname2(const char *hostname, void *v_buffer, const char **error) {
+  char BIGSTK tempo[HTS_URLMAXSIZE * 2];
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
 
   /* Clear */
@@ -4622,11 +4623,9 @@ HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const cha
      The resolver doesn't seem to handle IP6 addresses in brackets
    */
   if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
-    char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
     tempo[0] = '\0';
     strncatbuff(tempo, hostname + 1, strlen(hostname) - 2);
-    strcpybuff(hostname, tempo);
+    hostname = tempo;
   }
 
   {
@@ -4689,11 +4688,11 @@ HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const cha
   return NULL;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
+HTSEXT_API t_hostent *vxgethostbyname(const char *hostname, void *v_buffer) {
   return vxgethostbyname2(hostname, v_buffer, NULL);
 }
 
-HTSEXT_API int check_hostname_dns(char *hostname) {
+HTSEXT_API int check_hostname_dns(const char *hostname) {
   t_fullhostent buffer;
   return vxgethostbyname(hostname, &buffer) != NULL;
 }
@@ -4791,7 +4790,7 @@ t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) 
 }
 
 #else
-static HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, char *iadr,
+static HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
                                                t_fullhostent * buffer) {
   t_hostent *retour;
 
