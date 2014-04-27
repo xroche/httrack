@@ -37,9 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsalias.h"
 #include "htsglobal.h"
-
-void linput(FILE * fp, char *s, int max);
-void hts_lowcase(char *s);
+#include "htslib.h"
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 // #define is_realspace(c) (strchr(" \x0d\x0a\x09\x0b\x0c",(c))!=NULL)
