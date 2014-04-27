@@ -726,9 +726,9 @@ static unsigned int nlz8(unsigned char x) {
 */
 #define ADD_SEQ(UC, BITS, EMITTER) do {                                 \
     /* number of data bits in first octet */                            \
-    const int bits = BITS % 6;                                          \
+    const unsigned int bits = BITS % 6;                                 \
     /* shift for first octet */                                         \
-    const int shift0 = BITS - bits;                                     \
+    const unsigned int shift0 = BITS - bits;                            \
     /* first octet */                                                   \
     const unsigned char lead =                                          \
       /* leading bits */                                                \
