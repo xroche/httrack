@@ -34,7 +34,10 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_DEFLIB
 
 #include "htsglobal.h"
+
+#ifndef _WIN32
 #include <inttypes.h>
+#endif
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
