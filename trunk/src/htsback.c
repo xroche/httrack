@@ -989,7 +989,7 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
         == 0)
 #else
     if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME),
+        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME),
          S_IRWXU | S_IRWXG | S_IRWXO) == 0)
 #endif
     {

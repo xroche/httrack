@@ -2994,7 +2994,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"));
 #else
         mkdir(fconcat
-              (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-cache"),
+              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"),
               HTS_PROTECT_FOLDER);
 #endif
         fp =
