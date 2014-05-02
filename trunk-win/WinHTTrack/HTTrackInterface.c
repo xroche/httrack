@@ -170,17 +170,17 @@ TStamp time_local(void) {
 }
 
 /* / et \\ en / */
-static char* __fslash(char* a) {
-  int i;
-  for(i=0;i<(int) strlen(a);i++)
-    if (a[i]=='\\')  // convertir
-      a[i]='/';
-  return a;
-}
-
-char* fslash(char *catbuff,const char* a) {
-  return __fslash(concat(catbuff,a,""));
-}
+//static char* __fslash(char* a) {
+//  int i;
+//  for(i=0;i<(int) strlen(a);i++)
+//    if (a[i]=='\\')  // convertir
+//      a[i]='/';
+//  return a;
+//}
+//
+//char* fslash(char *catbuff,const char* a) {
+//  return __fslash(concat(catbuff,a,""));
+//}
 
 // conversion minuscules, avec buffer
 char* convtolower(char* catbuff,const char* a) {

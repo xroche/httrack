@@ -446,18 +446,20 @@ int check_continue(char* pathlog) {
     if ((path_log[strlen(path_log)-1]!='/') && (path_log[strlen(path_log)-1]!='\\'))
       strcatbuff(path_log,"/");
     if (
-      fexist(fconcat(catbuff,path_log,"hts-cache/new.zip"))
+      fexist(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/new.zip"))
       ||
-      (fexist(fconcat(catbuff2,path_log,"hts-cache/new.dat"))) && (fexist(fconcat(catbuff3,path_log,"hts-cache/new.ndx")))
+      (fexist(fconcat(catbuff2,sizeof(catbuff2),path_log,"hts-cache/new.dat")))
+      && (fexist(fconcat(catbuff3,sizeof(catbuff3),path_log,"hts-cache/new.ndx")))
       ) {  // il existe déja un cache précédent.. renommer
       //if (fexist(fconcat(path_log,"hts-cache/doit.log"))) {    // un cache est présent
       return 1;
       //}
     }
     if (
-      fexist(fconcat(catbuff,path_log,"hts-cache/old.zip"))
+      fexist(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/old.zip"))
       ||
-      (fexist(fconcat(catbuff2,path_log,"hts-cache/old.dat"))) && (fexist(fconcat(catbuff3,path_log,"hts-cache/old.ndx")))
+      (fexist(fconcat(catbuff2,sizeof(catbuff2),path_log,"hts-cache/old.dat")))
+      && (fexist(fconcat(catbuff3,sizeof(catbuff3),path_log,"hts-cache/old.ndx")))
       ) {  // il existe déja un ancien cache précédent.. renommer
       return 1;
     }
@@ -2042,12 +2044,12 @@ void lance(void) {
         
         // on efface le doit.log, pour annuler les parametres anciens et en redéfinir de nouveaux
         // c'est ici une logique qui diffère de la version en ligne de commande
-        if (fexist(fconcat(catbuff,path_log,"hts-cache/new.zip"))
-          || fexist(fconcat(catbuff2,path_log,"hts-cache/new.ndx"))
+        if (fexist(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/new.zip"))
+          || fexist(fconcat(catbuff2,sizeof(catbuff2),path_log,"hts-cache/new.ndx"))
           ) {    // un cache est présent
-          if (fexist(fconcat(catbuff,path_log,"hts-cache/doit.log")))
-            remove(fconcat(catbuff,path_log,"hts-cache/doit.log"));
-          FILE* fp=fopen(fconcat(catbuff,path_log,"hts-cache/doit.log"),"wb");
+          if (fexist(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/doit.log")))
+            remove(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/doit.log"));
+          FILE* fp=fopen(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/doit.log"),"wb");
           if (fp) fclose(fp);
         }
         //}
@@ -2106,11 +2108,11 @@ void lance(void) {
         if ((path_log[strlen(path_log)-1]!='/') && (path_log[strlen(path_log)-1]!='\\'))
           strcatbuff(path_log,"/");
         if (soft_term_requested || termine_requested) {
-          FILE* fp=fopen(fconcat(catbuff,path_log,"hts-cache/interrupted.lock"),"wb");
+          FILE* fp=fopen(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/interrupted.lock"),"wb");
           if (fp)
             fclose(fp);
         } else
-          remove(fconcat(catbuff,path_log,"hts-cache/interrupted.lock"));
+          remove(fconcat(catbuff,sizeof(catbuff),path_log,"hts-cache/interrupted.lock"));
     }
     
     //SetForegroundWindow();   // yop en premier plan!
@@ -2155,7 +2157,7 @@ void lance(void) {
           if ((pathlog[strlen(pathlog)-1]!='/') && (pathlog[strlen(pathlog)-1]!='\\'))
             strcatbuff(pathlog,"/");
           // fichier log existe ou on est télécommandé par un !
-          if ( (fsize(fconcat(catbuff,pathlog,"hts-err.txt")))>0) {
+          if ( (fsize(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-err.txt")))>0) {
             strcatbuff(end_mirror_msg,LANG(LANG_F23 /*"\n\nTip: Click [View log file] to see warning or error messages","\n\nConseil: [Voir fichiers log] pour voir les erreurs et messages"*/));
           }
       }
@@ -2970,8 +2972,7 @@ void Build_TopIndex(BOOL check_empty) {
                     strcatbuff(iname2,"\\hts-cache\\winprofile.ini");
                     if (fexist(iname)) {
                       char hname[HTS_URLMAXSIZE*2];
-                      strcpybuff(hname,find.cFileName);
-                      escape_check_url(hname);
+                      escape_check_url(find.cFileName, hname, sizeof(hname));
                       // Body
                       //fprintf(fpo,toptemplate_body,
                       //  hname,

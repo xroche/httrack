@@ -98,13 +98,13 @@ void Ciplog::AffLogRefresh() {
   if (fp==NULL) {
     txt="";
     if (type_log) {
-      fp=fopen(fconcat(catbuff,pathlog,"hts-log.txt"),"rb");
+      fp=fopen(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-log.txt"),"rb");
       SetWindowTextCP(this, LANG_E10);
       SetWindowTextCP(m_ctl_iplog, LANG_E10);
       SetDlgItemTextCP(this, IDC_changelog,LANG_E11);
     }
     else {
-      fp=fopen(fconcat(catbuff,pathlog,"hts-err.txt"),"rb");
+      fp=fopen(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-err.txt"),"rb");
       SetWindowTextCP(this, LANG_E11);
       SetWindowTextCP(m_ctl_iplog, LANG_E11);
       SetDlgItemTextCP(this, IDC_changelog,LANG_E10);

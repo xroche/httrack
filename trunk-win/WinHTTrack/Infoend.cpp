@@ -131,7 +131,8 @@ void Cinfoend::Onlog()
   if ((pathlog[strlen(pathlog)-1]!='/') && (pathlog[strlen(pathlog)-1]!='\\'))
     strcatbuff(pathlog,"/");
   // fichier log existe ou on est télécommandé par un !
-  if ( (fexist(fconcat(catbuff,pathlog,"hts-err.txt"))) || (fexist(fconcat(catbuff,pathlog,"hts-log.txt"))) ) {
+  if ( (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-err.txt")))
+    || (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-log.txt"))) ) {
     strcpybuff(form.pathlog,pathlog);
     form.DoModal();
   } else {
@@ -152,8 +153,8 @@ void Cinfoend::Onbrowse()
   if (strlen(pathlog)>0)
   if ((pathlog[strlen(pathlog)-1]!='/') && (pathlog[strlen(pathlog)-1]!='\\'))
     strcatbuff(pathlog,"\\");
-  if ( fexist(fconcat(catbuff,pathlog,"index.html")) ) {
-    ShellExecute(this->m_hWnd,"open",fconcat(catbuff,pathlog,"index.html"),"","",SW_RESTORE);	
+  if ( fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"index.html")) ) {
+    ShellExecute(this->m_hWnd,"open",fconcat(catbuff,sizeof(catbuff),pathlog,"index.html"),"","",SW_RESTORE);	
   } else {
     char s[HTS_URLMAXSIZE*2];
     sprintf(s,LANG(LANG_D2 /*"No index.html file in %s!"*/ ),pathlog);

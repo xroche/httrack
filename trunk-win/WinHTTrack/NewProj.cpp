@@ -449,11 +449,11 @@ void CNewProj::Changeprojname(CString stl) {
       strcatbuff(tempo,"/");
       strcatbuff(tempo,stl);
       strcatbuff(tempo,"/");
-      if (fexist(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"))     // un cache est présent
-        && fsize(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"))>0) {   // taille log contrôle>0
+      if (fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"))     // un cache est présent
+        && fsize(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"))>0) {   // taille log contrôle>0
         CString strSection       = "OptionsValues";
-        CString st  = MyGetProfileString(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"),strSection,"CurrentUrl");
-        CString st2 = MyGetProfileString(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"),strSection,"Category");
+        CString st  = MyGetProfileString(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"),strSection,"CurrentUrl");
+        CString st2 = MyGetProfileString(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"),strSection,"Category");
         //
         SetDlgItemTextCP(this, IDC_STATIC_comments, st);
         SetDlgItemTextCP(this, IDC_projcateg, st2);

@@ -22,8 +22,6 @@ extern int fexist(const char* s);
 extern off_t fsize(const char* s);
 extern TStamp time_local(void);
 
-extern char* __fslash(char* a);
-extern char* fslash(char* catbuff,const char* a);
 extern char* convtolower(char* catbuff,const char* a);
 extern void hts_lowcase(char* s);
 

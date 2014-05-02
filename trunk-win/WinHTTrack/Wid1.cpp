@@ -426,13 +426,13 @@ void Wid1::AfterChangepathlog()
 
   strcpybuff(tempo,dialog0->GetPath());
   {
-    if (fexist(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"))) {    // un cache est présent
-      if (fsize(fconcat(catbuff,tempo,"hts-cache/winprofile.ini"))>0) {   // taille log contrôle>0
+    if (fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"))) {    // un cache est présent
+      if (fsize(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/winprofile.ini"))>0) {   // taille log contrôle>0
         int i;
         for(i=0;i<(int) strlen(tempo);i++)
           if (tempo[i]=='/')
             tempo[i]='\\';
-          Read_profile(fconcat(catbuff,tempo,"hts-cache\\winprofile.ini"),0);
+          Read_profile(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache\\winprofile.ini"),0);
 
           // peut on modifier?
           int pos=m_ctl_todo.GetCurSel();
@@ -443,15 +443,16 @@ void Wid1::AfterChangepathlog()
           
           // existe: update
           if (
-            fexist(fconcat(catbuff,tempo,"hts-cache/new.zip"))
+            fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/new.zip"))
             ||
-            (fexist(fconcat(catbuff,tempo,"hts-cache/new.dat"))) && (fexist(fconcat(catbuff,tempo,"hts-cache/new.ndx")))
+            (fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/new.dat")))
+            && (fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/new.ndx")))
             ) {  // il existe déja un cache précédent.. renommer
             if (modify) {
               if (
-                (!fexist(fconcat(catbuff,tempo,"hts-in_progress.lock")))
+                (!fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-in_progress.lock")))
                 &&
-                (!fexist(fconcat(catbuff,tempo,"hts-cache/interrupted.lock")))
+                (!fexist(fconcat(catbuff,sizeof(catbuff),tempo,"hts-cache/interrupted.lock")))
                 )
                 m_ctl_todo.SetCurSel(LAST_ACTION);
               else
@@ -637,8 +638,7 @@ CString Wid1::TextToUrl(CString st,CLIPFORMAT cfFormat) {
     } 
     else if (st.GetLength()<256) {
       char s[256];
-      strcpybuff(s,st);
-      escape_check_url(s);     // coder %
+      escape_check_url(st, s, sizeof(s));     // coder %
       res = "file://";
       res += s;
     }
@@ -764,7 +764,7 @@ HCURSOR Wid1::OnQueryDragIcon()
 
 void Wid1::Onlogin2() 
 {
-	char catbuff[CATBUFF_SIZE];
+  char catbuff[CATBUFF_SIZE];
   CInsertUrl url;
   url.dest_path=dialog0->GetPath();
   if (url.DoModal() == IDOK) {
@@ -775,15 +775,14 @@ void Wid1::Onlogin2()
     if (url.m_urllogin.GetLength()==0) {
       SetDlgItemTextCP(this, IDC_URL,st+"\r\n"+url.m_urladr);
     } else {
-      char *a,*b;
-	  CString str = st+"\r\n";
-      escape_in_url(a=copychar(LPCTSTR(url.m_urllogin)));
-	  str += a;
-	  str += ":";
-      escape_in_url(b=copychar(LPCTSTR(url.m_urlpass)));
-	  str += b;
-	  str += "@";
-	  str += url.m_urladr;
+      CString str = st+"\r\n";
+      escape_in_url(LPCTSTR(url.m_urllogin), catbuff, sizeof(catbuff));
+      str += catbuff;
+      str += ":";
+      escape_in_url(LPCTSTR(url.m_urlpass), catbuff, sizeof(catbuff));
+      str += catbuff;
+      str += "@";
+      str += url.m_urladr;
       SetDlgItemTextCP(this, IDC_URL, str);
     }
     CleanUrls();

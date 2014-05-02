@@ -567,7 +567,9 @@ void Cinprogress::Oniplog(int mode)  {
     if ((pathlog[strlen(pathlog)-1]!='/') && (pathlog[strlen(pathlog)-1]!='\\'))
       strcatbuff(pathlog,"/");
     // fichier log existe ou on est télécommandé par un !
-    if ( (fexist(fconcat(catbuff,pathlog,"hts-err.txt"))) || (fexist(fconcat(catbuff,pathlog,"hts-log.txt"))) || (ShellOptions != NULL && ShellOptions->choixdeb[0]=='!') ) {
+    if ( (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-err.txt")))
+      || (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-log.txt")))
+      || (ShellOptions != NULL && ShellOptions->choixdeb[0]=='!') ) {
       if (mode)
         form.type_log=0;
       else
@@ -996,33 +998,35 @@ LRESULT Cinprogress::OnEndMirror(WPARAM /* wP*/, LPARAM /*lP*/) {
     }
     // Aborted updated.. restore old cache?!
     if ( 
-      fexist(fconcat(catbuff,pathlog,"hts-cache/old.zip"))
+      fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.zip"))
       ||
-      (fexist(fconcat(catbuff,pathlog,"hts-cache/old.dat"))) && (fexist(fconcat(catbuff,pathlog,"hts-cache/old.ndx"))) 
+      (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.dat")))
+      && (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.ndx"))) 
       ) {
       if (AfxMessageBox(LANG_F22b,MB_YESNO|MB_DEFBUTTON2) == IDYES) {
-        if (fexist(fconcat(catbuff,pathlog,"hts-cache/old.dat")) && fexist(fconcat(catbuff,pathlog,"hts-cache/old.ndx"))) {
-          if (remove(fconcat(catbuff,pathlog,"hts-cache/new.dat"))) {
+        if (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.dat"))
+          && fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.ndx"))) {
+          if (remove(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/new.dat"))) {
             AfxMessageBox(LANG_F24 );
           }
-          if (remove(fconcat(catbuff,pathlog,"hts-cache/new.ndx"))) {
+          if (remove(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/new.ndx"))) {
             AfxMessageBox(LANG_F24 );
           }
         }
-        if (remove(fconcat(catbuff,pathlog,"hts-cache/new.lst"))) {
+        if (remove(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/new.lst"))) {
           AfxMessageBox(LANG_F24 );
         }
-        if (fexist(fconcat(catbuff,pathlog,"hts-cache/old.zip"))) {
-          if (remove(fconcat(catbuff,pathlog,"hts-cache/new.zip"))) {
+        if (fexist(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.zip"))) {
+          if (remove(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/new.zip"))) {
             AfxMessageBox(LANG_F24 );
           }
         }
-        remove(fconcat(catbuff,pathlog,"hts-cache/new.txt"));
-        rename(fconcat(catbuff,pathlog,"hts-cache/old.zip"),fconcat(catbuff2,pathlog,"hts-cache/new.zip"));
-        rename(fconcat(catbuff,pathlog,"hts-cache/old.dat"),fconcat(catbuff2,pathlog,"hts-cache/new.dat"));
-        rename(fconcat(catbuff,pathlog,"hts-cache/old.ndx"),fconcat(catbuff2,pathlog,"hts-cache/new.ndx"));
-        rename(fconcat(catbuff,pathlog,"hts-cache/old.lst"),fconcat(catbuff2,pathlog,"hts-cache/new.lst"));
-        rename(fconcat(catbuff,pathlog,"hts-cache/old.txt"),fconcat(catbuff2,pathlog,"hts-cache/new.txt"));
+        remove(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/new.txt"));
+        rename(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.zip"),fconcat(catbuff2,sizeof(catbuff2),pathlog,"hts-cache/new.zip"));
+        rename(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.dat"),fconcat(catbuff2,sizeof(catbuff2),pathlog,"hts-cache/new.dat"));
+        rename(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.ndx"),fconcat(catbuff2,sizeof(catbuff2),pathlog,"hts-cache/new.ndx"));
+        rename(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.lst"),fconcat(catbuff2,sizeof(catbuff2),pathlog,"hts-cache/new.lst"));
+        rename(fconcat(catbuff,sizeof(catbuff),pathlog,"hts-cache/old.txt"),fconcat(catbuff2,sizeof(catbuff2),pathlog,"hts-cache/new.txt"));
       }
     }
   } else if (hts_is_exiting(global_opt) == 2) {     /* No connection! */
