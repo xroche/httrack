@@ -35,6 +35,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEFH
 #define HTS_DEFH
 
+#include "httrack-library.h"
+
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_htsrequest
 #define HTS_DEF_FWSTRUCT_htsrequest
@@ -92,7 +94,8 @@ MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
 }
 
 #undef MSVC2003INLINEBUG
-#define OPT_GET_BUFF(OPT) ( getHtsOptBuff_(OPT) )
+#define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
+#define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
 
 // structure pour paramètres supplémentaires lors de la requête
 #ifndef HTS_DEF_FWSTRUCT_htsrequest_proxy
@@ -240,24 +243,7 @@ int hts_read(htsblk * r, char *buff, int size);
 //int HTS_TOTAL_RECV_CHECK(int var);
 LLint check_downloadable_bytes(int rate);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int hts_init(void);
-HTSEXT_API int hts_uninit(void);
 HTSEXT_API int hts_uninit_module(void);
-HTSEXT_API int hts_resetvar(void);      /* dummy */
-HTSEXT_API void hts_debug(int level);
-HTSEXT_API httrackp *hts_create_opt(void);
-HTSEXT_API void hts_free_opt(httrackp * opt);
-HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
-HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
-HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
-                            const char *argv);
-
-HTSEXT_API char *hts_strdup(const char *string);
-HTSEXT_API void *hts_malloc(size_t size);
-HTSEXT_API void *hts_realloc(void *data, size_t size);
-HTSEXT_API void hts_free(void *data);
-#endif
 
 // fonctions principales
 T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour);
@@ -282,39 +268,28 @@ void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, char *rcvd);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API void infostatuscode(char *msg, int statuscode);
-#endif
-
 // sous-fonctions
 LLint http_xfread1(htsblk * r, int bufl);
 HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
                                         void *v_buffer, const char **error);
 HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
                                         void *v_buffer);
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API t_hostent *vxgethostbyname2(const char *hostname, void *v_buffer, const char **error);
-HTSEXT_API t_hostent *vxgethostbyname(const char *hostname, void *v_buffer);
-HTSEXT_API int check_hostname_dns(const char *hostname);
-#endif
+HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, void *v_buffer, const char **error);
+HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer);
+HTSEXT_API int check_hostname_dns(const char *const hostname);
+
 int ftp_available(void);
 
 #if HTS_DNSCACHE
-void hts_cache_free(t_dnscache * cache);
+void hts_cache_free(t_dnscache *const cache);
 t_dnscache *_hts_cache(httrackp * opt);
 #endif
 
 // outils divers
 HTS_INLINE TStamp time_local(void);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API HTS_INLINE TStamp mtime_local(void);
-#endif
 void sec2str(char *s, TStamp t);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API void qsec2str(char *st, TStamp t);
-#endif
 void time_gmt_rfc822(char *s);
 void time_local_rfc822(char *s);
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
@@ -324,12 +299,6 @@ int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n);
-HTSEXT_API char *int2bytes(strc_int2bytes2 * strc, LLint n);
-HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n);
-HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n);
-#endif
 HTS_INLINE int sendc(htsblk * r, const char *s);
 int finput(int fd, char *s, int max);
 int binput(char *buff, char *s, int max);
@@ -342,7 +311,7 @@ void rawlinput(FILE * fp, char *s, int max);
 char *strstrcase(char *s, char *o);
 int ident_url_absolute(const char *url, char *adr, char *fil);
 void fil_simplifie(char *f);
-int is_unicode_utf8(const char *buffer, size_t size);
+int is_unicode_utf8(const char *buffer, const size_t size);
 void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
@@ -357,118 +326,70 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
 void give_mimext(char *s, const char *st);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
-HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
-HTSEXT_API int is_dyntype(const char *fil);
-HTSEXT_API char *get_ext(char *catbuff, const char *fil);
-#endif
 int may_unknown(httrackp * opt, const char *st);
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API char *jump_identification(const char *);
-HTSEXT_API char *jump_normalized(const char *);
-HTSEXT_API char *jump_toport(const char *);
-HTSEXT_API char *fil_normalized(const char *source, char *dest);
-HTSEXT_API char *adr_normalized(const char *source, char *dest);
-#endif
 char *strrchr_limit(const char *s, char c, const char *limit);
 char *strstr_limit(const char *s, const char *sub, const char *limit);
 HTS_INLINE char *jump_protocol(const char *source);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API void unescape_amp(char *s);
-HTSEXT_API void escape_spc_url(char *s);
-HTSEXT_API void escape_in_url(char *s);
-HTSEXT_API void escape_uri(char *s);
-HTSEXT_API void escape_uri_utf(char *s);
-HTSEXT_API void escape_check_url(char *s);
-HTSEXT_API char *escape_check_url_addr(char *catbuff, const char *s);
-HTSEXT_API void x_escape_http(char *s, int mode);
-HTSEXT_API void x_escape_html(char *s);
-HTSEXT_API void escape_remove_control(char *s);
-HTSEXT_API void escape_for_html_print(char *s, char *d);
-HTSEXT_API void escape_for_html_print_full(char *s, char *d);
-#endif
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API char *unescape_http(char *catbuff, const char *s);
-HTSEXT_API char *unescape_http_unharm(char *catbuff, const char *s,
-                                      int no_high);
-HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
-HTSEXT_API char *concat(char *catbuff, const char *a, const char *b);
-HTSEXT_API char *fconcat(char *catbuff, const char *a, const char *b);
-HTSEXT_API char *fconv(char *catbuff, const char *a);
-#endif
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)
-char *fslash(char *catbuff, const char *a);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
-HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
-                              ...) HTS_PRINTF_FUN(3, 4);
-#endif
+char *convtolower(char *catbuff, const char *a);
+void hts_lowcase(char *s);
+void hts_replace(char *s, char from, char to);
+int multipleStringMatch(const char *s, const char *match);
 
-     char *convtolower(char *catbuff, const char *a);
-     void hts_lowcase(char *s);
-     void hts_replace(char *s, char from, char to);
-     int multipleStringMatch(const char *s, const char *match);
-
-     void fprintfio(FILE * fp, char *buff, char *prefix);
+void fprintfio(FILE * fp, char *buff, char *prefix);
 
 #ifdef _WIN32
 #else
-     int sig_ignore_flag(int setflag);  // flag ignore
+int sig_ignore_flag(int setflag);  // flag ignore
 #endif
 
-     void cut_path(char *fullpath, char *path, char *pname);
-     int fexist(const char *s);
-     int fexist_utf8(const char *s);
+void cut_path(char *fullpath, char *path, char *pname);
+int fexist(const char *s);
+int fexist_utf8(const char *s);
 
 /*LLint fsize(const char* s);    */
-     off_t fpsize(FILE * fp);
-     off_t fsize(const char *s);
-     off_t fsize_utf8(const char *s);
-
-/* root dir */
-#ifndef HTTRACK_DEFLIB
-     HTSEXT_API char *hts_rootdir(char *file);
-#endif
+off_t fpsize(FILE * fp);
+off_t fsize(const char *s);
+off_t fsize_utf8(const char *s);
 
 // Threads
-     typedef void *(*beginthread_type) (void *);
+typedef void *(*beginthread_type) (void *);
 
 /*unsigned long _beginthread( beginthread_type start_address, unsigned stack_size, void *arglist );*/
 
 /* variables globales */
-     extern HTSEXT_API hts_stat_struct HTS_STAT;
-     extern int _DEBUG_HEAD;
-     extern FILE *ioinfo;
+extern HTSEXT_API hts_stat_struct HTS_STAT;
+extern int _DEBUG_HEAD;
+extern FILE *ioinfo;
 
 /* constantes */
-     extern const char *hts_mime_keep[];
-     extern const char *hts_mime[][2];
-     extern const char *hts_main_mime[];
-     extern const char *hts_detect[];
-     extern const char *hts_detectbeg[];
-     extern const char *hts_nodetect[];
-     extern const char *hts_detectURL[];
-     extern const char *hts_detectandleave[];
-     extern const char *hts_detect_js[];
+extern const char *hts_mime_keep[];
+extern const char *hts_mime[][2];
+extern const char *hts_main_mime[];
+extern const char *hts_detect[];
+extern const char *hts_detectbeg[];
+extern const char *hts_nodetect[];
+extern const char *hts_detectURL[];
+extern const char *hts_detectandleave[];
+extern const char *hts_detect_js[];
 
 // htsmodule.c definitions
-     extern void *openFunctionLib(const char *file_);
-     extern void *getFunctionPtr(void *handle, const char *fncname);
-     extern void closeFunctionLib(void *handle);
+extern void *openFunctionLib(const char *file_);
+extern void *getFunctionPtr(void *handle, const char *fncname);
+extern void closeFunctionLib(void *handle);
 
-     extern void clearCallbacks(htscallbacks * chain);
-     extern size_t hts_get_callback_offs(const char *name);
-     int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
-                          const char *name, void *function);
-     void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
-                            const char *name);
+extern void clearCallbacks(htscallbacks * chain);
+extern size_t hts_get_callback_offs(const char *name);
+int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
+                     const char *name, void *function);
+void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
+                       const char *name);
 
 #define CBSTRUCT(OPT) ((t_hts_htmlcheck_callbacks*) ((OPT)->callbacks_fun))
 #define GET_USERCALLBACK(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .fun )
@@ -581,7 +502,7 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
 
 // compare le début de f avec s et retourne la position de la fin
 // 'A=a' (case insensitive)
-     HTS_STATIC int strfield(const char *f, const char *s) {
+HTS_STATIC int strfield(const char *f, const char *s) {
   int r = 0;
 
   while(streql(*f, *s) && ((*f) != 0) && ((*s) != 0)) {
@@ -593,7 +514,8 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
     return r;
   else
     return 0;
-     }
+}
+
 HTS_STATIC int strcmpnocase(char *a, char *b) {
   while(*a) {
     int cmp = hichar(*a) - hichar(*b);

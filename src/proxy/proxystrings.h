@@ -85,35 +85,21 @@ HTS_UNUSED static void escapexml(const char *s, String * tempo) {
   }
 }
 
-HTS_UNUSED static char *concat(char *catbuff, const char *a, const char *b) {
-  if (a != NULL && a[0] != '\0') {
-    strcpy(catbuff, a);
-  } else {
-    catbuff[0] = '\0';
-  }
-  if (b != NULL && b[0] != '\0') {
-    strcat(catbuff, b);
-  }
-  return catbuff;
-}
-
-HTS_UNUSED static char *__fconv(char *a) {
-#ifdef WIN32
-  int i;
-
-  for(i = 0; a[i] != 0; i++)
-    if (a[i] == '/')            // Unix-to-DOS style
-      a[i] = '\\';
+HTS_UNUSED static char* file_convert(char *dest, size_t size, const char *src) {
+  size_t i;
+  for(i = 0 ; src[i] != '\0' && i + 1 < size ; i++) {
+#ifdef _WIN32
+    if (src[i] == '/') {
+      dest[i] = '\\';
+    } else {
 #endif
-  return a;
-}
-
-HTS_UNUSED static char *fconcat(char *catbuff, const char *a, const char *b) {
-  return __fconv(concat(catbuff, a, b));
-}
-
-HTS_UNUSED static char *fconv(char *catbuff, const char *a) {
-  return __fconv(concat(catbuff, a, ""));
+    dest[i] = src[i];
+#ifdef _WIN32
+    }
+#endif
+  }
+  dest[i] = '\0';
+  return dest;
 }
 
 #endif

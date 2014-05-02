@@ -106,7 +106,7 @@ Please visit our Website: http://www.httrack.com
   if ((opt->getmode & 1) && (ptr>0)) { \
     size_t i_, j_; \
     char BIGSTK tempo_[HTS_URLMAXSIZE*2]; \
-    escape_for_html_print(A, tempo_); \
+    escape_for_html_print(A, tempo_, sizeof(tempo_)); \
     i_=strlen(tempo_); \
     j_=ht_len; \
     if (i_) { \
@@ -118,7 +118,7 @@ Please visit our Website: http://www.httrack.com
   if ((opt->getmode & 1) && (ptr>0)) { \
     size_t i_, j_; \
     char BIGSTK tempo_[HTS_URLMAXSIZE*2]; \
-    escape_for_html_print_full(A, tempo_); \
+    escape_for_html_print_full(A, tempo_, sizeof(tempo_)); \
     i_=strlen(tempo_); \
     j_=ht_len; \
     if (i_) { \
@@ -144,7 +144,7 @@ Please visit our Website: http://www.httrack.com
   int ok=0;\
   if (ht_buff) { \
     char digest[32+2];\
-    off_t fsize_old = fsize(fconv(OPT_GET_BUFF(opt),savename));\
+    off_t fsize_old = fsize(fconv(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),savename));\
     digest[0]='\0';\
     domd5mem(ht_buff,ht_len,digest,1);\
     if (fsize_old==ht_len) { \
@@ -210,8 +210,7 @@ Please visit our Website: http://www.httrack.com
   char BIGSTK tempo[1024]; \
   if (makeindex_links == 1) { \
   char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
-  strcpybuff(link_escaped, makeindex_firstlink); \
-  escape_uri_utf(link_escaped); \
+  escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
   sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,link_escaped); \
   } else \
   tempo[0]='\0'; \
@@ -222,7 +221,7 @@ Please visit our Website: http://www.httrack.com
   fflush(makeindex_fp); \
   fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
   makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8),"index.html"),"primary","primary");  \
+  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_html_utf8),"index.html"),"primary","primary");  \
   } \
   } \
   makeindex_done=1;    /* ok c'est fait */  \
@@ -654,13 +653,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (p) {      // ok center                            
                     if (makeindex_fp == NULL) {
                       file_notify(opt, "", "",
-                                  fconcat(OPT_GET_BUFF(opt),
+                                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
                                           StringBuff(opt->path_html_utf8),
                                           "index.html"), 1, 1, 0);
                       verif_backblue(opt, StringBuff(opt->path_html_utf8));     // générer gif
                       makeindex_fp =
                         filecreate(&opt->state.strc,
-                                   fconcat(OPT_GET_BUFF(opt),
+                                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
                                            StringBuff(opt->path_html_utf8),
                                            "index.html"));
                       if (makeindex_fp != NULL) {
@@ -692,7 +691,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                       if (lienrelatif
                           (tempo, liens[ptr]->sav,
-                           concat(OPT_GET_BUFF(opt),
+                           concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                   StringBuff(opt->path_html_utf8),
                                   "index.html")) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
@@ -729,7 +728,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Body
-                        escape_uri_utf(tempo);
+                        inplace_escape_uri_utf(tempo, sizeof(tempo));
                         fprintf(makeindex_fp, template_body, tempo, s);
                       }
                     }
@@ -1720,7 +1719,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   get_httptype(opt, type, tempo, 0);
                                   if (strnotempty(type))        // type reconnu!
                                     url_ok = 1;
-                                  else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), tempo)))       // reconnu php,cgi,asp..
+                                  else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo)))       // reconnu php,cgi,asp..
                                     url_ok = 1;
                                   // MAIS pas les foobar@aol.com !!
                                   if (strchr(tempo, '@'))
@@ -2107,7 +2106,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
 
                   // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
-                  strcpybuff(lien, unescape_http_unharm(catbuff, lien, 1 | 2));     /* note: '%' is still escaped */
+                  strcpybuff(lien, 
+                    unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
                   // Force to encode non-printable chars (should never happend)
                   escape_remove_control(lien);
@@ -2155,7 +2155,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                   // we need to encode query string non-ascii chars, 
                   // leaving the encoding as-is (unlike the file part)
-                  escape_check_url(query);
+                  inplace_escape_check_url(query, sizeof(query));
 
                   // copy back query
                   strcatbuff(lien, query);      /* restore */
@@ -2778,7 +2778,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (lienrelatif(tempo, save, relativesavename) ==
                                   0) {
                                 /* Never escape high-chars (we don't know the encoding!!) */
-                                escape_uri_utf(tempo);  // escape with %xx
+                                inplace_escape_uri_utf(tempo, sizeof(tempo));  // escape with %xx
                                 //if (!no_esc_utf)
                                 //  escape_uri(tempo);     // escape with %xx
                                 //else
@@ -2825,7 +2825,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (verif_external(opt, cat_nb, 1)) {
                                 FILE *fp =
                                   filecreate(&opt->state.strc,
-                                             fconcat(OPT_GET_BUFF(opt),
+                                             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
                                                      StringBuff(opt->
                                                                 path_html_utf8),
                                                      cat_name));
@@ -2844,7 +2844,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   }
                                   fclose(fp);
                                   usercommand(opt, 0, NULL,
-                                              fconcat(OPT_GET_BUFF(opt),
+                                              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
                                                       StringBuff(opt->
                                                                  path_html_utf8),
                                                       cat_name), "", "");
@@ -2943,21 +2943,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                        }
                      */
                     else if (opt->mimehtml) {
-                      char BIGSTK buff[HTS_URLMAXSIZE * 3];
+                      char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
                       HT_ADD("cid:");
-                      strcpybuff(buff, adr);
-                      strcatbuff(buff, fil);
-                      escape_in_url(buff);
-                      {
-                        char *a = buff;
-
-                        while((a = strchr(a, '%'))) {
-                          *a = 'X';
-                          a++;
-                        }
-                      }
-                      HT_ADD_HTMLESCAPED(buff);
+                      make_content_id(adr, fil, cid, sizeof(cid));
+                      HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == 3) {     // URI absolue /
                       if ((opt->getmode & 1) && (ptr > 0)) {    // ecrire les html
@@ -3020,7 +3010,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (lienrelatif(tempo, save, relativesavename) == 0) {
                         if (!in_media) {        // In media (such as real audio): don't patch
                           /* Never escape high-chars (we don't know the encoding!!) */
-                          escape_uri_utf(tempo);
+                          inplace_escape_uri_utf(tempo, sizeof(tempo));
 
                           //if (!no_esc_utf)
                           //  escape_uri(tempo);     // escape with %xx
@@ -3681,23 +3671,12 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             hts_log_print(opt, LOG_WARNING, "File has moved from %s%s to %s",
                           urladr, urlfil, mov_url);
             if (!opt->mimehtml) {
-              escape_uri(mov_url);
+              inplace_escape_uri(mov_url, sizeof(mov_url));
             } else {
-              char BIGSTK buff[HTS_URLMAXSIZE * 3];
-
-              strcpybuff(buff, mov_adr);
-              strcatbuff(buff, mov_fil);
-              escape_in_url(buff);
-              {
-                char *a = buff;
-
-                while((a = strchr(a, '%'))) {
-                  *a = 'X';
-                  a++;
-                }
-              }
+              char BIGSTK cid[HTS_URLMAXSIZE * 3];
+              make_content_id(mov_adr, mov_fil, cid, sizeof(cid));
               strcpybuff(mov_url, "cid:");
-              strcatbuff(mov_url, buff);
+              strcatbuff(mov_url, cid);
             }
             // On prépare une page qui sautera immédiatement sur la bonne URL
             // Le scanner re-changera, ensuite, cette URL, pour la mirrorer!
@@ -3968,13 +3947,16 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
     // user pause lockfile : create hts-paused.lock --> HTTrack will be paused
     if (fexist
         (fconcat
-         (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-stop.lock"))) {
+         (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+         StringBuff(opt->path_log), "hts-stop.lock"))) {
       // remove lockfile
       remove(fconcat
-             (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-stop.lock"));
+             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+             StringBuff(opt->path_log), "hts-stop.lock"));
       if (!fexist
           (fconcat
-           (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-stop.lock"))) {
+           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+           StringBuff(opt->path_log), "hts-stop.lock"))) {
         do_pause = 1;
       }
     }
@@ -4022,7 +4004,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       {
         FILE *fp =
           fopen(fconcat
-                (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                StringBuff(opt->path_log),
                  "hts-paused.lock"), "wb");
         if (fp) {
           fspc(NULL, fp, "info");       // dater
@@ -4036,10 +4019,10 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       stat_fragment = HTS_STAT.stat_bytes;
       /* Info for wrappers */
       hts_log_print(opt, LOG_INFO, "engine: pause: %s",
-                    fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log),
                             "hts-paused.lock"));
       RUN_CALLBACK1(opt, pause,
-                    fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log),
                             "hts-paused.lock"));
     }
     //
@@ -4375,15 +4358,17 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             int a = 0;
 
             *stre->last_info_shell_ = tl;
-            if (fexist(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-autopsy"))) { // débuggage: teste si le robot est vivant
+            if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log), "hts-autopsy"))) { // débuggage: teste si le robot est vivant
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
               remove(fconcat
-                     (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                     StringBuff(opt->path_log),
                       "hts-autopsy"));
               fp =
                 fopen(fconcat
-                      (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+                      (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                      StringBuff(opt->path_log),
                        "hts-isalive"), "wb");
               a = 1;
             }
@@ -4786,7 +4771,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
             strcpybuff(mov_url, back[b].r.location);    // copier URL
 
             /* Remove (temporarily created) file if it was created */
-            UNLINK(fconv(OPT_GET_BUFF(opt), back[b].url_sav));
+            UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), back[b].url_sav));
 
             /* Remove slot! */
             if (back[b].status == STATUS_READY) {

@@ -1157,7 +1157,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 /* Read in memory from cache */
                 if (flags & FETCH_BODY) {
                   if (strnotempty(previous_save)) {
-                    FILE *fp = fopen(fconv(catbuff, previous_save), "rb");
+                    FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
                     if (fp != NULL) {
                       r->adr = (char *) malloc(r->size + 4);
@@ -1179,7 +1179,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                     } else {
                       r->statuscode = STATUSCODE_INVALID;
                       sprintf(r->msg, "Read error (can't open '%s') from cache",
-                              fconv(catbuff, previous_save));
+                              file_convert(catbuff, sizeof(catbuff), previous_save));
                     }
                   } else {
                     r->statuscode = STATUSCODE_INVALID;

@@ -86,8 +86,7 @@ extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrlSpecial(const char *src,
-                                  char *dest, const size_t max,
-                                  int flags);
+extern int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
+                                  const int flags);
 
 #endif
