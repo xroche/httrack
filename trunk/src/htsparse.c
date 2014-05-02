@@ -2155,10 +2155,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                   // we need to encode query string non-ascii chars, 
                   // leaving the encoding as-is (unlike the file part)
-                  inplace_escape_check_url(query, sizeof(query));
-
-                  // copy back query
-                  strcatbuff(lien, query);      /* restore */
+                  // and copy back query
+                  append_escape_check_url(query, lien, sizeof(lien));
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
