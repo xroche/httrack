@@ -298,26 +298,6 @@ HTS_STATIC int cache_readable(cache_back * cache) {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
-//
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int hts_is_parsing(httrackp * opt, int flag);
-HTSEXT_API int hts_is_testing(httrackp * opt);
-HTSEXT_API int hts_addurl(httrackp * opt, char **url);
-HTSEXT_API int hts_resetaddurl(httrackp * opt);
-HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to);
-HTSEXT_API char *hts_errmsg(httrackp * opt);
-HTSEXT_API int hts_setpause(httrackp * opt, int);
-
-//
-HTSEXT_API int hts_is_exiting(httrackp * opt);
-HTSEXT_API int hts_request_stop(httrackp * opt, int force);
-
-//
-HTSEXT_API int hts_cancel_file_push(httrackp * opt, const char *url);
-HTSEXT_API void hts_cancel_test(httrackp * opt);
-HTSEXT_API void hts_cancel_parsing(httrackp * opt);
-#endif
-
 char *hts_cancel_file_pop(httrackp * opt);
 
 #endif
@@ -345,11 +325,6 @@ void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
 void usercommand_exe(const char *cmd, const char *file);
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int structcheck(const char *path);
-HTSEXT_API int structcheck_utf8(const char *path);
-HTSEXT_API int dir_exists(const char *path);
-#endif
 int fspc(httrackp * opt, FILE * fp, const char *type);
 char *next_token(char *p, int flag);
 
@@ -376,13 +351,6 @@ int backlinks_done(struct_back * sback, lien_url ** liens, int lien_tot,
                    int ptr);
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
                  lien_url ** liens, int ptr, int numero_passe, int lien_tot);
-
-// cancel file
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API int hts_cancel_file_push(httrackp * opt, const char *url);
-HTSEXT_API void hts_cancel_test(httrackp * opt);
-HTSEXT_API void hts_cancel_parsing(httrackp * opt);
-#endif
 
 int ask_continue(httrackp * opt);
 int nombre_digit(int n);

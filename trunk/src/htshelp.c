@@ -401,7 +401,7 @@ void help_catchurl(const char *dest_path) {
       {
         char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
 
-        escape_check_url(dest);
+        inplace_escape_check_url(dest, sizeof(dest));
         sprintf(finalurl, "%s" POSTTOK "file:%s", url, dest);
         printf("\nThe URL is: \"%s\"\n", finalurl);
         printf("You can capture it through: httrack \"%s\"\n", finalurl);

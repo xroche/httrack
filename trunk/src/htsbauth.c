@@ -129,10 +129,10 @@ int cookie_del(t_cookie * cookie, char *cook_name, char *domain, char *path) {
 // chk_dom: the domain stored in the cookie (potentially wildcard).
 // domain: query domain
 static int cookie_cmp_wildcard_domain(char *chk_dom, char *domain) {
-  int n = strlen(chk_dom);
-  int m = strlen(domain);
-  int l = n < m ? n : m;
-  int i;
+  const size_t n = strlen(chk_dom);
+  const size_t m = strlen(domain);
+  const size_t l = n < m ? n : m;
+  size_t i;
   for (i = l - 1; i >= 0; i--) {
     if (chk_dom[n - i - 1] != domain[m - i - 1]) {
       return 1;
@@ -222,7 +222,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
       do {
         if (!(find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
           if (!(find.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)) {
-            FILE *fp = fopen(fconcat(catbuff, fpath, find.cFileName), "rb");
+            FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), fpath, find.cFileName), "rb");
 
             if (fp) {
               char cook_name[256];
@@ -264,7 +264,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
               }
               fclose(fp);
               if (cookie_merged)
-                remove(fconcat(catbuff, fpath, find.cFileName));
+                remove(fconcat(catbuff, sizeof(catbuff), fpath, find.cFileName));
             }                   // if fp
           }
       } while(FindNextFileA(h, &find));
@@ -275,7 +275,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
 
   // Ensuite, cookies.txt
   {
-    FILE *fp = fopen(fconcat(catbuff, fpath, name), "rb");
+    FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), fpath, name), "rb");
 
     if (fp) {
       char BIGSTK line[8192];
@@ -316,7 +316,7 @@ int cookie_save(t_cookie * cookie, char *name) {
 
   if (strnotempty(cookie->data)) {
     char BIGSTK line[8192];
-    FILE *fp = fopen(fconv(catbuff, name), "wb");
+    FILE *fp = fopen(fconv(catbuff, sizeof(catbuff), name), "wb");
 
     if (fp) {
       char *a = cookie->data;
