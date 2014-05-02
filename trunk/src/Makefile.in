@@ -115,8 +115,8 @@ am_libhttrack_la_OBJECTS = htscore.lo htsparse.lo htsback.lo \
 	htsinthash.lo htshelp.lo htslib.lo htscoremain.lo htsname.lo \
 	htsrobots.lo htstools.lo htswizard.lo htsalias.lo htsthread.lo \
 	htsindex.lo htsbauth.lo htsmd5.lo htszlib.lo htswrap.lo \
-	htsmodules.lo htscharset.lo punycode.lo htsencoding.lo md5.lo \
-	ioapi.lo mztools.lo unzip.lo zip.lo
+	htsconcat.lo htsmodules.lo htscharset.lo punycode.lo \
+	htsencoding.lo md5.lo ioapi.lo mztools.lo unzip.lo zip.lo
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 libhttrack_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -341,7 +341,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
-	htsmd5.c htszlib.c htswrap.c \
+	htsmd5.c htszlib.c htswrap.c htsconcat.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
@@ -548,6 +548,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscache.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscatchurl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscharset.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsconcat.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscore.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscoremain.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsencoding.Plo@am__quote@
