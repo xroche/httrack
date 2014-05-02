@@ -319,10 +319,6 @@ int ishtml_ext(const char *a);
 int ishttperror(int err);
 void guess_httptype(httrackp * opt, char *s, const char *fil);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
-                             int flag);
-#endif
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
 void give_mimext(char *s, const char *st);
 
