@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_DEFLIB
 
 #include "htsglobal.h"
+#include <inttypes.h>
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -300,7 +301,7 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 /** Macro aimed to break at build-time if a size is not a sizeof() strictly 
  *  greater than sizeof(char*). **/
 #undef COMPILE_TIME_CHECK_SIZE
-#define COMPILE_TIME_CHECK_SIZE(A) ((void (*)(char[A - sizeof(char*) - 1])) NULL)
+#define COMPILE_TIME_CHECK_SIZE(A) (void) ((void (*)(char[A - sizeof(char*) - 1])) NULL)
 
 /** Macro aimed to break at compile-time if a size is not a sizeof() strictly 
  *  greater than sizeof(char*). **/

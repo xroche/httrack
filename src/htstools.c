@@ -1110,7 +1110,7 @@ HTSEXT_API int hts_findnext(find_handle find) {
     if ((find->dirp = readdir(find->hdir)))
       if (find->dirp->d_name)
         if (!STAT
-            (concat(catbuff, find->path, find->dirp->d_name), &find->filestat))
+            (concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name), &find->filestat))
           return 1;
 #endif
   }
