@@ -189,8 +189,12 @@ static void inthash_fail(const char* exp, const char* file, int line) {
   abort();
 }
 #define inthash_assert(EXP) (void)( (EXP) || (inthash_fail(#EXP, __FILE__, __LINE__), 0) )
+#ifndef HTS_PRINTF_FUN
 #define HTS_PRINTF_FUN(FMT, ARGS)
+#endif
+#ifndef HTS_INLINE
 #define HTS_INLINE
+#endif
 #endif
 
 /* Logging level. */
@@ -235,6 +239,44 @@ static void inthash_log(const inthash hashtable, const char *format, ...)
 /* No logging (should be dropped by the compiler) */
 static void inthash_nolog(const inthash hashtable, const char *format, ...)
                           HTS_PRINTF_FUN(2, 3) {
+}
+
+static void inthash_log_stats(inthash hashtable) {
+  inthash_info(hashtable, "hashtable summary: "
+               "size=%"UINT_64_FORMAT" (lg2=%"UINT_64_FORMAT") "
+               "used=%"UINT_64_FORMAT" "
+               "stash-size=%"UINT_64_FORMAT" "
+               "pool-size=%"UINT_64_FORMAT" "
+               "pool-capacity=%"UINT_64_FORMAT" "
+               "pool-used=%"UINT_64_FORMAT" "
+               "writes=%"UINT_64_FORMAT" "
+               "(new=%"UINT_64_FORMAT") "
+               "moved=%"UINT_64_FORMAT " "
+               "stashed=%"UINT_64_FORMAT" "
+               "max-stash-size=%"UINT_64_FORMAT" "
+               "avg-moved=%g "
+               "rehash=%"UINT_64_FORMAT" "
+               "pool-compact=%"UINT_64_FORMAT" "
+               "pool-realloc=%"UINT_64_FORMAT" "
+               "memory=%"UINT_64_FORMAT,
+               (uint64_t) POW2(hashtable->lg_size),
+               (uint64_t) hashtable->lg_size,
+               (uint64_t) hashtable->used,
+               (uint64_t) hashtable->stash.size,
+               (uint64_t) hashtable->pool.size,
+               (uint64_t) hashtable->pool.capacity,
+               (uint64_t) hashtable->pool.used,
+               (uint64_t) hashtable->stats.write_count,
+               (uint64_t) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.cuckoo_moved,
+               (uint64_t) hashtable->stats.stash_added,
+               (uint64_t) hashtable->stats.max_stash_size,
+               (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.rehash_count,
+               (uint64_t) hashtable->stats.pool_compact_count,
+               (uint64_t) hashtable->stats.pool_realloc_count,
+               (uint64_t) inthash_memory_size(hashtable)
+               );
 }
 
 inthash_keys inthash_hash_value(const char *value) {
@@ -785,6 +827,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
   } else {
     /* we are doomed. hopefully the probability is lower than being killed
        by a wandering radioactive monkey */
+    inthash_log_stats(hashtable);
     inthash_assert(! "hashtable internal error: cuckoo/stash collision");
     /* not reachable code */
     return -1;
@@ -1167,31 +1210,6 @@ size_t inthash_memory_size(inthash hashtable) {
   const size_t hash_size = POW2(hashtable->lg_size)*sizeof(inthash_item);
   const size_t pool_size = hashtable->pool.capacity*sizeof(char);
   return size_struct + hash_size + pool_size;
-}
-
-static void inthash_log_stats(inthash hashtable) {
-  inthash_info(hashtable, "freeing table ; "
-               "writes=%"UINT_64_FORMAT" "
-               "(new=%"UINT_64_FORMAT") "
-               "moved=%"UINT_64_FORMAT " "
-               "stashed=%"UINT_64_FORMAT" "
-               "max-stash-size=%"UINT_64_FORMAT" "
-               "avg-moved=%g "
-               "rehash=%"UINT_64_FORMAT" "
-               "pool-compact=%"UINT_64_FORMAT" "
-               "pool-realloc=%"UINT_64_FORMAT" "
-               "memory=%"UINT_64_FORMAT,
-               (uint64_t) hashtable->stats.write_count,
-               (uint64_t) hashtable->stats.add_count,
-               (uint64_t) hashtable->stats.cuckoo_moved,
-               (uint64_t) hashtable->stats.stash_added,
-               (uint64_t) hashtable->stats.max_stash_size,
-               (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
-               (uint64_t) hashtable->stats.rehash_count,
-               (uint64_t) hashtable->stats.pool_compact_count,
-               (uint64_t) hashtable->stats.pool_realloc_count,
-               (uint64_t) inthash_memory_size(hashtable)
-               );
 }
 
 void inthash_delete(inthash *phashtable) {
