@@ -189,7 +189,18 @@ CWinHTTrackApp theApp;
 /////////////////////////////////////////////////////////////////////////////
 // CWinHTTrackApp initialization
 
-void InitCBErrMsg(char* msg, char* file, int line) {
+void InitCBErrMsg(const char* msg, const char* file, int line) {
+  // Produce audit file
+  FILE *const fp = fopen("CRASH.TXT", "wb");
+  if (fp != NULL) {
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n",
+            file, line);
+    fprintf(fp, "Reason:\r\n%s\r\n", msg);
+    fflush(fp);
+    fclose(fp);
+  }
+
+  // Display message box
   CString st;
   st.Format("A fatal error has occured\r\n%s"
     "\r\nin file '%s', line %d\r\n"

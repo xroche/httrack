@@ -72,7 +72,7 @@ BOOL CDialogHtmlHelp::OnInitDialog()
   strcpybuff(home,"file://");
   {
     char* a=home+strlen(home);
-    ::GetModuleFileName(NULL, a, sizeof(home)/sizeof(TCHAR) - 1 - strlen(home));
+    ::GetModuleFileName(NULL, a, (DWORD) ( sizeof(home)/sizeof(TCHAR) - 1 - strlen(home) ));
     // strcatbuff(home,AfxGetApp()->m_pszHelpFilePath);
     a = home + strlen(home) -1;
     while( (*a!='\\') && ( a > home ) ) a--;
