@@ -3527,8 +3527,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
     if (HTTP_IS_REDIRECT(r->statuscode)) {
       //if (r->adr!=NULL) {   // adr==null si fichier direct. [catch: davename normalement si cgi]
       //int i=0;
-      char *rn = NULL;
-
       // char* p;
 
       hts_log_print(opt, LOG_WARNING, "%s for %s%s", r->msg, urladr, urlfil);
@@ -3668,7 +3666,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         }                       // ident_url_xx
 
         if (get_it == 0) {      // adresse vraiment différente et potentiellement en html (pas de possibilité de bouger la page tel quel à cause des <img src..> et cie)
-          rn = (char *) calloct(8192, 1);
+          const size_t rn_size = 8192;
+          char *const rn = (char *) malloct(rn_size);
           if (rn != NULL) {
             hts_log_print(opt, LOG_WARNING, "File has moved from %s%s to %s",
                           urladr, urlfil, mov_url);
@@ -3682,25 +3681,20 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
             // On prépare une page qui sautera immédiatement sur la bonne URL
             // Le scanner re-changera, ensuite, cette URL, pour la mirrorer!
-            strcpybuff(rn, "<HTML>" CRLF);
-            strcatbuff(rn,
-                       "<!-- Created by HTTrack Website Copier/" HTTRACK_VERSION
-                       " " HTTRACK_AFF_AUTHORS " -->" CRLF);
-            strcatbuff(rn,
-                       "<HEAD>" CRLF "<TITLE>Page has moved</TITLE>" CRLF
-                       "</HEAD>" CRLF "<BODY>" CRLF);
-            strcatbuff(rn, "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=");
-            strcatbuff(rn, mov_url);    // URL
-            strcatbuff(rn, "\">" CRLF);
-            strcatbuff(rn, "<A HREF=\"");
-            strcatbuff(rn, mov_url);
-            strcatbuff(rn, "\">");
-            strcatbuff(rn, "<B>Click here...</B></A>" CRLF);
-            strcatbuff(rn, "</BODY>" CRLF);
-            strcatbuff(rn,
-                       "<!-- Created by HTTrack Website Copier/" HTTRACK_VERSION
-                       " " HTTRACK_AFF_AUTHORS " -->" CRLF);
-            strcatbuff(rn, "</HTML>" CRLF);
+            snprintf(rn, rn_size,
+              "<HTML>" CRLF
+              "<!-- Created by HTTrack Website Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->" CRLF
+              "<HEAD>" CRLF 
+              "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html;charset=UTF-8\">"
+              "<META HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"
+              "<TITLE>Page has moved</TITLE>" CRLF 
+              "</HEAD>" CRLF
+              "<BODY>" CRLF
+              "<A HREF=\"%s\"><h3>Click here...</h3></A>" CRLF
+              "</BODY>" CRLF
+              "<!-- Created by HTTrack Website Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->" CRLF
+              "</HTML>" CRLF,
+              mov_url, mov_url);
 
             // changer la page
             if (r->adr) {
