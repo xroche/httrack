@@ -1984,7 +1984,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   char *filter = NULL;
                   cache_back cache;
                   inthash cache_hashtable = inthash_new(0);
-                  int backupXFR = htsMemoryFastXfr;
                   int sendb = 0;
 
                   if (isdigit((unsigned char) *(com + 1))) {
@@ -1998,7 +1997,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     hasFilter = 1;
                     filter = argv[na];
                   }
-                  htsMemoryFastXfr = 1; /* fast load */
 
                   memset(&cache, 0, sizeof(cache_back));
                   cache.type = 1;       // cache?
@@ -2150,7 +2148,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                             (hasFilter) ? " for '" : "",
                             (hasFilter) ? filter : "", (hasFilter) ? "'" : "");
                   }
-                  htsMemoryFastXfr = backupXFR;
                   return 0;
                 }
                 break;
@@ -2163,13 +2160,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case 'X':
-#ifndef STRDEBUG
-                fprintf(stderr,
-                        "warning: no string debugging support built, option has no effect\n");
-#endif
-                htsMemoryFastXfr = 1;
+                fprintf(stderr, "warning: option has no effect\n");
                 if (*(com + 1) == '0') {
-                  htsMemoryFastXfr = 0;
                   com++;
                 }
                 break;

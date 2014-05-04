@@ -650,15 +650,11 @@ int httpmirror(char *url1, httrackp * opt) {
 
     // Initialiser cache
     {
-      int backupXFR = htsMemoryFastXfr;
-
       opt->state._hts_in_html_parsing = 4;
       if (!RUN_CALLBACK7(opt, loop, NULL, 0, 0, 0, lien_tot, 0, NULL)) {
         opt->state.exit_xh = 1; // exit requested
       }
-      htsMemoryFastXfr = 1;     /* fast load */
       cache_init(&cache, opt);
-      htsMemoryFastXfr = backupXFR;
       opt->state._hts_in_html_parsing = 0;
     }
 

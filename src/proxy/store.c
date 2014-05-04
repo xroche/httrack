@@ -41,6 +41,7 @@ static long int  timezone = 0;
 #include <pthread.h>
 #endif
 
+#define HTSSAFE_ABORT_FUNCTION(A,B,C)
 #include "htsglobal.h"
 
 #define HTS_INTERNAL_BYTECODE
@@ -252,8 +253,6 @@ void PT_Delete(PT_Indexes index) {
 int PT_RemoveIndex(PT_Indexes index, int indexId) {
   return 0;
 }
-
-#define assertf(exp)
 
 static int binput(char *buff, char *s, int max) {
   int count = 0;
