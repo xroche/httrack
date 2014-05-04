@@ -119,6 +119,14 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
  */
 #define strcpybuff(A, B) (clear_buffer_(A), strcatbuff(A, B))
 
+/**
+ * Append characters of "B" to "A", "A" having a maximum capacity of "S".
+ */
+#define strlcatbuff(A, B, S) \
+  strncat_safe_(A, S, B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
+
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
   size_t size;
