@@ -117,7 +117,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
-#define strcpybuff(A, B) strcatbuff(clear_buffer_(A), B)
+#define strcpybuff(A, B) (clear_buffer_(A), strcatbuff(A, B))
 
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
