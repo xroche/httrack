@@ -235,7 +235,8 @@ static char the_empty_string[1] = { 0 };
 
 /* Logging */
 static void inthash_log(const inthash hashtable, const char *format, ...)
-                        HTS_PRINTF_FUN(2, 3) {
+                        HTS_PRINTF_FUN(2, 3);
+static void inthash_log(const inthash hashtable, const char *format, ...) {
   va_list args;
   inthash_assert(format != NULL);
   fprintf(stderr, "[%p] ", (void*) hashtable);
@@ -247,7 +248,8 @@ static void inthash_log(const inthash hashtable, const char *format, ...)
 
 /* No logging (should be dropped by the compiler) */
 static void inthash_nolog(const inthash hashtable, const char *format, ...)
-                          HTS_PRINTF_FUN(2, 3) {
+                          HTS_PRINTF_FUN(2, 3);
+static void inthash_nolog(const inthash hashtable, const char *format, ...) {
 }
 
 static void inthash_log_stats(inthash hashtable) {
