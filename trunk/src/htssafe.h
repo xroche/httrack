@@ -68,12 +68,12 @@ HTSEXT_API htsErrorCallback htsCallbackErr;
  */
 #define assertf(exp) assertf_(exp, __FILE__, __LINE__)
 
-static void log_abort_(const char *msg, const char *file, int line) {
+static HTS_UNUSED void log_abort_(const char *msg, const char *file, int line) {
   fprintf(stderr, "%s failed at %s:%d\n", msg, file, line);
   fflush(stderr);
 }
 
-static void abortf_(const char *exp, const char *file, int line) {
+static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
   HTSSAFE_ABORT_FUNCTION(exp, file, line);
   log_abort_(exp, file, line);
   abort();
@@ -119,8 +119,8 @@ static void abortf_(const char *exp, const char *file, int line) {
  */
 #define strcpybuff(A, B) strcatbuff(clear_buffer_(A), B)
 
-static HTS_INLINE size_t strlen_safe_(const char *source, const size_t sizeof_source, 
-                                      const char *file, int line) {
+static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
+                                                 const char *file, int line) {
   size_t size;
   assertf_( source != NULL, file, line );
   size = strnlen(source, sizeof_source);
@@ -128,15 +128,15 @@ static HTS_INLINE size_t strlen_safe_(const char *source, const size_t sizeof_so
   return size;
 }
 
-static HTS_INLINE char* clear_buffer_(char *buffer) {
+static HTS_INLINE HTS_UNUSED char* clear_buffer_(char *buffer) {
   buffer[0] = '\0';
   return buffer;
 }
 
-static HTS_INLINE char* strncat_safe_(char *const dest, const size_t sizeof_dest,
-                                      const char *const source, const size_t sizeof_source, 
-                                      const size_t n,
-                                      const char *exp, const char *file, int line) {
+static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t sizeof_dest,
+                                                 const char *const source, const size_t sizeof_source, 
+                                                 const size_t n,
+                                                 const char *exp, const char *file, int line) {
   const size_t source_len = strlen_safe_(source, sizeof_source, file, line);
   const size_t dest_len = strlen_safe_(dest, sizeof_dest, file, line);
   const size_t source_copy = source_len <= n ? source_len : n;
