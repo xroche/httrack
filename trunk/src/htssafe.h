@@ -80,15 +80,26 @@ static void abortf_(const char *exp, const char *file, int line) {
 }
 
 /**
+ * Check wether 'VAR' is of type char[].
+ */
+#ifdef __GNUC__
+/* Note: char[] and const char[] are compatible */
+#define HTS_IS_CHAR_BUFFER(VAR) ( __builtin_types_compatible_p ( typeof (VAR), char[] ) )
+#else
+#define HTS_IS_CHAR_BUFFER(VAR) ( sizeof(VAR) != sizeof(char*) )
+#endif
+#define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
+
+/**
  * Append at most N characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
 #define strncatbuff(A, B, N) \
-  ( sizeof(A) == sizeof(char*) \
+  ( HTS_IS_NOT_CHAR_BUFFER(A) \
   ? strncat(A, B, N) \
   : strncat_safe_(A, sizeof(A), B, \
-  sizeof(B) == sizeof(char*) ? (size_t) -1 : sizeof(B), N, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
 
 /* note: "size_t is an unsigned integral type" */
