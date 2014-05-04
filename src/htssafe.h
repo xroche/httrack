@@ -86,6 +86,7 @@ static void abortf_(const char *exp, const char *file, int line) {
 /* Note: char[] and const char[] are compatible */
 #define HTS_IS_CHAR_BUFFER(VAR) ( __builtin_types_compatible_p ( typeof (VAR), char[] ) )
 #else
+/* Note: a bit lame as char[8] won't be seen. */
 #define HTS_IS_CHAR_BUFFER(VAR) ( sizeof(VAR) != sizeof(char*) )
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
