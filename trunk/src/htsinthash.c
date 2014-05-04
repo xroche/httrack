@@ -189,8 +189,6 @@ static void inthash_fail(const char* exp, const char* file, int line) {
   abort();
 }
 #define inthash_assert(EXP) (void)( (EXP) || (inthash_fail(#EXP, __FILE__, __LINE__), 0) )
-#endif
-
 /* Compiler-specific. */
 #ifndef HTS_PRINTF_FUN
 #ifdef __GNUC__
@@ -204,6 +202,7 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 #define HTS_INLINE __inline__
 #else
 #define HTS_INLINE
+#endif
 #endif
 #endif
 
