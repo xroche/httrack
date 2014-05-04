@@ -2526,7 +2526,11 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         FMT();
                         if (bench[loop].type == DO_ADD
                             || bench[loop].type == DO_DRY_ADD) {
+                          size_t k;
                           result = inthash_write(hashtable, name, (uintptr_t) expected);
+                          for(k = 0 ; k < /* stash_size*2 */ 32 ; k++) {
+                            (void) inthash_write(hashtable, name, (uintptr_t) expected);
+                          }
                           /* revert logic */
                           if (bench[loop].type == DO_DRY_ADD) {
                             result = result ? 0 : 1;
@@ -2534,7 +2538,11 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         }
                         else if (bench[loop].type == DO_DEL
                             || bench[loop].type == DO_DRY_DEL) {
+                          size_t k;
                           result = inthash_remove(hashtable, name);
+                          for(k = 0 ; k < /* stash_size*2 */ 32 ; k++) {
+                            (void) inthash_remove(hashtable, name);
+                          }
                           /* revert logic */
                           if (bench[loop].type == DO_DRY_DEL) {
                             result = result ? 0 : 1;
