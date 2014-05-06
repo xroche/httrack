@@ -116,16 +116,51 @@ void infomsg(char *msg) {
     }
   }
 }
+
+typedef struct help_wizard_buffers {
+  char urls[HTS_URLMAXSIZE * 2];
+  char mainpath[256];
+  char projname[256];
+  char stropt[2048];        // options
+  char stropt2[2048];       // options longues
+  char strwild[2048];       // wildcards
+  char cmd[4096];
+  char str[256];
+  char *argv[256];
+} help_wizard_buffers;
+
 void help_wizard(httrackp * opt) {
-  char *urls = (char *) malloct(HTS_URLMAXSIZE * 2);
-  char *mainpath = (char *) malloct(256);
-  char *projname = (char *) malloct(256);
-  char *stropt = (char *) malloct(2048);        // options
-  char *stropt2 = (char *) malloct(2048);       // options longues
-  char *strwild = (char *) malloct(2048);       // wildcards
-  char *cmd = (char *) malloct(4096);
-  char *str = (char *) malloct(256);
-  char **argv = (char **) malloct(256 * sizeof(char *));
+  help_wizard_buffers *buffers = malloct(sizeof(help_wizard_buffers));
+
+#undef urls
+#undef mainpath
+#undef projname
+#undef stropt
+#undef stropt2
+#undef strwild
+#undef cmd
+#undef str
+#undef argv
+
+#define urls (buffers->urls)
+#define mainpath (buffers->mainpath)
+#define projname (buffers->projname)
+#define stropt (buffers->stropt)
+#define stropt2 (buffers->stropt2)
+#define strwild (buffers->strwild)
+#define cmd (buffers->cmd)
+#define str (buffers->str)
+#define argv (buffers->argv)
+
+  //char *urls = (char *) malloct(HTS_URLMAXSIZE * 2);
+  //char *mainpath = (char *) malloct(256);
+  //char *projname = (char *) malloct(256);
+  //char *stropt = (char *) malloct(2048);        // options
+  //char *stropt2 = (char *) malloct(2048);       // options longues
+  //char *strwild = (char *) malloct(2048);       // wildcards
+  //char *cmd = (char *) malloct(4096);
+  //char *str = (char *) malloct(256);
+  //char **argv = (char **) malloct(256 * sizeof(char *));
 
   //
   char *a;
@@ -318,14 +353,16 @@ void help_wizard(httrackp * opt) {
   }
 
   /* Free buffers */
-  freet(urls);
-  freet(mainpath);
-  freet(projname);
-  freet(stropt);
-  freet(stropt2);
-  freet(strwild);
-  freet(cmd);
-  freet(str);
+  free(buffers);
+#undef urls
+#undef mainpath
+#undef projname
+#undef stropt
+#undef stropt2
+#undef strwild
+#undef cmd
+#undef str
+#undef argv
 }
 int help_query(char *list, int def) {
   char s[256];
