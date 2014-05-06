@@ -101,6 +101,18 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
   ? strncat(A, B, N) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+
+/**
+ * Copy characters from "B" to "A".
+ * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
+ * is assumed to be the capacity of this array.
+ */
+#define strcpybuff(A, B) \
+  ( HTS_IS_NOT_CHAR_BUFFER(A) \
+  ? strcpy(A, B) \
+  : strcpy_safe_(A, sizeof(A), B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
 
 /* note: "size_t is an unsigned integral type" */
@@ -111,13 +123,6 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
  * is assumed to be the capacity of this array.
  */
 #define strcatbuff(A, B) strncatbuff(A, B, (size_t) -1)
-
-/**
- * Copy characters of "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
- * is assumed to be the capacity of this array.
- */
-#define strcpybuff(A, B) (clear_buffer_(A), strcatbuff(A, B))
 
 /**
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
@@ -136,11 +141,6 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_
   return size;
 }
 
-static HTS_INLINE HTS_UNUSED char* clear_buffer_(char *buffer) {
-  buffer[0] = '\0';
-  return buffer;
-}
-
 static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t sizeof_dest,
                                                  const char *const source, const size_t sizeof_source, 
                                                  const size_t n,
@@ -153,6 +153,14 @@ static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t 
   memcpy(dest + dest_len, source, source_copy);
   dest[dest_final_len] = '\0';
   return dest;
+}
+
+static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t sizeof_dest,
+                                                const char *const source, const size_t sizeof_source, 
+                                                const char *exp, const char *file, int line) {
+  assertf_(sizeof_dest != 0, file, line);
+  dest[0] = '\0';
+  return strncat_safe_(dest, sizeof_dest, source, sizeof_source, (size_t) -1, exp, file, line);
 }
 
 #define malloct(A)          malloc(A)
