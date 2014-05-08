@@ -186,28 +186,20 @@ struct struct_inthash {
   } custom;
 };
 
-/* Using httrack code */
-static void inthash_fail(const char* exp, const char* file, int line) {
-  fprintf(stderr, "assertion '%s' failed at %s:%d\n", exp, file, line);
-  abort();
-}
+/* Assertion check. */
 #define inthash_assert(HASHTABLE, EXP) \
   (void)( (EXP) || (inthash_assert_failed(HASHTABLE, #EXP, __FILE__, __LINE__), 0) )
 
 /* Compiler-specific. */
-#ifndef HTS_PRINTF_FUN
 #ifdef __GNUC__
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
+#define HTS_INLINE __inline__
+#elif (defined(_MSC_VER))
+#define HTS_PRINTF_FUN(FMT, ARGS)
+#define HTS_INLINE __inline
 #else
 #define HTS_PRINTF_FUN(FMT, ARGS)
-#endif
-#endif
-#ifndef HTS_INLINE
-#ifdef __GNUC__
-#define HTS_INLINE __inline__
-#else
 #define HTS_INLINE
-#endif
 #endif
 
 /* Logging level. */
@@ -240,7 +232,14 @@ static char the_empty_string[1] = { 0 };
 /* global assertion handler */
 static t_inthash_asserthandler global_assert_handler = NULL;
 
-/* Assert failed handler. */
+/* default assertion handler, if neither hashtable one nor global one 
+   were defined */
+static void inthash_fail(const char* exp, const char* file, int line) {
+  fprintf(stderr, "assertion '%s' failed at %s:%d\n", exp, file, line);
+  abort();
+}
+
+/* assert failed handler. */
 static void inthash_assert_failed(const inthash hashtable, const char* exp, const char* file, int line) {
   if (hashtable != NULL && hashtable->custom.error.fatal != NULL) {
     hashtable->custom.error.fatal(hashtable->custom.error.arg, exp, file, line);
