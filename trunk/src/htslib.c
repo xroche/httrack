@@ -5112,6 +5112,10 @@ static int ssl_vulnerable(const char *version) {
   return 0;
 }
 
+static void default_inthash_asserthandler(void *arg, const char* exp, const char* file, int line) {
+  abortf_(exp, file, line);
+}
+
 static int hts_init_ok = 0;
 HTSEXT_API int hts_init(void) {
   const char *dbg_env;
@@ -5132,6 +5136,9 @@ HTSEXT_API int hts_init(void) {
   }
 
   hts_debug_log_print("entering hts_init()");   /* debug */
+
+  /* Init hashtable default assertion handler. */
+  inthash_set_global_assert_handler(default_inthash_asserthandler);
 
   /* Init threads (lazy init) */
   htsthread_init();
