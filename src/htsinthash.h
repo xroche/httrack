@@ -26,8 +26,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: httrack.c subroutines:                                 */
-/*       hash table system (fast index)                         */
+/* File: hash table system (fast index)                         */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -125,6 +124,9 @@ typedef char* (*t_inthash_duphandler) (void *arg, const char *name);
 /** Hash computation handler. **/
 typedef inthash_keys (*t_inthash_hasheshandler)(void *arg, const char *value);
 
+/** Hashtable fatal assertion failure. **/
+typedef void (*t_inthash_asserthandler)(void *arg, const char* exp, const char* file, int line);
+
 /**
  * Value comparison handler (returns non-zero value if strings are equal).
  **/
@@ -214,6 +216,14 @@ void inthash_value_set_key_handler(inthash hashtable,
                                    t_inthash_hasheshandler hash,
                                    t_inthash_cmphandler equals,
                                    void *arg);
+
+/**
+ * Set assertion failure handler.
+ * fatal: handled called upon serious programming error
+ **/
+void inthash_set_assert_handler(inthash hashtable,
+                                t_inthash_asserthandler fatal,
+                                void *arg);
 
 /**
  * Read an integer entry from the hashtable.
@@ -308,6 +318,15 @@ inthash_item *inthash_enum_next(struct_inthash_enum * e);
  * Compute a hash, given a string value.
  **/
 inthash_keys inthash_hash_value(const char *value);
+
+/**
+ * Set default global assertion failure handler.
+ * The handler will be used if no specific handler was defined in the
+ * hashtable itself.
+ * fatal: handled called upon serious programming error (opaque argument 
+ * is the hashtable)
+ **/
+void inthash_set_global_assert_handler(t_inthash_asserthandler fatal);
 
 #endif
 
