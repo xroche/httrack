@@ -1188,6 +1188,8 @@ inthash inthash_new(size_t initial_size) {
     hashtable->custom.key.hash = NULL;
     hashtable->custom.key.equals = NULL;
     hashtable->custom.key.arg = NULL;
+    hashtable->custom.error.fatal = NULL;
+    hashtable->custom.error.arg = NULL;
   }
   return hashtable;
 }
