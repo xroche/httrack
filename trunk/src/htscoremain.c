@@ -2577,7 +2577,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                     inthash_delete(&hashtable);
                     fprintf(stderr, "all hashtable tests were successful!\n");
                   } else {
-                    fprintf(stderr, "Malformed number");
+                    fprintf(stderr, "Malformed number\n");
                     exit(EXIT_FAILURE);
                   }
 #undef FMT
