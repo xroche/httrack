@@ -309,7 +309,7 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 /** Macro aimed to break at compile-time if a size is not a sizeof() strictly 
  *  greater than sizeof(char*). **/
 #undef RUNTIME_TIME_CHECK_SIZE
-#define RUNTIME_TIME_CHECK_SIZE(A) assert((A) != sizeof(void*))
+#define RUNTIME_TIME_CHECK_SIZE(A) assertf((A) != sizeof(void*))
 
 #define fconv(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fconv(A,B,C))
 #define concat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), concat(A,B,C,D))

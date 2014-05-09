@@ -820,8 +820,8 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   char *position;
 
   /* Security check. */
-  assert(str != NULL);
-  assert(str->pos < str->capacity);
+  assertf(str != NULL);
+  assertf(str->pos < str->capacity);
 
   /* Print */
   position = &str->buffer[str->pos];
@@ -833,7 +833,7 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 
   /* Increment. */
   str->pos += strlen(position);
-  assert(str->pos < str->capacity);
+  assertf(str->pos < str->capacity);
 }
 
 // envoi d'une requète
@@ -2854,7 +2854,7 @@ void time_rfc822(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
-    assert(localtime_returned_null);
+    assertf(localtime_returned_null);
   }
   strftime(s, 256, "%a, %d %b %Y %H:%M:%S GMT", A);
 }
@@ -2864,7 +2864,7 @@ void time_rfc822_local(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
-    assert(localtime_returned_null);
+    assertf(localtime_returned_null);
   }
   strftime(s, 256, "%a, %d %b %Y %H:%M:%S", A);
 }
@@ -3485,7 +3485,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
         strcatbuff(copyBuff, "&");
       strcatbuff(copyBuff, amps[i] + 1);
     }
-    assert((int) strlen(copyBuff) <= qLen);
+    assertf((int) strlen(copyBuff) <= qLen);
     strcpybuff(query, copyBuff);
 
     /* Cleanup */
@@ -3756,7 +3756,7 @@ HTSEXT_API char *escape_check_url_addr(const char *const src,
 #define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
 HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
   const size_t len = strnlen(dest, size); \
-  assert(len < size); \
+  assertf(len < size); \
   return NAME(src, dest + len, size - len); \
 }
 
@@ -3777,8 +3777,8 @@ HTSEXT_API size_t inplace_ ##NAME(char *const dest, const size_t size) { \
   const int in_buffer = len + 1 < sizeof(buffer); \
   char *src = in_buffer ? buffer : malloct(len + 1); \
   size_t ret; \
-  assert(src != NULL); \
-  assert(len < size); \
+  assertf(src != NULL); \
+  assertf(len < size); \
   memcpy(src, dest, len + 1); \
   ret = NAME(src, dest, size); \
   if (!in_buffer) { \
@@ -3815,7 +3815,7 @@ HTSEXT_API void escape_remove_control(char *const s) {
     const unsigned char c = (unsigned  char) s[i];
     if (c >= 32) {
       if (i != j) {
-        assert(j < i);
+        assertf(j < i);
         s[j] = s[i];
       }
       j++;
@@ -3825,7 +3825,7 @@ HTSEXT_API void escape_remove_control(char *const s) {
 
 #undef ADD_CHAR
 #define ADD_CHAR(C) do {   \
-      assert(j < size);    \
+      assertf(j < size);    \
       if (j + 1 == size) { \
         dest[j] = '\0';    \
         return size;       \
@@ -3881,7 +3881,7 @@ HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
     }
   }
 
-  assert(j < size);
+  assertf(j < size);
   dest[j] = '\0';
   return j;
 }
@@ -3903,7 +3903,7 @@ HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, c
       ADD_CHAR(c);
     }
   }
-  assert(j < size);
+  assertf(j < size);
   dest[j] = '\0';
   return j;
 }
@@ -3933,7 +3933,7 @@ HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const de
       ADD_CHAR(c);
     }
   }
-  assert(j < size);
+  assertf(j < size);
   dest[j] = '\0';
   return j;
 }
@@ -4562,12 +4562,12 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // 'capsule' contenant uniquement le cache
 t_dnscache *_hts_cache(httrackp * opt) {
-  assert(opt != NULL);
+  assertf(opt != NULL);
   if (opt->state.dns_cache == NULL) {
     opt->state.dns_cache = (t_dnscache *) malloct(sizeof(t_dnscache));
     memset(opt->state.dns_cache, 0, sizeof(t_dnscache));
   }
-  assert(opt->state.dns_cache != NULL);
+  assertf(opt->state.dns_cache != NULL);
   return opt->state.dns_cache;
 }
 
@@ -4594,8 +4594,9 @@ void hts_cache_free(t_dnscache *const root) {
 // si h_length==0 alors le nom n'existe pas dans le dns
 static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_hostent *retour) {
   for(; cache != NULL; cache = cache->n) {
-    assert(cache != NULL);
-    assert(iadr != NULL);
+    assertf(cache != NULL);
+    assertf(iadr != NULL);
+    assertf(cache->iadr != NULL);
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         if (retour->h_addr_list[0])
@@ -4696,7 +4697,7 @@ HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname,
     t_hostent *ret;
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
-    assert(copy != NULL);
+    assertf(copy != NULL);
     copy[0] = '\0';
     strncat(copy, hostname + 1, size - 2);
     ret =  vxgethostbyname2_(copy, v_buffer, error);
@@ -4724,9 +4725,9 @@ static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
   t_hostent *hp;
 
-  assert(opt != NULL);
-  assert(_iadr != NULL);
-  assert(v_buffer != NULL);
+  assertf(opt != NULL);
+  assertf(_iadr != NULL);
+  assertf(v_buffer != NULL);
 
   /* Clear */
   fullhostent_init(buffer);
@@ -4846,7 +4847,7 @@ void *hts_malloc(size_t len) {
 
   hts_meminit();
   htsLocker(mallocMutex, 1);
-  fassert(len > 0);
+  assertf(len > 0);
   adr = hts_xmalloc(len, 0);
   htsLocker(mallocMutex, 0);
   return adr;
@@ -4855,8 +4856,8 @@ void *hts_calloc(size_t len, size_t len2) {
   void *adr;
 
   hts_meminit();
-  fassert(len > 0);
-  fassert(len2 > 0);
+  assertf(len > 0);
+  assertf(len2 > 0);
   htsLocker(mallocMutex, 1);
   adr = hts_xmalloc(len, len2);
   htsLocker(mallocMutex, 0);
@@ -4867,16 +4868,16 @@ void *hts_strdup(char *str) {
   size_t size = str ? strlen(str) : 0;
   char *adr = (char *) hts_malloc(size + 1);
 
-  fassert(adr != NULL);
+  assertf(adr != NULL);
   strcpy(adr, str ? str : "");
   return adr;
 }
 void *hts_xmalloc(size_t len, size_t len2) {
   mlink *lnk = (mlink *) calloc(1, sizeof(mlink));
 
-  fassert(lnk != NULL);
-  fassert(len > 0);
-  fassert(len2 >= 0);
+  assertf(lnk != NULL);
+  assertf(len > 0);
+  assertf(len2 >= 0);
   if (lnk) {
     void *r = NULL;
     int size, bsize = sizeof(t_htsboundary);
@@ -4887,7 +4888,7 @@ void *hts_xmalloc(size_t len, size_t len2) {
       size = len;
     size += ((bsize - (size % bsize)) % bsize); /* check alignement */
     r = malloc(size + bsize * 2);
-    fassert(r != NULL);
+    assertf(r != NULL);
     if (r) {
       *((t_htsboundary *) ((char *) r))
         = *((t_htsboundary *) ((char *) r + size + bsize))
@@ -4909,7 +4910,7 @@ void hts_free(void *adr) {
   mlink *lnk = &trmalloc;
   int bsize = sizeof(t_htsboundary);
 
-  fassert(adr != NULL);
+  assertf(adr != NULL);
   if (!adr) {
     return;
   }
@@ -4918,9 +4919,9 @@ void hts_free(void *adr) {
     if (lnk->next->adr == adr) {
       mlink *blk_free = lnk->next;
 
-      fassert(blk_free->id != -1);
-      fassert(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
-      fassert(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
+      assertf(blk_free->id != -1);
+      assertf(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
+      assertf(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
               htsboundary);
       lnk->next = lnk->next->next;
       free((void *) blk_free);
@@ -4930,7 +4931,7 @@ void hts_free(void *adr) {
       return;
     }
     lnk = lnk->next;
-    fassert(lnk->next != NULL);
+    assertf(lnk->next != NULL);
   }
   free(adr);
   htsLocker(mallocMutex, 0);
@@ -4948,13 +4949,13 @@ void *hts_realloc(void *adr, size_t len) {
         {
           mlink *blk_free = lnk->next;
 
-          fassert(blk_free->id != -1);
-          fassert(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
-          fassert(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
+          assertf(blk_free->id != -1);
+          assertf(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
+          assertf(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
                   htsboundary);
         }
         adr = realloc((char *) adr - bsize, len + bsize * 2);
-        fassert(adr != NULL);
+        assertf(adr != NULL);
         lnk->next->adr = (char *) adr + bsize;
         lnk->next->len = len;
         *((t_htsboundary *) ((char *) adr))
@@ -4964,7 +4965,7 @@ void *hts_realloc(void *adr, size_t len) {
         return (char *) adr + bsize;
       }
       lnk = lnk->next;
-      fassert(lnk->next != NULL);
+      assertf(lnk->next != NULL);
     }
     htsLocker(mallocMutex, 0);
   }
@@ -4975,7 +4976,7 @@ mlink *hts_find(char *adr) {
   mlink *lnk = &trmalloc;
   int bsize = sizeof(t_htsboundary);
 
-  fassert(adr != NULL);
+  assertf(adr != NULL);
   if (!adr) {
     return NULL;
   }
@@ -4993,7 +4994,7 @@ mlink *hts_find(char *adr) {
 
     if (depl < 0)
       depl = -depl;
-    //fassert(depl < 512000);   /* near the stack frame.. doesn't look like malloc but stack variable */
+    //assertf(depl < 512000);   /* near the stack frame.. doesn't look like malloc but stack variable */
     return NULL;
   }
 }

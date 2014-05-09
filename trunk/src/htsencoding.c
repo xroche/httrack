@@ -30,10 +30,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#include <assert.h>
-
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htssafe.h"
 
 /* static int decode_entity(const unsigned int hash, const size_t len);
 */
@@ -67,7 +66,7 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
   int hex;
   unsigned int hash;
 
-  assert(max != 0);
+  assertf(max != 0);
   for(i = 0, j = 0, ampStart = (size_t) -1, ampStartDest = 0,
         uc = -1, hex = 0, hash = 0 ; src[i] != '\0' ; i++) {
     /* start of entity */
@@ -209,8 +208,8 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
   int seenQuery = 0;
   char utfBuffer[32];
 
-  assert(src != dest);
-  assert(max != 0);
+  assertf(src != dest);
+  assertf(max != 0);
 
   for(i = 0, j = 0, k = 0, utfBufferJ = 0, utfBufferSize = 0,
       lastI = (size_t) -1, lastJ = (size_t) -1

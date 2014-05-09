@@ -33,8 +33,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsbase.h"
 #include "punycode.h"
-
-#include <assert.h>
+#include "htssafe.h"
 
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
@@ -415,7 +414,7 @@ static char* hts_codepageToUTF8(const char *codepage, const char *s) {
       if (dest != NULL) {
         const size_t len = hts_writeUTF8(uc, &dest[k], MAX_UTF);
         k += len;
-        assert(k < capa);
+        assertf(k < capa);
       }
     }
     dest[k] = '\0';
@@ -982,7 +981,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 #undef WR
 
                 /* copy character */
-                assert(segOutputSize < segSize);
+                assertf(segOutputSize < segSize);
                 segInt[segOutputSize++] = uc;
 
                 /* not anymore in sequence */
@@ -991,7 +990,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 
               /* ascii ? */
               if (c < 0x80) {
-                assert(segOutputSize < segSize);
+                assertf(segOutputSize < segSize);
                 segInt[segOutputSize] = c;
                 if (c != 0) {
                   segOutputSize++;
