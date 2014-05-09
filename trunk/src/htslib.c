@@ -4596,8 +4596,7 @@ static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_ho
   for(; cache != NULL; cache = cache->n) {
     assertf(cache != NULL);
     assertf(iadr != NULL);
-    assertf(cache->iadr != NULL);
-    if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
+    if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         if (retour->h_addr_list[0])
           memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
