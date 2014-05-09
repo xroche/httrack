@@ -526,7 +526,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             if (!back[p].r.is_write) {
               // do not use tempnam() but a regular filename
               if (create_back_tmpfile(opt, &back[p]) == 0) {
-                assert(back[p].tmpfile != NULL);
+                assertf(back[p].tmpfile != NULL);
                 /* note: tmpfile is utf-8 */
                 back[p].r.out = FOPEN(back[p].tmpfile, "wb");
                 if (back[p].r.out) {
@@ -664,7 +664,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           if (A == NULL) {
             int localtime_returned_null = 0;
 
-            assert(localtime_returned_null);
+            assertf(localtime_returned_null);
           }
           strftime(s, 250, "%H:%M:%S", A);
 
@@ -1058,7 +1058,7 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
         strcpybuff(back[p].url_adr, tmp.url_adr);
         back[p].ka_time_start = tmp.ka_time_start;
         back[p].status = STATUS_ALIVE;  // alive & waiting
-        assert(back[p].ka_time_start != 0);
+        assertf(back[p].ka_time_start != 0);
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully saved #%d (%s)",
                       back[p].r.debugid, back[p].url_adr);
@@ -1112,7 +1112,7 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
       strcpybuff(back[q].url_adr, tmp.url_adr); // address
       back[q].ka_time_start = tmp.ka_time_start;
       back[q].status = STATUS_ALIVE;    // alive & waiting
-      assert(back[q].ka_time_start != 0);
+      assertf(back[q].ka_time_start != 0);
       hts_log_print(opt, LOG_DEBUG,
                     "(Keep-Alive): successfully preserved #%d (%s)",
                     back[q].r.debugid, back[q].url_adr);
@@ -2261,7 +2261,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
         } else if (back[i].r.keep_alive_max < 1) {
           reason = "keep-alive-max reached";
         } else if (time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
-          assert(back[i].ka_time_start != 0);
+          assertf(back[i].ka_time_start != 0);
           snprintf(buffer, sizeof(buffer), "keep-alive timeout = %ds)",
                    (int) back[i].r.keep_alive_t);
           reason = buffer;
@@ -2782,7 +2782,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                  (get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0)
                               ) {
                               if (create_back_tmpfile(opt, &back[i]) == 0) {
-                                assert(back[i].tmpfile != NULL);
+                                assertf(back[i].tmpfile != NULL);
                                 /* note: tmpfile is utf-8 */
                                 if ((back[i].r.out =
                                      FOPEN(back[i].tmpfile, "wb")) == NULL) {

@@ -3062,7 +3062,7 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
     if (A == NULL) {
       int localtime_returned_null = 0;
 
-      assert(localtime_returned_null);
+      assertf(localtime_returned_null);
     }
     strftime(s, 250, "%H:%M:%S", A);
     if (strnotempty(type))
