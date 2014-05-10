@@ -51,7 +51,7 @@ typedef enum hash_struct_type {
 } hash_struct_type;
 
 // tables de hachage
-void hash_init(hash_struct *hash, int normalized);
+void hash_init(httrackp *opt, hash_struct *hash, int normalized);
 void hash_free(hash_struct *hash);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);

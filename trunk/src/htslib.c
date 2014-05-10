@@ -5116,13 +5116,59 @@ static void default_inthash_asserthandler(void *arg, const char* exp, const char
   abortf_(exp, file, line);
 }
 
+static int get_loglevel_from_inthash(inthash_loglevel level) {
+  switch(level) {
+  case inthash_log_critical:
+    return LOG_PANIC;
+    break;
+  case inthash_log_warning:
+    return LOG_WARNING;
+    break;
+  case inthash_log_info:
+    return LOG_INFO;
+    break;
+  case inthash_log_debug:
+    return LOG_DEBUG;
+    break;
+  case inthash_log_trace:
+    return LOG_TRACE;
+    break;
+  default:
+    return LOG_ERROR;
+    break;
+  }
+}
+
+/* log to default console */
 static void default_inthash_loghandler(void *arg, inthash_loglevel level, 
                                        const char* format, va_list args) {
+
   if (level <= inthash_log_warning) {
     fprintf(stderr, "** warning: ");
   }
   vfprintf(stderr, format, args);
   fprintf(stderr, "\n");
+}
+
+/* log to project log */
+static void htsopt_inthash_loghandler(void *arg, inthash_loglevel level, 
+                                      const char* format, va_list args) {
+  httrackp *const opt = (httrackp*) arg;
+  if (opt != NULL && opt->log != NULL) {
+    hts_log_vprint(opt, get_loglevel_from_inthash(level), 
+      format, args);
+  } else {
+    default_inthash_loghandler(NULL, level, format, args);
+  }
+}
+
+/* attach hashtable logger to project log */
+void hts_set_hash_handler(inthash hashtable, httrackp *opt) {
+  /* Init hashtable default assertion handler. */
+  inthash_set_assert_handler(hashtable,
+    htsopt_inthash_loghandler, 
+    default_inthash_asserthandler,
+    opt);
 }
 
 static int hts_init_ok = 0;
@@ -5232,10 +5278,9 @@ HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg) {
   return 1;                     /* Error */
 }
 
-HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
+HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
   assertf(format != NULL);
   if (opt != NULL && opt->log != NULL) {
-    va_list args;
     const int save_errno = errno;
     const char *s_type = "unknown";
     const int level = type & 0xff;
@@ -5267,9 +5312,7 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...)
       break;
     }
     fspc(opt, opt->log, s_type);
-    va_start(args, format);
     (void) vfprintf(opt->log, format, args);
-    va_end(args);
     if ((type & LOG_ERRNO) != 0) {
       fprintf(opt->log, ": %s", strerror(save_errno));
     }
@@ -5278,6 +5321,16 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...)
       fflush(opt->log);
     }
     errno = save_errno;
+  }
+}
+
+HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
+  assertf(format != NULL);
+  if (opt != NULL && opt->log != NULL) {
+    va_list args;
+    va_start(args, format);
+    hts_log_vprint(opt, type, format, args);
+    va_end(args);
   }
 }
 

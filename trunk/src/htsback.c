@@ -67,13 +67,15 @@ static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
 
-struct_back *back_new(int back_max) {
+struct_back *back_new(httrackp *opt, int back_max) {
   int i;
   struct_back *sback = calloct(1, sizeof(struct_back));
 
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
   sback->ready = inthash_new(0);
+  hts_set_hash_handler(sback->ready, opt);
+  inthash_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
   inthash_value_is_malloc(sback->ready, 1);
   // init
