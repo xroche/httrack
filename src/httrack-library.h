@@ -116,6 +116,8 @@ HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
 HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
 HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
                               ...) HTS_PRINTF_FUN(3, 4);
+HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format,
+                               va_list args);
 
 /* Infos */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);

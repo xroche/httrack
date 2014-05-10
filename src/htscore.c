@@ -401,6 +401,10 @@ int httpmirror(char *url1, httrackp * opt) {
     XH_extuninit;
     return 0;
   }
+  hts_set_hash_handler(cache_hashtable, opt);
+  hts_set_hash_handler(cache_tests, opt);
+  inthash_set_name(cache_hashtable, "cache_hashtable");
+  inthash_set_name(cache_tests, "cache_tests");
   inthash_value_is_malloc(cache_tests, 1);      /* malloc */
   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
@@ -445,7 +449,7 @@ int httpmirror(char *url1, httrackp * opt) {
   lien_tot = 0;
 
   // initialiser hachage
-  hash_init(&hash, opt->urlhack);
+  hash_init(opt, &hash, opt->urlhack);
   // note: we need a cast because of the const
   hash.liens = (const lien_url **) liens;
 
@@ -683,7 +687,7 @@ int httpmirror(char *url1, httrackp * opt) {
     // On prévoit large: les fichiers HTML ne prennent que peu de place en mémoire, et les
     // fichiers non html sont sauvés en direct sur disque.
     // --> 1024 entrées + 32 entrées par socket en supplément
-    sback = back_new(opt->maxsoc * 32 + 1024);
+    sback = back_new(opt, opt->maxsoc * 32 + 1024);
     if (sback == NULL) {
       hts_log_print(opt, LOG_PANIC,
                     "Not enough memory, can not allocate %d bytes",

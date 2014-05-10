@@ -234,6 +234,9 @@ struct t_dnscache {
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 
+// attach specific project log to hachtable logger
+void hts_set_hash_handler(inthash hashtable, httrackp *opt);
+
 // version
 HTSEXT_API const char* hts_version(void);
 
