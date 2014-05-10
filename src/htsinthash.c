@@ -184,6 +184,8 @@ struct struct_inthash {
       t_inthash_asserthandler fatal;
       /** opaque argument **/
       void *arg;
+      /** hashtable name for logging **/
+      const char *name;
     } error;
   } custom;
 };
@@ -194,14 +196,14 @@ struct struct_inthash {
 
 /* Compiler-specific. */
 #ifdef __GNUC__
-#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
-#define HTS_INLINE __inline__
+#define INTHASH_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
+#define INTHASH_INLINE __inline__
 #elif (defined(_MSC_VER))
-#define HTS_PRINTF_FUN(FMT, ARGS)
-#define HTS_INLINE __inline
+#define INTHASH_PRINTF_FUN(FMT, ARGS)
+#define INTHASH_INLINE __inline
 #else
-#define HTS_PRINTF_FUN(FMT, ARGS)
-#define HTS_INLINE
+#define INTHASH_PRINTF_FUN(FMT, ARGS)
+#define INTHASH_INLINE
 #endif
 
 /* Logging level. */
@@ -209,7 +211,7 @@ static void inthash_log(const inthash hashtable, inthash_loglevel level,
                         const char *format, va_list args);
 #define DECLARE_LOG_FUNCTION(NAME, LEVEL) \
 static void NAME(const inthash hashtable, const char *format, ...) \
-  HTS_PRINTF_FUN(2, 3); \
+  INTHASH_PRINTF_FUN(2, 3); \
 static void NAME(const inthash hashtable, const char *format, ...) { \
   va_list args; \
   va_start(args, format); \
@@ -260,6 +262,9 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 
 /* assert failed handler. */
 static void inthash_assert_failed(const inthash hashtable, const char* exp, const char* file, int line) {
+  const char *name = inthash_get_name(hashtable);
+  inthash_crit(hashtable, "hashtable %s: %s failed at %s:%d", 
+    name != NULL ? name : "<unknown>", exp, file, line);
   if (hashtable != NULL && hashtable->custom.error.fatal != NULL) {
     hashtable->custom.error.fatal(hashtable->custom.error.arg, exp, file, line);
   } else if (global_assert_handler != NULL) {
@@ -287,12 +292,17 @@ static void inthash_log(const inthash hashtable, inthash_loglevel level,
 
 /* No logging (should be dropped by the compiler) */
 static void inthash_nolog(const inthash hashtable, const char *format, ...)
-                          HTS_PRINTF_FUN(2, 3);
+                          INTHASH_PRINTF_FUN(2, 3);
 static void inthash_nolog(const inthash hashtable, const char *format, ...) {
 }
 
+const char* inthash_get_name(inthash hashtable) {
+  return hashtable->custom.error.name;
+}
+
 static void inthash_log_stats(inthash hashtable) {
-  inthash_info(hashtable, "hashtable summary: "
+  const char *name = inthash_get_name(hashtable);
+  inthash_info(hashtable, "hashtable %s%s%ssummary: "
                "size=%"UINT_64_FORMAT" (lg2=%"UINT_64_FORMAT") "
                "used=%"UINT_64_FORMAT" "
                "stash-size=%"UINT_64_FORMAT" "
@@ -309,6 +319,9 @@ static void inthash_log_stats(inthash hashtable) {
                "pool-compact=%"UINT_64_FORMAT" "
                "pool-realloc=%"UINT_64_FORMAT" "
                "memory=%"UINT_64_FORMAT,
+               name != NULL ? "\"" : "",
+               name != NULL ? name : "",
+               name != NULL ? "\" " : "",
                (uint64_t) POW2(hashtable->lg_size),
                (uint64_t) hashtable->lg_size,
                (uint64_t) hashtable->used,
@@ -410,39 +423,39 @@ inthash_keys inthash_hash_value(const char *value) {
 #endif
 }
 
-static HTS_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
-                                                   const char *value) {
+static INTHASH_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
+                                                       const char *value) {
   return hashtable->custom.key.hash == NULL 
     ? inthash_hash_value(value)
     : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
 }
 
 /* position 'pos' is free ? */
-static HTS_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
+static INTHASH_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
   return hashtable->items[pos].name == NULL;
 }
 
 /* compare two keys ; by default using strcmp() */
-static HTS_INLINE int inthash_equals(inthash hashtable,
-                                     const char *a, const char *b) {
+static INTHASH_INLINE int inthash_equals(inthash hashtable,
+                                         const char *a, const char *b) {
   return hashtable->custom.key.equals == NULL
     ? strcmp(a, b) == 0
     : hashtable->custom.key.equals(hashtable->custom.key.arg, a, b);
 }
 
-static HTS_INLINE int inthash_matches_(inthash hashtable,
-                                       const inthash_item *const item,
-                                       const char *name,
-                                       const inthash_keys *hashes) {
+static INTHASH_INLINE int inthash_matches_(inthash hashtable,
+                                           const inthash_item *const item,
+                                           const char *name,
+                                           const inthash_keys *hashes) {
   return item->name != NULL
     && item->hashes.hash1 == hashes->hash1
     && item->hashes.hash2 == hashes->hash2
     && inthash_equals(hashtable, item->name, name);
 }
 
-static HTS_INLINE int inthash_matches(inthash hashtable, size_t pos,
-                                      const char *name,
-                                      const inthash_keys *hashes) {
+static INTHASH_INLINE int inthash_matches(inthash hashtable, size_t pos,
+                                          const char *name,
+                                          const inthash_keys *hashes) {
   const inthash_item *const item = &hashtable->items[pos];
   return inthash_matches_(hashtable, item, name, hashes);
 }
@@ -620,7 +633,7 @@ static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
 }
 
 /* duplicate a key. default is to use the internal pool. */
-static HTS_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
+static INTHASH_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
   return hashtable->custom.key.dup == NULL
     ? inthash_dup_name_internal(hashtable, name)
     : hashtable->custom.key.dup(hashtable->custom.key.arg, name);
@@ -663,14 +676,14 @@ static void inthash_free_key(inthash hashtable, char *name) {
   }
 }
 
-static HTS_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
-                                              inthash_key hash) {
+static INTHASH_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
+                                                  inthash_key hash) {
   const inthash_key mask = POW2(lg_size) - 1;
   return hash & mask;
 }
 
-static HTS_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
-                                             inthash_key hash) {
+static INTHASH_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
+                                                 inthash_key hash) {
   return inthash_hash_to_pos_(hashtable->lg_size, hash);
 }
 
@@ -919,7 +932,8 @@ int inthash_write_value(inthash hashtable, const char *name,
         && half_size > POW2(16) 
         && hashtable->used < half_size / 4) {
           inthash_warning(hashtable, 
-            "stash size still full despite %"UINT_64_FORMAT" elements used out of %"UINT_64_FORMAT,
+            "stash size still full despite %"UINT_64_FORMAT
+            " elements used out of %"UINT_64_FORMAT,
             hashtable->used, half_size*2);
       }
 
@@ -1222,6 +1236,7 @@ inthash inthash_new(size_t initial_size) {
     hashtable->custom.key.equals = NULL;
     hashtable->custom.key.arg = NULL;
     hashtable->custom.error.fatal = NULL;
+    hashtable->custom.error.name = NULL;
     hashtable->custom.error.arg = NULL;
   }
   return hashtable;
@@ -1241,6 +1256,10 @@ void inthash_value_is_malloc(inthash hashtable, int flag) {
     hashtable->custom.value.free = NULL;
     hashtable->custom.value.arg = NULL;
   }
+}
+
+void inthash_set_name(inthash hashtable, const char *name) {
+  hashtable->custom.error.name = name;
 }
 
 void inthash_value_set_value_handler(inthash hashtable,

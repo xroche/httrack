@@ -241,6 +241,18 @@ void inthash_set_assert_handler(inthash hashtable,
                                 void *arg);
 
 /**
+ * Set the hashtable name, for degugging purpose.
+ * name: the hashtable name (ASCII or UTF-8)
+ */
+void inthash_set_name(inthash hashtable, const char *name);
+
+/**
+ * Get the hashtable name, for degugging purpose.
+ * Return NULL if no name was defined.
+ **/
+const char* inthash_get_name(inthash hashtable);
+
+/**
  * Read an integer entry from the hashtable.
  * Return non-zero value upon success and sets intvalue.
  **/
