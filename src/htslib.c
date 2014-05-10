@@ -5116,6 +5116,15 @@ static void default_inthash_asserthandler(void *arg, const char* exp, const char
   abortf_(exp, file, line);
 }
 
+static void default_inthash_loghandler(void *arg, inthash_loglevel level, 
+                                       const char* format, va_list args) {
+  if (level <= inthash_log_warning) {
+    fprintf(stderr, "** warning: ");
+  }
+  vfprintf(stderr, format, args);
+  fprintf(stderr, "\n");
+}
+
 static int hts_init_ok = 0;
 HTSEXT_API int hts_init(void) {
   const char *dbg_env;
@@ -5138,7 +5147,8 @@ HTSEXT_API int hts_init(void) {
   hts_debug_log_print("entering hts_init()");   /* debug */
 
   /* Init hashtable default assertion handler. */
-  inthash_set_global_assert_handler(default_inthash_asserthandler);
+  inthash_set_global_assert_handler(default_inthash_loghandler, 
+    default_inthash_asserthandler);
 
   /* Init threads (lazy init) */
   htsthread_init();

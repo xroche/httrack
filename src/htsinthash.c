@@ -82,7 +82,7 @@ Please visit our Website: http://www.httrack.com
 #define STASH_SIZE 16
 
 /** Minimum value for lg_size. **/
-#define MIN_LG_SIZE 8
+#define MIN_LG_SIZE 4
 
 /** Minimum value for pool.capacity. **/
 #define MIN_POOL_CAPACITY 256
@@ -178,6 +178,8 @@ struct struct_inthash {
 
     /** How to handle fatal assertions (might be NULL). **/
     struct {
+      /** logging **/
+      t_inthash_loghandler log;
       /** abort() **/
       t_inthash_asserthandler fatal;
       /** opaque argument **/
@@ -203,22 +205,36 @@ struct struct_inthash {
 #endif
 
 /* Logging level. */
+static void inthash_log(const inthash hashtable, inthash_loglevel level,
+                        const char *format, va_list args);
+#define DECLARE_LOG_FUNCTION(NAME, LEVEL) \
+static void NAME(const inthash hashtable, const char *format, ...) \
+  HTS_PRINTF_FUN(2, 3); \
+static void NAME(const inthash hashtable, const char *format, ...) { \
+  va_list args; \
+  va_start(args, format); \
+  inthash_log(hashtable, LEVEL, format, args); \
+  va_end(args); \
+}
 #if 0
 /* Verbose. */
-#define inthash_crit inthash_log
-#define inthash_info inthash_log
-#define inthash_debug inthash_log
-#define inthash_trace inthash_log
+DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
+DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
+DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
+DECLARE_LOG_FUNCTION(inthash_debug, inthash_log_debug)
+DECLARE_LOG_FUNCTION(inthash_trace, inthash_log_trace)
 #elif 0
 /* Info. */
-#define inthash_crit inthash_log
-#define inthash_info inthash_log
+DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
+DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
+DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
 #define inthash_debug inthash_log
 #define inthash_trace inthash_nolog
 #else
 /* No logging except stats and critical. */
-#define inthash_crit inthash_log
-#define inthash_info inthash_log
+DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
+DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
+DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
 #define inthash_debug inthash_nolog
 #define inthash_trace inthash_nolog
 #endif
@@ -231,6 +247,9 @@ static char the_empty_string[1] = { 0 };
 
 /* global assertion handler */
 static t_inthash_asserthandler global_assert_handler = NULL;
+
+/* global assertion handler */
+static t_inthash_loghandler global_log_handler = NULL;
 
 /* default assertion handler, if neither hashtable one nor global one 
    were defined */
@@ -252,16 +271,18 @@ static void inthash_assert_failed(const inthash hashtable, const char* exp, cons
 }
 
 /* Logging */
-static void inthash_log(const inthash hashtable, const char *format, ...)
-                        HTS_PRINTF_FUN(2, 3);
-static void inthash_log(const inthash hashtable, const char *format, ...) {
-  va_list args;
+static void inthash_log(const inthash hashtable, inthash_loglevel level,
+                        const char *format, va_list args) {
   inthash_assert(hashtable, format != NULL);
-  fprintf(stderr, "[%p] ", (void*) hashtable);
-  va_start(args, format);
-  (void) vfprintf(stderr, format, args);
-  va_end(args);
-  putc('\n', stderr);
+  if (hashtable != NULL && hashtable->custom.error.log != NULL) {
+    hashtable->custom.error.log(hashtable->custom.error.arg, level, format, args);
+  } else if (global_log_handler != NULL) {
+    global_log_handler(hashtable, level, format, args);
+  } else {
+    fprintf(stderr, "[%p] ", (void*) hashtable);
+    (void) vfprintf(stderr, format, args);
+    putc('\n', stderr);
+  }
 }
 
 /* No logging (should be dropped by the compiler) */
@@ -874,11 +895,15 @@ int inthash_write_value(inthash hashtable, const char *name,
     /* size of half of the table */
     const size_t half_size = POW2(hashtable->lg_size - 1);
 
+    /* size of half of the stash */
+    const size_t half_stash_size = STASH_SIZE / 2;
+
     /* item was added: increase count */
     hashtable->used++;
 
-    /* table is more than half-full */
-    if (hashtable->used >= half_size) {
+    /* table is more than half-full, or stash is more than half-full */
+    if (hashtable->used >= half_size
+      || hashtable->stash.size >= half_stash_size) {
       size_t i;
 
       /* size before  */
@@ -888,6 +913,15 @@ int inthash_write_value(inthash hashtable, const char *name,
 
       /* size after doubling it */
       const size_t alloc_size = prev_alloc_size * 2;
+
+      /* log stash issues */
+      if (hashtable->stash.size >= half_stash_size 
+        && half_size > POW2(16) 
+        && hashtable->used < half_size / 4) {
+          inthash_warning(hashtable, 
+            "stash size still full despite %"UINT_64_FORMAT" elements used out of %"UINT_64_FORMAT,
+            hashtable->used, half_size*2);
+      }
 
       /* statistics */
       hashtable->stats.rehash_count++;
@@ -1232,9 +1266,11 @@ void inthash_value_set_key_handler(inthash hashtable,
 }
 
 void inthash_set_assert_handler(inthash hashtable,
+                                t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
                                 void *arg) {
   inthash_assert(hashtable, fatal != NULL);
+  hashtable->custom.error.log = log;
   hashtable->custom.error.fatal = fatal;
   hashtable->custom.error.arg = arg;
 }
@@ -1320,6 +1356,8 @@ inthash_item *inthash_enum_next(struct_inthash_enum * e) {
   }
 }
 
-void inthash_set_global_assert_handler(t_inthash_asserthandler fatal) {
+void inthash_set_global_assert_handler(t_inthash_loghandler log,
+                                       t_inthash_asserthandler fatal) {
+  global_log_handler = log;
   global_assert_handler = fatal;
 }
