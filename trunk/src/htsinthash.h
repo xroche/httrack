@@ -112,17 +112,30 @@ struct inthash_item {
   inthash_keys hashes;
 };
 
+/** Log level. **/
+typedef enum inthash_loglevel {
+  inthash_log_critical,
+  inthash_log_warning,
+  inthash_log_info,
+  inthash_log_debug,
+  inthash_log_trace
+} inthash_loglevel;
+
 /** Alias for legacy code. **/
 typedef inthash_item inthash_chain;
 
 /** Value free handler **/
-typedef void (*t_inthash_freehandler) (void *arg, void *value);
+typedef void (*t_inthash_freehandler)(void *arg, void *value);
 
 /** Name dup handler. **/
-typedef char* (*t_inthash_duphandler) (void *arg, const char *name);
+typedef char* (*t_inthash_duphandler)(void *arg, const char *name);
 
 /** Hash computation handler. **/
 typedef inthash_keys (*t_inthash_hasheshandler)(void *arg, const char *value);
+
+/** Hashtable logging handler. **/
+typedef void (*t_inthash_loghandler)(void *arg, inthash_loglevel level, 
+                                     const char* format, va_list args);
 
 /** Hashtable fatal assertion failure. **/
 typedef void (*t_inthash_asserthandler)(void *arg, const char* exp, const char* file, int line);
@@ -219,9 +232,11 @@ void inthash_value_set_key_handler(inthash hashtable,
 
 /**
  * Set assertion failure handler.
- * fatal: handled called upon serious programming error
+ * log: handler called upon serious programming error
+ * fatal: handler called upon serious programming error
  **/
 void inthash_set_assert_handler(inthash hashtable,
+                                t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
                                 void *arg);
 
@@ -323,10 +338,13 @@ inthash_keys inthash_hash_value(const char *value);
  * Set default global assertion failure handler.
  * The handler will be used if no specific handler was defined in the
  * hashtable itself.
- * fatal: handled called upon serious programming error (opaque argument 
- * is the hashtable)
+ * log: handler called upon serious error log (opaque argument 
+ * is the hashtable itself)
+ * fatal: handler called upon serious programming error (opaque argument 
+ * is the hashtable itself)
  **/
-void inthash_set_global_assert_handler(t_inthash_asserthandler fatal);
+void inthash_set_global_assert_handler(t_inthash_loghandler log,
+                                       t_inthash_asserthandler fatal);
 
 #endif
 
