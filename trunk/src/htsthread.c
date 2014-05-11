@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsthread.h"
+#include "httrack-library.h"
 
 #if USE_BEGINTHREAD
 #ifdef _WIN32
