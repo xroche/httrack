@@ -1,182 +1,182 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "02 May 2014" "httrack website copier"
+.TH httrack 1 "12 May 2014" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
 .B httrack [ url ]... [ \-filter ]... [ +filter ]... [ 
-.B \-O\, \-\-path 
+.B \-O, \-\-path 
 ] [ 
-.B \-w\, \-\-mirror 
+.B \-w, \-\-mirror 
 ] [ 
-.B \-W\, \-\-mirror\-wizard 
+.B \-W, \-\-mirror\-wizard 
 ] [ 
-.B \-g\, \-\-get\-files 
+.B \-g, \-\-get\-files 
 ] [ 
-.B \-i\, \-\-continue 
+.B \-i, \-\-continue 
 ] [ 
-.B \-Y\, \-\-mirrorlinks 
+.B \-Y, \-\-mirrorlinks 
 ] [ 
-.B \-P\, \-\-proxy 
+.B \-P, \-\-proxy 
 ] [ 
-.B \-%f\, \-\-httpproxy\-ftp[=N] 
+.B \-%f, \-\-httpproxy\-ftp[=N] 
 ] [ 
-.B \-%b\, \-\-bind 
+.B \-%b, \-\-bind 
 ] [ 
-.B \-rN\, \-\-depth[=N] 
+.B \-rN, \-\-depth[=N] 
 ] [ 
-.B \-%eN\, \-\-ext\-depth[=N] 
+.B \-%eN, \-\-ext\-depth[=N] 
 ] [ 
-.B \-mN\, \-\-max\-files[=N] 
+.B \-mN, \-\-max\-files[=N] 
 ] [ 
-.B \-MN\, \-\-max\-size[=N] 
+.B \-MN, \-\-max\-size[=N] 
 ] [ 
-.B \-EN\, \-\-max\-time[=N] 
+.B \-EN, \-\-max\-time[=N] 
 ] [ 
-.B \-AN\, \-\-max\-rate[=N] 
+.B \-AN, \-\-max\-rate[=N] 
 ] [ 
-.B \-%cN\, \-\-connection\-per\-second[=N] 
+.B \-%cN, \-\-connection\-per\-second[=N] 
 ] [ 
-.B \-GN\, \-\-max\-pause[=N] 
+.B \-GN, \-\-max\-pause[=N] 
 ] [ 
-.B \-cN\, \-\-sockets[=N] 
+.B \-cN, \-\-sockets[=N] 
 ] [ 
-.B \-TN\, \-\-timeout[=N] 
+.B \-TN, \-\-timeout[=N] 
 ] [ 
-.B \-RN\, \-\-retries[=N] 
+.B \-RN, \-\-retries[=N] 
 ] [ 
-.B \-JN\, \-\-min\-rate[=N] 
+.B \-JN, \-\-min\-rate[=N] 
 ] [ 
-.B \-HN\, \-\-host\-control[=N] 
+.B \-HN, \-\-host\-control[=N] 
 ] [ 
-.B \-%P\, \-\-extended\-parsing[=N] 
+.B \-%P, \-\-extended\-parsing[=N] 
 ] [ 
-.B \-n\, \-\-near 
+.B \-n, \-\-near 
 ] [ 
-.B \-t\, \-\-test 
+.B \-t, \-\-test 
 ] [ 
-.B \-%L\, \-\-list 
+.B \-%L, \-\-list 
 ] [ 
-.B \-%S\, \-\-urllist 
+.B \-%S, \-\-urllist 
 ] [ 
-.B \-NN\, \-\-structure[=N] 
+.B \-NN, \-\-structure[=N] 
 ] [ 
-.B \-%D\, \-\-cached\-delayed\-type\-check 
+.B \-%D, \-\-cached\-delayed\-type\-check 
 ] [ 
-.B \-%M\, \-\-mime\-html 
+.B \-%M, \-\-mime\-html 
 ] [ 
-.B \-LN\, \-\-long\-names[=N] 
+.B \-LN, \-\-long\-names[=N] 
 ] [ 
-.B \-KN\, \-\-keep\-links[=N] 
+.B \-KN, \-\-keep\-links[=N] 
 ] [ 
-.B \-x\, \-\-replace\-external 
+.B \-x, \-\-replace\-external 
 ] [ 
-.B \-%x\, \-\-disable\-passwords 
+.B \-%x, \-\-disable\-passwords 
 ] [ 
-.B \-%q\, \-\-include\-query\-string 
+.B \-%q, \-\-include\-query\-string 
 ] [ 
-.B \-o\, \-\-generate\-errors 
+.B \-o, \-\-generate\-errors 
 ] [ 
-.B \-X\, \-\-purge\-old[=N] 
+.B \-X, \-\-purge\-old[=N] 
 ] [ 
-.B \-%p\, \-\-preserve 
+.B \-%p, \-\-preserve 
 ] [ 
-.B \-%T\, \-\-utf8\-conversion 
+.B \-%T, \-\-utf8\-conversion 
 ] [ 
-.B \-bN\, \-\-cookies[=N] 
+.B \-bN, \-\-cookies[=N] 
 ] [ 
-.B \-u\, \-\-check\-type[=N] 
+.B \-u, \-\-check\-type[=N] 
 ] [ 
-.B \-j\, \-\-parse\-java[=N] 
+.B \-j, \-\-parse\-java[=N] 
 ] [ 
-.B \-sN\, \-\-robots[=N] 
+.B \-sN, \-\-robots[=N] 
 ] [ 
-.B \-%h\, \-\-http\-10 
+.B \-%h, \-\-http\-10 
 ] [ 
-.B \-%k\, \-\-keep\-alive 
+.B \-%k, \-\-keep\-alive 
 ] [ 
-.B \-%B\, \-\-tolerant 
+.B \-%B, \-\-tolerant 
 ] [ 
-.B \-%s\, \-\-updatehack 
+.B \-%s, \-\-updatehack 
 ] [ 
-.B \-%u\, \-\-urlhack 
+.B \-%u, \-\-urlhack 
 ] [ 
-.B \-%A\, \-\-assume 
+.B \-%A, \-\-assume 
 ] [ 
-.B \-@iN\, \-\-protocol[=N] 
+.B \-@iN, \-\-protocol[=N] 
 ] [ 
-.B \-%w\, \-\-disable\-module 
+.B \-%w, \-\-disable\-module 
 ] [ 
-.B \-F\, \-\-user\-agent 
+.B \-F, \-\-user\-agent 
 ] [ 
-.B \-%R\, \-\-referer 
+.B \-%R, \-\-referer 
 ] [ 
-.B \-%E\, \-\-from 
+.B \-%E, \-\-from 
 ] [ 
-.B \-%F\, \-\-footer 
+.B \-%F, \-\-footer 
 ] [ 
-.B \-%l\, \-\-language 
+.B \-%l, \-\-language 
 ] [ 
-.B \-%a\, \-\-accept 
+.B \-%a, \-\-accept 
 ] [ 
-.B \-%X\, \-\-headers 
+.B \-%X, \-\-headers 
 ] [ 
-.B \-C\, \-\-cache[=N] 
+.B \-C, \-\-cache[=N] 
 ] [ 
-.B \-k\, \-\-store\-all\-in\-cache 
+.B \-k, \-\-store\-all\-in\-cache 
 ] [ 
-.B \-%n\, \-\-do\-not\-recatch 
+.B \-%n, \-\-do\-not\-recatch 
 ] [ 
-.B \-%v\, \-\-display 
+.B \-%v, \-\-display 
 ] [ 
-.B \-Q\, \-\-do\-not\-log 
+.B \-Q, \-\-do\-not\-log 
 ] [ 
-.B \-q\, \-\-quiet 
+.B \-q, \-\-quiet 
 ] [ 
-.B \-z\, \-\-extra\-log 
+.B \-z, \-\-extra\-log 
 ] [ 
-.B \-Z\, \-\-debug\-log 
+.B \-Z, \-\-debug\-log 
 ] [ 
-.B \-v\, \-\-verbose 
+.B \-v, \-\-verbose 
 ] [ 
-.B \-f\, \-\-file\-log 
+.B \-f, \-\-file\-log 
 ] [ 
-.B \-f2\, \-\-single\-log 
+.B \-f2, \-\-single\-log 
 ] [ 
-.B \-I\, \-\-index 
+.B \-I, \-\-index 
 ] [ 
-.B \-%i\, \-\-build\-top\-index 
+.B \-%i, \-\-build\-top\-index 
 ] [ 
-.B \-%I\, \-\-search\-index 
+.B \-%I, \-\-search\-index 
 ] [ 
-.B \-pN\, \-\-priority[=N] 
+.B \-pN, \-\-priority[=N] 
 ] [ 
-.B \-S\, \-\-stay\-on\-same\-dir 
+.B \-S, \-\-stay\-on\-same\-dir 
 ] [ 
-.B \-D\, \-\-can\-go\-down 
+.B \-D, \-\-can\-go\-down 
 ] [ 
-.B \-U\, \-\-can\-go\-up 
+.B \-U, \-\-can\-go\-up 
 ] [ 
-.B \-B\, \-\-can\-go\-up\-and\-down 
+.B \-B, \-\-can\-go\-up\-and\-down 
 ] [ 
-.B \-a\, \-\-stay\-on\-same\-address 
+.B \-a, \-\-stay\-on\-same\-address 
 ] [ 
-.B \-d\, \-\-stay\-on\-same\-domain 
+.B \-d, \-\-stay\-on\-same\-domain 
 ] [ 
-.B \-l\, \-\-stay\-on\-same\-tld 
+.B \-l, \-\-stay\-on\-same\-tld 
 ] [ 
-.B \-e\, \-\-go\-everywhere 
+.B \-e, \-\-go\-everywhere 
 ] [ 
-.B \-%H\, \-\-debug\-headers 
+.B \-%H, \-\-debug\-headers 
 ] [ 
-.B \-%!\, \-\-disable\-security\-limits 
+.B \-%!, \-\-disable\-security\-limits 
 ] [ 
-.B \-V\, \-\-userdef\-cmd 
+.B \-V, \-\-userdef\-cmd 
 ] [ 
-.B \-%W\, \-\-callback 
+.B \-%W, \-\-callback 
 ] [ 
-.B \-K\, \-\-keep\-links[=N] 
+.B \-K, \-\-keep\-links[=N] 
 ] [ 
 .B 
 .SH DESCRIPTION
@@ -191,7 +191,7 @@ allows you to download a World Wide Web site from the Internet to a local direct
  mirror the two sites together (with shared links) and accept any .jpg files on .com sites
 .TP
 .B httrack www.someweb.com/bob/bobby.html +* \-r6
-means get all files starting from bobby.html\, with 6 link\-depth\, and possibility of going everywhere on the web
+means get all files starting from bobby.html, with 6 link\-depth, and possibility of going everywhere on the web
 .TP
 .B httrack www.someweb.com/bob/bobby.html \-\-spider \-P proxy.myhost.com:8080
 runs the spider on www.someweb.com/bob/bobby.html using a proxy
@@ -208,7 +208,7 @@ continues a mirror in the current folder
 .SS General options:
 .IP \-O
 path for mirror/logfiles+cache (\-O path
-mirror[\,path
+mirror[,path
 cache
 and
 logfiles]) (\-\-path <param>)
@@ -217,7 +217,7 @@ logfiles]) (\-\-path <param>)
 .IP \-w
 *mirror web sites (\-\-mirror)
 .IP \-W
-mirror web sites\, semi\-automatic (asks questions) (\-\-mirror\-wizard)
+mirror web sites, semi\-automatic (asks questions) (\-\-mirror\-wizard)
 .IP \-g
 just get files (saved in the current directory) (\-\-get\-files)
 .IP \-i
@@ -240,34 +240,34 @@ set the mirror depth to N (* r9999) (\-\-depth[=N])
 set the external links depth to N (* %e0) (\-\-ext\-depth[=N])
 .IP \-mN
 maximum file length for a non\-html file (\-\-max\-files[=N])
-.IP \-mN\,N2
+.IP \-mN,N2
 maximum file length for non html (N) and html (N2)
 .IP \-MN
 maximum overall size that can be uploaded/scanned (\-\-max\-size[=N])
 .IP \-EN
-maximum mirror time in seconds (60=1 minute\, 3600=1 hour) (\-\-max\-time[=N])
+maximum mirror time in seconds (60=1 minute, 3600=1 hour) (\-\-max\-time[=N])
 .IP \-AN
 maximum transfer rate in bytes/seconds (1000=1KB/s max) (\-\-max\-rate[=N])
 .IP \-%cN
 maximum number of connections/seconds (*%c10) (\-\-connection\-per\-second[=N])
 .IP \-GN
-pause transfer if N bytes reached\, and wait until lock file is deleted (\-\-max\-pause[=N])
+pause transfer if N bytes reached, and wait until lock file is deleted (\-\-max\-pause[=N])
 
 .SS Flow control:
 .IP \-cN
 number of multiple connections (*c8) (\-\-sockets[=N])
 .IP \-TN
-timeout\, number of seconds after a non\-responding link is shutdown (\-\-timeout[=N])
+timeout, number of seconds after a non\-responding link is shutdown (\-\-timeout[=N])
 .IP \-RN
-number of retries\, in case of timeout or non\-fatal errors (*R1) (\-\-retries[=N])
+number of retries, in case of timeout or non\-fatal errors (*R1) (\-\-retries[=N])
 .IP \-JN
-traffic jam control\, minimum transfert rate (bytes/seconds) tolerated for a link (\-\-min\-rate[=N])
+traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link (\-\-min\-rate[=N])
 .IP \-HN
-host is abandonned if: 0=never\, 1=timeout\, 2=slow\, 3=timeout or slow (\-\-host\-control[=N])
+host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (\-\-host\-control[=N])
 
 .SS Links options:
 .IP \-%P
-*extended parsing\, attempt to parse all links\, even in unknown tags or Javascript (%P0 don t use) (\-\-extended\-parsing[=N])
+*extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don t use) (\-\-extended\-parsing[=N])
 .IP \-n
 get non\-html files  near  an html file (ex: an image located outside) (\-\-near)
 .IP \-t
@@ -279,25 +279,25 @@ test all URLs (even forbidden ones) (\-\-test)
 
 .SS Build options:
 .IP \-NN
-structure type (0 *original structure\, 1+: see below) (\-\-structure[=N])
+structure type (0 *original structure, 1+: see below) (\-\-structure[=N])
 .IP \-or
 user defined structure (\-N "%h%p/%n%q.%t")
 .IP \-%N
-delayed type check\, don t make any link test but wait for files download to start instead (experimental) (%N0 don t use\, %N1 use for unknown extensions\, * %N2 always use)
+delayed type check, don t make any link test but wait for files download to start instead (experimental) (%N0 don t use, %N1 use for unknown extensions, * %N2 always use)
 .IP \-%D
-cached delayed type check\, don t wait for remote type during updates\, to speedup them (%D0 wait\, * %D1 don t wait) (\-\-cached\-delayed\-type\-check)
+cached delayed type check, don t wait for remote type during updates, to speedup them (%D0 wait, * %D1 don t wait) (\-\-cached\-delayed\-type\-check)
 .IP \-%M
 generate a RFC MIME\-encapsulated full\-archive (.mht) (\-\-mime\-html)
 .IP \-LN
 long names (L1 *long names / L0 8\-3 conversion / L2 ISO9660 compatible) (\-\-long\-names[=N])
 .IP \-KN
-keep original links (e.g. http://www.adr/link) (K0 *relative link\, K absolute links\, K4 original links\, K3 absolute URI links\, K5 transparent proxy link) (\-\-keep\-links[=N])
+keep original links (e.g. http://www.adr/link) (K0 *relative link, K absolute links, K4 original links, K3 absolute URI links, K5 transparent proxy link) (\-\-keep\-links[=N])
 .IP \-x
 replace external html links by error pages (\-\-replace\-external)
 .IP \-%x
 do not include any password for external password protected websites (%x0 include) (\-\-disable\-passwords)
 .IP \-%q
-*include query string for local files (useless\, for information purpose only) (%q0 don t include) (\-\-include\-query\-string)
+*include query string for local files (useless, for information purpose only) (%q0 don t include) (\-\-include\-query\-string)
 .IP \-o
 *generate output html file in case of error (404..) (o0 don t generate) (\-\-generate\-errors)
 .IP \-X
@@ -309,29 +309,29 @@ links conversion to UTF\-8 (\-\-utf8\-conversion)
 
 .SS Spider options:
 .IP \-bN
-accept cookies in cookies.txt (0=do not accept\,* 1=accept) (\-\-cookies[=N])
+accept cookies in cookies.txt (0=do not accept,* 1=accept) (\-\-cookies[=N])
 .IP \-u
-check document type if unknown (cgi\,asp..) (u0 don t check\, * u1 check but /\, u2 check always) (\-\-check\-type[=N])
+check document type if unknown (cgi,asp..) (u0 don t check, * u1 check but /, u2 check always) (\-\-check\-type[=N])
 .IP \-j
-*parse Java Classes (j0 don t parse\, bitmask: |1 parse default\, |2 don t parse .class |4 don t parse .js |8 don t be aggressive) (\-\-parse\-java[=N])
+*parse Java Classes (j0 don t parse, bitmask: |1 parse default, |2 don t parse .class |4 don t parse .js |8 don t be aggressive) (\-\-parse\-java[=N])
 .IP \-sN
-follow robots.txt and meta robots tags (0=never\,1=sometimes\,* 2=always\, 3=always (even strict rules)) (\-\-robots[=N])
+follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always (even strict rules)) (\-\-robots[=N])
 .IP \-%h
-force HTTP/1.0 requests (reduce update features\, only for old servers or proxies) (\-\-http\-10)
+force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (\-\-http\-10)
 .IP \-%k
-use keep\-alive if possible\, greately reducing latency for small files and test requests (%k0 don t use) (\-\-keep\-alive)
+use keep\-alive if possible, greately reducing latency for small files and test requests (%k0 don t use) (\-\-keep\-alive)
 .IP \-%B
-tolerant requests (accept bogus responses on some servers\, but not standard!) (\-\-tolerant)
+tolerant requests (accept bogus responses on some servers, but not standard!) (\-\-tolerant)
 .IP \-%s
-update hacks: various hacks to limit re\-transfers when updating (identical size\, bogus response..) (\-\-updatehack)
+update hacks: various hacks to limit re\-transfers when updating (identical size, bogus response..) (\-\-updatehack)
 .IP \-%u
-url hacks: various hacks to limit duplicate URLs (strip //\, www.foo.com==foo.com..) (\-\-urlhack)
+url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..) (\-\-urlhack)
 .IP \-%A
-assume that a type (cgi\,asp..) is always linked with a mime type (\-%A php3\,cgi=text/html;dat\,bin=application/x\-zip) (\-\-assume <param>)
+assume that a type (cgi,asp..) is always linked with a mime type (\-%A php3,cgi=text/html;dat,bin=application/x\-zip) (\-\-assume <param>)
 .IP \-can
 also be used to force a specific file type: \-\-assume foo.cgi=text/html
 .IP \-@iN
-internet protocol (0=both ipv6+ipv4\, 4=ipv4 only\, 6=ipv6 only) (\-\-protocol[=N])
+internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (\-\-protocol[=N])
 .IP \-%w
 disable a specific external mime module (\-%w htsswf \-%w htsjava) (\-\-disable\-module <param>)
 
@@ -345,15 +345,15 @@ from email address sent in HTTP headers (\-\-from <param>)
 .IP \-%F
 footer string in Html code (\-%F "Mirrored [from host %s [file %s [at %s]]]" (\-\-footer <param>)
 .IP \-%l
-preffered language (\-%l "fr\, en\, jp\, *" (\-\-language <param>)
+preffered language (\-%l "fr, en, jp, *" (\-\-language <param>)
 .IP \-%a
-accepted formats (\-%l "text/html\,image/png\,image/jpeg\,image/gif;q=0.9\,*/*;q=0.1" (\-\-accept <param>)
+accepted formats (\-%l "text/html,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.1" (\-\-accept <param>)
 .IP \-%X
 additional HTTP header line (\-%X "X\-Magic: 42" (\-\-headers <param>)
 
-.SS Log\, index\, cache
+.SS Log, index, cache
 .IP \-C
-create/use a cache for updates and retries (C0 no cache\,C1 cache is prioritary\,* C2 test update before) (\-\-cache[=N])
+create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) (\-\-cache[=N])
 .IP \-k
 store all files in cache (not useful if files on disk) (\-\-store\-all\-in\-cache)
 .IP \-%n
@@ -385,7 +385,7 @@ make an searchable index for this mirror (* %I0 don t make) (\-\-search\-index)
 .IP \-pN
 priority mode: (* p3) (\-\-priority[=N])
 .IP \-p0
-just scan\, don t save anything (for checking links)
+just scan, don t save anything (for checking links)
 .IP \-p1
 save only html files
 .IP \-p2
@@ -393,7 +393,7 @@ save only non html files
 .IP \-*p3
 save all files
 .IP \-p7
-get html files before\, then treat other files
+get html files before, then treat other files
 .IP \-S
 stay on the same directory (\-\-stay\-on\-same\-dir)
 .IP \-D
@@ -455,35 +455,35 @@ generate transfer rate statictics every minutes (\-\-debug\-ratestats)
 
 .SS Dangerous options: (do NOT use unless you exactly know what you are doing)
 .IP \-%!
-bypass built\-in security limits aimed to avoid bandwidth abuses (bandwidth\, simultaneous connections) (\-\-disable\-security\-limits)
+bypass built\-in security limits aimed to avoid bandwidth abuses (bandwidth, simultaneous connections) (\-\-disable\-security\-limits)
 .IP \-IMPORTANT
-NOTE: DANGEROUS OPTION\, ONLY SUITABLE FOR EXPERTS
+NOTE: DANGEROUS OPTION, ONLY SUITABLE FOR EXPERTS
 .IP \-USE
 IT WITH EXTREME CARE
 
 .SS Command\-line specific options:
 .IP \-V
-execute system command after each files ($0 is the filename: \-V "rm \$0") (\-\-userdef\-cmd <param>)
+execute system command after each files ($0 is the filename: \-V "rm \\$0") (\-\-userdef\-cmd <param>)
 .IP \-%W
-use an external library function as a wrapper (\-%W myfoo.so[\,myparameters]) (\-\-callback <param>)
+use an external library function as a wrapper (\-%W myfoo.so[,myparameters]) (\-\-callback <param>)
 
 .SS Details: Option N
 .IP \-N0
 Site\-structure (default)
 .IP \-N1
-HTML in web/\, images/other files in web/images/
+HTML in web/, images/other files in web/images/
 .IP \-N2
-HTML in web/HTML\, images/other in web/images
+HTML in web/HTML, images/other in web/images
 .IP \-N3
-HTML in web/\,  images/other in web/
+HTML in web/,  images/other in web/
 .IP \-N4
-HTML in web/\, images/other in web/xxx\, where xxx is the file extension (all gif will be placed onto web/gif\, for example)
+HTML in web/, images/other in web/xxx, where xxx is the file extension (all gif will be placed onto web/gif, for example)
 .IP \-N5
 Images/other in web/xxx and HTML in web/HTML
 .IP \-N99
-All files in web/\, with random names (gadget !)
+All files in web/, with random names (gadget !)
 .IP \-N100
-Site\-structure\, without www.domain.xxx/
+Site\-structure, without www.domain.xxx/
 .IP \-N101
 Identical to N1 exept that "web" is replaced by the site s name
 .IP \-N102
@@ -510,15 +510,15 @@ Identical to N5 exept that there is no "web" directory
 Identical to N99 exept that there is no "web" directory
 .SS Details: User\-defined option N
    %n  Name of file without file type (ex: image)
-   %N  Name of file\, including file type (ex: image.gif)
+   %N  Name of file, including file type (ex: image.gif)
    %t  File type (ex: gif)
    %p  Path [without ending /] (ex: /someimages)
    %h  Host name (ex: www.someweb.com)
-   %M  URL MD5 (128 bits\, 32 ascii bytes)
-   %Q  query string MD5 (128 bits\, 32 ascii bytes)
+   %M  URL MD5 (128 bits, 32 ascii bytes)
+   %Q  query string MD5 (128 bits, 32 ascii bytes)
    %k  full query string
    %r  protocol name (ex: http)
-   %q  small query string MD5 (16 bits\, 4 ascii bytes)
+   %q  small query string MD5 (16 bits, 4 ascii bytes)
       %s?  Short name version (ex: %sN)
    %[param]  param variable in query string
    %[param:before:after:empty:notfound]  advanced variable extraction
@@ -535,11 +535,11 @@ Identical to N99 exept that there is no "web" directory
 .IP \-empty
 : string replacement if the parameter was empty
 .IP \-all
-fields\, except the first one (the parameter name)\, can be empty
+fields, except the first one (the parameter name), can be empty
 
 .SS Details: Option K
 .IP \-K0
-foo.cgi?q=45  \->  foo4B54.html?q=45 (relative URI\, default)
+foo.cgi?q=45  \->  foo4B54.html?q=45 (relative URI, default)
 .IP \-K
 \->  http://www.foobar.com/folder/foo.cgi?q=45 (absolute URL) (\-\-keep\-links[=N])
 .IP \-K3
@@ -553,7 +553,7 @@ foo.cgi?q=45  \->  foo4B54.html?q=45 (relative URI\, default)
 .IP \-\-mirror
      <URLs> *make a mirror of site(s) (default)
 .IP \-\-get
-        <URLs>  get the files indicated\, do not seek other URLs (\-qg)
+        <URLs>  get the files indicated, do not seek other URLs (\-qg)
 .IP \-\-list
   <text file>  add all URL located in this text file (\-%L)
 .IP \-\-mirrorlinks
@@ -561,15 +561,15 @@ foo.cgi?q=45  \->  foo4B54.html?q=45 (relative URI\, default)
 .IP \-\-testlinks
   <URLs>  test links in pages (\-r1p0C0I0t)
 .IP \-\-spider
-     <URLs>  spider site(s)\, to test links: reports Errors & Warnings (\-p0C0I0t)
+     <URLs>  spider site(s), to test links: reports Errors & Warnings (\-p0C0I0t)
 .IP \-\-testsite
    <URLs>  identical to \-\-spider
 .IP \-\-skeleton
-   <URLs>  make a mirror\, but gets only html files (\-p1)
+   <URLs>  make a mirror, but gets only html files (\-p1)
 .IP \-\-update
-             update a mirror\, without confirmation (\-iC2)
+             update a mirror, without confirmation (\-iC2)
 .IP \-\-continue
-           continue a mirror\, without confirmation (\-iC1)
+           continue a mirror, without confirmation (\-iC1)
 
 .IP \-\-catchurl
            create a temporary proxy to capture an URL or a form post URL
