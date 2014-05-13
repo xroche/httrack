@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include <unistd.h>
 #endif
 #endif /* _WIN32 */
+#include <stdarg.h>
 
 #include <string.h>
 #include <time.h>
