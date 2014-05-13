@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -685,20 +685,17 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
 
       // Test en cas de file:///C|...
       if (!fexist
-          (fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-          unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil))))
+          (fconv(OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt), fil))))
         if (fexist
             (fconv
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-             unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil + 1)))) {
+             (OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt), fil + 1)))) {
           char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
           strcpybuff(tempo, fil + 1);
           strcpybuff(fil, tempo);
         }
       // Ouvrir
-      retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-        unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)));       // taille du fichier
+      retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt), fil)));       // taille du fichier
       retour->msg[0] = '\0';
       soc = INVALID_SOCKET;
       if (retour->totalsize < 0)
@@ -706,8 +703,7 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
       else {
         // Note: On passe par un FILE* (plus propre)
         //soc=open(fil,O_RDONLY,0);    // en lecture seule!
-        retour->fp = FOPEN(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-          unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)), "rb");      // ouvrir
+        retour->fp = FOPEN(fconv(OPT_GET_BUFF(opt), unescape_http(OPT_GET_BUFF(opt), fil)), "rb");      // ouvrir
         if (retour->fp == NULL)
           soc = INVALID_SOCKET;
         else
@@ -820,8 +816,8 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   char *position;
 
   /* Security check. */
-  assertf(str != NULL);
-  assertf(str->pos < str->capacity);
+  assert(str != NULL);
+  assert(str->pos < str->capacity);
 
   /* Print */
   position = &str->buffer[str->pos];
@@ -833,7 +829,7 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 
   /* Increment. */
   str->pos += strlen(position);
-  assertf(str->pos < str->capacity);
+  assert(str->pos < str->capacity);
 }
 
 // envoi d'une requète
@@ -867,8 +863,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
     if (search_tag) {           // postfile
       if (mode == 0) {          // GET!
         FILE *fp =
-          FOPEN(unescape_http(OPT_GET_BUFF(opt), 
-                OPT_GET_BUFF_SIZE(opt), search_tag + strlen(POSTTOK) + 5), "rb");
+          FOPEN(unescape_http
+                (OPT_GET_BUFF(opt), search_tag + strlen(POSTTOK) + 5), "rb");
         if (fp) {
           char BIGSTK line[1100];
           char BIGSTK protocol[256], url[HTS_URLMAXSIZE * 2], method[256];
@@ -943,7 +939,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         strncatbuff(tempo, fil, (int) (search_tag - fil));
       else
         strcpybuff(tempo, fil);
-      inplace_escape_check_url(tempo, sizeof(tempo));
+      escape_check_url(tempo);
       print_buffer(&bstr, "%s", tempo);  // avec échappement
     }
 
@@ -971,7 +967,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         autorisation[0] = user_pass[0] = '\0';
         //
         strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-        strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
+        strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), user_pass));
         code64((unsigned char *) user_pass, (int) strlen(user_pass),
                (unsigned char *) autorisation, 0);
         print_buffer(&bstr, "Proxy-Authorization: Basic %s"H_CRLF,
@@ -1005,7 +1001,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
         print_buffer(&bstr, "Content-length: %d" H_CRLF,
                 (int) (strlen
                        (unescape_http
-                        (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        (OPT_GET_BUFF(opt),
                          search_tag + strlen(POSTTOK) + 1))));
       }
     }
@@ -1103,8 +1099,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 
             user_pass[0] = '\0';
             strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-            strcpybuff(user_pass, 
-              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
+            strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), user_pass));
             code64((unsigned char *) user_pass, (int) strlen(user_pass),
                    (unsigned char *) autorisation, 0);
             if (strcmp(fil, "/robots.txt"))     /* pas robots.txt */
@@ -1133,7 +1128,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
     if (search_tag)
       if (mode == 0)            // GET!
         print_buffer(&bstr, "%s",
-                   unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                   unescape_http(OPT_GET_BUFF(opt),
                                  search_tag + strlen(POSTTOK) + 1));
   }
 #if HDEBUG
@@ -2528,7 +2523,7 @@ void fil_simplifie(char *f) {
 }
 
 // fermer liaison fichier ou socket
-void deletehttp(htsblk * r) {
+HTS_INLINE void deletehttp(htsblk * r) {
 #if HTS_DEBUG_CLOSESOCK
   DEBUG_W("deletehttp: (htsblk*) 0x%p\n" _(void *)r);
 #endif
@@ -2555,7 +2550,7 @@ void deletehttp(htsblk * r) {
 
 // free the addr buffer
 // always returns 1
-int deleteaddr(htsblk * r) {
+HTS_INLINE int deleteaddr(htsblk * r) {
   if (r->adr != NULL) {
     freet(r->adr);
     r->adr = NULL;
@@ -2568,7 +2563,7 @@ int deleteaddr(htsblk * r) {
 }
 
 // fermer une socket
-void deletesoc(T_SOC soc) {
+HTS_INLINE void deletesoc(T_SOC soc) {
   if (soc != INVALID_SOCKET && soc != LOCAL_SOCKET_ID) {
 #if HTS_WIDE_DEBUG
     DEBUG_W("close %d\n" _(int) soc);
@@ -2593,7 +2588,7 @@ void deletesoc(T_SOC soc) {
 }
 
 /* Will also clean other things */
-void deletesoc_r(htsblk * r) {
+HTS_INLINE void deletesoc_r(htsblk * r) {
 #if HTS_USEOPENSSL
   if (r->ssl_con) {
     SSL_shutdown(r->ssl_con);
@@ -2609,12 +2604,12 @@ void deletesoc_r(htsblk * r) {
 }
 
 // renvoi le nombre de secondes depuis 1970
-TStamp time_local(void) {
+HTS_INLINE TStamp time_local(void) {
   return ((TStamp) time(NULL));
 }
 
 // number of millisec since 1970
-HTSEXT_API TStamp mtime_local(void) {
+HTSEXT_API HTS_INLINE TStamp mtime_local(void) {
 #ifndef HTS_DO_NOT_USE_FTIME
   struct timeb B;
 
@@ -2850,21 +2845,21 @@ int get_filetime_rfc822(const char *file, char *date) {
 }
 
 // heure au format rfc (taille buffer 256o)
-void time_rfc822(char *s, struct tm *A) {
+HTS_INLINE void time_rfc822(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
-    assertf(localtime_returned_null);
+    assert(localtime_returned_null);
   }
   strftime(s, 256, "%a, %d %b %Y %H:%M:%S GMT", A);
 }
 
 // heure locale au format rfc (taille buffer 256o)
-void time_rfc822_local(char *s, struct tm *A) {
+HTS_INLINE void time_rfc822_local(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
-    assertf(localtime_returned_null);
+    assert(localtime_returned_null);
   }
   strftime(s, 256, "%a, %d %b %Y %H:%M:%S", A);
 }
@@ -2885,7 +2880,7 @@ HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n) {
 
   strcpybuff(buff, a[0]);
   strcatbuff(buff, a[1]);
-  return concat(strc->catbuff, sizeof(strc->catbuff), buff, "/s");
+  return concat(strc->catbuff, buff, "/s");
 }
 HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n) {
   sprintf(strc->buff2, "%d", n);
@@ -2956,7 +2951,7 @@ int sig_ignore_flag(int setflag) {      // flag ignore
 #endif
 
 // envoi de texte (en têtes généralement) sur la socket soc
-int sendc(htsblk * r, const char *s) {
+HTS_INLINE int sendc(htsblk * r, const char *s) {
   int n, ssz = (int) strlen(s);
 
 #ifdef _WIN32
@@ -3201,13 +3196,11 @@ typedef struct {
 // 0 : no
 // 1 : yes
 // -1: don't know
-int is_unicode_utf8(const char *buffer_, const size_t size) {
+int is_unicode_utf8(const char *buffer_, size_t size) {
   const unsigned char *buffer = (const unsigned char *) buffer_;
   t_auto_seq seq;
   size_t i;
   int is_utf = -1;
-
-  RUNTIME_TIME_CHECK_SIZE(size);
 
   seq.pos = 0;
   for(i = 0; i < size; i++) {
@@ -3376,7 +3369,7 @@ int ishtml_ext(const char *a) {
 }
 
 // error (404,500..)
-int ishttperror(int err) {
+HTS_INLINE int ishttperror(int err) {
   switch (err / 100) {
   case 4:
   case 5:
@@ -3485,7 +3478,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
         strcatbuff(copyBuff, "&");
       strcatbuff(copyBuff, amps[i] + 1);
     }
-    assertf((int) strlen(copyBuff) <= qLen);
+    assert((int) strlen(copyBuff) <= qLen);
     strcpybuff(query, copyBuff);
 
     /* Cleanup */
@@ -3552,7 +3545,7 @@ char *strstr_limit(const char *s, const char *sub, const char *limit) {
 }
 
 // retourner adr sans ftp://
-char *jump_protocol(const char *source) {
+HTS_INLINE char *jump_protocol(const char *source) {
   int p;
 
   // scheme
@@ -3660,12 +3653,10 @@ void unescape_amp(char *s) {
 
 // remplacer %20 par ' ', etc..
 // buffer MAX 1Ko
-HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const char *const s) {
+HTSEXT_API char *unescape_http(char *catbuff, const char *s) {
   size_t i, j;
 
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  for(i = 0, j = 0; s[i] != '\0' && j + 1 < size ; i++) {
+  for(i = 0, j = 0; s[i] != '\0'; i++) {
     int h;
     if (s[i] == '%' && (h = ehex(&s[i + 1])) >= 0) {
       catbuff[j++] = (char) h;
@@ -3682,13 +3673,10 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
 // DOES NOT DECODE %25 (part of CHAR_DELIM)
 // no_high & 1: decode high chars
 // no_high & 2: decode space
-HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, 
-                                      const char *s, const int no_high) {
+HTSEXT_API char *unescape_http_unharm(char *catbuff, const char *s, int no_high) {
   size_t i, j;
 
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  for(i = 0, j = 0; s[i] != '\0' && j + 1 < size ; i++) {
+  for(i = 0, j = 0; s[i] != '\0'; i++) {
     if (s[i] == '%') {
       const int nchar = ehex(&s[i + 1]);
 
@@ -3717,228 +3705,182 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
 
 // remplacer " par %xx etc..
 // buffer MAX 1Ko
-HTSEXT_API size_t escape_spc_url(const char *const src, 
-                                 char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 2);
+HTSEXT_API void escape_spc_url(char *s) {
+  x_escape_http(s, 2);
 }
 
 // smith / john -> smith%20%2f%20john
-HTSEXT_API size_t escape_in_url(const char *const src, 
-                                char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 1);
+HTSEXT_API void escape_in_url(char *s) {
+  x_escape_http(s, 1);
 }
 
 // smith / john -> smith%20/%20john
-HTSEXT_API size_t escape_uri(const char *const src, 
-                             char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 3);
+HTSEXT_API void escape_uri(char *s) {
+  x_escape_http(s, 3);
 }
-
-HTSEXT_API size_t escape_uri_utf(const char *const src, 
-                                 char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 30);
+HTSEXT_API void escape_uri_utf(char *s) {
+  x_escape_http(s, 30);
 }
-
-HTSEXT_API size_t escape_check_url(const char *const src, 
-                                   char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 0);
+HTSEXT_API void escape_check_url(char *s) {
+  x_escape_http(s, 0);
 }
 
 // same as escape_check_url, but returns char*
-HTSEXT_API char *escape_check_url_addr(const char *const src, 
-                                       char *const dest, const size_t size) {
-  escape_check_url(src, dest, size);
-  return dest;
-}
+HTSEXT_API char *escape_check_url_addr(char *catbuff, const char *s) {
+  char *adr;
 
-// Same as above, but appending to "dest"
-#undef DECLARE_APPEND_ESCAPE_VERSION
-#define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
-HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
-  const size_t len = strnlen(dest, size); \
-  assertf(len < size); \
-  return NAME(src, dest + len, size - len); \
-}
-
-DECLARE_APPEND_ESCAPE_VERSION(escape_in_url)
-DECLARE_APPEND_ESCAPE_VERSION(escape_spc_url)
-DECLARE_APPEND_ESCAPE_VERSION(escape_uri_utf)
-DECLARE_APPEND_ESCAPE_VERSION(escape_check_url)
-DECLARE_APPEND_ESCAPE_VERSION(escape_uri)
-
-#undef DECLARE_APPEND_ESCAPE_VERSION
-
-// Same as above, but in-place
-#undef DECLARE_INPLACE_ESCAPE_VERSION
-#define DECLARE_INPLACE_ESCAPE_VERSION(NAME) \
-HTSEXT_API size_t inplace_ ##NAME(char *const dest, const size_t size) { \
-  char buffer[256]; \
-  const size_t len = strnlen(dest, size); \
-  const int in_buffer = len + 1 < sizeof(buffer); \
-  char *src = in_buffer ? buffer : malloct(len + 1); \
-  size_t ret; \
-  assertf(src != NULL); \
-  assertf(len < size); \
-  memcpy(src, dest, len + 1); \
-  ret = NAME(src, dest, size); \
-  if (!in_buffer) { \
-    freet(src); \
-  } \
-  return ret; \
-}
-
-DECLARE_INPLACE_ESCAPE_VERSION(escape_in_url)
-DECLARE_INPLACE_ESCAPE_VERSION(escape_spc_url)
-DECLARE_INPLACE_ESCAPE_VERSION(escape_uri_utf)
-DECLARE_INPLACE_ESCAPE_VERSION(escape_check_url)
-DECLARE_INPLACE_ESCAPE_VERSION(escape_uri)
-
-#undef DECLARE_INPLACE_ESCAPE_VERSION
-
-
-HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil, 
-                                  char *const dest, const size_t size) {
-  char *a;
-  size_t esc_size = escape_in_url(adr, dest, size);
-  esc_size += escape_in_url(fil, dest + esc_size, size - esc_size);
-  RUNTIME_TIME_CHECK_SIZE(size);
-  for(a = dest ; (a = strchr(a, '%')) != NULL ; a++) {
-    *a = 'X';
-  }
-  return esc_size;
+  escape_check_url(adr = concat(catbuff, s, ""));
+  return adr;
 }
 
 // strip all control characters
-HTSEXT_API void escape_remove_control(char *const s) {
-  size_t i, j;
-  for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
-    const unsigned char c = (unsigned  char) s[i];
-    if (c >= 32) {
-      if (i != j) {
-        assertf(j < i);
-        s[j] = s[i];
-      }
-      j++;
+HTSEXT_API void escape_remove_control(char *s) {
+  unsigned char *ss = (unsigned char *) s;
+
+  while(*ss) {
+    if (*ss < 32) {             /* CONTROL characters go away! */
+      char BIGSTK tmp[HTS_URLMAXSIZE * 2];
+
+      strcpybuff(tmp, (char *) ss + 1);
+      strcpybuff((char *) ss, tmp);
+    } else {
+      ss++;
     }
   }
 }
 
-#undef ADD_CHAR
-#define ADD_CHAR(C) do {   \
-      assertf(j < size);    \
-      if (j + 1 == size) { \
-        dest[j] = '\0';    \
-        return size;       \
-      }                    \
-      dest[j++] = (C);     \
-  } while(0)
+HTSEXT_API void x_escape_html(char *s) {
+  while(*s) {
+    int test = 0;
 
-/* Returns the number of characters written (not taking in account the terminating \0), or 'size' upon overflow. */
-HTSEXT_API size_t x_escape_http(const char *const s, char *const dest, 
-                                const size_t size, const int mode) {
-  static const char hex[] = "0123456789abcdef";
-  size_t i, j;
+    test = (CHAR_HIG(*s)
+            || CHAR_XXAVOID(*s));
 
-  RUNTIME_TIME_CHECK_SIZE(size);
+    if (test) {
+      char BIGSTK buffer[HTS_URLMAXSIZE * 3];
+      int n;
 
-  // Out-of-bound.
-  // Previous character is supposed to be the terminating \0.
-  if (size == 0) {
-    return 0;
+      n = (int) (unsigned char) *s;
+      strcpybuff(buffer, s + 1);
+      sprintf(s, "&#x%02x;", n);
+      strcatbuff(s, buffer);
+    }
+    s++;
   }
+}
 
-  for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
-    const unsigned char c = (unsigned char) s[i];
+HTSEXT_API void x_escape_http(char *s, int mode) {
+  while(*s) {
     int test = 0;
 
     if (mode == 0)
-      test = c == '"' || c == ' ' || CHAR_SPECIAL(c);
-    else if (mode == 1)
-      test = CHAR_RESERVED(c)
-             || CHAR_DELIM(c)
-             || CHAR_UNWISE(c)
-             || CHAR_SPECIAL(c)
-             || CHAR_XXAVOID(c)
-             || CHAR_MARK(c);
-    else if (mode == 2)
-      test = c == ' ';       // n'escaper que espace
-    else if (mode == 3)         // échapper que ce qui est nécessaire
-      test = CHAR_SPECIAL(c)
-             || CHAR_XXAVOID(c);
-    else if (mode == 30)      // échapper que ce qui est nécessaire
-      test = (c != '/' && CHAR_RESERVED(c))
-        || CHAR_DELIM(c)
-        || CHAR_UNWISE(c)
-        || CHAR_SPECIAL(c)
-        || CHAR_XXAVOID(c);
-
-    if (!test) {
-      ADD_CHAR(c);
-    } else {
-      ADD_CHAR('%');
-      ADD_CHAR(hex[c / 16]);
-      ADD_CHAR(hex[c % 16]);
+      test = (strchr("\" ", *s) != 0 || CHAR_SPECIAL(*s));
+    else if (mode == 1) {
+      test = (CHAR_RESERVED(*s)
+              || CHAR_DELIM(*s)
+              || CHAR_UNWISE(*s)
+              || CHAR_SPECIAL(*s)
+              || CHAR_XXAVOID(*s)
+              || CHAR_MARK(*s));
+    } else if (mode == 2)
+      test = (*s == ' ');       // n'escaper que espace
+    else if (mode == 3) {       // échapper que ce qui est nécessaire
+      test = (CHAR_SPECIAL(*s)
+              || CHAR_XXAVOID(*s));
+    } else if (mode == 30) {    // échapper que ce qui est nécessaire
+      test = (*s != '/' && CHAR_RESERVED(*s))
+        || CHAR_DELIM(*s)
+        || CHAR_UNWISE(*s)
+        || CHAR_SPECIAL(*s)
+        || CHAR_XXAVOID(*s);
     }
-  }
 
-  assertf(j < size);
-  dest[j] = '\0';
-  return j;
+    if (test) {
+      char BIGSTK buffer[HTS_URLMAXSIZE * 3];
+      int n;
+
+      n = (int) (unsigned char) *s;
+      strcpybuff(buffer, s + 1);
+      sprintf(s, "%%%02x", n);
+      strcatbuff(s, buffer);
+    }
+    s++;
+  }
 }
 
-HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, const size_t size) {
-  size_t i, j;
-
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
-    const unsigned char c = (unsigned char) s[i];
-    if (c == '&') {
-      ADD_CHAR('&');
-      ADD_CHAR('a');
-      ADD_CHAR('m');
-      ADD_CHAR('p');
-      ADD_CHAR(';');
+HTSEXT_API void escape_for_html_print(char *s, char *d) {
+  for(; *s; s++) {
+    if (*s == '&') {
+      strcpybuff(d, "&amp;");
+      d += strlen(d);
     } else {
-      ADD_CHAR(c);
+      *d++ = *s;
     }
   }
-  assertf(j < size);
-  dest[j] = '\0';
-  return j;
+  *d = '\0';
 }
 
-HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const dest, const size_t size) {
-  static const char hex[] = "0123456789abcdef";
-  size_t i, j;
-
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
-    const unsigned char c = (unsigned char) s[i];
-    if (c == '&') {
-      ADD_CHAR('&');
-      ADD_CHAR('a');
-      ADD_CHAR('m');
-      ADD_CHAR('p');
-      ADD_CHAR(';');
-    } else if (CHAR_HIG(c)) {
-      ADD_CHAR('&');
-      ADD_CHAR('#');
-      ADD_CHAR('x');
-      ADD_CHAR(hex[c / 16]);
-      ADD_CHAR(hex[c % 16]);
-      ADD_CHAR(';');
+HTSEXT_API void escape_for_html_print_full(char *s, char *d) {
+  for(; *s; s++) {
+    if (*s == '&') {
+      strcpybuff(d, "&amp;");
+      d += strlen(d);
+    } else if (CHAR_HIG(*s)) {
+      sprintf(d, "&#x%02x;", (unsigned char) *s);
+      d += strlen(d);
     } else {
-      ADD_CHAR(c);
+      *d++ = *s;
     }
   }
-  assertf(j < size);
-  dest[j] = '\0';
-  return j;
+  *d = '\0';
 }
 
-#undef ADD_CHAR
+// concat, concatène deux chaines et renvoi le résultat
+// permet d'alléger grandement le code
+// il faut savoir qu'on ne peut mettre plus de 16 concat() dans une expression
+HTSEXT_API char *concat(char *catbuff, const char *a, const char *b) {
+  if (a != NULL && a[0] != '\0') {
+    strcpybuff(catbuff, a);
+  } else {
+    catbuff[0] = '\0';
+  }
+  if (b != NULL && b[0] != '\0') {
+    strcatbuff(catbuff, b);
+  }
+  return catbuff;
+}
+
+// conversion fichier / -> antislash
+static char *__fconv(char *a) {
+#if HTS_DOSNAME
+  int i;
+
+  for(i = 0; a[i] != 0; i++)
+    if (a[i] == '/')            // Unix-to-DOS style
+      a[i] = '\\';
+#endif
+  return a;
+}
+
+HTSEXT_API char *fconcat(char *catbuff, const char *a, const char *b) {
+  return __fconv(concat(catbuff, a, b));
+}
+HTSEXT_API char *fconv(char *catbuff, const char *a) {
+  return __fconv(concat(catbuff, a, ""));
+}
+
+/* / et \\ en / */
+static char *__fslash(char *a) {
+  int i;
+
+  for(i = 0; a[i] != 0; i++)
+    if (a[i] == '\\')           // convertir
+      a[i] = '/';
+  return a;
+}
+char *fslash(char *catbuff, const char *a) {
+  return __fslash(concat(catbuff, a, NULL));
+}
 
 // conversion minuscules, avec buffer
 char *convtolower(char *catbuff, const char *a) {
@@ -3957,13 +3899,42 @@ void hts_lowcase(char *s) {
 }
 
 // remplacer un caractère d'une chaîne dans une autre
-void hts_replace(char *s, char from, char to) {
+HTS_INLINE void hts_replace(char *s, char from, char to) {
   char *a;
 
   while((a = strchr(s, from)) != NULL) {
     *a = to;
   }
 }
+
+// caractère espace, guillemets, CR, LF etc..
+/* SECTION OPTIMISEE:
+  #define  is_space(c) (strchr(" \"\x0d\x0a\x09'",c)!=NULL)
+  #define  is_realspace(c) (strchr(" \x0d\x0a\x09\x0c",c)!=NULL)
+*/
+/*
+static HTS_INLINE int is_space(char c) {
+  if (c==' ')  return 1;  // spc
+  if (c=='"')  return 1;  // quote
+  if (c==10)   return 1;  // lf
+  if (c==13)   return 1;  // cr
+  if (c=='\'') return 1;  // quote
+  //if (c=='`')  return 1;  // backquote      << non
+  if (c==9)    return 1;  // tab
+  return 0;
+}
+*/
+
+// caractère espace, CR, LF, TAB
+/*
+static HTS_INLINE int is_realspace(char c) {
+  if (c==' ')  return 1;  // spc
+  if (c==10)   return 1;  // lf
+  if (c==13)   return 1;  // cr
+  if (c==9)    return 1;  // tab
+  return 0;
+}
+*/
 
 // deviner type d'un fichier local..
 // ex: fil="toto.gif" -> s="image/gif"
@@ -4167,7 +4138,7 @@ HTSEXT_API int is_knowntype(httrackp * opt, const char *fil) {
 
   if (!fil)
     return 0;
-  ext = get_ext(catbuff, sizeof(catbuff), fil);
+  ext = get_ext(catbuff, fil);
   while(strnotempty(hts_mime[j][1])) {
     if (strfield2(hts_mime[j][1], ext)) {
       if (is_html_mime_type(hts_mime[j][0]))
@@ -4180,6 +4151,27 @@ HTSEXT_API int is_knowntype(httrackp * opt, const char *fil) {
 
   // Known by user?
   return (is_userknowntype(opt, fil));
+}
+
+// extension : html,gif..
+HTSEXT_API char *get_ext(char *catbuff, const char *fil) {
+  const char *a = fil + strlen(fil) - 1;
+
+  while((*a != '.') && (*a != '/') && (a > fil))
+    a--;
+  if (*a == '.') {
+    char fil_noquery[HTS_URLMAXSIZE * 2];
+    char *b;
+
+    fil_noquery[0] = '\0';
+    a++;                        // pointer sur extension
+    strncatbuff(fil_noquery, a, HTS_URLMAXSIZE);
+    b = strchr(fil_noquery, '?');
+    if (b)
+      *b = '\0';
+    return concat(catbuff, fil_noquery, "");
+  } else
+    return "";
 }
 
 // known type?..
@@ -4319,7 +4311,7 @@ int fexist(const char *s) {
   struct stat st;
 
   memset(&st, 0, sizeof(st));
-  if (stat(fconv(catbuff, sizeof(catbuff), s), &st) == 0) {
+  if (stat(fconv(catbuff, s), &st) == 0) {
     if (S_ISREG(st.st_mode)) {
       return 1;
     } else {
@@ -4339,7 +4331,7 @@ int fexist_utf8(const char *s) {
   STRUCT_STAT st;
 
   memset(&st, 0, sizeof(st));
-  if (STAT(fconv(catbuff, sizeof(catbuff), s), &st) == 0) {
+  if (STAT(fconv(catbuff, s), &st) == 0) {
     if (S_ISREG(st.st_mode)) {
       return 1;
     } else {
@@ -4562,12 +4554,12 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // 'capsule' contenant uniquement le cache
 t_dnscache *_hts_cache(httrackp * opt) {
-  assertf(opt != NULL);
+  assert(opt != NULL);
   if (opt->state.dns_cache == NULL) {
     opt->state.dns_cache = (t_dnscache *) malloct(sizeof(t_dnscache));
     memset(opt->state.dns_cache, 0, sizeof(t_dnscache));
   }
-  assertf(opt->state.dns_cache != NULL);
+  assert(opt->state.dns_cache != NULL);
   return opt->state.dns_cache;
 }
 
@@ -4594,9 +4586,9 @@ void hts_cache_free(t_dnscache *const root) {
 // si h_length==0 alors le nom n'existe pas dans le dns
 static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_hostent *retour) {
   for(; cache != NULL; cache = cache->n) {
-    assertf(cache != NULL);
-    assertf(iadr != NULL);
-    if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
+    assert(cache != NULL);
+    assert(iadr != NULL);
+    if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         if (retour->h_addr_list[0])
           memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
@@ -4614,12 +4606,28 @@ static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_ho
   return NULL;
 }
 
-static t_hostent *vxgethostbyname2_(const char *const hostname,
-                                    void *const v_buffer, const char **error) {
+HTSEXT_API t_hostent *vxgethostbyname2(char *hostname, void *v_buffer, const char **error) {
   t_fullhostent *buffer = (t_fullhostent *) v_buffer;
 
   /* Clear */
   fullhostent_init(buffer);
+
+  /* Protection */
+  if (!strnotempty(hostname)) {
+    return NULL;
+  }
+
+  /* 
+     Strip [] if any : [3ffe:b80:1234:1::1] 
+     The resolver doesn't seem to handle IP6 addresses in brackets
+   */
+  if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
+    char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+    tempo[0] = '\0';
+    strncatbuff(tempo, hostname + 1, strlen(hostname) - 2);
+    strcpybuff(hostname, tempo);
+  }
 
   {
 #if HTS_INET6==0
@@ -4681,37 +4689,11 @@ static t_hostent *vxgethostbyname2_(const char *const hostname,
   return NULL;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, 
-                                       void *const v_buffer, const char **error) {
-  /* Protection */
-  if (!strnotempty(hostname)) {
-    return NULL;
-  }
-
-  /*
-     Strip [] if any : [3ffe:b80:1234:1::1] 
-     The resolver doesn't seem to handle IP6 addresses in brackets
-   */
-  if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
-    t_hostent *ret;
-    size_t size = strlen(hostname);
-    char *copy = malloct(size + 1);
-    assertf(copy != NULL);
-    copy[0] = '\0';
-    strncat(copy, hostname + 1, size - 2);
-    ret =  vxgethostbyname2_(copy, v_buffer, error);
-    freet(copy);
-    return ret;
-  } else {
-    return vxgethostbyname2_(hostname, v_buffer, error);
-  }
-}
-
-HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer) {
+HTSEXT_API t_hostent *vxgethostbyname(char *hostname, void *v_buffer) {
   return vxgethostbyname2(hostname, v_buffer, NULL);
 }
 
-HTSEXT_API int check_hostname_dns(const char *const hostname) {
+HTSEXT_API int check_hostname_dns(char *hostname) {
   t_fullhostent buffer;
   return vxgethostbyname(hostname, &buffer) != NULL;
 }
@@ -4724,9 +4706,9 @@ static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
   t_hostent *hp;
 
-  assertf(opt != NULL);
-  assertf(_iadr != NULL);
-  assertf(v_buffer != NULL);
+  assert(opt != NULL);
+  assert(_iadr != NULL);
+  assert(v_buffer != NULL);
 
   /* Clear */
   fullhostent_init(buffer);
@@ -4846,7 +4828,7 @@ void *hts_malloc(size_t len) {
 
   hts_meminit();
   htsLocker(mallocMutex, 1);
-  assertf(len > 0);
+  fassert(len > 0);
   adr = hts_xmalloc(len, 0);
   htsLocker(mallocMutex, 0);
   return adr;
@@ -4855,8 +4837,8 @@ void *hts_calloc(size_t len, size_t len2) {
   void *adr;
 
   hts_meminit();
-  assertf(len > 0);
-  assertf(len2 > 0);
+  fassert(len > 0);
+  fassert(len2 > 0);
   htsLocker(mallocMutex, 1);
   adr = hts_xmalloc(len, len2);
   htsLocker(mallocMutex, 0);
@@ -4867,16 +4849,16 @@ void *hts_strdup(char *str) {
   size_t size = str ? strlen(str) : 0;
   char *adr = (char *) hts_malloc(size + 1);
 
-  assertf(adr != NULL);
+  fassert(adr != NULL);
   strcpy(adr, str ? str : "");
   return adr;
 }
 void *hts_xmalloc(size_t len, size_t len2) {
   mlink *lnk = (mlink *) calloc(1, sizeof(mlink));
 
-  assertf(lnk != NULL);
-  assertf(len > 0);
-  assertf(len2 >= 0);
+  fassert(lnk != NULL);
+  fassert(len > 0);
+  fassert(len2 >= 0);
   if (lnk) {
     void *r = NULL;
     int size, bsize = sizeof(t_htsboundary);
@@ -4887,7 +4869,7 @@ void *hts_xmalloc(size_t len, size_t len2) {
       size = len;
     size += ((bsize - (size % bsize)) % bsize); /* check alignement */
     r = malloc(size + bsize * 2);
-    assertf(r != NULL);
+    fassert(r != NULL);
     if (r) {
       *((t_htsboundary *) ((char *) r))
         = *((t_htsboundary *) ((char *) r + size + bsize))
@@ -4909,7 +4891,7 @@ void hts_free(void *adr) {
   mlink *lnk = &trmalloc;
   int bsize = sizeof(t_htsboundary);
 
-  assertf(adr != NULL);
+  fassert(adr != NULL);
   if (!adr) {
     return;
   }
@@ -4918,9 +4900,9 @@ void hts_free(void *adr) {
     if (lnk->next->adr == adr) {
       mlink *blk_free = lnk->next;
 
-      assertf(blk_free->id != -1);
-      assertf(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
-      assertf(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
+      fassert(blk_free->id != -1);
+      fassert(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
+      fassert(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
               htsboundary);
       lnk->next = lnk->next->next;
       free((void *) blk_free);
@@ -4930,7 +4912,7 @@ void hts_free(void *adr) {
       return;
     }
     lnk = lnk->next;
-    assertf(lnk->next != NULL);
+    fassert(lnk->next != NULL);
   }
   free(adr);
   htsLocker(mallocMutex, 0);
@@ -4948,13 +4930,13 @@ void *hts_realloc(void *adr, size_t len) {
         {
           mlink *blk_free = lnk->next;
 
-          assertf(blk_free->id != -1);
-          assertf(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
-          assertf(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
+          fassert(blk_free->id != -1);
+          fassert(*((t_htsboundary *) ((char *) adr - bsize)) == htsboundary);
+          fassert(*((t_htsboundary *) ((char *) adr + blk_free->len)) ==
                   htsboundary);
         }
         adr = realloc((char *) adr - bsize, len + bsize * 2);
-        assertf(adr != NULL);
+        fassert(adr != NULL);
         lnk->next->adr = (char *) adr + bsize;
         lnk->next->len = len;
         *((t_htsboundary *) ((char *) adr))
@@ -4964,7 +4946,7 @@ void *hts_realloc(void *adr, size_t len) {
         return (char *) adr + bsize;
       }
       lnk = lnk->next;
-      assertf(lnk->next != NULL);
+      fassert(lnk->next != NULL);
     }
     htsLocker(mallocMutex, 0);
   }
@@ -4975,7 +4957,7 @@ mlink *hts_find(char *adr) {
   mlink *lnk = &trmalloc;
   int bsize = sizeof(t_htsboundary);
 
-  assertf(adr != NULL);
+  fassert(adr != NULL);
   if (!adr) {
     return NULL;
   }
@@ -4993,7 +4975,7 @@ mlink *hts_find(char *adr) {
 
     if (depl < 0)
       depl = -depl;
-    //assertf(depl < 512000);   /* near the stack frame.. doesn't look like malloc but stack variable */
+    //fassert(depl < 512000);   /* near the stack frame.. doesn't look like malloc but stack variable */
     return NULL;
   }
 }
@@ -5112,65 +5094,6 @@ static int ssl_vulnerable(const char *version) {
   return 0;
 }
 
-static void default_inthash_asserthandler(void *arg, const char* exp, const char* file, int line) {
-  abortf_(exp, file, line);
-}
-
-static int get_loglevel_from_inthash(inthash_loglevel level) {
-  switch(level) {
-  case inthash_log_critical:
-    return LOG_PANIC;
-    break;
-  case inthash_log_warning:
-    return LOG_WARNING;
-    break;
-  case inthash_log_info:
-    return LOG_INFO;
-    break;
-  case inthash_log_debug:
-    return LOG_DEBUG;
-    break;
-  case inthash_log_trace:
-    return LOG_TRACE;
-    break;
-  default:
-    return LOG_ERROR;
-    break;
-  }
-}
-
-/* log to default console */
-static void default_inthash_loghandler(void *arg, inthash_loglevel level, 
-                                       const char* format, va_list args) {
-
-  if (level <= inthash_log_warning) {
-    fprintf(stderr, "** warning: ");
-  }
-  vfprintf(stderr, format, args);
-  fprintf(stderr, "\n");
-}
-
-/* log to project log */
-static void htsopt_inthash_loghandler(void *arg, inthash_loglevel level, 
-                                      const char* format, va_list args) {
-  httrackp *const opt = (httrackp*) arg;
-  if (opt != NULL && opt->log != NULL) {
-    hts_log_vprint(opt, get_loglevel_from_inthash(level), 
-      format, args);
-  } else {
-    default_inthash_loghandler(NULL, level, format, args);
-  }
-}
-
-/* attach hashtable logger to project log */
-void hts_set_hash_handler(inthash hashtable, httrackp *opt) {
-  /* Init hashtable default assertion handler. */
-  inthash_set_assert_handler(hashtable,
-    htsopt_inthash_loghandler, 
-    default_inthash_asserthandler,
-    opt);
-}
-
 static int hts_init_ok = 0;
 HTSEXT_API int hts_init(void) {
   const char *dbg_env;
@@ -5191,10 +5114,6 @@ HTSEXT_API int hts_init(void) {
   }
 
   hts_debug_log_print("entering hts_init()");   /* debug */
-
-  /* Init hashtable default assertion handler. */
-  inthash_set_global_assert_handler(default_inthash_loghandler, 
-    default_inthash_asserthandler);
 
   /* Init threads (lazy init) */
   htsthread_init();
@@ -5278,9 +5197,10 @@ HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg) {
   return 1;                     /* Error */
 }
 
-HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
+HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
   assertf(format != NULL);
   if (opt != NULL && opt->log != NULL) {
+    va_list args;
     const int save_errno = errno;
     const char *s_type = "unknown";
     const int level = type & 0xff;
@@ -5312,7 +5232,9 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       break;
     }
     fspc(opt, opt->log, s_type);
+    va_start(args, format);
     (void) vfprintf(opt->log, format, args);
+    va_end(args);
     if ((type & LOG_ERRNO) != 0) {
       fprintf(opt->log, ": %s", strerror(save_errno));
     }
@@ -5321,16 +5243,6 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       fflush(opt->log);
     }
     errno = save_errno;
-  }
-}
-
-HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
-  assertf(format != NULL);
-  if (opt != NULL && opt->log != NULL) {
-    va_list args;
-    va_start(args, format);
-    hts_log_vprint(opt, type, format, args);
-    va_end(args);
   }
 }
 
@@ -5912,7 +5824,7 @@ HTSEXT_API void *hts_malloc(size_t size) {
   return malloc(size);
 }
 
-HTSEXT_API void *hts_realloc(void *const data, const size_t size) {
+HTSEXT_API void *hts_realloc(void *data, size_t size) {
   return realloc(data, size);
 }
 

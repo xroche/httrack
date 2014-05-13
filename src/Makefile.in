@@ -110,27 +110,17 @@ libhtsjava_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 libhttrack_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
-	libhttrack_la-htsparse.lo libhttrack_la-htsback.lo \
-	libhttrack_la-htscache.lo libhttrack_la-htscatchurl.lo \
-	libhttrack_la-htsfilters.lo libhttrack_la-htsftp.lo \
-	libhttrack_la-htshash.lo libhttrack_la-htsinthash.lo \
-	libhttrack_la-htshelp.lo libhttrack_la-htslib.lo \
-	libhttrack_la-htscoremain.lo libhttrack_la-htsname.lo \
-	libhttrack_la-htsrobots.lo libhttrack_la-htstools.lo \
-	libhttrack_la-htswizard.lo libhttrack_la-htsalias.lo \
-	libhttrack_la-htsthread.lo libhttrack_la-htsindex.lo \
-	libhttrack_la-htsbauth.lo libhttrack_la-htsmd5.lo \
-	libhttrack_la-htszlib.lo libhttrack_la-htswrap.lo \
-	libhttrack_la-htsconcat.lo libhttrack_la-htsmodules.lo \
-	libhttrack_la-htscharset.lo libhttrack_la-punycode.lo \
-	libhttrack_la-htsencoding.lo libhttrack_la-md5.lo \
-	libhttrack_la-ioapi.lo libhttrack_la-mztools.lo \
-	libhttrack_la-unzip.lo libhttrack_la-zip.lo
+am_libhttrack_la_OBJECTS = htscore.lo htsparse.lo htsback.lo \
+	htscache.lo htscatchurl.lo htsfilters.lo htsftp.lo htshash.lo \
+	htsinthash.lo htshelp.lo htslib.lo htscoremain.lo htsname.lo \
+	htsrobots.lo htstools.lo htswizard.lo htsalias.lo htsthread.lo \
+	htsindex.lo htsbauth.lo htsmd5.lo htszlib.lo htswrap.lo \
+	htsmodules.lo htscharset.lo punycode.lo htsencoding.lo md5.lo \
+	ioapi.lo mztools.lo unzip.lo zip.lo
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 libhttrack_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libhttrack_la_CFLAGS) \
-	$(CFLAGS) $(libhttrack_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libhttrack_la_LDFLAGS) $(LDFLAGS) -o $@
 PROGRAMS = $(bin_PROGRAMS)
 am_htsserver_OBJECTS = htsserver.$(OBJEXT) htsweb.$(OBJEXT)
 htsserver_OBJECTS = $(am_htsserver_OBJECTS)
@@ -351,11 +341,11 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
-	htsmd5.c htszlib.c htswrap.c htsconcat.c \
+	htsmd5.c htszlib.c htswrap.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
-	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
+	hts-indextmpl.h htsalias.h htsback.h htsbase.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h htsinthash.h \
@@ -369,7 +359,6 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
-libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
@@ -553,43 +542,39 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsalias.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsback.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsbauth.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscatchurl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscharset.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscore.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htscoremain.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsencoding.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsfilters.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsftp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htshash.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htshelp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsindex.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsinthash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsjava.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htslib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsmd5.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsmodules.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsname.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsparse.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsrobots.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsthread.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htstools.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsweb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htswizard.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htswrap.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htszlib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsback.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsbauth.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscache.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscatchurl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscharset.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsconcat.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscore.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscoremain.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsencoding.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsfilters.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsftp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htshash.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htshelp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsindex.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsinthash.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htslib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmd5.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmodules.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsname.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsparse.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsrobots.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsthread.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htstools.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswizard.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswrap.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htszlib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-ioapi.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-md5.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-mztools.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-punycode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-unzip.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-zip.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ioapi.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md5.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mztools.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsinthash.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsmd5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-ioapi.Po@am__quote@
@@ -600,6 +585,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-store.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-unzip.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-zip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/punycode.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unzip.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zip.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -622,236 +610,33 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-libhttrack_la-htscore.lo: htscore.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscore.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscore.Tpo -c -o libhttrack_la-htscore.lo `test -f 'htscore.c' || echo '$(srcdir)/'`htscore.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htscore.Tpo $(DEPDIR)/libhttrack_la-htscore.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htscore.c' object='libhttrack_la-htscore.lo' libtool=yes @AMDEPBACKSLASH@
+ioapi.lo: minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ioapi.lo -MD -MP -MF $(DEPDIR)/ioapi.Tpo -c -o ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/ioapi.Tpo $(DEPDIR)/ioapi.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='ioapi.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscore.lo `test -f 'htscore.c' || echo '$(srcdir)/'`htscore.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
 
-libhttrack_la-htsparse.lo: htsparse.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsparse.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsparse.Tpo -c -o libhttrack_la-htsparse.lo `test -f 'htsparse.c' || echo '$(srcdir)/'`htsparse.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsparse.Tpo $(DEPDIR)/libhttrack_la-htsparse.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsparse.c' object='libhttrack_la-htsparse.lo' libtool=yes @AMDEPBACKSLASH@
+mztools.lo: minizip/mztools.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mztools.lo -MD -MP -MF $(DEPDIR)/mztools.Tpo -c -o mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/mztools.Tpo $(DEPDIR)/mztools.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='mztools.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsparse.lo `test -f 'htsparse.c' || echo '$(srcdir)/'`htsparse.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
 
-libhttrack_la-htsback.lo: htsback.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsback.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsback.Tpo -c -o libhttrack_la-htsback.lo `test -f 'htsback.c' || echo '$(srcdir)/'`htsback.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsback.Tpo $(DEPDIR)/libhttrack_la-htsback.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsback.c' object='libhttrack_la-htsback.lo' libtool=yes @AMDEPBACKSLASH@
+unzip.lo: minizip/unzip.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT unzip.lo -MD -MP -MF $(DEPDIR)/unzip.Tpo -c -o unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/unzip.Tpo $(DEPDIR)/unzip.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='unzip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsback.lo `test -f 'htsback.c' || echo '$(srcdir)/'`htsback.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
 
-libhttrack_la-htscache.lo: htscache.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscache.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscache.Tpo -c -o libhttrack_la-htscache.lo `test -f 'htscache.c' || echo '$(srcdir)/'`htscache.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htscache.Tpo $(DEPDIR)/libhttrack_la-htscache.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htscache.c' object='libhttrack_la-htscache.lo' libtool=yes @AMDEPBACKSLASH@
+zip.lo: minizip/zip.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT zip.lo -MD -MP -MF $(DEPDIR)/zip.Tpo -c -o zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/zip.Tpo $(DEPDIR)/zip.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='zip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscache.lo `test -f 'htscache.c' || echo '$(srcdir)/'`htscache.c
-
-libhttrack_la-htscatchurl.lo: htscatchurl.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscatchurl.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscatchurl.Tpo -c -o libhttrack_la-htscatchurl.lo `test -f 'htscatchurl.c' || echo '$(srcdir)/'`htscatchurl.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htscatchurl.Tpo $(DEPDIR)/libhttrack_la-htscatchurl.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htscatchurl.c' object='libhttrack_la-htscatchurl.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscatchurl.lo `test -f 'htscatchurl.c' || echo '$(srcdir)/'`htscatchurl.c
-
-libhttrack_la-htsfilters.lo: htsfilters.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsfilters.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsfilters.Tpo -c -o libhttrack_la-htsfilters.lo `test -f 'htsfilters.c' || echo '$(srcdir)/'`htsfilters.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsfilters.Tpo $(DEPDIR)/libhttrack_la-htsfilters.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsfilters.c' object='libhttrack_la-htsfilters.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsfilters.lo `test -f 'htsfilters.c' || echo '$(srcdir)/'`htsfilters.c
-
-libhttrack_la-htsftp.lo: htsftp.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsftp.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsftp.Tpo -c -o libhttrack_la-htsftp.lo `test -f 'htsftp.c' || echo '$(srcdir)/'`htsftp.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsftp.Tpo $(DEPDIR)/libhttrack_la-htsftp.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsftp.c' object='libhttrack_la-htsftp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsftp.lo `test -f 'htsftp.c' || echo '$(srcdir)/'`htsftp.c
-
-libhttrack_la-htshash.lo: htshash.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htshash.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htshash.Tpo -c -o libhttrack_la-htshash.lo `test -f 'htshash.c' || echo '$(srcdir)/'`htshash.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htshash.Tpo $(DEPDIR)/libhttrack_la-htshash.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htshash.c' object='libhttrack_la-htshash.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htshash.lo `test -f 'htshash.c' || echo '$(srcdir)/'`htshash.c
-
-libhttrack_la-htsinthash.lo: htsinthash.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsinthash.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsinthash.Tpo -c -o libhttrack_la-htsinthash.lo `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsinthash.Tpo $(DEPDIR)/libhttrack_la-htsinthash.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsinthash.c' object='libhttrack_la-htsinthash.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsinthash.lo `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
-
-libhttrack_la-htshelp.lo: htshelp.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htshelp.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htshelp.Tpo -c -o libhttrack_la-htshelp.lo `test -f 'htshelp.c' || echo '$(srcdir)/'`htshelp.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htshelp.Tpo $(DEPDIR)/libhttrack_la-htshelp.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htshelp.c' object='libhttrack_la-htshelp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htshelp.lo `test -f 'htshelp.c' || echo '$(srcdir)/'`htshelp.c
-
-libhttrack_la-htslib.lo: htslib.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htslib.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htslib.Tpo -c -o libhttrack_la-htslib.lo `test -f 'htslib.c' || echo '$(srcdir)/'`htslib.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htslib.Tpo $(DEPDIR)/libhttrack_la-htslib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htslib.c' object='libhttrack_la-htslib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htslib.lo `test -f 'htslib.c' || echo '$(srcdir)/'`htslib.c
-
-libhttrack_la-htscoremain.lo: htscoremain.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscoremain.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscoremain.Tpo -c -o libhttrack_la-htscoremain.lo `test -f 'htscoremain.c' || echo '$(srcdir)/'`htscoremain.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htscoremain.Tpo $(DEPDIR)/libhttrack_la-htscoremain.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htscoremain.c' object='libhttrack_la-htscoremain.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscoremain.lo `test -f 'htscoremain.c' || echo '$(srcdir)/'`htscoremain.c
-
-libhttrack_la-htsname.lo: htsname.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsname.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsname.Tpo -c -o libhttrack_la-htsname.lo `test -f 'htsname.c' || echo '$(srcdir)/'`htsname.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsname.Tpo $(DEPDIR)/libhttrack_la-htsname.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsname.c' object='libhttrack_la-htsname.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsname.lo `test -f 'htsname.c' || echo '$(srcdir)/'`htsname.c
-
-libhttrack_la-htsrobots.lo: htsrobots.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsrobots.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsrobots.Tpo -c -o libhttrack_la-htsrobots.lo `test -f 'htsrobots.c' || echo '$(srcdir)/'`htsrobots.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsrobots.Tpo $(DEPDIR)/libhttrack_la-htsrobots.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsrobots.c' object='libhttrack_la-htsrobots.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsrobots.lo `test -f 'htsrobots.c' || echo '$(srcdir)/'`htsrobots.c
-
-libhttrack_la-htstools.lo: htstools.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htstools.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htstools.Tpo -c -o libhttrack_la-htstools.lo `test -f 'htstools.c' || echo '$(srcdir)/'`htstools.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htstools.Tpo $(DEPDIR)/libhttrack_la-htstools.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htstools.c' object='libhttrack_la-htstools.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htstools.lo `test -f 'htstools.c' || echo '$(srcdir)/'`htstools.c
-
-libhttrack_la-htswizard.lo: htswizard.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htswizard.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htswizard.Tpo -c -o libhttrack_la-htswizard.lo `test -f 'htswizard.c' || echo '$(srcdir)/'`htswizard.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htswizard.Tpo $(DEPDIR)/libhttrack_la-htswizard.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htswizard.c' object='libhttrack_la-htswizard.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htswizard.lo `test -f 'htswizard.c' || echo '$(srcdir)/'`htswizard.c
-
-libhttrack_la-htsalias.lo: htsalias.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsalias.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsalias.Tpo -c -o libhttrack_la-htsalias.lo `test -f 'htsalias.c' || echo '$(srcdir)/'`htsalias.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsalias.Tpo $(DEPDIR)/libhttrack_la-htsalias.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsalias.c' object='libhttrack_la-htsalias.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsalias.lo `test -f 'htsalias.c' || echo '$(srcdir)/'`htsalias.c
-
-libhttrack_la-htsthread.lo: htsthread.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsthread.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsthread.Tpo -c -o libhttrack_la-htsthread.lo `test -f 'htsthread.c' || echo '$(srcdir)/'`htsthread.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsthread.Tpo $(DEPDIR)/libhttrack_la-htsthread.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsthread.c' object='libhttrack_la-htsthread.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsthread.lo `test -f 'htsthread.c' || echo '$(srcdir)/'`htsthread.c
-
-libhttrack_la-htsindex.lo: htsindex.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsindex.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsindex.Tpo -c -o libhttrack_la-htsindex.lo `test -f 'htsindex.c' || echo '$(srcdir)/'`htsindex.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsindex.Tpo $(DEPDIR)/libhttrack_la-htsindex.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsindex.c' object='libhttrack_la-htsindex.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsindex.lo `test -f 'htsindex.c' || echo '$(srcdir)/'`htsindex.c
-
-libhttrack_la-htsbauth.lo: htsbauth.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsbauth.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsbauth.Tpo -c -o libhttrack_la-htsbauth.lo `test -f 'htsbauth.c' || echo '$(srcdir)/'`htsbauth.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsbauth.Tpo $(DEPDIR)/libhttrack_la-htsbauth.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsbauth.c' object='libhttrack_la-htsbauth.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsbauth.lo `test -f 'htsbauth.c' || echo '$(srcdir)/'`htsbauth.c
-
-libhttrack_la-htsmd5.lo: htsmd5.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsmd5.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsmd5.Tpo -c -o libhttrack_la-htsmd5.lo `test -f 'htsmd5.c' || echo '$(srcdir)/'`htsmd5.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsmd5.Tpo $(DEPDIR)/libhttrack_la-htsmd5.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsmd5.c' object='libhttrack_la-htsmd5.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsmd5.lo `test -f 'htsmd5.c' || echo '$(srcdir)/'`htsmd5.c
-
-libhttrack_la-htszlib.lo: htszlib.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htszlib.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htszlib.Tpo -c -o libhttrack_la-htszlib.lo `test -f 'htszlib.c' || echo '$(srcdir)/'`htszlib.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htszlib.Tpo $(DEPDIR)/libhttrack_la-htszlib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htszlib.c' object='libhttrack_la-htszlib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htszlib.lo `test -f 'htszlib.c' || echo '$(srcdir)/'`htszlib.c
-
-libhttrack_la-htswrap.lo: htswrap.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htswrap.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htswrap.Tpo -c -o libhttrack_la-htswrap.lo `test -f 'htswrap.c' || echo '$(srcdir)/'`htswrap.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htswrap.Tpo $(DEPDIR)/libhttrack_la-htswrap.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htswrap.c' object='libhttrack_la-htswrap.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htswrap.lo `test -f 'htswrap.c' || echo '$(srcdir)/'`htswrap.c
-
-libhttrack_la-htsconcat.lo: htsconcat.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsconcat.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsconcat.Tpo -c -o libhttrack_la-htsconcat.lo `test -f 'htsconcat.c' || echo '$(srcdir)/'`htsconcat.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsconcat.Tpo $(DEPDIR)/libhttrack_la-htsconcat.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsconcat.c' object='libhttrack_la-htsconcat.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsconcat.lo `test -f 'htsconcat.c' || echo '$(srcdir)/'`htsconcat.c
-
-libhttrack_la-htsmodules.lo: htsmodules.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsmodules.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsmodules.Tpo -c -o libhttrack_la-htsmodules.lo `test -f 'htsmodules.c' || echo '$(srcdir)/'`htsmodules.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsmodules.Tpo $(DEPDIR)/libhttrack_la-htsmodules.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsmodules.c' object='libhttrack_la-htsmodules.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsmodules.lo `test -f 'htsmodules.c' || echo '$(srcdir)/'`htsmodules.c
-
-libhttrack_la-htscharset.lo: htscharset.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscharset.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscharset.Tpo -c -o libhttrack_la-htscharset.lo `test -f 'htscharset.c' || echo '$(srcdir)/'`htscharset.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htscharset.Tpo $(DEPDIR)/libhttrack_la-htscharset.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htscharset.c' object='libhttrack_la-htscharset.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscharset.lo `test -f 'htscharset.c' || echo '$(srcdir)/'`htscharset.c
-
-libhttrack_la-punycode.lo: punycode.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-punycode.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-punycode.Tpo -c -o libhttrack_la-punycode.lo `test -f 'punycode.c' || echo '$(srcdir)/'`punycode.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-punycode.Tpo $(DEPDIR)/libhttrack_la-punycode.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='punycode.c' object='libhttrack_la-punycode.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-punycode.lo `test -f 'punycode.c' || echo '$(srcdir)/'`punycode.c
-
-libhttrack_la-htsencoding.lo: htsencoding.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsencoding.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsencoding.Tpo -c -o libhttrack_la-htsencoding.lo `test -f 'htsencoding.c' || echo '$(srcdir)/'`htsencoding.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsencoding.Tpo $(DEPDIR)/libhttrack_la-htsencoding.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsencoding.c' object='libhttrack_la-htsencoding.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsencoding.lo `test -f 'htsencoding.c' || echo '$(srcdir)/'`htsencoding.c
-
-libhttrack_la-md5.lo: md5.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-md5.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-md5.Tpo -c -o libhttrack_la-md5.lo `test -f 'md5.c' || echo '$(srcdir)/'`md5.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-md5.Tpo $(DEPDIR)/libhttrack_la-md5.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='md5.c' object='libhttrack_la-md5.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-md5.lo `test -f 'md5.c' || echo '$(srcdir)/'`md5.c
-
-libhttrack_la-ioapi.lo: minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-ioapi.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-ioapi.Tpo -c -o libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-ioapi.Tpo $(DEPDIR)/libhttrack_la-ioapi.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='libhttrack_la-ioapi.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
-
-libhttrack_la-mztools.lo: minizip/mztools.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-mztools.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-mztools.Tpo -c -o libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-mztools.Tpo $(DEPDIR)/libhttrack_la-mztools.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='libhttrack_la-mztools.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
-
-libhttrack_la-unzip.lo: minizip/unzip.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-unzip.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-unzip.Tpo -c -o libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-unzip.Tpo $(DEPDIR)/libhttrack_la-unzip.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='libhttrack_la-unzip.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
-
-libhttrack_la-zip.lo: minizip/zip.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-zip.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-zip.Tpo -c -o libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-zip.Tpo $(DEPDIR)/libhttrack_la-zip.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='libhttrack_la-zip.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
 
 proxytrack-main.o: proxy/main.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-main.o -MD -MP -MF $(DEPDIR)/proxytrack-main.Tpo -c -o proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c

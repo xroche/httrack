@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -116,51 +116,16 @@ void infomsg(char *msg) {
     }
   }
 }
-
-typedef struct help_wizard_buffers {
-  char urls[HTS_URLMAXSIZE * 2];
-  char mainpath[256];
-  char projname[256];
-  char stropt[2048];        // options
-  char stropt2[2048];       // options longues
-  char strwild[2048];       // wildcards
-  char cmd[4096];
-  char str[256];
-  char *argv[256];
-} help_wizard_buffers;
-
 void help_wizard(httrackp * opt) {
-  help_wizard_buffers *buffers = malloct(sizeof(help_wizard_buffers));
-
-#undef urls
-#undef mainpath
-#undef projname
-#undef stropt
-#undef stropt2
-#undef strwild
-#undef cmd
-#undef str
-#undef argv
-
-#define urls (buffers->urls)
-#define mainpath (buffers->mainpath)
-#define projname (buffers->projname)
-#define stropt (buffers->stropt)
-#define stropt2 (buffers->stropt2)
-#define strwild (buffers->strwild)
-#define cmd (buffers->cmd)
-#define str (buffers->str)
-#define argv (buffers->argv)
-
-  //char *urls = (char *) malloct(HTS_URLMAXSIZE * 2);
-  //char *mainpath = (char *) malloct(256);
-  //char *projname = (char *) malloct(256);
-  //char *stropt = (char *) malloct(2048);        // options
-  //char *stropt2 = (char *) malloct(2048);       // options longues
-  //char *strwild = (char *) malloct(2048);       // wildcards
-  //char *cmd = (char *) malloct(4096);
-  //char *str = (char *) malloct(256);
-  //char **argv = (char **) malloct(256 * sizeof(char *));
+  char *urls = (char *) malloct(HTS_URLMAXSIZE * 2);
+  char *mainpath = (char *) malloct(256);
+  char *projname = (char *) malloct(256);
+  char *stropt = (char *) malloct(2048);        // options
+  char *stropt2 = (char *) malloct(2048);       // options longues
+  char *strwild = (char *) malloct(2048);       // wildcards
+  char *cmd = (char *) malloct(4096);
+  char *str = (char *) malloct(256);
+  char **argv = (char **) malloct(256 * sizeof(char *));
 
   //
   char *a;
@@ -182,7 +147,7 @@ void help_wizard(httrackp * opt) {
   printf("\n");
   printf("Welcome to HTTrack Website Copier (Offline Browser) " HTTRACK_VERSION
          "%s\n", hts_get_version_info(opt));
-  printf("Copyright (C) 1998-2014 Xavier Roche and other contributors\n");
+  printf("Copyright (C) 1998-2013 Xavier Roche and other contributors\n");
 #ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");
@@ -353,16 +318,14 @@ void help_wizard(httrackp * opt) {
   }
 
   /* Free buffers */
-  free(buffers);
-#undef urls
-#undef mainpath
-#undef projname
-#undef stropt
-#undef stropt2
-#undef strwild
-#undef cmd
-#undef str
-#undef argv
+  freet(urls);
+  freet(mainpath);
+  freet(projname);
+  freet(stropt);
+  freet(stropt2);
+  freet(strwild);
+  freet(cmd);
+  freet(str);
 }
 int help_query(char *list, int def) {
   char s[256];
@@ -438,7 +401,7 @@ void help_catchurl(const char *dest_path) {
       {
         char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
 
-        inplace_escape_check_url(dest, sizeof(dest));
+        escape_check_url(dest);
         sprintf(finalurl, "%s" POSTTOK "file:%s", url, dest);
         printf("\nThe URL is: \"%s\"\n", finalurl);
         printf("You can capture it through: httrack \"%s\"\n", finalurl);
@@ -481,7 +444,7 @@ void help(char *app, int more) {
     infomsg("1");
   if (more != 2) {
     sprintf(info,
-            "HTTrack version " HTTRACK_VERSION "%s",
+            "HTTrack version " HTTRACK_VERSION "%s (compiled " __DATE__ ")",
             hts_is_available());
     infomsg(info);
 #ifdef HTTRACK_AFF_WARNING
@@ -792,10 +755,10 @@ void help(char *app, int more) {
   infomsg("example: httrack --continue");
   infomsg("continues a mirror in the current folder");
   infomsg("");
-  sprintf(info, "HTTrack version " HTTRACK_VERSION "%s",
+  sprintf(info, "HTTrack version " HTTRACK_VERSION "%s (compiled " __DATE__ ")",
           hts_is_available());
   infomsg(info);
-  infomsg("Copyright (C) 1998-2014 Xavier Roche and other contributors");
+  infomsg("Copyright (C) 1998-2013 Xavier Roche and other contributors");
 #ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
 #endif

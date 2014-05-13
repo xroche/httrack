@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ typedef enum hash_struct_type {
 } hash_struct_type;
 
 // tables de hachage
-void hash_init(httrackp *opt, hash_struct *hash, int normalized);
+void hash_init(hash_struct *hash, int normalized);
 void hash_free(hash_struct *hash);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -36,7 +36,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsthread.h"
-#include "httrack-library.h"
 
 #if USE_BEGINTHREAD
 #ifdef _WIN32
@@ -197,7 +196,7 @@ HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
   }
   assertf(*mutex != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
+  assert((*mutex)->handle != NULL);
   WaitForSingleObject((*mutex)->handle, INFINITE);
 #else
   pthread_mutex_lock(&(*mutex)->handle);
@@ -207,7 +206,7 @@ HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
 HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
   assertf(mutex != NULL && *mutex != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
+  assert((*mutex)->handle != NULL);
   ReleaseMutex((*mutex)->handle);
 #else
   pthread_mutex_unlock(&(*mutex)->handle);

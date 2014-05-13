@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -86,7 +86,8 @@ extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
-                                  const int flags);
+extern int hts_unescapeUrlSpecial(const char *src,
+                                  char *dest, const size_t max,
+                                  int flags);
 
 #endif

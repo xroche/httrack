@@ -32,7 +32,7 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 
-	dh_autoreconf
+	autoreconf -v -i
 	# note: dpkg-buildflags to be removed when compat=9
 	dh_auto_configure -- --enable-online-unit-tests=auto $(shell dpkg-buildflags --export=configure)
 
@@ -55,7 +55,6 @@ clean:
 	dh_testroot
 	rm -f build-stamp configure-stamp
 	dh_auto_clean
-	dh_autoreconf_clean
 	dh_clean
 
 install: build
@@ -85,17 +84,10 @@ install: build
 	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/
 	mv $(CURDIR)/debian/httrack/usr/bin/htsserver \
 		$(CURDIR)/debian/httrack/usr/lib/httrack/
-	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
+	rm -f $(CURDIR)/debian/httrack/usr/lib/*.a
 	rm -f $(CURDIR)/debian/httrack/usr/lib/*.la
+	rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.a
 	rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.la
-	# remove *.a unless we do not have *.so files
-	# see BUG #744594
-	if ls $(CURDIR)/debian/httrack/usr/lib/*.so >/dev/null 2>/dev/null ; then \
-		rm -f $(CURDIR)/debian/httrack/usr/lib/*.a ; \
-	fi
-	if ls $(CURDIR)/debian/httrack/usr/lib/httrack/*.so >/dev/null 2>/dev/null ; then \
-		rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.a ; \
-	fi
 	mv $(CURDIR)/debian/httrack/usr/lib/httrack/lib* \
 		$(CURDIR)/debian/httrack/usr/share/httrack/libtest/
 	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/libtest

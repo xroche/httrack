@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -161,8 +161,8 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Init ?
   if (hts_index_init) {
-    UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"));
-    UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"));
+    UNLINK(concat(catbuff, indexpath, "index.txt"));
+    UNLINK(concat(catbuff, indexpath, "sindex.html"));
     hts_index_init = 0;
   }
   // Check MIME type
@@ -291,7 +291,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
             e++;                /* 0 means "once" */
 
-            if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
+            if (strncmp((const char *) fslash(catbuff, (char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
               strcpybuff(savelst, filename + strlen(indexpath));
             else
               strcpybuff(savelst, filename);
@@ -358,9 +358,9 @@ void index_finish(const char *indexpath, int mode) {
 
             // Write new file
             if (mode == 1)      // TEXT
-              fp = fopen(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"), "wb");
+              fp = fopen(concat(catbuff, indexpath, "index.txt"), "wb");
             else                // HTML
-              fp = fopen(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"), "wb");
+              fp = fopen(concat(catbuff, indexpath, "sindex.html"), "wb");
             if (fp) {
               char current_word[KEYW_LEN + 32];
               char word[KEYW_LEN + 32];

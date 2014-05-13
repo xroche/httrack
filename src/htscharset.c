@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,7 +33,8 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsbase.h"
 #include "punycode.h"
-#include "htssafe.h"
+
+#include <assert.h>
 
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
@@ -414,7 +415,7 @@ static char* hts_codepageToUTF8(const char *codepage, const char *s) {
       if (dest != NULL) {
         const size_t len = hts_writeUTF8(uc, &dest[k], MAX_UTF);
         k += len;
-        assertf(k < capa);
+        assert(k < capa);
       }
     }
     dest[k] = '\0';
@@ -725,9 +726,9 @@ static unsigned int nlz8(unsigned char x) {
 */
 #define ADD_SEQ(UC, BITS, EMITTER) do {                                 \
     /* number of data bits in first octet */                            \
-    const unsigned int bits = BITS % 6;                                 \
+    const int bits = BITS % 6;                                          \
     /* shift for first octet */                                         \
-    const unsigned int shift0 = BITS - bits;                            \
+    const int shift0 = BITS - bits;                                     \
     /* first octet */                                                   \
     const unsigned char lead =                                          \
       /* leading bits */                                                \
@@ -981,7 +982,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 #undef WR
 
                 /* copy character */
-                assertf(segOutputSize < segSize);
+                assert(segOutputSize < segSize);
                 segInt[segOutputSize++] = uc;
 
                 /* not anymore in sequence */
@@ -990,7 +991,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 
               /* ascii ? */
               if (c < 0x80) {
-                assertf(segOutputSize < segSize);
+                assert(segOutputSize < segSize);
                 segInt[segOutputSize] = c;
                 if (c != 0) {
                   segOutputSize++;

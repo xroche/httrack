@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -217,7 +217,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       ftp_filename = a;
       if (strnotempty(a)) {
         char catbuff[CATBUFF_SIZE];
-        char *ua = unescape_http(catbuff, sizeof(catbuff), a);
+        char *ua = unescape_http(catbuff, a);
         int len_a = (int) strlen(ua);
 
         if (len_a > 0 && ua[len_a - 1] == '/') {        /* obviously a directory listing */
@@ -528,7 +528,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           if (back->r.statuscode != -1) {
             if (!transfer_list) {
               char catbuff[CATBUFF_SIZE];
-              char *ua = unescape_http(catbuff, sizeof(catbuff), ftp_filename);
+              char *ua = unescape_http(catbuff, ftp_filename);
 
               if ((strchr(ua, ' '))
                   || (strchr(ua, '\"'))

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -67,15 +67,13 @@ static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
 
-struct_back *back_new(httrackp *opt, int back_max) {
+struct_back *back_new(int back_max) {
   int i;
   struct_back *sback = calloct(1, sizeof(struct_back));
 
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
   sback->ready = inthash_new(0);
-  hts_set_hash_handler(sback->ready, opt);
-  inthash_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
   inthash_value_is_malloc(sback->ready, 1);
   // init
@@ -197,7 +195,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
       char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
 
-      if ((fp = FOPEN(fconv(catbuff, sizeof(catbuff), fileback), "rb")) != NULL) {
+      if ((fp = FOPEN(fconv(catbuff, fileback), "rb")) != NULL) {
         if (back_unserialize(fp, &itemback) != 0) {
           if (itemback != NULL) {
             back_clear_entry(itemback);
@@ -528,7 +526,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             if (!back[p].r.is_write) {
               // do not use tempnam() but a regular filename
               if (create_back_tmpfile(opt, &back[p]) == 0) {
-                assertf(back[p].tmpfile != NULL);
+                assert(back[p].tmpfile != NULL);
                 /* note: tmpfile is utf-8 */
                 back[p].r.out = FOPEN(back[p].tmpfile, "wb");
                 if (back[p].r.out) {
@@ -642,7 +640,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                       fclose(fp);
                       fp = NULL;
                       // remove (temporary) file!
-                      UNLINK(fconv(catbuff, sizeof(catbuff), back[p].url_sav));
+                      UNLINK(fconv(catbuff, back[p].url_sav));
                     }
                     if (fp)
                       fclose(fp);
@@ -666,7 +664,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           if (A == NULL) {
             int localtime_returned_null = 0;
 
-            assertf(localtime_returned_null);
+            assert(localtime_returned_null);
           }
           strftime(s, 250, "%H:%M:%S", A);
 
@@ -767,27 +765,27 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           }
         }
         if (cache->txt) {
-#undef ESC_URL
-#define ESC_URL(S) escape_check_url_addr(S, OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt))
           fprintf(cache->txt,
                   "%d\t" "%s ('%s')\t" "%s\t" "%s%s\t" "%s%s%s\t%s\t"
                   "(from %s%s%s)" LF, back[p].r.statuscode, state,
-                  ESC_URL(back[p].r.msg),
-                  ESC_URL(back[p].r.contenttype),
-                  ((back[p].r.etag[0]) ? "etag:" : ((back[p].r.
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].r.msg),
+                  escape_check_url_addr(OPT_GET_BUFF(opt),
+                                        back[p].r.contenttype),
+                  ((back[p].r.
+                    etag[0]) ? "etag:" : ((back[p].r.
                                            lastmodified[0]) ? "date:" : "")),
-                  ESC_URL((back[p].r.etag[0]) ? back[p].r.
+                  escape_check_url_addr(OPT_GET_BUFF(opt),
+                                        (back[p].r.etag[0]) ? back[p].r.
                                         etag : (back[p].r.lastmodified)),
                   (link_has_authority(back[p].url_adr) ? "" : "http://"),
-                  ESC_URL(back[p].url_adr),
-                  ESC_URL(back[p].url_fil),
-                  ESC_URL(back[p].url_sav),
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].url_adr),
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].url_fil),
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].url_sav),
                   (link_has_authority(back[p].referer_adr)
                    || !back[p].referer_adr[0]) ? "" : "http://",
-                  ESC_URL(back[p].referer_adr),
-                  ESC_URL(back[p].referer_fil)
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].referer_adr),
+                  escape_check_url_addr(OPT_GET_BUFF(opt), back[p].referer_fil)
             );
-#undef ESC_URL
           if (opt->flush)
             fflush(cache->txt);
         }
@@ -987,11 +985,11 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
   if (fp == NULL) {
 #ifdef _WIN32
     if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME))
+        (fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME))
         == 0)
 #else
     if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME),
+        (fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), CACHE_REFNAME),
          S_IRWXU | S_IRWXG | S_IRWXO) == 0)
 #endif
     {
@@ -1060,7 +1058,7 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
         strcpybuff(back[p].url_adr, tmp.url_adr);
         back[p].ka_time_start = tmp.ka_time_start;
         back[p].status = STATUS_ALIVE;  // alive & waiting
-        assertf(back[p].ka_time_start != 0);
+        assert(back[p].ka_time_start != 0);
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully saved #%d (%s)",
                       back[p].r.debugid, back[p].url_adr);
@@ -1114,7 +1112,7 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
       strcpybuff(back[q].url_adr, tmp.url_adr); // address
       back[q].ka_time_start = tmp.ka_time_start;
       back[q].status = STATUS_ALIVE;    // alive & waiting
-      assertf(back[q].ka_time_start != 0);
+      assert(back[q].ka_time_start != 0);
       hts_log_print(opt, LOG_DEBUG,
                     "(Keep-Alive): successfully preserved #%d (%s)",
                     back[q].r.debugid, back[q].url_adr);
@@ -1506,8 +1504,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
     if (cache->cached_tests != NULL) {
       intptr_t ptr = 0;
 
-      if (inthash_read(cache->cached_tests,
-        concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr, fil), &ptr)) {       // gotcha
+      if (inthash_read(cache->cached_tests, concat(OPT_GET_BUFF(opt), adr, fil), &ptr)) {       // gotcha
         if (ptr != 0) {
           char *text = (char *) ptr;
           char *lf = strchr(text, '\n');
@@ -1574,7 +1571,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
             if (pos < 0) {      // pas de mise en cache data, vérifier existence
 #endif
               /* note: no check with IS_DELAYED_EXT() enabled - postcheck by client please! */
-              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize_utf8(fconv(catbuff, sizeof(catbuff), save)) <= 0) {  // fichier final n'existe pas ou est vide!
+              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize_utf8(fconv(catbuff, save)) <= 0) {  // fichier final n'existe pas ou est vide!
                 int found = 0;
 
                 /* It is possible that the file has been moved due to changes in build structure */
@@ -1592,10 +1589,10 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
                   if (r.is_write && previous_save[0] != '\0') {
                     /* Exists, but with another (old) filename: rename (almost) silently */
                     if (strcmp(previous_save, save) != 0
-                        && fexist_utf8(fconv(catbuff, sizeof(catbuff), previous_save))) {
-                      rename(fconv(catbuff, sizeof(catbuff), previous_save),
-                             fconv(catbuff2, sizeof(catbuff2), save));
-                      if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {
+                        && fexist_utf8(fconv(catbuff, previous_save))) {
+                      rename(fconv(catbuff, previous_save),
+                             fconv(catbuff2, save));
+                      if (fexist_utf8(fconv(catbuff, save))) {
                         found = 1;
                         hts_log_print(opt, LOG_DEBUG,
                                       "File '%s' has been renamed since last mirror to '%s' ; applying changes",
@@ -1621,8 +1618,8 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
                   // sinon, le fichier est ok à priori, mais on renverra un if-modified-since pour
                   // en être sûr
                   if (opt->norecatch) { // tester norecatch
-                    if (!fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {   // fichier existe pas mais déclaré: on l'a effacé
-                      FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), save), "wb");
+                    if (!fexist_utf8(fconv(catbuff, save))) {   // fichier existe pas mais déclaré: on l'a effacé
+                      FILE *fp = FOPEN(fconv(catbuff, save), "wb");
 
                       if (fp)
                         fclose(fp);
@@ -2263,7 +2260,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
         } else if (back[i].r.keep_alive_max < 1) {
           reason = "keep-alive-max reached";
         } else if (time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
-          assertf(back[i].ka_time_start != 0);
+          assert(back[i].ka_time_start != 0);
           snprintf(buffer, sizeof(buffer), "keep-alive timeout = %ds)",
                    (int) back[i].r.keep_alive_t);
           reason = buffer;
@@ -2458,7 +2455,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_WIDE_DEBUG
       DEBUG_W("select\n");
 #endif
-      select((int) nfds, &fds, &fds_c, &fds_e, &tv);
+      select(nfds, &fds, &fds_c, &fds_e, &tv);
 #if HTS_WIDE_DEBUG
       DEBUG_W("select done\n");
 #endif
@@ -2536,7 +2533,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
                 SSL_clear(back[i].r.ssl_con);
-                if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
+                if (SSL_set_fd(back[i].r.ssl_con, back[i].r.soc) == 1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
                 } else
@@ -2781,10 +2778,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (back[i].r.compressed &&
                                 /* .gz are *NOT* depacked!! */
                                 (strfield
-                                 (get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0)
+                                 (get_ext(catbuff, back[i].url_sav), "gz") == 0)
                               ) {
                               if (create_back_tmpfile(opt, &back[i]) == 0) {
-                                assertf(back[i].tmpfile != NULL);
+                                assert(back[i].tmpfile != NULL);
                                 /* note: tmpfile is utf-8 */
                                 if ((back[i].r.out =
                                      FOPEN(back[i].tmpfile, "wb")) == NULL) {
@@ -3659,7 +3656,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             file_notify(opt, back[i].url_adr, back[i].url_fil,
                                         back[i].url_sav, 0, 1,
                                         back[i].r.notmodified);
-                            back[i].r.out = FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav), "ab");       // append
+                            back[i].r.out = FOPEN(fconv(catbuff, back[i].url_sav), "ab");       // append
                             if (back[i].r.out && opt->cache != 0) {
                               back[i].r.is_write = 1;   // écrire
                               back[i].r.size = sz;      // déja écrit
@@ -3685,7 +3682,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           }
                         } else {        // mémoire
                           FILE *fp =
-                            FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav), "rb");
+                            FOPEN(fconv(catbuff, back[i].url_sav), "rb");
                           if (fp) {
                             LLint alloc_mem = sz + 1;
 

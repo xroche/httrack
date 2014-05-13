@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -88,6 +88,30 @@ HTSEXT_API const char *hts_get_version_info(httrackp * opt) {
   }
   return opt->state.HTbuff;
 }
+
+/* memory checks */
+HTSEXT_API htsErrorCallback htsCallbackErr = NULL;
+HTSEXT_API int htsMemoryFastXfr = 1;    /* fast xfr by default */
+void abortLog__fnc(char *msg, char *file, int line);
+void abortLog__fnc(char *msg, char *file, int line) {
+  FILE *fp = fopen("CRASH.TXT", "wb");
+
+  if (!fp)
+    fp = fopen("/tmp/CRASH.TXT", "wb");
+  if (!fp)
+    fp = fopen("C:\\CRASH.TXT", "wb");
+  if (!fp)
+    fp = fopen("CRASH.TXT", "wb");
+  if (fp) {
+    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n",
+            file, line);
+    fprintf(fp, "Reason:\r\n%s\r\n", msg);
+    fflush(fp);
+    fclose(fp);
+  }
+}
+
+HTSEXT_API t_abortLog abortLog__ = abortLog__fnc;       /* avoid VC++ inlining */
 
 static void htspe_log(htsmoduleStruct * str, const char *msg);
 

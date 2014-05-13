@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -64,6 +64,9 @@ struct htsmutex_s {
 /* Library internal definictions */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API void htsthread_wait(void);
+#endif
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
 /* Locking functions */

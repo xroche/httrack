@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -328,8 +328,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     is_html = ishtml(opt, fil);
   switch (is_html) {            /* .html,.shtml,.. */
   case 1:
-    if ((strfield2(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil), "html") == 0)
-        && (strfield2(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil), "htm") == 0)
+    if ((strfield2(get_ext(OPT_GET_BUFF(opt), fil), "html") == 0)
+        && (strfield2(get_ext(OPT_GET_BUFF(opt), fil), "htm") == 0)
       ) {
       strcpybuff(ext, "html");
       ext_chg = 1;
@@ -845,7 +845,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                     *d++ = *c++;
                   }
                   *d = '\0';
-                  d = unescape_http(catbuff, sizeof(catbuff), name[0]);
+                  d = unescape_http(catbuff, name[0]);
                   if (d && *d) {
                     strcpybuff(b, d);   /* value */
                     b += strlen(b);
@@ -1714,8 +1714,7 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
   char digest_filename[64];
 
   url_savename_refname(adr, fil, digest_filename);
-  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-    StringBuff(opt->path_log), digest_filename);
+  return fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log), digest_filename);
 }
 
 /* remove refname if any */

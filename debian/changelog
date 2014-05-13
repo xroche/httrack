@@ -1,22 +1,3 @@
-httrack (3.48.6-1) unstable; urgency=low
-
-  * Updated to 3.48.6 (3.48-6)
-
- -- Xavier Roche <xavier@debian.org>  Tue, 13 May 2014 21:23:02 +0200
-
-httrack (3.48.5-1) unstable; urgency=low
-
-  * Updated to 3.48.5 (3.48-5)
-
- -- Xavier Roche <xavier@debian.org>  Fri, 02 May 2014 16:37:08 +0200
-
-httrack (3.48.4-1) unstable; urgency=low
-
-  * Updated to 3.48.4 (3.48-4)
-    closes:#746173
-
- -- Xavier Roche <xavier@debian.org>  Sun, 27 Apr 2014 18:48:57 +0200
-
 httrack (3.48.3-1) unstable; urgency=low
 
   * Updated to 3.48.3 (3.48-3)
@@ -28,33 +9,6 @@ httrack (3.48.2-1) unstable; urgency=low
   * Updated to 3.48.2 (3.48-2)
 
  -- Xavier Roche <xavier@debian.org>  Thu, 10 Apr 2014 18:30:08 +0200
-
-httrack (3.48.1-5) unstable; urgency=low
-
-  * Really call dh_autoreconf, fix configure dependencies.
-
- -- Matthias Klose <doko@ubuntu.com>  Wed, 16 Apr 2014 14:46:20 +0200
-
-httrack (3.48.1-4) unstable; urgency=low
-
-  * Cleanup in dependencies
-
- -- Xavier Roche <xavier@debian.org>  Tue, 15 Apr 2014 22:13:19 +0200
-
-httrack (3.48.1-3) unstable; urgency=low
-
-  * Fixed FTBFS due to a missing Build-Depends: dh-autoreconf
-
- -- Xavier Roche <xavier@debian.org>  Tue, 15 Apr 2014 21:32:03 +0200
-
-httrack (3.48.1-2) unstable; urgency=low
-
-  * Fixed removal of .a files even on architectures where .a are libraries
-    closes:#744594
-    Enable verosity of unit tests
-    Call dh_autoreconf_clean before dh_clean
-
- -- Xavier Roche <xavier@debian.org>  Tue, 15 Apr 2014 21:02:14 +0200
 
 httrack (3.48.1-1) unstable; urgency=low
 

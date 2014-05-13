@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,6 +43,11 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+// Main, récupère les paramètres et appelle le robot
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API int hts_main(int argc, char **argv);
+HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
+#endif
 
 int cmdl_opt(char *s);
 int check_path(String * s, char *defaultname);

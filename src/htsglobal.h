@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -36,8 +36,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version (also check external version information)
-#define HTTRACK_VERSION      "3.48-6"
-#define HTTRACK_VERSIONID    "3.48.6"
+#define HTTRACK_VERSION      "3.48-3"
+#define HTTRACK_VERSIONID    "3.48.3"
 #define HTTRACK_AFF_VERSION  "3.x"
 #define HTTRACK_LIB_VERSION  "2.0"
 
@@ -54,19 +54,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
 #define SIZEOF_LONG_LONG 8
-#endif
-#endif
-
-/* GCC extension */
-#ifndef HTS_UNUSED
-#ifdef __GNUC__
-#define HTS_UNUSED __attribute__ ((unused))
-#define HTS_STATIC static __attribute__ ((unused))
-#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
-#else
-#define HTS_UNUSED
-#define HTS_STATIC static
-#define HTS_PRINTF_FUN(fmt, arg)
 #endif
 #endif
 
@@ -218,8 +205,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_CDLMAXSIZE 1024
 #endif
 
-/* Copyright (C) 1998-2014 Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
+/* Copyright (C) 1998-2013 Xavier Roche and other contributors */
+#define HTTRACK_AFF_AUTHORS "[XR&CO'2013]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,11 +34,11 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#include "htsopt.h"
 #include "htshash.h"
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsopt.h"
 #include "htsglobal.h"
 #include "htsmd5.h"
 #include "htscore.h"
@@ -171,19 +171,11 @@ static int key_former_adrfil_equals(void *arg, const char *a, const char *b) {
   return key_adrfil_equals_generic(arg, a, b, 1);
 }
 
-void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
+void hash_init(hash_struct * hash, int normalized) {
   hash->sav = inthash_new(0);
   hash->adrfil = inthash_new(0);
   hash->former_adrfil = inthash_new(0);
   hash->normalized = normalized;
-
-  hts_set_hash_handler(hash->sav, opt);
-  hts_set_hash_handler(hash->adrfil, opt);
-  hts_set_hash_handler(hash->former_adrfil, opt);
-
-  inthash_set_name(hash->sav, "hash->sav");
-  inthash_set_name(hash->adrfil, "hash->adrfil");
-  inthash_set_name(hash->former_adrfil, "hash->former_adrfil");
 
   /* Case-insensitive comparison ; keys are direct char* filenames */
   inthash_value_set_key_handler(hash->sav,

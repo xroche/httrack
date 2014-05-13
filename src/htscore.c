@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -162,7 +162,7 @@ RUN_CALLBACK0(opt, end); \
   if (opt->log != NULL) fflush(opt->log); \
   if (makestat_fp) { fclose(makestat_fp); makestat_fp=NULL; } \
   if (maketrack_fp){ fclose(maketrack_fp); maketrack_fp=NULL; } \
-  if (opt->accept_cookie) cookie_save(opt->cookie,fconcat(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),StringBuff(opt->path_log),"cookies.txt")); \
+  if (opt->accept_cookie) cookie_save(opt->cookie,fconcat(OPT_GET_BUFF(opt),StringBuff(opt->path_log),"cookies.txt")); \
   if (makeindex_fp) { fclose(makeindex_fp); makeindex_fp=NULL; } \
   if (cache_hashtable) { inthash_delete(&cache_hashtable); } \
   if (cache_tests)     { inthash_delete(&cache_tests); } \
@@ -236,7 +236,8 @@ if (makeindex_fp) { \
   char BIGSTK tempo[1024]; \
   if (makeindex_links == 1) { \
     char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
-    escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
+    strcpybuff(link_escaped, makeindex_firstlink); \
+    escape_uri_utf(link_escaped); \
     sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
   } else \
     tempo[0]='\0'; \
@@ -247,7 +248,7 @@ if (makeindex_fp) { \
   fflush(makeindex_fp); \
   fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
   makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),StringBuff(opt->path_html_utf8),"index.html"),"","");  \
+  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt),StringBuff(opt->path_html_utf8),"index.html"),"","");  \
 } \
 } \
 makeindex_done=1;    /* ok c'est fait */  \
@@ -368,15 +369,15 @@ int httpmirror(char *url1, httrackp * opt) {
   // et templates html
   template_header =
     readfile_or(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_bin),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_bin),
                  "templates/index-header.html"), HTS_INDEX_HEADER);
   template_body =
     readfile_or(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_bin),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_bin),
                  "templates/index-body.html"), HTS_INDEX_BODY);
   template_footer =
     readfile_or(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_bin),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_bin),
                  "templates/index-footer.html"), HTS_INDEX_FOOTER);
 
   // initialiser mimedefs
@@ -401,10 +402,6 @@ int httpmirror(char *url1, httrackp * opt) {
     XH_extuninit;
     return 0;
   }
-  hts_set_hash_handler(cache_hashtable, opt);
-  hts_set_hash_handler(cache_tests, opt);
-  inthash_set_name(cache_hashtable, "cache_hashtable");
-  inthash_set_name(cache_tests, "cache_tests");
   inthash_value_is_malloc(cache_tests, 1);      /* malloc */
   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
@@ -449,7 +446,7 @@ int httpmirror(char *url1, httrackp * opt) {
   lien_tot = 0;
 
   // initialiser hachage
-  hash_init(opt, &hash, opt->urlhack);
+  hash_init(&hash, opt->urlhack);
   // note: we need a cast because of the const
   hash.liens = (const lien_url **) liens;
 
@@ -631,8 +628,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
     // lien primaire
     liens_record("primary", "/primary",
-                 fslash(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                 fslash(OPT_GET_BUFF(opt),
+                        fconcat(OPT_GET_BUFF(opt),
                                 StringBuff(opt->path_html_utf8), "index.html")),
                  "", "", opt->urlhack);
     if (liens[lien_tot] == NULL) {      // erreur, pas de place réservée
@@ -654,11 +651,15 @@ int httpmirror(char *url1, httrackp * opt) {
 
     // Initialiser cache
     {
+      int backupXFR = htsMemoryFastXfr;
+
       opt->state._hts_in_html_parsing = 4;
       if (!RUN_CALLBACK7(opt, loop, NULL, 0, 0, 0, lien_tot, 0, NULL)) {
         opt->state.exit_xh = 1; // exit requested
       }
+      htsMemoryFastXfr = 1;     /* fast load */
       cache_init(&cache, opt);
+      htsMemoryFastXfr = backupXFR;
       opt->state._hts_in_html_parsing = 0;
     }
 
@@ -687,7 +688,7 @@ int httpmirror(char *url1, httrackp * opt) {
     // On prévoit large: les fichiers HTML ne prennent que peu de place en mémoire, et les
     // fichiers non html sont sauvés en direct sur disque.
     // --> 1024 entrées + 32 entrées par socket en supplément
-    sback = back_new(opt, opt->maxsoc * 32 + 1024);
+    sback = back_new(opt->maxsoc * 32 + 1024);
     if (sback == NULL) {
       hts_log_print(opt, LOG_PANIC,
                     "Not enough memory, can not allocate %d bytes",
@@ -699,7 +700,7 @@ int httpmirror(char *url1, httrackp * opt) {
   if (opt->makestat) {
     makestat_fp =
       fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-stats.txt"),
+            (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-stats.txt"),
             "wb");
     if (makestat_fp != NULL) {
       fprintf(makestat_fp, "HTTrack statistics report, every minutes" LF LF);
@@ -710,7 +711,7 @@ int httpmirror(char *url1, httrackp * opt) {
   if (opt->maketrack) {
     maketrack_fp =
       fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-track.txt"),
+            (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-track.txt"),
             "wb");
     if (maketrack_fp != NULL) {
       fprintf(maketrack_fp, "HTTrack tracking report, every minutes" LF LF);
@@ -1451,7 +1452,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
           /* Remove file if being processed */
           if (is_loaded_from_file) {
-            (void) unlink(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), savename));
+            (void) unlink(fconv(OPT_GET_BUFF(opt), savename));
             is_loaded_from_file = 0;
           }
 
@@ -1782,7 +1783,7 @@ int httpmirror(char *url1, httrackp * opt) {
 #ifndef _WIN32
               chmod(tempo, HTS_ACCESS_FILE);
 #endif
-              usercommand(opt, 0, NULL, fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo), "",
+              usercommand(opt, 0, NULL, fconv(OPT_GET_BUFF(opt), tempo), "",
                           "");
             }
 
@@ -1978,42 +1979,42 @@ int httpmirror(char *url1, httrackp * opt) {
     XH_uninit;
     if ((fexist
          (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/old.dat")))
+          (OPT_GET_BUFF(opt), StringBuff(opt->path_log), "hts-cache/old.dat")))
         &&
         (fexist
          (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+          (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
            "hts-cache/old.ndx")))) {
       remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
               "hts-cache/new.dat"));
       remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
               "hts-cache/new.ndx"));
       remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
               "hts-cache/new.lst"));
       remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
               "hts-cache/new.txt"));
       rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.dat"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+              "hts-cache/old.dat"), fconcat(OPT_GET_BUFF(opt),
                                             StringBuff(opt->path_log),
                                             "hts-cache/new.dat"));
       rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.ndx"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+              "hts-cache/old.ndx"), fconcat(OPT_GET_BUFF(opt),
                                             StringBuff(opt->path_log),
                                             "hts-cache/new.ndx"));
       rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.lst"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+              "hts-cache/old.lst"), fconcat(OPT_GET_BUFF(opt),
                                             StringBuff(opt->path_log),
                                             "hts-cache/new.lst"));
       rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.txt"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+             (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
+              "hts-cache/old.txt"), fconcat(OPT_GET_BUFF(opt),
                                             StringBuff(opt->path_log),
                                             "hts-cache/new.txt"));
     }
@@ -2037,16 +2038,16 @@ int httpmirror(char *url1, httrackp * opt) {
       //
       old_lst =
         fopen(fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+              (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
                "hts-cache/old.lst"), "rb");
       if (old_lst) {
         off_t sz =
           fsize(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
                  "hts-cache/new.lst"));
         new_lst =
           fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_log),
                  "hts-cache/new.lst"), "rb");
         if ((new_lst) && (sz > 0)) {
           char *adr = (char *) malloct(sz);
@@ -2848,10 +2849,10 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
     char BIGSTK savelst[HTS_URLMAXSIZE * 2];
     char catbuff[CATBUFF_SIZE];
 
-    strcpybuff(savelst, fslash(catbuff, sizeof(catbuff), s));
+    strcpybuff(savelst, fslash(catbuff, s));
     // couper chemin?
     if (strnotempty(strc->path)) {
-      if (strncmp(fslash(catbuff, sizeof(catbuff), strc->path), savelst, strlen(strc->path)) == 0) {     // couper
+      if (strncmp(fslash(catbuff, strc->path), savelst, strlen(strc->path)) == 0) {     // couper
         strcpybuff(savelst, s + strlen(strc->path));
       }
     }
@@ -2937,9 +2938,8 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
       if (rsc_fil == NULL)
         rsc_fil = fil;
       if (strncmp
-          (fslash(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), save),
-           fslash(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-           StringBuff(opt->path_html_utf8)), (n =
+          (fslash(OPT_GET_BUFF(opt), save),
+           fslash(OPT_GET_BUFF(opt), StringBuff(opt->path_html_utf8)), (n =
                                                                         (int)
                                                                         strlen
                                                                         (StringBuff
@@ -2953,15 +2953,13 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
         //first = 1;
         opt->state.mimefp =
           fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                StringBuff(opt->path_html), "index.mht"),
+                (OPT_GET_BUFF(opt), StringBuff(opt->path_html), "index.mht"),
                 "wb");
-        (void) unlink(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-          StringBuff(opt->path_html),
+        (void) unlink(fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
                               "index.eml"));
 #ifndef _WIN32
         if (symlink("index.mht",
-                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html),
+                    fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_html),
                             "index.eml")) != 0) {
           if (errno != EPERM) {
             hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
@@ -3007,7 +3005,17 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
           mimebuff[0] = '\0';
 
           /* CID */
-          make_content_id(adr, fil, cid, sizeof(cid));
+          strcpybuff(cid, adr);
+          strcatbuff(cid, fil);
+          escape_in_url(cid);
+          {
+            char *a = cid;
+
+            while((a = strchr(a, '%'))) {
+              *a = 'X';
+              a++;
+            }
+          }
 
           guess_httptype(opt, mimebuff, save);
           fprintf(opt->state.mimefp, "--%s\r\n",
@@ -3066,7 +3074,7 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
     if (A == NULL) {
       int localtime_returned_null = 0;
 
-      assertf(localtime_returned_null);
+      assert(localtime_returned_null);
     }
     strftime(s, 250, "%H:%M:%S", A);
     if (strnotempty(type))
@@ -3315,7 +3323,7 @@ int check_sockerror(T_SOC s) {
   FD_SET((T_SOC) s, &fds);
   tv.tv_sec = 0;
   tv.tv_usec = 0;
-  select((int) s + 1, NULL, NULL, &fds, &tv);
+  select(s + 1, NULL, NULL, &fds, &tv);
   return FD_ISSET(s, &fds);
 }
 
@@ -3328,7 +3336,7 @@ int check_sockdata(T_SOC s) {
   FD_SET((T_SOC) s, &fds);
   tv.tv_sec = 0;
   tv.tv_usec = 0;
-  select((int) s + 1, &fds, NULL, NULL, &tv);
+  select(s + 1, &fds, NULL, NULL, &tv);
   return FD_ISSET(s, &fds);
 }
 
@@ -3850,5 +3858,5 @@ void voidf(void) {
   (void) a;
 }
 
-// HTTrack Website Copier Copyright (C) 1998-2014 Xavier Roche and other contributors
+// HTTrack Website Copier Copyright (C) 1998-2013 Xavier Roche and other contributors
 //

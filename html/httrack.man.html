@@ -52,7 +52,8 @@ offline browser : copy websites to a local directory</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>httrack [
 url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
-&minus;&minus;path</b> ] [ <b>&minus;w,
+&minus;&minus;path</b> ] [ <b>&minus;%O,
+&minus;&minus;chroot</b> ] [ <b>&minus;w,
 &minus;&minus;mirror</b> ] [ <b>&minus;W,
 &minus;&minus;mirror&minus;wizard</b> ] [ <b>&minus;g,
 &minus;&minus;get&minus;files</b> ] [ <b>&minus;i,
@@ -69,6 +70,8 @@ url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
 &minus;&minus;max&minus;rate[=N]</b> ] [ <b>&minus;%cN,
 &minus;&minus;connection&minus;per&minus;second[=N]</b> ] [
 <b>&minus;GN, &minus;&minus;max&minus;pause[=N]</b> ] [
+<b>&minus;%mN,
+&minus;&minus;max&minus;mms&minus;time[=N]</b> ] [
 <b>&minus;cN, &minus;&minus;sockets[=N]</b> ] [
 <b>&minus;TN, &minus;&minus;timeout[=N]</b> ] [
 <b>&minus;RN, &minus;&minus;retries[=N]</b> ] [
@@ -108,9 +111,7 @@ url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
 &minus;&minus;referer</b> ] [ <b>&minus;%E,
 &minus;&minus;from</b> ] [ <b>&minus;%F,
 &minus;&minus;footer</b> ] [ <b>&minus;%l,
-&minus;&minus;language</b> ] [ <b>&minus;%a,
-&minus;&minus;accept</b> ] [ <b>&minus;%X,
-&minus;&minus;headers</b> ] [ <b>&minus;C,
+&minus;&minus;language</b> ] [ <b>&minus;C,
 &minus;&minus;cache[=N]</b> ] [ <b>&minus;k,
 &minus;&minus;store&minus;all&minus;in&minus;cache</b> ] [
 <b>&minus;%n, &minus;&minus;do&minus;not&minus;recatch</b> ]
@@ -143,7 +144,8 @@ url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
 <b>&minus;%!,
 &minus;&minus;disable&minus;security&minus;limits</b> ] [
 <b>&minus;V, &minus;&minus;userdef&minus;cmd</b> ] [
-<b>&minus;%W, &minus;&minus;callback</b> ] [ <b>&minus;K,
+<b>&minus;%U, &minus;&minus;user</b> ] [ <b>&minus;%W,
+&minus;&minus;callback</b> ] [ <b>&minus;K,
 &minus;&minus;keep&minus;links[=N]</b> ] [</p>
 
 <h2>DESCRIPTION
@@ -225,17 +227,29 @@ options:</b></p>
        cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="11%"></td>
-<td width="3%">
+<td width="4%">
 
 
 <p>&minus;O</p></td>
-<td width="8%"></td>
+<td width="7%"></td>
 <td width="78%">
 
 
 <p>path for mirror/logfiles+cache (&minus;O path
 mirror[,path cache and logfiles]) (&minus;&minus;path
 &lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%O</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>chroot path to, must be r00t (&minus;%O root path)
+(&minus;&minus;chroot &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Action
@@ -461,6 +475,19 @@ hour) (&minus;&minus;max&minus;time[=N])</p></td></tr>
 
 <p>pause transfer if N bytes reached, and wait until lock
 file is deleted (&minus;&minus;max&minus;pause[=N])</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="9%">
+
+
+<p>&minus;%mN</p></td>
+<td width="2%"></td>
+<td width="78%">
+
+
+<p>maximum mms stream download time in seconds (60=1
+minute, 3600=1 hour)
+(&minus;&minus;max&minus;mms&minus;time[=N])</p> </td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Flow
@@ -1022,32 +1049,6 @@ HTTP headers (&minus;F &quot;user&minus;agent name&quot;)
 
 <p>preffered language (&minus;%l &quot;fr, en, jp, *&quot;
 (&minus;&minus;language &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%a</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>accepted formats (&minus;%l
-&quot;text/html,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.1&quot;
-(&minus;&minus;accept &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%X</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>additional HTTP header line (&minus;%X
-&quot;X&minus;Magic: 42&quot; (&minus;&minus;headers
-&lt;param&gt;)</p> </td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Log, index,
@@ -1631,6 +1632,18 @@ memory boundary checks)
 
 <p>generate transfer rate statictics every minutes
 (&minus;&minus;debug&minus;ratestats)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="6%">
+
+
+<p>&minus;#!</p></td>
+<td width="5%"></td>
+<td width="78%">
+
+
+<p>execute a shell command (&minus;#! &quot;echo
+hello&quot;) (&minus;&minus;exec &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Dangerous
@@ -1694,8 +1707,20 @@ specific options:</b></p>
 
 
 <p style="margin-top: 1em">execute system command after
-each files ($0 is the filename: &minus;V &quot;rm \$0&quot;)
+each files ($0 is the filename: &minus;V &quot;rm &quot;)
 (&minus;&minus;userdef&minus;cmd &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>&minus;%U</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>run the engine with another id when called as root
+(&minus;%U smith) (&minus;&minus;user &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
@@ -2286,7 +2311,7 @@ other information you deem necessary.</p>
 
 
 <p style="margin-left:11%; margin-top: 1em">Copyright (C)
-1998-2014 Xavier Roche and other contributors</p>
+1998-2013 Xavier Roche and other contributors</p>
 
 <p style="margin-left:11%; margin-top: 1em">This program is
 free software: you can redistribute it and/or modify it

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,10 +34,6 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_DEFLIB
 
 #include "htsglobal.h"
-
-#ifndef _WIN32
-#include <inttypes.h>
-#endif
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -107,17 +103,14 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
 /* Options handling */
 HTSEXT_API httrackp *hts_create_opt(void);
 HTSEXT_API void hts_free_opt(httrackp * opt);
-HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
-HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
+HTSEXT_API void set_wrappers(httrackp * opt);   // DEPRECATED - DUMMY FUNCTION
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             const char *argv);
 
 /* Logging */
 HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
 HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
-                              ...) HTS_PRINTF_FUN(3, 4);
-HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format,
-                               va_list args);
+                              ...);
 
 /* Infos */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
@@ -129,22 +122,22 @@ HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 HTSEXT_API int htswrap_init(void);      // DEPRECATED - DUMMY FUNCTION
 HTSEXT_API int htswrap_free(void);      // DEPRECATED - DUMMY FUNCTION
 HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
-HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
+HTSEXT_API unsigned long int htswrap_read(httrackp * opt, const char *name);
 HTSEXT_API int htswrap_set_userdef(httrackp * opt, void *userdef);
 HTSEXT_API void *htswrap_get_userdef(httrackp * opt);
 
 /* Internal library allocators, if a different libc is being used by the client */
 HTSEXT_API char *hts_strdup(const char *string);
 HTSEXT_API void *hts_malloc(size_t size);
-HTSEXT_API void *hts_realloc(void *const data, const size_t size);
+HTSEXT_API void *hts_realloc(void *data, size_t size);
 HTSEXT_API void hts_free(void *data);
 
 /* Other functions */
 HTSEXT_API int hts_resetvar(void);      // DEPRECATED - DUMMY FUNCTION
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                                  const char *binpath);
-HTSEXT_API char *hts_getcategories(char *path, int type);
-HTSEXT_API char *hts_getcategory(const char *filename);
+HTSEXT_API const char *hts_getcategories(const char *path, int type);
+HTSEXT_API const char *hts_getcategory(const char *filename);
 
 /* Catch-URL */
 HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox);
@@ -157,12 +150,11 @@ HTSEXT_API int hts_is_testing(httrackp * opt);
 HTSEXT_API int hts_is_exiting(httrackp * opt);
 
 /*HTSEXT_API int hts_setopt(httrackp* opt); DEPRECATED ; see copy_htsopt() */
-
 HTSEXT_API int hts_addurl(httrackp * opt, char **url);
 HTSEXT_API int hts_resetaddurl(httrackp * opt);
-HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to);
+HTSEXT_API int copy_htsopt(httrackp * from, httrackp * to);
 HTSEXT_API char *hts_errmsg(httrackp * opt);
-HTSEXT_API int hts_setpause(httrackp * opt, int);
+HTSEXT_API int hts_setpause(httrackp * opt, int);       // pause transfer
 HTSEXT_API int hts_request_stop(httrackp * opt, int force);
 HTSEXT_API int hts_cancel_file_push(httrackp * opt, const char *url);
 HTSEXT_API void hts_cancel_test(httrackp * opt);
@@ -172,68 +164,46 @@ HTSEXT_API void hts_cancel_parsing(httrackp * opt);
 
 /* Tools */
 HTSEXT_API int structcheck(const char *path);
-HTSEXT_API int structcheck_utf8(const char *path);
 HTSEXT_API int dir_exists(const char *path);
 HTSEXT_API void infostatuscode(char *msg, int statuscode);
-HTSEXT_API TStamp mtime_local(void);
+HTSEXT_API HTS_INLINE TStamp mtime_local(void);
 HTSEXT_API void qsec2str(char *st, TStamp t);
 HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n);
 HTSEXT_API char *int2bytes(strc_int2bytes2 * strc, LLint n);
 HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n);
 HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n);
-HTSEXT_API char *jump_identification(const char *);
-HTSEXT_API char *jump_normalized(const char *);
-HTSEXT_API char *jump_toport(const char *);
-HTSEXT_API char *fil_normalized(const char *source, char *dest);
-HTSEXT_API char *adr_normalized(const char *source, char *dest);
+HTSEXT_API char *jump_identification(char *);
+HTSEXT_API char *jump_normalized(char *);
+HTSEXT_API char *jump_toport(char *);
+HTSEXT_API char *fil_normalized(char *source, char *dest);
+HTSEXT_API char *adr_normalized(char *source, char *dest);
 HTSEXT_API char *hts_rootdir(char *file);
 
 /* Escaping URLs */
 HTSEXT_API void unescape_amp(char *s);
-
-HTSEXT_API size_t escape_spc_url(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t escape_in_url(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t escape_uri(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t escape_uri_utf(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t escape_check_url(const char *const src, char *const dest, const size_t size);
-
-HTSEXT_API size_t append_escape_spc_url(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t append_escape_in_url(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t append_escape_uri(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t append_escape_uri_utf(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t append_escape_check_url(const char *const src, char *const dest, const size_t size);
-
-HTSEXT_API size_t inplace_escape_spc_url(char *const dest, const size_t size);
-HTSEXT_API size_t inplace_escape_in_url(char *const dest, const size_t size);
-HTSEXT_API size_t inplace_escape_uri(char *const dest, const size_t size);
-HTSEXT_API size_t inplace_escape_uri_utf(char *const dest, const size_t size);
-HTSEXT_API size_t inplace_escape_check_url(char *const dest, const size_t size);
-
-HTSEXT_API char *escape_check_url_addr(const char *const src, char *const dest, const size_t size);
-HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil, char *const dest, const size_t size);
-
-HTSEXT_API size_t x_escape_http(const char *const s, char *const dest, const size_t max_size, const int mode);
-HTSEXT_API void escape_remove_control(char *const s);
-HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, const size_t size);
-HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const dest, const size_t size);
-
-HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const char *const s);
-HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, const char *s, const int no_high);
+HTSEXT_API void escape_spc_url(char *s);
+HTSEXT_API void escape_in_url(char *s);
+HTSEXT_API void escape_uri(char *s);
+HTSEXT_API void escape_uri_utf(char *s);
+HTSEXT_API void escape_check_url(char *s);
+HTSEXT_API char *escape_check_url_addr(char *s);
+HTSEXT_API void x_escape_http(char *s, int mode);
+HTSEXT_API char *unescape_http(char *catbuff, const char *s);
+HTSEXT_API char *unescape_http_unharm(char *catbuff, const char *s,
+                                      int no_high);
 HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
-
 HTSEXT_API void escape_remove_control(char *s);
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
                              int flag);
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_dyntype(const char *fil);
-HTSEXT_API char *get_ext(char *catbuff, size_t size, const char *fil);
+HTSEXT_API char *get_ext(char *catbuff, const char *fil);
 
 /* Ugly string tools */
-HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b);
-HTSEXT_API char *fconcat(char *catbuff, size_t size, const char *a, const char *b);
-HTSEXT_API char *fconv(char *catbuff, size_t size, const char *a);
-HTSEXT_API char *fslash(char *catbuff, size_t size, const char *a);
+HTSEXT_API char *concat(char *catbuff, const char *a, const char *b);
+HTSEXT_API char *fconcat(char *catbuff, const char *a, const char *b);
+HTSEXT_API char *fconv(char *catbuff, const char *a);
 
 /* Debugging */
 HTSEXT_API void hts_debug(int level);
@@ -302,20 +272,5 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 #endif
 #define HTS_DEF_FILEAPI
 #endif
-
-/** Macro aimed to break at build-time if a size is not a sizeof() strictly 
- *  greater than sizeof(char*). **/
-#undef COMPILE_TIME_CHECK_SIZE
-#define COMPILE_TIME_CHECK_SIZE(A) (void) ((void (*)(char[A - sizeof(char*) - 1])) NULL)
-
-/** Macro aimed to break at compile-time if a size is not a sizeof() strictly 
- *  greater than sizeof(char*). **/
-#undef RUNTIME_TIME_CHECK_SIZE
-#define RUNTIME_TIME_CHECK_SIZE(A) assertf((A) != sizeof(void*))
-
-#define fconv(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fconv(A,B,C))
-#define concat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), concat(A,B,C,D))
-#define fconcat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), fconcat(A,B,C,D))
-#define fslash(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A,B,C))
 
 #endif

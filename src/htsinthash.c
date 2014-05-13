@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: hash tables                                            */
+/* File: httrack.c subroutines:                                 */
+/*       hash tables                                            */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -82,7 +83,7 @@ Please visit our Website: http://www.httrack.com
 #define STASH_SIZE 16
 
 /** Minimum value for lg_size. **/
-#define MIN_LG_SIZE 4
+#define MIN_LG_SIZE 8
 
 /** Minimum value for pool.capacity. **/
 #define MIN_POOL_CAPACITY 256
@@ -175,68 +176,40 @@ struct struct_inthash {
       /** opaque argument **/
       void *arg;
     } key;
-
-    /** How to handle fatal assertions (might be NULL). **/
-    struct {
-      /** logging **/
-      t_inthash_loghandler log;
-      /** abort() **/
-      t_inthash_asserthandler fatal;
-      /** opaque argument **/
-      void *arg;
-      /** hashtable name for logging **/
-      const char *name;
-    } error;
   } custom;
 };
 
-/* Assertion check. */
-#define inthash_assert(HASHTABLE, EXP) \
-  (void)( (EXP) || (inthash_assert_failed(HASHTABLE, #EXP, __FILE__, __LINE__), 0) )
-
-/* Compiler-specific. */
-#ifdef __GNUC__
-#define INTHASH_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
-#define INTHASH_INLINE __inline__
-#elif (defined(_MSC_VER))
-#define INTHASH_PRINTF_FUN(FMT, ARGS)
-#define INTHASH_INLINE __inline
+/* Using httrack code */
+#ifdef LIBHTTRACK_EXPORTS
+#include "htsbase.h"
+#define inthash_assert assertf
 #else
-#define INTHASH_PRINTF_FUN(FMT, ARGS)
-#define INTHASH_INLINE
+static void inthash_fail(const char* exp, const char* file, int line) {
+  fprintf(stderr, "assertion '%s' failed at %s:%d\n", exp, file, line);
+  abort();
+}
+#define inthash_assert(EXP) (void)( (EXP) || (inthash_fail(#EXP, __FILE__, __LINE__), 0) )
+#define HTS_PRINTF_FUN(FMT, ARGS)
+#define HTS_INLINE
 #endif
 
 /* Logging level. */
-static void inthash_log(const inthash hashtable, inthash_loglevel level,
-                        const char *format, va_list args);
-#define DECLARE_LOG_FUNCTION(NAME, LEVEL) \
-static void NAME(const inthash hashtable, const char *format, ...) \
-  INTHASH_PRINTF_FUN(2, 3); \
-static void NAME(const inthash hashtable, const char *format, ...) { \
-  va_list args; \
-  va_start(args, format); \
-  inthash_log(hashtable, LEVEL, format, args); \
-  va_end(args); \
-}
 #if 0
 /* Verbose. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
-DECLARE_LOG_FUNCTION(inthash_debug, inthash_log_debug)
-DECLARE_LOG_FUNCTION(inthash_trace, inthash_log_trace)
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
+#define inthash_debug inthash_log
+#define inthash_trace inthash_log
 #elif 0
 /* Info. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
 #define inthash_debug inthash_log
 #define inthash_trace inthash_nolog
 #else
 /* No logging except stats and critical. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
+#define inthash_crit inthash_log
+#define inthash_info inthash_log
 #define inthash_debug inthash_nolog
 #define inthash_trace inthash_nolog
 #endif
@@ -247,99 +220,21 @@ DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
 /* the empty string for the string pool */
 static char the_empty_string[1] = { 0 };
 
-/* global assertion handler */
-static t_inthash_asserthandler global_assert_handler = NULL;
-
-/* global assertion handler */
-static t_inthash_loghandler global_log_handler = NULL;
-
-/* default assertion handler, if neither hashtable one nor global one 
-   were defined */
-static void inthash_fail(const char* exp, const char* file, int line) {
-  fprintf(stderr, "assertion '%s' failed at %s:%d\n", exp, file, line);
-  abort();
-}
-
-/* assert failed handler. */
-static void inthash_assert_failed(const inthash hashtable, const char* exp, const char* file, int line) {
-  const char *name = inthash_get_name(hashtable);
-  inthash_crit(hashtable, "hashtable %s: %s failed at %s:%d", 
-    name != NULL ? name : "<unknown>", exp, file, line);
-  if (hashtable != NULL && hashtable->custom.error.fatal != NULL) {
-    hashtable->custom.error.fatal(hashtable->custom.error.arg, exp, file, line);
-  } else if (global_assert_handler != NULL) {
-    global_assert_handler(hashtable, exp, file, line);
-  } else {
-    inthash_fail(exp, file, line);
-  }
-  abort();
-}
-
 /* Logging */
-static void inthash_log(const inthash hashtable, inthash_loglevel level,
-                        const char *format, va_list args) {
-  inthash_assert(hashtable, format != NULL);
-  if (hashtable != NULL && hashtable->custom.error.log != NULL) {
-    hashtable->custom.error.log(hashtable->custom.error.arg, level, format, args);
-  } else if (global_log_handler != NULL) {
-    global_log_handler(hashtable, level, format, args);
-  } else {
-    fprintf(stderr, "[%p] ", (void*) hashtable);
-    (void) vfprintf(stderr, format, args);
-    putc('\n', stderr);
-  }
+static void inthash_log(const inthash hashtable, const char *format, ...)
+                        HTS_PRINTF_FUN(2, 3) {
+  va_list args;
+  inthash_assert(format != NULL);
+  fprintf(stderr, "[%p] ", (void*) hashtable);
+  va_start(args, format);
+  (void) vfprintf(stderr, format, args);
+  va_end(args);
+  putc('\n', stderr);
 }
 
 /* No logging (should be dropped by the compiler) */
 static void inthash_nolog(const inthash hashtable, const char *format, ...)
-                          INTHASH_PRINTF_FUN(2, 3);
-static void inthash_nolog(const inthash hashtable, const char *format, ...) {
-}
-
-const char* inthash_get_name(inthash hashtable) {
-  return hashtable->custom.error.name;
-}
-
-static void inthash_log_stats(inthash hashtable) {
-  const char *name = inthash_get_name(hashtable);
-  inthash_info(hashtable, "hashtable %s%s%ssummary: "
-               "size=%"UINT_64_FORMAT" (lg2=%"UINT_64_FORMAT") "
-               "used=%"UINT_64_FORMAT" "
-               "stash-size=%"UINT_64_FORMAT" "
-               "pool-size=%"UINT_64_FORMAT" "
-               "pool-capacity=%"UINT_64_FORMAT" "
-               "pool-used=%"UINT_64_FORMAT" "
-               "writes=%"UINT_64_FORMAT" "
-               "(new=%"UINT_64_FORMAT") "
-               "moved=%"UINT_64_FORMAT " "
-               "stashed=%"UINT_64_FORMAT" "
-               "max-stash-size=%"UINT_64_FORMAT" "
-               "avg-moved=%g "
-               "rehash=%"UINT_64_FORMAT" "
-               "pool-compact=%"UINT_64_FORMAT" "
-               "pool-realloc=%"UINT_64_FORMAT" "
-               "memory=%"UINT_64_FORMAT,
-               name != NULL ? "\"" : "",
-               name != NULL ? name : "",
-               name != NULL ? "\" " : "",
-               (uint64_t) POW2(hashtable->lg_size),
-               (uint64_t) hashtable->lg_size,
-               (uint64_t) hashtable->used,
-               (uint64_t) hashtable->stash.size,
-               (uint64_t) hashtable->pool.size,
-               (uint64_t) hashtable->pool.capacity,
-               (uint64_t) hashtable->pool.used,
-               (uint64_t) hashtable->stats.write_count,
-               (uint64_t) hashtable->stats.add_count,
-               (uint64_t) hashtable->stats.cuckoo_moved,
-               (uint64_t) hashtable->stats.stash_added,
-               (uint64_t) hashtable->stats.max_stash_size,
-               (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
-               (uint64_t) hashtable->stats.rehash_count,
-               (uint64_t) hashtable->stats.pool_compact_count,
-               (uint64_t) hashtable->stats.pool_realloc_count,
-               (uint64_t) inthash_memory_size(hashtable)
-               );
+                          HTS_PRINTF_FUN(2, 3) {
 }
 
 inthash_keys inthash_hash_value(const char *value) {
@@ -423,39 +318,39 @@ inthash_keys inthash_hash_value(const char *value) {
 #endif
 }
 
-static INTHASH_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
-                                                       const char *value) {
+static HTS_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
+                                                   const char *value) {
   return hashtable->custom.key.hash == NULL 
     ? inthash_hash_value(value)
     : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
 }
 
 /* position 'pos' is free ? */
-static INTHASH_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
+static HTS_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
   return hashtable->items[pos].name == NULL;
 }
 
 /* compare two keys ; by default using strcmp() */
-static INTHASH_INLINE int inthash_equals(inthash hashtable,
-                                         const char *a, const char *b) {
+static HTS_INLINE int inthash_equals(inthash hashtable,
+                                     const char *a, const char *b) {
   return hashtable->custom.key.equals == NULL
     ? strcmp(a, b) == 0
     : hashtable->custom.key.equals(hashtable->custom.key.arg, a, b);
 }
 
-static INTHASH_INLINE int inthash_matches_(inthash hashtable,
-                                           const inthash_item *const item,
-                                           const char *name,
-                                           const inthash_keys *hashes) {
+static HTS_INLINE int inthash_matches_(inthash hashtable,
+                                       const inthash_item *const item,
+                                       const char *name,
+                                       const inthash_keys *hashes) {
   return item->name != NULL
     && item->hashes.hash1 == hashes->hash1
     && item->hashes.hash2 == hashes->hash2
     && inthash_equals(hashtable, item->name, name);
 }
 
-static INTHASH_INLINE int inthash_matches(inthash hashtable, size_t pos,
-                                          const char *name,
-                                          const inthash_keys *hashes) {
+static HTS_INLINE int inthash_matches(inthash hashtable, size_t pos,
+                                      const char *name,
+                                      const inthash_keys *hashes) {
   const inthash_item *const item = &hashtable->items[pos];
   return inthash_matches_(hashtable, item, name, hashes);
 }
@@ -469,7 +364,7 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   size_t count = 0;
 
   /* we manage the string pool */
-  inthash_assert(hashtable, hashtable->custom.key.dup == NULL);
+  assert(hashtable->custom.key.dup == NULL);
 
   /* statistics */
   hashtable->stats.pool_compact_count++;
@@ -488,7 +383,7 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
       "** hashtable string pool compaction error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
-    inthash_assert(hashtable, ! "hashtable string pool compaction error");
+    inthash_assert(! "hashtable string pool compaction error");
   }
 
   /* relocate a string on a different pool */
@@ -501,18 +396,17 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
       char *const max_dest =                                \
         &hashtable->pool.buffer[capacity];                  \
       /* copy string */                                     \
-      inthash_assert(hashtable, dest < max_dest);           \
+      inthash_assert(dest < max_dest);                      \
       dest[0] = src[0];                                     \
       {                                                     \
         size_t i;                                           \
         for(i = 1 ; src[i - 1] != '\0' ; i++) {             \
-          inthash_assert(hashtable, &dest[i] < max_dest);   \
+          inthash_assert(&dest[i] < max_dest);              \
           dest[i] = src[i];                                 \
         }                                                   \
         /* update pool size */                              \
         hashtable->pool.size += i;                          \
-        inthash_assert(hashtable,                           \
-                       hashtable->pool.size <= capacity);   \
+        assert(hashtable->pool.size <= capacity);           \
       }                                                     \
       /* update source */                                   \
       S = dest;                                             \
@@ -551,7 +445,7 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
   size_t count = 0;
 
   /* we manage the string pool */
-  inthash_assert(hashtable, hashtable->custom.key.dup == NULL);
+  assert(hashtable->custom.key.dup == NULL);
 
   /* compact instead ? */
   if (hashtable->pool.used < ( hashtable->pool.size*3 ) / 4) {
@@ -573,17 +467,17 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
       "** hashtable string pool allocation error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
-    inthash_assert(hashtable, ! "hashtable string pool allocation error");
+    inthash_assert(! "hashtable string pool allocation error");
   }
 
   /* recompute string address */
-#define RECOMPUTE_STRING(S) do {                                     \
-    if (S != NULL && S != the_empty_string) {                        \
-      const size_t offset = (S) - oldbase;                           \
-      inthash_assert(hashtable, offset < hashtable->pool.capacity);  \
-      S = &hashtable->pool.buffer[offset];                           \
-      count++;                                                       \
-    }                                                                \
+#define RECOMPUTE_STRING(S) do {                                   \
+    if (S != NULL && S != the_empty_string) {                      \
+      const size_t offset = (S) - oldbase;                         \
+      assert(offset < hashtable->pool.capacity);                   \
+      S = &hashtable->pool.buffer[offset];                         \
+      count++;                                                     \
+    }                                                              \
 } while(0)
 
   /* recompute */
@@ -608,22 +502,22 @@ static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
   /* the pool does not allow empty strings for safety purpose ; handhe that
     (keys are being emptied when free'd to detect duplicate free) */
   if (len == 1) {
-    inthash_assert(hashtable, the_empty_string[0] == '\0');
+    assert(the_empty_string[0] == '\0');
     return the_empty_string;
   }
 
   /* expand pool capacity */
-  inthash_assert(hashtable, hashtable->pool.size <= hashtable->pool.capacity);
+  assert(hashtable->pool.size <= hashtable->pool.capacity);
   if (hashtable->pool.capacity - hashtable->pool.size < len) {
     size_t capacity;
     for(capacity = MIN_POOL_CAPACITY ; capacity < hashtable->pool.size + len
       ; capacity <<= 1) ;
-    inthash_assert(hashtable, hashtable->pool.size < capacity);
+    assert(hashtable->pool.size < capacity);
     inthash_realloc_pool(hashtable, capacity);
   }
 
   /* copy */
-  inthash_assert(hashtable, len + hashtable->pool.size <= hashtable->pool.capacity);
+  assert(len + hashtable->pool.size <= hashtable->pool.capacity);
   s = &hashtable->pool.buffer[hashtable->pool.size];
   memcpy(s, name, len);
   hashtable->pool.size += len;
@@ -633,7 +527,7 @@ static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
 }
 
 /* duplicate a key. default is to use the internal pool. */
-static INTHASH_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
+static HTS_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
   return hashtable->custom.key.dup == NULL
     ? inthash_dup_name_internal(hashtable, name)
     : hashtable->custom.key.dup(hashtable->custom.key.arg, name);
@@ -646,11 +540,11 @@ static void inthash_free_key_internal(inthash hashtable, char *name) {
 
   /* see inthash_dup_name_internal() handling */
   if (len == 1 && name == the_empty_string) {
-    inthash_assert(hashtable, the_empty_string[0] == '\0');
+    assert(the_empty_string[0] == '\0');
     return ;
   }
 
-  inthash_assert(hashtable, *name != '\0' || !"duplicate or bad string pool release");
+  assert(*name != '\0' || !"duplicate or bad string pool release");
   hashtable->pool.used -= len;
   *name = '\0'; /* the string is now invalidated */
 
@@ -661,7 +555,7 @@ static void inthash_free_key_internal(inthash hashtable, char *name) {
     if (hashtable->pool.used < capacity / 4) {
       capacity /= 2;
     }
-    inthash_assert(hashtable, hashtable->pool.used < capacity);
+    assert(hashtable->pool.used < capacity);
     inthash_compact_pool(hashtable, capacity);
   }
 }
@@ -676,14 +570,14 @@ static void inthash_free_key(inthash hashtable, char *name) {
   }
 }
 
-static INTHASH_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
-                                                  inthash_key hash) {
+static HTS_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
+                                              inthash_key hash) {
   const inthash_key mask = POW2(lg_size) - 1;
   return hash & mask;
 }
 
-static INTHASH_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
-                                                 inthash_key hash) {
+static HTS_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
+                                             inthash_key hash) {
   return inthash_hash_to_pos_(hashtable->lg_size, hash);
 }
 
@@ -864,7 +758,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
         cuckoo_hash = item.hashes.hash1;
       }
       else {
-        inthash_assert(hashtable, ! "hashtable internal error: unexpected position");
+        inthash_assert(! "hashtable internal error: unexpected position");
       }
 
       /* we are looping (back to same hash) */
@@ -891,8 +785,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
   } else {
     /* we are doomed. hopefully the probability is lower than being killed
        by a wandering radioactive monkey */
-    inthash_log_stats(hashtable);
-    inthash_assert(hashtable, ! "hashtable internal error: cuckoo/stash collision");
+    inthash_assert(! "hashtable internal error: cuckoo/stash collision");
     /* not reachable code */
     return -1;
   }
@@ -908,15 +801,11 @@ int inthash_write_value(inthash hashtable, const char *name,
     /* size of half of the table */
     const size_t half_size = POW2(hashtable->lg_size - 1);
 
-    /* size of half of the stash */
-    const size_t half_stash_size = STASH_SIZE / 2;
-
     /* item was added: increase count */
     hashtable->used++;
 
-    /* table is more than half-full, or stash is more than half-full */
-    if (hashtable->used >= half_size
-      || hashtable->stash.size >= half_stash_size) {
+    /* table is more than half-full */
+    if (hashtable->used >= half_size) {
       size_t i;
 
       /* size before  */
@@ -926,16 +815,6 @@ int inthash_write_value(inthash hashtable, const char *name,
 
       /* size after doubling it */
       const size_t alloc_size = prev_alloc_size * 2;
-
-      /* log stash issues */
-      if (hashtable->stash.size >= half_stash_size 
-        && half_size > POW2(16) 
-        && hashtable->used < half_size / 4) {
-          inthash_warning(hashtable, 
-            "stash size still full despite %"UINT_64_FORMAT
-            " elements used out of %"UINT_64_FORMAT,
-            hashtable->used, half_size*2);
-      }
 
       /* statistics */
       hashtable->stats.rehash_count++;
@@ -949,7 +828,7 @@ int inthash_write_value(inthash hashtable, const char *name,
           "** hashtable allocation error: "
           "could not allocate %"UINT_64_FORMAT" bytes", 
           (uint64_t) alloc_size);
-        inthash_assert(hashtable, ! "hashtable allocation error");
+        inthash_assert(! "hashtable allocation error");
       }
 
       /* clear upper half */
@@ -965,7 +844,7 @@ int inthash_write_value(inthash hashtable, const char *name,
             const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash1);
             /* no more the expected position */
             if (pos != i) {
-              inthash_assert(hashtable, pos >= prev_size);
+              inthash_assert(pos >= prev_size);
               hashtable->items[pos] = hashtable->items[i];
               memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
             }
@@ -974,13 +853,13 @@ int inthash_write_value(inthash hashtable, const char *name,
             const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash2);
             /* no more the expected position */
             if (pos != i) {
-              inthash_assert(hashtable, pos >= prev_size);
+              inthash_assert(pos >= prev_size);
               hashtable->items[pos] = hashtable->items[i];
               memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
             }
           }
           else {
-            inthash_assert(hashtable, ! "hashtable unexpected internal error (bad position)");
+            inthash_assert(! "hashtable unexpected internal error (bad position)");
           }
         }
       }
@@ -1003,12 +882,12 @@ int inthash_write_value(inthash hashtable, const char *name,
         for(i = 0 ; i < old_size ; i++) {
           const int ret = inthash_add_item_(hashtable, stash[i]);
           if (ret == 0) {
-            inthash_assert(hashtable, ! "hashtable duplicate key when merging the stash");
+            inthash_assert(! "hashtable duplicate key when merging the stash");
           }
         }
 
         /* logging */
-        inthash_assert(hashtable, hashtable->stash.size <= old_size);
+        inthash_assert(hashtable->stash.size <= old_size);
         if (hashtable->stash.size < old_size) {
           inthash_debug(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
                         "to %"UINT_64_FORMAT,
@@ -1095,7 +974,7 @@ static size_t inthash_inc_(inthash hashtable, const char *name,
   } else {
     /* create a new value */
     const int ret = inthash_write(hashtable, name, inc);
-    inthash_assert(hashtable, ret);
+    inthash_assert(ret);
     return inc;
   }
 }
@@ -1162,7 +1041,7 @@ int inthash_remove(inthash hashtable, const char *name) {
 
   if (ret) {
     /* item was removed: decrease count */
-    inthash_assert(hashtable, hashtable->used != 0);
+    inthash_assert(hashtable->used != 0);
     hashtable->used--;
 
     /* can we place stash entry back to the table ? */
@@ -1235,9 +1114,6 @@ inthash inthash_new(size_t initial_size) {
     hashtable->custom.key.hash = NULL;
     hashtable->custom.key.equals = NULL;
     hashtable->custom.key.arg = NULL;
-    hashtable->custom.error.fatal = NULL;
-    hashtable->custom.error.name = NULL;
-    hashtable->custom.error.arg = NULL;
   }
   return hashtable;
 }
@@ -1258,10 +1134,6 @@ void inthash_value_is_malloc(inthash hashtable, int flag) {
   }
 }
 
-void inthash_set_name(inthash hashtable, const char *name) {
-  hashtable->custom.error.name = name;
-}
-
 void inthash_value_set_value_handler(inthash hashtable,
                                      t_inthash_freehandler free,
                                      void *arg) {
@@ -1276,22 +1148,12 @@ void inthash_value_set_key_handler(inthash hashtable,
                                    t_inthash_cmphandler equals,
                                    void *arg) {
   /* dup and free must be consistent */
-  inthash_assert(hashtable, ( dup == NULL ) == ( free == NULL ) );
+  assert( ( dup == NULL ) == ( free == NULL ) );
   hashtable->custom.key.dup = dup;
   hashtable->custom.key.free = free;
   hashtable->custom.key.hash = hash;
   hashtable->custom.key.equals = equals;
   hashtable->custom.key.arg = arg;
-}
-
-void inthash_set_assert_handler(inthash hashtable,
-                                t_inthash_loghandler log,
-                                t_inthash_asserthandler fatal,
-                                void *arg) {
-  inthash_assert(hashtable, fatal != NULL);
-  hashtable->custom.error.log = log;
-  hashtable->custom.error.fatal = fatal;
-  hashtable->custom.error.arg = arg;
 }
 
 size_t inthash_nitems(inthash hashtable) {
@@ -1305,6 +1167,31 @@ size_t inthash_memory_size(inthash hashtable) {
   const size_t hash_size = POW2(hashtable->lg_size)*sizeof(inthash_item);
   const size_t pool_size = hashtable->pool.capacity*sizeof(char);
   return size_struct + hash_size + pool_size;
+}
+
+static void inthash_log_stats(inthash hashtable) {
+  inthash_info(hashtable, "freeing table ; "
+               "writes=%"UINT_64_FORMAT" "
+               "(new=%"UINT_64_FORMAT") "
+               "moved=%"UINT_64_FORMAT " "
+               "stashed=%"UINT_64_FORMAT" "
+               "max-stash-size=%"UINT_64_FORMAT" "
+               "avg-moved=%g "
+               "rehash=%"UINT_64_FORMAT" "
+               "pool-compact=%"UINT_64_FORMAT" "
+               "pool-realloc=%"UINT_64_FORMAT" "
+               "memory=%"UINT_64_FORMAT,
+               (uint64_t) hashtable->stats.write_count,
+               (uint64_t) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.cuckoo_moved,
+               (uint64_t) hashtable->stats.stash_added,
+               (uint64_t) hashtable->stats.max_stash_size,
+               (double) hashtable->stats.cuckoo_moved / (double) hashtable->stats.add_count,
+               (uint64_t) hashtable->stats.rehash_count,
+               (uint64_t) hashtable->stats.pool_compact_count,
+               (uint64_t) hashtable->stats.pool_realloc_count,
+               (uint64_t) inthash_memory_size(hashtable)
+               );
 }
 
 void inthash_delete(inthash *phashtable) {
@@ -1373,10 +1260,4 @@ inthash_item *inthash_enum_next(struct_inthash_enum * e) {
   else {
     return NULL;
   }
-}
-
-void inthash_set_global_assert_handler(t_inthash_loghandler log,
-                                       t_inthash_asserthandler fatal) {
-  global_log_handler = log;
-  global_assert_handler = fatal;
 }

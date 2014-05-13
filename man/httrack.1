@@ -1,12 +1,14 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "12 May 2014" "httrack website copier"
+.TH httrack 1 "HTTrack version 3.47-26 (compiled Sep  6 2013)" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
 .B httrack [ url ]... [ \-filter ]... [ +filter ]... [ 
 .B \-O, \-\-path 
+] [ 
+.B \-%O, \-\-chroot 
 ] [ 
 .B \-w, \-\-mirror 
 ] [ 
@@ -39,6 +41,8 @@ httrack \- offline browser : copy websites to a local directory
 .B \-%cN, \-\-connection\-per\-second[=N] 
 ] [ 
 .B \-GN, \-\-max\-pause[=N] 
+] [ 
+.B \-%mN, \-\-max\-mms\-time[=N] 
 ] [ 
 .B \-cN, \-\-sockets[=N] 
 ] [ 
@@ -118,10 +122,6 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B \-%l, \-\-language 
 ] [ 
-.B \-%a, \-\-accept 
-] [ 
-.B \-%X, \-\-headers 
-] [ 
 .B \-C, \-\-cache[=N] 
 ] [ 
 .B \-k, \-\-store\-all\-in\-cache 
@@ -174,6 +174,8 @@ httrack \- offline browser : copy websites to a local directory
 ] [ 
 .B \-V, \-\-userdef\-cmd 
 ] [ 
+.B \-%U, \-\-user 
+] [ 
 .B \-%W, \-\-callback 
 ] [ 
 .B \-K, \-\-keep\-links[=N] 
@@ -212,6 +214,9 @@ mirror[,path
 cache
 and
 logfiles]) (\-\-path <param>)
+.IP \-%O
+chroot path to, must be r00t (\-%O root
+path) (\-\-chroot <param>)
 
 .SS Action options:
 .IP \-w
@@ -252,6 +257,8 @@ maximum transfer rate in bytes/seconds (1000=1KB/s max) (\-\-max\-rate[=N])
 maximum number of connections/seconds (*%c10) (\-\-connection\-per\-second[=N])
 .IP \-GN
 pause transfer if N bytes reached, and wait until lock file is deleted (\-\-max\-pause[=N])
+.IP \-%mN
+maximum mms stream download time in seconds (60=1 minute, 3600=1 hour) (\-\-max\-mms\-time[=N])
 
 .SS Flow control:
 .IP \-cN
@@ -346,10 +353,6 @@ from email address sent in HTTP headers (\-\-from <param>)
 footer string in Html code (\-%F "Mirrored [from host %s [file %s [at %s]]]" (\-\-footer <param>)
 .IP \-%l
 preffered language (\-%l "fr, en, jp, *" (\-\-language <param>)
-.IP \-%a
-accepted formats (\-%l "text/html,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.1" (\-\-accept <param>)
-.IP \-%X
-additional HTTP header line (\-%X "X\-Magic: 42" (\-\-headers <param>)
 
 .SS Log, index, cache
 .IP \-C
@@ -452,6 +455,8 @@ generate transfer ops. log every minutes (\-\-debug\-xfrstats)
 wait time (\-\-advanced\-wait)
 .IP \-#Z
 generate transfer rate statictics every minutes (\-\-debug\-ratestats)
+.IP \-#!
+execute a shell command (\-#! "echo hello") (\-\-exec <param>)
 
 .SS Dangerous options: (do NOT use unless you exactly know what you are doing)
 .IP \-%!
@@ -463,7 +468,9 @@ IT WITH EXTREME CARE
 
 .SS Command\-line specific options:
 .IP \-V
-execute system command after each files ($0 is the filename: \-V "rm \\$0") (\-\-userdef\-cmd <param>)
+execute system command after each files ($0 is the filename: \-V "rm \$0") (\-\-userdef\-cmd <param>)
+.IP \-%U
+run the engine with another id when called as root (\-%U smith) (\-\-user <param>)
 .IP \-%W
 use an external library function as a wrapper (\-%W myfoo.so[,myparameters]) (\-\-callback <param>)
 
@@ -610,7 +617,7 @@ Please reports bugs to
 .B <bugs@httrack.com>.
 Include a complete, self-contained example that will allow the bug to be reproduced, and say which version of httrack you are using. Do not forget to detail options used, OS version, and any other information you deem necessary.
 .SH COPYRIGHT
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

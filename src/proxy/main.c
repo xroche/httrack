@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
   /* Args */
   printf("ProxyTrack %s, build proxies upon HTTrack Website Copier Archives\n",
          PROXYTRACK_VERSION);
-  printf("Copyright (C) 1998-2014 Xavier Roche and other contributors\n");
+  printf("Copyright (C) 1998-2013 Xavier Roche and other contributors\n");
   printf("\n");
   printf("This program is free software: you can redistribute it and/or modify\n");
   printf("it under the terms of the GNU General Public License as published by\n");

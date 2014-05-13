@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -381,7 +381,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     initStrElt initStr[] = {
       {"user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"},
       {"footer",
-       "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2014], %s -->"},
+       "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2013], %s -->"},
       {"url2", "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/*"},
       {NULL, NULL}
     };
@@ -964,7 +964,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (pos2 != NULL) {
                         *pos2 = '\0';
                         if (strstr(name, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, name))) {
+                          if (fexist(fconcat(catbuff, path, name))) {
                             langstr = pos2 + 1;
                           }
                         }
@@ -994,20 +994,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       } else if (strcmp(name, "if-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (!fexist(fconcat(catbuff, path, pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-project-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
                           if (!fexist
-                              (fconcat(catbuff, sizeof(catbuff), StringBuff(fspath), pos2))) {
+                              (fconcat(catbuff, StringBuff(fspath), pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-file-do-not-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (fexist(fconcat(catbuff, path, pos2))) {
                             outputmode = -1;
                           }
                         }
@@ -1443,7 +1443,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 int htslang_init(void) {
   if (NewLangList == NULL) {
     NewLangList = inthash_new(0);
-    inthash_set_name(NewLangList, "NewLangList");
     if (NewLangList == NULL) {
       abortLog("Error in lang.h: not enough memory");
     } else {
@@ -1488,8 +1487,6 @@ static int htslang_load(char *limit_to, char *path) {
     LANG_DELETE();
     NewLangStr = inthash_new(0);
     NewLangStrKeys = inthash_new(0);
-    inthash_set_name(NewLangStr, "NewLangStr");
-    inthash_set_name(NewLangStrKeys, "NewLangStrKeys");
     if ((NewLangStr == NULL) || (NewLangStrKeys == NULL)) {
       abortLog("Error in lang.h: not enough memory");
     } else {
@@ -1501,7 +1498,7 @@ static int htslang_load(char *limit_to, char *path) {
   /* Load master file (list of keys and internal keys) */
   if (!limit_to) {
     char *mname = "lang.def";
-    FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), path, mname), "rb");
+    FILE *fp = fopen(fconcat(catbuff, path, mname), "rb");
 
     if (fp) {
       char intkey[8192];
@@ -1582,7 +1579,7 @@ static int htslang_load(char *limit_to, char *path) {
         hashname = LANGINTKEY(name);
       }
       sprintf(lbasename, "lang/%s.txt", hashname);
-      fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
+      fp = fopen(fconcat(catbuff, path, lbasename), "rb");
       if (fp) {
         char extkey[8192];
         char value[8192];

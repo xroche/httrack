@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ typedef struct htsblk htsblk;
 #ifdef HTS_INTERNAL_BYTECODE
 
 // create/destroy
-struct_back *back_new(httrackp *opt, int back_max);
+struct_back *back_new(int back_max);
 void back_free(struct_back ** sback);
 
 // backing

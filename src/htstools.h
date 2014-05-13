@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2013 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -105,6 +105,11 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 HTSEXT_API int hts_findisdir(find_handle find);
 HTSEXT_API int hts_findisfile(find_handle find);
 HTSEXT_API int hts_findissystem(find_handle find);
+
+#ifndef HTTRACK_DEFLIB
+HTSEXT_API char *hts_getcategory(const char *filename);
+HTSEXT_API char *hts_getcategories(char *path, int type);
+#endif
 
 #endif
 
