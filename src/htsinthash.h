@@ -67,6 +67,7 @@ typedef unsigned __int64 uint64_t;
 #else
 #include <stdint.h>
 #endif
+#include <stdarg.h>
 
 /** Value. **/
 typedef union inthash_value {
