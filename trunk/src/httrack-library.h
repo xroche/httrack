@@ -37,8 +37,8 @@ Please visit our Website: http://www.httrack.com
 
 #ifndef _WIN32
 #include <inttypes.h>
-#include <stdarg.h>
 #endif
+#include <stdarg.h>
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
