@@ -1,0 +1,293 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Cache format specification</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h2 align="center"><em>Cache format specification</em></h2>
+
+<br />
+
+For updating purpose, HTTrack stores original (untouched) HTML data, 
+references to downloaded files, and other meta-data (especially parts of the HTTP headers) in a cache, 
+located in the hts-cache directory. Because local html pages are always modified to "fit" the local
+filesystem structure, and because meta-data such as the last-Modified date and Etag can not be stored
+with the associated files, the cache is absolutely mandatory for reprocessing (update/continue) phases.
+
+<br /><br />
+
+<h3>The (new) cache.zip format</h3>
+
+The 3.31 release of HTTrack introduces a new cache format, more extensible and efficient than the previous one (ndx/dat format).
+
+The main advantages of this cache are:
+
+<ul>
+<li>One single file for a complete website cache archive</li>
+<li>Standard <a href="http://www.pkware.com/products/enterprise/white_papers/appnote.txt" target="_new">ZIP</a> format, that can be easily reused on most platforms and languages</li>
+<li>Compressed data with the efficient and opened <a href="http://www.gzip.org/zlib/" target="_new">zlib</a> format</li>
+</ul>
+
+The cache is made of ZIP files entries ; with one ZIP file entry per fetched URL (successfully or not - errors are also stored).<br />
+For each entry:
+<ul>
+<li>The ZIP file name is the original URL [<small><a href="#orig">see notes below</a></small>]</li>
+<li>The ZIP file contents, <b>if available</b>, is the original (compressed, using the deflate algorythm) data</li>
+<li>The ZIP file extra field (in the local file header) contains a list of meta-fields, very similar to the <a href="http://www.ietf.org/rfc/rfc2616.txt?number=2616" target="new_">HTTP</a> headers fields. See also <a href="http://www.ietf.org/rfc/rfc2396.txt?number=2396" target="new_">RFC</a>.</li><br />
+<li>The ZIP file timestamp follows the "Last-Modified-Since" field given for this URL, if any</li>
+</ul>
+
+Example of cache file:
+<br />
+
+<pre>
+$ unzip -l hts-cache/new.zip
+Archive:  hts-cache/new.zip
+HTTrack Website Copier/3.31-ALPHA-4 mirror complete in 3 seconds : 5 links scanned, 
+3 files written (16109 bytes overall) [17690 bytes received at 5896 bytes/sec]
+(1 errors, 0 warnings, 0 messages)
+  Length     Date   Time    Name
+ --------    ----   ----    ----
+       94  07-18-03 08:59   http://www.httrack.com/robots.txt
+     9866  01-17-04 01:09   http://www.httrack.com/html/cache.html
+        0  05-11-03 13:31   http://www.httrack.com/html/images/bg_rings.gif
+      207  01-19-04 05:49   http://www.httrack.com/html/fade.gif
+        0  05-11-03 13:31   http://www.httrack.com/html/images/header_title_4.gif
+ --------                   -------
+    10167                   5 files
+</pre>
+
+Example of cache file meta-data:
+<br />
+
+<pre>
+HTTP/1.1 200 OK
+X-In-Cache: 1
+X-StatusCode: 200
+X-StatusMessage: OK
+X-Size: 94
+Content-Type: text/plain
+Last-Modified: Fri, 18 Jul 2003 08:59:11 GMT
+Etag: "40ebb5-5e-3f17b6df"
+X-Addr: www.httrack.com
+X-Fil: /robots.txt
+</pre>
+
+There are also specific issues regarding this format:
+
+<ul>
+<li>The data in the central directory (such as CD extra field, and CD comments) are not used</li>
+<li>The ZIP archive is allowed to contains more than 2^16 files (65535) ; in such case the total number of entries in the 32-bit central directory is 65536 (0xffff), but the presence of the 64-bit central directory is not mandatory</li>
+<li>The ZIP archive is allowed to contains more than 2^32 bytes (4GiB) ; in such case the 64-bit central directory must be present <b>(not currently supported)</b></li>
+</ul>
+
+<br />
+<b>Meta-data stored in the "extra field" of the local file headers</b><br />
+
+The extra field is composed of text data, and this text data is composed of distinct lines of headers.
+The end of text, <b>or</b> a double CR/LF, mark the end of this zone.
+This method allows you to optionally store original HTTP headers just after the "meta-data" headers for informational use.<br />
+
+<br />
+<b>The status line (the first headers line)</b><br />
+
+Status-Line = HTTP-Version SP Status-Code SP X-Reason-Phrase CRLF<br />
+
+<br />
+<b>Other lines:</b><br />
+
+<br />
+<b>Specific fields:</b><br />
+<ul>
+<li>X-In-Cache</li><br>
+Indicates if the data are present (value=1) in the cache (that is, as ZIP data), or in an external file (value=0).
+This field MUST be the first field.
+
+<li>X-StatusCode</li><br>
+The modified (by httrack) status code after processing. 304 error codes ("Not modified"), for example, are transformed into "200" codes after processing.
+
+<li>X-StatusMessage</li><br>
+The modified (by httrack) status message.
+
+<li>X-Size</li><br>
+The stored (either in cache, or in an external file) data size.
+
+<li>X-Charset</li><br>
+The original charset.
+
+<li>X-Addr</li><br>
+The original URL address part.
+
+<li>X-Fil</li><br>
+The original URL path part.
+
+<li>X-Save</li><br>
+The local filename, depending on user's "build structure" preferences.
+
+</ul>
+
+<br />
+<b>Standard (RFC 2616) "useful" fields:</b><br />
+<ul>
+<li>Content-Type</li>
+<li>Last-Modified</li>
+<li>Etag</li>
+<li>Location</li>
+<li>Content-Disposition</li>
+</ul>
+
+<br />
+<b>Specific fields in "BNF-like" grammar:</b><br />
+
+<pre>
+X-In-Cache          = "X-In-Cache" ":" 1*DIGIT
+X-StatusCode        = "X-StatusCode" ":" 1*DIGIT
+X-StatusMessage     = "X-StatusMessage" ":" *&lt;TEXT, excluding CR, LF&gt;
+X-Size              = "X-Size" ":" 1*DIGIT
+X-Charset           = "X-Charset" ":" value
+X-Addr              = "X-Addr" ":" scheme ":" "//" authority
+X-Fil               = "X-Fil" ":" rel_path
+X-Save              = "X-Save" ":" rel_path
+</pre>
+
+<b>RFC standard fields:</b><br />
+
+<pre>
+Content-Type        = "Content-Type" ":" media-type
+Last-Modified       = "Last-Modified" ":" HTTP-date
+Etag                = "ETag" ":" entity-tag
+Location            = "Location" ":" absoluteURI
+Content-Disposition = "Content-Disposition" ":" disposition-type *( ";" disposition-parm )
+</pre>
+
+<br />
+And, for your information,
+<pre>
+X-Reason-Phrase     = *&lt;TEXT, with a maximum of 32 characters, and excluding CR, LF&gt;
+</pre>
+
+
+<a name="orig">Note: Because the URLs may have an unexpected format, especially with double "/" inside, and other reserved characters ("?", "&" ..),
+various ZIP uncompressors can potentially have troubles accessing or decompressing the data.
+Libraries should generally handle this peculiar format, however.
+</a>
+
+<br /><br />
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+
