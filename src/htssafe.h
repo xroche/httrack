@@ -70,7 +70,7 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 /**
  * Fatal assertion check.
  */
-#define assertf_(exp, file, line) assertf__(exp, #exp, __FILE__, __LINE__)
+#define assertf_(exp, file, line) assertf__(exp, #exp, file, line)
 
 /**
  * Fatal assertion check.
