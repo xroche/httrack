@@ -66,6 +66,12 @@ typedef enum hts_log_type {
 typedef struct hts_stat_struct hts_stat_struct;
 #endif
 
+/** Assert error callback. **/
+#ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
+#define HTS_DEF_FWSTRUCT_htsErrorCallback
+typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
+#endif
+
 /* Helpers for plugging callbacks
 requires: htsdefines.h */
 
@@ -112,6 +118,8 @@ HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             const char *argv);
+HTSEXT_API void hts_set_error_callback(htsErrorCallback handler);
+HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 
 /* Logging */
 HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
