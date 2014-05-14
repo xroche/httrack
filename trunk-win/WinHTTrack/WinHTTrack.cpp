@@ -210,7 +210,7 @@ void InitCBErrMsg(const char* msg, const char* file, int line) {
   AfxMessageBox(st, MB_OK|MB_APPLMODAL|MB_SYSTEMMODAL|MB_ICONSTOP);
 }
 void InitCBErr() {
-  htsCallbackErr = InitCBErrMsg;
+  hts_set_error_callback(InitCBErrMsg);
 }
 
 int Eval_Exception( void );
