@@ -907,7 +907,8 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
         inthash_item *const item = &hashtable->stash.items[i];
         const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
         const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-        inthash_crit(hashtable, "stash[%u]: key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+        inthash_crit(hashtable, 
+          "stash[%u]: key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
           (int) i,
           hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
           hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
@@ -917,7 +918,8 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
           inthash_item *const item = &hashtable->items[pos1];
           const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
           const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-          inthash_crit(hashtable, "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+          inthash_crit(hashtable, 
+            "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
             hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
             (int) pos1, (int) pos2,
@@ -929,7 +931,8 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
           inthash_item *const item = &hashtable->items[pos2];
           const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
           const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-          inthash_crit(hashtable, "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+          inthash_crit(hashtable, 
+            "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
             hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
             (int) pos1, (int) pos2,
