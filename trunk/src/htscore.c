@@ -2355,7 +2355,7 @@ void host_ban(httrackp * opt, lien_url ** liens, int ptr, int lien_tot,
           if (strfield2(jump_identification(liens[i]->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", liens[i]->adr,
                           liens[i]->fil);
-            strcpybuff(liens[i]->adr, "!");     // cancel (invalide hash)
+            hash_invalidate_entry(opt->hash, i);  // invalidate hashtable entry
             // on efface pas le hash, because si on rencontre le lien, reverif sav..
           }
         } else {
