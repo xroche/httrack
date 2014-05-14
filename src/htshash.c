@@ -85,6 +85,14 @@ static int key_sav_equals(void *arg, const char *a, const char *b) {
   return strcasecmp(a, b) == 0;
 }
 
+static const char* key_sav_debug_print(void *arg, const char *a) {
+  return a;
+}
+
+static const char* value_sav_debug_print(void *arg, void *a) {
+  return (char*) a;
+}
+
 /* Pseudo-key (lien_url structure) hash function */
 static inthash_keys key_adrfil_hashes_generic(void *arg, const char *value_, 
                                               const int former) {
@@ -151,6 +159,32 @@ static int key_adrfil_equals_generic(void *arg, const char *a_, const char *b_,
   }
 }
 
+static const char* key_adrfil_debug_print_(void *arg, const char *a_, const int former) {
+  hash_struct *const hash = (hash_struct*) arg;
+  const int normalized = hash->normalized;
+  const lien_url*const a = (lien_url*) a_;
+  const char *const a_adr = !former ? a->adr : a->former_adr;
+  const char *const a_fil = !former ? a->fil : a->former_fil;
+  snprintf(hash->normfil, sizeof(hash->normfil), "%s%s", a_adr, a_fil);
+  return hash->normfil;
+}
+
+static const char* key_adrfil_debug_print(void *arg, const char *a_) {
+  return key_adrfil_debug_print_(arg, a_, 0);
+}
+
+static const char* key_former_adrfil_debug_print(void *arg, const char *a_) {
+  return key_adrfil_debug_print_(arg, a_, 1);
+}
+
+static const char* value_adrfil_debug_print(void *arg, void *value) {
+  hash_struct *const hash = (hash_struct*) arg;
+  inthash_value v;
+  v.ptr = value;
+  snprintf(hash->normfil2, sizeof(hash->normfil2), "%d", (int) v.intg);
+  return hash->normfil2;
+}
+
 /* "adr"/"fil" lien_url structure members hashing function */
 static inthash_keys key_adrfil_hashes(void *arg, const char *value_) {
   return key_adrfil_hashes_generic(arg, value_, 0);
@@ -207,6 +241,20 @@ void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
                                 key_former_adrfil_hashes,
                                 key_former_adrfil_equals,
                                 hash);
+
+  /* pretty-printing */
+  inthash_set_print_handler(hash->sav,
+                            key_sav_debug_print,
+                            value_sav_debug_print,
+                            NULL);
+  inthash_set_print_handler(hash->adrfil,
+                            key_adrfil_debug_print,
+                            value_adrfil_debug_print,
+                            hash);
+  inthash_set_print_handler(hash->former_adrfil,
+                            key_former_adrfil_debug_print,
+                            value_adrfil_debug_print,
+                            hash);
 }
 
 void hash_free(hash_struct *hash) {
@@ -270,5 +318,16 @@ void hash_write(hash_struct * hash, int lpos) {
   /* third entry: URL address and path before redirect */
   if (hash->liens[lpos]->former_adr) {        // former_adr existe?
     inthash_write(hash->former_adrfil, (char*) hash->liens[lpos], lpos);
+  }
+}
+
+void hash_invalidate_entry(hash_struct * hash, int lpos) {
+  if (inthash_remove(hash->adrfil, (char*) hash->liens[lpos])) {
+    /* devalidate entry now it is removed from hashtable */
+    strcpybuff(hash->liens[lpos]->adr, "!");
+    /* add back */
+    inthash_write(hash->adrfil, (char*) hash->liens[lpos], lpos);
+  } else {
+    assertf(! "error invalidating hash entry");
   }
 }
