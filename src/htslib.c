@@ -5113,6 +5113,9 @@ static int ssl_vulnerable(const char *version) {
   return 0;
 }
 
+/* user abort callback */
+htsErrorCallback htsCallbackErr = NULL;
+
 static void default_inthash_asserthandler(void *arg, const char* exp, const char* file, int line) {
   abortf_(exp, file, line);
 }
