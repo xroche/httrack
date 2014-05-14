@@ -36,16 +36,25 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 
 /**
- * Optional user-defined callback upon fatal error.
- */
-typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
-
-/**
  * Emergency logging.
+ * Default is to use libhttrack one.
  */
 #ifndef HTSSAFE_ABORT_FUNCTION
-HTSEXT_API htsErrorCallback htsCallbackErr;
-#define HTSSAFE_ABORT_FUNCTION(A,B,C) do { if (htsCallbackErr != NULL) { htsCallbackErr(A,B,C); } } while(0)
+
+/** Assert error callback. **/
+#ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
+#define HTS_DEF_FWSTRUCT_htsErrorCallback
+typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
+HTSEXT_API htsErrorCallback hts_get_error_callback(void);
+#endif
+
+#define HTSSAFE_ABORT_FUNCTION(A,B,C) do { \
+  htsErrorCallback callback = hts_get_error_callback(); \
+  if (callback != NULL) { \
+    callback(A,B,C); \
+  } \
+} while(0)
+
 #endif
 
 /**
