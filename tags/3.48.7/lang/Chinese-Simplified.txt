@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Chinese-Simplified
+LANGUAGE_FILE
+Chinese-Simplified
+LANGUAGE_ISO
+zh
+LANGUAGE_AUTHOR
+Brook Qin (brookqwr at sina.com) \r\n
+LANGUAGE_CHARSET
+gb2312
+LANGUAGE_WINDOWSID
+Chinese (PRC)
+OK
+确定
+Cancel
+取消
+Exit
+退出
+Close
+关闭
+Cancel changes
+取消更改
+Click to confirm
+点击以确认
+Click to get help!
+点击以获取帮助!
+Click to return to previous screen
+点击以返回前一屏幕
+Click to go to next screen
+点击以到达下一屏幕
+Hide password
+隐藏口令
+Save project
+保存工程
+Close current project?
+是否关闭当前工程?
+Delete this project?
+删除此工程?
+Delete empty project %s?
+删除空的工程 %s?
+Action not yet implemented
+操作仍未执行
+Error deleting this project
+删除该工程时出错
+Select a rule for the filter
+为过滤器选取规则
+Enter keywords for the filter
+为过滤器输入关键词
+Cancel
+取消
+Add this rule
+添加该规则
+Please enter one or several keyword(s) for the rule
+请为此规则输入一至几个关键词
+Add Scan Rule
+添加扫描规则
+Criterion
+准则
+String
+字符串
+Add
+添加
+Scan Rules
+扫描规则
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+使用通配符以包含或排除URLs或链接.\n多个规定扫描规则的字符串可写在同一行.\n使用空格键作为分隔符.\n\n示例: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+排除链接
+Include link(s)
+包含链接
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+提示: 欲包含某域名下的所有GIF文件, 可输入 +www.someweb.com/*.gif. \n(+*.gif / -*.gif 将包含/排除来自所有站点的GIF文件)
+Save prefs
+保存设置
+Matching links will be excluded:
+匹配的链接将被排除:
+Matching links will be included:
+匹配的链接将被包含:
+Example:
+示例:
+gif\r\nWill match all GIF files
+gif\r\n将匹配所有GIF文件
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\n将查找到所有包含'blue' 的文件, 诸如 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\n将匹配文件 'bigfile.mov', 但不包括 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\n将查找到文件夹名内包含'cgi' 的链接, 诸如 /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\n将查找到文件夹名内包含'cgi-bin' 的链接 (但cgi-bin-2 除外)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\n将查找到包含诸如www.someweb.com, private.someweb.com 等的链接
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\n将查找到包含诸如www.someweb.com, www.someweb.edu, private.someweb.otherweb.com 等的链接
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\n将查找到包含'www.someweb.com' 的链接 (但不包括private.someweb.com/ 等)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\n将查找到任何诸如以下的链接: www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html 等
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\n将仅查找到'www.test.com/test/someweb.html' 文件. 注意请输入完整的路径.
+All links will match
+所有的链接都将匹配
+Add exclusion filter
+为过滤器添加排除规则
+Add inclusion filter
+为过滤器添加包含规则
+Existing filters
+已定制的过滤字符串
+Cancel changes
+取消更改
+Save current preferences as default values
+将当前设置存为缺省值
+Click to confirm
+点击以确认
+No log files in %s!
+%s 内无日志文件!
+No 'index.html' file in %s!
+%s 内无'index.html' 文件!
+Click to quit WinHTTrack Website Copier
+点击以退出WinHTTrack Website Copier
+View log files
+察看日志文件
+Browse HTML start page
+浏览 HTML 起始页
+End of mirror
+镜像结束
+View log files
+察看日志文件
+Browse Mirrored Website
+浏览已镜像的网站
+New project...
+新的工程...
+View error and warning reports
+察看错误及警告汇报
+View report
+察看汇报
+Close the log file window
+关闭日志文件窗口
+Info type:
+信息类型:
+Errors
+错误
+Infos
+信息
+Find
+查找
+Find a word
+查找一个单词
+Info log file
+信息日志文件
+Warning/Errors log file
+警告/错误日志文件
+Unable to initialize the OLE system
+无法初始化OLE系统
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack 未能在指定文件夹内找到被中断的文件下载预存区!
+Could not connect to provider
+无法连接到网络
+receive
+接收
+request
+请求
+connect
+连接
+search
+寻找
+ready
+就绪
+error
+错误
+Receiving files..
+接收文件..
+Parsing HTML file..
+解析HTML文件..
+Purging files..
+清除文件..
+Loading cache in progress..
+
+Parsing HTML file (testing links)..
+解析HTML文件 (测试链接)..
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+镜像暂停 - 切换[镜像]/[暂停下载]以继续操作
+Finishing pending transfers - Select [Cancel] to stop now!
+结束进行中的传输 - 选择[取消]以停止
+scanning
+扫描
+Waiting for scheduled time..
+等待预定的时间..
+Connecting to provider
+正在连接网络
+[%d seconds] to go before start of operation
+离操作开始还有[%d 秒]
+Site mirroring in progress [%s, %s bytes]
+站点镜像进行中 [%s, %s 字节]
+Site mirroring finished!
+站点镜像完毕!
+A problem occured during the mirroring operation\n
+镜像时发生错误\n
+\nDuring:\n
+\n发生在以下期间:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\n如有需要请看日志文件.\n\n点击'结束'以退出WinHTTrack Website Copier.\n\n谢谢使用WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+镜像完成.\n点击'确定'以退出WinHTTrack.\n如有需要请看日志文件, 以确保万无一失.\n\n谢谢使用WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * 镜像被取消! * *\r\n当前临时的预存区为日后更新所需, 仅存有此次被中断的镜像期间内下载的数据.\r\n而原有预存区可能会存有更完整的内容; 如果你不想失去原有的数据, 请恢复之, 并删除当前预存区.\r\n[注: 欲删除当前预存区, 仅需删除以下文件: hts-cache/new.*]\r\n\r\n你是否肯定原有预存区存有更完整的内容, 并希望恢复之?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * 镜像出错!* *\r\nHTTrack检测到当前镜像未储存任何数据. 若使用的更新模式, 则前一次镜像已被恢复.\r\n=> 原因: 首页未能找到, 或发生连接错误.\r\n请确定欲镜像的网站存在, 并/或检查代理设置! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\n提示: 点击 [察看日志文件] 以察看警告或错误消息
+Error deleting a hts-cache/new.* file, please do it manually
+删除hts-cache/new.* 文件时出错, 请手工删除
+Do you really want to quit WinHTTrack Website Copier?
+真的要退出WinHTTrack Website Copier 吗?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- 镜像模式 -\n\n请在URL框内输入地址
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- 交互向导模式 (发问) -\n\n请在URL框内输入地址
+- File Download Mode -\n\nEnter file address(es) in URL box
+- 文件下载模式 -\n\n请在URL框内输入文件地址
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- 链接测试模式 -\n\n请在URL框内输入含有链接的Web页地址
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- 更新模式 -\n\n请核对URL框里的地址, 如有需要请检查选项, 然后点击'Next'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- 继续模式 (被中断的操作) -\n\n请核对URL框里的地址, 如有需要请检查选项, 然后点击'Next'
+Log files Path
+日志文件路径
+Path
+路径
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- 链接表模式 -\n\n请在URL框内输入页面的地址, 页面中含有链接的列表, 列表中所有链接均会被镜像
+New project / Import?
+新的工程 / 导入?
+Choose criterion
+选取将进行的操作的类型
+Maximum link scanning depth
+最大链接扫描深度
+Enter address(es) here
+请在此输入地址
+Define additional filtering rules
+定义附加过滤器规则
+Proxy Name (if needed)
+代理地址(如若需要)
+Proxy Port
+代理端口
+Define proxy settings
+定义代理服务器设置
+Use standard HTTP proxy as FTP proxy
+使用标准HTTP代理替代FTP代理
+Path
+路径
+Select Path
+选择路径
+Path
+路径
+Select Path
+选择路径
+Quit WinHTTrack Website Copier
+退出WinHTTrack Website Copier
+About WinHTTrack
+关于WinHTTrack
+Save current preferences as default values
+保存当前设置为缺省值
+Click to continue
+点击以继续
+Click to define options
+点击以设定选项
+Click to add a URL
+点击以添加URL
+Load URL(s) from text file
+从文本文件中载入URL(s)
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack设置文件 (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+地址列表文本文件 (*.txt)|*.txt||
+File not found!
+文件未找到!
+Do you really want to change the project name/path?
+真的要改变工程的名称或路径吗?
+Load user-default options?
+载入用户定义的缺省选项值吗?
+Save user-default options?
+存为用户定义的缺省选项值吗?
+Reset all default options?
+将所有选项恢复到最初设定吗?
+Welcome to WinHTTrack!
+欢迎使用WinHTTrack!
+Action:
+操作:
+Max Depth
+最大深度
+Maximum external depth:
+最大外部链接深度
+Filters (refuse/accept links) :
+过滤器 (排除/包含链接):
+Paths
+路径
+Save prefs
+保存设置
+Define..
+定义..
+Set options..
+选项..
+Preferences and mirror options:
+选项设定:
+Project name
+工程名称
+Add a URL...
+添加URL..
+Web Addresses: (URL)
+Web地址: (URL)
+Stop WinHTTrack?
+停止WinHTTrack?
+No log files in %s!
+%s 内无日志文件!
+Pause Download?
+暂停下载?
+Stop the mirroring operation
+停止镜像
+Minimize to System Tray
+最小化至系统托盘区
+Click to skip a link or stop parsing
+点击以跳过一个链接或停止解析
+Click to skip a link
+点击以跳过一个链接
+Bytes saved
+已保存字节:
+Links scanned
+已扫描链接:
+Time:
+时间:
+Connections:
+连接:
+Running:
+运行:
+Hide
+隐藏
+Transfer rate
+传输速率:
+SKIP
+跳过
+Information
+信息
+Files written:
+已储存文件:
+Files updated:
+已更新文件:
+Errors:
+错误:
+In progress:
+进程中:
+Follow external links
+追随外部链接
+Test all links in pages
+测试页面中的所有链接
+Try to ferret out all links
+尽可能查出所有链接
+Download HTML files first (faster)
+先下载HTML文件 (更快)
+Choose local site structure
+选择本地站点结构
+Set user-defined structure on disk
+设置在磁盘上的用户自定义结构
+Use a cache for updates and retries
+使用预存区, 用于更新和重试
+Do not update zero size or user-erased files
+不更新零字节文件或由用户删除的文件
+Create a Start Page
+创建一个起始页面
+Create a word database of all html pages
+根据网页使用语言创建词汇库文件
+Create error logging and report files
+创建错误记录及汇报文件
+Generate DOS 8-3 filenames ONLY
+仅生成DOS下的8-3文件名格式
+Generate ISO9660 filenames ONLY for CDROM medias
+
+Do not create HTML error pages
+不创建HTML错误页面
+Select file types to be saved to disk
+选择将被存盘的文件类型
+Select parsing direction
+选择解析方向
+Select global parsing direction
+选择全局解析方向
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+设定对内部链接(被下载链接)和外部链接(不被下载链接)地址更置的规则
+Max simultaneous connections
+最多并发连接数
+File timeout
+文件超时
+Cancel all links from host if timeout occurs
+若超时发生, 取消所有来自主机的链接
+Minimum admissible transfer rate
+最小所允许的传输速率
+Cancel all links from host if too slow
+若传输过慢, 取消所有来自主机的链接
+Maximum number of retries on non-fatal errors
+最多重试次数 (发生非致命错误时)
+Maximum size for any single HTML file
+单个HTML文件所允许的最大尺寸
+Maximum size for any single non-HTML file
+单个非HTML文件所允许的最大尺寸
+Maximum amount of bytes to retrieve from the Web
+最多所允许从Web接收的字节数
+Make a pause after downloading this amount of bytes
+下载完指定的字节数后暂停
+Maximum duration time for the mirroring operation
+镜像过程所允许的最长时间
+Maximum transfer rate
+最大所限制的传输速率
+Maximum connections/seconds (avoid server overload)
+每秒最多并发连结数 (防止服务器超载)
+Maximum number of links that can be tested (not saved!)
+允许检测的最多链接数目(并非保存!)
+Browser identity
+浏览器身份
+Comment to be placed in each HTML file
+在每个HTML文件里添加的注释
+Back to starting page
+回到起始页面
+Save current preferences as default values
+将当前设置存为缺省值
+Click to continue
+点击以继续
+Click to cancel changes
+点击以取消改动
+Follow local robots rules on sites
+遵从网站的robots规则
+Links to non-localised external pages will produce error pages
+未本地化的外部页面链接将产生错误页面
+Do not erase obsolete files after update
+更新后不删除废弃的文件
+Accept cookies?
+是否接收cookies?
+Check document type when unknown?
+是否检查未知文件类型?
+Parse java applets to retrieve included files that must be downloaded?
+是否解析java应用程序以取回其中包含的文件?
+Store all files in cache instead of HTML only
+将所有文件仅保存在预存区里 (非HTML)
+Log file type (if generated)
+日志文件类型 (若有)
+Maximum mirroring depth from root address
+从地址根部开始最大的镜像深度
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+外部/非法地址镜像的最大深度(缺省为0, 即不镜像)
+Create a debugging file
+创建一个调试文件
+Use non-standard requests to get round some server bugs
+使用非标准请求以避免某些服务器错误
+Use old HTTP/1.0 requests (limits engine power!)
+使用旧的 HTTP/1.0 请求 (将限制镜像能力!)
+Attempt to limit retransfers through several tricks (file size test..)
+试以若干手段限制再传送 (如通过文件大小测试)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+保存链接时不泻露登陆名/口令
+Write internal links without query string
+改写内部链接时不显示输入的账号信息
+Get non-HTML files related to a link, eg external .ZIP or pictures
+保存所有指向非HTML文件的链接, 例如外部的ZIP文件或图片文件
+Test all links (even forbidden ones)
+测试所有链接 (即使被禁止的)
+Try to catch all URLs (even in unknown tags/code)
+试图捕获所有的URLs (即使存在于未知的标识符或代码内)
+Get HTML files first!
+首先保存HTML文件!
+Structure type (how links are saved)
+结构类型 (链接保存的方式)
+Use a cache for updates
+使用预存区以便日后更新
+Do not re-download locally erased files
+不再下载在本地已被删除的文件
+Make an index
+创建一个 index.html 文件
+Make a word database
+创建词汇库
+Log files
+日志文件
+DOS names (8+3)
+DOS 文件名格式 (8+3)
+ISO9660 names (CDROM)
+
+No error pages
+除去错误页
+Primary Scan Rule
+首要扫描规则
+Travel mode
+行进模式
+Global travel mode
+全局行进模式
+These options should be modified only exceptionally
+以下选项只在特殊情况下修改
+Activate Debugging Mode (winhttrack.log)
+启动调试模式 (创建winhttrack.log)
+Rewrite links: internal / external
+更置链接: 内部 / 外部
+Flow control
+流量控制
+Limits
+限制
+Identity
+身份
+HTML footer
+HTML页脚
+N# connections
+连接数
+Abandon host if error
+若发生错误, 则放弃和主机的连接
+Minimum transfer rate (B/s)
+最小传输率 (字节/秒)
+Abandon host if too slow
+若传输过慢, 则放弃和主机的连接
+Configure
+配置
+Use proxy for ftp transfers
+使用代理进行ftp传输
+TimeOut(s)
+超时
+Persistent connections (Keep-Alive)
+
+Reduce connection time and type lookup time using persistent connections
+
+Retries
+重试
+Size limit
+大小限制
+Max size of any HTML file (B)
+单个HTML文件的最大尺寸
+Max size of any non-HTML file
+单个非HTML文件的最大尺寸
+Max site size
+镜像站点最大尺寸
+Max time
+最长时间
+Save prefs
+保存设置
+Max transfer rate
+最大传输速率
+Follow robots.txt
+遵守 robots.txt 规则
+No external pages
+不产生外部页面
+Do not purge old files
+不清除废弃文件
+Accept cookies
+接收cookies
+Check document type
+检查文件类型
+Parse java files
+解析java文件
+Store ALL files in cache
+保存所有文件在预存区内
+Tolerant requests (for servers)
+允许对服务器的非精确请求
+Update hack (limit re-transfers)
+更新时采取其他手段防止重复下载
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+强制使用旧的HTTP/1.0请求 (不采用1.1)
+Max connections / seconds
+每秒最多连接数
+Maximum number of links
+最多扫描链接
+Pause after downloading..
+暂停于每下载..
+Hide passwords
+隐藏口令
+Hide query strings
+隐藏账号信息
+Links
+链接
+Build
+构造
+Experts Only
+高级
+Flow Control
+流量控制
+Limits
+限制
+Browser ID
+浏览器标识
+Scan Rules
+扫描规则
+Spider
+搜寻
+Log, Index, Cache
+日志, 索引, 预存区
+Proxy
+代理
+MIME Types
+
+Do you really want to quit WinHTTrack Website Copier?
+真的要退出WinHTTrack Website Copier 吗?
+Do not connect to a provider (already connected)
+已连接到网络
+Do not use remote access connection
+不使用远程连接
+Schedule the mirroring operation
+预定进行镜像的时间
+Quit WinHTTrack Website Copier
+退出WinHTTrack Website Copier
+Back to starting page
+回到起始页面
+Click to start!
+点击以开始!
+No saved password for this connection!
+该连接缺少已保存的密码!
+Can not get remote connection settings
+无法获取远程连接的设置
+Select a connection provider
+请选择一个连接
+Start
+开始
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+如有需要请修改连接参数,\n然后按 '完成' 开始镜像
+Save settings only, do not launch download now.
+不立即进行镜像, 仅保存当前设置
+On hold
+挂起
+Transfer scheduled for: (hh/mm/ss)
+预定镜像开始于: (点/分/秒)
+Start
+开始
+Connect to provider (RAS)
+连接到网络(远程连接服务器)
+Connect to this provider
+使用该连接:
+Disconnect when finished
+完成时断掉连接
+Disconnect modem on completion
+完成时断掉调制解调器
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(有任何程序错误或问题请联系我们)\r\n\r\n开发:\r\n界面设计 (Windows): Xavier Roche\r\n解析引擎: Xavier Roche\r\nJava解析引擎: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\n感谢:\r\nRobert Lagadec (rlagadec@yahoo.fr) 提供翻译技巧
+About WinHTTrack Website Copier
+关于WinHTTrack Website Copier
+Please visit our Web page
+请访问我们的主页
+Wizard query
+向导提问
+Your answer:
+你的答案:
+Link detected..
+检测到链接..
+Choose a rule
+请选择规则
+Ignore this link
+忽略此链接
+Ignore directory
+忽略此目录
+Ignore domain
+忽略此域名
+Catch this page only
+仅下载此页
+Mirror site
+镜像站点
+Mirror domain
+镜像域名
+Ignore all
+全部忽略
+Wizard query
+向导提问
+NO
+否
+File
+文件
+Options
+选项
+Log
+日志
+Window
+窗口
+Help
+帮助
+Pause transfer
+暂停传输
+Exit
+退出
+Modify options
+修改选项
+View log
+察看日志
+View error log
+察看错误日志
+View file transfers
+察看文件传输
+Hide
+隐藏
+About WinHTTrack Website Copier
+关于WinHTTrack Website Copier
+Check program updates...
+检查版本更新...
+&Toolbar
+工具栏
+&Status Bar
+状态栏
+S&plit
+分割
+File
+文件
+Preferences
+设置
+Mirror
+镜像
+Log
+日志
+Window
+窗口
+Help
+帮助
+Exit
+退出
+Load default options
+载入自定义缺省选项
+Save default options
+存为自定义缺省选项
+Reset to default options
+恢复原始设定
+Load options...
+载入选项...
+Save options as...
+保存选项...
+Language preference...
+界面语言设置...
+Contents...
+内容...
+About WinHTTrack...
+关于WinHTTrack...
+New project\tCtrl+N
+新的工程\tCtrl+N
+&Open...\tCtrl+O
+&打开...\tCtrl+O
+&Save\tCtrl+S
+&保存\tCtrl+S
+Save &As...
+保存选项...
+&Delete...
+&删除...
+&Browse sites...
+&浏览已镜像站点...
+User-defined structure
+用户自定义结构
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\t不含扩展名的文件名(如: image)\r\n%N\t含有扩展名的文件名(如: image.gif)\r\n%t\t仅扩展名(如: gif)\r\n%p\t路径[无尾随'/'] (如: /someimages)\r\n%h\t主机名(如: www.someweb.com)\r\n%M\tMD5 URL (128位, 32 ascii 字节)\r\n%Q\tMD5 query string (128位, 32 ascii 字节)\r\n%q\tMD5 small query string (16位, 4 ascii 字节)\r\n\r\n%s?\t短文件名(如: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+示例:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+代理设置
+Proxy address:
+代理地址:
+Proxy port:
+代理端口:
+Authentication (only if needed)
+身份验证 (如若需要)
+Login
+登录
+Password
+口令
+Enter proxy address here
+在此输入代理地址
+Enter proxy port here
+在此输入代理端口
+Enter proxy login
+输入代理服务器登录信息
+Enter proxy password
+输入代理服务器所需口令
+Enter project name here
+在此输入工程名
+Enter saving path here
+在此输入总保存路径
+Select existing project to update
+请选择一个已有的工程以更新
+Click here to select path
+点击此处以选择路径
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack 工程向导...
+New project name:
+新工程的名称:
+Existing project name:
+现有工程的名称:
+Project name:
+工程名:
+Base path:
+总保存路径:
+Project category:
+
+C:\\My Web Sites
+C:\\My Websites
+Type a new project name, \r\nor select existing project to update/resume
+请键入一个新的工程名, \r\n或选择已有工程以更新或继续
+New project
+新的工程
+Insert URL
+插入URL
+URL:
+URL地址:
+Authentication (only if needed)
+身份验证 (如若需要)
+Login
+登录
+Password
+口令
+Forms or complex links:
+表格或复杂链接:
+Capture URL...
+捕获URL地址...
+Enter URL address(es) here
+请在此输入URL地址
+Enter site login
+请输入站点登录名
+Enter site password
+请输入站点登陆口令
+Use this capture tool for links that can only be accessed through forms or javascript code
+使用此工具捕获只能通过表格或java代码访问到的链接
+Choose language according to preference
+请根据个人喜好选择界面语言
+Catch URL!
+捕获URL地址!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+请先暂时将浏览器的代理设为如下数值(拷贝/粘贴代理地址和端口).\n然后点击浏览器页面上表格的SUBMIT按钮, 或点击想要捕获的链接
+This will send the desired link from your browser to WinHTTrack.
+所需的链接将从浏览器被送至WinHTTrack.
+ABORT
+放弃
+Copy/Paste the temporary proxy parameters here
+在此拷贝/粘贴暂时的代理参数
+Cancel
+取消
+Unable to find Help files!
+无法找到帮助文件!
+Unable to save parameters!
+无法保存参数!
+Please drag only one folder at a time
+请每次只拖一个文件夹
+Please drag only folders, not files
+请不要拖文件, 只拖文件夹
+Please drag folders only
+请只拖文件夹
+Select user-defined structure?
+选择用户自定义结构吗?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+请确保用户定义的字符串的正确性,\n否则生成文件名时可能出错!
+Do you really want to use a user-defined structure?
+真的要使用用户自定义结构吗?
+Too manu URLs, cannot handle so many links!!
+过多URLs地址, 无法处理!!
+Not enough memory, fatal internal error..
+内存不足, 发生致命内部错误!
+Unknown operation!
+未知操作!
+Add this URL?\r\n
+添加此URL?
+Warning: main process is still not responding, cannot add URL(s)..
+警告: 主进程未有响应, 不能添加URL(s)..
+Type/MIME associations
+文件类型/扩展关联
+File types:
+文件类型:
+MIME identity:
+MIME identity
+Select or modify your file type(s) here
+在此选择或修改文件类型
+Select or modify your MIME type(s) here
+在此选择或修改关联文件类型
+Go up
+向上
+Go down
+向下
+File download information
+文件下载信息
+Freeze Window
+锁定窗口信息
+More information:
+更多信息:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+欢迎使用WinHTTrack Website Copier!\n\n请点击'Next' 以\n\n- 开始一个新的工程\n- 或继续执行一个以前的镜像
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+文件名中包含扩展名:\n文件名中包含:\n此文件名:\n文件夹名中包含:\n此文件夹名:\n此域名:\n域名中包含:\n此主机:\n链接中包含:\n此链接:\n所有链接
+Show all\nHide debug\nHide infos\nHide debug and infos
+显示全部内容\n隐藏错误\n隐藏消息\n隐藏错误和消息
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+站点原有结构(缺省)\nhtml文件在web/, 图片和其他文件在web/images/\nhtml文件在web/html, 图片和其他文件在web/images\nhtml文件在web/, 图片和其他文件也在web/\nhtml文件在web/, 图片和其他文件在web/xxx, xxx为文件扩展名\nhtml文件在web/html, 图片和其他文件在web/xxx\n站点原有结构(去掉www.domain.xxx/)\nhtml文件在site_name/, 图片和其他文件在site_name/images/\nhtml文件在site_name/html, 图片和其他文件在site_name/images\nhtml文件在site_name/, 图片和其他文件也在site_name/\nhtml文件在site_name/, 图片和其他文件在site_name/xxx\nhtml文件在site_name/html, 图片和其他文件在site_name/xxx\n所有文件在web/, 文件名任意产生\n所有文件在site_name/, 文件名任意产生\n用户自定义结构..
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+只做扫描\n只保存html文件\n只保存非html文件\n保存所有文件 (缺省)\n先保存html文件
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+停留于同一目录\n允许往下进行 (缺省)\n允许往上进行\n上下都允许进行
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+停留于同一地址 (缺省)\n停留于同一域名\n停留于同一顶级域名\n任何网络地址
+Never\nIf unknown (except /)\nIf unknown
+从不\n如果未知 (/ 除外)\n如果未知
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+不遵守robots.txt\n遵守过滤器优先于robots.txt\n完全遵守robots.txt
+normal\nextended\ndebug
+普通日志\n扩展日志\n除错日志
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+下载网站\n下载网站 + 提问\n下载个别文件\n下载页面中的所有站点 (多个镜像)\n测试页面中的链接 (书签测试)\n* 继续被中断的镜像\n* 更新已有镜像
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+相对地址 / 绝对地址 (缺省)\n绝对地址 / 绝对地址\n绝对地址 / 绝对地址\n原始 地址 / 原始地址
+Open Source offline browser
+
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+
+httrack, winhttrack, webhttrack, offline browser
+
+URL list (.txt)
+
+Previous
+
+Next
+
+URLs
+
+Warning
+
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+
+Thank you
+
+You can now close this window
+
+Server terminated
+
+A fatal error has occured during this mirror
+

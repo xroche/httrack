@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Norsk
+LANGUAGE_FILE
+Norsk
+LANGUAGE_ISO
+no
+LANGUAGE_AUTHOR
+Tobias "Spug" Langhoff (Dark Spug at hazardlabs.com )\r\n[ spug_enigma@hotmail.com ] \r\n
+LANGUAGE_CHARSET
+ISO-8859-1
+LANGUAGE_WINDOWSID
+Norwegian (Nynorsk)
+OK
+OK
+Cancel
+Avbryt
+Exit
+Avslutt
+Close
+Lukk
+Cancel changes
+Angre endringer
+Click to confirm
+Klikk for å bekrefte
+Click to get help!
+Klikk her for å få hjelp!
+Click to return to previous screen
+Klikk for å gå tilbake til forrige skjerm
+Click to go to next screen
+Klikk for å gå til neste skjerm
+Hide password
+Skjul passord
+Save project
+Lagre prosjekt
+Close current project?
+Vil du lukke prosjektet?
+Delete this project?
+Vil du slette dette prosjektet?
+Delete empty project %s?
+Vil du slette det tomme prosjektet %s?
+Action not yet implemented
+Denne funksjonen er ikke utviklet enda
+Error deleting this project
+Kunne ikke slette prosjektet
+Select a rule for the filter
+Velg en regel for dette filteret
+Enter keywords for the filter
+Skriv inn nøkkelord for dette filteret
+Cancel
+Avbryt
+Add this rule
+Legg til regel
+Please enter one or several keyword(s) for the rule
+Skriv inn et eller flere nøkkelord for denne regelen
+Add Scan Rule
+Legg til søkeregel
+Criterion
+Kriterier
+String
+Streng
+Add
+Legg til
+Scan Rules
+Søkeregler
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Bruk jokertegn (* og ?) for å ekskludere eller inkludere URLer eller linker.\nDu kan sette inn flere søkeregler på samme linje.\nBruk mellomrom som separatortegn.\n\nEksempel: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Ekskluder link(er)
+Include link(s)
+Inkluder link(er)
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Tips: For å inkludere ALLE GIF-filer, skriv noe sånt som +www.someweb.com/*.gif. \n(+*.gif / -*.gif inkluderer/ekskluderer ALLE GIF-filer fra ALLE sider)
+Save prefs
+Lagre innstillinger
+Matching links will be excluded:
+Følgende matchende linker vil bli utelukket:
+Matching links will be included:
+Følgende matchende linker vil bli inkludert:
+Example:
+Eksempel:
+gif\r\nWill match all GIF files
+gif\r\nMatcher alle GIF-filer
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nFinner alle filer med matchende tekst. Skriver du f.eks. 'blue' lastes 'bluesky-small.jpeg' ned.
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nFinner filen 'bigfile.mov', men ikke 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nFinner linker med mappenavn som matcher tekststrengen 'cgi', f.eks. /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nFinner linker med mappenavn som matcher hele 'cgi-bin'-strengen (men ikke cgi-bin-2, for eksempel)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nFinner linker med matchende tekststreng, som f.eks www.someweb.com, private.someweb.com osv.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nFinner linker med mappenavn som matcher tekststrengen 'someweb', for eksempel www.someweb.com, www.someweb.no, private.someweb.otherweb.com osv.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nFinner linker som matcher hele 'www.someweb.com'-strengen (men ikke linker som f.eks private.someweb.com/.. osv.)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nFinner alle linker med matchende tekststreng, som for eksempel www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html osv.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nFinner bare filen 'www.test.com/test/someweb.html'. Legg merke til at du må skrive hele adressen (URL + mappenavn)
+All links will match
+Alle linker matcher
+Add exclusion filter
+Legg til ekskluderingsfilter
+Add inclusion filter
+Legg til inkluderingsfilter
+Existing filters
+Eksisterende filtre
+Cancel changes
+Angre endringer
+Save current preferences as default values
+Lagre nåværende innstillinger som standardinnstillinger
+Click to confirm
+Klikk for å bekrefte
+No log files in %s!
+Det finnes ingen logg-filer i %s!
+No 'index.html' file in %s!
+Det finnes ingen 'index.html'-fil i %s!
+Click to quit WinHTTrack Website Copier
+Klikk for å avslutte WinHTTrack Website Copier
+View log files
+Vis logg-filer
+Browse HTML start page
+Vis HTML-startside
+End of mirror
+Kopieringen er fullført
+View log files
+Vis logg-filer
+Browse Mirrored Website
+Vis den kopierte websiden
+New project...
+Nytt prosjekt...
+View error and warning reports
+Vis feil- og advarselsrapporter
+View report
+Vis rapport
+Close the log file window
+Lukk loggvinduet
+Info type:
+Informasjonstype:
+Errors
+Feil
+Infos
+Informasjon
+Find
+Søk
+Find a word
+Søk etter et ord
+Info log file
+Informasjonslogg
+Warning/Errors log file
+Advarsels- og feillogg
+Unable to initialize the OLE system
+Kan ikke starte OLE-systemet
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack kunne ikke finne noen avbrutte nedlastninger i den angitte mappen!
+Could not connect to provider
+Kunne ikke koble til leverandør
+receive
+mottar
+request
+tillatelse
+connect
+kobler til
+search
+søker
+ready
+klar
+error
+feil
+Receiving files..
+Mottar filer...
+Parsing HTML file..
+Overfører HTML-fil...
+Purging files..
+Sletter filer...
+Loading cache in progress..
+
+Parsing HTML file (testing links)..
+Overfører HTML-fil (tester linker)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Pause - Velg [Kopier]/[Pause nedlasting] for å fortsette nedlastingen
+Finishing pending transfers - Select [Cancel] to stop now!
+Avslutter aktive nedlastinger - velg [Avbryt] for å avslutte nå!
+scanning
+søker
+Waiting for scheduled time..
+Venter på planlagt tidspunkt...
+Connecting to provider
+Kobler til leverandør
+[%d seconds] to go before start of operation
+[%d sekunder] til start
+Site mirroring in progress [%s, %s bytes]
+Kopiering pågår [%s, %s bytes]
+Site mirroring finished!
+Kopieringen er fullført!
+A problem occured during the mirroring operation\n
+Et problem oppsto under kopieringen\n
+\nDuring:\n
+\nUnder:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nVis loggen hvis nødvendig.\n\nKlikk på AVSLUTT for å avslutte WinHTTrack Website Copier.\n\nTakk for at du brukte WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Kopieringen er fullført.\nKlikk AVSLUTT for å avslutte WinHTTrack.\nVis loggfil(er) vis det er nødvendig, for å sjekke at alt er OK.\n\nTakk for at du brukte WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * KOPIERINGEN ER AVBRUTT! * *\r\nDen nåværende midlertidige cachen er obligatorisk for alle oppdateringsoperasjoner, og inneholder bare data fra den siste avbrutte kopieringsprosessen.\r\nDen tidligere cachen kan inneholde fyldigere informasjon; hvis du ønsker å beholde den informasjonen må du gjenopprette den og slette den aktuelle cachen.\r\n[OBS: Dette kan lettest gjøres ved å slette alle 'hts-cache/new.*'-filer]\r\n\r\nTror du den tidligere cache-filen kanskje inneholder fyldigere informasjon, og vil du gjenopprette den?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * KOPIERINGSFEIL! * *\r\nHttrack har oppdaget at den gjeldende websiden er tom. Hvis du var i gang med å oppdatere enn kopi, vil det gamle innholdet bli gjenopprettet.\r\nMulig årsak: Den første siden kunne enten ikke finnes, eller det oppstod et problem med forbindelsen.\r\n=> Kontroller at websiden fremdeles finnes, og/eller sjekk proxy-innstillingene dine! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nTips: Klikk på [Vis loggfil] for å se advarsler og feilmeldinger
+Error deleting a hts-cache/new.* file, please do it manually
+Det oppstod en feil ved sletting av hts-cache/new.*-filen. Prøv å slett filen manuelt.
+Do you really want to quit WinHTTrack Website Copier?
+Vil du virkelig avslutte WinHTTrack Website Copier?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Kopiering av webside -\n\nSkriv adressen(e) i URL-feltet
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Interaktiv guide (spørsmål) -\n\nSkriv inn adressen(e) i URL-feltet
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Filnedlasting -\n\nSkriv inn filen(e)s adresse(r) i URL-feltet
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Linktest -\n\nSkriv inn webadressen(e) du vil teste i URL-feltet
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Oppdatering -\n\nBekreft adressen(e) i URL-feltet, sjekk eventuelt om innstillingene er riktige og trykk deretter på 'NESTE'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Fortsett kopiering (hvis kopieringen ble avbrutt) -\n\nBekreft adressen(e) i URL-feltet, sjekk eventuelt om innstillingene er riktige og trykk deretter på 'NESTE'
+Log files Path
+Plassering av loggfil
+Path
+Bane
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Linkliste -\n\nBruk URL-feltet til å angi adresse(r) på sider som inneholder linker som skal kopieres.
+New project / Import?
+Nytt prosjekt / importer prosjekt?
+Choose criterion
+Velg kriterier
+Maximum link scanning depth
+Maximum søkedybde på linker
+Enter address(es) here
+Skriv inn adressen(e) her
+Define additional filtering rules
+Velg ytterligere filtreringsregler
+Proxy Name (if needed)
+Proxy-navn (om nødvendig)
+Proxy Port
+Proxy-port
+Define proxy settings
+Velg proxy-innstillinger
+Use standard HTTP proxy as FTP proxy
+Bruk standard HTTP-proxy som FTP-proxy
+Path
+Bane
+Select Path
+Velg bane
+Path
+Bane
+Select Path
+Velg bane
+Quit WinHTTrack Website Copier
+Avslutt WinHTTrack Website Copier
+About WinHTTrack
+Om WinHTTrack
+Save current preferences as default values
+Lagre nåværende innstillinger som standardinnstillinger
+Click to continue
+Klikk for å fortsette
+Click to define options
+Klikk for å velge innstillinger
+Click to add a URL
+Klikk for å legge til en URL
+Load URL(s) from text file
+Hent URL(er) fra tekstfil
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack-innstillinger (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Adresseliste (tekstfil) (*.txt)|*.txt||
+File not found!
+Finner ikke filen!
+Do you really want to change the project name/path?
+Vil du virkelig endre prosjektets navn / plassering?
+Load user-default options?
+Åpne egendefinerte innstillinger?
+Save user-default options?
+Lagre egendefinerte innstillinger?
+Reset all default options?
+Nullstill alle standardinnstillinger?
+Welcome to WinHTTrack!
+Velkommen til WinHTTrack!
+Action:
+Handling:
+Max Depth
+Maksimum dybde
+Maximum external depth:
+Maksimum ekstern dybde:
+Filters (refuse/accept links) :
+Filtre (ekskluder/inkluder linker):
+Paths
+Baner
+Save prefs
+Lagre innstillinger
+Define..
+Definer...
+Set options..
+Velg innstillinger...
+Preferences and mirror options:
+Instillinger og kopieringsvalg:
+Project name
+Prosjektnavn
+Add a URL...
+Legg til en URL...
+Web Addresses: (URL)
+Webadresser: (URL)
+Stop WinHTTrack?
+Stopp WinHTTrack?
+No log files in %s!
+%s inneholder ingen loggfiler!
+Pause Download?
+Pause kopieringen?
+Stop the mirroring operation
+Stopp kopieringsprosessen
+Minimize to System Tray
+Minimer til systemlinjen
+Click to skip a link or stop parsing
+Klikk for å hoppe over en link eller stoppe overføringen
+Click to skip a link
+Klikk for å hoppe over en link
+Bytes saved
+Bytes nedlastet
+Links scanned
+Gjennomsøkte linker
+Time:
+Tid:
+Connections:
+Tilkoblinger:
+Running:
+Kjører:
+Hide
+Minimer
+Transfer rate
+Overføringshastighet
+SKIP
+HOPP OVER
+Information
+Informasjon
+Files written:
+Kopierte filer:
+Files updated:
+Oppdaterte filer:
+Errors:
+Feil:
+In progress:
+Arbeider:
+Follow external links
+Følg eksterne linker
+Test all links in pages
+Test alle linker på siden
+Try to ferret out all links
+Prøv å utvide alle linker
+Download HTML files first (faster)
+Last ned HTML-filer først (raskere)
+Choose local site structure
+Velg lokal sidestruktur
+Set user-defined structure on disk
+Velg brukerdefinert sidestruktur på disken
+Use a cache for updates and retries
+Bruk cache til oppdateringer og oppdateringsforsøk
+Do not update zero size or user-erased files
+Ikke oppdater tomme filer eller filer slettet av bruker
+Create a Start Page
+Opprett en startside
+Create a word database of all html pages
+Opprett en ord-database over alle HTML-sider
+Create error logging and report files
+Opprett feillogging og rapporter
+Generate DOS 8-3 filenames ONLY
+Lag filnavn KUN i DOS 8-3-format
+Generate ISO9660 filenames ONLY for CDROM medias
+Lag filnavn i ISO9660-format KUN for CD-ROM
+Do not create HTML error pages
+Ikke opprett HTML-feilmeldinger
+Select file types to be saved to disk
+Velg filtyper som skal kopieres
+Select parsing direction
+Velg overføringsretning
+Select global parsing direction
+Velg global overføringsretning
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Velg regler for omskrivning av URL for interne linker (nedlastede linker) og eksterne linker (ikke nedlastede)
+Max simultaneous connections
+Maksimum antall samtidige forbindelser
+File timeout
+Fil time-out
+Cancel all links from host if timeout occurs
+Avbryt alle linker fra vert hvis time-out oppstår
+Minimum admissible transfer rate
+Minimum akseptabel overføringshastighet
+Cancel all links from host if too slow
+Avbryt alle linker fra vert hvis overføringen er for langsom
+Maximum number of retries on non-fatal errors
+Maksimalt antall forsøk på ikke-fatale feil
+Maximum size for any single HTML file
+Maksimum filstørrelse for en enkelt HTML-fil
+Maximum size for any single non-HTML file
+Maksimum filstørrelse for en enkelt ikke-HTML-fil
+Maximum amount of bytes to retrieve from the Web
+Maksimum antall bytes som hentes fra internett
+Make a pause after downloading this amount of bytes
+Pause kopieringen når så mange bytes har blitt lastet ned:
+Maximum duration time for the mirroring operation
+Maksimal overføringstid på kopieringsprosessen
+Maximum transfer rate
+Maksimum overføringshastighet
+Maximum connections/seconds (avoid server overload)
+Maksimum antall forbindelser/sekunder (for å unngå overbelastning av serveren)
+Maximum number of links that can be tested (not saved!)
+Maksimalt antall linker som kan testes (ikke lagret!)
+Browser identity
+Nettleser-identitet
+Comment to be placed in each HTML file
+Sett inn kommentar i alle HTML-filer
+Back to starting page
+Tilbake til startside
+Save current preferences as default values
+Lagre nåværende innstillinger som standardinnstillinger
+Click to continue
+Klikk for å fortsette
+Click to cancel changes
+Klikk for å angre endringer
+Follow local robots rules on sites
+Følg lokale robots-regler på websiden
+Links to non-localised external pages will produce error pages
+Linker til eksterne sider som ikke finnes vil opprette en feilside
+Do not erase obsolete files after update
+Ikke slett unødvendige filer etter oppdatering
+Accept cookies?
+Aksepter informasjonskapsler (cookies)?
+Check document type when unknown?
+Sjekk dokumenttypen hvis ukjent?
+Parse java applets to retrieve included files that must be downloaded?
+Overfør java-appleter sammen med inkluderte filer som skal lastes ned?
+Store all files in cache instead of HTML only
+Lagre alle filer i cache i stedet for bare HTML
+Log file type (if generated)
+Loggfiltype (hvis den opprettes)
+Maximum mirroring depth from root address
+Maksimum kopieringsdybde fra rotadressen (root)
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Maksimum kopieringsdybde for eksterne/forbudte adresser (0, altså ingen, er standard)
+Create a debugging file
+Opprett en feilfinningsfil
+Use non-standard requests to get round some server bugs
+Bruk ikke-standarde forespørsler for å unngå serverfeil
+Use old HTTP/1.0 requests (limits engine power!)
+Bruk gamle HTTP/1.0-forespørsler (begrenser effektiviteten!)
+Attempt to limit retransfers through several tricks (file size test..)
+Prøv å begrense gjentakelser av samme overføring ved å bruke spesielle 'triks' (f.eks å teste filstørrelsen)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+Skriv eksterne linker uten brukernavn/passord
+Write internal links without query string
+Skriv interne linker uten å spørre
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Hent ikke-HTML-filer relatert til linker, f.eks eksterne .ZIP-filer eller bilder
+Test all links (even forbidden ones)
+Test alle linker (også forbudte linker)
+Try to catch all URLs (even in unknown tags/code)
+Prøv å kopiere alle URLer (selv i ukjente tags / ukjent kode)
+Get HTML files first!
+Kopier HTML-filer først!
+Structure type (how links are saved)
+Angi struktur (hvordan linker lagres)
+Use a cache for updates
+Bruk cache til oppdateringer
+Do not re-download locally erased files
+Ikke last ned filer som er slettet av bruker på nytt
+Make an index
+Opprett en forside
+Make a word database
+Opprett en ord-database
+Log files
+Loggfiler
+DOS names (8+3)
+DOS-filnavn (8+3)
+ISO9660 names (CDROM)
+ISO9660-filnavn (CD-ROM)
+No error pages
+Ingen feilsider
+Primary Scan Rule
+Primær søkeregel
+Travel mode
+Søkemetode
+Global travel mode
+Global reisemetode
+These options should be modified only exceptionally
+Disse innstillingene bør bare endres hvis noe ikke virker, og kun av eksperter :)
+Activate Debugging Mode (winhttrack.log)
+Aktiver feilsøking (winhttrack.log)
+Rewrite links: internal / external
+Skriv linker om igjen: internt / eksternt
+Flow control
+Flow-kontroll
+Limits
+Begrensninger
+Identity
+Identitet
+HTML footer
+HTML-fotnote
+N# connections
+Antall forbindelser
+Abandon host if error
+Forlat verten hvis det oppstår feil
+Minimum transfer rate (B/s)
+Minimum overføringshastighet (bytes per sekund)
+Abandon host if too slow
+Forlat verten hvis den er for langsom
+Configure
+Konfigurer
+Use proxy for ftp transfers
+Bruk proxy til FTP-overføringer
+TimeOut(s)
+Time-out(s)
+Persistent connections (Keep-Alive)
+
+Reduce connection time and type lookup time using persistent connections
+
+Retries
+Forsøk
+Size limit
+Størrelsesbegrensning
+Max size of any HTML file (B)
+Maks. størrelse på hver HTML-fil (bytes)
+Max size of any non-HTML file
+Maks. størrelse på hver ikke-HTML-fil
+Max site size
+Maksimum websidestørrelse
+Max time
+Maksimum tid
+Save prefs
+Lagre innstillinger
+Max transfer rate
+Maksimum overføringshastighet
+Follow robots.txt
+Følg reglene i robots.txt
+No external pages
+Ingen eksterne websider
+Do not purge old files
+Ikke slett gamle filer
+Accept cookies
+Aksepter informasjonskapsler (cookies)
+Check document type
+Sjekk dokumenttype
+Parse java files
+Overfør java-filer
+Store ALL files in cache
+Lagre ALLE filer i cache
+Tolerant requests (for servers)
+Aksepter forespørsler (for servere)
+Update hack (limit re-transfers)
+Oppdater hack (begrens gjen-overføringer)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+Gjennomtving gamle HTTP/1.0-forespørsler (ikke 1.1)
+Max connections / seconds
+Maksimum antall forbindelser / sekunder
+Maximum number of links
+Maksimum antall linker
+Pause after downloading..
+Pause etter nedlastning...
+Hide passwords
+Skjul passord
+Hide query strings
+Skjul forespørsels-strenger
+Links
+Linker
+Build
+Struktur
+Experts Only
+Kun for eksperter
+Flow Control
+Flow-kontroll
+Limits
+Begrensninger
+Browser ID
+Nettleser-ID
+Scan Rules
+Søkeregler
+Spider
+Webrobot
+Log, Index, Cache
+Logg, forside, cache
+Proxy
+Proxy
+MIME Types
+
+Do you really want to quit WinHTTrack Website Copier?
+Vil du virkelig avslutte WinHTTrack Website Copier?
+Do not connect to a provider (already connected)
+Ikke opprett tilkobling til leverandør (er allerede tilkoblet)
+Do not use remote access connection
+Ikke bruk fjernoppringning
+Schedule the mirroring operation
+Planlegg kopieringen
+Quit WinHTTrack Website Copier
+Avslutt WinHTTrack Website Copier
+Back to starting page
+Tilbake til startside
+Click to start!
+Klikk for å starte!
+No saved password for this connection!
+Ingen lagrede passord for denne tilkoblingen!
+Can not get remote connection settings
+Kan ikke lese oppringningsinnstillinger
+Select a connection provider
+Velg en internettleverandør
+Start
+Start
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Vennligst endre tilkoblingsinnstillinger hvis det er nødvendig,\nog klikk på FULLFØR for å begynne kopieringsprosessen.
+Save settings only, do not launch download now.
+Bare lagre innstillingene, ikke begynn kopieringen.
+On hold
+Pause
+Transfer scheduled for: (hh/mm/ss)
+Kopiering planlagt på tidspunkt: (hh/mm/ss)
+Start
+Start
+Connect to provider (RAS)
+Koble til leverandør (RAS)
+Connect to this provider
+Koble til denne leverandøren
+Disconnect when finished
+Koble fra når fullført
+Disconnect modem on completion
+Koble fra modem når fullført
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Vennligst fortell oss om feil eller problemer med programmet)\r\n\r\nUtvikling (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche og andre bidragsytere\r\n\r\nNorwegian translation:\r\nTobias "Spug" Langhoff ( spug_enigma@hotmail.com )
+About WinHTTrack Website Copier
+Om WinHTTrack Website Copier
+Please visit our Web page
+Vennligst besøk vår internettside
+Wizard query
+Guide-spørsmål
+Your answer:
+Ditt svar:
+Link detected..
+Link oppdaget...
+Choose a rule
+Velg en regel
+Ignore this link
+Ignorer denne linken
+Ignore directory
+Ignorer denne mappen
+Ignore domain
+Ignorer dette domenet
+Catch this page only
+Kopier bare denne siden
+Mirror site
+Kopier side
+Mirror domain
+Kopier domene
+Ignore all
+Ignorer alle
+Wizard query
+Guide-spørsmål
+NO
+NEI
+File
+Fil
+Options
+Innstillinger
+Log
+Logg
+Window
+Vindu
+Help
+Hjelp
+Pause transfer
+Pause kopiering
+Exit
+Avslutt
+Modify options
+Endre innstillinger
+View log
+Vis logg
+View error log
+Vis feillogg
+View file transfers
+Vis filoverføringer
+Hide
+Minimer
+About WinHTTrack Website Copier
+Om WinHTTrack Website Copier
+Check program updates...
+Se etter programoppdateringer (krever internett-tilkobling)...
+&Toolbar
+&Verktøylinje
+&Status Bar
+&Statuslinje
+S&plit
+&Del
+File
+Fil
+Preferences
+Innstillinger
+Mirror
+Kopier webside
+Log
+Logg
+Window
+Vindu
+Help
+Hjelp
+Exit
+Avslutt
+Load default options
+Åpne standardinnstillinger
+Save default options
+Lagre standardinnstillinger
+Reset to default options
+Tilbakestill til standardinnstillinger
+Load options...
+Åpne innstillinger...
+Save options as...
+Lagre innstillinger som...
+Language preference...
+Språk...
+Contents...
+Hjelp (engelsk)...
+About WinHTTrack...
+Om WinHTTrack...
+New project\tCtrl+N
+&Nytt prosjekt\tCtrl+N
+&Open...\tCtrl+O
+Å&pne...\tCtrl+O
+&Save\tCtrl+S
+La&gre\tCtrl+S
+Save &As...
+Lagre &som...
+&Delete...
+Sl&ett...
+&Browse sites...
+Forhåndsvis webside...
+User-defined structure
+Brukerdefinert struktur
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tFilnavn uten filtype (f.eks bilde)\r\n%N\tFilnavn MED filtype (f.eks bilde.gif)\r\n%t\tBare filtype (f.eks gif)\r\n%p\tBane [uten slutt-/] (f.eks /bilder)\r\n%h\tVertsnavn (f.eks www.someweb.com)\r\n%M\tMD5-URL (128-biters, 32 ASCII-bytes)\r\n%Q\tMD5-forespørsels-streng (128-biters, 32 ASCII-bytes(\r\n%q\tKort MD5-forespørsels-streng (16-biters, 4 ASCII-bytes)\r\n\r\n%s?\tKort navn (f.eks %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Eksempel:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\bilder\\bilde.gif
+Proxy settings
+Proxyinnstillinger
+Proxy address:
+Proxyadresse:
+Proxy port:
+Proxyport:
+Authentication (only if needed)
+Identifikasjon (hvis nødvendig)
+Login
+Brukernavn
+Password
+Passord
+Enter proxy address here
+Skriv inn proxyadresse her
+Enter proxy port here
+Skriv inn proxyport her
+Enter proxy login
+Skriv inn proxybrukernavn
+Enter proxy password
+Skriv inn proxypassord
+Enter project name here
+Skriv inn prosjektnavn her
+Enter saving path here
+Skriv inn banen der filene skal lagres
+Select existing project to update
+Velg eksisterende prosjekt som skal oppdateres
+Click here to select path
+Klikk her for å velge bane
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack prosjektguide...
+New project name:
+Nytt prosjektnavn:
+Existing project name:
+Eksisterende prosjektnavn:
+Project name:
+Prosjektnavn:
+Base path:
+Lagringsbane:
+Project category:
+
+C:\\My Web Sites
+C:\\Mine websider
+Type a new project name, \r\nor select existing project to update/resume
+Skriv inn et nytt prosjektnavn, \r\neller velg et eksisterende prosjekt du vil oppdatere/fortsette på
+New project
+Nytt prosjekt
+Insert URL
+Skriv inn URL
+URL:
+URL:
+Authentication (only if needed)
+Godkjennelse (bare hvis det trengs)
+Login
+Brukernavn
+Password
+Passord
+Forms or complex links:
+For skjemaer eller komplekse linker:
+Capture URL...
+'Fang' URL...
+Enter URL address(es) here
+Skriv inn URL-adresse(r) her
+Enter site login
+Skriv inn websidens brukernavn
+Enter site password
+Skriv inn websidens passord
+Use this capture tool for links that can only be accessed through forms or javascript code
+Bruk dette verktøyet for å 'fange' linker som bare kan nås via skjemaer eller JavaScript-koder
+Choose language according to preference
+Velg språket du vil bruke
+Catch URL!
+'Fang' URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Vennligst sett nettleserens midlertidige proxy-innstillinger til følgende verdi (kopier/lim inn proxy-adresse og port).\nKlikk så på OK-knappen i nettleseren din, eller klikk på linken du vil 'fange'.
+This will send the desired link from your browser to WinHTTrack.
+Dette vil sende linken fra nettleseren din til WinHTTrack.
+ABORT
+AVBRYT
+Copy/Paste the temporary proxy parameters here
+Kopier/lim inn de midlertidige proxy-innstillingene her
+Cancel
+Avbryt
+Unable to find Help files!
+Finner ikke hjelpefiler!
+Unable to save parameters!
+Kan ikke lagre parameterne!
+Please drag only one folder at a time
+Bare dra én mappe om gangen!
+Please drag only folders, not files
+Bare dra mapper, ikke filer!
+Please drag folders only
+Bare dra mapper!
+Select user-defined structure?
+Velg bruker-definert struktur?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Pass på at den brukerdefinerte strengen stemmer,\nellers vil filnavnene være ugyldige!
+Do you really want to use a user-defined structure?
+Vil du bruke en brukerdefinert struktur?
+Too manu URLs, cannot handle so many links!!
+For mange URLer, kan ikke håndtere så mange!
+Not enough memory, fatal internal error..
+Ikke nok minne, fatal intern feil...
+Unknown operation!
+Ukjent kommando!
+Add this URL?\r\n
+Legg til denne URLen?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Advarsel: hovedprosessen svarer fremdeles ikke, URLen(e) kan ikke legges til...
+Type/MIME associations
+Type/MIME-tilknytninger
+File types:
+Filtyper:
+MIME identity:
+MIME-identitet:
+Select or modify your file type(s) here
+Velg eller endre filtypen(e) dine her
+Select or modify your MIME type(s) here
+Velg eller endre MIME-typen(e) dine her
+Go up
+Gå opp
+Go down
+Gå ned
+File download information
+Nedlastningsinformasjon om fil
+Freeze Window
+Frys vinduet
+More information:
+Mer informasjon:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Velkommen til WinHTTrack Website Copier!\n\nVennligst klikk på NESTE-knappen for å\n\n- starte et nytt prosjekt\n- eller fortsette en tidligere avbrutt kopiering
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Filnavn med etternavn:\nFilnavn som inneholder:\nDette filnavnet:\nMappenavn som inneholder:\nDette mappenavnet:\nLinker i dette domenet:\nLinker i domener som inneholder:\nLinker fra denne verten:\nLinker som inneholder:\nDenne linken:\nALLE LINKER
+Show all\nHide debug\nHide infos\nHide debug and infos
+Vis alle\nSkjul filsøking\nSkjul informasjon\nSkjul filsøking og informasjon
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Sidestruktur (standard)\nHTML i web/,       bilder/andre filer i web/bilder/\nHTML i web/HTML,   bilder/andre i web/bilder\nHTML i web/,       bilder/andre i web/\nHTML i web/,       bilder/andre i web/xxx, hvor xxx er filtypen\nHTML i web/HTML,   bilder/andre i web/xxx\nSidestruktur, uten www.domene.xxx/\nHTML i side_navn/, bilder/andre filer i side_navn/bilder/\nHTML i side_navn/HTML, bilder/andre i side_navn/bilder\nHTML i side_navn/, bilder/andre i side_navn/\nHTML i side_navn/, bilder/andre i side_navn/xxx\nHTML i side_navn/HTML, bilder/andre i side_navn/xxx\mAlle filer på nettet/, med tilfeldige navn (gadget !)\nAlle filer i side_navn/, med tilfeldige navn (gadget !)\nBruker-definert struktur...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Bare søk\nLagre HTML-filer\nLagre ikke-HTML-filer\nLagre alle filer (standard)\nLagre HTML-filer først
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Bli i samme mappe\nKan gå ned (standard)\nKan gå opp\nKan gå både opp og ned
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Bli på samme adresse (standard)\nBli på samme domene\nBli på samme toppnivå-domene\nGå hvor som helst på internett
+Never\nIf unknown (except /)\nIf unknown
+Aldri\nHvis ukjent (bortsett fra /)\nHvis ukjent
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+ingen robots.txt-regler\nrobots.txt bortsett fra guide\nfølg robots.txt-regler
+normal\nextended\ndebug
+normal\nutvidet\nfeilsøk
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Last ned webside(r)\nLast ned webside(r) (spør meg)\nHent individuelle filer\nLast ned alle sidene (multiple mirror)\nTest linkene på sidene (bookmark test)\n* Fortsett avbrutt kopiering\n* Oppdater eksisterende kopi
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Relativ URL / Fullstendig URL (standard)\nFullstendig URL / Fullstendig URL\nFullstendig URL / Fullstendig URL\nOriginal URL / Original URL
+Open Source offline browser
+
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+
+httrack, winhttrack, webhttrack, offline browser
+
+URL list (.txt)
+
+Previous
+
+Next
+
+URLs
+
+Warning
+
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+
+Thank you
+
+You can now close this window
+
+Server terminated
+
+A fatal error has occured during this mirror
+
