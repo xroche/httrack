@@ -187,6 +187,16 @@ struct struct_inthash {
       /** hashtable name for logging **/
       const char *name;
     } error;
+
+    /** How to handle pretty-print (debug) (might be NULL). **/
+    struct {
+      /** key print() **/
+      t_inthash_printkeyhandler key;
+      /** value print() **/
+      t_inthash_printvaluehandler value;
+      /** opaque argument **/
+      void *arg;
+    } print;
   } custom;
 };
 
@@ -889,10 +899,59 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
                   (int) hashtable->stash.size);
     return 1; /* added */
   } else {
+    /* debugging */
+    if (hashtable->custom.print.key != NULL 
+      && hashtable->custom.print.value != NULL) {
+      size_t i;
+      for(i = 0 ; i < hashtable->stash.size ; i++) {
+        inthash_item *const item = &hashtable->stash.items[i];
+        const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
+        const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
+        inthash_crit(hashtable, "stash[%u]: key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+          (int) i,
+          hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
+          hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+          (int) pos1, (int) pos2,
+          item->hashes.hash1, item->hashes.hash2);
+        if (!inthash_is_free(hashtable, pos1)) {
+          inthash_item *const item = &hashtable->items[pos1];
+          const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
+          const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
+          inthash_crit(hashtable, "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+            hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
+            hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+            (int) pos1, (int) pos2,
+            item->hashes.hash1, item->hashes.hash2);
+        } else {
+          inthash_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos1);
+        }
+        if (!inthash_is_free(hashtable, pos2)) {
+          inthash_item *const item = &hashtable->items[pos2];
+          const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
+          const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
+          inthash_crit(hashtable, "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
+            hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
+            hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+            (int) pos1, (int) pos2,
+            item->hashes.hash1, item->hashes.hash2);
+        } else {
+          inthash_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos2);
+        }
+      }
+      //struct_inthash_enum e = inthash_enum_new(hashtable);
+      //while((item = inthash_enum_next(&e)) != NULL) {
+      //  inthash_crit(hashtable, "element key='%s' value='%s' hash1=%04x hash2=%04x",
+      //    hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
+      //    hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+      //    item->hashes.hash1, item->hashes.hash2);
+      //}
+    }
+
     /* we are doomed. hopefully the probability is lower than being killed
        by a wandering radioactive monkey */
     inthash_log_stats(hashtable);
     inthash_assert(hashtable, ! "hashtable internal error: cuckoo/stash collision");
+
     /* not reachable code */
     return -1;
   }
@@ -1235,9 +1294,13 @@ inthash inthash_new(size_t initial_size) {
     hashtable->custom.key.hash = NULL;
     hashtable->custom.key.equals = NULL;
     hashtable->custom.key.arg = NULL;
+    hashtable->custom.error.log = NULL;
     hashtable->custom.error.fatal = NULL;
     hashtable->custom.error.name = NULL;
     hashtable->custom.error.arg = NULL;
+    hashtable->custom.print.key = NULL;
+    hashtable->custom.print.value = NULL;
+    hashtable->custom.print.arg = NULL;
   }
   return hashtable;
 }
@@ -1288,10 +1351,18 @@ void inthash_set_assert_handler(inthash hashtable,
                                 t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
                                 void *arg) {
-  inthash_assert(hashtable, fatal != NULL);
   hashtable->custom.error.log = log;
   hashtable->custom.error.fatal = fatal;
   hashtable->custom.error.arg = arg;
+}
+
+void inthash_set_print_handler(inthash hashtable,
+                               t_inthash_printkeyhandler key,
+                               t_inthash_printvaluehandler value,
+                               void *arg) {
+  hashtable->custom.print.key = key;
+  hashtable->custom.print.value = value;
+  hashtable->custom.print.arg = arg;
 }
 
 size_t inthash_nitems(inthash hashtable) {
