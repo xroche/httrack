@@ -141,6 +141,12 @@ typedef void (*t_inthash_loghandler)(void *arg, inthash_loglevel level,
 /** Hashtable fatal assertion failure. **/
 typedef void (*t_inthash_asserthandler)(void *arg, const char* exp, const char* file, int line);
 
+/** Key printer (debug) **/
+typedef const char* (*t_inthash_printkeyhandler)(void *arg, const char *name);
+
+/** Value printer (debug) **/
+typedef const char* (*t_inthash_printvaluehandler)(void *arg, void *value);
+
 /**
  * Value comparison handler (returns non-zero value if strings are equal).
  **/
@@ -240,6 +246,18 @@ void inthash_set_assert_handler(inthash hashtable,
                                 t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
                                 void *arg);
+
+/**
+ * Set pretty print loggers (debug). Both handlers must return a string
+ * pointer which shall be valid until the next call. Both key and value
+ * pointers shall be valid at the same time.
+ * name: handler called to print the string representation of the name
+ * value: handler called to print the string representation of the value
+ **/
+void inthash_set_print_handler(inthash hashtable,
+                               t_inthash_printkeyhandler key,
+                               t_inthash_printvaluehandler value,
+                               void *arg);
 
 /**
  * Set the hashtable name, for degugging purpose.
