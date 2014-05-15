@@ -996,7 +996,7 @@ int inthash_write_value(inthash hashtable, const char *name,
           inthash_warning(hashtable, 
             "stash size still full despite %"UINT_64_FORMAT
             " elements used out of %"UINT_64_FORMAT,
-            hashtable->used, half_size*2);
+            (uint64_t) hashtable->used, (uint64_t) half_size*2);
       }
 
       /* statistics */
