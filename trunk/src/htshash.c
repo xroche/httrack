@@ -161,7 +161,6 @@ static int key_adrfil_equals_generic(void *arg, const char *a_, const char *b_,
 
 static const char* key_adrfil_debug_print_(void *arg, const char *a_, const int former) {
   hash_struct *const hash = (hash_struct*) arg;
-  const int normalized = hash->normalized;
   const lien_url*const a = (lien_url*) a_;
   const char *const a_adr = !former ? a->adr : a->former_adr;
   const char *const a_fil = !former ? a->fil : a->former_fil;
