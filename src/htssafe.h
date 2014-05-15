@@ -100,6 +100,17 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
 
+/* Compile-time checks. */
+static HTS_UNUSED void htssafe_compile_time_check_() {
+  char array[32];
+  char *pointer = array;
+  char check_array[HTS_IS_CHAR_BUFFER(array) ? 1 : -1];
+  char check_pointer[HTS_IS_CHAR_BUFFER(pointer) ? -1 : 1];
+  (void) pointer;
+  (void) check_array;
+  (void) check_pointer;
+}
+
 /**
  * Append at most N characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
