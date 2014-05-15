@@ -101,7 +101,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
 
 /* Compile-time checks. */
-static HTS_UNUSED void htssafe_compile_time_check_() {
+static HTS_UNUSED void htssafe_compile_time_check_(void) {
   char array[32];
   char *pointer = array;
   char check_array[HTS_IS_CHAR_BUFFER(array) ? 1 : -1];
