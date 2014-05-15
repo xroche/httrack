@@ -4412,8 +4412,10 @@ HTSEXT_API char *hts_rootdir(char *file) {
       strc.path[0] = '\0';
       strc.init = 1;
       if (strnotempty(file)) {
+        const size_t file_len = strlen(file);
         char *a;
 
+        assertf(file_len < sizeof(strc.path));
         strcpybuff(strc.path, file);
         while((a = strrchr(strc.path, '\\')))
           *a = '/';
@@ -4423,7 +4425,7 @@ HTSEXT_API char *hts_rootdir(char *file) {
           strc.path[0] = '\0';
       }
       if (!strnotempty(strc.path)) {
-        if (getcwd(strc.path, 1024) == NULL)
+        if (getcwd(strc.path, sizeof(strc.path)) == NULL)
           strc.path[0] = '\0';
         else
           strcatbuff(strc.path, "/");
