@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+
+# IDNA routine
+test "$(httrack -O /dev/null -#4 "www.café.com")" == "www.xn--caf-dma.com"	|| exit 1
+test "$(httrack -O /dev/null -#4 "www.もののけ姫-the-movie.com")" == "www.xn---the-movie-g63irla2z8297c.com"	|| exit 1
+
+# reverse IDNA
+test "$(httrack -O /dev/null -#5 "www.xn--caf-dma.com")" == "www.café.com"	|| exit 1
+test "$(httrack -O /dev/null -#5 "www.xn---the-movie-g63irla2z8297c.com")" == "www.もののけ姫-the-movie.com"	|| exit 1

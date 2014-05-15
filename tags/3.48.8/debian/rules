@@ -1,0 +1,155 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# *** Patch for s390, mips, hppa..
+# It seems that htscore.c can not compile on several archs, due to compiler
+# capacity limits. These lines shall be removed when gcc is upgraded.
+# See discussions on 'Assembler messages: Branch out of range'
+# Addition (04/2004): gcc-3.3 on arm fcks up with htscoremain.c and -O3 (..)
+ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH),s390 mips mipsel hppa m68k arm))
+	CFLAGS += -DNOSTRDEBUG
+endif
+
+DEB_CFLAGS_MAINT_APPEND=-O3
+
+# DEB_BUILD_OPTIONS flags
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -g3
+endif
+
+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	INSTALL_PROGRAM += -s
+endif
+
+# as suggested by Simon McVittie
+# (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=744380)
+override_dh_auto_test:
+	VERBOSE=1 dh_auto_test
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	dh_autoreconf
+	# note: dpkg-buildflags to be removed when compat=9
+	dh_auto_configure -- --enable-online-unit-tests=auto $(shell dpkg-buildflags --export=configure)
+
+	touch configure-stamp
+
+build: build-arch build-indep
+
+build-indep:
+
+build-arch: build-stamp
+
+build-stamp: configure-stamp 
+	dh_testdir
+	dh_auto_build
+	dh_auto_test
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+	dh_auto_clean
+	dh_autoreconf_clean
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	dh_auto_install --destdir=$(CURDIR)/debian/httrack
+	##$(MAKE) install DESTDIR=$(CURDIR)/debian/httrack
+
+	# place html files (doc, webhttrack files)
+
+	# remove symlink created by html/Makefile's install-data-hook
+	rm $(CURDIR)/debian/httrack/usr/share/httrack/html
+	# and put back in place data
+	mv $(CURDIR)/debian/httrack/usr/share/doc/httrack \
+		$(CURDIR)/debian/httrack/usr/share/httrack/html
+	# create symlink on the other side
+	mkdir $(CURDIR)/debian/httrack/usr/share/doc/httrack
+	ln -s ../../httrack/html \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/html
+	# and put in place the two outer files
+	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
+		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
+
+	# place libraries and cleanup
+	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/
+	mv $(CURDIR)/debian/httrack/usr/bin/htsserver \
+		$(CURDIR)/debian/httrack/usr/lib/httrack/
+	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
+	rm -f $(CURDIR)/debian/httrack/usr/lib/*.la
+	rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.la
+	# remove *.a unless we do not have *.so files
+	# see BUG #744594
+	if ls $(CURDIR)/debian/httrack/usr/lib/*.so >/dev/null 2>/dev/null ; then \
+		rm -f $(CURDIR)/debian/httrack/usr/lib/*.a ; \
+	fi
+	if ls $(CURDIR)/debian/httrack/usr/lib/httrack/*.so >/dev/null 2>/dev/null ; then \
+		rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.a ; \
+	fi
+	mv $(CURDIR)/debian/httrack/usr/lib/httrack/lib* \
+		$(CURDIR)/debian/httrack/usr/share/httrack/libtest/
+	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/libtest
+	mv $(CURDIR)/debian/httrack/usr/share/httrack/libtest/lib* \
+		$(CURDIR)/debian/httrack/usr/lib/httrack/libtest
+	ln -s ../../../share/httrack/libtest/readme.txt \
+		 $(CURDIR)/debian/httrack/usr/lib/httrack/libtest/readme.txt
+
+	# Lintian overrides
+	mkdir -p $(CURDIR)/debian/httrack/usr/share/lintian/overrides
+	cp $(CURDIR)/debian/httrack.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
+	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
+	cp $(CURDIR)/debian/httrack-doc.lintian-overrides \
+		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
+
+	dh_movefiles --sourcedir=debian/httrack
+
+	# remove empty dirs
+	find debian -type d | xargs rmdir -p --ignore-fail-on-non-empty
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir -i
+	dh_testroot -i
+	dh_installdocs -i
+	dh_installchangelogs -i history.txt
+	dh_link -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir -a
+	dh_testroot -a
+	dh_installdocs -a
+	dh_installmenu -a
+	dh_installchangelogs -a history.txt
+	dh_link -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_makeshlibs -a -X/usr/lib/httrack/libtest --version-info
+	dh_installdeb -a
+	# we depend on the current version (ABI may change)
+	dh_shlibdeps -a -ldebian/libhttrack2/usr/lib
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

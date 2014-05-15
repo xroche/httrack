@@ -1,0 +1,24 @@
+0.5 - May 8 2006
+- added ARC (Internet Archive 1.0) file format
+- first index output routines (proxytrack --convert ..)
+
+0.4 - Sept 18 2005
+- implemented very limited WebDAV (RFC2518) primitives
+- index enumeration fixes
+- limited access to the proxy server through HTTP in non-proxy mode
+
+0.3 - Sept 10 2005
+- implemented ICPv2 server (tested with Squid Web Proxy Cache) implementing ICP_OP_QUERY and ICP_OP_SECHO
+- redirects for URLs with missing ending '/'
+- fixed htsnet.h macro errors (bogus port during address copy)
+- keep-alive fixes
+
+0.2 - Sept 4 2005
+- hack to fix the "external files stored as absolute references" bug
+- proper locking for indexes (unlocked zFile)
+- added previous httrack .dat/.ndx cache format
+- added catalog as index fallback
+- started to write ICPv2 server (RFC2186), but not yet ready
+
+0.1 - Aug 27 2005
+- initial release: HTTP (RFC2616) proxy and aggregation ready

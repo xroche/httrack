@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+
+# minimalistic charset test
+test "$(httrack -O /dev/null -#3 "iso-8859-1" "café")" == "cafÃ©"	|| exit 1
