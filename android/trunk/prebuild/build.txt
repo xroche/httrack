@@ -1,35 +1,46 @@
 # sources and settings (do modify)
 HTTRACK_SVN=/temp/httrack-*
 ICONV_TAR=/temp/android/libiconv-1.14.tar.gz
-ANDROID_SDK=/home/${USER}/bin/android-ndk-r8e
+ANDROID_SDK=/home/${USER}/bin/android-ndk-r9d
 TMP_DIR=/tmp/build_httrack_android
 DEST_DIR=/tmp/arm-inst
-# iconv and openSSL cache builds
+# iconv cache builds
 # rm -rf lib/*httrack* lib/libhtsjava.* &&
-# tar cvfz iconv-openssl-android.tgz lib include
-BUILD_CACHE=/temp/android/iconv-openssl-android.tgz
+# tar cvfz iconv-android.tgz lib include
+OPENSSL_BUILD=/temp/android/openssl-android.tgz
+ICONV_BUILD=/temp/android/iconv-android.tgz
 SAVE_BUILD=/temp/android/builds
 
 # setup
-objcopy=${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/arm-linux-androideabi/bin/objcopy
+objcopy=${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-linux-androideabi/bin/objcopy
 
 # cleanup
 rm -rf ${TMP_DIR} && cp -ax ${HTTRACK_SVN} ${TMP_DIR} && cd ${TMP_DIR}
 rm -rf ${DEST_DIR}
 
 # valid build cache ?
-if test -n "$BUILD_CACHE"; then
-if test -f "$BUILD_CACHE"; then
+if test -n "$ICONV_BUILD"; then
+if test -f "$ICONV_BUILD"; then
 mkdir -p ${DEST_DIR}
 cd ${DEST_DIR} || exit 1
-tar xf "$BUILD_CACHE" || exit 1
+tar xf "$ICONV_BUILD" || exit 1
 else
-BUILD_CACHE=
+ICONV_BUILD=
+fi
+fi
+# openssl
+if test -n "$OPENSSL_BUILD"; then
+if test -f "$OPENSSL_BUILD"; then
+mkdir -p ${DEST_DIR}
+cd ${DEST_DIR} || exit 1
+tar xf "$OPENSSL_BUILD" || exit 1
+else
+OPENSSL_BUILD=
 fi
 fi
 
 # build iconv and openSSL ?
-if ! test -n "$BUILD_CACHE"; then
+if ! test -n "$ICONV_BUILD"; then
 
 # See <http://danilogiulianelli.blogspot.fr/2012/12/how-to-cross-compile-libiconv-for.html>
 # wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
@@ -66,7 +77,7 @@ EOF
  --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
-CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib"
+CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib"
 
 # create Android mk
 mkdir jni
@@ -103,8 +114,13 @@ mkdir -p ${DEST_DIR}/lib ${DEST_DIR}/include
 cp -ax obj/local/armeabi/libiconv.so ${DEST_DIR}/lib || exit 1
 cp -ax include/iconv.h ${DEST_DIR}/include || exit 1
 
+else
+echo "using pre-build iconv binaries"
+fi
+
 # build openSSL
 # Thanks to the Guardian Project <http://guardianproject.info/> for the help
+if ! test -n "$OPENSSL_BUILD"; then
 git clone https://github.com/guardianproject/openssl-android.git
 cd openssl-android/
 ${ANDROID_SDK}/ndk-build
@@ -113,9 +129,7 @@ cp -ax include/openssl ${DEST_DIR}/include || exit 1
 cd ..
 
 else
-
-echo "using pre-build binaries"
-
+echo "using pre-build openssl binaries"
 fi
 
 # build httrack
@@ -127,7 +141,7 @@ cd ${TMP_DIR}
  --with-sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm \
  --with-zlib=${ANDROID_SDK}/platforms/android-5/arch-arm/usr \
  --includedir=${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include \
- CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
+ CC="${ANDROID_SDK}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc --sysroot=${ANDROID_SDK}/platforms/android-5/arch-arm -I${ANDROID_SDK}/platforms/android-5/arch-arm/usr/include -L${ANDROID_SDK}/platforms/android-5/arch-arm/usr/lib" \
  CFLAGS="-O3 -g3 -funwind-tables -Wl,--no-merge-exidx-entries -DANDROID -D_ANDROID -DLIBICONV_PLUG -DHTS_CRASH_TEST -I${DEST_DIR}/include -L${DEST_DIR}/lib" \
  LDFLAGS="-Wl,-O1" \
  && sed -i -e 's/CPPFLAGS = .*/CPPFLAGS =/' Makefile \
