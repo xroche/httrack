@@ -84,6 +84,13 @@ static long int  timezone = 0;
 #include <sys/stat.h>
 /* END specific definitions */
 
+/* Windows might be missing va_copy */
+#ifdef _WIN32
+#ifndef va_copy
+#define va_copy(dst, src) ((dst) = (src))
+#endif
+#endif
+
 // Debugging
 #if _HTS_WIDE
 FILE *DEBUG_fp = NULL;
@@ -5292,8 +5299,21 @@ HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg) {
   return 1;                     /* Error */
 }
 
+static void (*hts_log_print_callback)(httrackp * opt, int type, const char *format, va_list args) = NULL;
+
+HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt,
+                                            int type, const char *format, va_list args)) {
+  hts_log_print_callback = callback;
+}
+
 HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
   assertf(format != NULL);
+  if (hts_log_print_callback != NULL) {
+    va_list args_copy;
+    va_copy(args_copy, args);
+    hts_log_print_callback(opt, type, format, args);
+    va_end(args_copy);
+  }
   if (opt != NULL && opt->log != NULL) {
     const int save_errno = errno;
     const char *s_type = "unknown";
@@ -5340,7 +5360,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
 
 HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
   assertf(format != NULL);
-  if (opt != NULL && opt->log != NULL) {
+  if (opt != NULL && (opt->log != NULL 
+    || hts_log_print_callback != NULL)) {
     va_list args;
     va_start(args, format);
     hts_log_vprint(opt, type, format, args);
