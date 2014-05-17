@@ -3,7 +3,7 @@
     package="com.httrack.android"
     android:installLocation="auto"
     android:versionCode="54"
-    android:versionName="3.48.6.54" >
+    android:versionName="3.48.8.54" >
 
     <uses-sdk
         android:minSdkVersion="8"
