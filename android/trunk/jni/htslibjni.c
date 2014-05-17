@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <android/log.h>
+
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsopt.h"
@@ -47,14 +49,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* redirect stdio on a log file ? */
 #define REDIRECT_STDIO_LOG_FILE
 
-/* Our own assert version. */
-static void assert_failure(const char* exp, const char* file, int line) {
+/* log assertion failure. */
+static void log_assert_failure(const char* exp, const char* file, int line) {
+  __android_log_print(ANDROID_LOG_VERBOSE, "httrack", "assertion '%s' failed at %s:%d", exp, file, line);
+#define MKDIR_MODE (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
-  FILE *const dumpFile = fopen("/mnt/sdcard/Download/HTTrack/error.txt", "wb");
+  FILE *dumpFile;
+  (void) mkdir("/mnt/sdcard/Download/HTTrack", MKDIR_MODE);
+  dumpFile = fopen("/mnt/sdcard/Download/HTTrack/error.txt", "wb");
   if (dumpFile != NULL) {
     fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
     fclose(dumpFile);
   }
+}
+
+/* our own assert version. */
+static void assert_failure(const char* exp, const char* file, int line) {
+  log_assert_failure(exp, file, line);
 #ifdef USE_COFFEECATCH
   coffeecatch_abort(exp, file, line);
 #else
@@ -63,6 +74,29 @@ static void assert_failure(const char* exp, const char* file, int line) {
 }
 #undef assert
 #define assert(EXP) (void)( (EXP) || (assert_failure(#EXP, __FILE__, __LINE__), 0) )
+
+/* httrack-to-android error level dispatch */
+static int get_android_prio(const int type) {
+  switch(type & 0xff) {
+  case LOG_PANIC:
+    return ANDROID_LOG_ERROR;
+  case LOG_ERROR:
+    return ANDROID_LOG_INFO;
+  case LOG_WARNING:
+  case LOG_NOTICE:
+  case LOG_INFO:
+  case LOG_DEBUG:
+    return ANDROID_LOG_DEBUG;
+  case LOG_TRACE:
+  default:
+    return ANDROID_LOG_VERBOSE;
+  }
+}
+
+/* our own debugging log callabck */
+static void httrackLogCallback(httrackp *opt, int type, const char *format, va_list args) {
+  __android_log_vprint(get_android_prio(type), "httrack", format, args);
+}
 
 /** Context for HTTrackLib. **/
 typedef struct HTTrackLib_context {
@@ -268,6 +302,10 @@ static void throwNPException(JNIEnv* env, const char *message) {
   throwException(env, "java/lang/NullPointerException", message);
 }
 
+static void httrackAssertFailure(const char* exp, const char* file, int line) {
+  assert_failure(exp, file, line);
+}
+
 /* Static initialization. */
 void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass clazz) {
 #define L_(X) #X
@@ -352,6 +390,12 @@ void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass claz
   if (hts_init() != 1) {
     ASSERT_THROWS(! "hts_init() failed");
   }
+
+  /* Register assert callback */
+  hts_set_error_callback(httrackAssertFailure);
+
+  /* Register log callback */
+  hts_set_log_vprint_callback(httrackLogCallback);
 
   /* redirect stdout and stderr to a log file for debugging purpose */
 #ifdef REDIRECT_STDIO_LOG_FILE
