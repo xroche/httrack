@@ -5359,14 +5359,11 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
 }
 
 HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
+  va_list args;
   assertf(format != NULL);
-  if (opt != NULL && (opt->log != NULL 
-    || hts_log_print_callback != NULL)) {
-    va_list args;
-    va_start(args, format);
-    hts_log_vprint(opt, type, format, args);
-    va_end(args);
-  }
+  va_start(args, format);
+  hts_log_vprint(opt, type, format, args);
+  va_end(args);
 }
 
 HTSEXT_API void set_wrappers(httrackp * opt) {  // LEGACY
