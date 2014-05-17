@@ -156,7 +156,8 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_
                                                  const char *file, int line) {
   size_t size;
   assertf_( source != NULL, file, line );
-  size = strnlen(source, sizeof_source);
+  size = sizeof_source != (size_t) -1 
+    ? strnlen(source, sizeof_source) : strlen(source);
   assertf_( size < sizeof_source, file, line );
   return size;
 }
