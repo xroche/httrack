@@ -812,7 +812,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
               name[pos][0] = '\0';
             }
             pos = 0;
-            while(*a != ']') {
+            while(*a != '\0' && *a != ']') {
               if (pos < 5) {
                 if (*a == ':') {        // next token
                   c = name[++pos];
@@ -823,7 +823,9 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                 }
               }
             }
-            a++;
+            if (*a == ']') {
+              a++;
+            }
             strcatbuff(name[0], "=");   /* param=.. */
             c = strchr(fil_complete, '?');
             /* parameters exists */
