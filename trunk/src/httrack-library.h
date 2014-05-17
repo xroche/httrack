@@ -127,6 +127,9 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
                               ...) HTS_PRINTF_FUN(3, 4);
 HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format,
                                va_list args);
+HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt, 
+                                           int type, 
+                                           const char *format, va_list args));
 
 /* Infos */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
