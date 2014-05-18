@@ -517,9 +517,9 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
             tmp_argv[1] = _tmp_argv[1];
             tmp_argv[2] = _tmp_argv[2];
             tmp_argv[3] = _tmp_argv[3];
-            strcpybuff(tmp_argv[0], "--");
-            strcatbuff(tmp_argv[0], a);
-            strcpybuff(tmp_argv[1], b);
+            strcpybuff(_tmp_argv[0], "--");
+            strcatbuff(_tmp_argv[0], a);
+            strcpybuff(_tmp_argv[1], b);
 
             result =
               optalias_check(2, (const char *const *) tmp_argv, 0, &return_argc,
