@@ -253,7 +253,7 @@ T_SOC smallserver_init(int *port, char *adr) {
                         0)) != INVALID_SOCKET) {
       SOCaddr_initport(server, *port);
       if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-        if (listen(soc, 1) >= 0) {
+        if (listen(soc, 10) >= 0) {
           // SOCaddr_inetntoa(adr, 128, server2);
           strcpy(adr, h_loc);
         } else {
