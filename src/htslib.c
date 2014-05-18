@@ -5788,68 +5788,56 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   {htsdefault_parse, NULL}
 };
 
-#define CHARCAST(A) ( (char*) (A) )
-#define OFFSET_OF(TYPE, MEMBER) ( (size_t) ( CHARCAST(&(((TYPE*) NULL)->MEMBER)) - CHARCAST((TYPE*) NULL) ) )
-#define CALLBACK_REF(name, fun) \
-  { name, OFFSET_OF(t_hts_htmlcheck_callbacks, fun) }
-#define MEMBER_OF(STRUCT, OFFSET, TYPE) ( * ((TYPE*)((char*)(STRUCT) + (OFFSET))) )
+#define CALLBACK_OP(CB, NAME, OPERATION, S, FUN) do {   \
+  if (strcmp(NAME, S) == 0) {                           \
+    OPERATION(t_hts_htmlcheck_ ##FUN, (CB)->FUN.fun);   \
+  }                                                     \
+} while(0)
 
-const t_hts_callback_ref default_callbacks_ref[] = {
-  CALLBACK_REF("init", init),
-  CALLBACK_REF("free", uninit),
-  CALLBACK_REF("start", start),
-  CALLBACK_REF("end", end),
-  CALLBACK_REF("change-options", chopt),
-  CALLBACK_REF("preprocess-html", preprocess),
-  CALLBACK_REF("postprocess-html", postprocess),
-  CALLBACK_REF("check-html", check_html),
-  CALLBACK_REF("query", query),
-  CALLBACK_REF("query2", query2),
-  CALLBACK_REF("query3", query3),
-  CALLBACK_REF("loop", loop),
-  CALLBACK_REF("check-link", check_link),
-  CALLBACK_REF("check-mime", check_mime),
-  CALLBACK_REF("pause", pause),
-  CALLBACK_REF("save-file", filesave),
-  CALLBACK_REF("save-file2", filesave2),
-  CALLBACK_REF("link-detected", linkdetected),
-  CALLBACK_REF("link-detected2", linkdetected2),
-  CALLBACK_REF("transfer-status", xfrstatus),
-  CALLBACK_REF("save-name", savename),
-  CALLBACK_REF("send-header", sendhead),
-  CALLBACK_REF("receive-header", receivehead),
-  {NULL, 0}
-};
-
-size_t hts_get_callback_offs(const char *name) {
-  const t_hts_callback_ref *ref;
-
-  for(ref = &default_callbacks_ref[0]; ref->name != NULL; ref++) {
-    if (strcmp(name, ref->name) == 0) {
-      return ref->offset;
-    }
-  }
-  return (size_t) (-1);
-}
+#define DISPATCH_CALLBACK(CB, NAME, OPERATION) do { \
+  CALLBACK_OP(CB, NAME, OPERATION, "init", init); \
+  CALLBACK_OP(CB, NAME, OPERATION, "free", uninit); \
+  CALLBACK_OP(CB, NAME, OPERATION, "start", start); \
+  CALLBACK_OP(CB, NAME, OPERATION, "end", end); \
+  CALLBACK_OP(CB, NAME, OPERATION, "change-options", chopt); \
+  CALLBACK_OP(CB, NAME, OPERATION, "preprocess-html", preprocess); \
+  CALLBACK_OP(CB, NAME, OPERATION, "postprocess-html", postprocess); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-html", check_html); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query", query); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query2", query2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query3", query3); \
+  CALLBACK_OP(CB, NAME, OPERATION, "loop", loop); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-link", check_link); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-mime", check_mime); \
+  CALLBACK_OP(CB, NAME, OPERATION, "pause", pause); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-file", filesave); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-file2", filesave2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "link-detected", linkdetected); \
+  CALLBACK_OP(CB, NAME, OPERATION, "link-detected2", linkdetected2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "transfer-status", xfrstatus); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-name", savename); \
+  CALLBACK_OP(CB, NAME, OPERATION, "send-header", sendhead); \
+  CALLBACK_OP(CB, NAME, OPERATION, "receive-header", receivehead); \
+} while(0)
 
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name,
                      void *function) {
-  size_t offs = hts_get_callback_offs(name);
-
-  if (offs != (size_t) - 1) {
-    MEMBER_OF(callbacks, offs, void *) = function;
-
-    return 0;
-  }
-  return 1;
+  int error = 1;
+#define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
+    FUNCTION = (TYPE) function;                 \
+    error = 0;                                  \
+  } while(0)
+  DISPATCH_CALLBACK(callbacks, name, CALLBACK_OPERATION);
+#undef CALLBACK_OPERATION
+  return error;
 }
 
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name) {
-  size_t offs = hts_get_callback_offs(name);
-
-  if (offs != (size_t) - 1) {
-    return MEMBER_OF(callbacks, offs, void *);
-  }
+#define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
+    return (void*) FUNCTION;                    \
+  } while(0)
+  DISPATCH_CALLBACK(callbacks, name, CALLBACK_OPERATION);
+#undef CALLBACK_OPERATION
   return NULL;
 }
 
