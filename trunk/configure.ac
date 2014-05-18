@@ -47,6 +47,18 @@ AC_MSG_WARN([*** in_addr_t not found]),
 #include <netinet/in.h>
 #include <arpa/inet.h>])
 
+# check for in_port_
+AC_CHECK_TYPE(in_port_t, [], [AC_DEFINE([in_port_t], [uint16_t], [in_port_t])], [
+#include <sys/types.h>
+#include <netinet/in.h>
+])
+
+# check for sa_family_t
+AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_t])], [
+#include <sys/types.h>
+#include <netinet/in.h>
+])
+
 ### zlib
 CHECK_ZLIB()
 

@@ -15408,6 +15408,36 @@ $as_echo "$as_me: WARNING: *** in_addr_t not found" >&2;}
 fi
 
 
+# check for in_port_
+ac_fn_c_check_type "$LINENO" "in_port_t" "ac_cv_type_in_port_t" "
+#include <sys/types.h>
+#include <netinet/in.h>
+
+"
+if test "x$ac_cv_type_in_port_t" = xyes; then :
+
+else
+
+$as_echo "#define in_port_t uint16_t" >>confdefs.h
+
+fi
+
+
+# check for sa_family_t
+ac_fn_c_check_type "$LINENO" "sa_family_t" "ac_cv_type_sa_family_t" "
+#include <sys/types.h>
+#include <netinet/in.h>
+
+"
+if test "x$ac_cv_type_sa_family_t" = xyes; then :
+
+else
+
+$as_echo "#define sa_family_t uint16_t" >>confdefs.h
+
+fi
+
+
 ### zlib
 #
 # Handle user hints
