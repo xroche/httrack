@@ -108,3 +108,9 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* in_port_t */
+#undef in_port_t
+
+/* sa_family_t */
+#undef sa_family_t
