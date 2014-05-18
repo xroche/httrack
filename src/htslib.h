@@ -158,7 +158,7 @@ struct htsblk {
   short int is_file;            // ce n'est pas une socket mais un descripteur de fichier si 1
   T_SOC soc;                    // ID socket
   SOCaddr address;              // IP address
-  int address_size;             // IP address structure length
+  int address_size;             // IP address structure length (unused internally)
   FILE *fp;                     // fichier pour file://
 #if HTS_USEOPENSSL
   short int ssl;                // is this connection a SSL one? (https)
@@ -273,12 +273,16 @@ void treatfirstline(htsblk * retour, char *rcvd);
 
 // sous-fonctions
 LLint http_xfread1(htsblk * r, int bufl);
-HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
-                                        void *v_buffer, const char **error);
-HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
-                                        void *v_buffer);
-HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, void *v_buffer, const char **error);
-HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer);
+HTS_INLINE SOCaddr* hts_dns_resolve2(httrackp * opt, const char *iadr,
+                                     SOCaddr *const addr, 
+                                     const char **error);
+HTS_INLINE SOCaddr* hts_dns_resolve(httrackp * opt, const char *iadr,
+                                    SOCaddr *const addr);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
+                                              SOCaddr *const addr,
+                                              const char **error);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, 
+                                             SOCaddr *const addr);
 HTSEXT_API int check_hostname_dns(const char *const hostname);
 
 int ftp_available(void);
@@ -303,7 +307,7 @@ HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
-int finput(int fd, char *s, int max);
+int finput(T_SOC fd, char *s, int max);
 int binput(char *buff, char *s, int max);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);

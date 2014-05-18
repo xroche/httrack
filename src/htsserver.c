@@ -162,16 +162,15 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
 // 1- Init the URL catcher
 
 // get hostname. return 1 upon success.
-static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
+static int gethost(const char *hostname, SOCaddr * server) {
   if (hostname != NULL && *hostname != '\0') {
 #if HTS_INET6==0
     /* ipV4 resolver */
-    t_hostent *hp = gethostbyname(hostname);
+    struct hostent *hp = gethostbyname(hostname);
 
     if (hp != NULL) {
       if (hp->h_length) {
-        SOCaddr_copyaddr(*server, server_size, hp->h_addr_list[0],
-          hp->h_length);
+        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
         return 1;
       }
     }
@@ -187,7 +186,7 @@ static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
     if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
       if (res) {
         if ((res->ai_addr) && (res->ai_addrlen)) {
-          SOCaddr_copyaddr(*server, server_size, res->ai_addr, res->ai_addrlen);
+          SOCaddr_copyaddr2(*server, res->ai_addr, res->ai_addrlen);
           freeaddrinfo(res);
           return 1;
         }
@@ -204,7 +203,7 @@ static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
 static int my_getlocalhost(char *h_loc, size_t size) {
   SOCaddr addr;
   strcpy(h_loc, "localhost");
-  if (gethost(h_loc, &addr, sizeof(addr)) == 1) {
+  if (gethost(h_loc, &addr) == 1) {
     return 0;
   }
   // come on ...
@@ -220,7 +219,7 @@ static int my_gethostname(char *h_loc, size_t size) {
   h_loc[0] = '\0';
   if (gethostname(h_loc, (int) size) == 0) {    // host name
     SOCaddr addr;
-    if (gethost(h_loc, &addr, sizeof(addr)) == 1) {
+    if (gethost(h_loc, &addr) == 1) {
       return 0;
     } else {
       return my_getlocalhost(h_loc, size);
@@ -247,54 +246,16 @@ T_SOC smallserver_init(int *port, char *adr) {
 
   if (my_gethostname(h_loc, 256) == 0) {   // host name
     SOCaddr server;
-    int server_size = sizeof(server);
 
-    /*t_hostent* hp_loc;
-       t_fullhostent buffer; */
-
-    // effacer structure
-    memset(&server, 0, sizeof(server));
-
-                                                                /*if ( (hp_loc=vxgethostbyname(h_loc, &buffer)) ) */
-    {
-      // copie adresse
-      // NO (bind all)
-      // SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0], hp_loc->h_length);
-
-      SOCaddr_initany(server, server_size);
-      if ((soc =
-           (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
-                          0)) != INVALID_SOCKET) {
-        SOCaddr_initport(server, *port);
-        if (bind(soc, (struct sockaddr *) &server, server_size) == 0) {
-          /*SOClen len;
-             SOCaddr server2;
-             len=sizeof(server2); */
-          // effacer structure
-          /*memset(&server2, 0, sizeof(server2));
-             if (getsockname(soc,(struct sockaddr*) &server2,&len) == 0) {
-             *port=ntohs(SOCaddr_sinport(server));  // récupérer port */
-          if (listen(soc, 10) >= 0) {   // au pif le 10
-            // SOCaddr_inetntoa(adr, 128, server2, len);
-            strcpy(adr, h_loc);
-          } else {
-#ifdef _WIN32
-            closesocket(soc);
-#else
-            close(soc);
-#endif
-            soc = INVALID_SOCKET;
-          }
-
-          /*} else {
-             #ifdef _WIN32
-             closesocket(soc);
-             #else
-             close(soc);
-             #endif
-             soc=INVALID_SOCKET;
-             } */
-
+    SOCaddr_initany(server);
+    if ((soc =
+         (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
+                        0)) != INVALID_SOCKET) {
+      SOCaddr_initport(server, *port);
+      if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
+        if (listen(soc, 1) >= 0) {
+          // SOCaddr_inetntoa(adr, 128, server2);
+          strcpy(adr, h_loc);
         } else {
 #ifdef _WIN32
           closesocket(soc);
@@ -303,6 +264,13 @@ T_SOC smallserver_init(int *port, char *adr) {
 #endif
           soc = INVALID_SOCKET;
         }
+      } else {
+#ifdef _WIN32
+        closesocket(soc);
+#else
+        close(soc);
+#endif
+        soc = INVALID_SOCKET;
       }
     }
   }
@@ -1848,7 +1816,7 @@ static int check_readinput(htsblk * r) {
     FD_SET(r->soc, &fds);
     tv.tv_sec = 0;
     tv.tv_usec = 0;
-    select(r->soc + 1, &fds, NULL, NULL, &tv);
+    select((int) r->soc + 1, &fds, NULL, NULL, &tv);
     if (FD_ISSET(r->soc, &fds))
       return 1;
     else

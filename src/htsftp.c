@@ -147,7 +147,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   int timeout_onfly = 8;        // attente réponse supplémentaire
   int transfer_list = 0;        // directory
   int rest_understood = 0;      // rest command understood
-  t_fullhostent fullhostent_buffer;     // buffer pour resolver
 
   //
   T_SOC soc_ctl = INVALID_SOCKET;
@@ -249,8 +248,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   // connexion
   {
     SOCaddr server;
-    int server_size = sizeof(server);
-    t_hostent *hp;
     char *a;
     char _adr[256];
     const char *error = "unknown error";
@@ -270,8 +267,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
-    hp = hts_gethostbyname2(opt, _adr, &fullhostent_buffer, &error);
-    if (hp == NULL) {
+    if (hts_dns_resolve2(opt, _adr, &server, &error) == NULL) {
       snprintf(back->r.msg, sizeof(back->r.msg),
                "Unable to get server's address: %s", error);
       // back->status=STATUS_FTP_READY;    // fini
@@ -280,12 +276,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     }
     _CHECK_HALT_FTP;
 
-    // copie adresse
-    SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0], hp->h_length);
     // copie adresse pour cnx data
-    SOCaddr_copyaddr(server_data, server_data_size, hp->h_addr_list[0],
-                     hp->h_length);
-    // memcpy(&server.sin_addr, hp->h_addr, hp->h_length);
+    SOCaddr_copy_SOCaddr(server_data, server);
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
     soc_ctl = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
@@ -302,12 +294,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // connexion (bloquante, on est en thread)
     strcpybuff(back->info, "connect");
 
-#ifdef _WIN32
-    if (connect(soc_ctl, (const struct sockaddr FAR *) &server, server_size) !=
-        0) {
-#else
-    if (connect(soc_ctl, (struct sockaddr *) &server, server_size) == -1) {
-#endif
+    if (connect(soc_ctl, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
       strcpybuff(back->r.msg, "Unable to connect to the server");
       // back->status=STATUS_FTP_READY;    // fini
       back->r.statuscode = STATUSCODE_INVALID;
@@ -419,7 +406,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Pré-REST
         //
 #if FTP_PASV
-        if (SOCaddr_getproto(server, server_size) == '1') {
+        if (SOCaddr_getproto(server) == '1') {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "PASV");
           send_line(soc_ctl, line);
@@ -581,7 +568,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         if (port_pasv) {
           SOCaddr server;
           int server_size = sizeof(server);
-          t_hostent *hp;
           const char *error = "unknown error";
 
           // effacer structure
@@ -592,16 +578,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
           // résoudre
           if (adr_ip[0]) {
-            hp = hts_gethostbyname2(opt, adr_ip, &fullhostent_buffer, &error);
-            if (hp) {
-              SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0],
-                               hp->h_length);
-            } else {
-              server_size = 0;
-            }
+            hts_dns_resolve2(opt, adr_ip, &server, &error);
           } else {
-            memcpy(&server, &server_data, sizeof(server_data));
-            server_size = server_data_size;
+            SOCaddr_copy_SOCaddr(server, server_data);
           }
 
           // infos
@@ -615,15 +594,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             if (soc_dat != INVALID_SOCKET) {
               // structure: connexion au domaine internet, port 80 (ou autre)
               SOCaddr_initport(server, port_pasv);
-              // server.sin_port = htons((unsigned short int) port_pasv);
-#ifdef _WIN32
-              if (connect
-                  (soc_dat, (const struct sockaddr FAR *) &server,
-                   server_size) == 0) {
-#else
-              if (connect(soc_dat, (struct sockaddr *) &server, server_size) !=
-                  -1) {
-#endif
+              if (connect(soc_dat, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
                 strcpybuff(back->info, "retr");
                 strcpybuff(line, line_retr);
                 send_line(soc_ctl, line);
@@ -856,33 +827,19 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
   to_send[0] = '\0';
   if (gethostname(h_loc, 256) == 0) {   // host name
     SOCaddr server;
-    int server_size = sizeof(server);
-    t_hostent *hp_loc;
-    t_fullhostent buffer;
 
-    // effacer structure
-    memset(&server, 0, sizeof(server));
-
-    if ((hp_loc = vxgethostbyname(h_loc, &buffer))) {   // notre host
-
-      // copie adresse
-      SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0],
-                       hp_loc->h_length);
-
+    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) {   // notre host
       if ((soc =
            (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
                           0)) != INVALID_SOCKET) {
 
-        if (bind(soc, (struct sockaddr *) &server, server_size) == 0) {
+        if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
           SOCaddr server2;
-          SOClen len;
+          SOClen len = SOCaddr_capacity(server2);
 
-          len = sizeof(server2);
-          // effacer structure
-          memset(&server2, 0, sizeof(server2));
-          if (getsockname(soc, (struct sockaddr *) &server2, &len) == 0) {
+          if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
             // *port=ntohs(server.sin_port);  // récupérer port
-            if (listen(soc, 10) >= 0) { // au pif le 10
+            if (listen(soc, 1) >= 0) {
 #if HTS_INET6==0
               unsigned short int a, n1, n2;
 
@@ -895,7 +852,7 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
                 char dot[256 + 2];
                 char *a;
 
-                SOCaddr_inetntoa(dot, 256, server2, sizeof(server2));
+                SOCaddr_inetntoa(dot, 256, server2);
                 //
                 dots[0] = '\0';
                 strncatbuff(dots, dot, 128);
@@ -913,9 +870,9 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
               {
                 char dot[256 + 2];
 
-                SOCaddr_inetntoa(dot, 256, server2, len);
+                SOCaddr_inetntoa(dot, 256, server2);
                 snprintf(to_send, to_send_size, "EPRT |%c|%s|%d|",
-                         SOCaddr_getproto(server2, len), dot,
+                         SOCaddr_getproto(server2), dot,
                          SOCaddr_sinport(server2));
               }
 #endif
@@ -1093,7 +1050,7 @@ int check_socket(T_SOC soc) {
   tv.tv_sec = 0;
   tv.tv_usec = 0;
   // poll!     
-  select(soc + 1, &fds, NULL, &fds_e, &tv);
+  select((int) soc + 1, &fds, NULL, &fds_e, &tv);
   if (FD_ISSET(soc, &fds_e)) {  // error detected
     return -1;
   } else if (FD_ISSET(soc, &fds)) {
@@ -1116,7 +1073,7 @@ int check_socket_connect(T_SOC soc) {
   tv.tv_sec = 0;
   tv.tv_usec = 0;
   // poll!     
-  select(soc + 1, NULL, &fds, &fds_e, &tv);
+  select((int) soc + 1, NULL, &fds, &fds_e, &tv);
   if (FD_ISSET(soc, &fds_e)) {  // error detected
     return -1;
   } else if (FD_ISSET(soc, &fds)) {

@@ -2126,27 +2126,16 @@ htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc) {
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
 T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
               int waitconnect) {
-  t_fullhostent fullhostent_buffer;     // buffer pour resolver
   T_SOC soc;                    // descipteur de la socket
-  char *iadr;
 
-  // unsigned short int port;
-
-  // si iadr="#" alors c'est une fausse URL, mais un vrai fichier
-  // local.
-  // utile pour les tests!
-  //## if (iadr[0]!=lOCAL_CHAR) {
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
-    int server_size = sizeof(server);
-    t_hostent *hp;
     const char *error = "unknown error";
 
-    // effacer structure
-    memset(&server, 0, sizeof(server));
-
     // tester un éventuel id:pass et virer id:pass@ si détecté
-    iadr = jump_identification(_iadr);
+    const char *const iadr = jump_identification(_iadr);
+
+    SOCaddr_clear(server);
 
 #if HDEBUG
     printf("gethostbyname\n");
@@ -2164,7 +2153,8 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #else
       port = 80;                // port par défaut
 #endif
-      if (a) {
+
+      if (a != NULL) {
         char BIGSTK iadr2[HTS_URLMAXSIZE * 2];
         int i = -1;
 
@@ -2173,25 +2163,24 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
         if (i != -1) {
           port = (unsigned short int) i;
         }
+
         // adresse véritable (sans :xx)
         strncatbuff(iadr2, iadr, (int) (a - iadr));
 
         // adresse sans le :xx
-        hp = hts_gethostbyname2(opt, iadr2, &fullhostent_buffer, &error);
+        hts_dns_resolve2(opt, iadr2, &server, &error);
 
       } else {
 
         // adresse normale (port par défaut par la suite)
-        hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
+        hts_dns_resolve2(opt, iadr, &server, &error);
       }
 
-    } else                      // port défini
-      hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
+    } else {                    // port défini
+      hts_dns_resolve2(opt, iadr, &server, &error);
+    }
 
-    // Conversion iadr -> adresse
-    // structure recevant le nom de l'hôte, etc
-    //struct    hostent         *hp;
-    if (hp == NULL) {
+    if (!SOCaddr_is_valid(server)) {
 #if DEBUG
       printf("erreur gethostbyname\n");
 #endif
@@ -2206,13 +2195,10 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
       }
       return INVALID_SOCKET;
     }
-    // copie adresse
-    SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0], hp->h_length);
+
     // make a copy for external clients
-    retour->address_size = sizeof(retour->address);
-    SOCaddr_copyaddr(retour->address, retour->address_size, hp->h_addr_list[0],
-                     hp->h_length);
-    // memcpy(&SOCaddr_sinaddr(server), hp->h_addr_list[0], hp->h_length);
+    SOCaddr_copy_SOCaddr(retour->address, server);
+    retour->address_size = SOCaddr_size(retour->address);
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
 #if HDEBUG
@@ -2246,14 +2232,13 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     }
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
-      t_fullhostent bind_buffer;
       const char *error = "unknown error";
+      SOCaddr bind_addr;
 
-      hp = hts_gethostbyname2(opt, retour->req.proxy.bindhost, &bind_buffer,
-                              &error);
-      if (hp == NULL
-          || bind(soc, (struct sockaddr *) hp->h_addr_list[0],
-                  hp->h_length) != 0) {
+      if (hts_dns_resolve2(opt, retour->req.proxy.bindhost,
+                             &bind_addr, &error) == NULL
+          || bind(soc, &SOCaddr_sockaddr(bind_addr), 
+                  SOCaddr_size(bind_addr)) != 0) {
         if (retour && retour->msg) {
 #ifdef _WIN32
           snprintf(retour->msg, sizeof(retour->msg),
@@ -2305,25 +2290,20 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("connect\n");
 #endif
-#ifdef _WIN32
-    if (connect(soc, (const struct sockaddr FAR *) &server, server_size) != 0) {
-#else
-    if (connect(soc, (struct sockaddr *) &server, server_size) == -1) {
-#endif
-
+    if (connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
       // bloquant
       if (waitconnect) {
 #if HDEBUG
         printf("unable to connect!\n");
 #endif
-        if (retour && retour->msg) {
+        if (retour != NULL && retour->msg) {
 #ifdef _WIN32
-          int last_errno = WSAGetLastError();
+          const int last_errno = WSAGetLastError();
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
                   strerror(last_errno));
 #else
-          int last_errno = errno;
+          const int last_errno = errno;
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
                   strerror(last_errno));
@@ -2991,7 +2971,7 @@ int sendc(htsblk * r, const char *s) {
 }
 
 // Remplace read
-int finput(int fd, char *s, int max) {
+int finput(T_SOC fd, char *s, int max) {
   char c;
   int j = 0;
 
@@ -4568,7 +4548,6 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // -- Gestion cache DNS --
 // 'RX98
-#if HTS_DNSCACHE
 
 // 'capsule' contenant uniquement le cache
 t_dnscache *_hts_cache(httrackp * opt) {
@@ -4602,63 +4581,47 @@ void hts_cache_free(t_dnscache *const root) {
 // routine pour le cache - retour optionnel à donner à chaque fois
 // NULL: nom non encore testé dans le cache
 // si h_length==0 alors le nom n'existe pas dans le dns
-static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_hostent *retour) {
+static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCaddr *const addr) {
+  assertf(addr != NULL);
   for(; cache != NULL; cache = cache->n) {
     assertf(cache != NULL);
     assertf(iadr != NULL);
     if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
-        if (retour->h_addr_list[0])
-          memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
-        retour->h_length = cache->host_length;
+        SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
+        return addr;
       } else if (cache->host_length == 0) {     // en cours
         return NULL;
       } else {                  // erreur dans le dns, déja vérifié
-        if (retour->h_addr_list[0])
-          retour->h_addr_list[0][0] = '\0';
-        retour->h_length = 0;   // erreur, n'existe pas
+        SOCaddr_clear(*addr);
+        return addr;
       }
-      return retour;
     }
   }
   return NULL;
 }
 
-static t_hostent *vxgethostbyname2_(const char *const hostname,
-                                    void *const v_buffer, const char **error) {
-  t_fullhostent *buffer = (t_fullhostent *) v_buffer;
-
-  /* Clear */
-  fullhostent_init(buffer);
-
+static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
+                                          SOCaddr *const addr, 
+                                          const char **error) {
   {
 #if HTS_INET6==0
-    /*
-       ipV4 resolver
-     */
-    t_hostent *hp = gethostbyname(hostname);
+    /* IPv4 resolver */
+    struct hostent *const hp = gethostbyname(hostname);
 
     if (hp != NULL) {
-      if ((hp->h_length)
-          && (((unsigned int) hp->h_length) <= buffer->addr_maxlen)) {
-        memcpy(buffer->hp.h_addr_list[0], hp->h_addr_list[0], hp->h_length);
-        buffer->hp.h_length = hp->h_length;
-        return &(buffer->hp);
-      }
+      SOCaddr_copyaddr2(addr, hp->h_addr_list[0], hp->h_length);
+      return SOCaddr_is_valid(addr) ? &addr : NULL;
+    } else {
+      SOCaddr_clear(*addr);
     }
 #else
-    /*
-       ipV6 resolver
-     */
-    /*
-       int error_num=0;
-       t_hostent* hp=getipnodebyname(hostname, AF_INET6, AI_DEFAULT, &error_num);
-       oops, deprecated :(
-     */
+    /* IPv6 resolver */
     struct addrinfo *res = NULL;
     struct addrinfo hints;
     int gerr;
 
+    SOCaddr_clear(*addr);
     memset(&hints, 0, sizeof(hints));
     if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
       hints.ai_family = PF_INET;
@@ -4669,13 +4632,9 @@ static t_hostent *vxgethostbyname2_(const char *const hostname,
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     if ( ( gerr = getaddrinfo(hostname, NULL, &hints, &res) ) == 0) {
-      if (res) {
-        if ((res->ai_addr) && (res->ai_addrlen)
-            && (res->ai_addrlen <= buffer->addr_maxlen)) {
-          memcpy(buffer->hp.h_addr_list[0], res->ai_addr, res->ai_addrlen);
-          buffer->hp.h_length = (short) res->ai_addrlen;
-          freeaddrinfo(res);
-          return &(buffer->hp);
+      if (res != NULL) {
+        if (res->ai_addr != NULL && res->ai_addrlen != 0) {
+          SOCaddr_copyaddr2(*addr, res->ai_addr, res->ai_addrlen);
         }
       }
     } else {
@@ -4688,11 +4647,12 @@ static t_hostent *vxgethostbyname2_(const char *const hostname,
     }
 #endif
   }
-  return NULL;
+
+  return SOCaddr_is_valid(*addr) ? addr : NULL;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, 
-                                       void *const v_buffer, const char **error) {
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
+                                     SOCaddr *const addr, const char **error) {
   /* Protection */
   if (!strnotempty(hostname)) {
     return NULL;
@@ -4703,43 +4663,40 @@ HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname,
      The resolver doesn't seem to handle IP6 addresses in brackets
    */
   if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
-    t_hostent *ret;
+    SOCaddr *ret;
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
     assertf(copy != NULL);
     copy[0] = '\0';
     strncat(copy, hostname + 1, size - 2);
-    ret =  vxgethostbyname2_(copy, v_buffer, error);
+    ret =  hts_dns_resolve_nocache2_(copy, addr, error);
     freet(copy);
     return ret;
   } else {
-    return vxgethostbyname2_(hostname, v_buffer, error);
+    return hts_dns_resolve_nocache2_(hostname, addr, error);
   }
 }
 
-HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer) {
-  return vxgethostbyname2(hostname, v_buffer, NULL);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, SOCaddr *const addr) {
+  return hts_dns_resolve_nocache2(hostname, addr, NULL);
 }
 
 HTSEXT_API int check_hostname_dns(const char *const hostname) {
-  t_fullhostent buffer;
-  return vxgethostbyname(hostname, &buffer) != NULL;
+  SOCaddr buffer;
+  return hts_dns_resolve_nocache(hostname, &buffer) != NULL;
 }
 
 // Needs locking
 // cache dns interne à HTS // ** FREE A FAIRE sur la chaine
-static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
+static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
+                                   SOCaddr *const addr, const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
-  t_fullhostent *buffer = (t_fullhostent *) v_buffer;
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
-  t_hostent *hp;
+  SOCaddr *sa;
 
   assertf(opt != NULL);
   assertf(_iadr != NULL);
-  assertf(v_buffer != NULL);
-
-  /* Clear */
-  fullhostent_init(buffer);
+  assertf(addr != NULL);
 
   strcpybuff(iadr, jump_identification(_iadr));
   // couper éventuel :
@@ -4751,91 +4708,55 @@ static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_
   }
 
   /* get IP from the dns cache */
-  hp = hts_ghbn(cache, iadr, &buffer->hp);
-  if (hp) {
-    if (hp->h_length > 0)
-      return hp;
-    else
-      return NULL;              // entrée erronée (erreur DNS) dans le DNS
+  sa = hts_ghbn(cache, iadr, addr);
+  if (sa != NULL) {
+    return SOCaddr_is_valid(*sa) ? sa : NULL;
   } else {                      // non présent dans le cache dns, tester
     // find queue
     for(; cache->n != NULL; cache = cache->n) ;
 
-#if HTS_WIDE_DEBUG
-    DEBUG_W("gethostbyname\n");
-#endif
-#if HDEBUG
-    printf("gethostbyname (not in cache)\n");
-#endif
-    {
-      unsigned long inetaddr;
-
-#ifdef _WIN32
-      if ((inetaddr = inet_addr(iadr)) == INADDR_NONE) {
-#else
-      if ((inetaddr = inet_addr(iadr)) == (in_addr_t) - 1) {
-#endif
 #if DEBUGDNS
-        printf("resolving (not cached) %s\n", iadr);
+    printf("resolving (not cached) %s\n", iadr);
 #endif
-        hp = vxgethostbyname2(iadr, buffer, error);     // calculer IP host
-      } else {                  // numérique, convertir sans passer par le dns
-        buffer->hp.h_addr_list[0] = (char *) &inetaddr;
-        buffer->hp.h_length = 4;
-        hp = &buffer->hp;
-      }
-    }
+
+    sa = hts_dns_resolve_nocache2(iadr, addr, error);     // calculer IP host
+
 #if HTS_WIDE_DEBUG
     DEBUG_W("gethostbyname done\n");
 #endif
+
+    /* attempt to store new entry */
     cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
     if (cache->n != NULL) {
       strcpybuff(cache->n->iadr, iadr);
-      if (hp != NULL) {
-        memcpy(cache->n->host_addr, hp->h_addr_list[0], hp->h_length);
-        cache->n->host_length = hp->h_length;
+      if (sa != NULL) {
+        cache->n->host_length = SOCaddr_size(*sa);
+        assertf(cache->n->host_length < sizeof(cache->n->host_addr));
+        memcpy(cache->n->host_addr, &SOCaddr_sockaddr(*sa), cache->n->host_length);
       } else {
         cache->n->host_addr[0] = '\0';
         cache->n->host_length = 0;      // non existant dans le dns
       }
       cache->n->n = NULL;
-      return hp;
-    } else {                    // on peut pas noter, mais on peut renvoyer le résultat
-      return hp;
+      return sa;
     }
+
+    /* return result if any */
+    return sa;
   }                             // retour hp du cache
 }
 
-t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
-  t_hostent *ret;
+SOCaddr* hts_dns_resolve2(httrackp * opt, const char *_iadr, SOCaddr *const addr, const char **error) {
+  SOCaddr *ret;
   hts_mutexlock(&opt->state.lock);
-  ret = hts_gethostbyname_(opt, _iadr, v_buffer, error);
+  ret = hts_dns_resolve_(opt, _iadr, addr, error);
   hts_mutexrelease(&opt->state.lock);
   return ret;
 }
 
-t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) {
-  return hts_gethostbyname2(opt ,_iadr, v_buffer, NULL);
+SOCaddr* hts_dns_resolve(httrackp * opt, const char *_iadr, SOCaddr *const addr) {
+  return hts_dns_resolve2(opt, _iadr, addr, NULL);
 }
-
-#else
-static HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, char *iadr,
-                                               t_fullhostent * buffer) {
-  t_hostent *retour;
-
-#if HTS_WIDE_DEBUG
-  DEBUG_W("gethostbyname (2)\n");
-#endif
-#if DEBUGDNS
-  printf("blocking method gethostbyname() in progress for %s\n", iadr);
-#endif
-  retour = vxgethostbyname(jump_identification(iadr),);
-#if HTS_WIDE_DEBUG
-  DEBUG_W("gethostbyname (2) done\n");
-#endif
-  return retour;
-}
-#endif
 
 // --- Tracage des mallocs() ---
 #ifdef HTS_TRACE_MALLOC

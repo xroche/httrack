@@ -147,7 +147,7 @@ HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
     FD_SET(soc, &fds);
     tv.tv_sec = timeout;
     tv.tv_usec = 0;
-    select(soc + 1, &fds, NULL, NULL, &tv);
+    select((int) soc + 1, &fds, NULL, NULL, &tv);
     if (FD_ISSET(soc, &fds))
       return 1;
     else
