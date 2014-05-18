@@ -135,10 +135,20 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
   }
 }
 
+static HTS_INLINE HTS_UNUSED void SOCaddr_clear_(SOCaddr*const addr,
+                                                 const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
+  addr->m_addr.sa.sa_family = AF_UNSPEC;
+}
+
 /* Ipv4/6 structure members */
 #define SOCaddr_sinfamily(server)   ((server).m_addr.sa.sa_family)
 #define SOCaddr_sinport(server)     (*SOCaddr_sinport_(&(server), __FILE__, __LINE__))
-#define SOCaddr_size(server)        (*SOCaddr_size_(&(server, __FILE__, __LINE__)))
+#define SOCaddr_size(server)        (SOCaddr_size_(&(server), __FILE__, __LINE__))
+#define SOCaddr_is_valid(server)    (SOCaddr_size_(&(server), __FILE__, __LINE__) != 0 )
+#define SOCaddr_clear(server)       SOCaddr_clear_(&(server), __FILE__, __LINE__)
+#define SOCaddr_sockaddr(server)    ((server).m_addr.sa)
+#define SOCaddr_capacity(server)    sizeof((server).m_addr)
 
 /* AF_xx */
 #if HTS_INET6 != 0
@@ -160,8 +170,8 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
   return SOCaddr_size_(addr, file, line);
 }
 
-#define SOCaddr_initany(server, server_len) do { \
-  server_len = (int) SOCaddr_initany_(&(server), __FILE__, __LINE__); \
+#define SOCaddr_initany(server) do { \
+  SOCaddr_initany_(&(server), __FILE__, __LINE__); \
 } while(0)
 
 /*
@@ -203,6 +213,14 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server,
   server_len = (int) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
 } while(0)
 
+#define SOCaddr_copyaddr2(server, hpaddr, hpsize) do { \
+  (void) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
+} while(0)
+
+#define SOCaddr_copy_SOCaddr(dest, src) do { \
+  SOCaddr_copyaddr_(&(dest), &(src).m_addr.sa, SOCaddr_size(src), __FILE__, __LINE__); \
+} while(0)
+
 /* Get dotted address */
 
 static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen, 
@@ -225,34 +243,13 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
   }
 }
 
-#define SOCaddr_inetntoa(namebuf, namebuflen, ss, sslen) \
+#define SOCaddr_inetntoa(namebuf, namebuflen, ss) \
   SOCaddr_inetntoa_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
 /* Get protocol ID */
-#define SOCaddr_getproto(ss, sslen) ( (sslen) == sizeof(struct sockaddr_in) ? '1' : '2')
+#define SOCaddr_getproto(ss) ( SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')
 
 /* Socket length type */
 typedef socklen_t SOClen;
-
-/* Buffer structure to copy various hostent structures */
-#ifndef HTS_DEF_FWSTRUCT_t_fullhostent
-#define HTS_DEF_FWSTRUCT_t_fullhostent
-typedef struct t_fullhostent t_fullhostent;
-#endif
-struct t_fullhostent {
-  t_hostent hp;
-  char *list[2];
-  char addr[HTS_MAXADDRLEN];    /* various struct sockaddr structures */
-  unsigned int addr_maxlen;
-};
-
-/* Initialize a t_fullhostent structure */
-#define fullhostent_init(h) do { \
-memset((h), 0, sizeof(t_fullhostent)); \
-(h)->hp.h_addr_list = (char **) & ((h)->list); \
-(h)->list[0] = (char *) & ((h)->addr); \
-(h)->list[1] = NULL; \
-(h)->addr_maxlen = HTS_MAXADDRLEN; \
-} while(0)
 
 #endif

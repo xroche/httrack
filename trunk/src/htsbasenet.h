@@ -54,12 +54,9 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-typedef struct hostent FAR t_hostent;
-
 #else
 #define HTS_USESCOPEID
 #define INVALID_SOCKET -1
-typedef struct hostent t_hostent;
 #endif
 
 #if HTS_USEOPENSSL

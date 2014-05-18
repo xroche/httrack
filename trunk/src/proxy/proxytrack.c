@@ -226,18 +226,17 @@ static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   return -1;
 }
 
-static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
+static int gethost(const char *hostname, SOCaddr * server) {
   if (hostname != NULL && *hostname != '\0') {
 #if HTS_INET6==0
     /*
        ipV4 resolver
      */
-    t_hostent *hp = gethostbyname(hostname);
+    struct hostent *hp = gethostbyname(hostname);
 
     if (hp != NULL) {
       if (hp->h_length) {
-        SOCaddr_copyaddr(*server, server_size, hp->h_addr_list[0],
-                         hp->h_length);
+        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
         return 1;
       }
     }
@@ -256,13 +255,13 @@ static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
       hints.ai_family = PF_INET6;
     else
 #endif
-      hints.ai_family = PF_UNSPEC;
+    hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
       if (res) {
         if ((res->ai_addr) && (res->ai_addrlen)) {
-          SOCaddr_copyaddr(*server, server_size, res->ai_addr, res->ai_addrlen);
+          SOCaddr_copyaddr2(*server, res->ai_addr, res->ai_addrlen);
           freeaddrinfo(res);
           return 1;
         }
@@ -276,7 +275,7 @@ static int gethost(const char *hostname, SOCaddr * server, size_t server_size) {
   return 0;
 }
 
-static String getip(SOCaddr * server, int serverLen) {
+static String getip(SOCaddr * server) {
   String s = STRING_EMPTY;
 
 #if HTS_INET6==0
@@ -291,7 +290,7 @@ static String getip(SOCaddr * server, int serverLen) {
     proxytrack_print_log(CRITICAL, "memory exhausted");
     return s;
   }
-  SOCaddr_inetntoa(dotted, sizeMax, *server, serverLen);
+  SOCaddr_inetntoa(dotted, sizeMax, *server);
   sprintf(dotted + strlen(dotted), ":%d", port);
   StringAttach(&s, &dotted);
   return s;
@@ -299,18 +298,15 @@ static String getip(SOCaddr * server, int serverLen) {
 
 static T_SOC smallserver_init(const char *adr, int port, int family) {
   SOCaddr server;
-  size_t server_size = sizeof(server);
-
-  memset(&server, 0, sizeof(server));
-  SOCaddr_initany(server, server_size);
-  if (gethost(adr, &server, server_size)) {     // host name
+  SOCaddr_initany(server);
+  if (gethost(adr, &server)) {     // host name
     T_SOC soc = INVALID_SOCKET;
 
     if ((soc =
          (T_SOC) socket(SOCaddr_sinfamily(server), family,
                         0)) != INVALID_SOCKET) {
       SOCaddr_initport(server, port);
-      if (bind(soc, (struct sockaddr *) &server, (int) server_size) == 0) {
+      if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
         if (family != SOCK_STREAM || listen(soc, 10) >= 0) {
           return soc;
         } else {
@@ -1320,12 +1316,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       /* */
       String ip = STRING_EMPTY;
       SOCaddr serverClient;
-      SOClen lenServerClient = (int) sizeof(serverClient);
+      SOClen lenServerClient = SOCaddr_capacity(serverClient);
 
       memset(&serverClient, 0, sizeof(serverClient));
       if (getsockname
-          (soc_c, (struct sockaddr *) &serverClient, &lenServerClient) == 0) {
-        ip = getip(&serverClient, lenServerClient);
+          (soc_c, &SOCaddr_sockaddr(serverClient), &lenServerClient) == 0) {
+        ip = getip(&serverClient);
       } else {
         StringCopy(ip, "unknown");
       }
@@ -1571,14 +1567,14 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
     return -1;
   }
   while(soc != INVALID_SOCKET) {
-    struct sockaddr clientAddr;
-    SOClen clientAddrLen = sizeof(struct sockaddr);
+    SOCaddr clientAddr;
+    SOClen clientAddrLen = SOCaddr_capacity(clientAddr);
     int n;
 
     memset(&clientAddr, 0, sizeof(clientAddr));
-    n =
-      recvfrom(soc, (char *) buffer, bufferSize, 0, &clientAddr,
-               &clientAddrLen);
+    n = recvfrom(soc, (char *) buffer, bufferSize, 0, 
+                 &SOCaddr_sockaddr(clientAddr),
+                 &clientAddrLen);
     if (n != -1) {
       const char *LogRequest = "ERROR";
       const char *LogReply = "ERROR";
@@ -1621,11 +1617,11 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                   UrlRequestSize = (unsigned int) strlen((char *) UrlRequest);
                   LogRequest = "ICP_OP_QUERY";
                   if (indexes == NULL) {
-                    ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_DENIED,
+                    ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_DENIED,
                               Version, 0, Request_Number, 0, 0, 0, UrlRequest);
                     LogReply = "ICP_OP_DENIED";
                   } else if (PT_LookupIndex(indexes, (char*) UrlRequest)) {
-                    ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_HIT,
+                    ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_HIT,
                               Version, 0, Request_Number, 0, 0, 0, UrlRequest);
                     LogReply = "ICP_OP_HIT";
                   } else {
@@ -1637,7 +1633,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                       if (UrlRedirect != NULL) {
                         sprintf(UrlRedirect, "%s/", UrlRequest);
                         if (PT_LookupIndex(indexes, UrlRedirect)) {     /* We'll generate a redirect */
-                          ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_HIT,
+                          ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_HIT,
                                     Version, 0, Request_Number, 0, 0, 0,
                                     UrlRequest);
                           LogReply = "ICP_OP_HIT";
@@ -1648,7 +1644,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                       }
                     }
                     /* We won't retrive the cache MISS online, no way! */
-                    ICP_reply(&clientAddr, clientAddrLen, soc,
+                    ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc,
                               ICP_OP_MISS_NOFETCH, Version, 0, Request_Number,
                               0, 0, 0, UrlRequest);
                     LogReply = "ICP_OP_MISS_NOFETCH";
@@ -1660,24 +1656,24 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                   UrlRequest = &Payload[4];
                   LogRequest = "ICP_OP_QUERY";
                   LogReply = "ICP_OP_QUERY";
-                  ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_SECHO,
+                  ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_SECHO,
                             Version, 0, Request_Number, 0, 0, 0, UrlRequest);
                 }
                 break;
               default:
                 LogRequest = "NOTIMPLEMENTED";
                 LogReply = "ICP_OP_ERR";
-                ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_ERR, Version,
+                ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_ERR, Version,
                           0, Request_Number, 0, 0, 0, NULL);
                 break;
               }
             } else {
-              ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_ERR, 2, 0,
+              ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_ERR, 2, 0,
                         Request_Number, 0, 0, 0, NULL);
             }
           }                     /* Ignored (RFC2186) */
         } else {
-          ICP_reply(&clientAddr, clientAddrLen, soc, ICP_OP_ERR, Version, 0,
+          ICP_reply(&SOCaddr_sockaddr(clientAddr), clientAddrLen, soc, ICP_OP_ERR, Version, 0,
                     Request_Number, 0, 0, 0, NULL);
         }
       }
@@ -1691,7 +1687,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         SOCaddr_copyaddr(serverClient, lenServerClient, &clientAddr,
                          clientAddrLen);
         if (lenServerClient > 0) {
-          ip = getip(&serverClient, lenServerClient);
+          ip = getip(&clientAddr);
         } else {
           StringCopy(ip, "unknown");
         }
