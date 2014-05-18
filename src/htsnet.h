@@ -87,45 +87,58 @@ typedef struct SOCaddr SOCaddr;
 #endif
 struct SOCaddr {
   union {
+    /* Generic version, for network functions such as getnameinfo() */
+    struct sockaddr sa;
+    /* IPv4 */
     struct sockaddr_in in;
 #if HTS_INET6 != 0
+    /* IPv6 */
     struct sockaddr_in6 in6;
 #endif
-    /* For network functions such as getnameinfo */
-    struct sockaddr sa;
   } m_addr;
-  socklen_t size;
 };
 
-static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr) {
-#if HTS_INET6 != 0
-  if (addr->size == sizeof(struct sockaddr_in6)) {
-    return &addr->m_addr.in6.sin6_port;
-  } else {
-#endif
-    assertf(addr->size == sizeof(struct sockaddr_in));
+static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
+                                                         const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
+  switch(addr->m_addr.sa.sa_family) {
+  case AF_INET:
     return &addr->m_addr.in.sin_port;
+    break;
 #if HTS_INET6 != 0
-  }
+  case AF_INET6:
+    return &addr->m_addr.in6.sin6_port;
+    break;
 #endif
+  default:
+    assertf_(! "invalid structure", file, line);
+    return 0;
+    break;
+  }
 }
 
-static HTS_INLINE HTS_UNUSED sa_family_t* SOCaddr_sinfamily_(SOCaddr *const addr) {
+static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
+                                                     const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
+  switch(addr->m_addr.sa.sa_family) {
+  case AF_INET:
+    return sizeof(addr->m_addr.in);
+    break;
 #if HTS_INET6 != 0
-  if (addr->size == sizeof(struct sockaddr_in6)) {
-    return (sa_family_t*) &addr->m_addr.in6.sin6_family;
-  } else {
+  case AF_INET6:
+    return sizeof(addr->m_addr.in6);
+    break;
 #endif
-    assertf(addr->size == sizeof(struct sockaddr_in));
-    return (sa_family_t*) &addr->m_addr.in.sin_family;
-#if HTS_INET6 != 0
+  default:
+    return 0;
+    break;
   }
-#endif
 }
 
 /* Ipv4/6 structure members */
-#define SOCaddr_sinfamily(server)   (*SOCaddr_sinfamily_(&(server)))
-#define SOCaddr_sinport(server)     (*SOCaddr_sinport_(&(server)))
+#define SOCaddr_sinfamily(server)   ((server).m_addr.sa.sa_family)
+#define SOCaddr_sinport(server)     (*SOCaddr_sinport_(&(server), __FILE__, __LINE__))
+#define SOCaddr_size(server)        (*SOCaddr_size_(&(server, __FILE__, __LINE__)))
 
 /* AF_xx */
 #if HTS_INET6 != 0
@@ -139,15 +152,16 @@ static HTS_INLINE HTS_UNUSED sa_family_t* SOCaddr_sinfamily_(SOCaddr *const addr
   SOCaddr_sinport(server) = htons((in_port_t) (port)); \
 } while(0)
 
-static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr) {
-  addr->size = sizeof(struct sockaddr_in);
+static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
+                                                        const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
   memset(&addr->m_addr.in, 0, sizeof(addr->m_addr.in));
   addr->m_addr.in.sin_family = AF_INET;
-  return addr->size;
+  return SOCaddr_size_(addr, file, line);
 }
 
 #define SOCaddr_initany(server, server_len) do { \
-  server_len = (int) SOCaddr_initany_(&(server)); \
+  server_len = (int) SOCaddr_initany_(&(server), __FILE__, __LINE__); \
 } while(0)
 
 /*
@@ -161,30 +175,28 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server,
 
   if (data_size == sizeof(struct sockaddr_in)) {
     memcpy(&server->m_addr.in, data, sizeof(struct sockaddr_in));
-    server->size = sizeof(struct sockaddr_in);
+    assertf_(server->m_addr.sa.sa_family == AF_INET, file, line);
 #if HTS_INET6 != 0
   } else if (data_size == sizeof(struct sockaddr_in6)) {
     memcpy(&server->m_addr.in6, data, sizeof(struct sockaddr_in6));
-    server->size = sizeof(struct sockaddr_in6);
+    assertf_(server->m_addr.sa.sa_family == AF_INET6, file, line);
 #endif
   } else if (data_size == 4) {
     memset(&server->m_addr.in, 0, sizeof(server->m_addr.in));
     server->m_addr.in.sin_family = AF_INET;
     server->m_addr.in.sin_port = 0;
     memcpy(&server->m_addr.in.sin_addr, data, 4);
-    server->size = sizeof(struct sockaddr_in);
 #if HTS_INET6 != 0
   } else if (data_size == 16) {
     memset(&server->m_addr.in6, 0, sizeof(server->m_addr.in6));
     server->m_addr.in6.sin6_family = AF_INET6;
     server->m_addr.in6.sin6_port = 0;
     memcpy(&server->m_addr.in6.sin6_addr, data, 16);
-    server->size = sizeof(struct sockaddr_in6);
 #endif
   } else {
-    server->size = 0;    /* Error */
+    server->m_addr.in.sin_family = AF_INET;
   }
-  return server->size;
+  return SOCaddr_size_(server, file, line);
 }
 
 #define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize) do { \
@@ -198,7 +210,8 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
                                          const char *file, const int line) {
   assertf_(namebuf != NULL, file, line);
   assertf_(ss != NULL, file, line);
-  if (getnameinfo(&ss->m_addr.sa, ss->size,
+
+  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr),
                   namebuf, namebuflen, 
                   NULL, 0, 
                   NI_NUMERICHOST) == 0) {
