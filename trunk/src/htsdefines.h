@@ -232,7 +232,6 @@ struct t_hts_callback_ref {
 };
 
 extern const t_hts_htmlcheck_callbacks default_callbacks;
-extern const t_hts_callback_ref default_callbacks_ref[];
 
 #define HT_PRINT(A) strcatbuff(opt->state.HTbuff,A);
 #define HT_REQUEST_START opt->state.HTbuff[0]='\0';
