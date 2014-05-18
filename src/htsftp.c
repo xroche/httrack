@@ -152,10 +152,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   T_SOC soc_ctl = INVALID_SOCKET;
   T_SOC soc_servdat = INVALID_SOCKET;
   T_SOC soc_dat = INVALID_SOCKET;
-
-  //
   SOCaddr server_data;
-  int server_data_size = sizeof(server_data);
 
   //
   line_retr[0] = adr_ip[0] = '\0';
