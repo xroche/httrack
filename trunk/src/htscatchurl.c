@@ -176,7 +176,7 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
         char dot[256 + 2];
 
         SOCaddr_inetntoa(dot, 256, server2, sizeof(server2));
-        sprintf(url, "%s:%d", dot, htons(SOCaddr_sinport(server2)));
+        sprintf(url, "%s:%d", dot, ntohs(SOCaddr_sinport(server2)));
       }
     }
     /* INFOS */
