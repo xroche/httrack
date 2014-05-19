@@ -966,23 +966,28 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
             if (HTS_IS_LEADING_UTF8(c)) {
               /* commit sequence ? */
               if (utfSeq != (size_t) -1) {
-                /* unicode character */
-                punycode_uint uc = 0;
 
                 /* Reader: can read bytes up to j */
 #define RD ( utfSeq < j ? segData[utfSeq++] : -1 )
 
                 /* Writer: upon error, return FFFD (replacement character) */
-#define WR(C) uc = C != -1 ? (punycode_uint) C : (punycode_uint) 0xfffd
+#define WR(C) do { \
+  if ((C) != -1) { \
+    /* copy character */ \
+    assertf(segOutputSize < segSize); \
+    segInt[segOutputSize++] = (C); \
+  } \
+  /* In case of error, abort. */ \
+  else { \
+    FREE_BUFFER(); \
+    return NULL; \
+  } \
+} while(0)
 
-                /* Read Unicode character. */
+                /* Read/Write Unicode character. */
                 READ_UNICODE(RD, WR);
 #undef RD
 #undef WR
-
-                /* copy character */
-                assertf(segOutputSize < segSize);
-                segInt[segOutputSize++] = uc;
 
                 /* not anymore in sequence */
                 utfSeq = (size_t) -1;
