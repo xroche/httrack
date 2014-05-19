@@ -150,6 +150,14 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 #define strlcatbuff(A, B, S) \
   strncat_safe_(A, S, B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
+
+/**
+ * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
+ */
+#define strlcpybuff(A, B, S) \
+  strcpy_safe_(A, S, B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
