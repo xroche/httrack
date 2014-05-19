@@ -13,3 +13,9 @@ bash crawl-test.sh \
 	httrack 'http://ut.httrack.com/unicode-links/idna.html' \
 	'+*.ut.httrack.com/*' --robots=0
 
+# unicode tests (bogus links)
+bash crawl-test.sh \
+	--errors 0 --files 1 \
+	--found 'ut.httrack.com/unicode-links/idna_bogus.html' \
+	httrack 'http://ut.httrack.com/unicode-links/idna_bogus.html' \
+	'-*' --robots=0
