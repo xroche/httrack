@@ -119,16 +119,16 @@ HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
 /* Language files */
-HTS_UNUSED static int htslang_load(char *limit_to, char *apppath);
-HTS_UNUSED static void conv_printf(char *from, char *to);
+HTS_UNUSED static int htslang_load(char *limit_to, const char *apppath);
+HTS_UNUSED static void conv_printf(const char *from, char *to);
 HTS_UNUSED static void LANG_DELETE(void);
-HTS_UNUSED static void LANG_INIT(char *path);
-HTS_UNUSED static int LANG_T(char *path, int l);
+HTS_UNUSED static void LANG_INIT(const char *path);
+HTS_UNUSED static int LANG_T(const char *path, int l);
 HTS_UNUSED static int QLANG_T(int l);
-HTS_UNUSED static char *LANGSEL(char *name);
-HTS_UNUSED static char *LANGINTKEY(char *name);
-HTS_UNUSED static int LANG_SEARCH(char *path, char *iso);
-HTS_UNUSED static int LANG_LIST(char *path, char *buffer);
+HTS_UNUSED static const char *LANGSEL(const char *name);
+HTS_UNUSED static const char *LANGINTKEY(const char *name);
+HTS_UNUSED static int LANG_SEARCH(const char *path, const char *iso);
+HTS_UNUSED static int LANG_LIST(const char *path, char *buffer, size_t size);
 
 // URL Link catcher
 
@@ -904,7 +904,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       && (n = (pos - str)) && n < 1024) {
                     char name_[1024 + 2];
                     char *name = name_;
-                    char *langstr = NULL;
+                    const char *langstr = NULL;
                     int p;
                     int format = 0;
                     int listDefault = 0;
@@ -1139,8 +1139,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     if (langstr == NULL) {
                       if (strfield2(name, "#iso")) {
                         langstr = line2;
-                        langstr[0] = '\0';
-                        LANG_LIST(path, langstr);
+                        line2[0] = '\0';
+                        LANG_LIST(path, line2, sizeof(line2));
                         assertf(strlen(langstr) < sizeof(line2) - 2);
                       } else {
                         langstr = LANGSEL(name);
@@ -1159,7 +1159,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       switch (format) {
                       case 0:
                         {
-                          char *a = langstr;
+                          const char *a = langstr;
 
                           while(*a) {
                             if (a[0] == '\\' && isxdigit(a[1])
@@ -1205,7 +1205,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       default:
                         if (*langstr) {
                           int id = 1;
-                          char *fstr = langstr;
+                          const char *fstr = langstr;
 
                           StringClear(tmpbuff);
                           if (format == 2) {
@@ -1428,24 +1428,25 @@ int htslang_uninit(void) {
   return 1;
 }
 
-int smallserver_setkey(char *key, char *value) {
+int smallserver_setkey(const char *key, const char *value) {
   return inthash_write(NewLangList, key, (intptr_t) strdup(value));
 }
-int smallserver_setkeyint(char *key, LLint value) {
+
+int smallserver_setkeyint(const char *key, LLint value) {
   char tmp[256];
 
-  sprintf(tmp, LLintP, value);
+  snprintf(tmp, sizeof(tmp), LLintP, value);
   return inthash_write(NewLangList, key, (intptr_t) strdup(tmp));
 }
-int smallserver_setkeyarr(char *key, int id, char *key2, char *value) {
+int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value) {
   char tmp[256];
 
-  sprintf(tmp, "%s%d%s", key, id, key2);
+  snprintf(tmp, sizeof(tmp), "%s%d%s", key, id, key2);
   return inthash_write(NewLangList, tmp, (intptr_t) strdup(value));
 }
 
-static int htslang_load(char *limit_to, char *path) {
-  char *hashname;
+static int htslang_load(char *limit_to, const char *path) {
+  const char *hashname;
   char catbuff[CATBUFF_SIZE];
 
   //
@@ -1479,7 +1480,7 @@ static int htslang_load(char *limit_to, char *path) {
         linput_cpp(fp, intkey, 8000);
         linput_cpp(fp, key, 8000);
         if (strnotempty(intkey) && strnotempty(key)) {
-          char *test = LANGINTKEY(key);
+          const char *test = LANGINTKEY(key);
 
           /* Increment for multiple definitions */
           if (strnotempty(test)) {
@@ -1561,7 +1562,7 @@ static int htslang_load(char *limit_to, char *path) {
           if (strnotempty(extkey) && strnotempty(value)) {
             int len;
             char *buff;
-            char *intkey;
+            const char *intkey;
 
             intkey = LANGINTKEY(extkey);
 
@@ -1569,7 +1570,7 @@ static int htslang_load(char *limit_to, char *path) {
 
               /* Increment for multiple definitions */
               {
-                char *test = LANGSEL(intkey);
+                const char *test = LANGSEL(intkey);
 
                 if (strnotempty(test)) {
                   if (loops == 0) {
@@ -1623,7 +1624,7 @@ static int htslang_load(char *limit_to, char *path) {
 }
 
 /* NOTE : also contains the "webhttrack" hack */
-static void conv_printf(char *from, char *to) {
+static void conv_printf(const char *from, char *to) {
   int i = 0, j = 0, len;
 
   len = (int) strlen(from);
@@ -1697,7 +1698,7 @@ static void LANG_DELETE(void) {
 }
 
 // sélection de la langue
-static void LANG_INIT(char *path) {
+static void LANG_INIT(const char *path) {
   //CWinApp* pApp = AfxGetApp();
   //if (pApp) {
   /* pApp->GetProfileInt("Language","IntId",0); */
@@ -1705,7 +1706,7 @@ static void LANG_INIT(char *path) {
   //}
 }
 
-static int LANG_T(char *path, int l) {
+static int LANG_T(const char *path, int l) {
   if (l >= 0) {
     QLANG_T(l);
     htslang_load(NULL, path);
@@ -1713,7 +1714,7 @@ static int LANG_T(char *path, int l) {
   return QLANG_T(-1);           // 0=default (english)
 }
 
-static int LANG_SEARCH(char *path, char *iso) {
+static int LANG_SEARCH(const char *path, const char *iso) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
@@ -1732,7 +1733,7 @@ static int LANG_SEARCH(char *path, char *iso) {
   return found;
 }
 
-static int LANG_LIST(char *path, char *buffer) {
+static int LANG_LIST(const char *path, char *buffer, size_t size) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
@@ -1740,7 +1741,7 @@ static int LANG_LIST(char *path, char *buffer) {
   buffer[0] = '\0';
   do {
     QLANG_T(i);
-    strcpybuff(lang_str, "LANGUAGE_NAME");
+    strlcpybuff(lang_str, "LANGUAGE_NAME", size);
     htslang_load(lang_str, path);
     if (strlen(lang_str) > 0) {
       if (buffer[0])
@@ -1762,28 +1763,26 @@ static int QLANG_T(int l) {
   return lng;                   // 0=default (english)
 }
 
-static char *LANGSEL(char *name) {
-  intptr_t adr = 0;
-
-  if (NewLangStr)
-    if (!inthash_read(NewLangStr, name, &adr))
-      adr = 0;
-  if (adr) {
-    return (char *) adr;
+const char* LANGSEL(const char* name) {
+  inthash_value value;
+  if (NewLangStr != NULL 
+      && inthash_read_value(NewLangStr, name, &value) != 0
+      && value.ptr != NULL) {
+    return (char*) value.ptr;
+  } else {
+    return "";
   }
-  return "";
 }
 
-static char *LANGINTKEY(char *name) {
-  intptr_t adr = 0;
-
-  if (NewLangStrKeys)
-    if (!inthash_read(NewLangStrKeys, name, &adr))
-      adr = 0;
-  if (adr) {
-    return (char *) adr;
+const char* LANGINTKEY(const char* name) {
+  inthash_value value;
+  if (NewLangStrKeys != NULL
+      && inthash_read_value(NewLangStrKeys, name, &value) != 0
+      && value.ptr != NULL) {
+    return (char*) value.ptr;
+  } else {
+    return "";
   }
-  return "";
 }
 
 /* *** Various functions *** */
