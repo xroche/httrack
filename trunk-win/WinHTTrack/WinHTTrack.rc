@@ -758,8 +758,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,48,8,0
- PRODUCTVERSION 3,48,8,0
+ FILEVERSION 3,48,9,0
+ PRODUCTVERSION 3,48,9,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -777,13 +777,13 @@ BEGIN
             VALUE "Comments", "Website Copier [Offline Browser]"
             VALUE "CompanyName", "HTTrack"
             VALUE "FileDescription", "WinHTTrack Website Copier, Copy Websites to Your Computer"
-            VALUE "FileVersion", "3.48.8"
+            VALUE "FileVersion", "3.48.9"
             VALUE "InternalName", "WinHTTrack"
             VALUE "LegalCopyright", "Copyright (C) Xavier Roche and other contributors"
             VALUE "LegalTrademarks", "This software is covered by the GNU General Public License version 3"
             VALUE "OriginalFilename", "WinHTTrack.exe"
             VALUE "ProductName", "WinHTTrack Website Copier"
-            VALUE "ProductVersion", "3.48-8"
+            VALUE "ProductVersion", "3.48-9"
         END
     END
     BLOCK "VarFileInfo"
