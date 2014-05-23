@@ -257,7 +257,13 @@ Please visit our Website: http://www.httrack.com
 #define HTSEXT_API __declspec(dllimport)
 #endif
 #else
+/* See <http://gcc.gnu.org/wiki/Visibility> */
+#if ( ( defined(__GNUC__) && ( __GNUC__ >= 4 ) ) \
+      || ( defined(HAVE_VISIBILITY) && HAVE_VISIBILITY ) )
+#define HTSEXT_API __attribute__ ((visibility ("default")))
+#else
 #define HTSEXT_API
+#endif
 #endif
 
 #ifndef HTS_LONGLONG
