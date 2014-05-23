@@ -27,6 +27,11 @@ DEFAULT_CFLAGS="-Wall -Wcast-align -Wstrict-prototypes \
 AC_SUBST(DEFAULT_CFLAGS)
 AC_SUBST(VERSION_INFO)
 
+### Check for -fvisibility=hidden support
+gl_VISIBILITY
+AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
+AC_SUBST([AM_CFLAGS])
+
 ### Check for platform
 #case $host in
 #AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
