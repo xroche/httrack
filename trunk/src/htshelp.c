@@ -52,7 +52,7 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 #define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
-void infomsg(char *msg) {
+void infomsg(const char *msg) {
   int l = 0;
   int m = 0;
   int more = 0;
@@ -332,7 +332,7 @@ void help_wizard(httrackp * opt) {
       printf("\n");
 
       // couper en morceaux
-      argv[0] = "winhttrack";
+      argv[0] = strdup("winhttrack");
       argv[1] = cmd;
       argc++;
       while(cmd[i]) {
@@ -364,15 +364,15 @@ void help_wizard(httrackp * opt) {
 #undef str
 #undef argv
 }
-int help_query(char *list, int def) {
+int help_query(const char *list, int def) {
   char s[256];
-  char *a;
+  const char *a;
   int opt;
   int n = 1;
 
   a = list;
   while(strnotempty(a)) {
-    char *b = strchr(a, '|');
+    const char *b = strchr(a, '|');
 
     if (b) {
       char str[256];
@@ -455,7 +455,7 @@ void help_catchurl(const char *dest_path) {
 }
 
 // Créer un index.html vide
-void make_empty_index(char *str) {
+void make_empty_index(const char *str) {
 #if 0
   if (!fexist(fconcat(str, "index.html"))) {
     FILE *fp = fopen(fconcat(str, "index.html"), "wb");
@@ -473,7 +473,7 @@ void make_empty_index(char *str) {
 
 // mini-aide  (h: help)
 //           y
-void help(char *app, int more) {
+void help(const char *app, int more) {
   char info[2048];
 
   infomsg("");

@@ -238,7 +238,7 @@ static void back_launch_cmd(void *pP) {
   commandReturnCmdl = strdup(cmd);
 
   /* split */
-  argv[0] = "webhttrack";
+  argv[0] = strdup("webhttrack");
   argv[1] = cmd;
   argc++;
   i = 0;

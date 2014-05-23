@@ -577,7 +577,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                                 strcpybuff(curr_fil, mov_fil);
                                 stop_looping = 1;
                               } else if (*mov_url) {
-                                char *methode;
+                                const char *methode;
 
                                 if (!get_test_request)
                                   methode = BACK_ADD_TEST;      // tester avec HEAD

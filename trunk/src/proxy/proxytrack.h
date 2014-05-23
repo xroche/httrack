@@ -109,8 +109,8 @@ HTS_UNUSED static void proxytrack_print_log(const char *severity, const char *fo
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
-HTS_UNUSED static char *gethomedir(void) {
-  char *home = getenv("HOME");
+HTS_UNUSED static const char *gethomedir(void) {
+  const char *home = getenv("HOME");
 
   if (home)
     return home;

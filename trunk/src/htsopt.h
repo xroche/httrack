@@ -374,7 +374,7 @@ struct httrackp {
   int maxlink;                  // nombre max de liens
   int maxfilter;                // nombre max de filtres
   //
-  char *exec;                   // adresse du nom de l'éxecutable
+  const char *exec;             // adresse du nom de l'éxecutable
   //
   int quiet;                    // poser des questions autres que wizard?
   int keyboard;                 // vérifier stdin

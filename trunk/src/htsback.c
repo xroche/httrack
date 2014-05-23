@@ -117,7 +117,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 
       while((item = inthash_enum_next(&e))) {
 #ifndef HTS_NO_BACK_ON_DISK
-        char *filename = (char *) item->value.ptr;
+        const char *filename = (char *) item->value.ptr;
 
         if (filename != NULL) {
           (void) UNLINK(filename);
@@ -139,19 +139,19 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 // ---
 // routines de backing
 
-static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
-                            char *fil, char *sav, int getIndex);
-static int back_index_fetch(httrackp * opt, struct_back * sback, char *adr,
-                            char *fil, char *sav, int getIndex);
+static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr,
+                            const char *fil, const char *sav, int getIndex);
+static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr,
+                            const char *fil, const char *sav, int getIndex);
 
 // retourne l'index d'un lien dans un tableau de backing
-int back_index(httrackp * opt, struct_back * sback, char *adr, char *fil,
-               char *sav) {
+int back_index(httrackp * opt, struct_back * sback, const char *adr, const char *fil,
+               const char *sav) {
   return back_index_fetch(opt, sback, adr, fil, sav, 1);
 }
 
-static int back_index_fetch(httrackp * opt, struct_back * sback, char *adr,
-                            char *fil, char *sav, int getIndex) {
+static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr,
+                            const char *fil, const char *sav, int getIndex) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int index = -1;
@@ -177,8 +177,8 @@ static int back_index_fetch(httrackp * opt, struct_back * sback, char *adr,
 }
 
 /* resurrect stored entry */
-static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
-                            char *fil, char *sav, int getIndex) {
+static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr,
+                            const char *fil, const char *sav, int getIndex) {
   lien_back *const back = sback->lnk;
   void *ptr = NULL;
 
@@ -194,7 +194,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, char *adr,
 
 #ifndef HTS_NO_BACK_ON_DISK
       FILE *fp;
-      char *fileback = (char *) ptr;
+      const char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
 
       if ((fp = FOPEN(fconv(catbuff, sizeof(catbuff), fileback), "rb")) != NULL) {
@@ -420,8 +420,8 @@ int back_done_incache(struct_back * sback) {
 }
 
 // le lien a-t-il été mis en backing?
-HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, char *adr,
-                          char *fil, char *sav) {
+HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
+                          const char *fil, const char *sav) {
   return (back_index_fetch(opt, sback, adr, fil, sav, /*don't fetch */ 0) >= 0);
 }
 
@@ -515,7 +515,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         && (back[p].r.statuscode > 0)   // not internal error
       ) {
       if (!back[p].testmode) {  // not test mode
-        char *state = "unknown";
+        const char *state = "unknown";
 
         /* décompression */
 #if HTS_USEZLIB
@@ -980,7 +980,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
 /* serialize a reference ; used to store references of files being downloaded in case of broken download */
 /* Note: NOT utf-8 */
 int back_serialize_ref(httrackp * opt, const lien_back * src) {
-  char *filename =
+  const char *filename =
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
   FILE *fp = fopen(filename, "wb");
 
@@ -1010,9 +1010,9 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
 }
 
 /* unserialize a reference ; used to store references of files being downloaded in case of broken download */
-int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
+int back_unserialize_ref(httrackp * opt, const const char *adr, const const char *fil,
                          lien_back ** dst) {
-  char *filename = url_savename_refname_fullpath(opt, adr, fil);
+  const char *filename = url_savename_refname_fullpath(opt, adr, fil);
   FILE *fp = FOPEN(filename, "rb");
 
   if (fp != NULL) {
@@ -1148,7 +1148,7 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* search for a live position, or, if not possible, try to return a new one */
-int back_searchlive(httrackp * opt, struct_back * sback, char *search_addr) {
+int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
@@ -1400,8 +1400,8 @@ int back_stack_available(struct_back * sback) {
 
 // ajouter un lien en backing
 int back_add_if_not_exists(struct_back * sback, httrackp * opt,
-                           cache_back * cache, char *adr, char *fil, char *save,
-                           char *referer_adr, char *referer_fil, int test) {
+                           cache_back * cache, const char *adr, const char *fil, const char *save,
+                           const char *referer_adr, const char *referer_fil, int test) {
   back_clean(opt, cache, sback);        /* first cleanup the backlog to ensure that we have some entry left */
   if (!back_exist(sback, opt, adr, fil, save)) {
     return back_add(sback, opt, cache, adr, fil, save, referer_adr, referer_fil,
@@ -1410,8 +1410,8 @@ int back_add_if_not_exists(struct_back * sback, httrackp * opt,
   return 0;
 }
 
-int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
-             char *fil, char *save, char *referer_adr, char *referer_fil,
+int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char *adr,
+             const char *fil, const char *save, const char *referer_adr, const char *referer_fil,
              int test) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -1974,7 +1974,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
           printf("ok, dns cache ready..\n");
 #endif
           soc =
-            http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &(back[p].r));
+            http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &back[p].r);
           if (soc == INVALID_SOCKET) {
             back[p].status = STATUS_READY;      // fini, erreur
             back_set_finished(sback, p);

@@ -198,7 +198,7 @@ HTSEXT_API char *jump_normalized(const char *);
 HTSEXT_API char *jump_toport(const char *);
 HTSEXT_API char *fil_normalized(const char *source, char *dest);
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
-HTSEXT_API char *hts_rootdir(char *file);
+HTSEXT_API const char *hts_rootdir(char *file);
 
 /* Escaping URLs */
 HTSEXT_API void unescape_amp(char *s);
@@ -239,7 +239,7 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_dyntype(const char *fil);
-HTSEXT_API char *get_ext(char *catbuff, size_t size, const char *fil);
+HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
 
 /* Ugly string tools */
 HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b);

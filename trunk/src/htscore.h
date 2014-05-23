@@ -329,10 +329,10 @@ int fspc(httrackp * opt, FILE * fp, const char *type);
 char *next_token(char *p, int flag);
 
 //
-char *readfile(char *fil);
-char *readfile2(char *fil, LLint * size);
-char *readfile_utf8(char *fil);
-char *readfile_or(char *fil, char *defaultdata);
+char *readfile(const char *fil);
+char *readfile2(const char *fil, LLint * size);
+char *readfile_utf8(const char *fil);
+char *readfile_or(const char *fil, const char *defaultdata);
 
 #if 0
 void check_rate(TStamp stat_timestart, int maxrate);

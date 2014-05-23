@@ -91,11 +91,11 @@ static int ehexh(char c) {
   return 0;
 }
 
-static int ehex(char *s) {
+static int ehex(const char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-static void unescapehttp(char *s, String * tempo) {
+static void unescapehttp(const char *s, String * tempo) {
   size_t i;
 
   for(i = 0; s[i] != '\0'; i++) {
@@ -708,19 +708,18 @@ HTS_INLINE int rech_sampletag(const char *adr, const char *s) {
 }
 
 // teste si le tag contenu dans from est égal à "tag"
-HTS_INLINE int check_tag(char *from, const char *tag) {
-  char *a = from + 1;
+HTS_INLINE int check_tag(const char *from, const char *tag) {
+  const char *a = from + 1;
   int i = 0;
   char s[256];
 
   while(is_space(*a))
     a++;
-  while((isalnum((unsigned char) *a) || (*a == '/')) && (i < 250)) {
-    s[i++] = *a;
-    a++;
+  for( ; (isalnum((unsigned char) *a) || (*a == '/')) && i + 1 < sizeof(s) ; i++, a++) {
+    s[i] = *a;
   }
-  s[i++] = '\0';
-  return (strfield2(s, tag));   // comparer
+  s[i] = '\0';
+  return strfield2(s, tag);   // comparer
 }
 
 // teste si un fichier dépasse le quota
@@ -870,7 +869,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
           assertf(sortedElts != NULL);
           if (sortedElts != NULL) {
             int i;
-            char *category = "";
+            const char *category = "";
 
             /* Build array */
             struct topindex_chain *chain = startchain;

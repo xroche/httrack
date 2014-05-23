@@ -84,7 +84,7 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 //HTS_INLINE int rech_tageq(const char* adr,const char* s);
 HTS_INLINE int rech_sampletag(const char *adr, const char *s);
 HTS_INLINE int rech_endtoken(const char *adr, const char **start);
-HTS_INLINE int check_tag(char *from, const char *tag);
+HTS_INLINE int check_tag(const char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);
 int verif_external(httrackp * opt, int nb, int test);
 

@@ -249,11 +249,12 @@ LLint check_downloadable_bytes(int rate);
 HTSEXT_API int hts_uninit_module(void);
 
 // fonctions principales
-T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour);
+T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour);
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  char *xsend, char *adr, char *fil, htsblk * retour);
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
-                  char *adr, char *fil, char *referer_adr, char *referer_fil,
+                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend,
+                  const char *adr, const char *fil,
+                  const char *referer_adr, const char *referer_fil,
                   htsblk * retour);
 
 //int newhttp(char* iadr,char* err=NULL);
@@ -264,12 +265,12 @@ HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk * r);
 htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc);
-htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc);
+htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
-void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
+void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
-void treatfirstline(htsblk * retour, char *rcvd);
+void treatfirstline(htsblk * retour, const char *rcvd);
 
 // sous-fonctions
 LLint http_xfread1(htsblk * r, int bufl);
@@ -315,7 +316,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 int linput_trim(FILE * fp, char *s, int max);
 int linput_cpp(FILE * fp, char *s, int max);
 void rawlinput(FILE * fp, char *s, int max);
-char *strstrcase(char *s, char *o);
+char *strstrcase(char *s, const char *o);
 int ident_url_absolute(const char *url, char *adr, char *fil);
 void fil_simplifie(char *f);
 int is_unicode_utf8(const char *buffer, const size_t size);
@@ -345,7 +346,7 @@ void hts_lowcase(char *s);
 void hts_replace(char *s, char from, char to);
 int multipleStringMatch(const char *s, const char *match);
 
-void fprintfio(FILE * fp, char *buff, char *prefix);
+void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 #ifdef _WIN32
 #else

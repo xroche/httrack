@@ -436,7 +436,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int back_add_stats = opt->state.back_add_stats;
 
       //
-      char *in_media = NULL;    // in other media type (real media and so..)
+      const char *in_media = NULL;    // in other media type (real media and so..)
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
@@ -456,7 +456,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         INSCRIPT_DEFAULT = 256
       } INSCRIPT;
       INSCRIPT inscript_state_pos = INSCRIPT_START;
-      char *inscript_name = NULL;       // script tag name
+      const char *inscript_name = NULL;       // script tag name
       int inscript_tag = 0;     // on est dans un <body onLoad="... terminé par >
       char inscript_tag_lastc = '\0';
 
@@ -474,9 +474,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       //int parseall_incomment=0;   // dans un /* */ (exemple: a = /* URL */ "img.gif";)
       //
-      char *intag_start = adr;
-      char *intag_name = NULL;
-      char *intag_startattr = NULL;
+      const char *intag_start = adr;
+      const char *intag_name = NULL;
+      const char *intag_startattr = NULL;
       int intag_start_valid = 0;
       int intag_ctype = 0;
 
@@ -879,7 +879,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                         || check_tag(intag_start, "style")
                 )
               ) {
-              char *a = intag_start;    // <
+              const char *a = intag_start;    // <
 
               // ** while(is_realspace(*(--a)));
               if (*a == '<') {  // sûr que c'est un tag?
@@ -1405,7 +1405,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                        foo "url"
                      */
                     char expected = '=';        // caractère attendu après
-                    char *expected_end = ";";
+                    const char *expected_end = ";";
                     int can_avoid_quotes = 0;
                     char quotes_replacement = '\0';
                     int ensure_not_mime = 0;
@@ -2718,8 +2718,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             //
                             int patch_it = 0;
                             int add_url = 0;
-                            char *cat_name = NULL;
-                            char *cat_data = NULL;
+                            const char *cat_name = NULL;
+                            const char *cat_data = NULL;
                             int cat_nb = 0;
                             int cat_data_len = 0;
 
