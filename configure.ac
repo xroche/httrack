@@ -21,7 +21,8 @@ AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
 AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 
 ### Default CFLAGS
-DEFAULT_CFLAGS="-Wall -Wcast-align -Wstrict-prototypes \
+DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
+-Wmultichar -Wwrite-strings -Wcast-align -Wstrict-prototypes \
 -Wmissing-prototypes -Wmissing-declarations -Wpointer-arith \
 -Wnested-externs -D_REENTRANT"
 AC_SUBST(DEFAULT_CFLAGS)

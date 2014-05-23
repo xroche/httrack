@@ -609,7 +609,7 @@ void hts_init_htsblk(htsblk * r) {
 
 // ouvre une liaison http, envoie une requète GET et réceptionne le header
 // retour: socket
-T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
+T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour) {
   //                / GET, traiter en-tête
   return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
 }
@@ -620,10 +620,11 @@ T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
 // waitconnect: attendre le connect()
 // note: dans retour, on met les params du proxy
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  char *xsend, char *adr, char *fil, htsblk * retour) {
+                  const char *xsend, const char *adr, const char *fil, htsblk * retour) {
   //htsblk retour;
   //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
   T_SOC soc = INVALID_SOCKET;
+  char BIGSTK tempo_fil[HTS_URLMAXSIZE * 2];
 
   //char *p,*q;
 
@@ -699,10 +700,8 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
             (fconv
              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil + 1)))) {
-          char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-          strcpybuff(tempo, fil + 1);
-          strcpybuff(fil, tempo);
+          strcpybuff(tempo_fil, fil + 1);
+          fil = tempo_fil;
         }
       // Ouvrir
       retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
@@ -845,15 +844,16 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 // envoi d'une requète
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
-                  char *adr, char *fil, char *referer_adr, char *referer_fil,
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
+                  const char *xsend, const char *adr, const char *fil,
+                  const char *referer_adr, const char *referer_fil,
                   htsblk * retour) {
   char BIGSTK buffer_head_request[8192];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
   //int use_11=0;     // HTTP 1.1 utilisé
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
-  char *search_tag = NULL;
+  const char *search_tag = NULL;
 
   // Initialize buffer
   buffer_head_request[0] = '\0';
@@ -1054,7 +1054,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
     }
 
     {
-      char *real_adr = jump_identification(adr);
+      const char *real_adr = jump_identification(adr);
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
@@ -1099,12 +1099,12 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
       /* Authentification */
       {
         char autorisation[1100];
-        char *a;
+        const char *a;
 
         autorisation[0] = '\0';
         if (link_has_authorization(adr)) {      // ohh une authentification!
-          char *a = jump_identification(adr);
-          char *astart = jump_protocol(adr);
+          const char *a = jump_identification(adr);
+          const char *astart = jump_protocol(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
@@ -1184,8 +1184,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 }
 
 // traiter 1ere ligne d'en tête
-void treatfirstline(htsblk * retour, char *rcvd) {
-  char *a = rcvd;
+void treatfirstline(htsblk * retour, const char *rcvd) {
+  const char *a = rcvd;
 
   // exemple:
   // HTTP/1.0 200 OK
@@ -1255,7 +1255,7 @@ void treatfirstline(htsblk * retour, char *rcvd) {
 
 // traiter ligne par ligne l'en tête
 // gestion des cookies
-void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
+void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
   int p;
 
@@ -1388,7 +1388,7 @@ void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
     // Content-Range: bytes 0-70870/70871
-    char *a;
+    const char *a;
 
     for(a = rcvd + p; is_space(*a); a++) ;
     if (strncasecmp(a, "bytes ", 6) == 0) {
@@ -2019,7 +2019,7 @@ htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc) {
 // en cas de moved xx, dans location
 // abandonne désormais au bout de 30 secondes (aurevoir les sites
 // qui nous font poireauter 5 heures..) -> -2=timeout
-htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc) {
+htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
   T_SOC soc;
   htsblk retour;
 
@@ -3153,8 +3153,8 @@ void rawlinput(FILE * fp, char *s, int max) {
 }
 
 //cherche chaine, case insensitive
-char *strstrcase(char *s, char *o) {
-  while((*s) && (strfield(s, o) == 0))
+char *strstrcase(char *s, const char *o) {
+  while(*s && strfield(s, o) == 0)
     s++;
   if (*s == '\0')
     return NULL;
@@ -4277,7 +4277,7 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename) {
 // -- Utils fichiers
 
 // pretty print for i/o
-void fprintfio(FILE * fp, char *buff, char *prefix) {
+void fprintfio(FILE * fp, const char *buff, const char *prefix) {
   char nl = 1;
 
   while(*buff) {
@@ -4392,7 +4392,7 @@ typedef struct {
   char path[1024 + 4];
   int init;
 } hts_rootdir_strc;
-HTSEXT_API char *hts_rootdir(char *file) {
+HTSEXT_API const char *hts_rootdir(char *file) {
   static hts_rootdir_strc strc = { "", 0 };
   if (file) {
     if (!strc.init) {

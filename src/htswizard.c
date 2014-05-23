@@ -60,8 +60,8 @@ Please visit our Website: http://www.httrack.com
 } while(0)
 
 typedef struct htspair_t {
-  char *tag;
-  char *attr;
+  const char *tag;
+  const char *attr;
 } htspair_t;
 
 /* "embedded" */
@@ -80,8 +80,9 @@ htspair_t hts_detect_embed[] = {
 
 /* Internal */
 static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
-                           lien_url ** liens, char *adr, char *fil, char *tag,
-                           char *attribute, int *set_prio_to,
+                           lien_url ** liens, const char *adr,
+                           const char *fil, const char *tag,
+                           const char *attribute, int *set_prio_to,
                            int *just_test_it);
 
 /*
@@ -104,8 +105,10 @@ retour:
 -1 pas d'avis
 */
 
-int hts_acceptlink(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
-                   char *adr, char *fil, char *tag, char *attribute,
+int hts_acceptlink(httrackp * opt, int ptr,
+                   int lien_tot, lien_url ** liens,
+                   const char *adr, const char *fil,
+                   const char *tag, const char *attribute,
                    int *set_prio_to, int *just_test_it) {
   int forbidden_url = hts_acceptlink_(opt, ptr, lien_tot, liens,
                                       adr, fil, tag, attribute, set_prio_to,
@@ -134,8 +137,9 @@ static int cmp_token(const char *tag, const char *cmp) {
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
-                           lien_url ** liens, char *adr, char *fil, char *tag,
-                           char *attribute, int *set_prio_to,
+                           lien_url ** liens,
+                           const char *adr, const char *fil, const char *tag,
+                           const char *attribute, int *set_prio_to,
                            int *just_test_it) {
   int forbidden_url = -1;
   int meme_adresse;
@@ -515,7 +519,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
       // filters
       {
         int jok;
-        char *mdepth = "";
+        const char *mdepth = "";
 
         // filters, 0=sait pas 1=ok -1=interdit
         {
@@ -864,12 +868,12 @@ static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
 }
 
 int hts_acceptmime(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
-                   char *adr, char *fil, char *mime) {
+                   const char *adr, const char *fil, const char *mime) {
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
   int forbidden_url = -1;
-  char *mdepth = "";
+  const char *mdepth = "";
   int jokDepth = 0;
   int jok = 0;
 
@@ -906,7 +910,7 @@ int hts_acceptmime(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
 }
 
 // tester taille
-int hts_testlinksize(httrackp * opt, char *adr, char *fil, LLint size) {
+int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size) {
   int jok = 0;
 
   if (size >= 0) {

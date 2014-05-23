@@ -81,7 +81,7 @@ inthash NewLangList = NULL;
 
 #include "htsserver.h"
 
-char *gethomedir(void);
+const char *gethomedir(void);
 int commandRunning = 0;
 int commandEndRequested = 0;
 int commandEnd = 0;
@@ -97,13 +97,13 @@ extern void webhttrack_main(char *cmd);
 extern void webhttrack_lock(void);
 extern void webhttrack_release(void);
 
-static int is_image(char *file) {
+static int is_image(const char *file) {
   return ((strstr(file, ".gif") != NULL));
 }
-static int is_text(char *file) {
+static int is_text(const char *file) {
   return ((strstr(file, ".txt") != NULL));
 }
-static int is_html(char *file) {
+static int is_html(const char *file) {
   return ((strstr(file, ".htm") != NULL));
 }
 
@@ -287,12 +287,12 @@ T_SOC smallserver_init(int *port, char *adr) {
 // data: 32Kb
 
 typedef struct {
-  char *name;
+  const char *name;
   int value;
 } initIntElt;
 typedef struct {
-  char *name;
-  char *value;
+  const char *name;
+  const char *value;
 } initStrElt;
 
 #define SET_ERROR(err) do { \
@@ -326,10 +326,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   {
     char pth[1024];
 
-    char *initOn[] = { "parseall", "Cache", "ka",
+    const char *initOn[] = { "parseall", "Cache", "ka",
       "cookies", "parsejava", "testall", "updhack", "urlhack", "index", NULL
     };
-    initIntElt initInt[] = {
+    const initIntElt initInt[] = {
       {"filter", 4},
       {"travel", 2},
       {"travel2", 1},
@@ -383,7 +383,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     char line2[1024];
     T_SOC soc_c;
     LLint length = 0;
-    char *error_redirect = NULL;
+    const char *error_redirect = NULL;
 
     line[0] = '\0';
     buffer[0] = '\0';
@@ -498,7 +498,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
         strcatbuff(buffer, "&");
         while(s && (e = strchr(s, '=')) && (f = strchr(s, '&'))) {
-          char *ua;
+          const char *ua;
           String sua = STRING_EMPTY;
 
           *e = *f = '\0';
@@ -786,7 +786,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
         if (url && *++url == '/' && (pos = strchr(url, ' ')) && !(*pos = '\0')) {
           char fsfile[1024];
-          char *file;
+          const char *file;
           FILE *fp;
           char *qpos;
 
@@ -861,10 +861,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 "HTTP/1.0 302 Redirect\r\n" "Connection: close\r\n"
                 "Server: httrack-small-server\r\n";
               intptr_t adr = 0;
-              char *newfile = file;
+              const char *newfile = file;
 
               if (inthash_readptr(NewLangList, "redirect", &adr) && adr != 0) {
-                char *newadr = (char *) adr;
+                const char *newadr = (char *) adr;
 
                 if (*newadr) {
                   newfile = newadr;
@@ -939,6 +939,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       }
                     } else if ((p = strfield(name, "do:"))) {
                       char *pos2;
+                      char empty[2] = "";
 
                       name += p;
                       format = 1;
@@ -948,7 +949,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         *pos2 = '\0';
                         pos2++;
                       } else {
-                        pos2 = "";
+                        pos2 = empty;
                       }
                       if (strcmp(name, "output-mode") == 0) {
                         if (strcmp(pos2, "html") == 0) {
@@ -1063,7 +1064,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (pos2 != NULL) {
                         *pos2 = '\0';
                         if (inthash_readptr(NewLangList, name, &adr) || ztest) {
-                          char *newadr = (char *) adr;
+                          const char *newadr = (char *) adr;
 
                           if (!newadr)
                             newadr = "";
@@ -1469,7 +1470,7 @@ static int htslang_load(char *limit_to, const char *path) {
 
   /* Load master file (list of keys and internal keys) */
   if (!limit_to) {
-    char *mname = "lang.def";
+    const char *mname = "lang.def";
     FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), path, mname), "rb");
 
     if (fp) {
@@ -1733,7 +1734,7 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   return found;
 }
 
-static int LANG_LIST(const char *path, char *buffer, size_t size) {
+static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
@@ -1741,12 +1742,12 @@ static int LANG_LIST(const char *path, char *buffer, size_t size) {
   buffer[0] = '\0';
   do {
     QLANG_T(i);
-    strlcpybuff(lang_str, "LANGUAGE_NAME", size);
+    strlcpybuff(lang_str, "LANGUAGE_NAME", buffer_size);
     htslang_load(lang_str, path);
     if (strlen(lang_str) > 0) {
       if (buffer[0])
         strcatbuff(buffer, "\n");
-      strcatbuff(buffer, lang_str);
+      strlcatbuff(buffer, lang_str, buffer_size);
     }
     i++;
   } while(strlen(lang_str) > 0);
