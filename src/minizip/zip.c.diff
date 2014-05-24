@@ -1,26 +1,10 @@
---- zip.c.orig	2014-05-23 15:29:40.975965289 +0200
-+++ zip.c	2014-05-23 15:29:40.975965289 +0200
-@@ -7,8 +7,13 @@
- */
- 
- 
-+#ifndef _WIN32_WCE
- #include <stdio.h>
- #include <stdlib.h>
-+#else
-+#include <stdio.h>
-+#include "celib.h"
-+#endif
- #include <string.h>
- #include <time.h>
- #include "zlib.h"
-@@ -1178,3 +1183,17 @@
- 
-     return err;
+--- zip.c.orig	2014-05-24 09:54:26.314883072 +0200
++++ zip.c	2014-05-24 09:52:59.338410979 +0200
+@@ -1879,6 +1879,19 @@
+   return err;
  }
-+
-+extern int ZEXPORT zipFlush (file)
-+    zipFile file;
+ 
++extern int ZEXPORT zipFlush (zipFile file)
 +{
 +    zip_internal* zi;
 +    if (file == NULL)
@@ -32,3 +16,7 @@
 +    else
 +      return EOF;
 +}
++
+ extern int ZEXPORT zipClose (zipFile file, const char* global_comment)
+ {
+     zip64_internal* zi;

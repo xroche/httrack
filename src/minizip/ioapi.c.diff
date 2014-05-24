@@ -1,47 +1,28 @@
---- ioapi.c.orig	2014-05-23 15:29:40.975965289 +0200
-+++ ioapi.c	2014-05-23 15:29:40.975965289 +0200
-@@ -6,8 +6,13 @@
-    Copyright (C) 1998-2003 Gilles Vollant
- */
- 
-+#ifndef _WIN32_WCE
- #include <stdio.h>
- #include <stdlib.h>
-+#else
-+#include <stdio.h>
-+//#include "celib.h"
-+#endif
- #include <string.h>
- 
- #include "zlib.h"
-@@ -56,6 +61,10 @@
-    uLong offset,
-    int origin));
- 
-+int ZCALLBACK fflush_file_func OF((
-+   voidpf opaque,
-+   voidpf stream));
+--- ioapi.c.orig	2014-05-24 09:54:26.298884453 +0200
++++ ioapi.c	2014-05-24 09:50:22.708762308 +0200
+@@ -89,6 +89,8 @@
+ static uLong   ZCALLBACK fwrite_file_func OF((voidpf opaque, voidpf stream, const void* buf,uLong size));
+ static ZPOS64_T ZCALLBACK ftell64_file_func OF((voidpf opaque, voidpf stream));
+ static long    ZCALLBACK fseek64_file_func OF((voidpf opaque, voidpf stream, ZPOS64_T offset, int origin));
++static int     ZCALLBACK fflush_file_func OF((voidpf opaque, voidpf stream));
 +
- int ZCALLBACK fclose_file_func OF((
-    voidpf opaque,
-    voidpf stream));
-@@ -145,6 +154,15 @@
+ static int     ZCALLBACK fclose_file_func OF((voidpf opaque, voidpf stream));
+ static int     ZCALLBACK ferror_file_func OF((voidpf opaque, voidpf stream));
+ 
+@@ -206,6 +208,12 @@
      return ret;
  }
  
-+int ZCALLBACK fflush_file_func (opaque, stream)
-+   voidpf opaque;
-+   voidpf stream;
++static int ZCALLBACK fflush_file_func (voidpf opaque, voidpf stream)
 +{
 +    int ret;
 +    ret = fflush((FILE *)stream);
 +    return ret;
 +}
-+
- int ZCALLBACK fclose_file_func (opaque, stream)
-    voidpf opaque;
-    voidpf stream;
-@@ -171,6 +189,7 @@
+ 
+ static int ZCALLBACK fclose_file_func (voidpf opaque, voidpf stream)
+ {
+@@ -229,6 +237,7 @@
      pzlib_filefunc_def->zwrite_file = fwrite_file_func;
      pzlib_filefunc_def->ztell_file = ftell_file_func;
      pzlib_filefunc_def->zseek_file = fseek_file_func;
