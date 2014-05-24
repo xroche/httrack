@@ -149,6 +149,7 @@ typedef struct zlib_filefunc_def_s
     open_file_func      zopen_file;
     read_file_func      zread_file;
     write_file_func     zwrite_file;
+    flush_file_func     zflush_file;
     tell_file_func      ztell_file;
     seek_file_func      zseek_file;
     close_file_func     zclose_file;
