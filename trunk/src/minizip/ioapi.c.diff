@@ -1,5 +1,5 @@
 --- ioapi.c.orig	2012-01-21 20:58:45.000000000 +0100
-+++ ioapi.c	2014-05-24 10:30:08.688103848 +0200
++++ ioapi.c	2014-05-24 13:27:22.516230485 +0200
 @@ -73,6 +73,7 @@
      p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
      p_filefunc64_32->zfile_func64.zread_file = p_filefunc32->zread_file;
