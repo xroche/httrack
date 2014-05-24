@@ -166,6 +166,7 @@ typedef struct zlib_filefunc64_def_s
     open64_file_func    zopen64_file;
     read_file_func      zread_file;
     write_file_func     zwrite_file;
+    flush_file_func     zflush_file;
     tell64_file_func    ztell64_file;
     seek64_file_func    zseek64_file;
     close_file_func     zclose_file;
@@ -188,7 +189,7 @@ typedef struct zlib_filefunc64_32_def_s
 
 #define ZREAD64(filefunc,filestream,buf,size)     ((*((filefunc).zfile_func64.zread_file))   ((filefunc).zfile_func64.opaque,filestream,buf,size))
 #define ZWRITE64(filefunc,filestream,buf,size)    ((*((filefunc).zfile_func64.zwrite_file))  ((filefunc).zfile_func64.opaque,filestream,buf,size))
-#define ZFLUSH(filefunc,filestream)               ((*((filefunc).zflush_file))               ((filefunc).opaque,filestream))
+#define ZFLUSH64(filefunc,filestream)             ((*((filefunc).zfile_func64.zflush_file))  ((filefunc).zfile_func64.opaque,filestream))
 //#define ZTELL64(filefunc,filestream)            ((*((filefunc).ztell64_file)) ((filefunc).opaque,filestream))
 //#define ZSEEK64(filefunc,filestream,pos,mode)   ((*((filefunc).zseek64_file)) ((filefunc).opaque,filestream,pos,mode))
 #define ZCLOSE64(filefunc,filestream)             ((*((filefunc).zfile_func64.zclose_file))  ((filefunc).zfile_func64.opaque,filestream))

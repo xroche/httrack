@@ -1,6 +1,14 @@
---- ioapi.c.orig	2014-05-24 09:54:26.298884453 +0200
-+++ ioapi.c	2014-05-24 09:50:22.708762308 +0200
-@@ -89,6 +89,8 @@
+--- ioapi.c.orig	2012-01-21 20:58:45.000000000 +0100
++++ ioapi.c	2014-05-24 10:30:08.688103848 +0200
+@@ -73,6 +73,7 @@
+     p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
+     p_filefunc64_32->zfile_func64.zread_file = p_filefunc32->zread_file;
+     p_filefunc64_32->zfile_func64.zwrite_file = p_filefunc32->zwrite_file;
++    p_filefunc64_32->zfile_func64.zflush_file = p_filefunc32->zflush_file;
+     p_filefunc64_32->zfile_func64.ztell64_file = NULL;
+     p_filefunc64_32->zfile_func64.zseek64_file = NULL;
+     p_filefunc64_32->zfile_func64.zclose_file = p_filefunc32->zclose_file;
+@@ -89,6 +90,8 @@
  static uLong   ZCALLBACK fwrite_file_func OF((voidpf opaque, voidpf stream, const void* buf,uLong size));
  static ZPOS64_T ZCALLBACK ftell64_file_func OF((voidpf opaque, voidpf stream));
  static long    ZCALLBACK fseek64_file_func OF((voidpf opaque, voidpf stream, ZPOS64_T offset, int origin));
@@ -9,7 +17,7 @@
  static int     ZCALLBACK fclose_file_func OF((voidpf opaque, voidpf stream));
  static int     ZCALLBACK ferror_file_func OF((voidpf opaque, voidpf stream));
  
-@@ -206,6 +208,12 @@
+@@ -206,6 +209,12 @@
      return ret;
  }
  
@@ -22,10 +30,18 @@
  
  static int ZCALLBACK fclose_file_func (voidpf opaque, voidpf stream)
  {
-@@ -229,6 +237,7 @@
+@@ -229,6 +238,7 @@
      pzlib_filefunc_def->zwrite_file = fwrite_file_func;
      pzlib_filefunc_def->ztell_file = ftell_file_func;
      pzlib_filefunc_def->zseek_file = fseek_file_func;
++    pzlib_filefunc_def->zflush_file = fflush_file_func;
+     pzlib_filefunc_def->zclose_file = fclose_file_func;
+     pzlib_filefunc_def->zerror_file = ferror_file_func;
+     pzlib_filefunc_def->opaque = NULL;
+@@ -241,6 +251,7 @@
+     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
+     pzlib_filefunc_def->ztell64_file = ftell64_file_func;
+     pzlib_filefunc_def->zseek64_file = fseek64_file_func;
 +    pzlib_filefunc_def->zflush_file = fflush_file_func;
      pzlib_filefunc_def->zclose_file = fclose_file_func;
      pzlib_filefunc_def->zerror_file = ferror_file_func;

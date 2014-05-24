@@ -1,20 +1,19 @@
---- zip.c.orig	2014-05-24 09:54:26.314883072 +0200
-+++ zip.c	2014-05-24 09:52:59.338410979 +0200
-@@ -1879,6 +1879,19 @@
+--- zip.c.orig	2013-02-24 08:32:30.000000000 +0100
++++ zip.c	2014-05-24 10:36:41.744297397 +0200
+@@ -1879,6 +1879,18 @@
    return err;
  }
  
 +extern int ZEXPORT zipFlush (zipFile file)
 +{
-+    zip_internal* zi;
++    zip64_internal* zi;
++
 +    if (file == NULL)
 +        return ZIP_PARAMERROR;
-+    zi = (zip_internal*)file;
 +
-+    if (zi->z_filefunc.zflush_file != NULL && zi->filestream != NULL)
-+      return ZFLUSH(zi->z_filefunc,zi->filestream);
-+    else
-+      return EOF;
++    zi = (zip64_internal*)file;
++
++    return ZFLUSH64(zi->z_filefunc,zi->filestream);
 +}
 +
  extern int ZEXPORT zipClose (zipFile file, const char* global_comment)

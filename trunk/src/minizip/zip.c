@@ -1881,15 +1881,14 @@ int Write_GlobalComment(zip64_internal* zi, const char* global_comment)
 
 extern int ZEXPORT zipFlush (zipFile file)
 {
-    zip_internal* zi;
+    zip64_internal* zi;
+
     if (file == NULL)
         return ZIP_PARAMERROR;
-    zi = (zip_internal*)file;
 
-    if (zi->z_filefunc.zflush_file != NULL && zi->filestream != NULL)
-      return ZFLUSH(zi->z_filefunc,zi->filestream);
-    else
-      return EOF;
+    zi = (zip64_internal*)file;
+
+    return ZFLUSH64(zi->z_filefunc,zi->filestream);
 }
 
 extern int ZEXPORT zipClose (zipFile file, const char* global_comment)
