@@ -1,0 +1,22 @@
+--- zip.h.orig	2014-05-23 15:29:40.979965126 +0200
++++ zip.h	2014-05-23 15:29:40.975965289 +0200
+@@ -212,7 +212,6 @@
+   Close the current file in the zipfile
+ */
+ 
+-
+ extern int ZEXPORT zipCloseFileInZipRaw OF((zipFile file,
+                                             uLong uncompressed_size,
+                                             uLong crc32));
+@@ -228,6 +227,11 @@
+   Close the zipfile
+ */
+ 
++extern int ZEXPORT zipFlush OF((zipFile file));
++/*
++  Flush the zipfile output
++*/
++
+ #ifdef __cplusplus
+ }
+ #endif

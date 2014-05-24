@@ -1,0 +1,36 @@
+--- ioapi.h.orig	2014-05-23 15:29:40.979965126 +0200
++++ ioapi.h	2014-05-23 15:29:40.979965126 +0200
+@@ -35,11 +35,17 @@
+ extern "C" {
+ #endif
+ 
++/* fixed missing define on some zlib (Lars Wendler) */
++#ifndef OF
++#define OF(args) args
++#endif
++
+ typedef voidpf (ZCALLBACK *open_file_func) OF((voidpf opaque, const char* filename, int mode));
+ typedef uLong  (ZCALLBACK *read_file_func) OF((voidpf opaque, voidpf stream, void* buf, uLong size));
+ typedef uLong  (ZCALLBACK *write_file_func) OF((voidpf opaque, voidpf stream, const void* buf, uLong size));
+ typedef long   (ZCALLBACK *tell_file_func) OF((voidpf opaque, voidpf stream));
+ typedef long   (ZCALLBACK *seek_file_func) OF((voidpf opaque, voidpf stream, uLong offset, int origin));
++typedef int    (ZCALLBACK *flush_file_func) OF((voidpf opaque, voidpf stream));
+ typedef int    (ZCALLBACK *close_file_func) OF((voidpf opaque, voidpf stream));
+ typedef int    (ZCALLBACK *testerror_file_func) OF((voidpf opaque, voidpf stream));
+ 
+@@ -50,6 +56,7 @@
+     write_file_func     zwrite_file;
+     tell_file_func      ztell_file;
+     seek_file_func      zseek_file;
++    flush_file_func     zflush_file;
+     close_file_func     zclose_file;
+     testerror_file_func zerror_file;
+     voidpf              opaque;
+@@ -63,6 +70,7 @@
+ #define ZWRITE(filefunc,filestream,buf,size) ((*((filefunc).zwrite_file))((filefunc).opaque,filestream,buf,size))
+ #define ZTELL(filefunc,filestream) ((*((filefunc).ztell_file))((filefunc).opaque,filestream))
+ #define ZSEEK(filefunc,filestream,pos,mode) ((*((filefunc).zseek_file))((filefunc).opaque,filestream,pos,mode))
++#define ZFLUSH(filefunc,filestream) ((*((filefunc).zflush_file))((filefunc).opaque,filestream))
+ #define ZCLOSE(filefunc,filestream) ((*((filefunc).zclose_file))((filefunc).opaque,filestream))
+ #define ZERROR(filefunc,filestream) ((*((filefunc).zerror_file))((filefunc).opaque,filestream))
+ 
