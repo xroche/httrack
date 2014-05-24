@@ -73,6 +73,7 @@ void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filef
     p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
     p_filefunc64_32->zfile_func64.zread_file = p_filefunc32->zread_file;
     p_filefunc64_32->zfile_func64.zwrite_file = p_filefunc32->zwrite_file;
+    p_filefunc64_32->zfile_func64.zflush_file = p_filefunc32->zflush_file;
     p_filefunc64_32->zfile_func64.ztell64_file = NULL;
     p_filefunc64_32->zfile_func64.zseek64_file = NULL;
     p_filefunc64_32->zfile_func64.zclose_file = p_filefunc32->zclose_file;
@@ -250,6 +251,7 @@ void fill_fopen64_filefunc (zlib_filefunc64_def*  pzlib_filefunc_def)
     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
     pzlib_filefunc_def->ztell64_file = ftell64_file_func;
     pzlib_filefunc_def->zseek64_file = fseek64_file_func;
+    pzlib_filefunc_def->zflush_file = fflush_file_func;
     pzlib_filefunc_def->zclose_file = fclose_file_func;
     pzlib_filefunc_def->zerror_file = ferror_file_func;
     pzlib_filefunc_def->opaque = NULL;
