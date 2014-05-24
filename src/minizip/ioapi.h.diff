@@ -1,5 +1,5 @@
 --- ioapi.h.orig	2012-01-17 03:51:31.000000000 +0100
-+++ ioapi.h	2014-05-24 10:28:47.731394304 +0200
++++ ioapi.h	2014-05-24 13:27:22.516230485 +0200
 @@ -135,6 +135,7 @@
  typedef voidpf   (ZCALLBACK *open_file_func)      OF((voidpf opaque, const char* filename, int mode));
  typedef uLong    (ZCALLBACK *read_file_func)      OF((voidpf opaque, voidpf stream, void* buf, uLong size));
