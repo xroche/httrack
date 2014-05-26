@@ -625,7 +625,9 @@ void Cinprogress::OnModifyOpt()
     LLint ln;
     float nf;
 
-    httrackp *opt = hts_create_opt();
+    httrackp *const opt = hts_create_opt();
+    assert(opt->size_httrackp == sizeof(httrackp));
+
     opt->log = opt->errlog = NULL;
 
     // dévalider champs (non modifiés)

@@ -1730,6 +1730,7 @@ void __cdecl RunBackRobot(void* al_p) {
 				global_opt = NULL;
 			}
       global_opt = hts_create_opt();
+      assert(global_opt->size_httrackp == sizeof(httrackp));
 
       CHAIN_FUNCTION(global_opt, init, httrackengine_init, NULL);
       CHAIN_FUNCTION(global_opt, uninit, httrackengine_uninit, NULL);
