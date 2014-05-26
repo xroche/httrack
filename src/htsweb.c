@@ -264,6 +264,7 @@ static void back_launch_cmd(void *pP) {
   /* init */
   hts_init();
   global_opt = opt = hts_create_opt();
+  assert(opt->size_httrackp == sizeof(httrackp));
 
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);
