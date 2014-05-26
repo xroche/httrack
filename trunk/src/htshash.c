@@ -307,25 +307,25 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
 }
 
 // enregistrement lien lpos dans les 3 tables hash1..3
-void hash_write(hash_struct * hash, int lpos) {
+void hash_write(hash_struct * hash, size_t lpos) {
   /* first entry: destination filename (lowercased) */
-  inthash_write(hash->sav, hash->liens[lpos]->sav, lpos);
+  inthash_write(hash->sav, (*hash->liens)[lpos]->sav, lpos);
 
   /* second entry: URL address and path */
-  inthash_write(hash->adrfil, (char*) hash->liens[lpos], lpos);
+  inthash_write(hash->adrfil, (char*) (*hash->liens)[lpos], lpos);
 
   /* third entry: URL address and path before redirect */
-  if (hash->liens[lpos]->former_adr) {        // former_adr existe?
-    inthash_write(hash->former_adrfil, (char*) hash->liens[lpos], lpos);
+  if ((*hash->liens)[lpos]->former_adr) {        // former_adr existe?
+    inthash_write(hash->former_adrfil, (char*) (*hash->liens)[lpos], lpos);
   }
 }
 
 void hash_invalidate_entry(hash_struct * hash, int lpos) {
-  if (inthash_remove(hash->adrfil, (char*) hash->liens[lpos])) {
+  if (inthash_remove(hash->adrfil, (char*) (*hash->liens)[lpos])) {
     /* devalidate entry now it is removed from hashtable */
-    strcpybuff(hash->liens[lpos]->adr, "!");
+    strcpybuff((*hash->liens)[lpos]->adr, "!");
     /* add back */
-    inthash_write(hash->adrfil, (char*) hash->liens[lpos], lpos);
+    inthash_write(hash->adrfil, (char*) (*hash->liens)[lpos], lpos);
   } else {
     assertf(! "error invalidating hash entry");
   }

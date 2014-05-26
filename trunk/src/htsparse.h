@@ -66,7 +66,7 @@ struct htsmoduleStructExtended {
   char ***filters_;
   robots_wizard *robots_;
   hash_struct *hash_;
-  int *lien_max_;
+  //int *lien_max_;
 
   /* Base & codebase */
   char *base;
@@ -142,7 +142,6 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
 /* Context state */
 
 #define ENGINE_DEFINE_CONTEXT_BASE() \
-  lien_url** const liens HTS_UNUSED = (lien_url**) str->liens; \
   httrackp* const opt HTS_UNUSED = (httrackp*) str->opt; \
   struct_back* const sback HTS_UNUSED = (struct_back*) str->sback; \
   lien_back* const back HTS_UNUSED = sback->lnk; \
@@ -150,28 +149,18 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
   cache_back* const cache HTS_UNUSED = (cache_back*) str->cache; \
   hash_struct* const hashptr HTS_UNUSED = (hash_struct*) str->hashptr; \
   const int numero_passe HTS_UNUSED = str->numero_passe; \
-  const int add_tab_alloc HTS_UNUSED = str->add_tab_alloc; \
   /* variable */ \
-  int lien_tot = *str->lien_tot_; \
-  int ptr = *str->ptr_; \
-  size_t lien_size = *str->lien_size_; \
-  char* lien_buffer = *str->lien_buffer_
+  int ptr = *str->ptr_
 
 #define ENGINE_SET_CONTEXT_BASE() \
-  lien_tot = *str->lien_tot_; \
-  ptr = *str->ptr_; \
-  lien_size = *str->lien_size_; \
-  lien_buffer = *str->lien_buffer_
+  ptr = *str->ptr_
 
 #define ENGINE_LOAD_CONTEXT_BASE() \
   ENGINE_DEFINE_CONTEXT_BASE()
 
 #define ENGINE_SAVE_CONTEXT_BASE() \
   /* Apply changes */ \
-  * str->lien_tot_ = lien_tot; \
-  * str->ptr_ = ptr; \
-  * str->lien_size_ = lien_size; \
-  * str->lien_buffer_ = lien_buffer
+  * str->ptr_ = ptr
 
 #define WAIT_FOR_AVAILABLE_SOCKET() do { \
   int prev = opt->state._hts_in_html_parsing; \
@@ -186,10 +175,10 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
     HTS_STAT.stat_errors=fspc(opt,NULL,"error"); \
     HTS_STAT.stat_warnings=fspc(opt,NULL,"warning"); \
     HTS_STAT.stat_infos=fspc(opt,NULL,"info"); \
-    HTS_STAT.nbk=backlinks_done(sback,liens,lien_tot,ptr); \
+    HTS_STAT.nbk=backlinks_done(sback,opt->liens,opt->lien_tot,ptr); \
     HTS_STAT.nb=back_transferred(HTS_STAT.stat_bytes,sback); \
     /* Check */ \
-    if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, -1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
+    if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, -1,ptr,opt->lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
       return -1; \
     } \
   } \

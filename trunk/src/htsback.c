@@ -1010,7 +1010,7 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
 }
 
 /* unserialize a reference ; used to store references of files being downloaded in case of broken download */
-int back_unserialize_ref(httrackp * opt, const const char *adr, const const char *fil,
+int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst) {
   const char *filename = url_savename_refname_fullpath(opt, adr, fil);
   FILE *fp = FOPEN(filename, "rb");
