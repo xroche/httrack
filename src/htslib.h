@@ -325,12 +325,10 @@ void map_characters(unsigned char *buffer, unsigned int size,
 int ishtml(httrackp * opt, const char *urlfil);
 int ishtml_ext(const char *a);
 int ishttperror(int err);
-void guess_httptype(httrackp * opt, char *s, const char *fil);
 
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
 void give_mimext(char *s, const char *st);
 
-int may_unknown(httrackp * opt, const char *st);
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
