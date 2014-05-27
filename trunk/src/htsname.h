@@ -83,8 +83,8 @@ typedef struct lien_back lien_back;
 
 // note: 'headers' can either be null, or incomplete (only r member filled)
 int url_savename(char *adr_complete, char *fil_complete, char *save,
-                 char *former_adr, char *former_fil, char *referer_adr,
-                 char *referer_fil, httrackp * opt, lien_url ** liens,
+                 char *former_adr, char *former_fil, const char *referer_adr,
+                 const char *referer_fil, httrackp * opt, lien_url ** liens,
                  int lien_tot, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers);

@@ -3219,7 +3219,8 @@ void check_rate(TStamp stat_timestart, int maxrate) {
 // sous routines liées au moteur et au backing
 
 // supplemental links ready (done) after ptr or ready in background
-int backlinks_done(struct_back * sback, lien_url ** liens, int lien_tot,
+int backlinks_done(const struct_back * sback,
+                   const lien_url ** liens, int lien_tot,
                    int ptr) {
   int n = 0;
 

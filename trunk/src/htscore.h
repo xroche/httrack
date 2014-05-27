@@ -372,8 +372,8 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
               lien_url ** liens, int ptr, int numero_passe, int lien_tot);
-int backlinks_done(struct_back * sback, lien_url ** liens, int lien_tot,
-                   int ptr);
+int backlinks_done(const struct_back * sback, const lien_url ** liens, 
+                   int lien_tot, int ptr);
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
                  lien_url ** liens, int ptr, int numero_passe, int lien_tot);
 

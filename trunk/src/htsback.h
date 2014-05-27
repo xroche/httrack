@@ -76,13 +76,13 @@ void back_free(struct_back ** sback);
 #define BACK_ADD_TEST2 "(dummy2)"
 int back_index(httrackp * opt, struct_back * sback, const char *adr, const char *fil,
                const char *sav);
-int back_available(struct_back * sback);
-LLint back_incache(struct_back * sback);
-int back_done_incache(struct_back * sback);
+int back_available(const struct_back * sback);
+LLint back_incache(const struct_back * sback);
+int back_done_incache(const struct_back * sback);
 HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
-int back_nsoc(struct_back * sback);
-int back_nsoc_overall(struct_back * sback);
+int back_nsoc(const struct_back * sback);
+int back_nsoc_overall(const struct_back * sback);
 int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char *adr,
              const char *fil, const char *save, const char *referer_adr, const char *referer_fil,
              int test);
