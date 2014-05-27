@@ -349,8 +349,8 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 }
 
 // nombre d'entrées libres dans le backing
-int back_available(struct_back * sback) {
-  lien_back *const back = sback->lnk;
+int back_available(const struct_back * sback) {
+  const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
   int nb = 0;
@@ -362,8 +362,8 @@ int back_available(struct_back * sback) {
 }
 
 // retourne estimation de la taille des html et fichiers stockés en mémoire
-LLint back_incache(struct_back * sback) {
-  lien_back *const back = sback->lnk;
+LLint back_incache(const struct_back * sback) {
+  const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
   LLint sum = 0;
@@ -391,8 +391,8 @@ LLint back_incache(struct_back * sback) {
 }
 
 // retourne estimation de la taille des html et fichiers stockés en mémoire
-int back_done_incache(struct_back * sback) {
-  lien_back *const back = sback->lnk;
+int back_done_incache(const struct_back * sback) {
+  const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
   int n = 0;
@@ -426,8 +426,8 @@ HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
 }
 
 // nombre de sockets en tâche de fond
-int back_nsoc(struct_back * sback) {
-  lien_back *const back = sback->lnk;
+int back_nsoc(const struct_back * sback) {
+  const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int n = 0;
   int i;
@@ -438,8 +438,8 @@ int back_nsoc(struct_back * sback) {
 
   return n;
 }
-int back_nsoc_overall(struct_back * sback) {
-  lien_back *const back = sback->lnk;
+int back_nsoc_overall(const struct_back * sback) {
+  const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int n = 0;
   int i;

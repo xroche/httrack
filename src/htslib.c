@@ -2977,7 +2977,7 @@ int finput(T_SOC fd, char *s, int max) {
 
   do {
     //c=fgetc(fp);
-    if (read(fd, &c, 1) <= 0) {
+    if (read((int) fd, &c, 1) <= 0) {
       c = 0;
     }
     if (c != 0) {
