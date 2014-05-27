@@ -240,6 +240,8 @@ HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_dyntype(const char *fil);
 HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
+HTSEXT_API int may_unknown(httrackp * opt, const char *st);
+HTSEXT_API void guess_httptype(httrackp * opt, char *s, const char *fil);
 
 /* Ugly string tools */
 HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b);
