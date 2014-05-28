@@ -1,4 +1,32 @@
+AC_PREREQ(2.59)
+
 AC_INIT([httrack], [3.48.9], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_COPYRIGHT([
+HTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) 1998-2014 Xavier Roche and other contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+Important notes:
+
+- We hereby ask people using this source NOT to use it in purpose of grabbing
+emails addresses, or collecting any other private information on persons.
+This would disgrace our work, and spoil the many hours we spent on it.
+
+Please visit our Website: http://www.httrack.com
+])
+
 AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
@@ -6,13 +34,12 @@ AM_INIT_AUTOMAKE
 VERSION_INFO="2:48:0"
 AM_MAINTAINER_MODE
 
-AC_PREREQ(2.50)
-
 AC_PROG_CC
-AC_PROG_CXX
+AM_PROG_CC_C_O
 AC_STDC_HEADERS
 LT_INIT
 AC_PROG_LN_S
+AM_PROG_LIBTOOL
 
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
@@ -20,13 +47,27 @@ AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
 # Export .libs or equivalent.
 AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 
+# Export version info
+AC_SUBST(VERSION_INFO)
+
 ### Default CFLAGS
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
 -Wmultichar -Wwrite-strings -Wcast-align -Wstrict-prototypes \
--Wmissing-prototypes -Wmissing-declarations -Wpointer-arith \
--Wnested-externs -D_REENTRANT"
+-Wmissing-prototypes -Wmissing-declarations -Wdeclaration-after-statement \
+-Wpointer-arith -Wsequence-point -Wnested-externs \
+-D_REENTRANT"
 AC_SUBST(DEFAULT_CFLAGS)
-AC_SUBST(VERSION_INFO)
+DEFAULT_LDFLAGS=""
+AC_SUBST(DEFAULT_LDFLAGS)
+
+### Additional flags (if supported)
+AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"])
+AX_CHECK_COMPILE_FLAG([-Winit-self], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"])
+AX_CHECK_COMPILE_FLAG([-Wuninitialized], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wuninitialized"])
+AX_CHECK_COMPILE_FLAG([-Wformat=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat=2"])
+AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing=2"])
+AX_CHECK_LINK_FLAG([-Wl,--discard-all], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--discard-all"])
+AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--no-undefined"])
 
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
