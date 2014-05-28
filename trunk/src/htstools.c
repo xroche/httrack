@@ -757,10 +757,42 @@ static int sortTopIndexFnc(const void *a_, const void *b_) {
   return cmp;
 }
 
+typedef struct hts_template_format_buf {
+  FILE *fp;
+  char *buffer;
+  size_t size;
+  size_t offset;
+} hts_template_format_buf;
+
 // note: upstream arg list MUST be NULL-terminated for safety
 // returns a negative value upon error
-static int hts_template_formatv(FILE *const fp, const char *format, va_list args) {
-  if (fp != NULL && format != NULL) {
+static int hts_template_formatv(hts_template_format_buf *buf, 
+                                const char *format, va_list args) {
+#undef FPUTC
+#undef FPUTS
+#define FPUTC(C) do { \
+  if (buf->fp != NULL) { \
+    if (fputc(C, buf->fp) < 0) { \
+      return -1; \
+    } \
+  } else { \
+    assertf(buf->buffer != NULL); \
+    if (buf->offset + 1 < buf->size) { \
+      buf->buffer[buf->offset++] = (C); \
+    } else { \
+      return -1; \
+    } \
+  } \
+} while(0)
+#define FPUTS(S) do { \
+  size_t i; \
+  const char *const str_ = (S); \
+  for(i = 0 ; str_[i] != '\0' ; i++) { \
+    FPUTC(str_[i]); \
+  } \
+} while(0)
+
+  if (buf != NULL && format != NULL) {
     const char *arg_expanded[32];
     size_t i, nbArgs, posArgs;
     /* Expand internal code args. */
@@ -776,39 +808,57 @@ static int hts_template_formatv(FILE *const fp, const char *format, va_list args
         const unsigned char cFormat = format[++i];
         switch(cFormat) {
         case '%':
-          fputc('%', fp);
+          FPUTC('%');
           break;
         case 's':
           if (posArgs < nbArgs) {
             assertf(arg_expanded[posArgs] != NULL);
-            fputs(arg_expanded[posArgs], fp);
+            FPUTS(arg_expanded[posArgs]);
             posArgs++;
           } else {
-            fputs("???", fp);  /* error (args overflow) */
+            FPUTS("???");  /* error (args overflow) */
           }
           break;
         default:  /* ignored */
-          fputc('%', fp);
-          fputc(cFormat, fp);
+          FPUTC('%');
+          FPUTC(cFormat);
           break;
         }
       } else {
-        fputc(c, fp);
+        FPUTC(c);
       }
     }
     return 1;
   } else {
     return -1;
   }
+#undef FPUTC
+#undef FPUTS
 }
 
 // note: upstream arg list MUST be NULL-terminated for safety
 // returns a negative value upon error
 int hts_template_format(FILE *const out, const char *format, ...) {
   int success;
+  hts_template_format_buf buf = { NULL, NULL, 0, 0 };
   va_list args;
+  buf.fp = out;
   va_start(args, format);
-  success = hts_template_formatv(out, format, args);
+  success = hts_template_formatv(&buf, format, args);
+  va_end(args);
+  return success;
+}
+
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+int hts_template_format_str(char *buffer, size_t size, const char *format, ...) {
+  int success;
+  hts_template_format_buf buf = { NULL, NULL, 0, 0 };
+  va_list args;
+  buf.buffer = buffer;
+  buf.size = size;
+  va_start(args, format);
+  success = hts_template_formatv(&buf, format, args);
   va_end(args);
   return success;
 }
