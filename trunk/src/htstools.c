@@ -757,7 +757,61 @@ static int sortTopIndexFnc(const void *a_, const void *b_) {
   return cmp;
 }
 
-//HTSEXT_API char *hts_getcategory(const char *filename);
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+static int hts_template_formatv(FILE *const fp, const char *format, va_list args) {
+  if (fp != NULL && format != NULL) {
+    const char *arg_expanded[32];
+    size_t i, nbArgs, posArgs;
+    /* Expand internal code args. */
+    const char *str;
+    for(nbArgs = 0 ; ( str = va_arg(args, const char*) ) != NULL ; nbArgs++) {
+      assertf(nbArgs < sizeof(arg_expanded)/sizeof(arg_expanded[0]));
+      arg_expanded[nbArgs] = str;
+    }
+    /* Expand user-injected format string. */
+    for(posArgs = 0, i = 0 ; format[i] != '\0' ; i++) {
+      const unsigned char c = format[i];
+      if (c == '%') {
+        const unsigned char cFormat = format[++i];
+        switch(cFormat) {
+        case '%':
+          fputc('%', fp);
+          break;
+        case 's':
+          if (posArgs < nbArgs) {
+            assertf(arg_expanded[posArgs] != NULL);
+            fputs(arg_expanded[posArgs], fp);
+            posArgs++;
+          } else {
+            fputs("???", fp);  /* error (args overflow) */
+          }
+          break;
+        default:  /* ignored */
+          fputc('%', fp);
+          fputc(cFormat, fp);
+          break;
+        }
+      } else {
+        fputc(c, fp);
+      }
+    }
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+int hts_template_format(FILE *const out, const char *format, ...) {
+  int success;
+  va_list args;
+  va_start(args, format);
+  success = hts_template_formatv(out, format, args);
+  va_end(args);
+  return success;
+}
 
 /* Note: NOT utf-8 */
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
@@ -798,9 +852,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
       verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/")); // générer gif
       // Header
-      fprintf(fpo, toptemplate_header,
+      hts_template_format(fpo, toptemplate_header,
               "<!-- Mirror and index made by HTTrack Website Copier/"
-              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->");
+              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
       /* Find valid project names */
       h = hts_findfirst(rpath);
@@ -891,9 +945,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               /* Changed category */
               if (strcmp(category, sortedElts[i]->category) != 0) {
                 category = sortedElts[i]->category;
-                fprintf(fpo, toptemplate_bodycat, category);
+                hts_template_format(fpo, toptemplate_bodycat, category, /* EOF */ NULL);
               }
-              fprintf(fpo, toptemplate_body, hname, sortedElts[i]->name);
+              hts_template_format(fpo, toptemplate_body, hname, sortedElts[i]->name, /* EOF */ NULL);
             }
 
             /* Wipe elements */
@@ -911,9 +965,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
       }
       // Footer
-      fprintf(fpo, toptemplate_footer,
+      hts_template_format(fpo, toptemplate_footer,
               "<!-- Mirror and index made by HTTrack Website Copier/"
-              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->");
+              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
       fclose(fpo);
 

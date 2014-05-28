@@ -207,9 +207,9 @@ Please visit our Website: http://www.httrack.com
   sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,link_escaped); \
   } else \
   tempo[0]='\0'; \
-  fprintf(makeindex_fp,template_footer, \
+  hts_template_format(makeindex_fp,template_footer, \
   "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
-  tempo \
+  tempo, /* EOF */ NULL \
   ); \
   fflush(makeindex_fp); \
   fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
@@ -587,9 +587,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (makeindex_fp != NULL) {
 
                         // Header
-                        fprintf(makeindex_fp, template_header,
+                        hts_template_format(makeindex_fp, template_header,
                                 "<!-- Mirror and index made by HTTrack Website Copier/"
-                                HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->");
+                                HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
                       } else
                         makeindex_done = -1;    // fait, erreur
@@ -651,7 +651,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         // Body
                         inplace_escape_uri_utf(tempo, sizeof(tempo));
-                        fprintf(makeindex_fp, template_body, tempo, s);
+                        hts_template_format(makeindex_fp, template_body, tempo, s, /* EOF */ NULL);
                       }
                     }
                   }
