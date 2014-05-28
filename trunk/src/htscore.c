@@ -183,6 +183,11 @@ RUN_CALLBACK0(opt, end); \
   } \
 } while(0)
 
+#define TypedArraySize(A)   ((A).size)
+#define TypedArrayCapa(A)   ((A).capa)
+#define TypedArrayElts(A)   ((A).elts)
+#define TypedArrayNth(A, N) (TypedArrayElts(A)[N])
+
 struct lien_buffers {
   /* Main array of pointers. 
      This is the real "lien_url **liens" pointer base. */
@@ -243,8 +248,8 @@ static char* hts_record_link_strdup(httrackp *opt, const char *s) {
 size_t hts_record_link_latest(httrackp *opt) {
   lien_buffers *const liensbuf = opt->liensbuf;
 
-  assertf(liensbuf->ptr.size != 0);
-  return liensbuf->ptr.size - 1;
+  assertf(TypedArraySize(liensbuf->ptr) != 0);
+  return TypedArraySize(liensbuf->ptr) - 1;
 }
 
 // returns a new zeroed lien_url entry, 
@@ -281,12 +286,16 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   // Add new lien_url pointer to the array of links
   TypedArrayAdd(liensbuf->ptr, link);
 
+  // Ensure we have a guard NULL
+  TypedArrayAdd(liensbuf->ptr, NULL);
+  TypedArraySize(liensbuf->ptr)--;
+
   // Update pointer as it may have changed,
   // and update heap top index
-  opt->liens = liensbuf->ptr.elts;
-  assertf(liensbuf->ptr.size != 0);
-  assertf(liensbuf->ptr.size < ( (unsigned int) -1 ) / 2);
-  opt->lien_tot = (int) liensbuf->ptr.size;
+  opt->liens = TypedArrayElts(liensbuf->ptr);
+  assertf(TypedArraySize(liensbuf->ptr) != 0);
+  assertf(TypedArraySize(liensbuf->ptr) < ( (unsigned int) -1 ) / 2);
+  opt->lien_tot = (int) TypedArraySize(liensbuf->ptr);
 
   // return tail
   return hts_record_link_latest(opt);
@@ -314,9 +323,9 @@ void hts_record_free(httrackp *opt) {
       liensbuf->string_buffer_capa = 0;
     }
 
-    for(i = 0 ; i < liensbuf->string_buffers.size ; i++) {
-      freet(liensbuf->string_buffers.elts[i]);
-      liensbuf->string_buffers.elts[i] = NULL;
+    for(i = 0 ; i < TypedArraySize(liensbuf->string_buffers) ; i++) {
+      freet(TypedArrayNth(liensbuf->string_buffers, i));
+      TypedArrayNth(liensbuf->string_buffers, i) = NULL;
     }
     TypedArrayFree(liensbuf->string_buffers);
 
@@ -325,9 +334,9 @@ void hts_record_free(httrackp *opt) {
       liensbuf->lien_buffer = NULL;
     }
 
-    for(i = 0 ; i < liensbuf->lien_buffers.size ; i++) {
-      freet(liensbuf->lien_buffers.elts[i]);
-      liensbuf->lien_buffers.elts[i] = NULL;
+    for(i = 0 ; i < TypedArraySize(liensbuf->lien_buffers) ; i++) {
+      freet(TypedArrayNth(liensbuf->lien_buffers, i));
+      TypedArrayNth(liensbuf->lien_buffers, i) = NULL;
     }
     TypedArrayFree(liensbuf->lien_buffers);
 
@@ -966,7 +975,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
       // Skip empty/invalid/done in background
       if (heap(ptr)) {
-        while((heap(ptr))
+        while(ptr < opt->lien_tot
+              && (heap(ptr))
               && ((((urladr() != NULL) ? (urladr()) : (" "))[0] == '!')
                   || (((urlfil() != NULL) ? (urlfil()) : (" "))[0] == '\0')
                   || ((heap(ptr)->pass2 == -1))
