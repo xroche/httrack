@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include "htsmd5.h"
 #include "md5.h"
+#include "htssafe.h"
 
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
   int endian = 1;
@@ -90,6 +91,7 @@ void md5selftest() {
   if (strcmp(digest, VARMD) != 0) { \
     fprintf(stderr, "error: md5 selftest failed: '%s' => '%s'\n", \
             VAR, digest); \
+    assertf(! "md5 selftest failed"); \
   } \
 } while(0)
 MDCHECK(str1, str1m);
