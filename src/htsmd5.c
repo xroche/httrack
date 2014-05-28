@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "htsmd5.h"
 #include "md5.h"
 #include "htssafe.h"
@@ -91,7 +92,7 @@ void md5selftest() {
   if (strcmp(digest, VARMD) != 0) { \
     fprintf(stderr, "error: md5 selftest failed: '%s' => '%s'\n", \
             VAR, digest); \
-    assertf(! "md5 selftest failed"); \
+    assert(! "md5 selftest failed"); \
   } \
 } while(0)
 MDCHECK(str1, str1m);
