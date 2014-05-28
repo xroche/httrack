@@ -18,7 +18,10 @@ typedef unsigned long uint32;
 #endif
 
 struct MD5Context {
-  unsigned char in[64];
+  union {
+    unsigned char ui8[64];
+    uint32 ui32[16];
+  } in;
   uint32 buf[4];
   uint32 bits[2];
   int doByteReverse;
