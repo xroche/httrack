@@ -788,6 +788,7 @@ static int hts_template_formatv(hts_template_format_buf *buf,
 #define FPUTS(S) do { \
   size_t i; \
   const char *const str_ = (S); \
+  assertf(str_ != NULL); \
   for(i = 0 ; str_[i] != '\0' ; i++) { \
     FPUTC(str_[i]); \
   } \
