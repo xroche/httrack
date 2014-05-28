@@ -60,6 +60,7 @@ void longfile_to_83(int mode, char *n83, char *save);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
+int hts_template_format(FILE *const out, const char *format, ...);
 
 #define rech_tageq(adr,s) \
   ( \
