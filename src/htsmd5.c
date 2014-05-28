@@ -1,4 +1,4 @@
-/* ------------------------------------------------------------ */
+
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2014 Xavier Roche and other contributors
@@ -84,14 +84,15 @@ void md5selftest() {
   static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
   static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";
   static const char str2[] = "Hello";
-  static const char str2m[] = "09f7e02f1290be211da707a266f153b3";
+  static const char str2m[] = "8b1a9953c4611296a827abf8c47804d7";
   char digest[64];
 #define MDCHECK(VAR, VARMD) do { \
   memset(digest, 0xCC, sizeof(digest)); \
   domd5mem(VAR, sizeof(VAR) - 1, digest, 1); \
   if (strcmp(digest, VARMD) != 0) { \
-    fprintf(stderr, "error: md5 selftest failed: '%s' => '%s'\n", \
-            VAR, digest); \
+    fprintf(stderr, \
+            "error: md5 selftest failed: '%s' => '%s' (!= '%s')\n", \
+            VAR, digest, VARMD); \
     assert(! "md5 selftest failed"); \
   } \
 } while(0)
