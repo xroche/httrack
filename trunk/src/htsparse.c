@@ -748,9 +748,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   tempo[0] = '\0';
                   time_gmt_rfc822(gmttime);
                   strcatbuff(tempo, eol);
-                  sprintf(tempo + strlen(tempo), StringBuff(opt->footer),
+                  hts_template_format_str(tempo + strlen(tempo), sizeof(tempo) - strlen(tempo),
+                          StringBuff(opt->footer),
                           jump_identification(urladr()), urlfil(), gmttime,
-                          HTTRACK_VERSIONID, "", "", "", "", "", "", "");
+                          HTTRACK_VERSIONID, /* EOF */ NULL);
                   strcatbuff(tempo, eol);
                   //fwrite(tempo,1,strlen(tempo),fp);
                   HT_ADD(tempo);
