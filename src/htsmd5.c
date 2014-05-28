@@ -77,3 +77,23 @@ unsigned long int md5sum32(const char *buff) {
   domd5mem(buff, strlen(buff), u.md5digest, 0);
   return u.hash;
 }
+
+void md5selftest() {
+  static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
+  static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";
+  static const char str2[] = "Hello";
+  static const char str2m[] = "09f7e02f1290be211da707a266f153b3";
+  char digest[64];
+#define MDCHECK(VAR, VARMD) do { \
+  memset(digest, 0xCC, sizeof(digest)); \
+  domd5mem(VAR, sizeof(VAR) - 1, digest, 1); \
+  if (strcmp(digest, VARMD) != 0) { \
+    fprintf(stderr, "error: md5 selftest failed: '%s' => '%s'\n", \
+            VAR, digest); \
+  } \
+} while(0)
+MDCHECK(str1, str1m);
+MDCHECK(str2, str2m);
+#undef MDCHECK
+  fprintf(stderr, "md5 selftest succeeded\n");
+}
