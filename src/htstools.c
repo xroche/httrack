@@ -772,6 +772,7 @@ static int hts_template_formatv(hts_template_format_buf *buf,
 #undef FPUTS
 #define FPUTC(C) do { \
   if (buf->fp != NULL) { \
+    assertf(buf->buffer == NULL); \
     if (fputc(C, buf->fp) < 0) { \
       return -1; \
     } \
@@ -827,6 +828,10 @@ static int hts_template_formatv(hts_template_format_buf *buf,
       } else {
         FPUTC(c);
       }
+    }
+    /* Terminating NULL. */
+    if (buf->buffer != NULL) {
+      buf->buffer[buf->offset] = 0;
     }
     return 1;
   } else {
