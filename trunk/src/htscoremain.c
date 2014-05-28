@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htsmd5.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
@@ -2410,6 +2411,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '7':  // hashtable selftest: httrack -#7 nb_entries
+                md5selftest();
                 if (++na < argc) {
                   char *const snum = strdup(argv[na]);
                   unsigned long count = 0;
