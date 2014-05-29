@@ -3059,15 +3059,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     if ((afs.af.adr[0] != '\0') && (p_type != 2) && (p_type != -2) && (forbidden_url != 1)) {  // si le fichier n'existe pas, ajouter à la liste                            
                       // n'y a-t-il pas trop de liens?
-                      if (0) {
-                        // CLEANUP
-#if 0
-                      if (opt->lien_tot + 1 >= lien_max - 4) {       // trop de liens!
-                        printf("PANIC! : Too many URLs : >%d [%d]\n", lien_tot,
+                      if (opt->maxlink > 0 && opt->lien_tot + 1 >= opt->maxlink) {       // trop de liens!
+                        printf("PANIC! : Too many URLs : >%d [%d]\n", opt->lien_tot,
                                __LINE__);
-                        hts_log_print(opt, LOG_PANIC,
-                                      "Too many URLs, giving up..(>%d)",
-                                      lien_max);
+                        hts_log_print(opt, LOG_PANIC, "Too many URLs, giving up..(>%d)",
+                                      opt->maxlink);
                         hts_log_print(opt, LOG_INFO,
                                       "To avoid that: use #L option for more links (example: -#L1000000)");
                         if ((opt->getmode & 1) && (ptr > 0)) {
@@ -3078,7 +3074,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
                         XH_uninit;      // désallocation mémoire & buffers
                         return -1;
-#endif
                       } else {  // noter le lien sur la listes des liens à charger
                         int pass_fix, dejafait = 0;
 
@@ -3149,10 +3144,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     if (checkrobots(_ROBOTS, afs.af.adr, "") == -1) {  // robots.txt ?
                                       // enregistrer robots.txt (MACRO)
                                       if (!hts_record_link(opt, afs.af.adr, "/robots.txt", "", "", "", NULL)) {
-                                        printf
-                                          ("PANIC! : Not enough memory [%d]\n",
-                                           __LINE__);
-                                        hts_log_print(opt, LOG_PANIC, "Not enough memory");
                                         if ((opt->getmode & 1) && (ptr > 0)) {
                                           if (fp) {
                                             fclose(fp);
@@ -3192,9 +3183,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // enregistrer
                           if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, 
                                                former.adr, former.fil, codebase)) {
-                            printf("PANIC! : Not enough memory [%d]\n",
-                                   __LINE__);
-                            hts_log_print(opt, LOG_PANIC, "Not enough memory");
                             if ((opt->getmode & 1) && (ptr > 0)) {
                               if (fp) {
                                 fclose(fp);
@@ -3546,9 +3534,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
                   } else {      // oups erreur, plus de mémoire!!
-                    printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-                    hts_log_print(opt, LOG_PANIC, "Not enough memory");
-                    //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
                     XH_uninit;  // désallocation mémoire & buffers
                     return 0;
                   }
@@ -3646,9 +3631,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           hash_invalidate_entry(hashptr, ptr);  // invalidate hashtable entry
           //
         } else {              // oups erreur, plus de mémoire!!
-          printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-          hts_log_print(opt, LOG_PANIC, "Not enough memory");
-          //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
           XH_uninit;          // désallocation mémoire & buffers
           return 0;
         }
@@ -3783,10 +3765,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             heap_top()->premier = heap(ptr)->premier;
             heap_top()->precedent = heap(ptr)->precedent;
           } else {              // oups erreur, plus de mémoire!!
-            printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-            hts_log_print(opt, LOG_PANIC, "Not enough memory");
-            //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
-            XH_uninit;          // désallocation mémoire & buffers
             return 0;
           }
         }
@@ -3950,9 +3928,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
                             add.af.fil);
               //
             } else {            // oups erreur, plus de mémoire!!
-              printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-              hts_log_print(opt, LOG_PANIC, "Not enough memory");
-              //if (opt->getmode & 1) { if (fp) { fclose(fp); fp=NULL; } }
               XH_uninit;        // désallocation mémoire & buffers
               return;
             }

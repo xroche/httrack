@@ -366,10 +366,10 @@ void hts_record_free(httrackp *opt) {
 }
 
 // adds a new link and returns a non-zero value upon success
-int hts_record_link(httrackp * opt,
-                    const char *address, const char *file, const char *save,
-                    const char *ref_address, const char *ref_file,
-                    const char *codebase) {
+static int hts_record_link_(httrackp * opt,
+                            const char *address, const char *file, const char *save,
+                            const char *ref_address, const char *ref_file,
+                            const char *codebase) {
   // create a new entry
   const size_t lien_tot = hts_record_link_alloc(opt);
   lien_url*const link = lien_tot != (size_t) -1 ? opt->liens[lien_tot] : NULL;
@@ -402,6 +402,21 @@ int hts_record_link(httrackp * opt,
 
   // success
   return 1;
+}
+
+int hts_record_link(httrackp * opt,
+                    const char *address, const char *file, const char *save,
+                    const char *ref_address, const char *ref_file,
+                    const char *codebase) {
+  const int success = 
+    hts_record_link_(opt, address, file, save, ref_address, ref_file, codebase);
+  if (!success) {
+    hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
+                  (long int) heap_top_index(), (long int) opt->maxlink);
+    hts_log_print(opt, LOG_INFO,
+      "To avoid that: use #L option for more links (example: -#L1000000)");
+  }
+  return success;
 }
 
 #define HT_INDEX_END do { \
@@ -788,8 +803,6 @@ int httpmirror(char *url1, httrackp * opt) {
                         fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                         StringBuff(opt->path_html_utf8), "index.html")),
                         "", "", NULL)) {
-      printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-      hts_log_print(opt, LOG_PANIC, "Not enough memory");
       XH_extuninit;             // désallocation mémoire & buffers
       return 0;
     }
@@ -3901,8 +3914,6 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
 
               // enregistrer fichier (MACRO)
               if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
-                printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-                hts_log_print(opt, LOG_PANIC, "Not enough memory");
                 opt->state.exit_xh = -1;        /* fatal error -> exit */
                 return 0;
               }
