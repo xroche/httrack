@@ -216,7 +216,7 @@ HTS_UNUSED static const char *jump_protocol_and_auth(const char *source) {
 #endif
 HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloc(max + 2);
+  char *const ls = (char *) malloc(max + 1);
 
   s[0] = '\0';
   if (ls) {

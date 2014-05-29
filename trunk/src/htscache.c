@@ -2085,7 +2085,7 @@ char *readfile_or(const char *fil, const char *defaultdata) {
   if (ret)
     return ret;
   else {
-    char *adr = malloct(strlen(defaultdata) + 2);
+    char *adr = malloct(strlen(defaultdata) + 1);
 
     if (adr) {
       strcpybuff(adr, defaultdata);

@@ -3081,7 +3081,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
 }
 int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloct(max + 2);
+  char *ls = (char *) malloct(max + 1);
 
   s[0] = '\0';
   if (ls) {

@@ -228,7 +228,7 @@ static int linput(FILE * fp, char *s, int max) {
 }
 static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloc(max + 2);
+  char *ls = (char *) malloc(max + 1);
 
   s[0] = '\0';
   if (ls) {
