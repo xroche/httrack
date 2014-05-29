@@ -2425,7 +2425,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       hts_log_print(opt, LOG_DEBUG,
                                     "wizard link test at %s%s..", adr, fil);
                       forbidden_url =
-                        hts_acceptlink(opt, ptr, opt->lien_tot, opt->liens, adr, fil,
+                        hts_acceptlink(opt, ptr, adr, fil,
                                        intag_name ? intag_name : NULL,
                                        intag_name ? tag_attr_start : NULL,
                                        &set_prio_to, &just_test_it);
@@ -2492,8 +2492,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                             "wizard moved link retest at %s%s..",
                                             adr, fil);
                               forbidden_url =
-                                hts_acceptlink(opt, ptr, opt->lien_tot, opt->liens, adr,
-                                               fil,
+                                hts_acceptlink(opt, ptr, adr, fil,
                                                intag_name ? intag_name : NULL,
                                                intag_name ? tag_attr_start :
                                                NULL, &set_prio_to,
@@ -3337,7 +3336,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           opt->state._hts_in_html_poll = 0;
           // temps à attendre, et remplir autant que l'on peut le cache (backing)
           back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
-          back_fillmax(sback, opt, cache, opt->liens, ptr, numero_passe, opt->lien_tot);
+          back_fillmax(sback, opt, cache, ptr, numero_passe);
 
           // Transfer rate
           engine_stats();
@@ -3368,7 +3367,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         // refresh the backing system each 2 seconds
         if (engine_stats()) {
           back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
-          back_fillmax(sback, opt, cache, opt->liens, ptr, numero_passe, opt->lien_tot);
+          back_fillmax(sback, opt, cache, ptr, numero_passe);
         }
       } while((((int) (adr - r->adr))) < r->size);
 
@@ -3498,7 +3497,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                             "wizard link test for moved file at %s%s..",
                             mov_adr, mov_fil);
               // accepté?
-              if (hts_acceptlink(opt, ptr, opt->lien_tot, opt->liens, mov_adr, mov_fil, NULL, NULL, &set_prio_to, NULL) != 1) {   /* nouvelle adresse non refusée ? */
+              if (hts_acceptlink(opt, ptr, mov_adr, mov_fil, NULL, NULL, &set_prio_to, NULL) != 1) {   /* nouvelle adresse non refusée ? */
                 get_it = 1;
                 hts_log_print(opt, LOG_DEBUG, "moved link accepted: %s%s",
                               mov_adr, mov_fil);
@@ -3675,8 +3674,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         if (opt->hostcontrol) { // timeout et retry épuisés
           if ((opt->hostcontrol & 1) && (heap(ptr)->retry <= 0)) {
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
-            host_ban(opt, opt->liens, ptr, opt->lien_tot, sback,
-                     jump_identification(urladr()));
+            host_ban(opt, ptr, sback, jump_identification(urladr()));
             hts_log_print(opt, LOG_DEBUG,
                           "Info: previous log - link banned: %s%s", urladr(),
                           urlfil());
@@ -3689,8 +3687,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         if ((opt->hostcontrol) && (heap(ptr)->retry <= 0)) {   // too slow
           if (opt->hostcontrol & 2) {
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
-            host_ban(opt, opt->liens, ptr, opt->lien_tot, sback,
-                     jump_identification(urladr()));
+            host_ban(opt, ptr, sback, jump_identification(urladr()));
             hts_log_print(opt, LOG_DEBUG,
                           "Info: previous log - link banned: %s%s", urladr(),
                           urlfil());
@@ -4078,7 +4075,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
   if ((n > 0) && (!opt->state._hts_setpause)) { // si sockets libre et pas en pause, ajouter
     // remplir autant que l'on peut le cache (backing)
-    back_fillmax(sback, opt, cache, opt->liens, ptr, numero_passe, opt->lien_tot);
+    back_fillmax(sback, opt, cache, ptr, numero_passe);
   }
   // index du lien actuel
   {
@@ -4119,7 +4116,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       }
       // And fill the backing stack
       if (back[b].status > 0)
-        back_fillmax(sback, opt, cache, opt->liens, ptr, numero_passe, opt->lien_tot);
+        back_fillmax(sback, opt, cache, ptr, numero_passe);
 
       // Continue to the loop if link still present
       b = back_index(opt, sback, urladr(), urlfil(), savename());
@@ -4467,8 +4464,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
           /* Recompute authorization with MIME type */
           {
             int new_forbidden_url =
-              hts_acceptmime(opt, ptr, opt->lien_tot, opt->liens, adr, fil,
-                             back.r.contenttype);
+              hts_acceptmime(opt, ptr, adr, fil, back.r.contenttype);
             if (new_forbidden_url != -1) {
               hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
                             new_forbidden_url);
@@ -4541,8 +4537,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
           /* Recompute authorization with MIME type */
           {
             int new_forbidden_url =
-              hts_acceptmime(opt, ptr, opt->lien_tot, opt->liens, adr, fil,
-                             delayed_back.r.contenttype);
+              hts_acceptmime(opt, ptr, adr, fil, delayed_back.r.contenttype);
             if (new_forbidden_url != -1) {
               hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
                             *forbidden_url);
@@ -4591,7 +4586,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
             back_wait(sback, opt, cache, 0);
           }
           if (ptr >= 0) {
-            back_fillmax(sback, opt, cache, opt->liens, ptr, numero_passe, opt->lien_tot);
+            back_fillmax(sback, opt, cache, ptr, numero_passe);
           }
           // on est obligé d'appeler le shell pour le refresh..
           {
@@ -4691,7 +4686,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
                   {
                     int set_prio_to = 0;
 
-                    if (hts_acceptlink(opt, ptr, opt->lien_tot, opt->liens, mov_adr, mov_fil, NULL, NULL, &set_prio_to, NULL) == 1) {     /* forbidden */
+                    if (hts_acceptlink(opt, ptr, mov_adr, mov_fil, NULL, NULL, &set_prio_to, NULL) == 1) {     /* forbidden */
                       /* Note: the cache 'cached_tests' system will remember this error, and we'll only issue ONE request */
                       *forbidden_url = 1;       /* Forbidden! */
                       hts_log_print(opt, LOG_DEBUG,
@@ -4744,8 +4739,7 @@ int hts_wait_delayed(htsmoduleStruct * str, char *adr, char *fil, char *save,
             /* Recompute authorization with MIME type */
             {
               int new_forbidden_url =
-                hts_acceptmime(opt, ptr, opt->lien_tot, opt->liens, adr, fil,
-                               delayed_back.r.contenttype);
+                hts_acceptmime(opt, ptr, adr, fil, delayed_back.r.contenttype);
               if (new_forbidden_url != -1) {
                 hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
                               *forbidden_url);

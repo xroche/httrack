@@ -75,8 +75,7 @@ htspair_t hts_detect_embed[] = {
 };
 
 /* Internal */
-static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
-                           lien_url ** liens, const char *adr,
+static int hts_acceptlink_(httrackp * opt, int ptr, const char *adr,
                            const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
                            int *just_test_it);
@@ -102,11 +101,10 @@ retour:
 */
 
 int hts_acceptlink(httrackp * opt, int ptr,
-                   int lien_tot, lien_url ** liens,
                    const char *adr, const char *fil,
                    const char *tag, const char *attribute,
                    int *set_prio_to, int *just_test_it) {
-  int forbidden_url = hts_acceptlink_(opt, ptr, lien_tot, liens,
+  int forbidden_url = hts_acceptlink_(opt, ptr,
                                       adr, fil, tag, attribute, set_prio_to,
                                       just_test_it);
   int prev_prio = set_prio_to ? *set_prio_to : 0;
@@ -132,8 +130,7 @@ static int cmp_token(const char *tag, const char *cmp) {
           && !isalnum((unsigned char) tag[p]));
 }
 
-static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
-                           lien_url ** liens,
+static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
                            int *just_test_it) {
@@ -863,7 +860,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr, int lien_tot,
 #undef _ROBOTS
 }
 
-int hts_acceptmime(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
+int hts_acceptmime(httrackp * opt, int ptr,
                    const char *adr, const char *fil, const char *mime) {
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)

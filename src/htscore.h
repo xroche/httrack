@@ -337,8 +337,7 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
 char *hts_cancel_file_pop(httrackp * opt);
 int check_fatal_io_errno(void);
 int engine_stats(void);
-void host_ban(httrackp * opt, lien_url ** liens, int ptr, int lien_tot,
-              struct_back * sback, char *host);
+void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 FILE *filecreate(filenote_strc * strct, const char *s);
 FILE *fileappend(filenote_strc * strct, const char *s);
 int filecreateempty(filenote_strc * strct, const char *filename);
@@ -371,11 +370,11 @@ int liens_record(char *adr, char *fil, char *save, char *former_adr,
 int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
-              lien_url ** liens, int ptr, int numero_passe, int lien_tot);
+              int ptr, int numero_passe);
 int backlinks_done(const struct_back * sback, lien_url ** liens, 
                    int lien_tot, int ptr);
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
-                 lien_url ** liens, int ptr, int numero_passe, int lien_tot);
+                 int ptr, int numero_passe);
 
 int ask_continue(httrackp * opt);
 int nombre_digit(int n);

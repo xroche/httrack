@@ -500,8 +500,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                     back_wait(sback, opt, cache, 0);
                   }
                   if (ptr >= 0) {
-                    back_fillmax(sback, opt, cache, liens, ptr, numero_passe,
-                                 lien_tot);
+                    back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
                   // on est obligé d'appeler le shell pour le refresh..
                   // Transfer rate
