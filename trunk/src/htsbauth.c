@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htscore.h"
 
 /* END specific definitions */
 
@@ -231,15 +232,14 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
               char dummy[512];
 
               //
-              char domain[256]; // domaine cookie (.netscape.com)
-              char path[256];   // chemin (/)
+              lien_adrfil af;   // chemin (/)
               int cookie_merged = 0;
 
               //
               // Read all cookies
               while(!feof(fp)) {
                 cook_name[0] = cook_value[0] = domainpathpath[0]
-                  = dummy[0] = domain[0] = path[0] = '\0';
+                = dummy[0] = af.adr[0] = af.fil[0] = '\0';
                 linput(fp, cook_name, 250);
                 if (!feof(fp)) {
                   linput(fp, cook_value, 250);
@@ -254,8 +254,8 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
                     if (strnotempty(cook_name)
                         && strnotempty(cook_value)
                         && strnotempty(domainpathpath)) {
-                      if (ident_url_absolute(domainpathpath, domain, path) >= 0) {
-                        cookie_add(cookie, cook_name, cook_value, domain, path);
+                      if (ident_url_absolute(domainpathpath, &af) >= 0) {
+                        cookie_add(cookie, cook_name, cook_value, af.adr, af.fil);
                         cookie_merged = 1;
                       }
                     }

@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
+#include "htscore.h"
 #include <fcntl.h>
 #ifdef _WIN32
 #else
@@ -174,21 +175,20 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
       socinput(soc, line, 1000);
       if (strnotempty(line)) {
         if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
-          char BIGSTK url_adr[HTS_URLMAXSIZE * 2];
-          char BIGSTK url_fil[HTS_URLMAXSIZE * 2];
+          lien_adrfil af;
 
           // méthode en majuscule
           size_t i;
           int r = 0;
 
-          url_adr[0] = url_fil[0] = '\0';
+          af.adr[0] = af.fil[0] = '\0';
           //
           for(i = 0; method[i] != '\0'; i++) {
             if ((method[i] >= 'a') && (method[i] <= 'z'))
               method[i] -= ('a' - 'A');
           }
           // adresse du lien
-          if (ident_url_absolute(url, url_adr, url_fil) >= 0) {
+          if (ident_url_absolute(url, &af) >= 0) {
             // Traitement des en-têtes
             char BIGSTK loc[HTS_URLMAXSIZE * 2];
             htsblk blkretour;
@@ -197,7 +197,7 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
             //memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
-            sprintf(data, "%s %s %s\r\n", method, url_fil, protocol);
+            sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
             while(strnotempty(line)) {
               socinput(soc, line, 1000);
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
