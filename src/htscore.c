@@ -157,6 +157,13 @@ RUN_CALLBACK0(opt, end); \
 } while(0)
 #define XH_uninit do { XH_extuninit; if (r.adr) { freet(r.adr); r.adr=NULL; } } while(0)
 
+// memory allocation assertion failure
+static void hts_record_assert_memory_failed(const size_t size) {
+  fprintf(stderr, "memory allocation failed (%lu bytes)", \
+          (long int) size); \
+  assertf(! "memory allocation failed"); \
+}
+
 // Typed array
 #define TypedArray(T) \
   struct {            \
@@ -170,6 +177,9 @@ RUN_CALLBACK0(opt, end); \
   if ((A).capa == (A).size) { \
     (A).capa = (A).capa < 16 ? 16 : (A).capa * 2; \
     (A).elts = realloct((A).elts, (A).capa*sizeof(*(A).elts)); \
+    if ((A).elts == NULL) { \
+      hts_record_assert_memory_failed((A).capa*sizeof(*(A).elts)); \
+    } \
   } \
   assertf((A).size < (A).capa); \
   (A).elts[(A).size++] = (E); \
@@ -225,7 +235,7 @@ static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
 
     liensbuf->string_buffer = malloct(block_capa);
     if (liensbuf->string_buffer == NULL) {
-      return NULL;
+      hts_record_assert_memory_failed(block_capa); \
     }
     liensbuf->string_buffer_capa = block_capa;
     liensbuf->string_buffer_size = 0;
@@ -277,7 +287,7 @@ static size_t hts_record_link_alloc(httrackp *opt) {
 
     liensbuf->lien_buffer = (lien_url*) malloct(block_capa*sizeof(*liensbuf->lien_buffer));
     if (liensbuf->lien_buffer == NULL) {
-      return (size_t) -1;
+      hts_record_assert_memory_failed(block_capa*sizeof(*liensbuf->lien_buffer));
     }
     liensbuf->lien_buffer_capa = block_capa;
     liensbuf->lien_buffer_size = 0;
@@ -309,6 +319,9 @@ static size_t hts_record_link_alloc(httrackp *opt) {
 void hts_record_init(httrackp *opt) {
   if (opt->liensbuf == NULL) {
     opt->liensbuf = calloct(sizeof(*opt->liensbuf), 1);
+    if (opt->liensbuf == NULL) {
+      hts_record_assert_memory_failed(sizeof(*opt->liensbuf));
+    }
   }
 }
 
