@@ -1984,36 +1984,6 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
 }
 
-// teste une adresse, et suit l'éventuel chemin "moved"
-// retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
-// copie dans loc la véritable adresse si celle-ci est différente
-htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc) {
-  htsblk retour;
-  int retry = 0;
-  int tryagain;
-
-  // note: "RFC says"
-  // 5 boucles au plus, on en teste au plus 8 ici
-  // sinon abandon..
-  do {
-    tryagain = 0;
-    switch ((retour = http_test(opt, adr, fil, loc)).statuscode) {
-    case HTTP_OK:
-      break;                    // ok!
-    case HTTP_MOVED_PERMANENTLY:
-    case HTTP_FOUND:
-    case HTTP_SEE_OTHER:
-    case HTTP_TEMPORARY_REDIRECT:      // moved!
-      // recalculer adr et fil!
-      if (ident_url_absolute(loc, adr, fil) != -1) {
-        tryagain = 1;           // retenter
-        retry++;                // ..encore une fois
-      }
-    }
-  } while((tryagain) && (retry < 5 + 3));
-  return retour;
-}
-
 // teste si une URL (validité, header, taille)
 // retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
 // en cas de moved xx, dans location
@@ -2340,12 +2310,12 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 // couper http://www.truc.fr/pub/index.html -> www.truc.fr /pub/index.html
 // retour=-1 si erreur.
 // si file://... alors adresse=file:// (et coupe le ?query dans ce cas)
-int ident_url_absolute(const char *url, char *adr, char *fil) {
+int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   int pos = 0;
   int scheme = 0;
 
-  // effacer adr et fil
-  adr[0] = fil[0] = '\0';
+  // effacer adrfil->adr et adrfil->fil
+  adrfil->adr[0] = adrfil->fil[0] = '\0';
 
 #if HDEBUG
   printf("protocol: %s\n", url);
@@ -2364,15 +2334,15 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
   // 1. optional scheme ":"
   if ((pos = strfield(url, "file:"))) { // fichier local!! (pour les tests)
     //!!p+=3;
-    strcpybuff(adr, "file://");
+    strcpybuff(adrfil->adr, "file://");
   } else if ((pos = strfield(url, "http:"))) {  // HTTP
     //!!p+=3;
   } else if ((pos = strfield(url, "ftp:"))) {   // FTP
-    strcpybuff(adr, "ftp://");  // FTP!!
+    strcpybuff(adrfil->adr, "ftp://");  // FTP!!
     //!!p+=3;
 #if HTS_USEOPENSSL
   } else if ((pos = strfield(url, "https:"))) {     // HTTPS
-    strcpybuff(adr, "https://");
+    strcpybuff(adrfil->adr, "https://");
 #endif
   } else if (scheme) {
     return -1;                  // erreur non reconnu
@@ -2385,13 +2355,13 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
 
   // (url+pos) now points to the path (not net path)
 
-  //## if (adr[0]!=lOCAL_CHAR) {    // adresse normale http
-  if (!strfield(adr, "file:")) {        // PAS file://
+  //## if (adrfil->adr[0]!=lOCAL_CHAR) {    // adrfil->adresse normale http
+  if (!strfield(adrfil->adr, "file:")) {        // PAS adrfil->file://
     const char *p, *q;
 
     p = url + pos;
 
-    // p pointe sur le début de l'adresse, ex: www.truc.fr/sommaire/index.html
+    // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
     q = strchr(jump_identification(p), '/');
     if (q == 0)
       q = strchr(jump_identification(p), '?');  // http://www.foo.com?bar=1
@@ -2404,53 +2374,53 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
       //strcpybuff(retour.msg,"Path too long");
       return -1;                // erreur
     }
-    // recopier adresse www..
-    strncatbuff(adr, p, ((int) (q - p)));
-    // *( adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
+    // recopier adrfil->adresse www..
+    strncatbuff(adrfil->adr, p, ((int) (q - p)));
+    // *( adrfil->adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
     // recopier chemin /pub/..
     if (q[0] != '/')            // page par défaut (/)
-      strcatbuff(fil, "/");
-    strcatbuff(fil, q);
+      strcatbuff(adrfil->fil, "/");
+    strcatbuff(adrfil->fil, q);
     // SECURITE:
     // simplifier url pour les ../
-    fil_simplifie(fil);
-  } else {                      // localhost file://
+    fil_simplifie(adrfil->fil);
+  } else {                      // localhost adrfil->file://
     const char *p;
     size_t i;
     char *a;
 
     p = url + pos;
-    if (*p == '/' || *p == '\\') {      /* file:///.. */
-      strcatbuff(fil, p);       // fichier local ; adr="#"
+    if (*p == '/' || *p == '\\') {      /* adrfil->file:///.. */
+      strcatbuff(adrfil->fil, p);       // fichier local ; adrfil->adr="#"
     } else {
       if (p[1] != ':') {
-        strcatbuff(fil, "//");  /* file://server/foo */
-        strcatbuff(fil, p);
+        strcatbuff(adrfil->fil, "//");  /* adrfil->file://server/foo */
+        strcatbuff(adrfil->fil, p);
       } else {
-        strcatbuff(fil, p);     // file://C:\..
+        strcatbuff(adrfil->fil, p);     // adrfil->file://C:\..
       }
     }
 
-    a = strchr(fil, '?');
+    a = strchr(adrfil->fil, '?');
     if (a)
-      *a = '\0';                /* couper query (inutile pour file:// lors de la requête) */
-    // filtrer les \\ -> / pour les fichiers DOS
-    for(i = 0; fil[i] != '\0'; i++)
-      if (fil[i] == '\\')
-        fil[i] = '/';
+      *a = '\0';                /* couper query (inutile pour adrfil->file:// lors de la requête) */
+    // adrfil->filtrer les \\ -> / pour les fichiers DOS
+    for(i = 0; adrfil->fil[i] != '\0'; i++)
+      if (adrfil->fil[i] == '\\')
+        adrfil->fil[i] = '/';
   }
 
   // no hostname
-  if (!strnotempty(adr))
+  if (!strnotempty(adrfil->adr))
     return -1;                  // erreur non reconnu
 
   // nommer au besoin.. (non utilisé normalement)
-  if (!strnotempty(fil))
-    strcpybuff(fil, "default-index.html");
+  if (!strnotempty(adrfil->fil))
+    strcpybuff(adrfil->fil, "default-index.html");
 
-  // case insensitive pour adresse
+  // case insensitive pour adrfil->adresse
   {
-    char *a = jump_identification(adr);
+    char *a = jump_identification(adrfil->adr);
 
     while(*a) {
       if ((*a >= 'A') && (*a <= 'Z'))

@@ -998,6 +998,10 @@ int httpmirror(char *url1, httrackp * opt) {
           }
           ptr++;
         }
+        // We're done!
+        if (ptr == opt->lien_tot) {
+          goto jump_if_done;
+        }
       }
       if (heap(ptr) != NULL) { // on a qq chose à récupérer?
 
@@ -3716,8 +3720,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
   if (link != NULL && str != NULL && link[0] != '\0') {
     ENGINE_LOAD_CONTEXT_BASE();
     /* */
-    char BIGSTK adr[HTS_URLMAXSIZE * 2], fil[HTS_URLMAXSIZE * 2],
-      save[HTS_URLMAXSIZE * 2];
+    lien_adrfilsave afs;
     char BIGSTK codebase[HTS_URLMAXSIZE * 2];
 
     /* */
@@ -3788,13 +3791,13 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
       if (strnotempty(lien) && strlen(lien) < HTS_URLMAXSIZE) {
 
         // calculer les chemins et noms de sauvegarde
-        if (ident_url_relatif(lien, urladr(), codebase, adr, fil) >= 0) { // reformage selon chemin
+        if (ident_url_relatif(lien, urladr(), codebase, &afs.af) >= 0) { // reformage selon chemin
           int r;
           int set_prio_to = 0;
           int just_test_it = 0;
 
           forbidden_url =
-            hts_acceptlink(opt, ptr, adr, fil, NULL, NULL, &set_prio_to, &just_test_it);
+            hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil, NULL, NULL, &set_prio_to, &just_test_it);
           hts_log_print(opt, LOG_DEBUG,
                         "result for wizard external module link: %d",
                         forbidden_url);
@@ -3811,29 +3814,26 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             opt->savename_83 = 0;
             // note: adr,fil peuvent être patchés
             r =
-              url_savename(adr, fil, save, NULL, NULL, NULL, NULL, opt, opt->liens,
-                           opt->lien_tot, sback, cache, hashptr, ptr, numero_passe,
+              url_savename(&afs, NULL, NULL, NULL, opt, sback, cache, hashptr, ptr, numero_passe,
                            NULL);
             // resolve unresolved type
-            if (r != -1 && forbidden_url == 0 && IS_DELAYED_EXT(save)
+            if (r != -1 && forbidden_url == 0 && IS_DELAYED_EXT(afs.save)
               ) {               // pas d'erreur, on continue
-              char BIGSTK former_adr[HTS_URLMAXSIZE * 2];
-              char BIGSTK former_fil[HTS_URLMAXSIZE * 2];
+              lien_adrfil former;
 
-              former_adr[0] = former_fil[0] = '\0';
+              former.adr[0] = former.fil[0] = '\0';
               r =
-                hts_wait_delayed(str, adr, fil, save, NULL, NULL, former_adr,
-                                 former_fil, &forbidden_url);
+                hts_wait_delayed(str, &afs, NULL, NULL, &former, &forbidden_url);
             }
             // end resolve unresolved type
             opt->savename_type = a;
             opt->savename_83 = b;
             if (r != -1 && !forbidden_url) {
               if (savename()) {
-                if (lienrelatif(tempo, save, savename()) == 0) {
+                if (lienrelatif(tempo, afs.save, savename()) == 0) {
                   hts_log_print(opt, LOG_DEBUG,
                                 "(module): relative link at %s build with %s and %s: %s",
-                                adr, save, savename(), tempo);
+                                afs.af.adr, afs.save, savename(), tempo);
                   if (str->localLink
                       && str->localLinkSize > (int) strlen(tempo) + 1) {
                     strcpybuff(str->localLink, tempo);
@@ -3847,19 +3847,19 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             hts_log_print(opt, LOG_DEBUG, "(module): file not caught: %s",
                           lien);
             if (str->localLink
-                && str->localLinkSize > (int) (strlen(adr) + strlen(fil) + 8)) {
+                && str->localLinkSize > (int) (strlen(afs.af.adr) + strlen(afs.af.fil) + 8)) {
               str->localLink[0] = '\0';
-              if (!link_has_authority(adr))
+              if (!link_has_authority(afs.af.adr))
                 strcpybuff(str->localLink, "http://");
-              strcatbuff(str->localLink, adr);
-              strcatbuff(str->localLink, fil);
+              strcatbuff(str->localLink, afs.af.adr);
+              strcatbuff(str->localLink, afs.af.fil);
             }
             r = -1;
           }
           //
           if (r != -1) {
-            hts_log_print(opt, LOG_DEBUG, "(module): %s%s -> %s (base %s)", adr,
-                          fil, save, codebase);
+            hts_log_print(opt, LOG_DEBUG, "(module): %s%s -> %s (base %s)", afs.af.adr,
+                          afs.af.fil, afs.save, codebase);
 
             // modifié par rapport à l'autre version (cf prio_fix notamment et save2)
 
@@ -3869,7 +3869,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             //
             // On part de la fin et on essaye de se presser (économise temps machine)
             {
-              int i = hash_read(hashptr, save, NULL, HASH_STRUCT_FILENAME );    // lecture type 0 (sav)
+              int i = hash_read(hashptr, afs.save, NULL, HASH_STRUCT_FILENAME );    // lecture type 0 (sav)
 
               if (i >= 0) {
                 heap(i)->depth = maximum(heap(i)->depth, prio_fix);
@@ -3882,7 +3882,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               // >>>> CREER LE LIEN JAVA <<<<
 
               // enregistrer fichier (MACRO)
-              if (!hts_record_link(opt, adr, fil, save, "", "", "")) {    // erreur, pas de place réservée
+              if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
                 printf("PANIC! : Not enough memory [%d]\n", __LINE__);
                 hts_log_print(opt, LOG_PANIC, "Not enough memory");
                 opt->state.exit_xh = -1;        /* fatal error -> exit */

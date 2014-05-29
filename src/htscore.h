@@ -152,6 +152,26 @@ struct lien_url {
   int testmode;                 // mode test uniquement, envoyer juste un head!
 };
 
+// adr, fil
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
+#define HTS_DEF_FWSTRUCT_lien_adrfil
+typedef struct lien_adrfil lien_adrfil;
+#endif
+struct lien_adrfil {
+  char adr[HTS_URLMAXSIZE * 2];      // adresse
+  char fil[HTS_URLMAXSIZE * 2];      // nom du fichier distant
+};
+
+// adr, fil, save
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
+#define HTS_DEF_FWSTRUCT_lien_adrfilsave
+typedef struct lien_adrfilsave lien_adrfilsave;
+#endif
+struct lien_adrfilsave {
+  lien_adrfil af;
+  char save[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
+};
+
 // chargement de fichiers en 'arrière plan'
 #ifndef HTS_DEF_FWSTRUCT_lien_back
 #define HTS_DEF_FWSTRUCT_lien_back
@@ -398,7 +418,6 @@ int htsAddLink(htsmoduleStruct * str, char *link);
 
 // Void
 void voidf(void);
-
 #define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
 
 #endif

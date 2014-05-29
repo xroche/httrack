@@ -80,18 +80,27 @@ typedef struct hash_struct hash_struct;
 #define HTS_DEF_FWSTRUCT_lien_back
 typedef struct lien_back lien_back;
 #endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
+#define HTS_DEF_FWSTRUCT_lien_adrfil
+typedef struct lien_adrfil lien_adrfil;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
+#define HTS_DEF_FWSTRUCT_lien_adrfilsave
+typedef struct lien_adrfilsave lien_adrfilsave;
+#endif
 
 // note: 'headers' can either be null, or incomplete (only r member filled)
-int url_savename(char *adr_complete, char *fil_complete, char *save,
-                 char *former_adr, char *former_fil, const char *referer_adr,
-                 const char *referer_fil, httrackp * opt, lien_url ** liens,
-                 int lien_tot, struct_back * sback, cache_back * cache,
+int url_savename(lien_adrfilsave *const afs,
+                 lien_adrfil *const former,
+                 const char *referer_adr, const char *referer_fil, 
+                 httrackp * opt, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers);
-void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
+void standard_name(char *b, const char *dot_pos, const char *nom_pos,
+                   const char *fil_complete,
                    int short_ver);
-void url_savename_addstr(char *d, char *s);
-char *url_md5(char *digest_buffer, char *fil_complete);
+void url_savename_addstr(char *d, const char *s);
+char *url_md5(char *digest_buffer, const char *fil_complete);
 void url_savename_refname(const char *adr, const char *fil, char *filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil);

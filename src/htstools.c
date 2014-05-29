@@ -122,12 +122,15 @@ static void unescapehttp(const char *s, String * tempo) {
 // -1 : erreur
 // -2 : protocole non supporté (ftp)
 int ident_url_relatif(const char *lien, const char *origin_adr,
-                      const char *origin_fil, char *adr, char *fil) {
+                      const char *origin_fil,
+                      lien_adrfil* const adrfil) {
   int ok = 0;
   int scheme = 0;
 
-  adr[0] = '\0';
-  fil[0] = '\0';                //effacer buffers
+  assertf(adrfil != NULL);
+
+  adrfil->adr[0] = '\0';
+  adrfil->fil[0] = '\0';                //effacer buffers
 
   // lien non vide!
   if (strnotempty(lien) == 0)
@@ -149,13 +152,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       || (strfield(lien, "file://"))    // scheme+//
       || (strncmp(lien, "//", 2) == 0)  // // sans scheme (-> default)
     ) {
-    if (ident_url_absolute(lien, adr, fil) == -1) {
+    if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                  // erreur URL
     }
   } else if (strfield(lien, "ftp://")) {
     // Note: ftp:foobar.gif is not valid
     if (ftp_available()) {      // ftp supporté
-      if (ident_url_absolute(lien, adr, fil) == -1) {
+      if (ident_url_absolute(lien, adrfil) == -1) {
         ok = -1;                // erreur URL
       }
     } else {
@@ -164,7 +167,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 #if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
     // Note: ftp:foobar.gif is not valid
-    if (ident_url_absolute(lien, adr, fil) == -1) {
+    if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                // erreur URL
     }
 #endif
@@ -191,30 +194,30 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       /* patch scheme if necessary */
       if (strfield(lien, "http:")) {
         lien += 5;
-        strcpybuff(adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
+        strcpybuff(adrfil->adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
       } else if (strfield(lien, "https:")) {
         lien += 6;
-        strcpybuff(adr, "https://");    // même adresse forcée en https
-        strcatbuff(adr, jump_protocol(origin_adr));
+        strcpybuff(adrfil->adr, "https://");    // même adresse forcée en https
+        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
       } else if (strfield(lien, "ftp:")) {
         lien += 4;
-        strcpybuff(adr, "ftp://");      // même adresse forcée en ftp
-        strcatbuff(adr, jump_protocol(origin_adr));
+        strcpybuff(adrfil->adr, "ftp://");      // même adresse forcée en ftp
+        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
       } else {
-        strcpybuff(adr, origin_adr);    // même adresse ; et même éventuel protocole
+        strcpybuff(adrfil->adr, origin_adr);    // même adresse ; et même éventuel protocole
       }
 
       if (*lien != '/') {       // sinon c'est un lien absolu
         if (*lien == '\0') {
-          strcpybuff(fil, origin_fil);
+          strcpybuff(adrfil->fil, origin_fil);
         } else if (*lien == '?') {      // example: a href="?page=2"
           char *a;
 
-          strcpybuff(fil, origin_fil);
-          a = strchr(fil, '?');
+          strcpybuff(adrfil->fil, origin_fil);
+          a = strchr(adrfil->fil, '?');
           if (a)
             *a = '\0';
-          strcatbuff(fil, lien);
+          strcatbuff(adrfil->fil, lien);
         } else {
           const char *a = strchr(origin_fil, '?');
 
@@ -225,14 +228,14 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
           if (*a == '/') {      // ok on a un '/'
             if ((((int) (a - origin_fil)) + 1 + strlen(lien)) < HTS_URLMAXSIZE) {
               // copier chemin
-              strncpy(fil, origin_fil, ((int) (a - origin_fil)) + 1);
-              *(fil + ((int) (a - origin_fil)) + 1) = '\0';
+              strncpy(adrfil->fil, origin_fil, ((int) (a - origin_fil)) + 1);
+              *(adrfil->fil + ((int) (a - origin_fil)) + 1) = '\0';
 
               // copier chemin relatif
-              if (((int) strlen(fil) + (int) strlen(lien)) < HTS_URLMAXSIZE) {
-                strcatbuff(fil, lien + ((*lien == '/') ? 1 : 0));
+              if (((int) strlen(adrfil->fil) + (int) strlen(lien)) < HTS_URLMAXSIZE) {
+                strcatbuff(adrfil->fil, lien + ((*lien == '/') ? 1 : 0));
                 // simplifier url pour les ../
-                fil_simplifie(fil);
+                fil_simplifie(adrfil->fil);
               } else
                 ok = -1;        // erreur
             } else {            // erreur
@@ -244,8 +247,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
         }
       } else {                  // chemin absolu
         // copier chemin directement
-        strcatbuff(fil, lien);
-        fil_simplifie(fil);
+        strcatbuff(adrfil->fil, lien);
+        fil_simplifie(adrfil->fil);
       }                         // *lien!='/'
     } else
       ok = -1;
@@ -254,7 +257,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 
   // case insensitive pour adresse
   {
-    char *a = jump_identification(adr);
+    char *a = jump_identification(adrfil->adr);
 
     while(*a) {
       if ((*a >= 'A') && (*a <= 'Z'))
@@ -264,8 +267,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   }
 
   // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
-  if (!link_has_authority(adr) || strfield(adr, "https:")) {
-    char *const a = jump_identification(adr);
+  if (!link_has_authority(adrfil->adr) || strfield(adrfil->adr, "https:")) {
+    char *const a = jump_identification(adrfil->adr);
     // Non-ASCII characters (theorically forbidden, but browsers are lenient)
     if (!hts_isStringAscii(a, strlen(a))) {
       char *const idna = hts_convertStringUTF8ToIDNA(a, strlen(a));
