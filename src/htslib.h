@@ -615,6 +615,7 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
 // returns (size_t) -1 upon error
 static size_t off_t_to_size_t(off_t o) {
   if (o >= 0 && o < ( (size_t) -1 ) / 2) {
+    return (size_t) o;
   } else {
     return (size_t) -1;
   }
