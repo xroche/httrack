@@ -717,7 +717,7 @@ int httpmirror(char *url1, httrackp * opt) {
         FILE *fp = fopen(StringBuff(opt->filelist), "rb");
 
         if (fp) {
-          filelist_buff = malloct(filelist_sz + 2);
+          filelist_buff = malloct(filelist_sz + 1);
           if (filelist_buff) {
             if (fread(filelist_buff, 1, filelist_sz, fp) != filelist_sz) {
               freet(filelist_buff);
@@ -1384,7 +1384,7 @@ int httpmirror(char *url1, httrackp * opt) {
       //          if (sz < 8192) {   // ok, small file --> to parse!
       //            FILE* fp=FOPEN(savename(),"rb");
       //            if (fp) {
-      //              r.adr=malloct((int)sz + 2);
+      //              r.adr=malloct(sz + 1);
       //              if (r.adr) {
       //                if (fread(r.adr,1,sz,fp) == sz) {
       //                  r.size=sz;

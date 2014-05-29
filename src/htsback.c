@@ -626,7 +626,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   FILE *fp = FOPEN(back[p].url_sav, "rb");
 
                   if (fp) {
-                    back[p].r.adr = malloct((int) sz + 2);
+                    back[p].r.adr = malloct((size_t) sz + 1);
                     if (back[p].r.adr) {
                       if (fread(back[p].r.adr, 1, sz, fp) == sz) {
                         back[p].r.size = sz;

@@ -343,7 +343,7 @@ void cookie_insert(char *s, const char *ins) {
   if (strnotempty(s) == 0) {    // rien à faire, juste concat
     strcatbuff(s, ins);
   } else {
-    buff = (char *) malloct(strlen(s) + 2);
+    buff = (char *) malloct(strlen(s) + 1);
     if (buff) {
       strcpybuff(buff, s);      // copie temporaire
       strcpybuff(s, ins);       // insérer
@@ -360,7 +360,7 @@ void cookie_delete(char *s, size_t pos) {
   if (strnotempty(s + pos) == 0) {      // rien à faire, effacer
     s[0] = '\0';
   } else {
-    buff = (char *) malloct(strlen(s + pos) + 2);
+    buff = (char *) malloct(strlen(s + pos) + 1);
     if (buff) {
       strcpybuff(buff, s + pos);        // copie temporaire
       strcpybuff(s, buff);      // copier

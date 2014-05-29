@@ -1497,11 +1497,9 @@ static int htslang_load(char *limit_to, const char *path) {
 
           if (!strnotempty(test)) {     // éviter doublons
             // conv_printf(key,key);
-            int len;
-            char *buff;
+            const size_t len = strlen(intkey);
+            char *const buff = (char *) malloc(len + 1);
 
-            len = (int) strlen(intkey);
-            buff = (char *) malloc(len + 2);
             if (buff) {
               strcpybuff(buff, intkey);
               inthash_add(NewLangStrKeys, key, (intptr_t) buff);
@@ -1561,8 +1559,6 @@ static int htslang_load(char *limit_to, const char *path) {
           linput_cpp(fp, extkey, 8000);
           linput_cpp(fp, value, 8000);
           if (strnotempty(extkey) && strnotempty(value)) {
-            int len;
-            char *buff;
             const char *intkey;
 
             intkey = LANGINTKEY(extkey);
@@ -1599,8 +1595,8 @@ static int htslang_load(char *limit_to, const char *path) {
 
               /* Add key */
               if (strnotempty(intkey)) {
-                len = (int) strlen(value);
-                buff = (char *) malloc(len + 2);
+                const size_t len = strlen(value);
+                char *const buff = (char *) malloc(len + 2);
                 if (buff) {
                   conv_printf(value, buff);
                   inthash_add(NewLangStr, intkey, (intptr_t) buff);
