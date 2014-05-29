@@ -263,6 +263,11 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   assertf(opt != NULL);
   assertf(liensbuf != NULL);
 
+  // Limit the number of links
+  if (opt->maxlink > 0 && TypedArraySize(liensbuf->ptr) >= opt->maxlink) {
+    return (size_t) -1;
+  }
+
   // Create a new chunk of lien_url[]
   // There are references to item pointers, so we can not just realloc()
   if (liensbuf->lien_buffer_size == liensbuf->lien_buffer_capa) {
