@@ -5461,13 +5461,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->path_log, "");
   StringCopy(opt->path_bin, "");
   //
-#if HTS_SPARE_MEMORY==0
-  opt->maxlink = 100000;        // 100,000 liens max par défaut (400Kb)
+  opt->maxlink = 100000;        // 100,000 liens max par défaut
   opt->maxfilter = 200;         // 200 filtres max par défaut
-#else
-  opt->maxlink = 10000;         // 10,000 liens max par défaut (40Kb)
-  opt->maxfilter = 50;          // 50 filtres max par défaut
-#endif
   opt->maxcache = 1048576 * 32; // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
   opt->maxtime = -1;            // temps max en secondes
