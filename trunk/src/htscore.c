@@ -2389,8 +2389,8 @@ int engine_stats(void) {
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
 
 // bannir host (trop lent etc)
-void host_ban(httrackp * opt, lien_url ** liens, int ptr, int lien_tot,
-              struct_back * sback, char *host) {
+void host_ban(httrackp * opt, int ptr,
+              struct_back * sback, const char *host) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -2451,7 +2451,7 @@ void host_ban(httrackp * opt, lien_url ** liens, int ptr, int lien_tot,
 
   // effacer liens
   //l=strlen(host);
-  for(i = 0; i < lien_tot; i++) {
+  for(i = 0; i < opt->lien_tot; i++) {
     //if (heap(i)->adr_len==l) {    // même taille de chaîne
     // Calcul de taille sécurisée
     if (heap(i)) {
@@ -3255,11 +3255,11 @@ int backlinks_done(const struct_back * sback,
 
 // remplir backing si moins de max_bytes en mémoire
 HTS_INLINE int back_fillmax(struct_back * sback, httrackp * opt,
-                            cache_back * cache, lien_url ** liens, int ptr,
-                            int numero_passe, int lien_tot) {
+                            cache_back * cache, int ptr,
+                            int numero_passe) {
   if (!opt->state.stop) {
     if (back_incache(sback) < opt->maxcache) {  // pas trop en mémoire?
-      return back_fill(sback, opt, cache, liens, ptr, numero_passe, lien_tot);
+      return back_fill(sback, opt, cache, ptr, numero_passe);
     }
   }
   return -1;                    /* plus de place */
@@ -3306,7 +3306,7 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt) {
 
 // remplir backing
 int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
-              lien_url ** liens, int ptr, int numero_passe, int lien_tot) {
+              int ptr, int numero_passe) {
   int n = back_pluggable_sockets(sback, opt);
 
   if (opt->savename_delayed == 2 && !opt->delayed_cached)       /* cancel (always delayed) */
@@ -3322,7 +3322,7 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
     /* on a déja parcouru */
     if (p < cache->ptr_ant)
       p = cache->ptr_ant;
-    while((p < lien_tot) && (n > 0) && back_checkmirror(opt)) {
+    while(p < opt->lien_tot && n > 0 && back_checkmirror(opt)) {
       //while((p<lien_tot) && (n>0) && (p < ptr+opt->maxcache_anticipate)) {
       int ok = 1;
 
@@ -3794,8 +3794,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
           int just_test_it = 0;
 
           forbidden_url =
-            hts_acceptlink(opt, ptr, opt->lien_tot, opt->liens, adr, fil, NULL, NULL,
-                           &set_prio_to, &just_test_it);
+            hts_acceptlink(opt, ptr, adr, fil, NULL, NULL, &set_prio_to, &just_test_it);
           hts_log_print(opt, LOG_DEBUG,
                         "result for wizard external module link: %d",
                         forbidden_url);
