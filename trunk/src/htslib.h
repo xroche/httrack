@@ -50,6 +50,14 @@ typedef struct htsblk htsblk;
 #define HTS_DEF_FWSTRUCT_t_dnscache
 typedef struct t_dnscache t_dnscache;
 #endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
+#define HTS_DEF_FWSTRUCT_lien_adrfil
+typedef struct lien_adrfil lien_adrfil;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
+#define HTS_DEF_FWSTRUCT_lien_adrfilsave
+typedef struct lien_adrfilsave lien_adrfilsave;
+#endif
 
 /* définitions globales */
 #include "htsglobal.h"
@@ -264,7 +272,6 @@ HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk * r);
-htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc);
 htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
@@ -317,7 +324,7 @@ int linput_trim(FILE * fp, char *s, int max);
 int linput_cpp(FILE * fp, char *s, int max);
 void rawlinput(FILE * fp, char *s, int max);
 char *strstrcase(char *s, const char *o);
-int ident_url_absolute(const char *url, char *adr, char *fil);
+int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
 int is_unicode_utf8(const char *buffer, const size_t size);
 void map_characters(unsigned char *buffer, unsigned int size,
