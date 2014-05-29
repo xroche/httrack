@@ -2106,7 +2106,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 while((lien[0] == '.') && (lien[1] == '/')) {
                   char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-                  strcpybuff(tempo, lien + 1);
+                  strcpybuff(tempo, lien + /* ./ */ 2);
                   strcpybuff(lien, tempo);
                 }
                 if (strnotempty(lien) == 0)     // sauf si plus de nom de fichier
