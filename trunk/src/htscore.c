@@ -2158,7 +2158,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                  "hts-cache/new.lst"), "rb");
         if (new_lst != NULL && sz != (size_t) -1) {
-          char *const adr = (char *) malloct(sz);
+          char *adr = (char *) malloct(sz);
 
           if (adr) {
             if (fread(adr, 1, sz, new_lst) == sz) {
