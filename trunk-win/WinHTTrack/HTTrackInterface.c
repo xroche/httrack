@@ -152,11 +152,11 @@ int fexist(const char* s) {
   return 0;
 } 
 
-off_t fsize(const char* s) {
+size_t fsize(const char* s) {
   FILE* fp;
   fp=fopen(s,"rb");
   if (fp!=NULL) {
-    off_t i;
+    size_t i;
     fseek(fp,0,SEEK_END);
     i = ftell(fp);
     fclose(fp);

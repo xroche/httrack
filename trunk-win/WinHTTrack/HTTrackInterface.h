@@ -20,7 +20,7 @@ extern int linput_cpp(FILE* fp,char* s,int max);
 extern void rawlinput(FILE* fp,char* s,int max);
 extern int binput(char* buff,char* s,int max);
 extern int fexist(const char* s);
-extern off_t fsize(const char* s);
+extern size_t fsize(const char* s);
 extern TStamp time_local(void);
 
 extern char* convtolower(char* catbuff,const char* a);
