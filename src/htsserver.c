@@ -1596,7 +1596,7 @@ static int htslang_load(char *limit_to, const char *path) {
               /* Add key */
               if (strnotempty(intkey)) {
                 const size_t len = strlen(value);
-                char *const buff = (char *) malloc(len + 2);
+                char *const buff = (char *) malloc(len + 1);
                 if (buff) {
                   conv_printf(value, buff);
                   inthash_add(NewLangStr, intkey, (intptr_t) buff);
