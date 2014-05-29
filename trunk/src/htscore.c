@@ -711,9 +711,9 @@ int httpmirror(char *url1, httrackp * opt) {
     /* OPTIMIZED for fast load */
     if (StringNotEmpty(opt->filelist)) {
       char *filelist_buff = NULL;
-      off_t filelist_sz = fsize(StringBuff(opt->filelist));
+      const size_t filelist_sz = off_t_to_size_t(fsize(StringBuff(opt->filelist)));
 
-      if (filelist_sz > 0) {
+      if (filelist_sz != (size_t) -1) {
         FILE *fp = fopen(StringBuff(opt->filelist), "rb");
 
         if (fp) {
@@ -2149,16 +2149,16 @@ int httpmirror(char *url1, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                "hts-cache/old.lst"), "rb");
       if (old_lst) {
-        off_t sz =
-          fsize(fconcat
+        const size_t sz =
+          off_t_to_size_t(fsize(fconcat
                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                 "hts-cache/new.lst"));
+                 "hts-cache/new.lst")));
         new_lst =
           fopen(fconcat
                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                  "hts-cache/new.lst"), "rb");
-        if ((new_lst) && (sz > 0)) {
-          char *adr = (char *) malloct(sz);
+        if (new_lst != NULL && sz != (size_t) -1) {
+          char *const adr = (char *) malloct(sz);
 
           if (adr) {
             if (fread(adr, 1, sz, new_lst) == sz) {
