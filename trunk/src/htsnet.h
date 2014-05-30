@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbasenet.h"
 #include "htssafe.h"
 
+#include <string.h>
 #include <ctype.h>
 #ifdef _WIN32
  // pour read
