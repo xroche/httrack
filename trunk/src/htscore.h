@@ -345,6 +345,9 @@ int hts_record_link(httrackp * opt,
 // index of the latest added link
 size_t hts_record_link_latest(httrackp *opt);
 
+// invalidate an entry
+void hts_invalidate_link(httrackp * opt, int lpos);
+
 // wipe all records
 void hts_record_init(httrackp *opt);
 void hts_record_free(httrackp *opt);
