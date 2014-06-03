@@ -419,6 +419,12 @@ int hts_record_link(httrackp * opt,
   return success;
 }
 
+void hts_invalidate_link(httrackp * opt, int lpos) {
+  /* devalidate entry  */
+  opt->liens[lpos]->pass2 = -1;
+}
+
+
 #define HT_INDEX_END do { \
 if (!makeindex_done) { \
 if (makeindex_fp) { \
@@ -2499,7 +2505,7 @@ void host_ban(httrackp * opt, int ptr,
           if (strfield2(jump_identification(heap(i)->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr,
                           heap(i)->fil);
-            hash_invalidate_entry(opt->hash, i);  // invalidate hashtable entry
+            hts_invalidate_link(opt, i);  // invalidate hashtable entry
             // on efface pas le hash, because si on rencontre le lien, reverif sav..
           }
         } else {

@@ -319,14 +319,3 @@ void hash_write(hash_struct * hash, size_t lpos) {
     inthash_write(hash->former_adrfil, (char*) (*hash->liens)[lpos], lpos);
   }
 }
-
-void hash_invalidate_entry(hash_struct * hash, int lpos) {
-  if (inthash_remove(hash->adrfil, (char*) (*hash->liens)[lpos])) {
-    /* devalidate entry now it is removed from hashtable */
-    strcpybuff((*hash->liens)[lpos]->adr, "!");
-    /* add back */
-    inthash_write(hash->adrfil, (char*) (*hash->liens)[lpos], lpos);
-  } else {
-    assertf(! "error invalidating hash entry");
-  }
-}

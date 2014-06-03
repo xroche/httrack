@@ -3507,7 +3507,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                           urladr(), urlfil(), moved->adr, moved->fil);
             // canceller lien actuel
             error = 1;
-            hash_invalidate_entry(hashptr, ptr);  // invalidate hashtable entry
+            hts_invalidate_link(opt, ptr);  // invalidate hashtable entry
             // noter NOUVEAU lien
             //xxc xxc
             //  set_prio_to=0+1;  // protection if the moved URL is an html page!!
@@ -3628,7 +3628,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           //
           // canceller lien actuel
           error = 1;
-          hash_invalidate_entry(hashptr, ptr);  // invalidate hashtable entry
+          hts_invalidate_link(opt, ptr);  // invalidate hashtable entry
           //
         } else {              // oups erreur, plus de mémoire!!
           XH_uninit;          // désallocation mémoire & buffers

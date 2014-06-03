@@ -56,7 +56,6 @@ void hash_free(hash_struct *hash);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
-void hash_invalidate_entry(hash_struct * hash, int lpos);
 int *hash_calc_chaine(hash_struct * hash, hash_struct_type type, int pos);
 unsigned long int hash_cle(const char *nom1, const char *nom2);
 #endif
