@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
+
+if test "$HTTPS_SUPPORT" == "no"; then
+	echo "no https support compiled, skipping"
+	exit 77
+fi
+
+bash crawl-test.sh --errors 0 --files 5 httrack https://ut.httrack.com/simple/basic.html

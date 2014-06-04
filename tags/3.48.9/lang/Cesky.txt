@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Èesky
+LANGUAGE_FILE
+Cesky
+LANGUAGE_ISO
+cs
+LANGUAGE_AUTHOR
+Antonín Matìjèík (matejcik@volny.cz) \r \n
+LANGUAGE_CHARSET
+WINDOWS-1250
+LANGUAGE_WINDOWSID
+Czech
+OK
+Ano
+Cancel
+Zrušit
+Exit
+Konec
+Close
+Zavøít
+Cancel changes
+Zrušit zmìny
+Click to confirm
+Klikni pro potvrzení
+Click to get help!
+Klikni pro nápovìdu
+Click to return to previous screen
+Klikni pro návrat do pøedchozího okna
+Click to go to next screen
+Klikni pro pokraèování na následujícím oknì
+Hide password
+Skrýt heslo
+Save project
+Uložit projekt
+Close current project?
+Zavøít aktuální projekt?
+Delete this project?
+Smazat tento projekt?
+Delete empty project %s?
+Smazat prázdný projekt %s?
+Action not yet implemented
+Akce není ještì implementována
+Error deleting this project
+Chyba pøi mazání tohoto projektu
+Select a rule for the filter
+Výbìr pravidla pro filtr
+Enter keywords for the filter
+Zadej klíèová slova pro filtr
+Cancel
+Zrušit
+Add this rule
+Pøidat toto pravidlo
+Please enter one or several keyword(s) for the rule
+Zadej jedno nebo nìkolik klíèových slov pro pravidlo
+Add Scan Rule
+Pøidat filtr
+Criterion
+Kritérium filtru
+String
+Øetìzec
+Add
+Pøidat
+Scan Rules
+Filtry
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Používej zástupných znakù (wildcards) pro pøidání nebo odebrání URL nebo odkazù. \nMùžeš použít nìkolik zástupných znakù na jediném øádku. \Používej mezery jako oddìlovaèe. \n\nNapøíklad: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi */
+Exclude links
+Vylouèit odkaz(y)
+Include link(s)
+Zahrnout odkaz(y)
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Tip: Pro zahrnutí všech GIF souborù, použij tøeba +www.someweb.com/*.gif. \n(+*.gif / -*.gif zahrne/vylouèí VŠECHNY GIF soubory ze všech stránek)
+Save prefs
+Uložit nastavení
+Matching links will be excluded:
+Shodné odkazy budou vylouèeny:
+Matching links will be included:
+Shodné odkazy budou zahrnuty:
+Example:
+Pøíklad:
+gif\r\nWill match all GIF files
+gif\r\nZahrne všechny GIF soubory
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+modrá\r\nZahrne všechny soubory obsahující slova 'modrá', napø. 'modrá-obloha.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nZahrne soubor 'bigfile.mov', ale již ne 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nNajde odkazy s názvem adresáøe obsahující øetìzec 'cgi' jako tøeba /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nNajde odkazy s názvem adresáøe obsahující celý 'cgi-bin' øetìzec (ale již ne cgi-bin-2)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nNajde odkazy obsahující øetìzce www.someweb.com, private.someweb.com apod.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nNajde odkazy shodné s názvem adresáøe obsahující øetìzce www.someweb.com, www.someweb.edu, private.someweb.otherweb.com apod.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nNajde odkazy obsahující celý 'www.someweb.com' øetìzec (ale ne øetìzce jako private.someweb.com/..)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nNajde jakékoliv odkazy obsahující øetìzec jako www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html apod.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nNajde pouze soubor 'www.test.com/test/someweb.html'. Nezapomeò, že musíš zadat celou cestu (URL + cesta ke stránce)
+All links will match
+Všechny odkazy se budou shodovat
+Add exclusion filter
+Pøidat filtr pro vylouèení
+Add inclusion filter
+Pøidat filtr pro zahrnutí
+Existing filters
+Definované filtry
+Cancel changes
+Zrušit zmìny
+Save current preferences as default values
+Uložit aktuální nastavení jako výchozí
+Click to confirm
+Klikni pro potvrzení
+No log files in %s!
+Chybí protokoly v %s!
+No 'index.html' file in %s!
+Chybí 'index.html' soubor v %s!
+Click to quit WinHTTrack Website Copier
+Klikni pro ukonèení programu WinHTTrack Website Copier
+View log files
+Zobrazit protokoly
+Browse HTML start page
+Prohlídnout úvodní HTML stránku
+End of mirror
+Konec stahování
+View log files
+Zobrazit protokoly
+Browse Mirrored Website
+Prohlídnout stažené stránky
+New project...
+Nový projekt..
+View error and warning reports
+Zobrazit chyby a upozornìní
+View report
+Zobrazit hlášení
+Close the log file window
+Zavøít okno s protokolem
+Info type:
+Typ informace:
+Errors
+Chyby
+Infos
+Informace
+Find
+Najít
+Find a word
+Najít slovo
+Info log file
+Informaèní protokol
+Warning/Errors log file
+Protokol s chybami
+Unable to initialize the OLE system
+Inicializace OLE systému selhala
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack nemùže nalézt žádné stažené soubory v cache pøi pøerušení stahování v urèeném adresáøi!
+Could not connect to provider
+Spojení s poskytovatelem nenavázáno
+receive
+pøíjem
+request
+požadavek
+connect
+spojení
+search
+hledání
+ready
+hotovo
+error
+chyba
+Receiving files..
+Pøíjem souborù..
+Parsing HTML file..
+Analýza HTML souboru..
+Purging files..
+Uvolnìní souborù..
+Loading cache in progress..
+
+Parsing HTML file (testing links)..
+Analýza HTML souboru (test odkazù)..
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Pøerušení - Pro pokraèování zvol [Stahování]/[Pøerušit pøenos]
+Finishing pending transfers - Select [Cancel] to stop now!
+Dokonèují se zbývající pøenosy - Zvol [Zrušit] pro jejich zastavení
+scanning
+provìøování
+Waiting for scheduled time..
+Èekání na naplánovaný èas..
+Connecting to provider
+Pøipojování k poskytovateli
+[%d seconds] to go before start of operation
+[%d sekund] do startu
+Site mirroring in progress [%s, %s bytes]
+Probíhá stahování stránek [%s, %s bajtù]
+Site mirroring finished!
+Stahování stránek skonèeno!
+A problem occured during the mirroring operation\n
+Pøi stahování se vyskytl problém\n
+\nDuring:\n
+\nBìhem:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nZobraz protokol.\n\nKlikni na Ukonèit pro ukonèení programu WinHTTrack Website Copier.\n\nDíky za použití programu WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Stahování skonèeno.\nKlikni na Konec pro ukonèení programu WinHTTrack.\nZobraz si protokoly pro kontrolu chyb pøi stahování.\n\nDíky za použití programu WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * STAHOVÁNÍ ZRUŠENO! * *\r\nPro pokraèování stahování je zapotøebí lokální cache, obsahující stažená data.\r\nPøedchozí cache mùže obsahovat více informací. Pokud je nechceš ztratit, musíš ji obnovit a smazat aktuální cache.\r\n[Poznámka: To mùže být provedeno teï smazáním hts-cache/new.* souborù]\r\n\r\nMyslíš, že cache obsahuje více informací a pøeješ si ji obnovit?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * CHYBA PØI STAHOVÁNÍ! * *\r\nHTTrack zjistil, že se nestáhla žádná data. Pokud se jednalo o aktualizaci, pak pøedešlá data byla obnovena.\r\nDùvod: Nemohla být nalezena první stránka nebo se vyskytl problém se spojením.\r\n=>Provìø zda zadaná adresa existuje anebo zkontroluj nastavení proxy! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nTip: Klikni [Zobraz protokoly] pro zobrazení upozornìní a chyb
+Error deleting a hts-cache/new.* file, please do it manually
+Chyba pøi mazání hts-cache/new.* souborù, udìlej to ruènì
+Do you really want to quit WinHTTrack Website Copier?
+Opravdu ukonèit WinHTTrack Website Copier?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Mód stahování -\n\nZadej adresu(y) do URL øádky
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Interaktivní mód (otázky) -\n\nZadej adresu(y) do URL øádky
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Mód stahování souborù -\n\nZadej adresu(y) do URL øádky
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Mód kontroly odkazù -\n\nZadej Web adresu(y) s odkazy pro kontrolu do URL øádky
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Mód pro aktualizaci -\n\nZkontroluj adresu(y) v URL øádce, ovìø znovu parametry (pokud je to nutné) a klikni na 'Další'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Mód pro navázání (pøi pøerušení) -\n\nZkontroluj adresu(y) v seznamu, ovìø znovu parametry (pokud je to nutné) a klikni na 'Další'
+Log files Path
+Cesta k protokolùm
+Path
+Cesta
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Mód seznamu odkazù -\n\nDo URL øádky zadej adresu(y) stránek obsahující odkazy ke stažení
+New project / Import?
+Nový projekt/Import?
+Choose criterion
+Vybrat kritérium
+Maximum link scanning depth
+Maximální hloubka provìøování odkazù
+Enter address(es) here
+Zadej adresu(y)
+Define additional filtering rules
+Definice dodateèných filtrù
+Proxy Name (if needed)
+Jméno proxy (pokud to je nutné)
+Proxy Port
+Proxy port
+Define proxy settings
+Proxy nastavení
+Use standard HTTP proxy as FTP proxy
+Použít standardní proxy jako FTP proxy
+Path
+Cesta
+Select Path
+Vyber cestu
+Path
+Cesta
+Select Path
+Vyber cestu
+Quit WinHTTrack Website Copier
+Ukonèit WinHTTrack Website Copier
+About WinHTTrack
+O programu WinHTTrack Website Copier
+Save current preferences as default values
+Uložit aktuální nastavení jako výchozí
+Click to continue
+Klikni pro pokraèování
+Click to define options
+Klikni pro nastavení
+Click to add a URL
+Klikni pro pøidání URL adresy
+Load URL(s) from text file
+Naèíst URL adresu z textového souboru
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack nastavení (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Soubor obsahující seznam adres (*.txt)|*.txt||
+File not found!
+Soubor nenalezen!
+Do you really want to change the project name/path?
+Opravdu chceš zmìnit název/cestu projektu?
+Load user-default options?
+Naèíst uživatelsky-výchozí nastavení?
+Save user-default options?
+Uložit uživatelsky-výchozí nastavení?
+Reset all default options?
+Obnovit všechna výchozí nastavení?
+Welcome to WinHTTrack!
+Vítá Vás program WinHTTrack Website Copier!
+Action:
+Akce:
+Max Depth
+Maximální hloubka
+Maximum external depth:
+Maximální hloubka externího odkazu
+Filters (refuse/accept links) :
+Filtry (odmítnout/pøijmout odkazy):
+Paths
+Cesty
+Save prefs
+Ulož nastavení
+Define..
+Definice..
+Set options..
+Nastavení..
+Preferences and mirror options:
+Pøedvolby a nastavení stahování:
+Project name
+Název projektu
+Add a URL...
+Pøidat URL..
+Web Addresses: (URL)
+Adresa WWW (URL):
+Stop WinHTTrack?
+Zastavit WinHTTrack?
+No log files in %s!
+Nenalezen žádný protokol v %s!
+Pause Download?
+Pøerušit stahování?
+Stop the mirroring operation
+Zastavit stahování?
+Minimize to System Tray
+Minimalizace do systémové lišty
+Click to skip a link or stop parsing
+Klikni pro pøeskoèení odkazu nebo pro zastavení provìøování odkazu
+Click to skip a link
+Klikni pro pøeskoèení odkazu
+Bytes saved
+Bajtù uloženo:
+Links scanned
+Odkazù provìøeno:
+Time:
+Èas:
+Connections:
+Spojení:
+Running:
+Zobrazit prùbìh
+Hide
+Skrýt
+Transfer rate
+Pøenosová rychlost:
+SKIP
+PØESKOÈIT
+Information
+Informace
+Files written:
+Zapsáno souborù:
+Files updated:
+Zaktualizováno:
+Errors:
+Chyby:
+In progress:
+Zpracovává se:
+Follow external links
+Následuj externí odkazy
+Test all links in pages
+Vyzkoušej všechny odkazy na stránce
+Try to ferret out all links
+Zkus prohledat všechny odkazy
+Download HTML files first (faster)
+Nejprve stáhnout HTML stránky (rychlejší)
+Choose local site structure
+Zvolit místní strukturu stránky
+Set user-defined structure on disk
+Nastavit uživatelsky-definovanou strukturu na disku
+Use a cache for updates and retries
+Použít cache pro aktualizace a obnovení
+Do not update zero size or user-erased files
+Neaktualizovat soubory uživatelem smazané nebo s nulovou velikostí
+Create a Start Page
+Vytvoøit úvodní stránku
+Create a word database of all html pages
+Vytvoøit seznam slov ze všech HTML stránek
+Create error logging and report files
+Vytvoøit protokol s chybami a hlášeními
+Generate DOS 8-3 filenames ONLY
+Vytváøet názvy souborù v DOS 8+3
+Generate ISO9660 filenames ONLY for CDROM medias
+
+Do not create HTML error pages
+Nevytváøet HTML stránky s chybami
+Select file types to be saved to disk
+Vyber typy souborù pro ukládání na disk
+Select parsing direction
+Vybrat smìr analýzy
+Select global parsing direction
+Vybrat globální smìr analýzy
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Nastav pøepis zásad URL pro interní odkazy (jednou již stažené) a externí odkazy (ještì nestažené)
+Max simultaneous connections
+Maximální poèet soubìžných spojení
+File timeout
+Doba èekání pro soubory
+Cancel all links from host if timeout occurs
+Zruš všechny odkazy pokud je pøekroèena doba èekání
+Minimum admissible transfer rate
+Minimální pøípustná pøenosová rychlost
+Cancel all links from host if too slow
+Zruš všechny odkazy pokud je pøenos pøíliš pomalý
+Maximum number of retries on non-fatal errors
+Maximální poèet opakování pøi nepodstatných chybách
+Maximum size for any single HTML file
+Maximální velikost jednoho HTML souboru
+Maximum size for any single non-HTML file
+Maximální velikost jednoho ne-HTML souboru
+Maximum amount of bytes to retrieve from the Web
+Maximální poèet pøenesených bajtù z Webu
+Make a pause after downloading this amount of bytes
+Pozastavit stahování po pøenosu tohoto poètu bajtù
+Maximum duration time for the mirroring operation
+Maximální èas trvání stahování
+Maximum transfer rate
+Maximální pøenosová rychlost
+Maximum connections/seconds (avoid server overload)
+Maximální poèet spojení/sekund (zabránìní pøetížení serveru)
+Maximum number of links that can be tested (not saved!)
+Maximální poèet odkazù, které mají být otestovány (ne uloženy)
+Browser identity
+Totožnost prohlížeèe
+Comment to be placed in each HTML file
+Komentáø vložený do každého HTML souboru
+Back to starting page
+Zpìt na úvodní stránku
+Save current preferences as default values
+Uložit aktuální nastavení jako výchozí
+Click to continue
+Klikni pro pokraèování
+Click to cancel changes
+Klikni pro zrušení zmìn
+Follow local robots rules on sites
+Aplikuj lokální pravidla robotù na stránkách
+Links to non-localised external pages will produce error pages
+Odkazy na nelokalizované externí stránky zapøièiní vytvoøení stránek s chybami
+Do not erase obsolete files after update
+Nesmazat starší soubory po jejich aktualizaci
+Accept cookies?
+Pøijímat cookies?
+Check document type when unknown?
+Provìøit typ dokumentu pokud je neznámý?
+Parse java applets to retrieve included files that must be downloaded?
+Analyzovat java aplety kvùli nalezení nutných souborù pro stažení
+Store all files in cache instead of HTML only
+Uložení všech souborù do cache místo jen do HTML
+Log file type (if generated)
+Typ protokolu (pokud je vytvoøen)
+Maximum mirroring depth from root address
+Maximální hloubka stahování z koøenového adresáøe
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Maximální hloubka stahování pro externí/zakázané adresy (0 - znamenající žádná - je výchozí)
+Create a debugging file
+Vytvoøení souboru pro ladìní
+Use non-standard requests to get round some server bugs
+Použít nestandardních požadavkù pro pøedejití chyb serveru
+Use old HTTP/1.0 requests (limits engine power!)
+Použít starší verze HTTP/1.0 požadavkù (omezuje výkonost stroje)
+Attempt to limit retransfers through several tricks (file size test..)
+Pokus k zamezení opìtovného pøenosu pomocí rùzných zpùsobù (test velikosti souboru,..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+Zápis externích odkazù bez pøihlášení/hesla
+Write internal links without query string
+Zápis interních odkazù bez ovìøení øetìzce
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Stáhnout soubory patøící k odkazu v ne-HTML formátu, napø. externí .ZIP nebo obrázky
+Test all links (even forbidden ones)
+Kontrola všech odkazù (vèetnì zakázaných)
+Try to catch all URLs (even in unknown tags/code)
+Pokus o získání všech URL (vèetnì tìch v neznámých znacích nebo kódech)
+Get HTML files first!
+Stáhnout nejprve HTML soubory!
+Structure type (how links are saved)
+Typ struktury (jak budou odkazy uloženy)
+Use a cache for updates
+Použít cache pro aktualizaci
+Do not re-download locally erased files
+Znovu nestahovat lokálnì smazané soubory
+Make an index
+Vytvoøit rejstøík
+Make a word database
+Vytvoøit seznam slov
+Log files
+Protokoly
+DOS names (8+3)
+Jména souborù v DOS (8+3)
+ISO9660 names (CDROM)
+
+No error pages
+Žádné chybové stránky
+Primary Scan Rule
+Primární filtr
+Travel mode
+Mód pro cestování
+Global travel mode
+Globální mód pro cestování
+These options should be modified only exceptionally
+Tyto parametry by mìli být zmìnìny pouze vyjímeènì
+Activate Debugging Mode (winhttrack.log)
+Aktivuj mód ladìní (winhttrack.log)
+Rewrite links: internal / external
+Pøepiš odkazy: interní/externí
+Flow control
+Sledování bìhu
+Limits
+Limity
+Identity
+Identifikace
+HTML footer
+Záhlaví HTML
+N# connections
+Poèet spojení
+Abandon host if error
+Pøerušit spojení, pokud dojde k chybì serveru
+Minimum transfer rate (B/s)
+Minimální pøenosová rychlost (B/s)
+Abandon host if too slow
+Pøerušit spojení, pokud je pøenos pøíliš pomalý
+Configure
+Konfigurace
+Use proxy for ftp transfers
+Použít proxy pro FTP pøenos
+TimeOut(s)
+Èasové limity
+Persistent connections (Keep-Alive)
+
+Reduce connection time and type lookup time using persistent connections
+
+Retries
+Poèet opakování
+Size limit
+Omezení velikosti
+Max size of any HTML file (B)
+Maximální velikost HTML souboru
+Max size of any non-HTML file
+Maximální velikost ne-HTML souboru
+Max site size
+Maximální velikost stránky
+Max time
+Maximální èas
+Save prefs
+Uložit nastavení
+Max transfer rate
+Maximální pøenososvá rychlost
+Follow robots.txt
+Øiï se podle robots.txt
+No external pages
+Žádné externí stránky
+Do not purge old files
+Neuvolnit staré soubory
+Accept cookies
+Pøíjem cookies
+Check document type
+Kontrola typu dokumentu
+Parse java files
+Analyzovat java soubory
+Store ALL files in cache
+Ukládat VŠECHNY soubory do cache
+Tolerant requests (for servers)
+Pøípustné požadavky (pro servery)
+Update hack (limit re-transfers)
+Aktualizovat chytrou obnovu (zabrání znovu pøenosu souborù)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+Použít pouze staré HTTP/1.0 požadavky (ne HTTP/1.1)
+Max connections / seconds
+Maximální poèet spojení/sekund
+Maximum number of links
+Maximální poèet odkazù
+Pause after downloading..
+Pøerušit po stažení
+Hide passwords
+Skrýt heslo
+Hide query strings
+Skrýt ovìøovací znaky
+Links
+Odkazy
+Build
+Struktura
+Experts Only
+Pro odborníky
+Flow Control
+Øízení bìhu
+Limits
+Limitní hodnoty
+Browser ID
+ID prohlížeèe
+Scan Rules
+Filtry
+Spider
+Pavouk
+Log, Index, Cache
+Protokol, rejstøík, cache
+Proxy
+Proxy
+MIME Types
+
+Do you really want to quit WinHTTrack Website Copier?
+Opravdu ukonèit WinHTTrack Website Copier?
+Do not connect to a provider (already connected)
+Nepøipojovat se k poskytovateli (již spojeno)
+Do not use remote access connection
+Nepoužívat vzdáleného pøístupového spojení
+Schedule the mirroring operation
+Naplánovat stahování
+Quit WinHTTrack Website Copier
+Ukonèit WinHTTrack Website Copier
+Back to starting page
+Zpìt na úvodní stránku
+Click to start!
+Klikni pro start
+No saved password for this connection!
+Není uloženo heslo pro toto spojení!
+Can not get remote connection settings
+Není pøístup k nastavení vzdáleného spojení
+Select a connection provider
+Vyber poskytovatele
+Start
+Start
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Pokud je to nutné, uprav parametry spojení,\npak klikni na DOKONÈIT pro zahájení stahování
+Save settings only, do not launch download now.
+Pouze uložit nastavení, nezahájit stahování.
+On hold
+Podržet
+Transfer scheduled for: (hh/mm/ss)
+Nastavení èasu stahování v: (hh/mm/ss)
+Start
+Start
+Connect to provider (RAS)
+Spojení s poskytovatelem (RAS)
+Connect to this provider
+Spojit s tímto poskytovatelem spojení
+Disconnect when finished
+Odpojit po dokonèení
+Disconnect modem on completion
+Odpojit modem po dokonèení
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Prosíme o podání hlášení o jakýchkoliv chybách)\r\n\r\nVývoj:\r\nRozhraní (Windows): Xavier Roche\r\nPavouk: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche a ostatní, kdo pøispìli\r\nÈeský pøeklad:\r\nAntonín Matìjèík (matejcik@volny.cz)
+About WinHTTrack Website Copier
+O programu WinHTTrack Website Copier
+Please visit our Web page
+Návštìva naší stránky
+Wizard query
+Otázky pro pomocníka
+Your answer:
+Tvá odpovìï:
+Link detected..
+Odkaz detekován..
+Choose a rule
+Vybrat filtr
+Ignore this link
+Ignorovat tento odkaz
+Ignore directory
+Ignorovat adresáø
+Ignore domain
+Ignorovat doménu
+Catch this page only
+Získat pouze tuto stránku
+Mirror site
+Stránka pro stahování
+Mirror domain
+Doména stránky pro stahování
+Ignore all
+Ignoruj vše
+Wizard query
+Otázka pomocníka
+NO
+Ne
+File
+Soubor
+Options
+Nastavení
+Log
+Protokol
+Window
+Okno
+Help
+Nápovìda
+Pause transfer
+Pøerušit pøenos
+Exit
+Konec
+Modify options
+Zmìna nastavení
+View log
+Zobrazit protokol
+View error log
+Zobrazit chybový protokol
+View file transfers
+Zobrazit pøenosy souborù
+Hide
+Do systémové lišty
+About WinHTTrack Website Copier
+O programu WinHTTrack Website Copier
+Check program updates...
+Stažení novìjší verze..
+&Toolbar
+&Lišta
+&Status Bar
+&Stavová lišta
+S&plit
+R&ozdìlit
+File
+Soubor
+Preferences
+Nastavení
+Mirror
+Stahování
+Log
+Protokol
+Window
+Okno
+Help
+Nápovìda
+Exit
+Konec
+Load default options
+Nahrát výchozí nastavení
+Save default options
+Uložit výchozí nastavení
+Reset to default options
+Obnovit výchozí nastavení
+Load options...
+Nahrát nastavení..
+Save options as...
+Uložit nastavení jako..
+Language preference...
+Volba jazyka
+Contents...
+Obsah (Anglicky)
+About WinHTTrack...
+O programu WiHTTrack Website Copier
+New project\tCtrl+N
+Nový projekt\tCtrl+N
+&Open...\tCtrl+O
+&Oteøít..\tCtrl+O
+&Save\tCtrl+S
+&Uložit\tCtrl+S
+Save &As...
+Uložit &jako..
+&Delete...
+&Smazat
+&Browse sites...
+&Prohlídnout stažené stránky..
+User-defined structure
+Uživatelsky-definovaná struktura
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tNázev souboru bez pøípony (napø. obr)\r\n%N\tNázev souboru vèetnì pøípony (napø. obr.gif)\r\n%t\tPouze pøípona (napø. gif)\r\n%p\tCesta [bez posledního /] (napø. /obrázky)\r\n%h\tWeb adresa (napø. www.kdesi.com)\r\n%M\tMD5 URL (128 bitù, 32 ascii bajtù)\r\n%Q\tMD5 ovìøovací øetìzec (128 bitù, 32 ascii bajtù)\r\n%q\tMD5 malý ovìøovací øetìzec (16 bitù, 4 ascii bajtù)\r\n\r\n%s?\tZkratka (napø. %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Pøíklad:\t%h%p/%n%q.%t\n->\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Nastavení proxy
+Proxy address:
+Adresa Proxy:
+Proxy port:
+Port Proxy
+Authentication (only if needed)
+Ovìøení (pouze když je vyžadováno)
+Login
+Pøihlášení
+Password
+Heslo
+Enter proxy address here
+Vlož adresu proxy
+Enter proxy port here
+Vlož port proxy
+Enter proxy login
+Vlož pøihlášení k proxy
+Enter proxy password
+Vlož heslo proxy
+Enter project name here
+Napiš název projektu
+Enter saving path here
+Vlož cestu pro uložení
+Select existing project to update
+Zvolt existující projekt pro aktualizaci
+Click here to select path
+Klikni pro výbìr cesty
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+Pomocník HTTrack projektu..
+New project name:
+Název nového projektu:
+Existing project name:
+Existující název projektu:
+Project name:
+Název projektu:
+Base path:
+Základní cesta:
+Project category:
+
+C:\\My Web Sites
+C:\\Temp\Projekty
+Type a new project name, \r\nor select existing project to update/resume
+Napiš nový název projektu, \r\nnebo vyber projekt k aktualizaci
+New project
+Nový projekt
+Insert URL
+Vložit URL adresu
+URL:
+URL adresa:
+Authentication (only if needed)
+Ovìøení (pouze pokud je tøeba)
+Login
+Pøihlášení
+Password
+Heslo
+Forms or complex links:
+Formuláøe nebo souhrné odkazy:
+Capture URL...
+Získat URL..
+Enter URL address(es) here
+Vlož URL adresu(y)
+Enter site login
+Vlož pøihlášení na stránku
+Enter site password
+Vlož heslo pro stránku
+Use this capture tool for links that can only be accessed through forms or javascript code
+Použít tento nástroj pro získání odkazù, které mohou být dostupné pouze pomocí formuláøù nebo java skriptù
+Choose language according to preference
+Volba jazyka podle nastavení
+Catch URL!
+Získej URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Nastav doèasnì proxy pro tvùj prohlížeè na následující hodnoty (zkopírovat/vložit adresu a port proxy).\nPak klikni na tlaèítko OK na formuláøi ve tvém prohlížeèi nebo klikni na daný odkaz, který chceš získat.
+This will send the desired link from your browser to WinHTTrack.
+Požadovaný odkaz se odešle z tvého prohlížeèe do programu WinHTTrack.
+ABORT
+ZRUŠIT
+Copy/Paste the temporary proxy parameters here
+Zkopírovat/Vložit doèasné proxy parametry
+Cancel
+Zrušit
+Unable to find Help files!
+Nebylo možné nalézt soubory Nápovìdy!
+Unable to save parameters!
+Nebylo možné uložit parametry!
+Please drag only one folder at a time
+Prosím uchop do myši najednou pouze jeden adresáø
+Please drag only folders, not files
+Prosím uchopuj pouze adresáøe, ne soubory
+Please drag folders only
+Prosím uchopuj pouze adresáøe
+Select user-defined structure?
+Vybrat uživatelsky-definovanou strukturu?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Prosím zajisti, že uživatelsky-definovaný øetìzec je správný, jinak budou názvy souborù špatnì pojmenovány!
+Do you really want to use a user-defined structure?
+Opravdu chceš použít uživatelsky-definovanou strukturu?
+Too manu URLs, cannot handle so many links!!
+Pøíliš mnoho URL adres, není možné pracovat s takovým množstvím!
+Not enough memory, fatal internal error..
+Nedostatek pamìti, vážná vnitøní chyba..
+Unknown operation!
+Neznámá operace!
+Add this URL?\r\n
+Pøidat tuto URL adresu?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Upozornìní: hlavní proces ještì nereaguje, nemožné pøidat URL adresu(y)..
+Type/MIME associations
+Type/MIME pøidružení
+File types:
+Typy souborù:
+MIME identity:
+Identita MIME:
+Select or modify your file type(s) here
+Vybrat nebo zmìnit typ(y) souborù
+Select or modify your MIME type(s) here
+Vybrat nebo zmìnit typ(y) MIME souborù
+Go up
+Nahoru
+Go down
+Dolù
+File download information
+Informace o staženém souboru
+Freeze Window
+Zamrznutí okna
+More information:
+Další informace:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Vítej v programu WinHTTrack!\n\nKlikni na tlaèítko Další pro\n\n- vytvoøení nového projektu\n  nebo \n- návrat k èásteènì staženému projektu
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Názvy souborù s pøíponami:\nNázvy souborù obsahující:\n Tento název souboru:\nJména adresáøù obsahující:\nTento název adresáøe:\nOdkazy v této doménì:\nOdkazy v doménách obsahující:\nOdkazy z tohoto poèítaèe:\nOdkazy obsahující:\nTento odkaz:\nVŠECHNY ODKAZY
+Show all\nHide debug\nHide infos\nHide debug and infos
+Zobraz vše\nSkryj ladìní\nSkryj informace\nSkryj ladìní a informace
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Struktura stránky (výchozí)\nHtml ve web/,       obrázky/ostatní soubory ve web/obrázky/\nHtml ve web/html,   obrázky/ostatní ve web/obrázky\nHtml ve web/,       obrázky/ostatní ve web/\nHtml ve web/,       obrázky/ostatní ve web/xxx, kde xxx znaèí pøíponu souboru\nHtml ve web/html,   obrázky/ostatní ve web/xxx\nStruktura stránky bez www.doména.xxx/\nHtml v název_stránky/, obrázky/ostatní soubory v název_stránky/obrázky/\nHtml v název_stránky/html, obrázky/ostatní v název_stránky/obrázky\nHtml v název_stránky/, obrázky/ostatní v název_stránky/\nHtml v název_stránky/, obrázky/ostatní v název_stránky/xxx\nHtml v název_stránky/html, obrázky/ostatní v název_stránky/xxx\nVšechny soubory ve web/, s náhodnými názvy (vynález!)\nVšechny soubory v název_stránky/, s náhodnými názvy (vynález!)\nUživatelsky-definovaná struktura..
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Pouze provìøit\nUložit HTML soubory\nUložit ne-HTML soubory\nUložit všechny soubory (výchozí)\nUložit nejprve HTML soubory
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Zùstat ve stejném adresáøi\nDolù (výchozí)\nNahoru\nNahoru i dolù
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Zùstat na stejné adrese (výchozí)\nZùstat ve stejné doménì\nZùstat ve stejné doménì nejvyš. øádu\nJít na jakýkoliv web
+Never\nIf unknown (except /)\nIf unknown
+Nikdy\nPokud není znám (kromì /)\nPokud není znám
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+žádná pravidla podle robot.txt\nrobot.txt kromì pomocníka\naplikovat pravidla podle robot.txt
+normal\nextended\ndebug
+normální\nrozšíøený\nladìní
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Stažení web stránek\nStažení web stránek + otázky\nStažení souborù\nStažení všech stránek (vícenásobné stažení)\nKontrola odkazù na stránkách (test záložek)\n*  Navázání pøerušeného stahování\n*  Aktualizace stažených stránek
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Relativní URI/Absolutní URL (výchozí)\nAbsolutní URL/Absolutní URL\nAbsolutní URI/Absolutní URL\nPùvodní URL/Pùvodní URL
+Open Source offline browser
+
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+
+httrack, winhttrack, webhttrack, offline browser
+
+URL list (.txt)
+
+Previous
+
+Next
+
+URLs
+
+Warning
+
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+
+Thank you
+
+You can now close this window
+
+Server terminated
+
+A fatal error has occured during this mirror
+
