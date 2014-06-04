@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Bulgarian
+LANGUAGE_FILE
+Bulgarian
+LANGUAGE_ISO
+bg
+LANGUAGE_AUTHOR
+Илия Линдов [ilia@infomat-bg.com]\r\n
+LANGUAGE_CHARSET
+windows-1251
+LANGUAGE_WINDOWSID
+Bulgarian
+OK
+Да
+Cancel
+Отказ
+Exit
+Изход
+Close
+Затвори
+Cancel changes
+Откажи промените
+Click to confirm
+Потвърди
+Click to get help!
+За помощ
+Click to return to previous screen
+Връщане към предходния прозорец
+Click to go to next screen
+Към следващия прозорец
+Hide password
+Скрий паролата
+Save project
+Запази проекта
+Close current project?
+Затвори текущия прозорец?
+Delete this project?
+Изтрий проекта?
+Delete empty project %s?
+Изтрий празния проект %s?
+Action not yet implemented
+Действието е неизпълнимо
+Error deleting this project
+Грешка при изтриването на проекта
+Select a rule for the filter
+Избери правило за търсене
+Enter keywords for the filter
+Въведи ключови думи за търсене
+Cancel
+Отказ
+Add this rule
+Добави това правило
+Please enter one or several keyword(s) for the rule
+Моля въведете една или няколко ключови думи за правилото
+Add Scan Rule
+Добави правило при сканирането
+Criterion
+Критерий
+String
+Низ
+Add
+Добави
+Scan Rules
+Правила за сканиране
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Използвайте спец. символи за да включите или изключите URL адреси или препратки.\nМоже да използвате няколко низа за сканиране на един ред,\nкато използвате интервали за разделители\n\nНапример: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Изключи препратките
+Include link(s)
+Добави препратките
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Съвет: За да добавите всички .GIF файлове, използвайте например +www.someweb.com/*.gif. \n(+*.gif / -*.gif, което ще включи/изключи ВСИЧКИ .GIF файлове от ВСИЧКИ сайтове
+Save prefs
+Запази предпочитанията
+Matching links will be excluded:
+Съвпадащите препратки ще бъдат изключени
+Matching links will be included:
+Съвпадащите препратки ще бъдат включени
+Example:
+Пример:
+gif\r\nWill match all GIF files
+gif\r\nЩе съвпаднат всички .GIF файлове
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nЩе намери всички файлове със съвпадащ 'blue' подниз като 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nЩе съвпадне с файл 'bigfile.mov', но не и с 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nЩе намери препратки към директории със съвпадащ подниз 'cgi' като /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nЩе намери препратки към директории съвпадащи с целия низ 'cgi-bin', но не и с cgi-bin-2, например
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nЩе намери препратки със съвпадащ подниз като www.someweb.com, private.someweb.com и т.н.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb.com\r\nЩе намери препратки към директории със съвпадащ подниз като www.someweb.com, www.someweb.edu, private.someweb.otherweb.com и т.н.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nЩе намери препратки съвпадащи с целия подниз 'www.someweb.com', но не и с препратки като private.someweb.com/
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nЩе намери всякакви препратки съвпадащи с подниз като www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html и т.н.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nЩе намери само файла 'www.test.com/test/someweb.html'. Отбележете, че  трябва да напишете пълния път (URL + пътя в самия сайт)
+All links will match
+Всички препратки ще съвпаднат
+Add exclusion filter
+Добави изключващ филтър
+Add inclusion filter
+Добави включващ филтър
+Existing filters
+Съществуващи филтри
+Cancel changes
+Откажи промените
+Save current preferences as default values
+Запази текущите предпочитания като основни
+Click to confirm
+Кликни за потвърждение
+No log files in %s!
+В %s не са намерени log файлове!
+No 'index.html' file in %s!
+В %s не съществува файл 'index.html'!
+Click to quit WinHTTrack Website Copier
+Кликни за изход от WinHTTrack Website Copier
+View log files
+Прегледай log-файловете
+Browse HTML start page
+Прегледай стартовата HTML страница
+End of mirror
+Създаването на огледалния сайт приключи
+View log files
+Прегледай log-файловете
+Browse Mirrored Website
+Разгледай огл. сайт
+New project...
+Нов проект...
+View error and warning reports
+Прегледай отчетите за грешките и предупрежденията
+View report
+Прегледай отчета
+Close the log file window
+Затвори прозореца на log-файла
+Info type:
+Тип на информацията:
+Errors
+Грешки
+Infos
+Информация
+Find
+Намери
+Find a word
+Намери дума
+Info log file
+Информация за log-файла
+Warning/Errors log file
+Файл за предупр. и грешки
+Unable to initialize the OLE system
+Не може да бъде инициализирана OLE системата
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack не намира никакви кеш-файлове на прекъснато сваляне в зададената директория!
+Could not connect to provider
+Не може да се свърже с доставчика
+receive
+получава
+request
+заявява
+connect
+връзка
+search
+търси
+ready
+готов
+error
+грешка
+Receiving files..
+Получава файлове...
+Parsing HTML file..
+Прави разбор на HTML файл...
+Purging files..
+Прочиства файлове...
+Loading cache in progress..
+Зареждането на кеша напредва...
+Parsing HTML file (testing links)..
+Прави разбор на HTML файл (тества препратки)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Пауза - Изберете [Огледало]/[Пауза на свалянето] за да продължите
+Finishing pending transfers - Select [Cancel] to stop now!
+Довършване на започнатите трансфери - Изберете [Отказ] за да спрете сега!
+scanning
+сканира
+Waiting for scheduled time..
+Очаква зададеното време за начало...
+Connecting to provider
+Свързване към доставчика
+[%d seconds] to go before start of operation
+[%d секунди] до старта на операцията
+Site mirroring in progress [%s, %s bytes]
+Прогрес на създаването на огледалния сайт [%s, %s байта]
+Site mirroring finished!
+Съдаването на огледалния сайт завърши!
+A problem occured during the mirroring operation\n
+Възникна проблем по време на създаването на огледалния сайт\n
+\nDuring:\n
+\nПо време на:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nВиж log-файла ако е необходимо.\n\nКликни КРАЙ за изход от WinHTTrack Website Copier.\n\nБлагодарим, Ви, че използвате WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Създаването на огледалния сайт завърши!\nКликни Изход за затваряне на WinHTTrack.\nВижте log-файловете да са се уверите, че всичко е наред.\n\nБлагодарим, Ви, че използвате WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * КОПИРАНЕТО ПРЕКЪСНАТО! * *\r\nТекущият временен кеш е необходим за всякакви обновления и съдържа само данни свалени по време на тази прекъсната сесия.\r\nВъзможно е предшестващият кеш да съдържа по-пълна информация; ако не желаете за загубите тази информация, трябва да я възстановите и изтриете текущия кеш.\r\n[Забележка: Това може да бъде постигнато лесно чрез изтриване на hts-cache/new.* файловете]\r\n\r\nПредполагате ли, че предшестващия кеш съдържа по пълна информация и желаете ли да я възстановите?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * ГРЕШКА ПРИ КОПИРАНЕТО! * *\r\nТекущият сайт е празен.Ако действието е било обновление, то предходното огледално копие е възстановено.\r\nПричина: първата страница(и) или не бе открита, или е възникнал проблем с връзката.\r\n=>Уверете се, че този сайт все още съществува и/или проверете Вашите proxy настройки! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nСъвет: Кликни [Виж log-файл] за предупредителните съобщения или съобщенията за грешки
+Error deleting a hts-cache/new.* file, please do it manually
+Грешка при изтриване на hts-cache/new.* файл, моля направете го ръчно
+Do you really want to quit WinHTTrack Website Copier?
+Сигурни ли сте, че желаете изход от WinHTTrack Website Copier?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Режим: Създаване на огледален сайт -\n\nВъведете адресите в URL кутията
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Режим: Интерактивен Помощник (въпроси) -\n\nВъведете адресите в URL кутията
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Режим: Сваляне на файл -\n\nВъведете адресите на файловете в URL кутията
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Режим: Тестване на препратките -\n\nВъведете адресите с линкове за тестване в URL кутията
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Режим: Обновяване -\n\nПроверете адресите в URL кутията и останалите параметри, ако е необходимо, и кликнете върху бутона 'НАПРЕД'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Режим: Продължение  (Прекъсната операция) -\n\nПроверете адресите в URL кутията и останалите параметри, ако е необходимо, и кликнете върху бутона 'НАПРЕД'
+Log files Path
+Път към log-файловете
+Path
+Път
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Режим: Тестване на препратките -\n\nИзползвайте URL кутията за да въведете адреси на страници съдържащи препратки за създаване на огледално копие
+New project / Import?
+Нов проект / Импорт
+Choose criterion
+Избери критерий
+Maximum link scanning depth
+Максимална дълбочина за сканиране на препратките
+Enter address(es) here
+Въведете адресите тук
+Define additional filtering rules
+Определи допълнителни правила за филтриране
+Proxy Name (if needed)
+Име на Proxy (ако е необходимо)
+Proxy Port
+Порт на Proxy
+Define proxy settings
+Определи настройки за proxy
+Use standard HTTP proxy as FTP proxy
+Използвай стандартното HTTP proxy за FTP proxy
+Path
+Път
+Select Path
+Избери път
+Path
+Път
+Select Path
+Избери път
+Quit WinHTTrack Website Copier
+Изход от WinHTTrack Website Copier
+About WinHTTrack
+За WinHTTrack
+Save current preferences as default values
+Запази текущите предпочитания като основни
+Click to continue
+Кликни за продължение
+Click to define options
+Кликни за дефиниране на опциите
+Click to add a URL
+Кликни за добавяне на URL
+Load URL(s) from text file
+Зареди URL списък от текстов файл
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack предпочитания (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Текстов файл с адреси (*.txt)|*.txt||
+File not found!
+Файлът не е намерен!
+Do you really want to change the project name/path?
+Сигурни ли сте, че желаете да промените името/пътя на проекта?
+Load user-default options?
+Зареди основните за потребителя опции?
+Save user-default options?
+Съхрани основните за потребителя опции?
+Reset all default options?
+Върни всички основни опции?
+Welcome to WinHTTrack!
+Добре дошли във WinHTTrack!
+Action:
+Действие:
+Max Depth
+Максимална дълбочина:
+Maximum external depth:
+Макс. дълбочина за външни сайтове:
+Filters (refuse/accept links) :
+Филтри (откажи/приеми препратки) :
+Paths
+Пътища
+Save prefs
+Съхрани предпочитанията
+Define..
+Определи...
+Set options..
+Настрой опции...
+Preferences and mirror options:
+Предпочитания и опции за огл. копие...
+Project name
+Име на проекта
+Add a URL...
+Добави URL...
+Web Addresses: (URL)
+Адреси: (URL)
+Stop WinHTTrack?
+Спри WinHTTrack?
+No log files in %s!
+В %s няма log-файлове!
+Pause Download?
+Пауза на свалянето?
+Stop the mirroring operation
+Спри операцията за създаване на огледален сайт?
+Minimize to System Tray
+Минимизирай в System Tray
+Click to skip a link or stop parsing
+Кликни за пропускане на препратка или за сприране на разбора
+Click to skip a link
+Кликни за пропускане на препратка
+Bytes saved
+Записани байтове:
+Links scanned
+Сканирани препратки
+Time:
+Време:
+Connections:
+Връзки:
+Running:
+Активни:
+Hide
+Скрий
+Transfer rate
+Скорост на трансфер:
+SKIP
+ПРОПУСНИ
+Information
+Информация
+Files written:
+Записани файлове:
+Files updated:
+Обновени файлове:
+Errors:
+Грешки:
+In progress:
+В изпълнение:
+Follow external links
+Следвай препратките към външни сайтове
+Test all links in pages
+Тествай всички препратки в страниците
+Try to ferret out all links
+Опитай да откриеш всички препратки
+Download HTML files first (faster)
+Свали първо HTML файловете (по-бързо)
+Choose local site structure
+Избери структурата на локалния сайт
+Set user-defined structure on disk
+Определи дефинирана от потребителя структура на диска
+Use a cache for updates and retries
+Използвай кеш за обновленията и повторните опити
+Do not update zero size or user-erased files
+Не обновявай нулевия размер на файлове изтрити от потребителя
+Create a Start Page
+Създай стартова страница
+Create a word database of all html pages
+Създай база данни с думите от всички html страници
+Create error logging and report files
+Създай файлове за отчети и запис на грешките
+Generate DOS 8-3 filenames ONLY
+Създавай имената на файловете САМО в DOS формат (8-3)
+Generate ISO9660 filenames ONLY for CDROM medias
+Създавай имената на файловете САМО в ISO9660 формат за CDROM носители
+Do not create HTML error pages
+Не създавай HTML страници-грешки
+Select file types to be saved to disk
+Избери типовете файлове, които да бъдат записани на диска
+Select parsing direction
+Изберете посока за изпълнение на разбора
+Select global parsing direction
+Изберете глобална посока за изпълнение на разбора
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Настрой правилата за презаписване на URL за вътрешните препратки (вече свалени) и външните препратки (които не са свалени)
+Max simultaneous connections
+Максимален брой едновременни връзки
+File timeout
+Максимално време за изчакване на файл
+Cancel all links from host if timeout occurs
+Откажи всички препратки от даден хост ако макс. време за изчакване изтече
+Minimum admissible transfer rate
+Минимално приемлива скорост на трансфер
+Cancel all links from host if too slow
+Откажи всички препратки от даден хост ако скоростта на трансфер е прекалено ниска
+Maximum number of retries on non-fatal errors
+Максимален брой повторни опити при не-фатални грешки
+Maximum size for any single HTML file
+Максимален размер на всеки един HTML файл
+Maximum size for any single non-HTML file
+Максимален размер на всеки един не-HTML файл
+Maximum amount of bytes to retrieve from the Web
+Максимално количество байтове, които да бъдат свалени от сайта
+Make a pause after downloading this amount of bytes
+Направи пауза след сваляне на това количество байтове
+Maximum duration time for the mirroring operation
+Максимално времетраене на копиране на огледалния сайт
+Maximum transfer rate
+Максимална скорост на трансфер
+Maximum connections/seconds (avoid server overload)
+Максимален брой връзки/секунди (предотвратяване претоварване на сървъра)
+Maximum number of links that can be tested (not saved!)
+Максимален брой препратки, които могат да бъдат тествани (не записани!)
+Browser identity
+Идентификация на браузъра
+Comment to be placed in each HTML file
+Да бъде поставен коментар във всеки HTML файл
+Back to starting page
+Назад към стартовата страница
+Save current preferences as default values
+Запази текущите предпочитания като основни
+Click to continue
+Кликни за продължение
+Click to cancel changes
+Кликни за отказ от промените
+Follow local robots rules on sites
+Следвай локалните правила за роботи в сайтовете
+Links to non-localised external pages will produce error pages
+Препратки към нелокализирани външни страници ще съдадат страници-грешки
+Do not erase obsolete files after update
+Не изтривай старите файлове след обновление
+Accept cookies?
+Приемай 'бисквитки'?
+Check document type when unknown?
+Провери типа на документа, когато е неизвестен?
+Parse java applets to retrieve included files that must be downloaded?
+Прави разбор на Java аплети за откриване на файлове, които трябва да бъдат свалени?
+Store all files in cache instead of HTML only
+Запази всички файлове в кеша, вместо само в HTML файлове
+Log file type (if generated)
+Тип на log-файла (ако е генериран)
+Maximum mirroring depth from root address
+Максимално дълбочинно ниво на сканиране от основния адрес
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Максимално дълбочинно ниво на сканиране за външни/забранени адреси (0 - неограничено, основно по подразбиране)
+Create a debugging file
+Създай debug-файл
+Use non-standard requests to get round some server bugs
+Използвай нестандартни заявки, за да се избегнат някои сървърни проблеми
+Use old HTTP/1.0 requests (limits engine power!)
+Използвай стари HTTP/1.0 заявки (ограничава възможностите на програмата)
+Attempt to limit retransfers through several tricks (file size test..)
+Опит да се ограничи ре-трансфериране чрез няколко трика (тест на големината на файла..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+Записвай външните препратки без име/парола
+Write internal links without query string
+Записвай вътрешните препратки без въпросителен знак
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Вземи не-HTML файлове отнасящи се до препратка, напр. външни .ZIP или картинки
+Test all links (even forbidden ones)
+Тествай всички препратки (дори и забранените)
+Try to catch all URLs (even in unknown tags/code)
+Опитай да засечеш всички URL адреси (дори при нейзвестни тагове/код)
+Get HTML files first!
+Вземи първо HTML файловете!
+Structure type (how links are saved)
+Тип на структурата (как се записват препратките)
+Use a cache for updates
+Използвай кеш за обновяване
+Do not re-download locally erased files
+Не сваляй повторно локално изтритите файлове
+Make an index
+Създай индекс
+Make a word database
+Създай база данни с думи
+Log files
+Log файлове
+DOS names (8+3)
+DOS имена (8+3)
+ISO9660 names (CDROM)
+ISO9660 имена (CDROM)
+No error pages
+Без страници грешки
+Primary Scan Rule
+Първично правило при сканиране
+Travel mode
+Метод на сканиране
+Global travel mode
+Глобален метод на сканиране
+These options should be modified only exceptionally
+Обичайно, тези опции не трябва да се променят
+Activate Debugging Mode (winhttrack.log)
+Режим Трасиране за грешки (winhttrack.log)
+Rewrite links: internal / external
+Презапиши препратките: (вътрешни/външни)
+Flow control
+Контрол на потока
+Limits
+Ограничения
+Identity
+Идентичност
+HTML footer
+HTML край (footer)
+N# connections
+Брой връзки
+Abandon host if error
+Изостави хоста при грешка
+Minimum transfer rate (B/s)
+Мин. скорост на трансфер (Б/сек.)
+Abandon host if too slow
+Изостави хоста ако е прекалено бавен
+Configure
+Настрой
+Use proxy for ftp transfers
+Използвай прокси за FTP трансфери
+TimeOut(s)
+Прекъсване(ния)
+Persistent connections (Keep-Alive)
+Постоянни връзки (Keep-Alive)
+Reduce connection time and type lookup time using persistent connections
+Намали времетраенето на връзката и времето за определяне на типа чрез простоянни връзки
+Retries
+Повторни опити
+Size limit
+Ограничение на размера
+Max size of any HTML file (B)
+Макс. размер на HTML файл (Б)
+Max size of any non-HTML file
+Макс. размер на не-HTML файл (Б)
+Max site size
+Максимален размер на сайта
+Max time
+Максимално времетраене
+Save prefs
+Запази предпочитанията
+Max transfer rate
+Максимална скорост на трансфер
+Follow robots.txt
+Следвай robots.txt
+No external pages
+Без външни страници
+Do not purge old files
+Не премахвай старите файлове
+Accept cookies
+Приемай 'бисквитки'
+Check document type
+Провери типа на документа
+Parse java files
+Прави разбор на Java файлове
+Store ALL files in cache
+Запази ВСИЧКИ файлове в кеша
+Tolerant requests (for servers)
+Толерантни заявки (към сървърите)
+Update hack (limit re-transfers)
+Update hack (ограничи повторните трансфери)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+Използвай стари HTTP/1.0 заявки (не 1.1)
+Max connections / seconds
+Максимален брой връзки/секунди
+Maximum number of links
+Максимален брой препратки
+Pause after downloading..
+Пауза след сваляне..
+Hide passwords
+Скривай паролите
+Hide query strings
+Скривай въпросителните низове
+Links
+Препратки
+Build
+Структура
+Experts Only
+Само за експерти
+Flow Control
+Контрол на потока
+Limits
+Ограничения
+Browser ID
+Идентификация на браузъра
+Scan Rules
+Правила за сканиране
+Spider
+Паяк
+Log, Index, Cache
+Log, Индекс, Кеш
+Proxy
+Прокси
+MIME Types
+MIME типове
+Do you really want to quit WinHTTrack Website Copier?
+Сигурни ли сте, че желаете изход от WinHTTrack Website Copier?
+Do not connect to a provider (already connected)
+Не се свързвай с доставчик (връзката е вече установена)
+Do not use remote access connection
+Не използвай връзка с отдалечен достъп
+Schedule the mirroring operation
+Планирай операцията по създаване на огледален сайт
+Quit WinHTTrack Website Copier
+Изход от WinHTTrack Website Copier
+Back to starting page
+Назад към стартовата страница
+Click to start!
+Кликни за старт!
+No saved password for this connection!
+Няма съхранена парола за тази връзка!
+Can not get remote connection settings
+Не може да получи настройките за отдалечената връзка
+Select a connection provider
+Изберете доставчик за връзка
+Start
+Старт
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Моля, донастройте  парам. на връзката ако е необходимо,\nслед това натиснете КРАЙ за старт на опреацията за създаване на огледален сайт.
+Save settings only, do not launch download now.
+Само запази настройките! Не стартирай копирането сега!
+On hold
+Задръж
+Transfer scheduled for: (hh/mm/ss)
+Трансферът е планиран за: (чч/мм/сс)
+Start
+Старт
+Connect to provider (RAS)
+Свържи се с доставчик (чрез модем)
+Connect to this provider
+Свържи се с този доставчик
+Disconnect when finished
+Прекрати връзката след края на операцията
+Disconnect modem on completion
+След края на операцията разкачи модема
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Моля уведомете ни за всяка грешка или проблем)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nПаяк: Xavier Roche\r\nJava Разборни Класове: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche и други сътрудници\r\nМНОГО БЛАГОДАРНОСТИ за Българският превод на:\r\nИлия Линдов (ilia@infomat-bg.com)
+About WinHTTrack Website Copier
+За WinHTTrack Website Copier
+Please visit our Web page
+Моля посетете нашата Интернет страница
+Wizard query
+Запитване към съветника
+Your answer:
+Вашият отговор:
+Link detected..
+Намерена връзка..
+Choose a rule
+Избери правило
+Ignore this link
+Игнорирай тази препратка
+Ignore directory
+Игнорирай директория
+Ignore domain
+Игнорирай област
+Catch this page only
+Свали само тази страница
+Mirror site
+Направи огледално копие на сайта
+Mirror domain
+Направи огледално копие на областта
+Ignore all
+Игнорирай всичко
+Wizard query
+Запитване към съветника
+NO
+НЕ
+File
+Файл
+Options
+Опции
+Log
+Log
+Window
+Прозорец
+Help
+Помощ
+Pause transfer
+Пауза на трансфера
+Exit
+Изход
+Modify options
+Промени опциите
+View log
+Виж log-а
+View error log
+Виж log-а за грешки
+View file transfers
+Виж трансферите на файлове
+Hide
+Скрий
+About WinHTTrack Website Copier
+За WinHTTrack Website Copier
+Check program updates...
+Провери за обновления на програмата...
+&Toolbar
+&Панел с инструменти
+&Status Bar
+&Статус панел
+S&plit
+&Раздели
+File
+Файл
+Preferences
+Предпочитания
+Mirror
+Огледало
+Log
+Log
+Window
+Прозорец
+Help
+Помощ
+Exit
+Изход
+Load default options
+Зареди основните предпочитания
+Save default options
+Запази основните предпочитания
+Reset to default options
+Върни основните опции
+Load options...
+Зареди опции...
+Save options as...
+Запази опциите като...
+Language preference...
+Предпочитан език...
+Contents...
+Съдържание
+About WinHTTrack...
+За WinHTTrack...
+New project\tCtrl+N
+Нов проект\tCtrl+N
+&Open...\tCtrl+O
+&Отвори...\tCtrl+O
+&Save\tCtrl+S
+&Запази\tCtrl+S
+Save &As...
+Запази &Като...
+&Delete...
+&Изтрий
+&Browse sites...
+&Прегледай сайт...
+User-defined structure
+Структура определена от потребителя
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tИме на файл без разширение (напр.: image)\r\n%N\tИме на файл с разширение (напр.: image.gif)\r\n%t\tСамо тип на файл(разширение)(напр.: gif)\r\n%p\tПът [без '/' накрая](напр.: /someimages)\r\n%h\tИме на хост (напр.: www.someweb.com)\r\n%M\tMD5 URL (128 бита, 32 ascii бита)\r\n%Q\tMD5 въпросителен низ (128 бита, 32 ascii бита)\r\n%q\tMD5 малък въпросителен низ (16 бита, 4 ascii бита)\r\n\r\n%s?\tКъсо име (напр.: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Пример:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Прокси настройки
+Proxy address:
+Прокси адрес:
+Proxy port:
+Прокси порт:
+Authentication (only if needed)
+Идентифициране (само ако е необходимо)
+Login
+Идентификатор
+Password
+Парола
+Enter proxy address here
+Въведете адрес на прокси тук
+Enter proxy port here
+Въведете порт на прокси тук
+Enter proxy login
+Въведете идентификатор за прокси
+Enter proxy password
+Въведете парола за прокси
+Enter project name here
+Въведете име на проекта тук
+Enter saving path here
+Въведете път за записване тук
+Select existing project to update
+Изберете съществуващ проект за обновление
+Click here to select path
+Кликнете тук за да изберете път
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack Съветник-Проекти...
+New project name:
+Име на нов проект:
+Existing project name:
+Име на съществуващ проект:
+Project name:
+Име на проект:
+Base path:
+Основен път:
+Project category:
+Категория на проекта
+C:\\My Web Sites
+C:\\Моите Интернет Страници
+Type a new project name, \r\nor select existing project to update/resume
+Задайте име на нов проект, \r\nили изберете съществуващ проект за обновление/продължение
+New project
+Нов проект
+Insert URL
+Въведете URL
+URL:
+URL:
+Authentication (only if needed)
+Идентификация
+Login
+Идентификатор
+Password
+Парола
+Forms or complex links:
+Формули или сложни препратки:
+Capture URL...
+Прихвани URL...
+Enter URL address(es) here
+Въведете URL адресът(ите) тук
+Enter site login
+Въведете идентификатор за сайта
+Enter site password
+Въведете парола за сайта
+Use this capture tool for links that can only be accessed through forms or javascript code
+Използвай този инструмент за прихващане на препратки, които могат да бъдат достигнати само чрез форми или JavaScript код
+Choose language according to preference
+Избери език съгласно предпочитанията
+Catch URL!
+Прихвани URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Моля временно задайте показаните прокси настройки на Вашия браузър ('Copy/Paste' прокси адреса и порта).\nСлед това кликнете върху бутона ПРЕДАЙ (SUBMIT) в страницата на браузъра или кликнете върху препратка, която желаете да бъде прихваната.
+This will send the desired link from your browser to WinHTTrack.
+Това ще изпрати предпочетената препратка от Вашия браузър към WinHTTrack.
+ABORT
+АНУЛИРАЙ
+Copy/Paste the temporary proxy parameters here
+Copy/Paste временните прокси параметри тук
+Cancel
+Отказ
+Unable to find Help files!
+Не са намерени файловете за Помощ!
+Unable to save parameters!
+Параметрите не могат да бъдат записани!
+Please drag only one folder at a time
+Моля придръпвайте само по една директория
+Please drag only folders, not files
+Моля придръпвайте само директории, не файлове
+Please drag folders only
+Моля придръпвайте само директории
+Select user-defined structure?
+Избирате структура дефинирана от потребителя?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Моля уверете се, че низът дефиниран от потребителя е правилен,\nиначе имената на файловете ще бъдат некоректни (повредени)!
+Do you really want to use a user-defined structure?
+Сигурни ли сте, че желаете да използвате дефинирана от потребителя структура?
+Too manu URLs, cannot handle so many links!!
+Прекалено много URL адреси, програмата не може да се справи с такова количество препратки!
+Not enough memory, fatal internal error..
+Недостатъчно памет, фатална вътрешна грешка...
+Unknown operation!
+Неизвестна операция!
+Add this URL?\r\n
+Добави този URL адрес?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Предупреждение: Основният процес все още не отговаря. Не могат да бъдат добавяни URL адреси...
+Type/MIME associations
+Тип/MIME асоциации
+File types:
+Файлови типове:
+MIME identity:
+MIME идентичност:
+Select or modify your file type(s) here
+Изберете или променете Вашите файлови типове тук
+Select or modify your MIME type(s) here
+Изберете или променете Вашите MIME типове тук
+Go up
+Нагоре
+Go down
+Надолу
+File download information
+Информация за свалянето на файла
+Freeze Window
+Замрази прозореца
+More information:
+Повече информация:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Добре дошли във WinHTTrack Website Copier!\n\nМоля кликнете върху бутона 'НАПРЕД'\n\n- за да създадете нов проект\n\n- или за да продължите незавършено сваляне
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Файлови имена с разширение:\nФайлови имена съдържащи:\nТова име на файл:\nИмена на директории съдържащи:\nТова име на директория:\nПрепратки в тази област:\nПрепратки в области съдържащи:\nПрепратки от този хост:\nПрепратки съдържащи:\nТази препратка:\nВСИЧКИ ПРЕПРАТКИ
+Show all\nHide debug\nHide infos\nHide debug and infos
+Покажи всички\nСкрий debug\nСкрий информацията\nСкрий debug и информацията
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Структура на сайта(по подразбиране)\nHtml в мрежата/,       изобр./други файлове в мрежата/изобр./\nHtml в мрежата/html,   изобр./други в мрежата/изобр.\nHtml в мрежата/,       изобр./други в мрежата/\nHtml в мрежата/,   изобр./др. в мрежата/xxx, където ххх е разш. на файла\nHtml в мрежата/html,   изобр./други в мрежата/xxx\nСтруктура на сайта, без www.област.xxx/\nHtml в име_на_сайта/, изобр./други файлове  в име_на_сайта/изобр./\nHtml  в име_на_сайта/html, изобр./други  в име_на_сайта/изобр.\nHtml  в име_на_сайта/, изобр./други в име_на_сайта/\nHtml  в име_на_сайта/, изобр./други  в име_на_сайта/xxx\nHtml  в име_на_сайта/html, изобр./други в име_на_сайта/ххх\nВсички файлове в мрежата/, със случайни имена (gadget !)\nВсички файлове в име_на_сайта/, със случайни имена (gadget !)\nСтруктура дефинирана от потребителя..
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Само сканирай\nЗапази html файлове\nЗапази не-html файлове\nЗапази вс. файлове (по подразбиране)\nЗапази първо html файловете
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Стой в същата директория\nМоже да слиза надолу (по подразб.)\nМоже да се изкачва нагоре\nМоже да ходи нагоре и надолу
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Стой на същия адрес (по подразб.)\nСтой в същата област\nСтой в основната (top level) област\nХоди навсякъде в мрежата
+Never\nIf unknown (except /)\nIf unknown
+Никога\nАко е неизвестен (освен /)\nАко е неизвестен
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+няма robots.txt правила\nrobots.txt изключващ съветник\nследвай robots.txt правилата
+normal\nextended\ndebug
+нормален\nразширен\nтрасиране за грешки
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Свали сайта(сайтовете)\nСвали сайта(сайтовете) + въпроси\nВземи индивидуални файлове\nСвали всички сайтове в стр.(много огл. сайтове)\nТествай препр. в страниците (тест на отметките)\n* Продължи прекъснато сваляне\n* Обнови съществуващо копие
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Относ. URI / Абс. URL (по подразбиране)\nАбсолютен URL / Абсолютен URL\nАбсолютен URI / Абсолютен URI\nОригинален URL / Оригинален URL
+Open Source offline browser
+Offline браузър Отворен Код
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Програма за копиране на сайтове/Offline браузър. Копира отдалечени сайтове на Вашия компютър. Безплатна.
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline browser, offline браузър
+URL list (.txt)
+URL списък (.txt)
+Previous
+Предходен
+Next
+Следващ
+URLs
+URL-та
+Warning
+Предупреждение
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Вашият браузър не поддържа JavaScript. За по-добри резултати, моля използвайте браузър с JavaScript поддръжка.
+Thank you
+Благодаря
+You can now close this window
+Сега можете да затворите този прозорец
+Server terminated
+Сървърът не отговаря
+A fatal error has occured during this mirror
+Фатална грешка при създаването на този огледален сайт

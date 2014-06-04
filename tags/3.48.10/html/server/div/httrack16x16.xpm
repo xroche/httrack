@@ -1,0 +1,25 @@
+/* XPM */
+static char *httrack__[] = {
+/* columns rows colors chars-per-pixel */
+"16 16 3 1",
+"  c #000000000000",
+". c #000000008080",
+"X c #808080808080",
+/* pixels */
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.            .X",
+"X.            .X",
+"X.            .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X",
+"X.   XXXXXX   .X"
+};
