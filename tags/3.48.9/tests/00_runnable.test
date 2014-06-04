@@ -1,5 +1,0 @@
-#!/bin/bash
-#
-
-# check that httrack starts
-httrack --version >/dev/null

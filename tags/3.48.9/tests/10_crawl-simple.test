@@ -1,6 +1,0 @@
-#!/bin/bash
-#
-
-bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
-
-bash crawl-test.sh --errors 0 --files 5 httrack http://ut.httrack.com/simple/basic.html
