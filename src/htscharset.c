@@ -723,21 +723,43 @@ static unsigned int nlz8(unsigned char x) {
   26	U+200000	U+3FFFFFF	5	111110xx
   31	U+4000000	U+7FFFFFFF	6	1111110x
 */
-#define ADD_FIRST_SEQ(UC, LEN, EMITTER) do {                            \
-  /* first octet */                                                     \
-  const unsigned char lead =                                            \
-    /* leading bits: LEN "1" bits */                                    \
-    ~ ( ( 1 << (unsigned) ( 8 - LEN ) ) - 1 )                           \
-    /* encoded bits */                                                  \
-    | ( (UC) >> (unsigned) ( ( LEN - 1 ) * 6 ) );                       \
-  EMITTER(lead);                                                        \
-  } while(0)
-
-#define ADD_NEXT_SEQ(UC, SHIFT, EMITTER) do {                           \
-  /* further bytes are encoding 6 bits */                               \
-  const unsigned char next =                                            \
-    0x80 | ( ( (UC) >> SHIFT ) & 0x3f );                                \
-  EMITTER(next);                                                        \
+#define ADD_SEQ(UC, BITS, EMITTER) do {                                 \
+    /* number of data bits in first octet */                            \
+    const unsigned int bits = BITS % 6;                                 \
+    /* shift for first octet */                                         \
+    const unsigned int shift0 = BITS - bits;                            \
+    /* first octet */                                                   \
+    const unsigned char lead =                                          \
+      /* leading bits */                                                \
+      ( 0xff ^ ( ( 1 << ( bits + 1 ) ) - 1 ) )                          \
+      /* encoded bits */                                                \
+      | ( ( (UC) >> shift0 ) & ( ( 1 << ( bits + 1 ) ) - 1 ) )          \
+      ;                                                                 \
+    /* further bytes are encoding 6 bits */                             \
+    const unsigned char second =                                        \
+      0x80 | ( ( (UC) >> ( shift0 - 6 ) ) & 0x3f );                     \
+    EMITTER(lead);                                                      \
+    EMITTER(second);                                                    \
+    if (BITS > 6*2) {                                                   \
+      const unsigned char next =                                        \
+        0x80 | ( ( (UC) >> ( shift0 - 6*2 ) ) & 0x3f );                 \
+      EMITTER(next);                                                    \
+      if (BITS > 6*3) {                                                 \
+        const unsigned char next =                                      \
+          0x80 | ( ( (UC) >> ( shift0 - 6*3 ) ) & 0x3f );               \
+        EMITTER(next);                                                  \
+        if (BITS > 6*4) {                                               \
+          const unsigned char next =                                    \
+            0x80 | ( ( (UC) >> ( shift0 - 6*4 ) ) & 0x3f );             \
+          EMITTER(next);                                                \
+          if (BITS > 6*5) {                                             \
+            const unsigned char next =                                  \
+              0x80 | ( ( (UC) >> ( shift0 - 6*5 ) ) & 0x3f );           \
+            EMITTER(next);                                              \
+          }                                                             \
+        }                                                               \
+      }                                                                 \
+    }                                                                   \
   } while(0)
 
 /* UC is a constant. EMITTER is a macro function taking an unsigned int. */
@@ -745,30 +767,15 @@ static unsigned int nlz8(unsigned char x) {
     if ((UC) < 0x80) {                          \
       EMITTER(((unsigned char) (UC)));          \
     } else if ((UC) < 0x0800) {                 \
-      ADD_FIRST_SEQ(UC, 2, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
+      ADD_SEQ(UC, 11, EMITTER);                 \
     } else if ((UC) < 0x10000) {                \
-      ADD_FIRST_SEQ(UC, 3, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
+      ADD_SEQ(UC, 16, EMITTER);                 \
     } else if ((UC) < 0x200000) {               \
-      ADD_FIRST_SEQ(UC, 4, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
+      ADD_SEQ(UC, 21, EMITTER);                 \
     } else if ((UC) < 0x4000000) {              \
-      ADD_FIRST_SEQ(UC, 5, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 18, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
+      ADD_SEQ(UC, 26, EMITTER);                 \
     } else {                                    \
-      ADD_FIRST_SEQ(UC, 6, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 24, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 18, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
+      ADD_SEQ(UC, 31, EMITTER);                 \
     }                                           \
   } while(0)
 

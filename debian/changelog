@@ -1,9 +1,3 @@
-httrack (3.48.10) unstable; urgency=low
-
-  * Updated to 3.48.10 (3.48-10)
-
- -- Xavier Roche <xavier@debian.org>  Wed, 04 Jun 2014 19:00:07 +0200
-
 httrack (3.48.9-1) unstable; urgency=low
 
   * Updated to 3.48.9 (3.48-9)

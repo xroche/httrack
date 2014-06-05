@@ -104,12 +104,17 @@ struct htsmoduleStruct {
   httrackp *opt;
 
   /* Internal use - please don't touch */
+  lien_url **liens;
   struct_back *sback;
   cache_back *cache;
   hash_struct *hashptr;
   int numero_passe;
+  int add_tab_alloc;
   /* */
+  int *lien_tot_;
   int *ptr_;
+  size_t *lien_size_;
+  char **lien_buffer_;
   const char *page_charset_;
   /* Internal use - please don't touch */
 

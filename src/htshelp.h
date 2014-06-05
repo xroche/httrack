@@ -43,11 +43,11 @@ Please visit our Website: http://www.httrack.com
 typedef struct httrackp httrackp;
 #endif
 
-void infomsg(const char *msg);
-void help(const char *app, int more);
-void make_empty_index(const char *str);
+void infomsg(char *msg);
+void help(char *app, int more);
+void make_empty_index(char *str);
 void help_wizard(httrackp * opt);
-int help_query(const char *list, int def);
+int help_query(char *list, int def);
 void help_catchurl(const char *dest_path);
 
 #endif

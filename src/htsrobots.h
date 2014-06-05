@@ -47,9 +47,9 @@ struct robots_wizard {
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil);
+int checkrobots(robots_wizard * robots, char *adr, char *fil);
 void checkrobots_free(robots_wizard * robots);
-int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
+int checkrobots_set(robots_wizard * robots, char *adr, char *data);
 #endif
 
 #endif

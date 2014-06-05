@@ -274,11 +274,6 @@ typedef enum htsparsejava_flags {
   HTSPARSE_NO_AGGRESSIVE = 8    // don't aggressively parse .js or .java
 } htsparsejava_flags;
 
-#ifndef HTS_DEF_FWSTRUCT_lien_buffers
-#define HTS_DEF_FWSTRUCT_lien_buffers
-typedef struct lien_buffers lien_buffers;
-#endif
-
 // paramètres httrack (options)
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -367,9 +362,7 @@ struct httrackp {
   String urllist;               // fichier liste de filtres à inclure
   htsfilters filters;           // contient les pointeurs pour les filtres
   hash_struct *hash;            // hash structure
-  lien_url **liens;             // links
-  int lien_tot;                 // top index of "links" heap (always out-of-range)
-  lien_buffers *liensbuf;       // links buffers
+  lien_url **liens;             // liens
   robots_wizard *robotsptr;     // robots ptr
   String lang_iso;              // en, fr ..
   String accept;                // Accept:
@@ -381,7 +374,7 @@ struct httrackp {
   int maxlink;                  // nombre max de liens
   int maxfilter;                // nombre max de filtres
   //
-  const char *exec;             // adresse du nom de l'éxecutable
+  char *exec;                   // adresse du nom de l'éxecutable
   //
   int quiet;                    // poser des questions autres que wizard?
   int keyboard;                 // vérifier stdin

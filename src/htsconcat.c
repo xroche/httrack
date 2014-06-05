@@ -105,7 +105,7 @@ char *fslash(char *catbuff, size_t size, const char *a) {
 }
 
 // extension : html,gif..
-HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil) {
+HTSEXT_API char *get_ext(char *catbuff, size_t size, const char *fil) {
   size_t i, last;
 
   RUNTIME_TIME_CHECK_SIZE(size);

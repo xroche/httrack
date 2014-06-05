@@ -56,7 +56,7 @@ EOF
                 i=$[${i}+1]
             done
             echo -e "    /* $A */"
-            echo -e "  case ${hash}u:"
+            echo -e "  case ${hash}:"
             echo -e "    if (len == ${#ent} /* && strncmp(ent, \"${ent}\") == 0 */) {"
             echo -e "      return ${code};"
             echo -e "    }"

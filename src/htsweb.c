@@ -238,7 +238,7 @@ static void back_launch_cmd(void *pP) {
   commandReturnCmdl = strdup(cmd);
 
   /* split */
-  argv[0] = strdup("webhttrack");
+  argv[0] = "webhttrack";
   argv[1] = cmd;
   argc++;
   i = 0;
@@ -264,7 +264,6 @@ static void back_launch_cmd(void *pP) {
   /* init */
   hts_init();
   global_opt = opt = hts_create_opt();
-  assert(opt->size_httrackp == sizeof(httrackp));
 
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);

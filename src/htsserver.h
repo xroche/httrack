@@ -100,7 +100,7 @@ int htslang_uninit(void);
 
 /* Static definitions */
 
-HTS_UNUSED static const char *gethomedir(void);
+HTS_UNUSED static char *gethomedir(void);
 HTS_UNUSED static int linput_cpp(FILE * fp, char *s, int max);
 HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max);
 HTS_UNUSED static int fexist(const char *s);
@@ -163,8 +163,8 @@ HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   return -1;
 }
 
-static const char *gethomedir(void) {
-  const char *home = getenv("HOME");
+static char *gethomedir(void) {
+  char *home = getenv("HOME");
 
   if (home)
     return home;
@@ -228,7 +228,7 @@ static int linput(FILE * fp, char *s, int max) {
 }
 static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloc(max + 1);
+  char *ls = (char *) malloc(max + 2);
 
   s[0] = '\0';
   if (ls) {
@@ -267,11 +267,11 @@ static int ehexh(char c) {
   return 0;
 }
 
-static int ehex(const char *s) {
+static int ehex(char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
+HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
   size_t i;
 
   for(i = 0; s[i] != '\0'; i++) {

@@ -69,14 +69,9 @@ libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \
+		minizip/ChangeLogUnzip \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
-		minizip/ioapi.c.diff \
-		minizip/ioapi.h.diff \
-		minizip/zip.c.diff \
-		minizip/zip.h.diff \
-		minizip/MiniZip64_Changes.txt \
-		minizip/MiniZip64_info.txt \
 		proxy/AUTHORS \
 		proxy/COPYING \
 		proxy/changelog.txt \

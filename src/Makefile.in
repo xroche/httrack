@@ -179,7 +179,6 @@ CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
-AM_CFLAGS = @AM_CFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -188,12 +187,14 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
-CFLAG_VISIBILITY = @CFLAG_VISIBILITY@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+CXXDEPMODE = @CXXDEPMODE@
+CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFAULT_CFLAGS = @DEFAULT_CFLAGS@
-DEFAULT_LDFLAGS = @DEFAULT_LDFLAGS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
@@ -207,7 +208,6 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GREP = @GREP@
-HAVE_VISIBILITY = @HAVE_VISIBILITY@
 HTTPS_SUPPORT = @HTTPS_SUPPORT@
 ICONV_LIBS = @ICONV_LIBS@
 INSTALL = @INSTALL@
@@ -263,6 +263,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -374,14 +375,9 @@ libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
+		minizip/ChangeLogUnzip \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
-		minizip/ioapi.c.diff \
-		minizip/ioapi.h.diff \
-		minizip/zip.c.diff \
-		minizip/zip.h.diff \
-		minizip/MiniZip64_Changes.txt \
-		minizip/MiniZip64_info.txt \
 		proxy/AUTHORS \
 		proxy/COPYING \
 		proxy/changelog.txt \

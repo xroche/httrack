@@ -88,7 +88,7 @@ void MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len) {
   /* Handle any leading odd-sized chunks */
 
   if (t) {
-    unsigned char *p = ctx->in.ui8 + t;
+    unsigned char *p = (unsigned char *) ctx->in + t;
 
     t = 64 - t;
     if (len < t) {
@@ -97,25 +97,25 @@ void MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len) {
     }
     memcpy(p, buf, t);
     if (ctx->doByteReverse)
-      byteReverse(ctx->in.ui8, 16);
-    MD5Transform(ctx->buf, ctx->in.ui32);
+      byteReverse(ctx->in, 16);
+    MD5Transform(ctx->buf, (uint32 *) ctx->in);
     buf += t;
     len -= t;
   }
   /* Process data in 64-byte chunks */
 
   while(len >= 64) {
-    memcpy(ctx->in.ui8, buf, 64);
+    memcpy(ctx->in, buf, 64);
     if (ctx->doByteReverse)
-      byteReverse(ctx->in.ui8, 16);
-    MD5Transform(ctx->buf, ctx->in.ui32);
+      byteReverse(ctx->in, 16);
+    MD5Transform(ctx->buf, (uint32 *) ctx->in);
     buf += 64;
     len -= 64;
   }
 
   /* Handle any remaining bytes of data. */
 
-  memcpy(ctx->in.ui8, buf, len);
+  memcpy(ctx->in, buf, len);
 }
 
 /*
@@ -131,7 +131,7 @@ void MD5Final(unsigned char digest[16], struct MD5Context *ctx) {
 
   /* Set the first char of padding to 0x80.  This is safe since there is
      always at least one byte free */
-  p = ctx->in.ui8 + count;
+  p = ctx->in + count;
   *p++ = 0x80;
 
   /* Bytes of padding needed to make 64 bytes */
@@ -142,27 +142,26 @@ void MD5Final(unsigned char digest[16], struct MD5Context *ctx) {
     /* Two lots of padding:  Pad the first block to 64 bytes */
     memset(p, 0, count);
     if (ctx->doByteReverse)
-      byteReverse(ctx->in.ui8, 16);
-    MD5Transform(ctx->buf, ctx->in.ui32);
+      byteReverse(ctx->in, 16);
+    MD5Transform(ctx->buf, (uint32 *) ctx->in);
 
     /* Now fill the next block with 56 bytes */
-    memset(ctx->in.ui8, 0, 56);
+    memset(ctx->in, 0, 56);
   } else {
     /* Pad block to 56 bytes */
     memset(p, 0, count - 8);
   }
   if (ctx->doByteReverse)
-    byteReverse(ctx->in.ui8, 14);
+    byteReverse(ctx->in, 14);
 
   /* Append length in bits and transform */
   /* Note: see patch for PAM from Tomas Mraz */
-  ctx->in.ui32[14] = ctx->bits[0];
-  ctx->in.ui32[15] = ctx->bits[1];
+  memcpy((uint32 *) ctx->in + 14, ctx->bits, 2 * sizeof(uint32));
   /*((uint32 *) ctx->in)[14] = ctx->bits[0];
      ((uint32 *) ctx->in)[15] = ctx->bits[1];
    */
 
-  MD5Transform(ctx->buf, ctx->in.ui32);
+  MD5Transform(ctx->buf, (uint32 *) ctx->in);
   if (ctx->doByteReverse)
     byteReverse((unsigned char *) ctx->buf, 4);
   memcpy(digest, ctx->buf, 16);

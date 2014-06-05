@@ -189,10 +189,10 @@ const char *hts_optalias[][4] = {
   /* Badly documented */
   {"debug-testfilters", "-#0", "param1", "debug: test filters"},
   {"advanced-flushlogs", "-#f", "single", ""},
-  {"advanced-maxfilters", "-#F", "param", "maximum number of scan rules"},
+  {"advanced-maxfilters", "-#F", "param", ""},
   {"version", "-#h", "single", ""},
   {"debug-scanstdin", "-#K", "single", ""},
-  {"advanced-maxlinks", "-#L", "single", "maximum number of links (0 to disable limit)"},
+  {"advanced-maxlinks", "-#L", "single", ""},
   {"advanced-progressinfo", "-#p", "single", "deprecated"},
   {"catch-url", "-#P", "single", "catch complex URL through proxy"},
   /*{"debug-oldftp","-#R","single",""}, */
@@ -560,8 +560,8 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
 
 /* Get home directory, '.' if failed */
 /* example: /home/smith */
-const char *hts_gethome(void) {
-  const char *home = getenv("HOME");
+char *hts_gethome(void) {
+  char *home = getenv("HOME");
 
   if (home)
     return home;

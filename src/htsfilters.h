@@ -39,11 +39,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 
-int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * size,
+int fa_strjoker(int type, char **filters, int nfil, char *nom, LLint * size,
                 int *size_flag, int *depth);
-HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * size,
+HTS_INLINE char *strjoker(char *chaine, char *joker, LLint * size,
                           int *size_flag);
-const char *strjokerfind(const char *chaine, const char *joker);
+char *strjokerfind(char *chaine, char *joker);
 #endif
 
 #endif

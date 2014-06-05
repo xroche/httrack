@@ -212,6 +212,7 @@ extern int ZEXPORT zipCloseFileInZip OF((zipFile file));
   Close the current file in the zipfile
 */
 
+
 extern int ZEXPORT zipCloseFileInZipRaw OF((zipFile file,
                                             uLong uncompressed_size,
                                             uLong crc32));
@@ -225,11 +226,6 @@ extern int ZEXPORT zipClose OF((zipFile file,
                 const char* global_comment));
 /*
   Close the zipfile
-*/
-
-extern int ZEXPORT zipFlush OF((zipFile file));
-/*
-  Flush the zipfile output
 */
 
 #ifdef __cplusplus

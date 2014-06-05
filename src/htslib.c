@@ -609,7 +609,7 @@ void hts_init_htsblk(htsblk * r) {
 
 // ouvre une liaison http, envoie une requète GET et réceptionne le header
 // retour: socket
-T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour) {
+T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
   //                / GET, traiter en-tête
   return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
 }
@@ -620,11 +620,10 @@ T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * reto
 // waitconnect: attendre le connect()
 // note: dans retour, on met les params du proxy
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil, htsblk * retour) {
+                  char *xsend, char *adr, char *fil, htsblk * retour) {
   //htsblk retour;
   //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
   T_SOC soc = INVALID_SOCKET;
-  char BIGSTK tempo_fil[HTS_URLMAXSIZE * 2];
 
   //char *p,*q;
 
@@ -700,8 +699,10 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
             (fconv
              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil + 1)))) {
-          strcpybuff(tempo_fil, fil + 1);
-          fil = tempo_fil;
+          char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+          strcpybuff(tempo, fil + 1);
+          strcpybuff(fil, tempo);
         }
       // Ouvrir
       retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
@@ -844,16 +845,15 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 // envoi d'une requète
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
-                  const char *xsend, const char *adr, const char *fil,
-                  const char *referer_adr, const char *referer_fil,
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
+                  char *adr, char *fil, char *referer_adr, char *referer_fil,
                   htsblk * retour) {
   char BIGSTK buffer_head_request[8192];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
   //int use_11=0;     // HTTP 1.1 utilisé
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
-  const char *search_tag = NULL;
+  char *search_tag = NULL;
 
   // Initialize buffer
   buffer_head_request[0] = '\0';
@@ -1054,7 +1054,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     }
 
     {
-      const char *real_adr = jump_identification(adr);
+      char *real_adr = jump_identification(adr);
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
@@ -1099,12 +1099,12 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       /* Authentification */
       {
         char autorisation[1100];
-        const char *a;
+        char *a;
 
         autorisation[0] = '\0';
         if (link_has_authorization(adr)) {      // ohh une authentification!
-          const char *a = jump_identification(adr);
-          const char *astart = jump_protocol(adr);
+          char *a = jump_identification(adr);
+          char *astart = jump_protocol(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
@@ -1184,8 +1184,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 }
 
 // traiter 1ere ligne d'en tête
-void treatfirstline(htsblk * retour, const char *rcvd) {
-  const char *a = rcvd;
+void treatfirstline(htsblk * retour, char *rcvd) {
+  char *a = rcvd;
 
   // exemple:
   // HTTP/1.0 200 OK
@@ -1255,7 +1255,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
 
 // traiter ligne par ligne l'en tête
 // gestion des cookies
-void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
+void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
                char *rcvd) {
   int p;
 
@@ -1388,7 +1388,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
     // Content-Range: bytes 0-70870/70871
-    const char *a;
+    char *a;
 
     for(a = rcvd + p; is_space(*a); a++) ;
     if (strncasecmp(a, "bytes ", 6) == 0) {
@@ -1984,12 +1984,42 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
 }
 
+// teste une adresse, et suit l'éventuel chemin "moved"
+// retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
+// copie dans loc la véritable adresse si celle-ci est différente
+htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc) {
+  htsblk retour;
+  int retry = 0;
+  int tryagain;
+
+  // note: "RFC says"
+  // 5 boucles au plus, on en teste au plus 8 ici
+  // sinon abandon..
+  do {
+    tryagain = 0;
+    switch ((retour = http_test(opt, adr, fil, loc)).statuscode) {
+    case HTTP_OK:
+      break;                    // ok!
+    case HTTP_MOVED_PERMANENTLY:
+    case HTTP_FOUND:
+    case HTTP_SEE_OTHER:
+    case HTTP_TEMPORARY_REDIRECT:      // moved!
+      // recalculer adr et fil!
+      if (ident_url_absolute(loc, adr, fil) != -1) {
+        tryagain = 1;           // retenter
+        retry++;                // ..encore une fois
+      }
+    }
+  } while((tryagain) && (retry < 5 + 3));
+  return retour;
+}
+
 // teste si une URL (validité, header, taille)
 // retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
 // en cas de moved xx, dans location
 // abandonne désormais au bout de 30 secondes (aurevoir les sites
 // qui nous font poireauter 5 heures..) -> -2=timeout
-htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
+htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc) {
   T_SOC soc;
   htsblk retour;
 
@@ -2310,12 +2340,12 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 // couper http://www.truc.fr/pub/index.html -> www.truc.fr /pub/index.html
 // retour=-1 si erreur.
 // si file://... alors adresse=file:// (et coupe le ?query dans ce cas)
-int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
+int ident_url_absolute(const char *url, char *adr, char *fil) {
   int pos = 0;
   int scheme = 0;
 
-  // effacer adrfil->adr et adrfil->fil
-  adrfil->adr[0] = adrfil->fil[0] = '\0';
+  // effacer adr et fil
+  adr[0] = fil[0] = '\0';
 
 #if HDEBUG
   printf("protocol: %s\n", url);
@@ -2334,15 +2364,15 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   // 1. optional scheme ":"
   if ((pos = strfield(url, "file:"))) { // fichier local!! (pour les tests)
     //!!p+=3;
-    strcpybuff(adrfil->adr, "file://");
+    strcpybuff(adr, "file://");
   } else if ((pos = strfield(url, "http:"))) {  // HTTP
     //!!p+=3;
   } else if ((pos = strfield(url, "ftp:"))) {   // FTP
-    strcpybuff(adrfil->adr, "ftp://");  // FTP!!
+    strcpybuff(adr, "ftp://");  // FTP!!
     //!!p+=3;
 #if HTS_USEOPENSSL
   } else if ((pos = strfield(url, "https:"))) {     // HTTPS
-    strcpybuff(adrfil->adr, "https://");
+    strcpybuff(adr, "https://");
 #endif
   } else if (scheme) {
     return -1;                  // erreur non reconnu
@@ -2355,13 +2385,13 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
 
   // (url+pos) now points to the path (not net path)
 
-  //## if (adrfil->adr[0]!=lOCAL_CHAR) {    // adrfil->adresse normale http
-  if (!strfield(adrfil->adr, "file:")) {        // PAS adrfil->file://
+  //## if (adr[0]!=lOCAL_CHAR) {    // adresse normale http
+  if (!strfield(adr, "file:")) {        // PAS file://
     const char *p, *q;
 
     p = url + pos;
 
-    // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
+    // p pointe sur le début de l'adresse, ex: www.truc.fr/sommaire/index.html
     q = strchr(jump_identification(p), '/');
     if (q == 0)
       q = strchr(jump_identification(p), '?');  // http://www.foo.com?bar=1
@@ -2374,53 +2404,53 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
       //strcpybuff(retour.msg,"Path too long");
       return -1;                // erreur
     }
-    // recopier adrfil->adresse www..
-    strncatbuff(adrfil->adr, p, ((int) (q - p)));
-    // *( adrfil->adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
+    // recopier adresse www..
+    strncatbuff(adr, p, ((int) (q - p)));
+    // *( adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
     // recopier chemin /pub/..
     if (q[0] != '/')            // page par défaut (/)
-      strcatbuff(adrfil->fil, "/");
-    strcatbuff(adrfil->fil, q);
+      strcatbuff(fil, "/");
+    strcatbuff(fil, q);
     // SECURITE:
     // simplifier url pour les ../
-    fil_simplifie(adrfil->fil);
-  } else {                      // localhost adrfil->file://
+    fil_simplifie(fil);
+  } else {                      // localhost file://
     const char *p;
     size_t i;
     char *a;
 
     p = url + pos;
-    if (*p == '/' || *p == '\\') {      /* adrfil->file:///.. */
-      strcatbuff(adrfil->fil, p);       // fichier local ; adrfil->adr="#"
+    if (*p == '/' || *p == '\\') {      /* file:///.. */
+      strcatbuff(fil, p);       // fichier local ; adr="#"
     } else {
       if (p[1] != ':') {
-        strcatbuff(adrfil->fil, "//");  /* adrfil->file://server/foo */
-        strcatbuff(adrfil->fil, p);
+        strcatbuff(fil, "//");  /* file://server/foo */
+        strcatbuff(fil, p);
       } else {
-        strcatbuff(adrfil->fil, p);     // adrfil->file://C:\..
+        strcatbuff(fil, p);     // file://C:\..
       }
     }
 
-    a = strchr(adrfil->fil, '?');
+    a = strchr(fil, '?');
     if (a)
-      *a = '\0';                /* couper query (inutile pour adrfil->file:// lors de la requête) */
-    // adrfil->filtrer les \\ -> / pour les fichiers DOS
-    for(i = 0; adrfil->fil[i] != '\0'; i++)
-      if (adrfil->fil[i] == '\\')
-        adrfil->fil[i] = '/';
+      *a = '\0';                /* couper query (inutile pour file:// lors de la requête) */
+    // filtrer les \\ -> / pour les fichiers DOS
+    for(i = 0; fil[i] != '\0'; i++)
+      if (fil[i] == '\\')
+        fil[i] = '/';
   }
 
   // no hostname
-  if (!strnotempty(adrfil->adr))
+  if (!strnotempty(adr))
     return -1;                  // erreur non reconnu
 
   // nommer au besoin.. (non utilisé normalement)
-  if (!strnotempty(adrfil->fil))
-    strcpybuff(adrfil->fil, "default-index.html");
+  if (!strnotempty(fil))
+    strcpybuff(fil, "default-index.html");
 
-  // case insensitive pour adrfil->adresse
+  // case insensitive pour adresse
   {
-    char *a = jump_identification(adrfil->adr);
+    char *a = jump_identification(adr);
 
     while(*a) {
       if ((*a >= 'A') && (*a <= 'Z'))
@@ -2947,7 +2977,7 @@ int finput(T_SOC fd, char *s, int max) {
 
   do {
     //c=fgetc(fp);
-    if (read((int) fd, &c, 1) <= 0) {
+    if (read(fd, &c, 1) <= 0) {
       c = 0;
     }
     if (c != 0) {
@@ -3051,7 +3081,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
 }
 int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloct(max + 1);
+  char *ls = (char *) malloct(max + 2);
 
   s[0] = '\0';
   if (ls) {
@@ -3123,8 +3153,8 @@ void rawlinput(FILE * fp, char *s, int max) {
 }
 
 //cherche chaine, case insensitive
-char *strstrcase(char *s, const char *o) {
-  while(*s && strfield(s, o) == 0)
+char *strstrcase(char *s, char *o) {
+  while((*s) && (strfield(s, o) == 0))
     s++;
   if (*s == '\0')
     return NULL;
@@ -4247,7 +4277,7 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename) {
 // -- Utils fichiers
 
 // pretty print for i/o
-void fprintfio(FILE * fp, const char *buff, const char *prefix) {
+void fprintfio(FILE * fp, char *buff, char *prefix) {
   char nl = 1;
 
   while(*buff) {
@@ -4362,7 +4392,7 @@ typedef struct {
   char path[1024 + 4];
   int init;
 } hts_rootdir_strc;
-HTSEXT_API const char *hts_rootdir(char *file) {
+HTSEXT_API char *hts_rootdir(char *file) {
   static hts_rootdir_strc strc = { "", 0 };
   if (file) {
     if (!strc.init) {
@@ -5461,8 +5491,13 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->path_log, "");
   StringCopy(opt->path_bin, "");
   //
-  opt->maxlink = 100000;        // 100,000 liens max par défaut
+#if HTS_SPARE_MEMORY==0
+  opt->maxlink = 100000;        // 100,000 liens max par défaut (400Kb)
   opt->maxfilter = 200;         // 200 filtres max par défaut
+#else
+  opt->maxlink = 10000;         // 10,000 liens max par défaut (40Kb)
+  opt->maxfilter = 50;          // 50 filtres max par défaut
+#endif
   opt->maxcache = 1048576 * 32; // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
   opt->maxtime = -1;            // temps max en secondes

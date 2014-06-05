@@ -36,8 +36,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version (also check external version information)
-#define HTTRACK_VERSION      "3.48-10"
-#define HTTRACK_VERSIONID    "3.48.10"
+#define HTTRACK_VERSION      "3.48-9"
+#define HTTRACK_VERSIONID    "3.48.9"
 #define HTTRACK_AFF_VERSION  "3.x"
 #define HTTRACK_LIB_VERSION  "2.0"
 
@@ -132,6 +132,11 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
+// don't spare memory usage by default
+#ifndef HTS_SPARE_MEMORY
+#define HTS_SPARE_MEMORY 0
+#endif
+
 #ifndef BIGSTK
 #define BIGSTK
 #endif
@@ -201,10 +206,17 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
+#if HTS_SPARE_MEMORY==0
 /* Taille max d'une URL */
 #define HTS_URLMAXSIZE 1024
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
+#else
+/* Taille max d'une URL */
+#define HTS_URLMAXSIZE 256
+/* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
+#define HTS_CDLMAXSIZE 1024
+#endif
 
 /* Copyright (C) 1998-2014 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
@@ -245,13 +257,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSEXT_API __declspec(dllimport)
 #endif
 #else
-/* See <http://gcc.gnu.org/wiki/Visibility> */
-#if ( ( defined(__GNUC__) && ( __GNUC__ >= 4 ) ) \
-      || ( defined(HAVE_VISIBILITY) && HAVE_VISIBILITY ) )
-#define HTSEXT_API __attribute__ ((visibility ("default")))
-#else
 #define HTSEXT_API
-#endif
 #endif
 
 #ifndef HTS_LONGLONG
@@ -323,6 +329,11 @@ typedef unsigned __int32 T_SOC;
 typedef int T_SOC;
 #endif
 
+/* Default alignement */
+#ifndef HTS_ALIGN
+#define HTS_ALIGN (sizeof(void*))
+#endif
+
 /* IPV4, IPV6 and various unified structures */
 #define HTS_MAXADDRLEN 64
 
@@ -367,7 +378,11 @@ typedef int T_SOC;
 #define LOCAL_SOCKET_ID -2
 
 // taille de chaque buffer (10 sockets 650 ko)
+#if HTS_SPARE_MEMORY==0
 #define TAILLE_BUFFER 65536
+#else
+#define TAILLE_BUFFER 8192
+#endif
 
 #ifdef HTS_DO_NOT_USE_PTHREAD
 #error needs threads support

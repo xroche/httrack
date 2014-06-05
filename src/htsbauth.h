@@ -34,8 +34,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSBAUTH_DEFH
 #define HTSBAUTH_DEFH
 
-#include <sys/types.h>
-
 // robots wizard
 #ifndef HTS_DEF_FWSTRUCT_bauth_chain
 #define HTS_DEF_FWSTRUCT_bauth_chain
@@ -62,21 +60,21 @@ struct t_cookie {
 #ifdef HTS_INTERNAL_BYTECODE
 
 // cookies
-int cookie_add(t_cookie * cookie, const  char *cook_name, const  char *cook_value,
-               const  char *domain, const  char *path);
-int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, const char *path);
+int cookie_add(t_cookie * cookie, char *cook_name, char *cook_value,
+               char *domain, char *path);
+int cookie_del(t_cookie * cookie, char *cook_name, char *domain, char *path);
 int cookie_load(t_cookie * cookie, const char *path, const char *name);
-int cookie_save(t_cookie * cookie, const char *name);
-void cookie_insert(char *s, const char *ins);
-void cookie_delete(char *s, size_t pos);
-const char *cookie_get(char *buffer, const char *cookie_base, int param);
-char *cookie_find(char *s, const char *cook_name, const char *domain, const char *path);
+int cookie_save(t_cookie * cookie, char *name);
+void cookie_insert(char *s, char *ins);
+void cookie_delete(char *s, int pos);
+char *cookie_get(char *buffer, char *cookie_base, int param);
+char *cookie_find(char *s, char *cook_name, char *domain, char *path);
 char *cookie_nextfield(char *a);
 
 // basic auth
-int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth);
-char *bauth_check(t_cookie * cookie, const char *adr, const char *fil);
-char *bauth_prefix(char *buffer, const char *adr, const char *fil);
+int bauth_add(t_cookie * cookie, char *adr, char *fil, char *auth);
+char *bauth_check(t_cookie * cookie, char *adr, char *fil);
+char *bauth_prefix(char *buffer, char *adr, char *fil);
 
 #endif
 

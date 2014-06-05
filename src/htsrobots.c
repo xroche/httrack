@@ -45,7 +45,7 @@ Please visit our Website: http://www.httrack.com
 // -- robots --
 
 // fil="" : vérifier si règle déja enregistrée
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
+int checkrobots(robots_wizard * robots, char *adr, char *fil) {
   while(robots) {
     if (strfield2(robots->adr, adr)) {
       if (fil[0]) {
@@ -60,7 +60,7 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
                 return -1;      // interdit
               }
             } else {            // relatif
-              if (strstrcase((char*) fil, line)) {
+              if (strstrcase(fil, line)) {
                 return -1;
               }
             }
@@ -74,7 +74,7 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
   }
   return 0;
 }
-int checkrobots_set(robots_wizard * robots, const char *adr, const char *data) {
+int checkrobots_set(robots_wizard * robots, char *adr, char *data) {
   if (((int) strlen(adr)) >= sizeof(robots->adr) - 2)
     return 0;
   if (((int) strlen(data)) >= sizeof(robots->token) - 2)

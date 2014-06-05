@@ -224,7 +224,6 @@ int main(int argc, char **argv) {
   signal_handlers();
   hts_init();
   opt = global_opt = hts_create_opt();
-  assert(opt->size_httrackp == sizeof(httrackp));
 
   CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
   CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);

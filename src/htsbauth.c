@@ -38,15 +38,14 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
-#include "htscore.h"
 
 /* END specific definitions */
 
 // gestion des cookie
 // ajoute, dans l'ordre
 // !=0 : erreur
-int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
-               const char *domain, const char *path) {
+int cookie_add(t_cookie * cookie, char *cook_name, char *cook_value,
+               char *domain, char *path) {
   char buffer[8192];
   char *a = cookie->data;
   char *insert;
@@ -54,20 +53,20 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
 
   // effacer éventuel cookie en double
   cookie_del(cookie, cook_name, domain, path);
-  if (strlen(cook_value) > 1024)
+  if ((int) strlen(cook_value) > 1024)
     return -1;                  // trop long
-  if (strlen(cook_name) > 256)
+  if ((int) strlen(cook_name) > 256)
     return -1;                  // trop long
-  if (strlen(domain) > 256)
+  if ((int) strlen(domain) > 256)
     return -1;                  // trop long
-  if (strlen(path) > 256)
+  if ((int) strlen(path) > 256)
     return -1;                  // trop long
-  if (strlen(cookie->data)
+  if ((int) (strlen(cookie->data)
              + strlen(cook_value)
              + strlen(cook_name)
              + strlen(domain)
              + strlen(path)
-             + 256 > cookie->max_len)
+             + 256) > cookie->max_len)
     return -1;                  // impossible d'ajouter
 
   insert = a;                   // insérer ici
@@ -100,7 +99,7 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   strcatbuff(cook, "\t");
   strcatbuff(cook, cook_value);
   strcatbuff(cook, "\n");
-  if (!((strlen(cookie->data) + strlen(cook)) < cookie->max_len))
+  if (!(((int) strlen(cookie->data) + (int) strlen(cook)) < cookie->max_len))
     return -1;                  // impossible d'ajouter
   cookie_insert(insert, cook);
 #if DEBUG_COOK
@@ -112,13 +111,13 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
 }
 
 // effacer cookie si existe
-int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, const char *path) {
+int cookie_del(t_cookie * cookie, char *cook_name, char *domain, char *path) {
   char *a, *b;
 
   b = cookie_find(cookie->data, cook_name, domain, path);
   if (b) {
     a = cookie_nextfield(b);
-    cookie_delete(b, a - b);
+    cookie_delete(b, (int) (a - b));
 #if DEBUG_COOK
     printf("deleted old cookie: %s %s %s\n", cook_name, domain, path);
 #endif
@@ -129,7 +128,7 @@ int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, con
 // Matches wildcard cookie domains that start with a dot
 // chk_dom: the domain stored in the cookie (potentially wildcard).
 // domain: query domain
-static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
+static int cookie_cmp_wildcard_domain(char *chk_dom, char *domain) {
   const size_t n = strlen(chk_dom);
   const size_t m = strlen(domain);
   const size_t l = n < m ? n : m;
@@ -153,7 +152,7 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
 // renvoie pointeur sur ligne, ou NULL si introuvable
 // path est aligné à droite et cook_name peut être vide (chercher alors tout cookie)
 // .doubleclick.net     TRUE    /       FALSE   1999999999      id      A
-char *cookie_find(char *s, const char *cook_name, const char *domain, const char *path) {
+char *cookie_find(char *s, char *cook_name, char *domain, char *path) {
   char buffer[8192];
   char *a = s;
 
@@ -166,15 +165,15 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       t = (strcmp(cookie_get(buffer, a, 5), cook_name) == 0);   // tester si même nom
     if (t) {                    // même nom ou nom qualconque
       //
-      const char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
+      char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
 
-      if ((strlen(chk_dom) <= strlen(domain) &&
+      if (((int) strlen(chk_dom) <= (int) strlen(domain) &&
         strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) ||
         !cookie_cmp_wildcard_domain(chk_dom, domain)) {  // même domaine
           //
-        const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
+        char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
-        if (strlen(chk_path) <= strlen(path)) {
+        if ((int) strlen(chk_path) <= (int) strlen(path)) {
           if (strncmp(path, chk_path, strlen(chk_path)) == 0) {       // même chemin
             return a;
           }
@@ -232,14 +231,15 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
               char dummy[512];
 
               //
-              lien_adrfil af;   // chemin (/)
+              char domain[256]; // domaine cookie (.netscape.com)
+              char path[256];   // chemin (/)
               int cookie_merged = 0;
 
               //
               // Read all cookies
               while(!feof(fp)) {
                 cook_name[0] = cook_value[0] = domainpathpath[0]
-                = dummy[0] = af.adr[0] = af.fil[0] = '\0';
+                  = dummy[0] = domain[0] = path[0] = '\0';
                 linput(fp, cook_name, 250);
                 if (!feof(fp)) {
                   linput(fp, cook_value, 250);
@@ -254,8 +254,8 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
                     if (strnotempty(cook_name)
                         && strnotempty(cook_value)
                         && strnotempty(domainpathpath)) {
-                      if (ident_url_absolute(domainpathpath, &af) >= 0) {
-                        cookie_add(cookie, cook_name, cook_value, af.adr, af.fil);
+                      if (ident_url_absolute(domainpathpath, domain, path) >= 0) {
+                        cookie_add(cookie, cook_name, cook_value, domain, path);
                         cookie_merged = 1;
                       }
                     }
@@ -311,7 +311,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
 
 // écrire cookies.txt
 // !=0 : erreur
-int cookie_save(t_cookie * cookie, const char *name) {
+int cookie_save(t_cookie * cookie, char *name) {
   char catbuff[CATBUFF_SIZE];
 
   if (strnotempty(cookie->data)) {
@@ -337,13 +337,13 @@ int cookie_save(t_cookie * cookie, const char *name) {
 }
 
 // insertion chaine ins avant s
-void cookie_insert(char *s, const char *ins) {
+void cookie_insert(char *s, char *ins) {
   char *buff;
 
   if (strnotempty(s) == 0) {    // rien à faire, juste concat
     strcatbuff(s, ins);
   } else {
-    buff = (char *) malloct(strlen(s) + 1);
+    buff = (char *) malloct(strlen(s) + 2);
     if (buff) {
       strcpybuff(buff, s);      // copie temporaire
       strcpybuff(s, ins);       // insérer
@@ -354,13 +354,13 @@ void cookie_insert(char *s, const char *ins) {
 }
 
 // destruction chaine dans s position pos
-void cookie_delete(char *s, size_t pos) {
+void cookie_delete(char *s, int pos) {
   char *buff;
 
   if (strnotempty(s + pos) == 0) {      // rien à faire, effacer
     s[0] = '\0';
   } else {
-    buff = (char *) malloct(strlen(s + pos) + 1);
+    buff = (char *) malloct(strlen(s + pos) + 2);
     if (buff) {
       strcpybuff(buff, s + pos);        // copie temporaire
       strcpybuff(s, buff);      // copier
@@ -371,8 +371,8 @@ void cookie_delete(char *s, size_t pos) {
 
 // renvoie champ param de la chaine cookie_base
 // ex: cookie_get("ceci est<tab>un<tab>exemple",1) renvoi "un"
-const char *cookie_get(char *buffer, const char *cookie_base, int param) {
-  const char *limit;
+char *cookie_get(char *buffer, char *cookie_base, int param) {
+  char *limit;
 
   while(*cookie_base == '\n')
     cookie_base++;
@@ -393,7 +393,7 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
     }
     if (cookie_base) {
       if (cookie_base < limit) {
-        const char *a = cookie_base;
+        char *a = cookie_base;
 
         while((*a) && (*a != '\t') && (*a != '\n'))
           a++;
@@ -413,7 +413,7 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
 // -- basic auth --
 
 /* déclarer un répertoire comme possédant une authentification propre */
-int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth) {
+int bauth_add(t_cookie * cookie, char *adr, char *fil, char *auth) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
@@ -439,7 +439,7 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
 
 /* tester adr et fil, et retourner authentification si nécessaire */
 /* sinon, retourne NULL */
-char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
+char *bauth_check(t_cookie * cookie, char *adr, char *fil) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
@@ -458,7 +458,7 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   return NULL;
 }
 
-char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
+char *bauth_prefix(char *prefix, char *adr, char *fil) {
   char *a;
 
   strcpybuff(prefix, jump_identification(adr));

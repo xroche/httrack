@@ -45,7 +45,6 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsencoding.h"
-#include "htsmd5.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
@@ -2007,7 +2006,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
                   cache.ro = 1; /* read only */
                   if (cache.hashtable) {
-                    lien_adrfilsave afs;
+                    char BIGSTK adr[HTS_URLMAXSIZE * 2];
+                    char BIGSTK fil[HTS_URLMAXSIZE * 2];
                     char BIGSTK url[HTS_URLMAXSIZE * 2];
                     char linepos[256];
                     int pos;
@@ -2030,50 +2030,52 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                           /* */
                           a++;
                           /* read "host/file" */
-                          a += binput(a, afs.af.adr, HTS_URLMAXSIZE);
-                          a += binput(a, afs.af.fil, HTS_URLMAXSIZE);
+                          a += binput(a, adr, HTS_URLMAXSIZE);
+                          a += binput(a, fil, HTS_URLMAXSIZE);
                           url[0] = '\0';
-                          if (!link_has_authority(afs.af.adr))
+                          if (!link_has_authority(adr))
                             strcatbuff(url, "http://");
-                          strcatbuff(url, afs.af.adr);
-                          strcatbuff(url, afs.af.fil);
+                          strcatbuff(url, adr);
+                          strcatbuff(url, fil);
                           /* read position */
                           a += binput(a, linepos, 200);
                           sscanf(linepos, "%d", &pos);
                           if (!hasFilter
                               || (strjoker(url, filter, NULL, NULL) != NULL)
                             ) {
-                            r = cache_read_ro(opt, &cache, afs.af.adr, afs.af.fil, "", NULL); // lire entrée cache + data
+                            r = cache_read_ro(opt, &cache, adr, fil, "", NULL); // lire entrée cache + data
                             if (r.statuscode != -1) {   // No errors
                               found++;
                               if (!hasFilter) {
                                 fprintf(stdout, "%s%s%s\r\n",
-                                        (link_has_authority(afs.af.adr)) ? "" :
-                                        "http://", afs.af.adr, afs.af.fil);
+                                        (link_has_authority(adr)) ? "" :
+                                        "http://", adr, fil);
                               } else {
                                 char msg[256], cdate[256];
+                                char BIGSTK sav[HTS_URLMAXSIZE * 2];
 
                                 infostatuscode(msg, r.statuscode);
                                 time_gmt_rfc822(cdate);
 
                                 fprintf(stdout, "HTTP/1.1 %d %s\r\n",
                                         r.statuscode, r.msg[0] ? r.msg : msg);
-                                fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
-                                fprintf(stdout, "X-File: %s\r\n", afs.af.fil);
+                                fprintf(stdout, "X-Host: %s\r\n", adr);
+                                fprintf(stdout, "X-File: %s\r\n", fil);
                                 fprintf(stdout, "X-URL: %s%s%s\r\n",
-                                        (link_has_authority(afs.af.adr)) ? "" :
-                                        "http://", afs.af.adr, afs.af.fil);
+                                        (link_has_authority(adr)) ? "" :
+                                        "http://", adr, fil);
                                 if (url_savename
-                                    (&afs, /*former */ NULL,
-                                     /*referer_adr */
+                                    (adr, fil, sav, /*former_adr */ NULL,
+                                     /*former_fil */ NULL, /*referer_adr */
                                      NULL, /*referer_fil */ NULL,
-                                     /*opt */ opt, /*sback */ NULL,
+                                     /*opt */ opt, /*liens */ NULL,
+                                     /*lien_tot */ 0, /*sback */ NULL,
                                      /*cache */ &cache, /*hash */ NULL, /*ptr */
                                      0, /*numero_passe */ 0, /*mime_type */
                                      NULL) != -1) {
-                                  if (fexist(afs.save)) {
+                                  if (fexist(sav)) {
                                     fprintf(stdout, "Content-location: %s\r\n",
-                                            afs.save);
+                                            sav);
                                   }
                                 }
                                 fprintf(stdout, "Date: %s\r\n", cdate);
@@ -2408,7 +2410,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '7':  // hashtable selftest: httrack -#7 nb_entries
-                md5selftest();
                 if (++na < argc) {
                   char *const snum = strdup(argv[na]);
                   unsigned long count = 0;

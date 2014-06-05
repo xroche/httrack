@@ -47,20 +47,11 @@ typedef struct httrackp httrackp;
 typedef struct find_handle_struct find_handle_struct;
 typedef find_handle_struct *find_handle;
 #endif
-#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
-#define HTS_DEF_FWSTRUCT_lien_adrfil
-typedef struct lien_adrfil lien_adrfil;
-#endif
-#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
-#define HTS_DEF_FWSTRUCT_lien_adrfilsave
-typedef struct lien_adrfilsave lien_adrfilsave;
-#endif
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int ident_url_relatif(const char *lien, const char *origin_adr,
-                      const char *origin_fil,
-                      lien_adrfil* const adrfil);
+int ident_url_relatif(const char *lien, const char *urladr, const char *urlfil,
+                      char *adr, char *fil);
 int lienrelatif(char *s, const char *link, const char *curr);
 int link_has_authority(const char *lien);
 int link_has_authorization(const char *lien);
@@ -69,9 +60,6 @@ void longfile_to_83(int mode, char *n83, char *save);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
-
-int hts_template_format(FILE *const out, const char *format, ...);
-int hts_template_format_str(char *buffer, size_t size, const char *format, ...);
 
 #define rech_tageq(adr,s) \
   ( \
@@ -96,7 +84,7 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...);
 //HTS_INLINE int rech_tageq(const char* adr,const char* s);
 HTS_INLINE int rech_sampletag(const char *adr, const char *s);
 HTS_INLINE int rech_endtoken(const char *adr, const char **start);
-HTS_INLINE int check_tag(const char *from, const char *tag);
+HTS_INLINE int check_tag(char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);
 int verif_external(httrackp * opt, int nb, int test);
 

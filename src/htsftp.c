@@ -142,7 +142,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #endif
   char BIGSTK adr_ip[1024];
   char *adr, *real_adr;
-  const char *ftp_filename = "";
+  char *ftp_filename = "";
   int timeout = 300;            // timeout
   int timeout_onfly = 8;        // attente réponse supplémentaire
   int transfer_list = 0;        // directory
@@ -913,7 +913,7 @@ FILE *dd = NULL;
 
 // routines de réception/émission
 // 0 = ERROR
-int send_line(T_SOC soc, const char *data) {
+int send_line(T_SOC soc, char *data) {
   char BIGSTK line[1024];
 
   if (_DEBUG_HEAD) {

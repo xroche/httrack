@@ -54,7 +54,7 @@ Please visit our Website: http://www.httrack.com
 // optionnel: taille à contrôller (ou numéro, etc) en pointeur
 //            (en de détection de *size, la taille limite est écrite par dessus *size)
 // exemple: +-*.gif*[<5] == supprimer GIF si <5KB
-int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * size,
+int fa_strjoker(int type, char **filters, int nfil, char *nom, LLint * size,
                 int *size_flag, int *depth) {
   int verdict = 0;              // on sait pas
   int i;
@@ -101,7 +101,7 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
 // cet algo est 'un peu' récursif mais ne consomme pas trop de tm
 // * = toute lettre
 // --?-- : spécifique à HTTrack et aux ?
-HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * size,
+HTS_INLINE char *strjoker(char *chaine, char *joker, LLint * size,
                           int *size_flag) {
   //int err=0;
   if (strnotempty(joker) == 0) {        // fin de chaine joker
@@ -262,7 +262,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
 
     {
       int i, max;
-      const char *adr;
+      char *adr;
 
       // la chaine doit se terminer exactement
       if (cut) {
@@ -335,8 +335,8 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
 // exemple: find dans un texte de strcpybuff(*[A-Z,a-z],"*[0-9]"); va rechercher la première occurence
 // d'un strcpy sur une variable ayant un nom en lettres et copiant une chaine de chiffres
 // ATTENTION!! Eviter les jokers en début, où gare au temps machine!
-const char *strjokerfind(const char *chaine, const char *joker) {
-  const char *adr;
+char *strjokerfind(char *chaine, char *joker) {
+  char *adr;
 
   while(*chaine) {
     if ((adr = strjoker(chaine, joker, NULL, NULL))) {  // ok trouvé

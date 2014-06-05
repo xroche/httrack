@@ -48,7 +48,7 @@ const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);
 const char *opthelp_value(int p);
-const char *hts_gethome(void);
+char *hts_gethome(void);
 void expand_home(String * str);
 #endif
 

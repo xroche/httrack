@@ -1253,7 +1253,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   headersSize = 0;
   /* */
   {
-    const char *message;
+    char *message;
 
     if (strlen(element->msg) < 32) {
       message = element->msg;
