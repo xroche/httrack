@@ -1,0 +1,193 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Offline Browser</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h2 align="center"><em>Option panel : MIME Types</em></h2>
+
+<br>
+
+<ul>
+  <center><img src="img/snap9_k.gif" border="0"></center>
+  <br><br>
+  <br><br>
+<!-- -->
+  <li>MIME Types</li>
+  <br><small>
+An important new feature for some people. This panel tells the engine that if a link is encountered, with a 
+specific type (.cgi, .asp, or .php3 for example), it MUST assume that this link has always the same MIME type, for example
+the "text/html" MIME type.
+This is VERY important to speed up many mirrors. 
+Some big HTML files which have many links of unknown type embedded, such as ".asp", cause the engine to test all links, and this
+slows down the parser.
+<br>
+<br>
+In this case, you can tell HTTrack: ".asp pages are in fact HTML pages"
+<br>
+This is possible, using:
+<br>
+<br>
+File type: <tt>asp</tt> MIME identity: <tt>text/html</tt>
+<br>
+<br>
+You can declare multiple definitions, or declare multiple types separed by ",", like in:
+<br>
+File type: <tt>asp,php,php3</tt> MIME identity: <tt>text/html</tt>
+<br>
+<br>
+Most important MIME types are:
+<br>
+<table border="1">
+<tr><td>text/html</td><td>Html files, parsed by HTTrack</td></tr>
+<tr><td>image/gif</td><td>GIF files</td></tr>
+<tr><td>image/jpeg</td><td>Jpeg files</td></tr>
+<tr><td>image/png</td><td>PNG files</td></tr>
+<tr><td>application/x-zip</td><td>.zip files</td></tr>
+<tr><td>application/x-mp3</td><td>.mp3 files</td></tr>
+<tr><td>application/x-foo</td><td>.foo files</td></tr>
+<tr><td>application/octet-stream</td><td>Unknown files</td></tr>
+</table>
+
+<br>
+
+You can rename files on a mirror. If you KNOW that all "dat" files are in fact "zip" files renamed into "dat", you can
+tell httrack:<br>
+
+File type: <tt>dat</tt> MIME identity: <tt>application/x-zip</tt>
+
+<br><br>
+
+You can also "name" a file type, with its original MIME type, if this type is not known by HTTrack. This will avoid a test
+when the link will be reached:<br>
+
+File type: <tt>foo</tt> MIME identity: <tt>application/octet-stream</tt>
+
+<br><br>
+
+In this case, HTTrack won't check the type, because it has learned that "foo" is a known type, or MIME type
+"application/octet-stream". Therefore, it will let untouched the "foo" type.
+
+  </small><br><br>
+</ul>
+
+<br><br><br><br>
+<p align="right">Back to <a href="index.html">Home</a></p>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+
