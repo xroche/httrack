@@ -8,8 +8,11 @@ DevIncludes_DATA = \
 	../config.h \
 	htsmodules.h \
 	htsbasenet.h \
+	htsnet.h \
 	htsbauth.h \
-	htsdefines.h
+	htsdefines.h \
+	htsstrings.h \
+	htssafe.h
 
 INCLUDES = \
 	@DEFAULT_CFLAGS@ \
