@@ -61,7 +61,7 @@ static void hts_record_assert_memory_failed(const size_t size) {
     /** Capacity. **/ \
     size_t capa;      \
   }
-#define EMPTY_TYPED_ARRAY { NULL, 0, 0 }
+#define EMPTY_TYPED_ARRAY { { NULL }, 0, 0 }
 
 /** Array size, in elements. **/
 #define TypedArraySize(A)   ((A).size)
