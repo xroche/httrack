@@ -60,87 +60,62 @@ Please visit our Website: http://www.httrack.com
 #include "htsparse.h"
 #include "htsback.h"
 
+// arrays
+#include "htsarrays.h"
+
+static void AppendString(TypedArray(char) *const a, const char *s, size_t size) {
+  TypedArrayAppend(*a, s, size);
+}
+
+/** Append bytes to the output buffer up to the pointer 'html'. **/
+#define HT_add_adr do { \
+  if ( (opt->getmode & 1) != 0 && ptr > 0 ) { \
+    const size_t sz_ = html - lastsaved; \
+    if (sz_ != 0) { \
+      TypedArrayAppend(output_buffer, lastsaved, sz_); \
+      lastsaved = html; \
+    } \
+  } \
+} while(0)
+
+/** Append to the output buffer the string 'A'. **/
+#define HT_ADD(A) TypedArrayAppend(output_buffer, A, strlen(A))
+
+/** Append to the output buffer the string 'A', html-escaped. **/
+#define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION) do { \
+  if ((opt->getmode & 1) != 0 && ptr>0) { \
+    const char *const str_ = (A); \
+    size_t size_; \
+    /* &amp; is the maximum expansion */ \
+    TypedArrayEnsureRoom(output_buffer, strlen(str_) * 5 + 1024); \
+    size_ = FUNCTION(str_, &TypedArrayTail(output_buffer), \
+                     TypedArrayRoom(output_buffer)); \
+    TypedArraySize(output_buffer) += size_; \
+  } \
+} while(0)
+
+/** Append to the output buffer the string 'A', html-escaped for &. **/
+#define HT_ADD_HTMLESCAPED(A) HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print)
+
+/**
+ * Append to the output buffer the string 'A', html-escaped for & and 
+ * high chars.
+ **/
+#define HT_ADD_HTMLESCAPED_FULL(A) HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full)
+
 // does nothing
 #define XH_uninit do {} while(0)
 
-// version optimisée, qui permet de ne pas toucher aux html non modifiés (update)
-#define REALLOC_SIZE 8192
-#define HT_ADD_CHK(A) if (((int) (A)+ht_len+1) >= ht_size) { \
-  char message[256]; \
-  ht_size=(A)+ht_len+REALLOC_SIZE; \
-  ht_buff=(char*) realloct(ht_buff,ht_size); \
-  if (ht_buff==NULL) { \
-  printf("PANIC! : Not enough memory [%d]\n", __LINE__); \
-  XH_uninit; \
-  snprintf(message, sizeof(message), "not enough memory for current html document in HT_ADD_CHK : realloct("LLintP") failed", (LLint) ht_size); \
-  abortLog(message); \
-  abort(); \
-  } \
-} \
-  ht_len+=A;
-#define HT_add_adr \
-  if ((opt->getmode & 1) && (ptr>0)) { \
-  size_t i = ((html - lastsaved)),j=ht_len; HT_ADD_CHK(i) \
-  memcpy(ht_buff+j, lastsaved, i); \
-  ht_buff[j+i]='\0'; \
-  lastsaved=html; \
-  }
-#define HT_ADD(A) \
-  if ((opt->getmode & 1) && (ptr>0)) { \
-  size_t i_ = strlen(A), j_ = ht_len; \
-  if (i_) { \
-  HT_ADD_CHK(i_) \
-  memcpy(ht_buff+j_, A, i_); \
-  ht_buff[j_+i_]='\0'; \
-  } }
-#define HT_ADD_HTMLESCAPED(A) \
-  if ((opt->getmode & 1) && (ptr>0)) { \
-    size_t i_, j_; \
-    char BIGSTK tempo_[HTS_URLMAXSIZE*2]; \
-    escape_for_html_print(A, tempo_, sizeof(tempo_)); \
-    i_=strlen(tempo_); \
-    j_=ht_len; \
-    if (i_) { \
-    HT_ADD_CHK(i_) \
-    memcpy(ht_buff+j_, tempo_, i_); \
-    ht_buff[j_+i_]='\0'; \
-  } }
-#define HT_ADD_HTMLESCAPED_FULL(A) \
-  if ((opt->getmode & 1) && (ptr>0)) { \
-    size_t i_, j_; \
-    char BIGSTK tempo_[HTS_URLMAXSIZE*2]; \
-    escape_for_html_print_full(A, tempo_, sizeof(tempo_)); \
-    i_=strlen(tempo_); \
-    j_=ht_len; \
-    if (i_) { \
-    HT_ADD_CHK(i_) \
-    memcpy(ht_buff+j_, tempo_, i_); \
-    ht_buff[j_+i_]='\0'; \
-  } }
-#define HT_ADD_START \
-  char message[256]; \
-  size_t ht_size=(size_t)(r->size*5)/4+REALLOC_SIZE; \
-  size_t ht_len=0; \
-  char* ht_buff=NULL; \
-  if ((opt->getmode & 1) && (ptr>0)) { \
-  ht_buff=(char*) malloct(ht_size); \
-  if (ht_buff==NULL) { \
-  printf("PANIC! : Not enough memory [%d]\n",__LINE__); \
-  XH_uninit; \
-  snprintf(message, sizeof(message), "not enough memory for current html document in HT_ADD_START : malloct("LLintP") failed", (LLint) ht_size); \
-  abortLog(message); \
-  abort(); \
-  } \
-  ht_buff[0]='\0'; \
-  }
 #define HT_ADD_END { \
   int ok=0;\
-  if (ht_buff) { \
+  if (TypedArraySize(output_buffer) != 0) { \
+    const size_t ht_len = TypedArraySize(output_buffer); \
+    const char *const ht_buff = TypedArrayElts(output_buffer); \
     char digest[32+2];\
     off_t fsize_old = fsize(fconv(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),savename()));\
-    digest[0]='\0';\
-    domd5mem(ht_buff,ht_len,digest,1);\
-    if (fsize_old==ht_len) { \
+    digest[0] = '\0';\
+    domd5mem(TypedArrayElts(output_buffer), ht_len, digest, 1);\
+    if (fsize_old == (off_t) ht_len) { \
       int mlen = 0;\
       char* mbuff;\
       cache_readdata(cache,"//[HTML-MD5]//",savename(),&mbuff,&mlen);\
@@ -192,7 +167,7 @@ Please visit our Website: http://www.httrack.com
     if (cache->ndx)\
       cache_writedata(cache->ndx,cache->dat,"//[HTML-MD5]//",savename(),digest,(int)strlen(digest));\
   } \
-  freet(ht_buff); ht_buff=NULL; \
+  TypedArrayFree(output_buffer); \
 }
 #define HT_ADD_FOP
 
@@ -362,11 +337,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     }
 
     if (!error) {
+      // output HTML
+      TypedArray(char) output_buffer = EMPTY_TYPED_ARRAY;
+
       time_t user_interact_timestamp = 0;
       int detect_title = 0;     // détection  du title
       int back_add_stats = opt->state.back_add_stats;
 
-      //
       const char *in_media = NULL;    // in other media type (real media and so..)
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
@@ -417,7 +394,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
       int parent_relative = 0;  // the parent is the base path (.js, .css..)
 
-      HT_ADD_START;             // débuter
       lastsaved = html;
 
       /* Initialize script automate for comments, quotes.. */
@@ -3368,15 +3344,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       if ((opt->getmode & 1) && (ptr > 0)) {
         {
-          char *cAddr = ht_buff;
-          int cSize = (int) ht_len;
+          char *cAddr = TypedArrayElts(output_buffer);
+          int cSize = (int) TypedArraySize(output_buffer);
 
           hts_log_print(opt, LOG_DEBUG, "engine: postprocess-html: %s%s",
                         urladr(), urlfil());
-          if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) ==
-              1) {
-            ht_buff = cAddr;
-            ht_len = cSize;
+          if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
+            if (cAddr != TypedArrayElts(output_buffer)) {
+              hts_log_print(opt, LOG_DEBUG, 
+                "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
+              TypedArraySize(output_buffer) = 0;
+              TypedArrayAppend(output_buffer, cAddr, cSize);
+            }
           }
         }
 
