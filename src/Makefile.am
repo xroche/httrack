@@ -12,6 +12,7 @@ DevIncludes_DATA = \
 	htsbauth.h \
 	htsdefines.h \
 	htsstrings.h \
+	htsarrays.h \
 	htssafe.h
 
 INCLUDES = \
@@ -59,7 +60,8 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htszlib.h  \
-	htsstrings.h httrack-library.h htscharset.h punycode.h htsencoding.h \
+	htsstrings.h htsarrays.h httrack-library.h \
+	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	md5.h murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
