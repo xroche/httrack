@@ -241,7 +241,7 @@ static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
     liensbuf->string_buffer_size = 0;
   }
 
-  assertf(len + liensbuf->string_buffer_size < liensbuf->string_buffer_capa);
+  assertf(len + liensbuf->string_buffer_size <= liensbuf->string_buffer_capa);
   s_dup = &liensbuf->string_buffer[liensbuf->string_buffer_size];
   memcpy(s_dup, s, len);
   liensbuf->string_buffer_size += len;
