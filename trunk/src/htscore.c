@@ -178,7 +178,7 @@ struct lien_buffers {
 
 // duplicate a string, or return NULL upon error (out-of-memory)
 static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
-  static const size_t block_capa = 256000;
+  static const size_t block_capa = 32768;
   lien_buffers *const liensbuf = opt->liensbuf;
   const size_t len = strlen(s) + 1;  /* including terminating \0 */
   char *s_dup;
@@ -193,15 +193,22 @@ static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
       TypedArrayAdd(liensbuf->string_buffers, liensbuf->string_buffer);
       liensbuf->string_buffer = NULL;
       liensbuf->string_buffer_size = 0;
-      liensbuf->string_buffer_capa = 0;
     }
 
-    liensbuf->string_buffer = malloct(block_capa);
+    // Double capacity for each new chaines block
+    liensbuf->string_buffer_capa = 
+      liensbuf->string_buffer_capa < block_capa 
+      ? block_capa : liensbuf->string_buffer_capa * 2;
+
+    liensbuf->string_buffer = malloct(liensbuf->string_buffer_capa);
     if (liensbuf->string_buffer == NULL) {
-      hts_record_assert_memory_failed(block_capa); \
+      hts_record_assert_memory_failed(liensbuf->string_buffer_capa);
     }
-    liensbuf->string_buffer_capa = block_capa;
     liensbuf->string_buffer_size = 0;
+
+    hts_log_print(opt, LOG_DEBUG,
+      "reallocated %d new bytes of strings room",
+      (int) liensbuf->string_buffer_capa);
   }
 
   assertf(len + liensbuf->string_buffer_size <= liensbuf->string_buffer_capa);
@@ -229,7 +236,7 @@ size_t hts_record_link_latest(httrackp *opt) {
 // or (size_t) -1 upon error (out-of-memory)
 // the returned index is the osset within opt->liens[]
 static size_t hts_record_link_alloc(httrackp *opt) {
-  static const size_t block_capa = 10000;
+  static const size_t block_capa = 256;
   lien_buffers *const liensbuf = opt->liensbuf;
   lien_url *link;
 
@@ -244,18 +251,27 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   // Create a new chunk of lien_url[]
   // There are references to item pointers, so we can not just realloc()
   if (liensbuf->lien_buffer_size == liensbuf->lien_buffer_capa) {
+    size_t capa_bytes;
+
     if (liensbuf->lien_buffer != NULL) {
       TypedArrayAdd(liensbuf->lien_buffers, liensbuf->lien_buffer);
       liensbuf->lien_buffer_size = 0;
-      liensbuf->lien_buffer_capa = 0;
     }
 
-    liensbuf->lien_buffer = (lien_url*) malloct(block_capa*sizeof(*liensbuf->lien_buffer));
+    // Double capacity for each new chaines block
+    liensbuf->lien_buffer_capa = 
+      liensbuf->lien_buffer_capa < block_capa 
+      ? block_capa : liensbuf->lien_buffer_capa * 2;
+
+    capa_bytes = liensbuf->lien_buffer_capa*sizeof(*liensbuf->lien_buffer);
+    liensbuf->lien_buffer = (lien_url*) malloct(capa_bytes);
     if (liensbuf->lien_buffer == NULL) {
-      hts_record_assert_memory_failed(block_capa*sizeof(*liensbuf->lien_buffer));
+      hts_record_assert_memory_failed(capa_bytes);
     }
-    liensbuf->lien_buffer_capa = block_capa;
     liensbuf->lien_buffer_size = 0;
+
+    hts_log_print(opt, LOG_DEBUG, "reallocated %d new link placeholders",
+      (int) liensbuf->lien_buffer_capa);
   }
 
   // Take next lien_url item
