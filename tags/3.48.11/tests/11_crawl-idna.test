@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+
+bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
+
+# unicode tests
+bash crawl-test.sh \
+	--errors 1 --files 5 \
+	--found 'café.ut.httrack.com/unicode-links/café3860.html' \
+	--found 'café.ut.httrack.com/unicode-links/café30f4.html' \
+	--found 'café.ut.httrack.com/unicode-links/café5e1f.html' \
+	--found 'café.ut.httrack.com/unicode-links/café7b30.html' \
+	httrack 'http://ut.httrack.com/unicode-links/idna.html' \
+	'+*.ut.httrack.com/*' --robots=0
+
+# unicode tests (bogus links)
+bash crawl-test.sh \
+	--errors 0 --files 1 \
+	--found 'ut.httrack.com/unicode-links/idna_bogus.html' \
+	httrack 'http://ut.httrack.com/unicode-links/idna_bogus.html' \
+	'-*' --robots=0

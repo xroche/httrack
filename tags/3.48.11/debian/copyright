@@ -1,0 +1,31 @@
+This package was debianized by Xavier Roche <roche@httrack.com> on
+Fri, 27 Sep 2002 16:42:26 +0200
+
+The current Debian maintainer is Xavier Roche <xavier@debian.org>
+
+Upstream author: Xavier Roche <roche@httrack.com>
+
+Copyright: 1998-2014 Xavier Roche and other contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+On Debian systems, the complete text of the GNU General Public
+License can be found in /usr/share/common-licenses/GPL file.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+In addition, as a special exception, Xavier Roche gives permission to
+link the code of this program with the openSSL library (or with
+modified versions of openSSL that use the same license as openSSL),
+and distribute linked combinations including the two.  You must obey
+the GNU General Public License in all respects for all of the code
+used other than openSSL.  If you modify this file, you may extend this
+exception to your version of the file, but you are not obligated to do
+so.  If you do not wish to do so, delete this exception statement from
+your version.
