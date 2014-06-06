@@ -222,6 +222,7 @@ static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
   char *s_dup;
 
   assertf(liensbuf != NULL);
+  assertf(len < block_capa);
 
   // not enough capacity ? then create a new chunk
   if (len + liensbuf->string_buffer_size > liensbuf->string_buffer_capa) {
