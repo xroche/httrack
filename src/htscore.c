@@ -61,6 +61,9 @@ Please visit our Website: http://www.httrack.com
 /* Charset handling */
 #include "htscharset.h"
 
+/* Dynamic typed arrays */
+#include "htsarrays.h"
+
 /* END specific definitions */
 
 /* external modules */
@@ -157,47 +160,6 @@ RUN_CALLBACK0(opt, end); \
 } while(0)
 #define XH_uninit do { XH_extuninit; if (r.adr) { freet(r.adr); r.adr=NULL; } } while(0)
 
-// memory allocation assertion failure
-static void hts_record_assert_memory_failed(const size_t size) {
-  fprintf(stderr, "memory allocation failed (%lu bytes)", \
-          (long int) size); \
-  assertf(! "memory allocation failed"); \
-}
-
-// Typed array
-#define TypedArray(T) \
-  struct {            \
-    T* elts;          \
-    size_t size;      \
-    size_t capa;      \
-  }
-#define EMPTY_TYPED_ARRAY { NULL, 0, 0 }
-
-#define TypedArrayAdd(A, E) do { \
-  if ((A).capa == (A).size) { \
-    (A).capa = (A).capa < 16 ? 16 : (A).capa * 2; \
-    (A).elts = realloct((A).elts, (A).capa*sizeof(*(A).elts)); \
-    if ((A).elts == NULL) { \
-      hts_record_assert_memory_failed((A).capa*sizeof(*(A).elts)); \
-    } \
-  } \
-  assertf((A).size < (A).capa); \
-  (A).elts[(A).size++] = (E); \
-} while(0)
-
-#define TypedArrayFree(A) do { \
-  if ((A).elts != NULL) { \
-    freet((A).elts); \
-    (A).elts = NULL; \
-    (A).capa = (A).size = 0; \
-  } \
-} while(0)
-
-#define TypedArraySize(A)   ((A).size)
-#define TypedArrayCapa(A)   ((A).capa)
-#define TypedArrayElts(A)   ((A).elts)
-#define TypedArrayNth(A, N) (TypedArrayElts(A)[N])
-
 struct lien_buffers {
   /* Main array of pointers. 
      This is the real "lien_url **liens" pointer base. */
@@ -282,9 +244,11 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   // Create a new chunk of lien_url[]
   // There are references to item pointers, so we can not just realloc()
   if (liensbuf->lien_buffer_size == liensbuf->lien_buffer_capa) {
-    TypedArrayAdd(liensbuf->lien_buffers, liensbuf->lien_buffer);
-    liensbuf->lien_buffer_size = 0;
-    liensbuf->lien_buffer_capa = 0;
+    if (liensbuf->lien_buffer != NULL) {
+      TypedArrayAdd(liensbuf->lien_buffers, liensbuf->lien_buffer);
+      liensbuf->lien_buffer_size = 0;
+      liensbuf->lien_buffer_capa = 0;
+    }
 
     liensbuf->lien_buffer = (lien_url*) malloct(block_capa*sizeof(*liensbuf->lien_buffer));
     if (liensbuf->lien_buffer == NULL) {
