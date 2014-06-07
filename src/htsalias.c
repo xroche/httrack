@@ -192,7 +192,7 @@ const char *hts_optalias[][4] = {
   {"advanced-maxfilters", "-#F", "param", "maximum number of scan rules"},
   {"version", "-#h", "single", ""},
   {"debug-scanstdin", "-#K", "single", ""},
-  {"advanced-maxlinks", "-#L", "single", "maximum number of links (0 to disable limit)"},
+  {"advanced-maxlinks", "-#L", "param", "maximum number of links (0 to disable limit)"},
   {"advanced-progressinfo", "-#p", "single", "deprecated"},
   {"catch-url", "-#P", "single", "catch complex URL through proxy"},
   /*{"debug-oldftp","-#R","single",""}, */
