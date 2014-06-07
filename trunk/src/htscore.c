@@ -395,7 +395,7 @@ int hts_record_link(httrackp * opt,
     hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
                   (long int) heap_top_index(), (long int) opt->maxlink);
     hts_log_print(opt, LOG_INFO,
-      "To avoid that: use #L option for more links (example: -#L1000000)");
+      "To avoid that: use #L option for more links (example: -#L1000000, or -#L0 to disable)");
   }
   return success;
 }
