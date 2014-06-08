@@ -33,6 +33,10 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_DEFLIB
 #define HTTRACK_DEFLIB
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "htsglobal.h"
 
 #ifndef _WIN32
@@ -331,5 +335,9 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 #define concat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), concat(A,B,C,D))
 #define fconcat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), fconcat(A,B,C,D))
 #define fslash(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A,B,C))
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
