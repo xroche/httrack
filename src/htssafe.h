@@ -33,19 +33,38 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSSAFE_DEFH
 #define HTSSAFE_DEFH
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "htsglobal.h"
 
 /**
- * Optional user-defined callback upon fatal error.
- */
-typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
-
-/**
  * Emergency logging.
+ * Default is to use libhttrack one.
  */
 #ifndef HTSSAFE_ABORT_FUNCTION
-HTSEXT_API htsErrorCallback htsCallbackErr;
-#define HTSSAFE_ABORT_FUNCTION(A,B,C) do { if (htsCallbackErr != NULL) { htsCallbackErr(A,B,C); } } while(0)
+
+/** Assert error callback. **/
+#ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
+#define HTS_DEF_FWSTRUCT_htsErrorCallback
+typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
+#ifdef __cplusplus
+extern "C" {
+#endif
+HTSEXT_API htsErrorCallback hts_get_error_callback(void);
+#ifdef __cplusplus
+}
+#endif
+#endif
+
+#define HTSSAFE_ABORT_FUNCTION(A,B,C) do { \
+  htsErrorCallback callback = hts_get_error_callback(); \
+  if (callback != NULL) { \
+    callback(A,B,C); \
+  } \
+} while(0)
+
 #endif
 
 /**
@@ -61,7 +80,7 @@ HTSEXT_API htsErrorCallback htsCallbackErr;
 /**
  * Fatal assertion check.
  */
-#define assertf_(exp, file, line) assertf__(exp, #exp, __FILE__, __LINE__)
+#define assertf_(exp, file, line) assertf__(exp, #exp, file, line)
 
 /**
  * Fatal assertion check.
@@ -82,7 +101,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 /**
  * Check wether 'VAR' is of type char[].
  */
-#ifdef __GNUC__
+#if (defined(__GNUC__) && !defined(__cplusplus))
 /* Note: char[] and const char[] are compatible */
 #define HTS_IS_CHAR_BUFFER(VAR) ( __builtin_types_compatible_p ( typeof (VAR), char[] ) )
 #else
@@ -90,6 +109,17 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #define HTS_IS_CHAR_BUFFER(VAR) ( sizeof(VAR) != sizeof(char*) )
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
+
+/* Compile-time checks. */
+static HTS_UNUSED void htssafe_compile_time_check_(void) {
+  char array[32];
+  char *pointer = array;
+  char check_array[HTS_IS_CHAR_BUFFER(array) ? 1 : -1];
+  char check_pointer[HTS_IS_CHAR_BUFFER(pointer) ? -1 : 1];
+  (void) pointer;
+  (void) check_array;
+  (void) check_pointer;
+}
 
 /**
  * Append at most N characters from "B" to "A".
@@ -130,13 +160,22 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #define strlcatbuff(A, B, S) \
   strncat_safe_(A, S, B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
+
+/**
+ * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
+ */
+#define strlcpybuff(A, B, S) \
+  strcpy_safe_(A, S, B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
   size_t size;
   assertf_( source != NULL, file, line );
-  size = strnlen(source, sizeof_source);
+  size = sizeof_source != (size_t) -1 
+    ? strnlen(source, sizeof_source) : strlen(source);
   assertf_( size < sizeof_source, file, line );
   return size;
 }

@@ -74,21 +74,21 @@ void back_free(struct_back ** sback);
 // backing
 #define BACK_ADD_TEST "(dummy)"
 #define BACK_ADD_TEST2 "(dummy2)"
-int back_index(httrackp * opt, struct_back * sback, char *adr, char *fil,
-               char *sav);
-int back_available(struct_back * sback);
-LLint back_incache(struct_back * sback);
-int back_done_incache(struct_back * sback);
-HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, char *adr,
-                          char *fil, char *sav);
-int back_nsoc(struct_back * sback);
-int back_nsoc_overall(struct_back * sback);
-int back_add(struct_back * sback, httrackp * opt, cache_back * cache, char *adr,
-             char *fil, char *save, char *referer_adr, char *referer_fil,
+int back_index(httrackp * opt, struct_back * sback, const char *adr, const char *fil,
+               const char *sav);
+int back_available(const struct_back * sback);
+LLint back_incache(const struct_back * sback);
+int back_done_incache(const struct_back * sback);
+HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
+                          const char *fil, const char *sav);
+int back_nsoc(const struct_back * sback);
+int back_nsoc_overall(const struct_back * sback);
+int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char *adr,
+             const char *fil, const char *save, const char *referer_adr, const char *referer_fil,
              int test);
 int back_add_if_not_exists(struct_back * sback, httrackp * opt,
-                           cache_back * cache, char *adr, char *fil, char *save,
-                           char *referer_adr, char *referer_fil, int test);
+                           cache_back * cache, const char *adr, const char *fil, const char *save,
+                           const char *referer_adr, const char *referer_fil, int test);
 int back_stack_available(struct_back * sback);
 int back_search(httrackp * opt, struct_back * sback);
 int back_search_quick(struct_back * sback);
@@ -99,7 +99,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                TStamp stat_timestart);
 int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
                  const int p);
-int back_searchlive(httrackp * opt, struct_back * sback, char *search_addr);
+int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr);
 void back_connxfr(htsblk * src, htsblk * dst);
 void back_move(lien_back * src, lien_back * dst);
 void back_copy_static(const lien_back * src, lien_back * dst);

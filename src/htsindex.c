@@ -103,7 +103,7 @@ Please visit our Website: http://www.httrack.com
 
 /* End of Keyword Indexer Parameters */
 
-int strcpos(char *adr, char c);
+int strcpos(const char *adr, char c);
 int mystrcmp(const void *_e1, const void *_e2);
 
 // Global variables
@@ -468,8 +468,8 @@ void index_finish(const char *indexpath, int mode) {
 /* Subroutines */
 
 #if HTS_MAKE_KEYWORD_INDEX
-int strcpos(char *adr, char c) {
-  char *apos = strchr(adr, c);
+int strcpos(const char *adr, char c) {
+  const char *apos = strchr(adr, c);
 
   if (apos)
     return (int) (apos - adr);

@@ -231,8 +231,15 @@ struct t_hts_callback_ref {
   size_t offset;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern const t_hts_htmlcheck_callbacks default_callbacks;
-extern const t_hts_callback_ref default_callbacks_ref[];
+
+#ifdef __cplusplus
+}
+#endif
 
 #define HT_PRINT(A) strcatbuff(opt->state.HTbuff,A);
 #define HT_REQUEST_START opt->state.HTbuff[0]='\0';

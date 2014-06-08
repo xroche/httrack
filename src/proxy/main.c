@@ -31,6 +31,7 @@ Please visit our Website: http://www.httrack.com
 #include <time.h>
 #include <ctype.h>
 
+#define HTSSAFE_ABORT_FUNCTION(A,B,C)
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"

@@ -1,4 +1,4 @@
-/* ------------------------------------------------------------ */
+
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2014 Xavier Roche and other contributors
@@ -41,8 +41,10 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "htsmd5.h"
 #include "md5.h"
+#include "htssafe.h"
 
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
   int endian = 1;
@@ -76,4 +78,26 @@ unsigned long int md5sum32(const char *buff) {
 
   domd5mem(buff, strlen(buff), u.md5digest, 0);
   return u.hash;
+}
+
+void md5selftest() {
+  static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
+  static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";
+  static const char str2[] = "Hello";
+  static const char str2m[] = "8b1a9953c4611296a827abf8c47804d7";
+  char digest[64];
+#define MDCHECK(VAR, VARMD) do { \
+  memset(digest, 0xCC, sizeof(digest)); \
+  domd5mem(VAR, sizeof(VAR) - 1, digest, 1); \
+  if (strcmp(digest, VARMD) != 0) { \
+    fprintf(stderr, \
+            "error: md5 selftest failed: '%s' => '%s' (!= '%s')\n", \
+            VAR, digest, VARMD); \
+    assert(! "md5 selftest failed"); \
+  } \
+} while(0)
+MDCHECK(str1, str1m);
+MDCHECK(str2, str2m);
+#undef MDCHECK
+  fprintf(stderr, "md5 selftest succeeded\n");
 }

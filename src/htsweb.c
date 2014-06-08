@@ -178,6 +178,14 @@ int main(int argc, char *argv[]) {
   }
   smallserver_setkey("HTTRACK_WEB", HTTRACK_WEB);
 
+  /* Check version compatibility */
+  if (hts_sizeof_opt() != sizeof(httrackp)) {
+    fprintf(stderr,
+      "** CRITICAL: incompatible current httrack library version %s, expected version %s",
+      hts_version(), HTTRACK_VERSIONID);
+    smallserver_setkey("HTTRACK_INCOMPATIBLE_VERSIONID", hts_version());
+  }
+
   /* protected session-id */
   {
     char buff[1024];
@@ -238,7 +246,7 @@ static void back_launch_cmd(void *pP) {
   commandReturnCmdl = strdup(cmd);
 
   /* split */
-  argv[0] = "webhttrack";
+  argv[0] = strdup("webhttrack");
   argv[1] = cmd;
   argc++;
   i = 0;
@@ -264,6 +272,7 @@ static void back_launch_cmd(void *pP) {
   /* init */
   hts_init();
   global_opt = opt = hts_create_opt();
+  assert(opt->size_httrackp == sizeof(httrackp));
 
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);

@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include <unistd.h>
 #endif
 #endif /* _WIN32 */
+#include <stdarg.h>
 
 #include <string.h>
 #include <time.h>
@@ -82,6 +83,13 @@ static long int  timezone = 0;
 
 #include <sys/stat.h>
 /* END specific definitions */
+
+/* Windows might be missing va_copy */
+#ifdef _WIN32
+#ifndef va_copy
+#define va_copy(dst, src) ((dst) = (src))
+#endif
+#endif
 
 // Debugging
 #if _HTS_WIDE
@@ -601,7 +609,7 @@ void hts_init_htsblk(htsblk * r) {
 
 // ouvre une liaison http, envoie une requète GET et réceptionne le header
 // retour: socket
-T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
+T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour) {
   //                / GET, traiter en-tête
   return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
 }
@@ -612,10 +620,11 @@ T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour) {
 // waitconnect: attendre le connect()
 // note: dans retour, on met les params du proxy
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  char *xsend, char *adr, char *fil, htsblk * retour) {
+                  const char *xsend, const char *adr, const char *fil, htsblk * retour) {
   //htsblk retour;
   //int bufl=TAILLE_BUFFER;    // 8Ko de buffer
   T_SOC soc = INVALID_SOCKET;
+  char BIGSTK tempo_fil[HTS_URLMAXSIZE * 2];
 
   //char *p,*q;
 
@@ -691,10 +700,8 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
             (fconv
              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil + 1)))) {
-          char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-          strcpybuff(tempo, fil + 1);
-          strcpybuff(fil, tempo);
+          strcpybuff(tempo_fil, fil + 1);
+          fil = tempo_fil;
         }
       // Ouvrir
       retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
@@ -837,15 +844,16 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 // envoi d'une requète
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
-                  char *adr, char *fil, char *referer_adr, char *referer_fil,
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
+                  const char *xsend, const char *adr, const char *fil,
+                  const char *referer_adr, const char *referer_fil,
                   htsblk * retour) {
   char BIGSTK buffer_head_request[8192];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
   //int use_11=0;     // HTTP 1.1 utilisé
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
-  char *search_tag = NULL;
+  const char *search_tag = NULL;
 
   // Initialize buffer
   buffer_head_request[0] = '\0';
@@ -1046,7 +1054,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
     }
 
     {
-      char *real_adr = jump_identification(adr);
+      const char *real_adr = jump_identification(adr);
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
@@ -1091,12 +1099,12 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
       /* Authentification */
       {
         char autorisation[1100];
-        char *a;
+        const char *a;
 
         autorisation[0] = '\0';
         if (link_has_authorization(adr)) {      // ohh une authentification!
-          char *a = jump_identification(adr);
-          char *astart = jump_protocol(adr);
+          const char *a = jump_identification(adr);
+          const char *astart = jump_protocol(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
@@ -1176,8 +1184,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
 }
 
 // traiter 1ere ligne d'en tête
-void treatfirstline(htsblk * retour, char *rcvd) {
-  char *a = rcvd;
+void treatfirstline(htsblk * retour, const char *rcvd) {
+  const char *a = rcvd;
 
   // exemple:
   // HTTP/1.0 200 OK
@@ -1247,7 +1255,7 @@ void treatfirstline(htsblk * retour, char *rcvd) {
 
 // traiter ligne par ligne l'en tête
 // gestion des cookies
-void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
+void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
   int p;
 
@@ -1380,7 +1388,7 @@ void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
     // Content-Range: bytes 0-70870/70871
-    char *a;
+    const char *a;
 
     for(a = rcvd + p; is_space(*a); a++) ;
     if (strncasecmp(a, "bytes ", 6) == 0) {
@@ -1976,42 +1984,12 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
 }
 
-// teste une adresse, et suit l'éventuel chemin "moved"
-// retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
-// copie dans loc la véritable adresse si celle-ci est différente
-htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc) {
-  htsblk retour;
-  int retry = 0;
-  int tryagain;
-
-  // note: "RFC says"
-  // 5 boucles au plus, on en teste au plus 8 ici
-  // sinon abandon..
-  do {
-    tryagain = 0;
-    switch ((retour = http_test(opt, adr, fil, loc)).statuscode) {
-    case HTTP_OK:
-      break;                    // ok!
-    case HTTP_MOVED_PERMANENTLY:
-    case HTTP_FOUND:
-    case HTTP_SEE_OTHER:
-    case HTTP_TEMPORARY_REDIRECT:      // moved!
-      // recalculer adr et fil!
-      if (ident_url_absolute(loc, adr, fil) != -1) {
-        tryagain = 1;           // retenter
-        retry++;                // ..encore une fois
-      }
-    }
-  } while((tryagain) && (retry < 5 + 3));
-  return retour;
-}
-
 // teste si une URL (validité, header, taille)
 // retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
 // en cas de moved xx, dans location
 // abandonne désormais au bout de 30 secondes (aurevoir les sites
 // qui nous font poireauter 5 heures..) -> -2=timeout
-htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc) {
+htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
   T_SOC soc;
   htsblk retour;
 
@@ -2118,27 +2096,16 @@ htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc) {
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
 T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
               int waitconnect) {
-  t_fullhostent fullhostent_buffer;     // buffer pour resolver
   T_SOC soc;                    // descipteur de la socket
-  char *iadr;
 
-  // unsigned short int port;
-
-  // si iadr="#" alors c'est une fausse URL, mais un vrai fichier
-  // local.
-  // utile pour les tests!
-  //## if (iadr[0]!=lOCAL_CHAR) {
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
-    int server_size = sizeof(server);
-    t_hostent *hp;
     const char *error = "unknown error";
 
-    // effacer structure
-    memset(&server, 0, sizeof(server));
-
     // tester un éventuel id:pass et virer id:pass@ si détecté
-    iadr = jump_identification(_iadr);
+    const char *const iadr = jump_identification(_iadr);
+
+    SOCaddr_clear(server);
 
 #if HDEBUG
     printf("gethostbyname\n");
@@ -2156,7 +2123,8 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #else
       port = 80;                // port par défaut
 #endif
-      if (a) {
+
+      if (a != NULL) {
         char BIGSTK iadr2[HTS_URLMAXSIZE * 2];
         int i = -1;
 
@@ -2165,25 +2133,24 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
         if (i != -1) {
           port = (unsigned short int) i;
         }
+
         // adresse véritable (sans :xx)
         strncatbuff(iadr2, iadr, (int) (a - iadr));
 
         // adresse sans le :xx
-        hp = hts_gethostbyname2(opt, iadr2, &fullhostent_buffer, &error);
+        hts_dns_resolve2(opt, iadr2, &server, &error);
 
       } else {
 
         // adresse normale (port par défaut par la suite)
-        hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
+        hts_dns_resolve2(opt, iadr, &server, &error);
       }
 
-    } else                      // port défini
-      hp = hts_gethostbyname2(opt, iadr, &fullhostent_buffer, &error);
+    } else {                    // port défini
+      hts_dns_resolve2(opt, iadr, &server, &error);
+    }
 
-    // Conversion iadr -> adresse
-    // structure recevant le nom de l'hôte, etc
-    //struct    hostent         *hp;
-    if (hp == NULL) {
+    if (!SOCaddr_is_valid(server)) {
 #if DEBUG
       printf("erreur gethostbyname\n");
 #endif
@@ -2198,13 +2165,10 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
       }
       return INVALID_SOCKET;
     }
-    // copie adresse
-    SOCaddr_copyaddr(server, server_size, hp->h_addr_list[0], hp->h_length);
+
     // make a copy for external clients
-    retour->address_size = sizeof(retour->address);
-    SOCaddr_copyaddr(retour->address, retour->address_size, hp->h_addr_list[0],
-                     hp->h_length);
-    // memcpy(&SOCaddr_sinaddr(server), hp->h_addr_list[0], hp->h_length);
+    SOCaddr_copy_SOCaddr(retour->address, server);
+    retour->address_size = SOCaddr_size(retour->address);
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
 #if HDEBUG
@@ -2238,14 +2202,13 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     }
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
-      t_fullhostent bind_buffer;
       const char *error = "unknown error";
+      SOCaddr bind_addr;
 
-      hp = hts_gethostbyname2(opt, retour->req.proxy.bindhost, &bind_buffer,
-                              &error);
-      if (hp == NULL
-          || bind(soc, (struct sockaddr *) hp->h_addr_list[0],
-                  hp->h_length) != 0) {
+      if (hts_dns_resolve2(opt, retour->req.proxy.bindhost,
+                             &bind_addr, &error) == NULL
+          || bind(soc, &SOCaddr_sockaddr(bind_addr), 
+                  SOCaddr_size(bind_addr)) != 0) {
         if (retour && retour->msg) {
 #ifdef _WIN32
           snprintf(retour->msg, sizeof(retour->msg),
@@ -2297,25 +2260,20 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("connect\n");
 #endif
-#ifdef _WIN32
-    if (connect(soc, (const struct sockaddr FAR *) &server, server_size) != 0) {
-#else
-    if (connect(soc, (struct sockaddr *) &server, server_size) == -1) {
-#endif
-
+    if (connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
       // bloquant
       if (waitconnect) {
 #if HDEBUG
         printf("unable to connect!\n");
 #endif
-        if (retour && retour->msg) {
+        if (retour != NULL && retour->msg) {
 #ifdef _WIN32
-          int last_errno = WSAGetLastError();
+          const int last_errno = WSAGetLastError();
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
                   strerror(last_errno));
 #else
-          int last_errno = errno;
+          const int last_errno = errno;
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
                   strerror(last_errno));
@@ -2352,12 +2310,12 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 // couper http://www.truc.fr/pub/index.html -> www.truc.fr /pub/index.html
 // retour=-1 si erreur.
 // si file://... alors adresse=file:// (et coupe le ?query dans ce cas)
-int ident_url_absolute(const char *url, char *adr, char *fil) {
+int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   int pos = 0;
   int scheme = 0;
 
-  // effacer adr et fil
-  adr[0] = fil[0] = '\0';
+  // effacer adrfil->adr et adrfil->fil
+  adrfil->adr[0] = adrfil->fil[0] = '\0';
 
 #if HDEBUG
   printf("protocol: %s\n", url);
@@ -2376,15 +2334,15 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
   // 1. optional scheme ":"
   if ((pos = strfield(url, "file:"))) { // fichier local!! (pour les tests)
     //!!p+=3;
-    strcpybuff(adr, "file://");
+    strcpybuff(adrfil->adr, "file://");
   } else if ((pos = strfield(url, "http:"))) {  // HTTP
     //!!p+=3;
   } else if ((pos = strfield(url, "ftp:"))) {   // FTP
-    strcpybuff(adr, "ftp://");  // FTP!!
+    strcpybuff(adrfil->adr, "ftp://");  // FTP!!
     //!!p+=3;
 #if HTS_USEOPENSSL
   } else if ((pos = strfield(url, "https:"))) {     // HTTPS
-    strcpybuff(adr, "https://");
+    strcpybuff(adrfil->adr, "https://");
 #endif
   } else if (scheme) {
     return -1;                  // erreur non reconnu
@@ -2397,13 +2355,13 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
 
   // (url+pos) now points to the path (not net path)
 
-  //## if (adr[0]!=lOCAL_CHAR) {    // adresse normale http
-  if (!strfield(adr, "file:")) {        // PAS file://
+  //## if (adrfil->adr[0]!=lOCAL_CHAR) {    // adrfil->adresse normale http
+  if (!strfield(adrfil->adr, "file:")) {        // PAS adrfil->file://
     const char *p, *q;
 
     p = url + pos;
 
-    // p pointe sur le début de l'adresse, ex: www.truc.fr/sommaire/index.html
+    // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
     q = strchr(jump_identification(p), '/');
     if (q == 0)
       q = strchr(jump_identification(p), '?');  // http://www.foo.com?bar=1
@@ -2416,53 +2374,53 @@ int ident_url_absolute(const char *url, char *adr, char *fil) {
       //strcpybuff(retour.msg,"Path too long");
       return -1;                // erreur
     }
-    // recopier adresse www..
-    strncatbuff(adr, p, ((int) (q - p)));
-    // *( adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
+    // recopier adrfil->adresse www..
+    strncatbuff(adrfil->adr, p, ((int) (q - p)));
+    // *( adrfil->adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
     // recopier chemin /pub/..
     if (q[0] != '/')            // page par défaut (/)
-      strcatbuff(fil, "/");
-    strcatbuff(fil, q);
+      strcatbuff(adrfil->fil, "/");
+    strcatbuff(adrfil->fil, q);
     // SECURITE:
     // simplifier url pour les ../
-    fil_simplifie(fil);
-  } else {                      // localhost file://
+    fil_simplifie(adrfil->fil);
+  } else {                      // localhost adrfil->file://
     const char *p;
     size_t i;
     char *a;
 
     p = url + pos;
-    if (*p == '/' || *p == '\\') {      /* file:///.. */
-      strcatbuff(fil, p);       // fichier local ; adr="#"
+    if (*p == '/' || *p == '\\') {      /* adrfil->file:///.. */
+      strcatbuff(adrfil->fil, p);       // fichier local ; adrfil->adr="#"
     } else {
       if (p[1] != ':') {
-        strcatbuff(fil, "//");  /* file://server/foo */
-        strcatbuff(fil, p);
+        strcatbuff(adrfil->fil, "//");  /* adrfil->file://server/foo */
+        strcatbuff(adrfil->fil, p);
       } else {
-        strcatbuff(fil, p);     // file://C:\..
+        strcatbuff(adrfil->fil, p);     // adrfil->file://C:\..
       }
     }
 
-    a = strchr(fil, '?');
+    a = strchr(adrfil->fil, '?');
     if (a)
-      *a = '\0';                /* couper query (inutile pour file:// lors de la requête) */
-    // filtrer les \\ -> / pour les fichiers DOS
-    for(i = 0; fil[i] != '\0'; i++)
-      if (fil[i] == '\\')
-        fil[i] = '/';
+      *a = '\0';                /* couper query (inutile pour adrfil->file:// lors de la requête) */
+    // adrfil->filtrer les \\ -> / pour les fichiers DOS
+    for(i = 0; adrfil->fil[i] != '\0'; i++)
+      if (adrfil->fil[i] == '\\')
+        adrfil->fil[i] = '/';
   }
 
   // no hostname
-  if (!strnotempty(adr))
+  if (!strnotempty(adrfil->adr))
     return -1;                  // erreur non reconnu
 
   // nommer au besoin.. (non utilisé normalement)
-  if (!strnotempty(fil))
-    strcpybuff(fil, "default-index.html");
+  if (!strnotempty(adrfil->fil))
+    strcpybuff(adrfil->fil, "default-index.html");
 
-  // case insensitive pour adresse
+  // case insensitive pour adrfil->adresse
   {
-    char *a = jump_identification(adr);
+    char *a = jump_identification(adrfil->adr);
 
     while(*a) {
       if ((*a >= 'A') && (*a <= 'Z'))
@@ -2983,13 +2941,13 @@ int sendc(htsblk * r, const char *s) {
 }
 
 // Remplace read
-int finput(int fd, char *s, int max) {
+int finput(T_SOC fd, char *s, int max) {
   char c;
   int j = 0;
 
   do {
     //c=fgetc(fp);
-    if (read(fd, &c, 1) <= 0) {
+    if (read((int) fd, &c, 1) <= 0) {
       c = 0;
     }
     if (c != 0) {
@@ -3093,7 +3051,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
 }
 int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloct(max + 2);
+  char *ls = (char *) malloct(max + 1);
 
   s[0] = '\0';
   if (ls) {
@@ -3165,8 +3123,8 @@ void rawlinput(FILE * fp, char *s, int max) {
 }
 
 //cherche chaine, case insensitive
-char *strstrcase(char *s, char *o) {
-  while((*s) && (strfield(s, o) == 0))
+char *strstrcase(char *s, const char *o) {
+  while(*s && strfield(s, o) == 0)
     s++;
   if (*s == '\0')
     return NULL;
@@ -4289,7 +4247,7 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename) {
 // -- Utils fichiers
 
 // pretty print for i/o
-void fprintfio(FILE * fp, char *buff, char *prefix) {
+void fprintfio(FILE * fp, const char *buff, const char *prefix) {
   char nl = 1;
 
   while(*buff) {
@@ -4404,15 +4362,17 @@ typedef struct {
   char path[1024 + 4];
   int init;
 } hts_rootdir_strc;
-HTSEXT_API char *hts_rootdir(char *file) {
+HTSEXT_API const char *hts_rootdir(char *file) {
   static hts_rootdir_strc strc = { "", 0 };
   if (file) {
     if (!strc.init) {
       strc.path[0] = '\0';
       strc.init = 1;
       if (strnotempty(file)) {
+        const size_t file_len = strlen(file);
         char *a;
 
+        assertf(file_len < sizeof(strc.path));
         strcpybuff(strc.path, file);
         while((a = strrchr(strc.path, '\\')))
           *a = '/';
@@ -4422,7 +4382,7 @@ HTSEXT_API char *hts_rootdir(char *file) {
           strc.path[0] = '\0';
       }
       if (!strnotempty(strc.path)) {
-        if (getcwd(strc.path, 1024) == NULL)
+        if (getcwd(strc.path, sizeof(strc.path)) == NULL)
           strc.path[0] = '\0';
         else
           strcatbuff(strc.path, "/");
@@ -4558,7 +4518,6 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // -- Gestion cache DNS --
 // 'RX98
-#if HTS_DNSCACHE
 
 // 'capsule' contenant uniquement le cache
 t_dnscache *_hts_cache(httrackp * opt) {
@@ -4592,63 +4551,47 @@ void hts_cache_free(t_dnscache *const root) {
 // routine pour le cache - retour optionnel à donner à chaque fois
 // NULL: nom non encore testé dans le cache
 // si h_length==0 alors le nom n'existe pas dans le dns
-static t_hostent *hts_ghbn(const t_dnscache *cache, const char *const iadr, t_hostent *retour) {
+static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCaddr *const addr) {
+  assertf(addr != NULL);
   for(; cache != NULL; cache = cache->n) {
     assertf(cache != NULL);
     assertf(iadr != NULL);
     if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
-        if (retour->h_addr_list[0])
-          memcpy(retour->h_addr_list[0], cache->host_addr, cache->host_length);
-        retour->h_length = cache->host_length;
+        SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
+        return addr;
       } else if (cache->host_length == 0) {     // en cours
         return NULL;
       } else {                  // erreur dans le dns, déja vérifié
-        if (retour->h_addr_list[0])
-          retour->h_addr_list[0][0] = '\0';
-        retour->h_length = 0;   // erreur, n'existe pas
+        SOCaddr_clear(*addr);
+        return addr;
       }
-      return retour;
     }
   }
   return NULL;
 }
 
-static t_hostent *vxgethostbyname2_(const char *const hostname,
-                                    void *const v_buffer, const char **error) {
-  t_fullhostent *buffer = (t_fullhostent *) v_buffer;
-
-  /* Clear */
-  fullhostent_init(buffer);
-
+static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
+                                          SOCaddr *const addr, 
+                                          const char **error) {
   {
 #if HTS_INET6==0
-    /*
-       ipV4 resolver
-     */
-    t_hostent *hp = gethostbyname(hostname);
+    /* IPv4 resolver */
+    struct hostent *const hp = gethostbyname(hostname);
 
     if (hp != NULL) {
-      if ((hp->h_length)
-          && (((unsigned int) hp->h_length) <= buffer->addr_maxlen)) {
-        memcpy(buffer->hp.h_addr_list[0], hp->h_addr_list[0], hp->h_length);
-        buffer->hp.h_length = hp->h_length;
-        return &(buffer->hp);
-      }
+      SOCaddr_copyaddr2(addr, hp->h_addr_list[0], hp->h_length);
+      return SOCaddr_is_valid(addr) ? &addr : NULL;
+    } else {
+      SOCaddr_clear(*addr);
     }
 #else
-    /*
-       ipV6 resolver
-     */
-    /*
-       int error_num=0;
-       t_hostent* hp=getipnodebyname(hostname, AF_INET6, AI_DEFAULT, &error_num);
-       oops, deprecated :(
-     */
+    /* IPv6 resolver */
     struct addrinfo *res = NULL;
     struct addrinfo hints;
     int gerr;
 
+    SOCaddr_clear(*addr);
     memset(&hints, 0, sizeof(hints));
     if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
       hints.ai_family = PF_INET;
@@ -4659,13 +4602,9 @@ static t_hostent *vxgethostbyname2_(const char *const hostname,
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     if ( ( gerr = getaddrinfo(hostname, NULL, &hints, &res) ) == 0) {
-      if (res) {
-        if ((res->ai_addr) && (res->ai_addrlen)
-            && (res->ai_addrlen <= buffer->addr_maxlen)) {
-          memcpy(buffer->hp.h_addr_list[0], res->ai_addr, res->ai_addrlen);
-          buffer->hp.h_length = (short) res->ai_addrlen;
-          freeaddrinfo(res);
-          return &(buffer->hp);
+      if (res != NULL) {
+        if (res->ai_addr != NULL && res->ai_addrlen != 0) {
+          SOCaddr_copyaddr2(*addr, res->ai_addr, res->ai_addrlen);
         }
       }
     } else {
@@ -4678,11 +4617,12 @@ static t_hostent *vxgethostbyname2_(const char *const hostname,
     }
 #endif
   }
-  return NULL;
+
+  return SOCaddr_is_valid(*addr) ? addr : NULL;
 }
 
-HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, 
-                                       void *const v_buffer, const char **error) {
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
+                                     SOCaddr *const addr, const char **error) {
   /* Protection */
   if (!strnotempty(hostname)) {
     return NULL;
@@ -4693,43 +4633,40 @@ HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname,
      The resolver doesn't seem to handle IP6 addresses in brackets
    */
   if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
-    t_hostent *ret;
+    SOCaddr *ret;
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
     assertf(copy != NULL);
     copy[0] = '\0';
     strncat(copy, hostname + 1, size - 2);
-    ret =  vxgethostbyname2_(copy, v_buffer, error);
+    ret =  hts_dns_resolve_nocache2_(copy, addr, error);
     freet(copy);
     return ret;
   } else {
-    return vxgethostbyname2_(hostname, v_buffer, error);
+    return hts_dns_resolve_nocache2_(hostname, addr, error);
   }
 }
 
-HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer) {
-  return vxgethostbyname2(hostname, v_buffer, NULL);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, SOCaddr *const addr) {
+  return hts_dns_resolve_nocache2(hostname, addr, NULL);
 }
 
 HTSEXT_API int check_hostname_dns(const char *const hostname) {
-  t_fullhostent buffer;
-  return vxgethostbyname(hostname, &buffer) != NULL;
+  SOCaddr buffer;
+  return hts_dns_resolve_nocache(hostname, &buffer) != NULL;
 }
 
 // Needs locking
 // cache dns interne à HTS // ** FREE A FAIRE sur la chaine
-static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
+static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
+                                   SOCaddr *const addr, const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
-  t_fullhostent *buffer = (t_fullhostent *) v_buffer;
   t_dnscache *cache = _hts_cache(opt);  // adresse du cache
-  t_hostent *hp;
+  SOCaddr *sa;
 
   assertf(opt != NULL);
   assertf(_iadr != NULL);
-  assertf(v_buffer != NULL);
-
-  /* Clear */
-  fullhostent_init(buffer);
+  assertf(addr != NULL);
 
   strcpybuff(iadr, jump_identification(_iadr));
   // couper éventuel :
@@ -4741,91 +4678,55 @@ static t_hostent *hts_gethostbyname_(httrackp * opt, const char *_iadr, void *v_
   }
 
   /* get IP from the dns cache */
-  hp = hts_ghbn(cache, iadr, &buffer->hp);
-  if (hp) {
-    if (hp->h_length > 0)
-      return hp;
-    else
-      return NULL;              // entrée erronée (erreur DNS) dans le DNS
+  sa = hts_ghbn(cache, iadr, addr);
+  if (sa != NULL) {
+    return SOCaddr_is_valid(*sa) ? sa : NULL;
   } else {                      // non présent dans le cache dns, tester
     // find queue
     for(; cache->n != NULL; cache = cache->n) ;
 
-#if HTS_WIDE_DEBUG
-    DEBUG_W("gethostbyname\n");
-#endif
-#if HDEBUG
-    printf("gethostbyname (not in cache)\n");
-#endif
-    {
-      unsigned long inetaddr;
-
-#ifdef _WIN32
-      if ((inetaddr = inet_addr(iadr)) == INADDR_NONE) {
-#else
-      if ((inetaddr = inet_addr(iadr)) == (in_addr_t) - 1) {
-#endif
 #if DEBUGDNS
-        printf("resolving (not cached) %s\n", iadr);
+    printf("resolving (not cached) %s\n", iadr);
 #endif
-        hp = vxgethostbyname2(iadr, buffer, error);     // calculer IP host
-      } else {                  // numérique, convertir sans passer par le dns
-        buffer->hp.h_addr_list[0] = (char *) &inetaddr;
-        buffer->hp.h_length = 4;
-        hp = &buffer->hp;
-      }
-    }
+
+    sa = hts_dns_resolve_nocache2(iadr, addr, error);     // calculer IP host
+
 #if HTS_WIDE_DEBUG
     DEBUG_W("gethostbyname done\n");
 #endif
+
+    /* attempt to store new entry */
     cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
     if (cache->n != NULL) {
       strcpybuff(cache->n->iadr, iadr);
-      if (hp != NULL) {
-        memcpy(cache->n->host_addr, hp->h_addr_list[0], hp->h_length);
-        cache->n->host_length = hp->h_length;
+      if (sa != NULL) {
+        cache->n->host_length = SOCaddr_size(*sa);
+        assertf(cache->n->host_length < sizeof(cache->n->host_addr));
+        memcpy(cache->n->host_addr, &SOCaddr_sockaddr(*sa), cache->n->host_length);
       } else {
         cache->n->host_addr[0] = '\0';
         cache->n->host_length = 0;      // non existant dans le dns
       }
       cache->n->n = NULL;
-      return hp;
-    } else {                    // on peut pas noter, mais on peut renvoyer le résultat
-      return hp;
+      return sa;
     }
+
+    /* return result if any */
+    return sa;
   }                             // retour hp du cache
 }
 
-t_hostent *hts_gethostbyname2(httrackp * opt, const char *_iadr, void *v_buffer, const char **error) {
-  t_hostent *ret;
+SOCaddr* hts_dns_resolve2(httrackp * opt, const char *_iadr, SOCaddr *const addr, const char **error) {
+  SOCaddr *ret;
   hts_mutexlock(&opt->state.lock);
-  ret = hts_gethostbyname_(opt, _iadr, v_buffer, error);
+  ret = hts_dns_resolve_(opt, _iadr, addr, error);
   hts_mutexrelease(&opt->state.lock);
   return ret;
 }
 
-t_hostent *hts_gethostbyname(httrackp * opt, const char *_iadr, void *v_buffer) {
-  return hts_gethostbyname2(opt ,_iadr, v_buffer, NULL);
+SOCaddr* hts_dns_resolve(httrackp * opt, const char *_iadr, SOCaddr *const addr) {
+  return hts_dns_resolve2(opt, _iadr, addr, NULL);
 }
-
-#else
-static HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, char *iadr,
-                                               t_fullhostent * buffer) {
-  t_hostent *retour;
-
-#if HTS_WIDE_DEBUG
-  DEBUG_W("gethostbyname (2)\n");
-#endif
-#if DEBUGDNS
-  printf("blocking method gethostbyname() in progress for %s\n", iadr);
-#endif
-  retour = vxgethostbyname(jump_identification(iadr),);
-#if HTS_WIDE_DEBUG
-  DEBUG_W("gethostbyname (2) done\n");
-#endif
-  return retour;
-}
-#endif
 
 // --- Tracage des mallocs() ---
 #ifdef HTS_TRACE_MALLOC
@@ -5112,6 +5013,17 @@ static int ssl_vulnerable(const char *version) {
   return 0;
 }
 
+/* user abort callback */
+htsErrorCallback htsCallbackErr = NULL;
+
+HTSEXT_API void hts_set_error_callback(htsErrorCallback handler) {
+  htsCallbackErr = handler;
+}
+
+HTSEXT_API htsErrorCallback hts_get_error_callback() {
+  return htsCallbackErr;
+}
+
 static void default_inthash_asserthandler(void *arg, const char* exp, const char* file, int line) {
   abortf_(exp, file, line);
 }
@@ -5278,8 +5190,21 @@ HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg) {
   return 1;                     /* Error */
 }
 
+static void (*hts_log_print_callback)(httrackp * opt, int type, const char *format, va_list args) = NULL;
+
+HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt,
+                                            int type, const char *format, va_list args)) {
+  hts_log_print_callback = callback;
+}
+
 HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
   assertf(format != NULL);
+  if (hts_log_print_callback != NULL) {
+    va_list args_copy;
+    va_copy(args_copy, args);
+    hts_log_print_callback(opt, type, format, args);
+    va_end(args_copy);
+  }
   if (opt != NULL && opt->log != NULL) {
     const int save_errno = errno;
     const char *s_type = "unknown";
@@ -5325,13 +5250,11 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
 }
 
 HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
+  va_list args;
   assertf(format != NULL);
-  if (opt != NULL && opt->log != NULL) {
-    va_list args;
-    va_start(args, format);
-    hts_log_vprint(opt, type, format, args);
-    va_end(args);
-  }
+  va_start(args, format);
+  hts_log_vprint(opt, type, format, args);
+  va_end(args);
 }
 
 HTSEXT_API void set_wrappers(httrackp * opt) {  // LEGACY
@@ -5538,13 +5461,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->path_log, "");
   StringCopy(opt->path_bin, "");
   //
-#if HTS_SPARE_MEMORY==0
-  opt->maxlink = 100000;        // 100,000 liens max par défaut (400Kb)
+  opt->maxlink = 100000;        // 100,000 liens max par défaut
   opt->maxfilter = 200;         // 200 filtres max par défaut
-#else
-  opt->maxlink = 10000;         // 10,000 liens max par défaut (40Kb)
-  opt->maxfilter = 50;          // 50 filtres max par défaut
-#endif
   opt->maxcache = 1048576 * 32; // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
   opt->maxtime = -1;            // temps max en secondes
@@ -5581,6 +5499,10 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   }
 
   return opt;
+}
+
+HTSEXT_API size_t hts_sizeof_opt(void) {
+  return sizeof(httrackp);
 }
 
 HTSEXT_API void hts_free_opt(httrackp * opt) {
@@ -5835,68 +5757,56 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   {htsdefault_parse, NULL}
 };
 
-#define CHARCAST(A) ( (char*) (A) )
-#define OFFSET_OF(TYPE, MEMBER) ( (size_t) ( CHARCAST(&(((TYPE*) NULL)->MEMBER)) - CHARCAST((TYPE*) NULL) ) )
-#define CALLBACK_REF(name, fun) \
-  { name, OFFSET_OF(t_hts_htmlcheck_callbacks, fun) }
-#define MEMBER_OF(STRUCT, OFFSET, TYPE) ( * ((TYPE*)((char*)(STRUCT) + (OFFSET))) )
+#define CALLBACK_OP(CB, NAME, OPERATION, S, FUN) do {   \
+  if (strcmp(NAME, S) == 0) {                           \
+    OPERATION(t_hts_htmlcheck_ ##FUN, (CB)->FUN.fun);   \
+  }                                                     \
+} while(0)
 
-const t_hts_callback_ref default_callbacks_ref[] = {
-  CALLBACK_REF("init", init),
-  CALLBACK_REF("free", uninit),
-  CALLBACK_REF("start", start),
-  CALLBACK_REF("end", end),
-  CALLBACK_REF("change-options", chopt),
-  CALLBACK_REF("preprocess-html", preprocess),
-  CALLBACK_REF("postprocess-html", postprocess),
-  CALLBACK_REF("check-html", check_html),
-  CALLBACK_REF("query", query),
-  CALLBACK_REF("query2", query2),
-  CALLBACK_REF("query3", query3),
-  CALLBACK_REF("loop", loop),
-  CALLBACK_REF("check-link", check_link),
-  CALLBACK_REF("check-mime", check_mime),
-  CALLBACK_REF("pause", pause),
-  CALLBACK_REF("save-file", filesave),
-  CALLBACK_REF("save-file2", filesave2),
-  CALLBACK_REF("link-detected", linkdetected),
-  CALLBACK_REF("link-detected2", linkdetected2),
-  CALLBACK_REF("transfer-status", xfrstatus),
-  CALLBACK_REF("save-name", savename),
-  CALLBACK_REF("send-header", sendhead),
-  CALLBACK_REF("receive-header", receivehead),
-  {NULL, 0}
-};
-
-size_t hts_get_callback_offs(const char *name) {
-  const t_hts_callback_ref *ref;
-
-  for(ref = &default_callbacks_ref[0]; ref->name != NULL; ref++) {
-    if (strcmp(name, ref->name) == 0) {
-      return ref->offset;
-    }
-  }
-  return (size_t) (-1);
-}
+#define DISPATCH_CALLBACK(CB, NAME, OPERATION) do { \
+  CALLBACK_OP(CB, NAME, OPERATION, "init", init); \
+  CALLBACK_OP(CB, NAME, OPERATION, "free", uninit); \
+  CALLBACK_OP(CB, NAME, OPERATION, "start", start); \
+  CALLBACK_OP(CB, NAME, OPERATION, "end", end); \
+  CALLBACK_OP(CB, NAME, OPERATION, "change-options", chopt); \
+  CALLBACK_OP(CB, NAME, OPERATION, "preprocess-html", preprocess); \
+  CALLBACK_OP(CB, NAME, OPERATION, "postprocess-html", postprocess); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-html", check_html); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query", query); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query2", query2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "query3", query3); \
+  CALLBACK_OP(CB, NAME, OPERATION, "loop", loop); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-link", check_link); \
+  CALLBACK_OP(CB, NAME, OPERATION, "check-mime", check_mime); \
+  CALLBACK_OP(CB, NAME, OPERATION, "pause", pause); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-file", filesave); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-file2", filesave2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "link-detected", linkdetected); \
+  CALLBACK_OP(CB, NAME, OPERATION, "link-detected2", linkdetected2); \
+  CALLBACK_OP(CB, NAME, OPERATION, "transfer-status", xfrstatus); \
+  CALLBACK_OP(CB, NAME, OPERATION, "save-name", savename); \
+  CALLBACK_OP(CB, NAME, OPERATION, "send-header", sendhead); \
+  CALLBACK_OP(CB, NAME, OPERATION, "receive-header", receivehead); \
+} while(0)
 
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name,
                      void *function) {
-  size_t offs = hts_get_callback_offs(name);
-
-  if (offs != (size_t) - 1) {
-    MEMBER_OF(callbacks, offs, void *) = function;
-
-    return 0;
-  }
-  return 1;
+  int error = 1;
+#define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
+    FUNCTION = (TYPE) function;                 \
+    error = 0;                                  \
+  } while(0)
+  DISPATCH_CALLBACK(callbacks, name, CALLBACK_OPERATION);
+#undef CALLBACK_OPERATION
+  return error;
 }
 
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name) {
-  size_t offs = hts_get_callback_offs(name);
-
-  if (offs != (size_t) - 1) {
-    return MEMBER_OF(callbacks, offs, void *);
-  }
+#define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
+    return (void*) FUNCTION;                    \
+  } while(0)
+  DISPATCH_CALLBACK(callbacks, name, CALLBACK_OPERATION);
+#undef CALLBACK_OPERATION
   return NULL;
 }
 

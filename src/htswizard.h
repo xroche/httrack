@@ -49,12 +49,13 @@ typedef struct httrackp httrackp;
 typedef struct lien_url lien_url;
 #endif
 
-int hts_acceptlink(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
-                   char *adr, char *fil, char *tag, char *attribute,
+int hts_acceptlink(httrackp * opt, int ptr,
+                   const char *adr, const char *fil,
+                   const char *tag, const char *attribute,
                    int *set_prio_to_0, int *just_test_it);
-int hts_testlinksize(httrackp * opt, char *adr, char *fil, LLint size);
-int hts_acceptmime(httrackp * opt, int ptr, int lien_tot, lien_url ** liens,
-                   char *adr, char *fil, char *mime);
+int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size);
+int hts_acceptmime(httrackp * opt, int ptr,
+                   const char *adr, const char *fil, const char *mime);
 #endif
 
 #endif

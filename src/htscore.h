@@ -129,78 +129,24 @@ typedef struct filecreate_params filecreate_params;
 
 #include "hts-indextmpl.h"
 
-// structure d'un lien
-#ifndef HTS_DEF_FWSTRUCT_lien_url
-#define HTS_DEF_FWSTRUCT_lien_url
-typedef struct lien_url lien_url;
+// adr, fil
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
+#define HTS_DEF_FWSTRUCT_lien_adrfil
+typedef struct lien_adrfil lien_adrfil;
 #endif
-struct lien_url {
-  char firstblock;              // flag 1=premier malloc 
-  char link_import;             // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
-  int depth;                    // profondeur autorisée lien ; >0 forte 0=faible
-  int pass2;                    // traiter après les autres, seconde passe. si == -1, lien traité en background
-  int premier;                  // pointeur sur le premier lien qui a donné lieu aux autres liens du domaine
-  int precedent;                // pointeur sur le lien qui a donné lieu à ce lien précis
-  //int moved;          // pointeur sur moved
-  int retry;                    // nombre de retry restants
-  int testmode;                 // mode test uniquement, envoyer juste un head!
-  char *adr;                    // adresse
-  char *fil;                    // nom du fichier distant
-  char *sav;                    // nom à sauver sur disque (avec chemin éventuel)
-  char *cod;                    // chemin codebase éventuel si classe java
-  char *former_adr;             // adresse initiale (avant éventuel moved), peut être nulle
-  char *former_fil;             // nom du fichier distant initial (avant éventuel moved), peut être nul
+struct lien_adrfil {
+  char adr[HTS_URLMAXSIZE * 2];      // adresse
+  char fil[HTS_URLMAXSIZE * 2];      // nom du fichier distant
 };
 
-// chargement de fichiers en 'arrière plan'
-#ifndef HTS_DEF_FWSTRUCT_lien_back
-#define HTS_DEF_FWSTRUCT_lien_back
-typedef struct lien_back lien_back;
+// adr, fil, save
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
+#define HTS_DEF_FWSTRUCT_lien_adrfilsave
+typedef struct lien_adrfilsave lien_adrfilsave;
 #endif
-struct lien_back {
-#if DEBUG_CHECKINT
-  char magic;
-#endif
-  char url_adr[HTS_URLMAXSIZE * 2];     // adresse
-  char url_fil[HTS_URLMAXSIZE * 2];     // nom du fichier distant
-  char url_sav[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
-  char referer_adr[HTS_URLMAXSIZE * 2]; // adresse host page referer
-  char referer_fil[HTS_URLMAXSIZE * 2]; // fichier page referer
-  char location_buffer[HTS_URLMAXSIZE * 2];     // "location" en cas de "moved" (302,..)
-  char *tmpfile;                // nom à sauver temporairement (compressé)
-  char tmpfile_buffer[HTS_URLMAXSIZE * 2];      // buffer pour le nom à sauver temporairement
-  char send_too[1024];          // données à envoyer en même temps que le header
-  int status;                   // status (-1=non utilisé, 0: prêt, >0: opération en cours)
-  int locked;                   // locked (to be used soon)
-  int testmode;                 // mode de test
-  int timeout;                  // gérer des timeouts? (!=0  : nombre de secondes)
-  TStamp timeout_refresh;       // si oui, time refresh
-  int rateout;                  // timeout refresh? (!=0 : taux minimum toléré en octets/s)
-  TStamp rateout_time;          // si oui, date de départ
-  LLint maxfile_nonhtml;        // taille max d'un fichier non html
-  LLint maxfile_html;           // idem pour un ficheir html
-  htsblk r;                     // structure htsblk de chaque objet en background 
-  int is_update;                // mode update
-  int head_request;             // requète HEAD?
-  LLint range_req_size;         // range utilisé
-  TStamp ka_time_start;         // refresh time for KA 
-  //
-  int http11;                   // L'en tête doit être signé HTTP/1.1 et non HTTP/1.0
-  int is_chunk;                 // chunk?
-  char *chunk_adr;              // adresse chunk en cours de chargement
-  LLint chunk_size;             // taille chunk en cours de chargement
-  LLint chunk_blocksize;        // taille data declaree par le chunk
-  LLint compressed_size;        // taille compressés (stats uniquement)
-  //
-  //int links_index;        // to access liens[links_index]
-  //
-  char info[256];               // éventuel status pour le ftp
-  int stop_ftp;                 // flag stop pour ftp
-  int finalized;                // finalized (optim memory)
-  int early_add;                // was added before link heap saw it
-#if DEBUG_CHECKINT
-  char magic2;
-#endif
+struct lien_adrfilsave {
+  lien_adrfil af;
+  char save[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
 };
 
 #ifndef HTS_DEF_FWSTRUCT_struct_back
@@ -255,7 +201,7 @@ typedef struct hash_struct hash_struct;
 #endif
 struct hash_struct {
   /* Links big array reference */
-  const lien_url **liens;
+  const lien_url ***liens;
   /* Savename (case insensitive ; lowercased) */
   inthash sav;
   /* Address and path */
@@ -277,6 +223,20 @@ struct filecreate_params {
   FILE *lst;
   char path[HTS_URLMAXSIZE * 2];
 };
+
+/* Access macros. */
+#define heap(N)            (opt->liens[N])
+#define heap_top_index()   (opt->lien_tot - 1)
+#define heap_top()         (heap(heap_top_index()))
+#define urladr()           (heap(ptr)->adr)
+#define urlfil()           (heap(ptr)->fil)
+#define savename()         (heap(ptr)->sav)
+#define parenturladr()     (heap(heap(ptr)->precedent)->adr)
+#define parenturlfil()     (heap(heap(ptr)->precedent)->fil)
+#define parentsavename()   (heap(heap(ptr)->precedent)->sav)
+#define relativeurladr()   ((!parent_relative)?urladr():parenturladr())
+#define relativeurlfil()   ((!parent_relative)?urlfil():parenturlfil())
+#define relativesavename() ((!parent_relative)?savename():parentsavename())
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -302,7 +262,21 @@ char *hts_cancel_file_pop(httrackp * opt);
 
 #endif
 
-//
+// add a link on the heap
+int hts_record_link(httrackp * opt,
+                    const char *address, const char *file, const char *save,
+                    const char *ref_address, const char *ref_file,
+                    const char *codebase);
+
+// index of the latest added link
+size_t hts_record_link_latest(httrackp *opt);
+
+// invalidate an entry
+void hts_invalidate_link(httrackp * opt, int lpos);
+
+// wipe all records
+void hts_record_init(httrackp *opt);
+void hts_record_free(httrackp *opt);
 
 //int httpmirror(char* url,int level,httrackp opt);
 int httpmirror(char *url1, httrackp * opt);
@@ -312,8 +286,7 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
 char *hts_cancel_file_pop(httrackp * opt);
 int check_fatal_io_errno(void);
 int engine_stats(void);
-void host_ban(httrackp * opt, lien_url ** liens, int ptr, int lien_tot,
-              struct_back * sback, char *host);
+void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 FILE *filecreate(filenote_strc * strct, const char *s);
 FILE *fileappend(filenote_strc * strct, const char *s);
 int filecreateempty(filenote_strc * strct, const char *filename);
@@ -329,10 +302,10 @@ int fspc(httrackp * opt, FILE * fp, const char *type);
 char *next_token(char *p, int flag);
 
 //
-char *readfile(char *fil);
-char *readfile2(char *fil, LLint * size);
-char *readfile_utf8(char *fil);
-char *readfile_or(char *fil, char *defaultdata);
+char *readfile(const char *fil);
+char *readfile2(const char *fil, LLint * size);
+char *readfile_utf8(const char *fil);
+char *readfile_or(const char *fil, const char *defaultdata);
 
 #if 0
 void check_rate(TStamp stat_timestart, int maxrate);
@@ -346,11 +319,11 @@ int liens_record(char *adr, char *fil, char *save, char *former_adr,
 int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
-              lien_url ** liens, int ptr, int numero_passe, int lien_tot);
-int backlinks_done(struct_back * sback, lien_url ** liens, int lien_tot,
-                   int ptr);
+              int ptr, int numero_passe);
+int backlinks_done(const struct_back * sback, lien_url ** liens, 
+                   int lien_tot, int ptr);
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
-                 lien_url ** liens, int ptr, int numero_passe, int lien_tot);
+                 int ptr, int numero_passe);
 
 int ask_continue(httrackp * opt);
 int nombre_digit(int n);
@@ -374,7 +347,6 @@ int htsAddLink(htsmoduleStruct * str, char *link);
 
 // Void
 void voidf(void);
-
 #define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
 
 #endif

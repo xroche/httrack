@@ -50,6 +50,14 @@ typedef struct htsblk htsblk;
 #define HTS_DEF_FWSTRUCT_t_dnscache
 typedef struct t_dnscache t_dnscache;
 #endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfil
+#define HTS_DEF_FWSTRUCT_lien_adrfil
+typedef struct lien_adrfil lien_adrfil;
+#endif
+#ifndef HTS_DEF_FWSTRUCT_lien_adrfilsave
+#define HTS_DEF_FWSTRUCT_lien_adrfilsave
+typedef struct lien_adrfilsave lien_adrfilsave;
+#endif
 
 /* définitions globales */
 #include "htsglobal.h"
@@ -96,86 +104,6 @@ MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
 #undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
-
-// structure pour paramètres supplémentaires lors de la requête
-#ifndef HTS_DEF_FWSTRUCT_htsrequest_proxy
-#define HTS_DEF_FWSTRUCT_htsrequest_proxy
-typedef struct htsrequest_proxy htsrequest_proxy;
-#endif
-struct htsrequest_proxy {
-  int active;
-  const char* name;
-  int port;
-  const char* bindhost;           // bind this host
-};
-
-#ifndef HTS_DEF_FWSTRUCT_htsrequest
-#define HTS_DEF_FWSTRUCT_htsrequest
-typedef struct htsrequest htsrequest;
-#endif
-struct htsrequest {
-  short int user_agent_send;    // user agent (ex: httrack/1.0 [sun])
-  short int http11;             // l'en tête peut (doit) être signé HTTP/1.1 et non HTTP/1.0
-  short int nokeepalive;        // pas de keep-alive
-  short int range_used;         // Range utilisé
-  short int nocompression;      // Pas de compression
-  short int flush_garbage;      // recycled
-  const char* user_agent;
-  const char* referer;
-  const char* from;
-  const char* lang_iso;
-  const char* accept;
-  const char* headers;
-  htsrequest_proxy proxy;       // proxy
-};
-
-// structure pour retour d'une connexion/prise d'en tête
-#ifndef HTS_DEF_FWSTRUCT_htsblk
-#define HTS_DEF_FWSTRUCT_htsblk
-typedef struct htsblk htsblk;
-#endif
-struct htsblk {
-  int statuscode;               // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  short int notmodified;        // page ou fichier NON modifié (transféré)
-  short int is_write;           // sortie sur disque (out) ou en mémoire (adr)
-  short int is_chunk;           // mode chunk
-  short int compressed;         // compressé?
-  short int empty;              // vide?
-  short int keep_alive;         // Keep-Alive?
-  short int keep_alive_trailers;        // ..with trailers extension
-  int keep_alive_t;             // KA timeout
-  int keep_alive_max;           // KA number of requests
-  char *adr;                    // adresse du bloc de mémoire, NULL=vide
-  char *headers;                // adresse des en têtes si présents
-  FILE *out;                    // écriture directe sur disque (si is_write=1)
-  LLint size;                   // taille fichier
-  char msg[80];                 // message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // content-type ("text/html" par exemple)
-  char charset[64];             // charset ("iso-8859-1" par exemple)
-  char contentencoding[64];     // content-encoding ("gzip" par exemple)
-  char *location;               // on copie dedans éventuellement la véritable 'location'
-  LLint totalsize;              // taille totale à télécharger (-1=inconnue)
-  short int is_file;            // ce n'est pas une socket mais un descripteur de fichier si 1
-  T_SOC soc;                    // ID socket
-  SOCaddr address;              // IP address
-  int address_size;             // IP address structure length
-  FILE *fp;                     // fichier pour file://
-#if HTS_USEOPENSSL
-  short int ssl;                // is this connection a SSL one? (https)
-  // BIO* ssl_soc;          // SSL structure
-  SSL *ssl_con;                 // connection structure
-#endif
-  char lastmodified[64];        // Last-Modified
-  char etag[256];               // Etag
-  char cdispo[256];             // Content-Disposition coupé
-  LLint crange;                 // Content-Range
-  LLint crange_start;           // Content-Range
-  LLint crange_end;             // Content-Range
-  int debugid;                  // debug connection
-  /* */
-  htsrequest req;               // paramètres pour la requête
-  /*char digest[32+2];   // digest md5 généré par le moteur ("" si non généré) */
-};
 
 /* ANCIENNE STURCTURE pour cache 1.0 */
 #ifndef HTS_DEF_FWSTRUCT_OLD_t_proxy
@@ -249,11 +177,12 @@ LLint check_downloadable_bytes(int rate);
 HTSEXT_API int hts_uninit_module(void);
 
 // fonctions principales
-T_SOC http_fopen(httrackp * opt, char *adr, char *fil, htsblk * retour);
+T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour);
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  char *xsend, char *adr, char *fil, htsblk * retour);
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, char *xsend,
-                  char *adr, char *fil, char *referer_adr, char *referer_fil,
+                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend,
+                  const char *adr, const char *fil,
+                  const char *referer_adr, const char *referer_fil,
                   htsblk * retour);
 
 //int newhttp(char* iadr,char* err=NULL);
@@ -263,22 +192,25 @@ HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk * r);
-htsblk http_location(httrackp * opt, char *adr, char *fil, char *loc);
-htsblk http_test(httrackp * opt, char *adr, char *fil, char *loc);
+htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
-void treathead(t_cookie * cookie, char *adr, char *fil, htsblk * retour,
+void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
-void treatfirstline(htsblk * retour, char *rcvd);
+void treatfirstline(htsblk * retour, const char *rcvd);
 
 // sous-fonctions
 LLint http_xfread1(htsblk * r, int bufl);
-HTS_INLINE t_hostent *hts_gethostbyname2(httrackp * opt, const char *iadr,
-                                        void *v_buffer, const char **error);
-HTS_INLINE t_hostent *hts_gethostbyname(httrackp * opt, const char *iadr,
-                                        void *v_buffer);
-HTSEXT_API t_hostent *vxgethostbyname2(const char *const hostname, void *v_buffer, const char **error);
-HTSEXT_API t_hostent *vxgethostbyname(const char *const hostname, void *v_buffer);
+HTS_INLINE SOCaddr* hts_dns_resolve2(httrackp * opt, const char *iadr,
+                                     SOCaddr *const addr, 
+                                     const char **error);
+HTS_INLINE SOCaddr* hts_dns_resolve(httrackp * opt, const char *iadr,
+                                    SOCaddr *const addr);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
+                                              SOCaddr *const addr,
+                                              const char **error);
+HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, 
+                                             SOCaddr *const addr);
 HTSEXT_API int check_hostname_dns(const char *const hostname);
 
 int ftp_available(void);
@@ -303,7 +235,7 @@ HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
-int finput(int fd, char *s, int max);
+int finput(T_SOC fd, char *s, int max);
 int binput(char *buff, char *s, int max);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);
@@ -311,8 +243,8 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 int linput_trim(FILE * fp, char *s, int max);
 int linput_cpp(FILE * fp, char *s, int max);
 void rawlinput(FILE * fp, char *s, int max);
-char *strstrcase(char *s, char *o);
-int ident_url_absolute(const char *url, char *adr, char *fil);
+char *strstrcase(char *s, const char *o);
+int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
 int is_unicode_utf8(const char *buffer, const size_t size);
 void map_characters(unsigned char *buffer, unsigned int size,
@@ -320,12 +252,10 @@ void map_characters(unsigned char *buffer, unsigned int size,
 int ishtml(httrackp * opt, const char *urlfil);
 int ishtml_ext(const char *a);
 int ishttperror(int err);
-void guess_httptype(httrackp * opt, char *s, const char *fil);
 
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
 void give_mimext(char *s, const char *st);
 
-int may_unknown(httrackp * opt, const char *st);
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
@@ -341,7 +271,7 @@ void hts_lowcase(char *s);
 void hts_replace(char *s, char from, char to);
 int multipleStringMatch(const char *s, const char *match);
 
-void fprintfio(FILE * fp, char *buff, char *prefix);
+void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 #ifdef _WIN32
 #else
@@ -384,7 +314,6 @@ extern void *getFunctionPtr(void *handle, const char *fncname);
 extern void closeFunctionLib(void *handle);
 
 extern void clearCallbacks(htscallbacks * chain);
-extern size_t hts_get_callback_offs(const char *name);
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
                      const char *name, void *function);
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
@@ -609,6 +538,15 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
 }
 
 #endif
+
+// returns (size_t) -1 upon error
+static HTS_UNUSED size_t off_t_to_size_t(off_t o) {
+  if (o >= 0 && o < ( (size_t) -1 ) / 2) {
+    return (size_t) o;
+  } else {
+    return (size_t) -1;
+  }
+}
 
 /* dirent() compatibility */
 #ifdef _WIN32

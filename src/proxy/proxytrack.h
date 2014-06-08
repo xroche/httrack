@@ -109,8 +109,8 @@ HTS_UNUSED static void proxytrack_print_log(const char *severity, const char *fo
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
-HTS_UNUSED static char *gethomedir(void) {
-  char *home = getenv("HOME");
+HTS_UNUSED static const char *gethomedir(void) {
+  const char *home = getenv("HOME");
 
   if (home)
     return home;
@@ -216,7 +216,7 @@ HTS_UNUSED static const char *jump_protocol_and_auth(const char *source) {
 #endif
 HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloc(max + 2);
+  char *const ls = (char *) malloc(max + 1);
 
   s[0] = '\0';
   if (ls) {
