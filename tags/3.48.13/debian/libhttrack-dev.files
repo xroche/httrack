@@ -1,0 +1,6 @@
+usr/include/httrack
+usr/lib/libhttrack.{so}
+usr/lib/libhtsjava.{so}
+usr/share/httrack/libtest
+usr/lib/httrack/libtest
+usr/share/lintian/overrides/libhttrack-dev

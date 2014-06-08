@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+
+# simplify engine
+test "$(httrack -O /dev/null -#1 ./foo/bar/)" == "simplified=foo/bar/"	|| exit 1
+test "$(httrack -O /dev/null -#1 ./foo/bar)" == "simplified=foo/bar"	|| exit 1
+test "$(httrack -O /dev/null -#1 ./foo/./bar)" == "simplified=foo/bar"	|| exit 1
+test "$(httrack -O /dev/null -#1 ./foo/bar/.././tmp/foobar)" == "simplified=foo/tmp/foobar"	|| exit 1
+test "$(httrack -O /dev/null -#1 ./foo/bar/.././tmp/foobar/../foobaz)" == "simplified=foo/tmp/foobaz"	|| exit 1
