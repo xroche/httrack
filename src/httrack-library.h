@@ -5,7 +5,7 @@ Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
+as published by the Free Software Foundation; either version 2
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -118,7 +118,6 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
 /* Options handling */
 HTSEXT_API httrackp *hts_create_opt(void);
 HTSEXT_API void hts_free_opt(httrackp * opt);
-HTSEXT_API size_t hts_sizeof_opt(void);
 HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,

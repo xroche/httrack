@@ -105,6 +105,86 @@ MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
 
+// structure pour paramètres supplémentaires lors de la requête
+#ifndef HTS_DEF_FWSTRUCT_htsrequest_proxy
+#define HTS_DEF_FWSTRUCT_htsrequest_proxy
+typedef struct htsrequest_proxy htsrequest_proxy;
+#endif
+struct htsrequest_proxy {
+  int active;
+  const char* name;
+  int port;
+  const char* bindhost;           // bind this host
+};
+
+#ifndef HTS_DEF_FWSTRUCT_htsrequest
+#define HTS_DEF_FWSTRUCT_htsrequest
+typedef struct htsrequest htsrequest;
+#endif
+struct htsrequest {
+  short int user_agent_send;    // user agent (ex: httrack/1.0 [sun])
+  short int http11;             // l'en tête peut (doit) être signé HTTP/1.1 et non HTTP/1.0
+  short int nokeepalive;        // pas de keep-alive
+  short int range_used;         // Range utilisé
+  short int nocompression;      // Pas de compression
+  short int flush_garbage;      // recycled
+  const char* user_agent;
+  const char* referer;
+  const char* from;
+  const char* lang_iso;
+  const char* accept;
+  const char* headers;
+  htsrequest_proxy proxy;       // proxy
+};
+
+// structure pour retour d'une connexion/prise d'en tête
+#ifndef HTS_DEF_FWSTRUCT_htsblk
+#define HTS_DEF_FWSTRUCT_htsblk
+typedef struct htsblk htsblk;
+#endif
+struct htsblk {
+  int statuscode;               // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
+  short int notmodified;        // page ou fichier NON modifié (transféré)
+  short int is_write;           // sortie sur disque (out) ou en mémoire (adr)
+  short int is_chunk;           // mode chunk
+  short int compressed;         // compressé?
+  short int empty;              // vide?
+  short int keep_alive;         // Keep-Alive?
+  short int keep_alive_trailers;        // ..with trailers extension
+  int keep_alive_t;             // KA timeout
+  int keep_alive_max;           // KA number of requests
+  char *adr;                    // adresse du bloc de mémoire, NULL=vide
+  char *headers;                // adresse des en têtes si présents
+  FILE *out;                    // écriture directe sur disque (si is_write=1)
+  LLint size;                   // taille fichier
+  char msg[80];                 // message éventuel si échec ("\0"=non précisé)
+  char contenttype[64];         // content-type ("text/html" par exemple)
+  char charset[64];             // charset ("iso-8859-1" par exemple)
+  char contentencoding[64];     // content-encoding ("gzip" par exemple)
+  char *location;               // on copie dedans éventuellement la véritable 'location'
+  LLint totalsize;              // taille totale à télécharger (-1=inconnue)
+  short int is_file;            // ce n'est pas une socket mais un descripteur de fichier si 1
+  T_SOC soc;                    // ID socket
+  SOCaddr address;              // IP address
+  int address_size;             // IP address structure length (unused internally)
+  FILE *fp;                     // fichier pour file://
+#if HTS_USEOPENSSL
+  short int ssl;                // is this connection a SSL one? (https)
+  // BIO* ssl_soc;          // SSL structure
+  SSL *ssl_con;                 // connection structure
+#endif
+  char lastmodified[64];        // Last-Modified
+  char etag[256];               // Etag
+  char cdispo[256];             // Content-Disposition coupé
+  LLint crange;                 // Content-Range
+  LLint crange_start;           // Content-Range
+  LLint crange_end;             // Content-Range
+  int debugid;                  // debug connection
+  /* */
+  htsrequest req;               // paramètres pour la requête
+  /*char digest[32+2];   // digest md5 généré par le moteur ("" si non généré) */
+};
+
 /* ANCIENNE STURCTURE pour cache 1.0 */
 #ifndef HTS_DEF_FWSTRUCT_OLD_t_proxy
 #define HTS_DEF_FWSTRUCT_OLD_t_proxy

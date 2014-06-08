@@ -33,6 +33,10 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSSAFE_DEFH
 #define HTSSAFE_DEFH
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,13 +53,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
 #define HTS_DEF_FWSTRUCT_htsErrorCallback
 typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
-#ifdef __cplusplus
-extern "C" {
-#endif
 HTSEXT_API htsErrorCallback hts_get_error_callback(void);
-#ifdef __cplusplus
-}
-#endif
 #endif
 
 #define HTSSAFE_ABORT_FUNCTION(A,B,C) do { \
@@ -208,5 +206,9 @@ static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t s
 #define strdupt(A)          strdup(A)
 #define realloct(A,B)       realloc(A, B)
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

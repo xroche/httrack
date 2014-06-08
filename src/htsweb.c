@@ -178,14 +178,6 @@ int main(int argc, char *argv[]) {
   }
   smallserver_setkey("HTTRACK_WEB", HTTRACK_WEB);
 
-  /* Check version compatibility */
-  if (hts_sizeof_opt() != sizeof(httrackp)) {
-    fprintf(stderr,
-      "** CRITICAL: incompatible current httrack library version %s, expected version %s",
-      hts_version(), HTTRACK_VERSIONID);
-    smallserver_setkey("HTTRACK_INCOMPATIBLE_VERSIONID", hts_version());
-  }
-
   /* protected session-id */
   {
     char buff[1024];
