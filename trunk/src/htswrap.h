@@ -46,8 +46,16 @@ Please visit our Website: http://www.httrack.com
 typedef struct httrackp httrackp;
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 HTSEXT_API int htswrap_init(void);      // LEGACY
 HTSEXT_API int htswrap_free(void);      // LEGACY
+
+#ifdef __cplusplus
+}
+#endif
 
 //HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
 //HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);

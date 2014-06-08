@@ -129,29 +129,6 @@ typedef struct filecreate_params filecreate_params;
 
 #include "hts-indextmpl.h"
 
-// structure d'un lien
-#ifndef HTS_DEF_FWSTRUCT_lien_url
-#define HTS_DEF_FWSTRUCT_lien_url
-typedef struct lien_url lien_url;
-#endif
-struct lien_url {
-  char *adr;                    // adresse
-  char *fil;                    // nom du fichier distant
-  char *sav;                    // nom à sauver sur disque (avec chemin éventuel)
-  char *cod;                    // chemin codebase éventuel si classe java
-  char *former_adr;             // adresse initiale (avant éventuel moved), peut être nulle
-  char *former_fil;             // nom du fichier distant initial (avant éventuel moved), peut être nul
-
-  int premier;                  // pointeur sur le premier lien qui a donné lieu aux autres liens du domaine
-  int precedent;                // pointeur sur le lien qui a donné lieu à ce lien précis
-  int depth;                    // profondeur autorisée lien ; >0 forte 0=faible
-  int pass2;                    // traiter après les autres, seconde passe. si == -1, lien traité en background
-  char link_import;             // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
-  //int moved;          // pointeur sur moved
-  int retry;                    // nombre de retry restants
-  int testmode;                 // mode test uniquement, envoyer juste un head!
-};
-
 // adr, fil
 #ifndef HTS_DEF_FWSTRUCT_lien_adrfil
 #define HTS_DEF_FWSTRUCT_lien_adrfil
@@ -170,57 +147,6 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 struct lien_adrfilsave {
   lien_adrfil af;
   char save[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
-};
-
-// chargement de fichiers en 'arrière plan'
-#ifndef HTS_DEF_FWSTRUCT_lien_back
-#define HTS_DEF_FWSTRUCT_lien_back
-typedef struct lien_back lien_back;
-#endif
-struct lien_back {
-#if DEBUG_CHECKINT
-  char magic;
-#endif
-  char url_adr[HTS_URLMAXSIZE * 2];     // adresse
-  char url_fil[HTS_URLMAXSIZE * 2];     // nom du fichier distant
-  char url_sav[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
-  char referer_adr[HTS_URLMAXSIZE * 2]; // adresse host page referer
-  char referer_fil[HTS_URLMAXSIZE * 2]; // fichier page referer
-  char location_buffer[HTS_URLMAXSIZE * 2];     // "location" en cas de "moved" (302,..)
-  char *tmpfile;                // nom à sauver temporairement (compressé)
-  char tmpfile_buffer[HTS_URLMAXSIZE * 2];      // buffer pour le nom à sauver temporairement
-  char send_too[1024];          // données à envoyer en même temps que le header
-  int status;                   // status (-1=non utilisé, 0: prêt, >0: opération en cours)
-  int locked;                   // locked (to be used soon)
-  int testmode;                 // mode de test
-  int timeout;                  // gérer des timeouts? (!=0  : nombre de secondes)
-  TStamp timeout_refresh;       // si oui, time refresh
-  int rateout;                  // timeout refresh? (!=0 : taux minimum toléré en octets/s)
-  TStamp rateout_time;          // si oui, date de départ
-  LLint maxfile_nonhtml;        // taille max d'un fichier non html
-  LLint maxfile_html;           // idem pour un ficheir html
-  htsblk r;                     // structure htsblk de chaque objet en background 
-  int is_update;                // mode update
-  int head_request;             // requète HEAD?
-  LLint range_req_size;         // range utilisé
-  TStamp ka_time_start;         // refresh time for KA 
-  //
-  int http11;                   // L'en tête doit être signé HTTP/1.1 et non HTTP/1.0
-  int is_chunk;                 // chunk?
-  char *chunk_adr;              // adresse chunk en cours de chargement
-  LLint chunk_size;             // taille chunk en cours de chargement
-  LLint chunk_blocksize;        // taille data declaree par le chunk
-  LLint compressed_size;        // taille compressés (stats uniquement)
-  //
-  //int links_index;        // to access liens[links_index]
-  //
-  char info[256];               // éventuel status pour le ftp
-  int stop_ftp;                 // flag stop pour ftp
-  int finalized;                // finalized (optim memory)
-  int early_add;                // was added before link heap saw it
-#if DEBUG_CHECKINT
-  char magic2;
-#endif
 };
 
 #ifndef HTS_DEF_FWSTRUCT_struct_back

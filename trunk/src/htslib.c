@@ -5501,6 +5501,10 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   return opt;
 }
 
+HTSEXT_API size_t hts_sizeof_opt(void) {
+  return sizeof(httrackp);
+}
+
 HTSEXT_API void hts_free_opt(httrackp * opt) {
   if (opt != NULL) {
 

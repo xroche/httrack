@@ -74,6 +74,10 @@ typedef unsigned long in_addr_t;
 #endif
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Ipv4 structures */
 #if HTS_INET6 != 0
 typedef struct in6_addr INaddr;
@@ -252,5 +256,9 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
 
 /* Socket length type */
 typedef socklen_t SOClen;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
