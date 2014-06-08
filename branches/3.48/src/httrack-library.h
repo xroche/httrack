@@ -5,7 +5,7 @@ Copyright (C) 1998-2014 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-as published by the Free Software Foundation; either version 2
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -33,11 +33,16 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_DEFLIB
 #define HTTRACK_DEFLIB
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "htsglobal.h"
 
 #ifndef _WIN32
 #include <inttypes.h>
 #endif
+#include <stdarg.h>
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -63,6 +68,12 @@ typedef enum hts_log_type {
 #ifndef HTS_DEF_FWSTRUCT_hts_stat_struct
 #define HTS_DEF_FWSTRUCT_hts_stat_struct
 typedef struct hts_stat_struct hts_stat_struct;
+#endif
+
+/** Assert error callback. **/
+#ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
+#define HTS_DEF_FWSTRUCT_htsErrorCallback
+typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
 #endif
 
 /* Helpers for plugging callbacks
@@ -107,10 +118,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
 /* Options handling */
 HTSEXT_API httrackp *hts_create_opt(void);
 HTSEXT_API void hts_free_opt(httrackp * opt);
+HTSEXT_API size_t hts_sizeof_opt(void);
 HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
 HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             const char *argv);
+HTSEXT_API void hts_set_error_callback(htsErrorCallback handler);
+HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 
 /* Logging */
 HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
@@ -118,6 +132,9 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
                               ...) HTS_PRINTF_FUN(3, 4);
 HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format,
                                va_list args);
+HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt, 
+                                           int type, 
+                                           const char *format, va_list args));
 
 /* Infos */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
@@ -186,7 +203,7 @@ HTSEXT_API char *jump_normalized(const char *);
 HTSEXT_API char *jump_toport(const char *);
 HTSEXT_API char *fil_normalized(const char *source, char *dest);
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
-HTSEXT_API char *hts_rootdir(char *file);
+HTSEXT_API const char *hts_rootdir(char *file);
 
 /* Escaping URLs */
 HTSEXT_API void unescape_amp(char *s);
@@ -227,7 +244,9 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_dyntype(const char *fil);
-HTSEXT_API char *get_ext(char *catbuff, size_t size, const char *fil);
+HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
+HTSEXT_API int may_unknown(httrackp * opt, const char *st);
+HTSEXT_API void guess_httptype(httrackp * opt, char *s, const char *fil);
 
 /* Ugly string tools */
 HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b);
@@ -317,5 +336,9 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 #define concat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), concat(A,B,C,D))
 #define fconcat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), fconcat(A,B,C,D))
 #define fslash(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A,B,C))
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

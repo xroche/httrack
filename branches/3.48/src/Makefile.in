@@ -110,6 +110,7 @@ libhtsjava_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 libhttrack_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__dirstamp = $(am__leading_dot)dirstamp
 am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsparse.lo libhttrack_la-htsback.lo \
 	libhttrack_la-htscache.lo libhttrack_la-htscatchurl.lo \
@@ -125,8 +126,9 @@ am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsconcat.lo libhttrack_la-htsmodules.lo \
 	libhttrack_la-htscharset.lo libhttrack_la-punycode.lo \
 	libhttrack_la-htsencoding.lo libhttrack_la-md5.lo \
-	libhttrack_la-ioapi.lo libhttrack_la-mztools.lo \
-	libhttrack_la-unzip.lo libhttrack_la-zip.lo
+	minizip/libhttrack_la-ioapi.lo \
+	minizip/libhttrack_la-mztools.lo \
+	minizip/libhttrack_la-unzip.lo minizip/libhttrack_la-zip.lo
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 libhttrack_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libhttrack_la_CFLAGS) \
@@ -139,12 +141,14 @@ htsserver_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 httrack_SOURCES = httrack.c
 httrack_OBJECTS = httrack.$(OBJEXT)
 httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
-am_proxytrack_OBJECTS = proxytrack-main.$(OBJEXT) \
-	proxytrack-proxytrack.$(OBJEXT) proxytrack-store.$(OBJEXT) \
+am_proxytrack_OBJECTS = proxy/proxytrack-main.$(OBJEXT) \
+	proxy/proxytrack-proxytrack.$(OBJEXT) \
+	proxy/proxytrack-store.$(OBJEXT) \
 	proxytrack-htsinthash.$(OBJEXT) proxytrack-htsmd5.$(OBJEXT) \
-	proxytrack-md5.$(OBJEXT) proxytrack-ioapi.$(OBJEXT) \
-	proxytrack-mztools.$(OBJEXT) proxytrack-unzip.$(OBJEXT) \
-	proxytrack-zip.$(OBJEXT)
+	proxytrack-md5.$(OBJEXT) minizip/proxytrack-ioapi.$(OBJEXT) \
+	minizip/proxytrack-mztools.$(OBJEXT) \
+	minizip/proxytrack-unzip.$(OBJEXT) \
+	minizip/proxytrack-zip.$(OBJEXT)
 proxytrack_OBJECTS = $(am_proxytrack_OBJECTS)
 proxytrack_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 proxytrack_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -179,6 +183,7 @@ CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_CFLAGS = @AM_CFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -187,14 +192,12 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAG_VISIBILITY = @CFLAG_VISIBILITY@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CXX = @CXX@
-CXXCPP = @CXXCPP@
-CXXDEPMODE = @CXXDEPMODE@
-CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFAULT_CFLAGS = @DEFAULT_CFLAGS@
+DEFAULT_LDFLAGS = @DEFAULT_LDFLAGS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
@@ -208,6 +211,7 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GREP = @GREP@
+HAVE_VISIBILITY = @HAVE_VISIBILITY@
 HTTPS_SUPPORT = @HTTPS_SUPPORT@
 ICONV_LIBS = @ICONV_LIBS@
 INSTALL = @INSTALL@
@@ -263,7 +267,6 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
-ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -320,10 +323,14 @@ DevIncludes_DATA = \
 	../config.h \
 	htsmodules.h \
 	htsbasenet.h \
+	htsnet.h \
 	htsbauth.h \
-	htsdefines.h
+	htsdefines.h \
+	htsstrings.h \
+	htsarrays.h \
+	htssafe.h
 
-INCLUDES = \
+AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
 	@V6_FLAG@ \
@@ -363,7 +370,8 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htszlib.h  \
-	htsstrings.h httrack-library.h htscharset.h punycode.h htsencoding.h \
+	htsstrings.h htsarrays.h httrack-library.h \
+	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	md5.h murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
@@ -375,9 +383,14 @@ libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
-		minizip/ChangeLogUnzip \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
+		minizip/ioapi.c.diff \
+		minizip/ioapi.h.diff \
+		minizip/zip.c.diff \
+		minizip/zip.h.diff \
+		minizip/MiniZip64_Changes.txt \
+		minizip/MiniZip64_info.txt \
 		proxy/AUTHORS \
 		proxy/COPYING \
 		proxy/changelog.txt \
@@ -454,6 +467,20 @@ clean-libLTLIBRARIES:
 	done
 libhtsjava.la: $(libhtsjava_la_OBJECTS) $(libhtsjava_la_DEPENDENCIES) $(EXTRA_libhtsjava_la_DEPENDENCIES) 
 	$(libhtsjava_la_LINK) -rpath $(libdir) $(libhtsjava_la_OBJECTS) $(libhtsjava_la_LIBADD) $(LIBS)
+minizip/$(am__dirstamp):
+	@$(MKDIR_P) minizip
+	@: > minizip/$(am__dirstamp)
+minizip/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) minizip/$(DEPDIR)
+	@: > minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/libhttrack_la-ioapi.lo: minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/libhttrack_la-mztools.lo: minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/libhttrack_la-unzip.lo: minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/libhttrack_la-zip.lo: minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
 libhttrack.la: $(libhttrack_la_OBJECTS) $(libhttrack_la_DEPENDENCIES) $(EXTRA_libhttrack_la_DEPENDENCIES) 
 	$(libhttrack_la_LINK) -rpath $(libdir) $(libhttrack_la_OBJECTS) $(libhttrack_la_LIBADD) $(LIBS)
 install-binPROGRAMS: $(bin_PROGRAMS)
@@ -508,6 +535,26 @@ htsserver$(EXEEXT): $(htsserver_OBJECTS) $(htsserver_DEPENDENCIES) $(EXTRA_htsse
 httrack$(EXEEXT): $(httrack_OBJECTS) $(httrack_DEPENDENCIES) $(EXTRA_httrack_DEPENDENCIES) 
 	@rm -f httrack$(EXEEXT)
 	$(LINK) $(httrack_OBJECTS) $(httrack_LDADD) $(LIBS)
+proxy/$(am__dirstamp):
+	@$(MKDIR_P) proxy
+	@: > proxy/$(am__dirstamp)
+proxy/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) proxy/$(DEPDIR)
+	@: > proxy/$(DEPDIR)/$(am__dirstamp)
+proxy/proxytrack-main.$(OBJEXT): proxy/$(am__dirstamp) \
+	proxy/$(DEPDIR)/$(am__dirstamp)
+proxy/proxytrack-proxytrack.$(OBJEXT): proxy/$(am__dirstamp) \
+	proxy/$(DEPDIR)/$(am__dirstamp)
+proxy/proxytrack-store.$(OBJEXT): proxy/$(am__dirstamp) \
+	proxy/$(DEPDIR)/$(am__dirstamp)
+minizip/proxytrack-ioapi.$(OBJEXT): minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/proxytrack-mztools.$(OBJEXT): minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/proxytrack-unzip.$(OBJEXT): minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
+minizip/proxytrack-zip.$(OBJEXT): minizip/$(am__dirstamp) \
+	minizip/$(DEPDIR)/$(am__dirstamp)
 proxytrack$(EXEEXT): $(proxytrack_OBJECTS) $(proxytrack_DEPENDENCIES) $(EXTRA_proxytrack_DEPENDENCIES) 
 	@rm -f proxytrack$(EXEEXT)
 	$(proxytrack_LINK) $(proxytrack_OBJECTS) $(proxytrack_LDADD) $(LIBS)
@@ -549,6 +596,21 @@ uninstall-whttrackrunSCRIPTS:
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f minizip/libhttrack_la-ioapi.$(OBJEXT)
+	-rm -f minizip/libhttrack_la-ioapi.lo
+	-rm -f minizip/libhttrack_la-mztools.$(OBJEXT)
+	-rm -f minizip/libhttrack_la-mztools.lo
+	-rm -f minizip/libhttrack_la-unzip.$(OBJEXT)
+	-rm -f minizip/libhttrack_la-unzip.lo
+	-rm -f minizip/libhttrack_la-zip.$(OBJEXT)
+	-rm -f minizip/libhttrack_la-zip.lo
+	-rm -f minizip/proxytrack-ioapi.$(OBJEXT)
+	-rm -f minizip/proxytrack-mztools.$(OBJEXT)
+	-rm -f minizip/proxytrack-unzip.$(OBJEXT)
+	-rm -f minizip/proxytrack-zip.$(OBJEXT)
+	-rm -f proxy/proxytrack-main.$(OBJEXT)
+	-rm -f proxy/proxytrack-proxytrack.$(OBJEXT)
+	-rm -f proxy/proxytrack-store.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
@@ -584,40 +646,43 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswizard.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htszlib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-ioapi.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-md5.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-mztools.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-punycode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-unzip.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-zip.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsinthash.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsmd5.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-ioapi.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-md5.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-mztools.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-proxytrack.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-store.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-unzip.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-zip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-ioapi.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-mztools.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-unzip.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-zip.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/proxytrack-ioapi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/proxytrack-mztools.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/proxytrack-unzip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/proxytrack-zip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@proxy/$(DEPDIR)/proxytrack-main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@proxy/$(DEPDIR)/proxytrack-proxytrack.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@proxy/$(DEPDIR)/proxytrack-store.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c $<
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCC_TRUE@	depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
@@ -825,75 +890,75 @@ libhttrack_la-md5.lo: md5.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-md5.lo `test -f 'md5.c' || echo '$(srcdir)/'`md5.c
 
-libhttrack_la-ioapi.lo: minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-ioapi.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-ioapi.Tpo -c -o libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-ioapi.Tpo $(DEPDIR)/libhttrack_la-ioapi.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='libhttrack_la-ioapi.lo' libtool=yes @AMDEPBACKSLASH@
+minizip/libhttrack_la-ioapi.lo: minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT minizip/libhttrack_la-ioapi.lo -MD -MP -MF minizip/$(DEPDIR)/libhttrack_la-ioapi.Tpo -c -o minizip/libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/libhttrack_la-ioapi.Tpo minizip/$(DEPDIR)/libhttrack_la-ioapi.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='minizip/libhttrack_la-ioapi.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-ioapi.lo `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
 
-libhttrack_la-mztools.lo: minizip/mztools.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-mztools.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-mztools.Tpo -c -o libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-mztools.Tpo $(DEPDIR)/libhttrack_la-mztools.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='libhttrack_la-mztools.lo' libtool=yes @AMDEPBACKSLASH@
+minizip/libhttrack_la-mztools.lo: minizip/mztools.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT minizip/libhttrack_la-mztools.lo -MD -MP -MF minizip/$(DEPDIR)/libhttrack_la-mztools.Tpo -c -o minizip/libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/libhttrack_la-mztools.Tpo minizip/$(DEPDIR)/libhttrack_la-mztools.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='minizip/libhttrack_la-mztools.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-mztools.lo `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
 
-libhttrack_la-unzip.lo: minizip/unzip.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-unzip.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-unzip.Tpo -c -o libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-unzip.Tpo $(DEPDIR)/libhttrack_la-unzip.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='libhttrack_la-unzip.lo' libtool=yes @AMDEPBACKSLASH@
+minizip/libhttrack_la-unzip.lo: minizip/unzip.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT minizip/libhttrack_la-unzip.lo -MD -MP -MF minizip/$(DEPDIR)/libhttrack_la-unzip.Tpo -c -o minizip/libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/libhttrack_la-unzip.Tpo minizip/$(DEPDIR)/libhttrack_la-unzip.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='minizip/libhttrack_la-unzip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-unzip.lo `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
 
-libhttrack_la-zip.lo: minizip/zip.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-zip.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-zip.Tpo -c -o libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-zip.Tpo $(DEPDIR)/libhttrack_la-zip.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='libhttrack_la-zip.lo' libtool=yes @AMDEPBACKSLASH@
+minizip/libhttrack_la-zip.lo: minizip/zip.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT minizip/libhttrack_la-zip.lo -MD -MP -MF minizip/$(DEPDIR)/libhttrack_la-zip.Tpo -c -o minizip/libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/libhttrack_la-zip.Tpo minizip/$(DEPDIR)/libhttrack_la-zip.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='minizip/libhttrack_la-zip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
 
-proxytrack-main.o: proxy/main.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-main.o -MD -MP -MF $(DEPDIR)/proxytrack-main.Tpo -c -o proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-main.Tpo $(DEPDIR)/proxytrack-main.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/main.c' object='proxytrack-main.o' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-main.o: proxy/main.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-main.o -MD -MP -MF proxy/$(DEPDIR)/proxytrack-main.Tpo -c -o proxy/proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-main.Tpo proxy/$(DEPDIR)/proxytrack-main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/main.c' object='proxy/proxytrack-main.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
 
-proxytrack-main.obj: proxy/main.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-main.obj -MD -MP -MF $(DEPDIR)/proxytrack-main.Tpo -c -o proxytrack-main.obj `if test -f 'proxy/main.c'; then $(CYGPATH_W) 'proxy/main.c'; else $(CYGPATH_W) '$(srcdir)/proxy/main.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-main.Tpo $(DEPDIR)/proxytrack-main.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/main.c' object='proxytrack-main.obj' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-main.obj: proxy/main.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-main.obj -MD -MP -MF proxy/$(DEPDIR)/proxytrack-main.Tpo -c -o proxy/proxytrack-main.obj `if test -f 'proxy/main.c'; then $(CYGPATH_W) 'proxy/main.c'; else $(CYGPATH_W) '$(srcdir)/proxy/main.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-main.Tpo proxy/$(DEPDIR)/proxytrack-main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/main.c' object='proxy/proxytrack-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-main.obj `if test -f 'proxy/main.c'; then $(CYGPATH_W) 'proxy/main.c'; else $(CYGPATH_W) '$(srcdir)/proxy/main.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-main.obj `if test -f 'proxy/main.c'; then $(CYGPATH_W) 'proxy/main.c'; else $(CYGPATH_W) '$(srcdir)/proxy/main.c'; fi`
 
-proxytrack-proxytrack.o: proxy/proxytrack.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-proxytrack.o -MD -MP -MF $(DEPDIR)/proxytrack-proxytrack.Tpo -c -o proxytrack-proxytrack.o `test -f 'proxy/proxytrack.c' || echo '$(srcdir)/'`proxy/proxytrack.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-proxytrack.Tpo $(DEPDIR)/proxytrack-proxytrack.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/proxytrack.c' object='proxytrack-proxytrack.o' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-proxytrack.o: proxy/proxytrack.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-proxytrack.o -MD -MP -MF proxy/$(DEPDIR)/proxytrack-proxytrack.Tpo -c -o proxy/proxytrack-proxytrack.o `test -f 'proxy/proxytrack.c' || echo '$(srcdir)/'`proxy/proxytrack.c
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-proxytrack.Tpo proxy/$(DEPDIR)/proxytrack-proxytrack.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/proxytrack.c' object='proxy/proxytrack-proxytrack.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-proxytrack.o `test -f 'proxy/proxytrack.c' || echo '$(srcdir)/'`proxy/proxytrack.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-proxytrack.o `test -f 'proxy/proxytrack.c' || echo '$(srcdir)/'`proxy/proxytrack.c
 
-proxytrack-proxytrack.obj: proxy/proxytrack.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-proxytrack.obj -MD -MP -MF $(DEPDIR)/proxytrack-proxytrack.Tpo -c -o proxytrack-proxytrack.obj `if test -f 'proxy/proxytrack.c'; then $(CYGPATH_W) 'proxy/proxytrack.c'; else $(CYGPATH_W) '$(srcdir)/proxy/proxytrack.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-proxytrack.Tpo $(DEPDIR)/proxytrack-proxytrack.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/proxytrack.c' object='proxytrack-proxytrack.obj' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-proxytrack.obj: proxy/proxytrack.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-proxytrack.obj -MD -MP -MF proxy/$(DEPDIR)/proxytrack-proxytrack.Tpo -c -o proxy/proxytrack-proxytrack.obj `if test -f 'proxy/proxytrack.c'; then $(CYGPATH_W) 'proxy/proxytrack.c'; else $(CYGPATH_W) '$(srcdir)/proxy/proxytrack.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-proxytrack.Tpo proxy/$(DEPDIR)/proxytrack-proxytrack.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/proxytrack.c' object='proxy/proxytrack-proxytrack.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-proxytrack.obj `if test -f 'proxy/proxytrack.c'; then $(CYGPATH_W) 'proxy/proxytrack.c'; else $(CYGPATH_W) '$(srcdir)/proxy/proxytrack.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-proxytrack.obj `if test -f 'proxy/proxytrack.c'; then $(CYGPATH_W) 'proxy/proxytrack.c'; else $(CYGPATH_W) '$(srcdir)/proxy/proxytrack.c'; fi`
 
-proxytrack-store.o: proxy/store.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-store.o -MD -MP -MF $(DEPDIR)/proxytrack-store.Tpo -c -o proxytrack-store.o `test -f 'proxy/store.c' || echo '$(srcdir)/'`proxy/store.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-store.Tpo $(DEPDIR)/proxytrack-store.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/store.c' object='proxytrack-store.o' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-store.o: proxy/store.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-store.o -MD -MP -MF proxy/$(DEPDIR)/proxytrack-store.Tpo -c -o proxy/proxytrack-store.o `test -f 'proxy/store.c' || echo '$(srcdir)/'`proxy/store.c
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-store.Tpo proxy/$(DEPDIR)/proxytrack-store.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/store.c' object='proxy/proxytrack-store.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-store.o `test -f 'proxy/store.c' || echo '$(srcdir)/'`proxy/store.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-store.o `test -f 'proxy/store.c' || echo '$(srcdir)/'`proxy/store.c
 
-proxytrack-store.obj: proxy/store.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-store.obj -MD -MP -MF $(DEPDIR)/proxytrack-store.Tpo -c -o proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-store.Tpo $(DEPDIR)/proxytrack-store.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/store.c' object='proxytrack-store.obj' libtool=no @AMDEPBACKSLASH@
+proxy/proxytrack-store.obj: proxy/store.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-store.obj -MD -MP -MF proxy/$(DEPDIR)/proxytrack-store.Tpo -c -o proxy/proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) proxy/$(DEPDIR)/proxytrack-store.Tpo proxy/$(DEPDIR)/proxytrack-store.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy/store.c' object='proxy/proxytrack-store.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
 
 proxytrack-htsinthash.o: htsinthash.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-htsinthash.o -MD -MP -MF $(DEPDIR)/proxytrack-htsinthash.Tpo -c -o proxytrack-htsinthash.o `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
@@ -937,67 +1002,68 @@ proxytrack-md5.obj: md5.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-md5.obj `if test -f 'md5.c'; then $(CYGPATH_W) 'md5.c'; else $(CYGPATH_W) '$(srcdir)/md5.c'; fi`
 
-proxytrack-ioapi.o: minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-ioapi.o -MD -MP -MF $(DEPDIR)/proxytrack-ioapi.Tpo -c -o proxytrack-ioapi.o `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-ioapi.Tpo $(DEPDIR)/proxytrack-ioapi.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='proxytrack-ioapi.o' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-ioapi.o: minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-ioapi.o -MD -MP -MF minizip/$(DEPDIR)/proxytrack-ioapi.Tpo -c -o minizip/proxytrack-ioapi.o `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-ioapi.Tpo minizip/$(DEPDIR)/proxytrack-ioapi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='minizip/proxytrack-ioapi.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-ioapi.o `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-ioapi.o `test -f 'minizip/ioapi.c' || echo '$(srcdir)/'`minizip/ioapi.c
 
-proxytrack-ioapi.obj: minizip/ioapi.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-ioapi.obj -MD -MP -MF $(DEPDIR)/proxytrack-ioapi.Tpo -c -o proxytrack-ioapi.obj `if test -f 'minizip/ioapi.c'; then $(CYGPATH_W) 'minizip/ioapi.c'; else $(CYGPATH_W) '$(srcdir)/minizip/ioapi.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-ioapi.Tpo $(DEPDIR)/proxytrack-ioapi.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='proxytrack-ioapi.obj' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-ioapi.obj: minizip/ioapi.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-ioapi.obj -MD -MP -MF minizip/$(DEPDIR)/proxytrack-ioapi.Tpo -c -o minizip/proxytrack-ioapi.obj `if test -f 'minizip/ioapi.c'; then $(CYGPATH_W) 'minizip/ioapi.c'; else $(CYGPATH_W) '$(srcdir)/minizip/ioapi.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-ioapi.Tpo minizip/$(DEPDIR)/proxytrack-ioapi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/ioapi.c' object='minizip/proxytrack-ioapi.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-ioapi.obj `if test -f 'minizip/ioapi.c'; then $(CYGPATH_W) 'minizip/ioapi.c'; else $(CYGPATH_W) '$(srcdir)/minizip/ioapi.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-ioapi.obj `if test -f 'minizip/ioapi.c'; then $(CYGPATH_W) 'minizip/ioapi.c'; else $(CYGPATH_W) '$(srcdir)/minizip/ioapi.c'; fi`
 
-proxytrack-mztools.o: minizip/mztools.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-mztools.o -MD -MP -MF $(DEPDIR)/proxytrack-mztools.Tpo -c -o proxytrack-mztools.o `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-mztools.Tpo $(DEPDIR)/proxytrack-mztools.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='proxytrack-mztools.o' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-mztools.o: minizip/mztools.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-mztools.o -MD -MP -MF minizip/$(DEPDIR)/proxytrack-mztools.Tpo -c -o minizip/proxytrack-mztools.o `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-mztools.Tpo minizip/$(DEPDIR)/proxytrack-mztools.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='minizip/proxytrack-mztools.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-mztools.o `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-mztools.o `test -f 'minizip/mztools.c' || echo '$(srcdir)/'`minizip/mztools.c
 
-proxytrack-mztools.obj: minizip/mztools.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-mztools.obj -MD -MP -MF $(DEPDIR)/proxytrack-mztools.Tpo -c -o proxytrack-mztools.obj `if test -f 'minizip/mztools.c'; then $(CYGPATH_W) 'minizip/mztools.c'; else $(CYGPATH_W) '$(srcdir)/minizip/mztools.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-mztools.Tpo $(DEPDIR)/proxytrack-mztools.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='proxytrack-mztools.obj' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-mztools.obj: minizip/mztools.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-mztools.obj -MD -MP -MF minizip/$(DEPDIR)/proxytrack-mztools.Tpo -c -o minizip/proxytrack-mztools.obj `if test -f 'minizip/mztools.c'; then $(CYGPATH_W) 'minizip/mztools.c'; else $(CYGPATH_W) '$(srcdir)/minizip/mztools.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-mztools.Tpo minizip/$(DEPDIR)/proxytrack-mztools.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/mztools.c' object='minizip/proxytrack-mztools.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-mztools.obj `if test -f 'minizip/mztools.c'; then $(CYGPATH_W) 'minizip/mztools.c'; else $(CYGPATH_W) '$(srcdir)/minizip/mztools.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-mztools.obj `if test -f 'minizip/mztools.c'; then $(CYGPATH_W) 'minizip/mztools.c'; else $(CYGPATH_W) '$(srcdir)/minizip/mztools.c'; fi`
 
-proxytrack-unzip.o: minizip/unzip.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-unzip.o -MD -MP -MF $(DEPDIR)/proxytrack-unzip.Tpo -c -o proxytrack-unzip.o `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-unzip.Tpo $(DEPDIR)/proxytrack-unzip.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='proxytrack-unzip.o' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-unzip.o: minizip/unzip.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-unzip.o -MD -MP -MF minizip/$(DEPDIR)/proxytrack-unzip.Tpo -c -o minizip/proxytrack-unzip.o `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-unzip.Tpo minizip/$(DEPDIR)/proxytrack-unzip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='minizip/proxytrack-unzip.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-unzip.o `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-unzip.o `test -f 'minizip/unzip.c' || echo '$(srcdir)/'`minizip/unzip.c
 
-proxytrack-unzip.obj: minizip/unzip.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-unzip.obj -MD -MP -MF $(DEPDIR)/proxytrack-unzip.Tpo -c -o proxytrack-unzip.obj `if test -f 'minizip/unzip.c'; then $(CYGPATH_W) 'minizip/unzip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/unzip.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-unzip.Tpo $(DEPDIR)/proxytrack-unzip.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='proxytrack-unzip.obj' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-unzip.obj: minizip/unzip.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-unzip.obj -MD -MP -MF minizip/$(DEPDIR)/proxytrack-unzip.Tpo -c -o minizip/proxytrack-unzip.obj `if test -f 'minizip/unzip.c'; then $(CYGPATH_W) 'minizip/unzip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/unzip.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-unzip.Tpo minizip/$(DEPDIR)/proxytrack-unzip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/unzip.c' object='minizip/proxytrack-unzip.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-unzip.obj `if test -f 'minizip/unzip.c'; then $(CYGPATH_W) 'minizip/unzip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/unzip.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-unzip.obj `if test -f 'minizip/unzip.c'; then $(CYGPATH_W) 'minizip/unzip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/unzip.c'; fi`
 
-proxytrack-zip.o: minizip/zip.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-zip.o -MD -MP -MF $(DEPDIR)/proxytrack-zip.Tpo -c -o proxytrack-zip.o `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-zip.Tpo $(DEPDIR)/proxytrack-zip.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='proxytrack-zip.o' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-zip.o: minizip/zip.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-zip.o -MD -MP -MF minizip/$(DEPDIR)/proxytrack-zip.Tpo -c -o minizip/proxytrack-zip.o `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-zip.Tpo minizip/$(DEPDIR)/proxytrack-zip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='minizip/proxytrack-zip.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-zip.o `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-zip.o `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
 
-proxytrack-zip.obj: minizip/zip.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-zip.obj -MD -MP -MF $(DEPDIR)/proxytrack-zip.Tpo -c -o proxytrack-zip.obj `if test -f 'minizip/zip.c'; then $(CYGPATH_W) 'minizip/zip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/zip.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-zip.Tpo $(DEPDIR)/proxytrack-zip.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='proxytrack-zip.obj' libtool=no @AMDEPBACKSLASH@
+minizip/proxytrack-zip.obj: minizip/zip.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT minizip/proxytrack-zip.obj -MD -MP -MF minizip/$(DEPDIR)/proxytrack-zip.Tpo -c -o minizip/proxytrack-zip.obj `if test -f 'minizip/zip.c'; then $(CYGPATH_W) 'minizip/zip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/zip.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) minizip/$(DEPDIR)/proxytrack-zip.Tpo minizip/$(DEPDIR)/proxytrack-zip.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='minizip/proxytrack-zip.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-zip.obj `if test -f 'minizip/zip.c'; then $(CYGPATH_W) 'minizip/zip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/zip.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o minizip/proxytrack-zip.obj `if test -f 'minizip/zip.c'; then $(CYGPATH_W) 'minizip/zip.c'; else $(CYGPATH_W) '$(srcdir)/minizip/zip.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf minizip/.libs minizip/_libs
 install-DevIncludesDATA: $(DevIncludes_DATA)
 	@$(NORMAL_INSTALL)
 	@list='$(DevIncludes_DATA)'; test -n "$(DevIncludesdir)" || list=; \
@@ -1137,6 +1203,10 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f minizip/$(DEPDIR)/$(am__dirstamp)
+	-rm -f minizip/$(am__dirstamp)
+	-rm -f proxy/$(DEPDIR)/$(am__dirstamp)
+	-rm -f proxy/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -1147,7 +1217,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1193,7 +1263,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

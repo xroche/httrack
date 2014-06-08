@@ -54,12 +54,13 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-typedef struct hostent FAR t_hostent;
-
 #else
 #define HTS_USESCOPEID
 #define INVALID_SOCKET -1
-typedef struct hostent t_hostent;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 #if HTS_USEOPENSSL
@@ -156,5 +157,9 @@ typedef enum HTTrackStatus {
   STATUS_FTP_TRANSFER = 1000,
   STATUS_FTP_READY = 1001
 } HTTrackStatus;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

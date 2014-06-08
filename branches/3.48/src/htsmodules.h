@@ -104,21 +104,20 @@ struct htsmoduleStruct {
   httrackp *opt;
 
   /* Internal use - please don't touch */
-  lien_url **liens;
   struct_back *sback;
   cache_back *cache;
   hash_struct *hashptr;
   int numero_passe;
-  int add_tab_alloc;
   /* */
-  int *lien_tot_;
   int *ptr_;
-  size_t *lien_size_;
-  char **lien_buffer_;
   const char *page_charset_;
   /* Internal use - please don't touch */
 
 };
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Used to wrap module initialization */
 /* return 1 if init was ok */
@@ -136,6 +135,10 @@ extern int hts_parse_externals(htsmoduleStruct * str);
 
 /*extern int swf_is_available;*/
 extern int V6_is_available;
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

@@ -47,15 +47,15 @@ Please visit our Website: http://www.httrack.com
     {  /* ajout nom */\
       char BIGSTK buff[HTS_URLMAXSIZE*2];\
       buff[0]='\0';\
-      strncatbuff(buff,start_pos,(int) (nom_pos - start_pos));\
-      url_savename_addstr(save,buff);\
+      strncatbuff(buff,start_pos,nom_pos - start_pos);\
+      url_savename_addstr(afs->save, buff);\
     }
 
 #define ADD_STANDARD_NAME(shortname) \
     {  /* ajout nom */\
       char BIGSTK buff[HTS_URLMAXSIZE*2];\
       standard_name(buff,dot_pos,nom_pos,fil_complete,(shortname));\
-      url_savename_addstr(save,buff);\
+      url_savename_addstr(afs->save, buff);\
     }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -82,11 +82,11 @@ static const char *hts_tbdev[] = {
     HTS_STAT.stat_errors=fspc(opt,NULL,"error"); \
     HTS_STAT.stat_warnings=fspc(opt,NULL,"warning"); \
     HTS_STAT.stat_infos=fspc(opt,NULL,"info"); \
-    HTS_STAT.nbk=backlinks_done(sback,liens,lien_tot,ptr); \
+    HTS_STAT.nbk=backlinks_done(sback,opt->liens,opt->lien_tot,ptr); \
     HTS_STAT.nb=back_transferred(HTS_STAT.stat_bytes,sback); \
     /* Check */ \
     { \
-      if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count,-1,ptr,lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
+      if (!RUN_CALLBACK7(opt, loop, sback->lnk, sback->count,-1,ptr,opt->lien_tot,(int) (time_local()-HTS_STAT.stat_timestart),&HTS_STAT)) { \
         return -1; \
       } \
     } \
@@ -139,10 +139,10 @@ static void cleanEndingSpaceOrDot(char *s) {
 
 // forme le nom du fichier à sauver (save) à partir de fil et adr
 // système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
-int url_savename(char *adr_complete, char *fil_complete, char *save,
-                 char *former_adr, char *former_fil, char *referer_adr,
-                 char *referer_fil, httrackp * opt, lien_url ** liens,
-                 int lien_tot, struct_back * sback, cache_back * cache,
+int url_savename(lien_adrfilsave *const afs,
+                 lien_adrfil *const former,
+                 const char *referer_adr, const char *referer_fil, 
+                 httrackp * opt, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers) {
   char catbuff[CATBUFF_SIZE];
@@ -152,7 +152,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   lien_back *const back = sback->lnk;
 
   /* */
-  char BIGSTK newfil[HTS_URLMAXSIZE * 2];       /* ="" */
+  char BIGSTK fil[HTS_URLMAXSIZE * 2];       /* ="" */
+
+  const char *const adr_complete = afs->af.adr;
+  const char *const fil_complete = afs->af.fil;
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */
   char BIGSTK normadr_[HTS_URLMAXSIZE * 2], normfil_[HTS_URLMAXSIZE * 2];
@@ -162,12 +165,11 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     { "http", "https", "ftp", "file", "unknown" };
   int protocol = PROTOCOL_HTTP;
   const char *const adr = jump_identification(adr_complete);
-  char *fil = fil_complete;
   // copy of fil, used for lookups (see urlhack)
   const char *normadr = adr;
-  const char *normfil = fil;
+  const char *normfil = fil_complete;
   const char *const print_adr = jump_protocol(adr);
-  char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
+  const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
 
   // pour changement d'extension ou de nom (content-disposition)
   int ext_chg = 0, ext_chg_delayed = 0;
@@ -176,8 +178,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   int max_char = 0;
 
   //CLEAR
-  newfil[0] = ext[0] = '\0';
-  save[0] = '\0';
+  fil[0] = ext[0] = '\0';
+  afs->save[0] = '\0';
 
   /* 8-3 ? */
   switch (opt->savename_83) {
@@ -199,7 +201,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (opt->urlhack) {
     // copy of adr (without protocol), used for lookups (see urlhack)
     normadr = adr_normalized(adr, normadr_);
-    normfil = fil_normalized(fil, normfil_);
+    normfil = fil_normalized(fil_complete, normfil_);
   } else {
     if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
       char *pos = strchr(adr_complete, ':');
@@ -227,8 +229,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
   // court-circuit pour lien primaire
   if (strnotempty(adr) == 0) {
-    if (strcmp(fil, "primary") == 0) {
-      strcatbuff(save, "primary.html");
+    if (strcmp(fil_complete, "primary") == 0) {
+      strcatbuff(afs->save, "primary.html");
       return 0;
     }
   }
@@ -259,21 +261,21 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   // vérifier que le nom n'a pas déja été calculé (si oui le renvoyer tel que)
   // vérifier que le nom n'est pas déja pris...
   // NOTE: si on cherche /toto/ et que /toto est trouvé on le prend (et réciproquqment) ** // **
-  if (liens != NULL) {
+  if (opt->liens != NULL) {
     int i;
 
     i = hash_read(hash, normadr, normfil, HASH_STRUCT_ADR_PATH);     // recherche table 1 (adr+fil)
     if (i >= 0) {               // ok, trouvé
-      strcpybuff(save, liens[i]->sav);
+      strcpybuff(afs->save, heap(i)->sav);
       return 0;
     }
-    i = hash_read(hash, normadr, normfil, HASH_STRUCT_ORIGINAL_ADR_PATH);     // recherche table 2 (former_adr+former_fil)
+    i = hash_read(hash, normadr, normfil, HASH_STRUCT_ORIGINAL_ADR_PATH);     // recherche table 2 (former->adr+former->fil)
     if (i >= 0) {               // ok, trouvé
       // copier location moved!
-      strcpybuff(adr_complete, liens[i]->adr);
-      strcpybuff(fil_complete, liens[i]->fil);
+      strcpybuff(afs->af.adr, heap(i)->adr);
+      strcpybuff(afs->af.fil, heap(i)->fil);
       // et save
-      strcpybuff(save, liens[i]->sav);  // copier (formé à partir du nouveau lien!)
+      strcpybuff(afs->save, heap(i)->sav);  // copier (formé à partir du nouveau lien!)
       return 0;
     }
     // chercher sans / ou avec / dans former
@@ -286,13 +288,13 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         fil_complete_patche[strlen(fil_complete_patche) - 1] = '\0';
       else
         strcatbuff(fil_complete_patche, "/");
-      i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former_adr+former_fil)
+      i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former->adr+former->fil)
       if (i >= 0) {
-        // écraser fil et adr (pas former_fil?????)
-        strcpybuff(adr_complete, liens[i]->adr);
-        strcpybuff(fil_complete, liens[i]->fil);
+        // écraser fil et adr (pas former->fil?????)
+        strcpybuff(afs->af.adr, heap(i)->adr);
+        strcpybuff(afs->af.fil, heap(i)->fil);
         // écrire save
-        strcpybuff(save, liens[i]->sav);
+        strcpybuff(afs->save, heap(i)->sav);
         return 0;
       }
     }
@@ -303,13 +305,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   {
     char *a;
 
-    a = strchr(fil, '?');
+    a = strchr(fil_complete, '?');
     if (a != NULL) {
-      strncatbuff(newfil, fil, (int) (a - fil));
+      strncatbuff(fil, fil_complete, a - fil_complete);
     } else {
-      strcpybuff(newfil, fil);
+      strcpybuff(fil, fil_complete);
     }
-    fil = newfil;
   }
 
   // decode remaining % (normally not necessary; already done in htsparse.c)
@@ -465,8 +466,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
             //
             int hihp = opt->state._hts_in_html_parsing;
             int has_been_moved = 0;
-            char BIGSTK curr_adr[HTS_URLMAXSIZE * 2],
-              curr_fil[HTS_URLMAXSIZE * 2];
+            lien_adrfil current;
 
             /* Ensure we don't use too many sockets by using a "testing" one
                If we have only 1 simultaneous connection authorized, wait for pending download
@@ -475,20 +475,20 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
             URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET();
 
             /* Rock'in */
-            curr_adr[0] = curr_fil[0] = '\0';
+            current.adr[0] = current.fil[0] = '\0';
             opt->state._hts_in_html_parsing = 2;        // test
             hts_log_print(opt, LOG_DEBUG, "Testing link type %s%s",
                           adr_complete, fil_complete);
-            strcpybuff(curr_adr, adr_complete);
-            strcpybuff(curr_fil, fil_complete);
+            strcpybuff(current.adr, adr_complete);
+            strcpybuff(current.fil, fil_complete);
             // ajouter dans le backing le fichier en mode test
             // savename: rien car en mode test
             if (back_add
-                (sback, opt, cache, curr_adr, curr_fil, BACK_ADD_TEST,
+                (sback, opt, cache, current.adr, current.fil, BACK_ADD_TEST,
                  referer_adr, referer_fil, 1) != -1) {
               int b;
 
-              b = back_index(opt, sback, curr_adr, curr_fil, BACK_ADD_TEST);
+              b = back_index(opt, sback, current.adr, current.fil, BACK_ADD_TEST);
               if (b >= 0) {
                 int stop_looping = 0;
                 int petits_tours = 0;
@@ -500,8 +500,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                     back_wait(sback, opt, cache, 0);
                   }
                   if (ptr >= 0) {
-                    back_fillmax(sback, opt, cache, liens, ptr, numero_passe,
-                                 lien_tot);
+                    back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
                   // on est obligé d'appeler le shell pour le refresh..
                   // Transfer rate
@@ -512,11 +511,11 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                   HTS_STAT.stat_errors = fspc(opt, NULL, "error");
                   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
                   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-                  HTS_STAT.nbk = backlinks_done(sback, liens, lien_tot, ptr);
+                  HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
                   HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
 
                   if (!RUN_CALLBACK7
-                      (opt, loop, sback->lnk, sback->count, b, ptr, lien_tot,
+                      (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
                        (int) (time_local() - HTS_STAT.stat_timestart),
                        &HTS_STAT)) {
                     return -1;
@@ -527,42 +526,40 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                   // traitement des 304,303..
                   if (back[b].status <= 0) {
                     if (HTTP_IS_REDIRECT(back[b].r.statuscode)) {       // agh moved.. un tit tour de plus
-                      if ((petits_tours < 5) && (former_adr) && (former_fil)) { // on va pas tourner en rond non plus!
-                        if ((int) strnotempty(back[b].r.location)) {    // location existe!
-                          char BIGSTK mov_url[HTS_URLMAXSIZE * 2],
-                            mov_adr[HTS_URLMAXSIZE * 2],
-                            mov_fil[HTS_URLMAXSIZE * 2];
-                          mov_url[0] = mov_adr[0] = mov_fil[0] = '\0';
+                      if ((petits_tours < 5) && former != NULL) { // on va pas tourner en rond non plus!
+                        if (strnotempty(back[b].r.location)) {    // location existe!
+                          char BIGSTK mov_url[HTS_URLMAXSIZE * 2];
+                          lien_adrfil moved;
+                          mov_url[0] = moved.adr[0] = moved.fil[0] = '\0';
                           //
                           strcpybuff(mov_url, back[b].r.location);      // copier URL
                           if (ident_url_relatif
-                              (mov_url, curr_adr, curr_fil, mov_adr,
-                               mov_fil) >= 0) {
+                              (mov_url, current.adr, current.fil, &moved) >= 0) {
                             // si non bouclage sur soi même, ou si test avec GET non testé
-                            if ((strcmp(mov_adr, curr_adr))
-                                || (strcmp(mov_fil, curr_fil))
+                            if ((strcmp(moved.adr, current.adr))
+                                || (strcmp(moved.fil, current.fil))
                                 || (get_test_request == 0)) {
                               // bouclage?
-                              if ((!strcmp(mov_adr, curr_adr))
-                                  && (!strcmp(mov_fil, curr_fil)))
+                              if ((!strcmp(moved.adr, current.adr))
+                                  && (!strcmp(moved.fil, current.fil)))
                                 get_test_request = 1;   // faire requète avec GET
 
-                              // recopier former_adr/fil?
-                              if ((former_adr) && (former_fil)) {
-                                if (strnotempty(former_adr) == 0) {     // Pas déja noté
-                                  strcpybuff(former_adr, curr_adr);
-                                  strcpybuff(former_fil, curr_fil);
+                              // recopier former->adr/fil?
+                              if (former != NULL) {
+                                if (strnotempty(former->adr) == 0) {     // Pas déja noté
+                                  strcpybuff(former->adr, current.adr);
+                                  strcpybuff(former->fil, current.fil);
                                 }
                               }
                               // check explicit forbidden - don't follow 3xx in this case
                               {
                                 int set_prio_to = 0;
 
-                                if (hts_acceptlink(opt, ptr, lien_tot, liens, mov_adr, mov_fil, NULL, NULL, &set_prio_to, NULL) == 1) { /* forbidden */
+                                if (hts_acceptlink(opt, ptr, moved.adr, moved.fil, NULL, NULL, &set_prio_to, NULL) == 1) { /* forbidden */
                                   has_been_moved = 1;
                                   back_maydelete(opt, cache, sback, b); // ok
-                                  strcpybuff(curr_adr, mov_adr);
-                                  strcpybuff(curr_fil, mov_fil);
+                                  strcpybuff(current.adr, moved.adr);
+                                  strcpybuff(current.fil, moved.fil);
                                   mov_url[0] = '\0';
                                   stop_looping = 1;
                                 }
@@ -573,11 +570,11 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                                 ) {     // ftp, ok on arrête
                                 has_been_moved = 1;
                                 back_maydelete(opt, cache, sback, b);   // ok
-                                strcpybuff(curr_adr, mov_adr);
-                                strcpybuff(curr_fil, mov_fil);
+                                strcpybuff(current.adr, moved.adr);
+                                strcpybuff(current.fil, moved.fil);
                                 stop_looping = 1;
                               } else if (*mov_url) {
-                                char *methode;
+                                const char *methode;
 
                                 if (!get_test_request)
                                   methode = BACK_ADD_TEST;      // tester avec HEAD
@@ -585,24 +582,24 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                                   methode = BACK_ADD_TEST2;     // tester avec GET
                                   hts_log_print(opt, LOG_WARNING,
                                                 "Loop with HEAD request (during prefetch) at %s%s",
-                                                curr_adr, curr_fil);
+                                                current.adr, current.fil);
                                 }
                                 // Ajouter
                                 URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET();
-                                if (back_add(sback, opt, cache, mov_adr, mov_fil, methode, referer_adr, referer_fil, 1) != -1) {        // OK
+                                if (back_add(sback, opt, cache, moved.adr, moved.fil, methode, referer_adr, referer_fil, 1) != -1) {        // OK
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "(during prefetch) %s (%d) to link %s at %s%s",
                                                 back[b].r.msg,
                                                 back[b].r.statuscode,
-                                                back[b].r.location, curr_adr,
-                                                curr_fil);
+                                                back[b].r.location, current.adr,
+                                                current.fil);
 
                                   // libérer emplacement backing actuel et attendre le prochain
                                   back_maydelete(opt, cache, sback, b);
-                                  strcpybuff(curr_adr, mov_adr);
-                                  strcpybuff(curr_fil, mov_fil);
+                                  strcpybuff(current.adr, moved.adr);
+                                  strcpybuff(current.fil, moved.fil);
                                   b =
-                                    back_index(opt, sback, curr_adr, curr_fil,
+                                    back_index(opt, sback, current.adr, current.fil,
                                                methode);
                                   if (!get_test_request)
                                     has_been_moved = 1; // sinon ne pas forcer has_been_moved car non déplacé
@@ -611,7 +608,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                                 } else {        // sinon on fait rien et on s'en va.. (ftp etc)
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "Warning: Savename redirect backing error at %s%s",
-                                                mov_adr, mov_fil);
+                                                moved.adr, moved.fil);
                                 }
                               }
                             } else {
@@ -673,13 +670,13 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                 // oops, a été déplacé.. on recalcule en récursif (osons!)
                 if (has_been_moved) {
                   // copier adr, fil (optionnel, mais sinon marche pas pour le rip)
-                  strcpybuff(adr_complete, curr_adr);
-                  strcpybuff(fil_complete, curr_fil);
+                  strcpybuff(afs->af.adr, current.adr);
+                  strcpybuff(afs->af.fil, current.fil);
                   // copier adr, fil
 
-                  return url_savename(curr_adr, curr_fil, save, NULL, NULL,
-                                      referer_adr, referer_fil, opt, liens,
-                                      lien_tot, sback, cache, hash, ptr,
+                  return url_savename(afs, NULL,
+                                      referer_adr, referer_fil, opt, 
+                                      sback, cache, hash, ptr,
                                       numero_passe, NULL);
                 }
                 // --- --- ---
@@ -749,7 +746,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
   // Rechercher premier / et dernier .
   {
-    char *a = fil + strlen(fil) - 1;
+    const char *a = fil + strlen(fil) - 1;
 
     // passer structures
     start_pos = fil;
@@ -770,7 +767,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   // ajouter nom du site éventuellement en premier
   if (opt->savename_type == -1) {       // utiliser savename_userdef! (%h%p/%n%q.%t)
     const char *a = StringBuff(opt->savename_userdef);
-    char *b = save;
+    char *b = afs->save;
 
     /*char *nom_pos=NULL,*dot_pos=NULL;  // Position nom et point */
     char tok;
@@ -791,7 +788,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
      */
 
     // Construire nom
-    while((*a) && (((int) (b - save)) < HTS_URLMAXSIZE)) {      // parser, et pas trop long..
+    while((*a) && (((int) (b - afs->save)) < HTS_URLMAXSIZE)) {      // parser, et pas trop long..
       if (*a == '%') {
         int short_ver = 0;
 
@@ -812,7 +809,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
               name[pos][0] = '\0';
             }
             pos = 0;
-            while(*a != ']') {
+            while(*a != '\0' && *a != ']') {
               if (pos < 5) {
                 if (*a == ':') {        // next token
                   c = name[++pos];
@@ -823,7 +820,9 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
                 }
               }
             }
-            a++;
+            if (*a == ']') {
+              a++;
+            }
             strcatbuff(name[0], "=");   /* param=.. */
             c = strchr(fil_complete, '?');
             /* parameters exists */
@@ -1046,26 +1045,26 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
         // adresse url
         if (!opt->savename_83) {      // noms longs (et pas de .)
-          strcatbuff(save, final_adr);
+          strcatbuff(afs->save, final_adr);
         } else {              // noms 8-3
           if (strlen(final_adr) > 4) {
             if (strfield(final_adr, "www."))
-              hts_appendStringUTF8(save, final_adr + 4, max_char);
+              hts_appendStringUTF8(afs->save, final_adr + 4, max_char);
             else
-              hts_appendStringUTF8(save, final_adr, max_char);
+              hts_appendStringUTF8(afs->save, final_adr, max_char);
           } else
-            hts_appendStringUTF8(save, final_adr, max_char);
+            hts_appendStringUTF8(afs->save, final_adr, max_char);
         }
 
         /* release */
         RELEASE_ADR();
 
         if (*fil != '/')
-          strcatbuff(save, "/");
+          strcatbuff(afs->save, "/");
       }
     }
 
-    hts_lowcase(save);
+    hts_lowcase(afs->save);
 
     /*
        // ne sert à rien car a déja été filtré normalement
@@ -1091,42 +1090,42 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         DECLARE_ADR(final_adr);
 
         if (!opt->savename_83) {      // noms longs
-          strcatbuff(save, final_adr);
-          strcatbuff(save, "/");
+          strcatbuff(afs->save, final_adr);
+          strcatbuff(afs->save, "/");
         } else {              // noms 8-3
           if (strlen(final_adr) > 4) {
             if (strfield(final_adr, "www."))
-              hts_appendStringUTF8(save, final_adr + 4, max_char);
+              hts_appendStringUTF8(afs->save, final_adr + 4, max_char);
             else
-              hts_appendStringUTF8(save, final_adr, max_char);
-            strcatbuff(save, "/");
+              hts_appendStringUTF8(afs->save, final_adr, max_char);
+            strcatbuff(afs->save, "/");
           } else {
-            hts_appendStringUTF8(save, final_adr, max_char);
-            strcatbuff(save, "/");
+            hts_appendStringUTF8(afs->save, final_adr, max_char);
+            strcatbuff(afs->save, "/");
           }
         }
 
         /* release */
         RELEASE_ADR();
       } else {
-        strcatbuff(save, "web/");       // répertoire général
+        strcatbuff(afs->save, "web/");       // répertoire général
       }
     }
     // si un html à coup sûr
     if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
       if (opt->savename_type % 100 == 2) {      // html/
-        strcatbuff(save, "html/");
+        strcatbuff(afs->save, "html/");
       }
     } else {
       if ((opt->savename_type % 100 == 1) || (opt->savename_type % 100 == 2)) { // html & images
-        strcatbuff(save, "images/");
+        strcatbuff(afs->save, "images/");
       }
     }
 
     switch (opt->savename_type % 100) {
     case 4:
     case 5:{                   // séparer par types
-        char *a = fil + strlen(fil) - 1;
+        const char *a = fil + strlen(fil) - 1;
 
         // passer structures
         while((a > fil) && (*a != '/') && (*a != '\\'))
@@ -1137,17 +1136,17 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         // html?
         if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
           if (opt->savename_type % 100 == 5)
-            strcatbuff(save, "html/");
+            strcatbuff(afs->save, "html/");
         } else {
-          char *a = fil + strlen(fil) - 1;
+          const char *a = fil + strlen(fil) - 1;
 
           while((a > fil) && (*a != '/') && (*a != '.'))
             a--;
           if (*a != '.')
-            strcatbuff(save, "other");
+            strcatbuff(afs->save, "other");
           else
-            strcatbuff(save, a + 1);
-          strcatbuff(save, "/");
+            strcatbuff(afs->save, a + 1);
+          strcatbuff(afs->save, "/");
         }
         /*strcatbuff(save,a); */
         /* add name */
@@ -1156,8 +1155,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       break;
     case 99:{                  // 'codé' .. c'est un gadget
         size_t i;
-        int j;
-        char *a;
+        size_t j;
+        const char *a;
         char C[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
         int L;
 
@@ -1173,19 +1172,19 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
         }
         srand(s);
 
-        j = (int) strlen(save);
+        j = strlen(afs->save);
         for(i = 0; i < 8; i++) {
           char c = C[(rand() % L)];
 
-          save[i + j] = c;
+          afs->save[i + j] = c;
         }
-        save[i + j] = '\0';
+        afs->save[i + j] = '\0';
         // ajouter extension
         a = fil + strlen(fil) - 1;
         while((a > fil) && (*a != '/') && (*a != '.'))
           a--;
         if (*a == '.') {
-          strcatbuff(save, a);  // ajouter
+          strcatbuff(afs->save, a);  // ajouter
         }
       }
       break;
@@ -1204,10 +1203,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       break;
     }
 
-    hts_lowcase(save);
+    hts_lowcase(afs->save);
 
-    if (save[strlen(save) - 1] == '/')
-      strcatbuff(save, DEFAULT_HTML);   // nommer page par défaut!!
+    if (afs->save[strlen(afs->save) - 1] == '/')
+      strcatbuff(afs->save, DEFAULT_HTML);   // nommer page par défaut!!
   }
 
   // vérifier qu'on ne doit pas forcer l'extension
@@ -1225,23 +1224,23 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   // de même en cas de manque d'extension on en place une de manière forcée..
   // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
   if (opt->savename_type != -1 && opt->savename_delayed != 2) {
-    char *a = save + strlen(save) - 1;
+    char *a = afs->save + strlen(afs->save) - 1;
 
-    while((a > save) && (*a != '.') && (*a != '/'))
+    while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
     if (*a != '.') {            // agh pas de point
       //strcatbuff(save,".none");                 // a éviter
-      strcatbuff(save, ".html");        // préférable!
+      strcatbuff(afs->save, ".html");        // préférable!
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
-                    adr_complete, fil_complete, save);
+                    adr_complete, fil_complete, afs->save);
     }
   }
   // effacer pass au besoin pour les autentifications
   // (plus la peine : masqué au début)
 /*
   {
-    char* a=jump_identification(save);
-    if (a!=save) {
+    char* a=jump_identification(afs->save);
+    if (a!=afs->save) {
       char BIGSTK tempo[HTS_URLMAXSIZE*2];
       char *b;
       tempo[0]='\0';
@@ -1258,18 +1257,18 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 */
 
   // éviter les / au début (cause: N100)
-  if (save[0] == '/') {
+  if (afs->save[0] == '/') {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-    strcpybuff(tempo, save + 1);
-    strcpybuff(save, tempo);
+    strcpybuff(tempo, afs->save + 1);
+    strcpybuff(afs->save, tempo);
   }
 
   /* Cleanup reserved or forbidden characters. */
   {
     size_t i;
-    for(i = 0 ; save[i] != '\0' ; i++) {
-      unsigned char c = (unsigned char) save[i];
+    for(i = 0 ; afs->save[i] != '\0' ; i++) {
+      unsigned char c = (unsigned char) afs->save[i];
       if (c < 32      // control
         || c == 127   // unwise
         || c == '~'   // unix unwise
@@ -1294,13 +1293,13 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           )
         )
       {
-         save[i] = '_';
+         afs->save[i] = '_';
       }
     }
   }
 
   // éliminer les // (comme ftp://)
-  cleanDoubleSlash(save);
+  cleanDoubleSlash(afs->save);
 
 #if HTS_OVERRIDE_DOS_FOLDERS
   /* Replace /foo/nul/bar by /foo/nul_/bar */
@@ -1308,7 +1307,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     int i = 0;
 
     while(hts_tbdev[i][0]) {
-      char *a = save;
+      char *a = afs->save;
 
       while((a = strstrcase(a, (char *) hts_tbdev[i]))) {
         switch ((int) a[strlen(hts_tbdev[i])]) {
@@ -1319,10 +1318,10 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
             char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
             tempo[0] = '\0';
-            strncatbuff(tempo, save, (int) (a - save) + strlen(hts_tbdev[i]));
+            strncatbuff(tempo, afs->save, (int) (a - afs->save) + strlen(hts_tbdev[i]));
             strcatbuff(tempo, "_");
             strcatbuff(tempo, a + strlen(hts_tbdev[i]));
-            strcpybuff(save, tempo);
+            strcpybuff(afs->save, tempo);
           }
           break;
         }
@@ -1333,7 +1332,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
 
   /* Strip ending . or ' ' forbidden on windoz */
-  cleanEndingSpaceOrDot(save);
+  cleanEndingSpaceOrDot(afs->save);
 
 #endif
 
@@ -1341,8 +1340,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (opt->savename_83) {
     char BIGSTK n83[HTS_URLMAXSIZE * 2];
 
-    long_to_83(opt->savename_83, n83, save);
-    strcpybuff(save, n83);
+    long_to_83(opt->savename_83, n83, afs->save);
+    strcpybuff(afs->save, n83);
   }
   // enforce stricter ISO9660 compliance (bug reported by Steffo Carlsson)
   // Level 1 File names are restricted to 8 characters with a 3 character extension, 
@@ -1353,12 +1352,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   if (opt->savename_83 > 0) {
     char *a, *last;
 
-    for(last = save + strlen(save) - 1;
-        last != save && *last != '/' && *last != '\\' && *last != '.'; last--) ;
+    for(last = afs->save + strlen(afs->save) - 1;
+        last != afs->save && *last != '/' && *last != '\\' && *last != '.'; last--) ;
     if (*last != '.') {
       last = NULL;
     }
-    for(a = save; *a != '\0'; a++) {
+    for(a = afs->save; *a != '\0'; a++) {
       if (*a >= 'a' && *a <= 'z') {
         *a -= 'a' - 'A';
       } else if (*a == '.') {
@@ -1375,7 +1374,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
   }
 
   /* ensure that there is no ../ (potential vulnerability) */
-  fil_simplifie(save);
+  fil_simplifie(afs->save);
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
   //if (charset != NULL && charset[0] != '\0') {
@@ -1392,17 +1391,17 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
   /* callback */
   RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
-                referer_fil, save);
+                referer_fil, afs->save);
 
   hts_log_print(opt, LOG_DEBUG, "engine: save-name: local name: %s%s -> %s",
-                adr, fil, save);
+                adr, fil, afs->save);
 
   /* Ensure that the MANDATORY "temporary" extension is set */
   if (ext_chg_delayed) {
     char *ptr;
     char *lastDot = NULL;
 
-    for(ptr = save; *ptr != 0; ptr++) {
+    for(ptr = afs->save; *ptr != 0; ptr++) {
       if (*ptr == '.') {
         lastDot = ptr;
       } else if (*ptr == '/' || *ptr == '\\') {
@@ -1410,8 +1409,8 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       }
     }
     if (lastDot == NULL) {
-      strcatbuff(save, "." DELAYED_EXT);
-    } else if (!IS_DELAYED_EXT(save)) {
+      strcatbuff(afs->save, "." DELAYED_EXT);
+    } else if (!IS_DELAYED_EXT(afs->save)) {
       strcatbuff(lastDot, "." DELAYED_EXT);
     }
   }
@@ -1424,12 +1423,12 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 #define MIN_LAST_SEG_RESERVE 12
 #define MAX_LAST_SEG_RESERVE 24
 #define MAX_SEG_LEN 48
-  if (hts_stringLengthUTF8(save) +
+  if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
     // convert to Unicode (much simpler)
     size_t wsaveLen;
-    hts_UCS4 *const wsave = hts_convertUTF8StringToUCS4(save, strlen(save), &wsaveLen);
+    hts_UCS4 *const wsave = hts_convertUTF8StringToUCS4(afs->save, strlen(afs->save), &wsaveLen);
     if (wsave != NULL) {
       const size_t parentLen =
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
@@ -1484,7 +1483,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       // copy final name and cleanup
       saveFinal = hts_convertUCS4StringToUTF8(wsave, j);
       if (saveFinal != NULL) {
-        strcpybuff(save, saveFinal);
+        strcpybuff(afs->save, saveFinal);
         free(saveFinal);
       } else {
         hts_log_print(opt, LOG_ERROR, "Could not revert to UTF-8: %s%s",
@@ -1494,13 +1493,13 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 
       // log in debug
       hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
-        adr_complete, fil_complete, save);
+        adr_complete, fil_complete, afs->save);
     } else {
-      hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", save);
+      hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", afs->save);
     }
 
     // Re-check again ending space or dot after cut (see bug #5)
-    cleanEndingSpaceOrDot(save);
+    cleanEndingSpaceOrDot(afs->save);
   }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
@@ -1511,11 +1510,11 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
     strcpybuff(tempo, StringBuff(opt->path_html_utf8));
-    strcatbuff(tempo, save);
-    strcpybuff(save, tempo);
+    strcatbuff(tempo, afs->save);
+    strcpybuff(afs->save, tempo);
   }
   // vérifier que le nom n'est pas déja pris...
-  if (liens != NULL) {
+  if (opt->liens != NULL) {
     int nom_ok;
 
     do {
@@ -1529,20 +1528,20 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
       printf("\nStart search\n");
 #endif
 
-      i = hash_read(hash, save, NULL, HASH_STRUCT_FILENAME);      // lecture type 0 (sav)
+      i = hash_read(hash, afs->save, NULL, HASH_STRUCT_FILENAME);      // lecture type 0 (sav)
       if (i >= 0) {
-        int sameAdr = (strfield2(liens[i]->adr, normadr) != 0);
+        int sameAdr = (strfield2(heap(i)->adr, normadr) != 0);
         int sameFil;
 
         // NO - URL hack is only for stripping // and www.
         //if (opt->urlhack != 0)
-        //  sameFil = ( strfield2(liens[i]->fil, normfil) != 0);
+        //  sameFil = ( strfield2(heap(i)->fil, normfil) != 0);
         //else
-        sameFil = (strcmp(liens[i]->fil, normfil) == 0);
+        sameFil = (strcmp(heap(i)->fil, normfil) == 0);
         if (sameAdr && sameFil) {       // ok c'est le même lien, adresse déja définie
           /* Take the existing name not to screw up with cAsE sEnSiTiViTy of Linux/Unix */
-          if (strcmp(liens[i]->sav, save) != 0) {
-            strcpybuff(save, liens[i]->sav);
+          if (strcmp(heap(i)->sav, afs->save) != 0) {
+            strcpybuff(afs->save, heap(i)->sav);
           }
           i = 0;
 #if DEBUG_SAVENAME
@@ -1550,7 +1549,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 #endif
         } else {                // utilisé par un AUTRE, changer de nom
           char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-          char *a = save + strlen(save) - 1;
+          char *a = afs->save + strlen(afs->save) - 1;
           char *b;
           int n = 2;
           char collisionSeparator = ((opt->savename_83 != 2) ? '-' : '_');
@@ -1558,18 +1557,18 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           tempo[0] = '\0';
 
 #if DEBUG_SAVENAME
-          printf("\nWRONG CASE UNMATCH : \n%s\n%s, REDEFINE\n", liens[i]->fil,
+          printf("\nWRONG CASE UNMATCH : \n%s\n%s, REDEFINE\n", heap(i)->fil,
                  fil_complete);
 #endif
           nom_ok = 0;
           i = 0;
 
-          while((a > save) && (*a != '.') && (*a != '\\') && (*a != '/'))
+          while((a > afs->save) && (*a != '.') && (*a != '\\') && (*a != '/'))
             a--;
           if (*a == '.')
-            strncatbuff(tempo, save, (int) (a - save));
+            strncatbuff(tempo, afs->save, a - afs->save);
           else
-            strcatbuff(tempo, save);
+            strcatbuff(tempo, afs->save);
 
           // tester la présence d'un -xx (ex: index-2.html -> index-3.html)
           b = tempo + strlen(tempo) - 1;
@@ -1600,7 +1599,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
           if (*a == '.')
             strcatbuff(tempo, a);
 
-          strcpybuff(save, tempo);
+          strcpybuff(afs->save, tempo);
 
           //printf("switched: %s\n",save);
 
@@ -1618,7 +1617,7 @@ int url_savename(char *adr_complete, char *fil_complete, char *save,
 }
 
 /* nom avec md5 urilisé partout */
-void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
+void standard_name(char *b, const char *dot_pos, const char *nom_pos, const char *fil,
                    int short_ver) {
   char md5[32 + 2];
 
@@ -1626,9 +1625,9 @@ void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
   /* Nom */
   if (dot_pos) {
     if (!short_ver)             // Noms longs
-      strncatbuff(b, nom_pos, (int) (dot_pos - nom_pos));
+      strncatbuff(b, nom_pos, (dot_pos - nom_pos));
     else
-      strncatbuff(b, nom_pos, min((int) (dot_pos - nom_pos), 8));
+      strncatbuff(b, nom_pos, min(dot_pos - nom_pos, 8));
   } else {
     if (!short_ver)             // Noms longs
       strcatbuff(b, nom_pos);
@@ -1636,7 +1635,7 @@ void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
       strncatbuff(b, nom_pos, 8);
   }
   /* MD5 - 16 bits */
-  strncatbuff(b, url_md5(md5, fil_complete), 4);
+  strncatbuff(b, url_md5(md5, fil), 4);
   /* Ext */
   if (dot_pos) {
     strcatbuff(b, ".");
@@ -1657,11 +1656,11 @@ void standard_name(char *b, char *dot_pos, char *nom_pos, char *fil_complete,
 }
 
 /* Petit md5 */
-char *url_md5(char *digest, char *fil_complete) {
+char *url_md5(char *digest, const char *fil) {
   char *a;
 
   digest[0] = '\0';
-  a = strchr(fil_complete, '?');
+  a = strchr(fil, '?');
   if (a) {
     if (strlen(a)) {
       char BIGSTK buff[HTS_URLMAXSIZE * 2];
@@ -1676,7 +1675,7 @@ char *url_md5(char *digest, char *fil_complete) {
 }
 
 // interne à url_savename: ajoute une chaîne à une autre avec \ -> /
-void url_savename_addstr(char *d, char *s) {
+void url_savename_addstr(char *d, const char *s) {
   int i = (int) strlen(d);
 
   while(*s) {
@@ -1695,9 +1694,9 @@ void url_savename_refname(const char *adr, const char *fil, char *filename) {
   MD5_CTX ctx;
 
   MD5Init(&ctx, 0);
-  MD5Update(&ctx, (const unsigned char *) adr, strlen(adr));
+  MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
-  MD5Update(&ctx, (const unsigned char *) fil, strlen(fil));
+  MD5Update(&ctx, (const unsigned char *) fil, (int) strlen(fil));
   MD5Final(bindigest, &ctx);
   sprintf(filename,
           CACHE_REFNAME "/" "%02x%02x%02x%02x%02x%02x%02x%02x"

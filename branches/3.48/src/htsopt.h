@@ -35,7 +35,13 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_DEFOPT
 
 #include <stdio.h>
+
 #include "htsglobal.h"
+#include "htsnet.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_t_hts_htmlcheck_callbacks
@@ -274,6 +280,11 @@ typedef enum htsparsejava_flags {
   HTSPARSE_NO_AGGRESSIVE = 8    // don't aggressively parse .js or .java
 } htsparsejava_flags;
 
+#ifndef HTS_DEF_FWSTRUCT_lien_buffers
+#define HTS_DEF_FWSTRUCT_lien_buffers
+typedef struct lien_buffers lien_buffers;
+#endif
+
 // paramètres httrack (options)
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -362,7 +373,9 @@ struct httrackp {
   String urllist;               // fichier liste de filtres à inclure
   htsfilters filters;           // contient les pointeurs pour les filtres
   hash_struct *hash;            // hash structure
-  lien_url **liens;             // liens
+  lien_url **liens;             // links
+  int lien_tot;                 // top index of "links" heap (always out-of-range)
+  lien_buffers *liensbuf;       // links buffers
   robots_wizard *robotsptr;     // robots ptr
   String lang_iso;              // en, fr ..
   String accept;                // Accept:
@@ -374,7 +387,7 @@ struct httrackp {
   int maxlink;                  // nombre max de liens
   int maxfilter;                // nombre max de filtres
   //
-  char *exec;                   // adresse du nom de l'éxecutable
+  const char *exec;             // adresse du nom de l'éxecutable
   //
   int quiet;                    // poser des questions autres que wizard?
   int keyboard;                 // vérifier stdin
@@ -431,5 +444,163 @@ struct hts_stat_struct {
   TStamp last_connect;          // last connect() call
   TStamp last_request;          // last request issued
 };
+
+// structure pour paramètres supplémentaires lors de la requête
+#ifndef HTS_DEF_FWSTRUCT_htsrequest_proxy
+#define HTS_DEF_FWSTRUCT_htsrequest_proxy
+typedef struct htsrequest_proxy htsrequest_proxy;
+#endif
+struct htsrequest_proxy {
+  int active;
+  const char* name;
+  int port;
+  const char* bindhost;           // bind this host
+};
+
+#ifndef HTS_DEF_FWSTRUCT_htsrequest
+#define HTS_DEF_FWSTRUCT_htsrequest
+typedef struct htsrequest htsrequest;
+#endif
+struct htsrequest {
+  short int user_agent_send;    // user agent (ex: httrack/1.0 [sun])
+  short int http11;             // l'en tête peut (doit) être signé HTTP/1.1 et non HTTP/1.0
+  short int nokeepalive;        // pas de keep-alive
+  short int range_used;         // Range utilisé
+  short int nocompression;      // Pas de compression
+  short int flush_garbage;      // recycled
+  const char* user_agent;
+  const char* referer;
+  const char* from;
+  const char* lang_iso;
+  const char* accept;
+  const char* headers;
+  htsrequest_proxy proxy;       // proxy
+};
+
+// structure pour retour d'une connexion/prise d'en tête
+#ifndef HTS_DEF_FWSTRUCT_htsblk
+#define HTS_DEF_FWSTRUCT_htsblk
+typedef struct htsblk htsblk;
+#endif
+struct htsblk {
+  int statuscode;               // status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
+  short int notmodified;        // page ou fichier NON modifié (transféré)
+  short int is_write;           // sortie sur disque (out) ou en mémoire (adr)
+  short int is_chunk;           // mode chunk
+  short int compressed;         // compressé?
+  short int empty;              // vide?
+  short int keep_alive;         // Keep-Alive?
+  short int keep_alive_trailers;        // ..with trailers extension
+  int keep_alive_t;             // KA timeout
+  int keep_alive_max;           // KA number of requests
+  char *adr;                    // adresse du bloc de mémoire, NULL=vide
+  char *headers;                // adresse des en têtes si présents
+  FILE *out;                    // écriture directe sur disque (si is_write=1)
+  LLint size;                   // taille fichier
+  char msg[80];                 // message éventuel si échec ("\0"=non précisé)
+  char contenttype[64];         // content-type ("text/html" par exemple)
+  char charset[64];             // charset ("iso-8859-1" par exemple)
+  char contentencoding[64];     // content-encoding ("gzip" par exemple)
+  char *location;               // on copie dedans éventuellement la véritable 'location'
+  LLint totalsize;              // taille totale à télécharger (-1=inconnue)
+  short int is_file;            // ce n'est pas une socket mais un descripteur de fichier si 1
+  T_SOC soc;                    // ID socket
+  SOCaddr address;              // IP address
+  int address_size;             // IP address structure length (unused internally)
+  FILE *fp;                     // fichier pour file://
+#if HTS_USEOPENSSL
+  short int ssl;                // is this connection a SSL one? (https)
+  // BIO* ssl_soc;          // SSL structure
+  SSL *ssl_con;                 // connection structure
+#endif
+  char lastmodified[64];        // Last-Modified
+  char etag[256];               // Etag
+  char cdispo[256];             // Content-Disposition coupé
+  LLint crange;                 // Content-Range
+  LLint crange_start;           // Content-Range
+  LLint crange_end;             // Content-Range
+  int debugid;                  // debug connection
+  /* */
+  htsrequest req;               // paramètres pour la requête
+  /*char digest[32+2];   // digest md5 généré par le moteur ("" si non généré) */
+};
+
+// structure d'un lien
+#ifndef HTS_DEF_FWSTRUCT_lien_url
+#define HTS_DEF_FWSTRUCT_lien_url
+typedef struct lien_url lien_url;
+#endif
+struct lien_url {
+  char *adr;                    // adresse
+  char *fil;                    // nom du fichier distant
+  char *sav;                    // nom à sauver sur disque (avec chemin éventuel)
+  char *cod;                    // chemin codebase éventuel si classe java
+  char *former_adr;             // adresse initiale (avant éventuel moved), peut être nulle
+  char *former_fil;             // nom du fichier distant initial (avant éventuel moved), peut être nul
+
+  int premier;                  // pointeur sur le premier lien qui a donné lieu aux autres liens du domaine
+  int precedent;                // pointeur sur le lien qui a donné lieu à ce lien précis
+  int depth;                    // profondeur autorisée lien ; >0 forte 0=faible
+  int pass2;                    // traiter après les autres, seconde passe. si == -1, lien traité en background
+  char link_import;             // lien importé à la suite d'un moved - ne pas appliquer les règles classiques up/down
+  //int moved;          // pointeur sur moved
+  int retry;                    // nombre de retry restants
+  int testmode;                 // mode test uniquement, envoyer juste un head!
+};
+
+// chargement de fichiers en 'arrière plan'
+#ifndef HTS_DEF_FWSTRUCT_lien_back
+#define HTS_DEF_FWSTRUCT_lien_back
+typedef struct lien_back lien_back;
+#endif
+struct lien_back {
+#if DEBUG_CHECKINT
+  char magic;
+#endif
+  char url_adr[HTS_URLMAXSIZE * 2];     // adresse
+  char url_fil[HTS_URLMAXSIZE * 2];     // nom du fichier distant
+  char url_sav[HTS_URLMAXSIZE * 2];     // nom à sauver sur disque (avec chemin éventuel)
+  char referer_adr[HTS_URLMAXSIZE * 2]; // adresse host page referer
+  char referer_fil[HTS_URLMAXSIZE * 2]; // fichier page referer
+  char location_buffer[HTS_URLMAXSIZE * 2];     // "location" en cas de "moved" (302,..)
+  char *tmpfile;                // nom à sauver temporairement (compressé)
+  char tmpfile_buffer[HTS_URLMAXSIZE * 2];      // buffer pour le nom à sauver temporairement
+  char send_too[1024];          // données à envoyer en même temps que le header
+  int status;                   // status (-1=non utilisé, 0: prêt, >0: opération en cours)
+  int locked;                   // locked (to be used soon)
+  int testmode;                 // mode de test
+  int timeout;                  // gérer des timeouts? (!=0  : nombre de secondes)
+  TStamp timeout_refresh;       // si oui, time refresh
+  int rateout;                  // timeout refresh? (!=0 : taux minimum toléré en octets/s)
+  TStamp rateout_time;          // si oui, date de départ
+  LLint maxfile_nonhtml;        // taille max d'un fichier non html
+  LLint maxfile_html;           // idem pour un ficheir html
+  htsblk r;                     // structure htsblk de chaque objet en background 
+  int is_update;                // mode update
+  int head_request;             // requète HEAD?
+  LLint range_req_size;         // range utilisé
+  TStamp ka_time_start;         // refresh time for KA 
+  //
+  int http11;                   // L'en tête doit être signé HTTP/1.1 et non HTTP/1.0
+  int is_chunk;                 // chunk?
+  char *chunk_adr;              // adresse chunk en cours de chargement
+  LLint chunk_size;             // taille chunk en cours de chargement
+  LLint chunk_blocksize;        // taille data declaree par le chunk
+  LLint compressed_size;        // taille compressés (stats uniquement)
+  //
+  //int links_index;        // to access liens[links_index]
+  //
+  char info[256];               // éventuel status pour le ftp
+  int stop_ftp;                 // flag stop pour ftp
+  int finalized;                // finalized (optim memory)
+  int early_add;                // was added before link heap saw it
+#if DEBUG_CHECKINT
+  char magic2;
+#endif
+};
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

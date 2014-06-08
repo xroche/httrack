@@ -2016,12 +2016,12 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
 // lire un fichier.. (compatible \0)
 /* Note: NOT utf-8 */
-char *readfile(char *fil) {
+char *readfile(const char *fil) {
   return readfile2(fil, NULL);
 }
 
 /* Note: NOT utf-8 */
-char *readfile2(char *fil, LLint * size) {
+char *readfile2(const char *fil, LLint * size) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
   INTsys len = 0;
@@ -2049,7 +2049,7 @@ char *readfile2(char *fil, LLint * size) {
 }
 
 /* Note: utf-8 */
-char *readfile_utf8(char *fil) {
+char *readfile_utf8(const char *fil) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
   const off_t len = fsize_utf8(fil);
@@ -2074,8 +2074,8 @@ char *readfile_utf8(char *fil) {
 }
 
 /* Note: NOT utf-8 */
-char *readfile_or(char *fil, char *defaultdata) {
-  char *realfile = fil;
+char *readfile_or(const char *fil, const char *defaultdata) {
+  const char *realfile = fil;
   char *ret;
   char catbuff[CATBUFF_SIZE];
 
@@ -2085,7 +2085,7 @@ char *readfile_or(char *fil, char *defaultdata) {
   if (ret)
     return ret;
   else {
-    char *adr = malloct(strlen(defaultdata) + 2);
+    char *adr = malloct(strlen(defaultdata) + 1);
 
     if (adr) {
       strcpybuff(adr, defaultdata);

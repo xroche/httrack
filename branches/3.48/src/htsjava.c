@@ -493,8 +493,9 @@ static char *printname(char rname[1024], char name[1024]) {
 
   p = &name[0];
 
-  if (*p != '[')
-    return "";
+  if (*p != '[') {
+    return rname;  // ""
+  }
   p += 2;
   //rname=(char*)calloct(strlen(name)+8,sizeof(char));
   p1 = rname;
@@ -504,13 +505,13 @@ static char *printname(char rname[1024], char name[1024]) {
     if (*p == ';') {
       *p1 = '\0';
       strcat(rname, ".class");
-      return (rname);
+      return rname;
     } else
       *p1 = *p;
     p1++;
   }
   p1 -= 3;
   *p1 = '\0';
-  return (rname);
+  return rname;
 
 }

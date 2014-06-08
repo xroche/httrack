@@ -59,8 +59,9 @@ int hts_zunpack(char *filename, char *newfile) {
       char catbuff[CATBUFF_SIZE];
       FILE *const in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
       const int fd = in != NULL ? fileno(in) : -1;
+      const int dup_fd = fd != -1 ? dup(fd) : -1;
       // Note: we must dup to be able to flose cleanly.
-      gzFile gz = fd != -1 ? gzdopen(dup(fd), "rb") : NULL;
+      const gzFile gz = dup_fd != -1 ? gzdopen(dup_fd, "rb") : NULL;
 
       if (gz) {
         FILE *const fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");

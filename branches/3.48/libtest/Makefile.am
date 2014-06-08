@@ -3,7 +3,7 @@ exemplesdir = $(datadir)/httrack/libtest
 exemples_DATA = *.c *.h *.txt
 EXTRA_DIST = $(exemples_DATA)
 
-INCLUDES = \
+AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
 	@V6_FLAG@ \
@@ -13,7 +13,7 @@ INCLUDES = \
 	-DDATADIR=\""$(datadir)"\" \
 	-DLIBDIR=\""$(libdir)"\"
 
-AM_CPPFLAGS = -I../src
+AM_CPPFLAGS += -I../src
 AM_LDFLAGS = -L../src
 
 # Examples

@@ -189,10 +189,10 @@ const char *hts_optalias[][4] = {
   /* Badly documented */
   {"debug-testfilters", "-#0", "param1", "debug: test filters"},
   {"advanced-flushlogs", "-#f", "single", ""},
-  {"advanced-maxfilters", "-#F", "param", ""},
+  {"advanced-maxfilters", "-#F", "param", "maximum number of scan rules"},
   {"version", "-#h", "single", ""},
   {"debug-scanstdin", "-#K", "single", ""},
-  {"advanced-maxlinks", "-#L", "single", ""},
+  {"advanced-maxlinks", "-#L", "param", "maximum number of links (0 to disable limit)"},
   {"advanced-progressinfo", "-#p", "single", "deprecated"},
   {"catch-url", "-#P", "single", "catch complex URL through proxy"},
   /*{"debug-oldftp","-#R","single",""}, */
@@ -517,9 +517,9 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
             tmp_argv[1] = _tmp_argv[1];
             tmp_argv[2] = _tmp_argv[2];
             tmp_argv[3] = _tmp_argv[3];
-            strcpybuff(tmp_argv[0], "--");
-            strcatbuff(tmp_argv[0], a);
-            strcpybuff(tmp_argv[1], b);
+            strcpybuff(_tmp_argv[0], "--");
+            strcatbuff(_tmp_argv[0], a);
+            strcpybuff(_tmp_argv[1], b);
 
             result =
               optalias_check(2, (const char *const *) tmp_argv, 0, &return_argc,
@@ -560,8 +560,8 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
 
 /* Get home directory, '.' if failed */
 /* example: /home/smith */
-char *hts_gethome(void) {
-  char *home = getenv("HOME");
+const char *hts_gethome(void) {
+  const char *home = getenv("HOME");
 
   if (home)
     return home;

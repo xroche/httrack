@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
+#include "htscore.h"
 #include <fcntl.h>
 #ifdef _WIN32
 #else
@@ -77,40 +78,25 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
 // 1- Init the URL catcher
 
 // catch_url_init(&port,&return_host);
-HTSEXT_API T_SOC catch_url_init(int *port, char *adr) {
+HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   T_SOC soc = INVALID_SOCKET;
-  char h_loc[256 + 2];
+  char h_loc[256];
 
-  if (gethostname(h_loc, 256) == 0) {   // host name
+  if (gethostname(h_loc, sizeof(h_loc)) == 0) {   // host name
     SOCaddr server;
-    int server_size = sizeof(server);
-    t_hostent *hp_loc;
-    t_fullhostent buffer;
-
-    // effacer structure
-    memset(&server, 0, sizeof(server));
-
-    if ((hp_loc = vxgethostbyname(h_loc, &buffer))) {   // notre host      
-
-      // copie adresse
-      SOCaddr_copyaddr(server, server_size, hp_loc->h_addr_list[0],
-                       hp_loc->h_length);
-
+    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) {   // notre host
       if ((soc =
            (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
                           0)) != INVALID_SOCKET) {
         SOCaddr_initport(server, *port);
-        if (bind(soc, (struct sockaddr *) &server, server_size) == 0) {
+        if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
           SOCaddr server2;
-          SOClen len;
+          SOClen len = SOCaddr_capacity(server2);
 
-          len = sizeof(server2);
-          // effacer structure
-          memset(&server2, 0, sizeof(server2));
-          if (getsockname(soc, (struct sockaddr *) &server2, &len) == 0) {
+          if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
             *port = ntohs(SOCaddr_sinport(server));     // récupérer port
-            if (listen(soc, 10) >= 0) { // au pif le 10
-              SOCaddr_inetntoa(adr, 128, server2, len);
+            if (listen(soc, 1) >= 0) {
+              SOCaddr_inetntoa(adr, 128, server2);
             } else {
 #ifdef _WIN32
               closesocket(soc);
@@ -168,15 +154,13 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
     /* INFOS */
     {
       SOCaddr server2;
-      SOClen len = sizeof(server2);
+      SOClen len = SOCaddr_capacity(server2);
 
-      // effacer structure
-      memset(&server2, 0, sizeof(server2));
-      if (getpeername(soc, (struct sockaddr *) &server2, &len) == 0) {
+      if (getpeername(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
         char dot[256 + 2];
 
-        SOCaddr_inetntoa(dot, 256, server2, sizeof(server2));
-        sprintf(url, "%s:%d", dot, htons(SOCaddr_sinport(server2)));
+        SOCaddr_inetntoa(dot, sizeof(dot), server2);
+        sprintf(url, "%s:%d", dot, ntohs(SOCaddr_sinport(server2)));
       }
     }
     /* INFOS */
@@ -191,21 +175,20 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
       socinput(soc, line, 1000);
       if (strnotempty(line)) {
         if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
-          char BIGSTK url_adr[HTS_URLMAXSIZE * 2];
-          char BIGSTK url_fil[HTS_URLMAXSIZE * 2];
+          lien_adrfil af;
 
           // méthode en majuscule
           size_t i;
           int r = 0;
 
-          url_adr[0] = url_fil[0] = '\0';
+          af.adr[0] = af.fil[0] = '\0';
           //
           for(i = 0; method[i] != '\0'; i++) {
             if ((method[i] >= 'a') && (method[i] <= 'z'))
               method[i] -= ('a' - 'A');
           }
           // adresse du lien
-          if (ident_url_absolute(url, url_adr, url_fil) >= 0) {
+          if (ident_url_absolute(url, &af) >= 0) {
             // Traitement des en-têtes
             char BIGSTK loc[HTS_URLMAXSIZE * 2];
             htsblk blkretour;
@@ -214,7 +197,7 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
             //memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
-            sprintf(data, "%s %s %s\r\n", method, url_fil, protocol);
+            sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
             while(strnotempty(line)) {
               socinput(soc, line, 1000);
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter

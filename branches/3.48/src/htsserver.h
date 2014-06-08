@@ -91,16 +91,16 @@ extern httrackp *global_opt;
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
-extern int smallserver_setkey(char *key, char *value);
-extern int smallserver_setkeyint(char *key, LLint value);
-extern int smallserver_setkeyarr(char *key, int id, char *key2, char *value);
+extern int smallserver_setkey(const char *key, const char *value);
+extern int smallserver_setkeyint(const char *key, LLint value);
+extern int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value);
 
 int htslang_init(void);
 int htslang_uninit(void);
 
 /* Static definitions */
 
-HTS_UNUSED static char *gethomedir(void);
+HTS_UNUSED static const char *gethomedir(void);
 HTS_UNUSED static int linput_cpp(FILE * fp, char *s, int max);
 HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max);
 HTS_UNUSED static int fexist(const char *s);
@@ -147,7 +147,7 @@ HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
     FD_SET(soc, &fds);
     tv.tv_sec = timeout;
     tv.tv_usec = 0;
-    select(soc + 1, &fds, NULL, NULL, &tv);
+    select((int) soc + 1, &fds, NULL, NULL, &tv);
     if (FD_ISSET(soc, &fds))
       return 1;
     else
@@ -163,8 +163,8 @@ HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   return -1;
 }
 
-static char *gethomedir(void) {
-  char *home = getenv("HOME");
+static const char *gethomedir(void) {
+  const char *home = getenv("HOME");
 
   if (home)
     return home;
@@ -228,7 +228,7 @@ static int linput(FILE * fp, char *s, int max) {
 }
 static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
-  char *ls = (char *) malloc(max + 2);
+  char *ls = (char *) malloc(max + 1);
 
   s[0] = '\0';
   if (ls) {
@@ -267,11 +267,11 @@ static int ehexh(char c) {
   return 0;
 }
 
-static int ehex(char *s) {
+static int ehex(const char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-HTS_UNUSED static void unescapehttp(char *s, String * tempo) {
+HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
   size_t i;
 
   for(i = 0; s[i] != '\0'; i++) {

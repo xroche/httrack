@@ -4,8 +4,21 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.48-6
-+ Fixed: mitigate the "hashtable internal error: cuckoo/stash collision" errors
+3.48-12
++ Fixed: --advanced-maxlinks broken (Localhost)
++ Fixed: -devel package should now be standalone
++ Fixed: assertion failure at htscore.c:244 (len + liensbuf->string_buffer_size < liensbuf->string_buffer_capa)
++ Fixed: injection-proof templates
++ Fixed: htshash.c:330 assertion failure ("error invalidating hash entry") (Sergey)
++ Fixed: Windows 2000 regression (fantozzi.usenet)
++ Fixed: code cleanup (aliasing issues, const correctness, safe strings)
++ New: handle --advanced-maxlinks=0 to disable maximum link limits
++ New: updated ZIP routines (zlib 1.2.8)
++ Fixed: broken 32-bit version
++ Fixed: assertion "segOutputSize < segSize assertion fails at htscharset.c:993"
++ Fixed: new zlib version fixing CVE-2004-0797 and CVE-2005-2096
++ Fixed: more reliable crash reporting
++ Fixed: fixed infamous "hashtable internal error: cuckoo/stash collision" errors
 + Fixed: safety cleanup in many strings operations
 + Fixed: buggy option pannels
 + New: Enforce check against CVE-2014-0160

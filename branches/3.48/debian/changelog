@@ -1,3 +1,47 @@
+httrack (3.48.13-1) unstable; urgency=low
+
+  * Updated to 3.48.13 (3.48-13)
+    closes:#750931
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 08 Jun 2014 16:22:13 +0200
+
+httrack (3.48.12-1) unstable; urgency=low
+
+  * Updated to 3.48.12 (3.48-12)
+    Should fix missing/broken .h for libhttrack-dev
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 08 Jun 2014 13:19:49 +0200
+
+httrack (3.48.11-1) unstable; urgency=low
+
+  * Updated to 3.48.11 (3.48-11)
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 06 Jun 2014 17:58:12 +0200
+
+httrack (3.48.10-1) unstable; urgency=low
+
+  * Updated to 3.48.10 (3.48-10)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 04 Jun 2014 19:00:07 +0200
+
+httrack (3.48.9-1) unstable; urgency=low
+
+  * Updated to 3.48.9 (3.48-9)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 21 May 2014 19:22:04 +0200
+
+httrack (3.48.8-1) unstable; urgency=low
+
+  * Updated to 3.48.8 (3.48-8)
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 15 May 2014 19:21:21 +0200
+
+httrack (3.48.7-1) unstable; urgency=low
+
+  * Updated to 3.48.7 (3.48-7)
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 14 May 2014 19:51:57 +0200
+
 httrack (3.48.6-1) unstable; urgency=low
 
   * Updated to 3.48.6 (3.48-6)

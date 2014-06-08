@@ -91,11 +91,11 @@ static int ehexh(char c) {
   return 0;
 }
 
-static int ehex(char *s) {
+static int ehex(const char *s) {
   return 16 * ehexh(*s) + ehexh(*(s + 1));
 }
 
-static void unescapehttp(char *s, String * tempo) {
+static void unescapehttp(const char *s, String * tempo) {
   size_t i;
 
   for(i = 0; s[i] != '\0'; i++) {
@@ -122,12 +122,15 @@ static void unescapehttp(char *s, String * tempo) {
 // -1 : erreur
 // -2 : protocole non supporté (ftp)
 int ident_url_relatif(const char *lien, const char *origin_adr,
-                      const char *origin_fil, char *adr, char *fil) {
+                      const char *origin_fil,
+                      lien_adrfil* const adrfil) {
   int ok = 0;
   int scheme = 0;
 
-  adr[0] = '\0';
-  fil[0] = '\0';                //effacer buffers
+  assertf(adrfil != NULL);
+
+  adrfil->adr[0] = '\0';
+  adrfil->fil[0] = '\0';                //effacer buffers
 
   // lien non vide!
   if (strnotempty(lien) == 0)
@@ -149,13 +152,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       || (strfield(lien, "file://"))    // scheme+//
       || (strncmp(lien, "//", 2) == 0)  // // sans scheme (-> default)
     ) {
-    if (ident_url_absolute(lien, adr, fil) == -1) {
+    if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                  // erreur URL
     }
   } else if (strfield(lien, "ftp://")) {
     // Note: ftp:foobar.gif is not valid
     if (ftp_available()) {      // ftp supporté
-      if (ident_url_absolute(lien, adr, fil) == -1) {
+      if (ident_url_absolute(lien, adrfil) == -1) {
         ok = -1;                // erreur URL
       }
     } else {
@@ -164,7 +167,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 #if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
     // Note: ftp:foobar.gif is not valid
-    if (ident_url_absolute(lien, adr, fil) == -1) {
+    if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                // erreur URL
     }
 #endif
@@ -191,30 +194,30 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       /* patch scheme if necessary */
       if (strfield(lien, "http:")) {
         lien += 5;
-        strcpybuff(adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
+        strcpybuff(adrfil->adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
       } else if (strfield(lien, "https:")) {
         lien += 6;
-        strcpybuff(adr, "https://");    // même adresse forcée en https
-        strcatbuff(adr, jump_protocol(origin_adr));
+        strcpybuff(adrfil->adr, "https://");    // même adresse forcée en https
+        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
       } else if (strfield(lien, "ftp:")) {
         lien += 4;
-        strcpybuff(adr, "ftp://");      // même adresse forcée en ftp
-        strcatbuff(adr, jump_protocol(origin_adr));
+        strcpybuff(adrfil->adr, "ftp://");      // même adresse forcée en ftp
+        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
       } else {
-        strcpybuff(adr, origin_adr);    // même adresse ; et même éventuel protocole
+        strcpybuff(adrfil->adr, origin_adr);    // même adresse ; et même éventuel protocole
       }
 
       if (*lien != '/') {       // sinon c'est un lien absolu
         if (*lien == '\0') {
-          strcpybuff(fil, origin_fil);
+          strcpybuff(adrfil->fil, origin_fil);
         } else if (*lien == '?') {      // example: a href="?page=2"
           char *a;
 
-          strcpybuff(fil, origin_fil);
-          a = strchr(fil, '?');
+          strcpybuff(adrfil->fil, origin_fil);
+          a = strchr(adrfil->fil, '?');
           if (a)
             *a = '\0';
-          strcatbuff(fil, lien);
+          strcatbuff(adrfil->fil, lien);
         } else {
           const char *a = strchr(origin_fil, '?');
 
@@ -225,14 +228,14 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
           if (*a == '/') {      // ok on a un '/'
             if ((((int) (a - origin_fil)) + 1 + strlen(lien)) < HTS_URLMAXSIZE) {
               // copier chemin
-              strncpy(fil, origin_fil, ((int) (a - origin_fil)) + 1);
-              *(fil + ((int) (a - origin_fil)) + 1) = '\0';
+              strncpy(adrfil->fil, origin_fil, ((int) (a - origin_fil)) + 1);
+              *(adrfil->fil + ((int) (a - origin_fil)) + 1) = '\0';
 
               // copier chemin relatif
-              if (((int) strlen(fil) + (int) strlen(lien)) < HTS_URLMAXSIZE) {
-                strcatbuff(fil, lien + ((*lien == '/') ? 1 : 0));
+              if (((int) strlen(adrfil->fil) + (int) strlen(lien)) < HTS_URLMAXSIZE) {
+                strcatbuff(adrfil->fil, lien + ((*lien == '/') ? 1 : 0));
                 // simplifier url pour les ../
-                fil_simplifie(fil);
+                fil_simplifie(adrfil->fil);
               } else
                 ok = -1;        // erreur
             } else {            // erreur
@@ -244,8 +247,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
         }
       } else {                  // chemin absolu
         // copier chemin directement
-        strcatbuff(fil, lien);
-        fil_simplifie(fil);
+        strcatbuff(adrfil->fil, lien);
+        fil_simplifie(adrfil->fil);
       }                         // *lien!='/'
     } else
       ok = -1;
@@ -254,7 +257,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 
   // case insensitive pour adresse
   {
-    char *a = jump_identification(adr);
+    char *a = jump_identification(adrfil->adr);
 
     while(*a) {
       if ((*a >= 'A') && (*a <= 'Z'))
@@ -264,8 +267,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   }
 
   // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
-  if (!link_has_authority(adr) || strfield(adr, "https:")) {
-    char *const a = jump_identification(adr);
+  if (!link_has_authority(adrfil->adr) || strfield(adrfil->adr, "https:")) {
+    char *const a = jump_identification(adrfil->adr);
     // Non-ASCII characters (theorically forbidden, but browsers are lenient)
     if (!hts_isStringAscii(a, strlen(a))) {
       char *const idna = hts_convertStringUTF8ToIDNA(a, strlen(a));
@@ -708,19 +711,18 @@ HTS_INLINE int rech_sampletag(const char *adr, const char *s) {
 }
 
 // teste si le tag contenu dans from est égal à "tag"
-HTS_INLINE int check_tag(char *from, const char *tag) {
-  char *a = from + 1;
+HTS_INLINE int check_tag(const char *from, const char *tag) {
+  const char *a = from + 1;
   int i = 0;
   char s[256];
 
   while(is_space(*a))
     a++;
-  while((isalnum((unsigned char) *a) || (*a == '/')) && (i < 250)) {
-    s[i++] = *a;
-    a++;
+  for( ; (isalnum((unsigned char) *a) || (*a == '/')) && i + 1 < sizeof(s) ; i++, a++) {
+    s[i] = *a;
   }
-  s[i++] = '\0';
-  return (strfield2(s, tag));   // comparer
+  s[i] = '\0';
+  return strfield2(s, tag);   // comparer
 }
 
 // teste si un fichier dépasse le quota
@@ -758,7 +760,117 @@ static int sortTopIndexFnc(const void *a_, const void *b_) {
   return cmp;
 }
 
-//HTSEXT_API char *hts_getcategory(const char *filename);
+typedef struct hts_template_format_buf {
+  FILE *fp;
+  char *buffer;
+  size_t size;
+  size_t offset;
+} hts_template_format_buf;
+
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+static int hts_template_formatv(hts_template_format_buf *buf, 
+                                const char *format, va_list args) {
+#undef FPUTC
+#undef FPUTS
+#define FPUTC(C) do { \
+  if (buf->fp != NULL) { \
+    assertf(buf->buffer == NULL); \
+    if (fputc(C, buf->fp) < 0) { \
+      return -1; \
+    } \
+  } else { \
+    assertf(buf->buffer != NULL); \
+    if (buf->offset + 1 < buf->size) { \
+      buf->buffer[buf->offset++] = (C); \
+    } else { \
+      return -1; \
+    } \
+  } \
+} while(0)
+#define FPUTS(S) do { \
+  size_t i; \
+  const char *const str_ = (S); \
+  assertf(str_ != NULL); \
+  for(i = 0 ; str_[i] != '\0' ; i++) { \
+    FPUTC(str_[i]); \
+  } \
+} while(0)
+
+  if (buf != NULL && format != NULL) {
+    const char *arg_expanded[32];
+    size_t i, nbArgs, posArgs;
+    /* Expand internal code args. */
+    const char *str;
+    for(nbArgs = 0 ; ( str = va_arg(args, const char*) ) != NULL ; nbArgs++) {
+      assertf(nbArgs < sizeof(arg_expanded)/sizeof(arg_expanded[0]));
+      arg_expanded[nbArgs] = str;
+    }
+    /* Expand user-injected format string. */
+    for(posArgs = 0, i = 0 ; format[i] != '\0' ; i++) {
+      const unsigned char c = format[i];
+      if (c == '%') {
+        const unsigned char cFormat = format[++i];
+        switch(cFormat) {
+        case '%':
+          FPUTC('%');
+          break;
+        case 's':
+          if (posArgs < nbArgs) {
+            assertf(arg_expanded[posArgs] != NULL);
+            FPUTS(arg_expanded[posArgs]);
+            posArgs++;
+          } else {
+            FPUTS("???");  /* error (args overflow) */
+          }
+          break;
+        default:  /* ignored */
+          FPUTC('%');
+          FPUTC(cFormat);
+          break;
+        }
+      } else {
+        FPUTC(c);
+      }
+    }
+    /* Terminating NULL. */
+    if (buf->buffer != NULL) {
+      buf->buffer[buf->offset] = 0;
+    }
+    return 1;
+  } else {
+    return -1;
+  }
+#undef FPUTC
+#undef FPUTS
+}
+
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+int hts_template_format(FILE *const out, const char *format, ...) {
+  int success;
+  hts_template_format_buf buf = { NULL, NULL, 0, 0 };
+  va_list args;
+  buf.fp = out;
+  va_start(args, format);
+  success = hts_template_formatv(&buf, format, args);
+  va_end(args);
+  return success;
+}
+
+// note: upstream arg list MUST be NULL-terminated for safety
+// returns a negative value upon error
+int hts_template_format_str(char *buffer, size_t size, const char *format, ...) {
+  int success;
+  hts_template_format_buf buf = { NULL, NULL, 0, 0 };
+  va_list args;
+  buf.buffer = buffer;
+  buf.size = size;
+  va_start(args, format);
+  success = hts_template_formatv(&buf, format, args);
+  va_end(args);
+  return success;
+}
 
 /* Note: NOT utf-8 */
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
@@ -799,9 +911,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
       verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/")); // générer gif
       // Header
-      fprintf(fpo, toptemplate_header,
+      hts_template_format(fpo, toptemplate_header,
               "<!-- Mirror and index made by HTTrack Website Copier/"
-              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->");
+              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
       /* Find valid project names */
       h = hts_findfirst(rpath);
@@ -870,7 +982,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
           assertf(sortedElts != NULL);
           if (sortedElts != NULL) {
             int i;
-            char *category = "";
+            const char *category = "";
 
             /* Build array */
             struct topindex_chain *chain = startchain;
@@ -892,9 +1004,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               /* Changed category */
               if (strcmp(category, sortedElts[i]->category) != 0) {
                 category = sortedElts[i]->category;
-                fprintf(fpo, toptemplate_bodycat, category);
+                hts_template_format(fpo, toptemplate_bodycat, category, /* EOF */ NULL);
               }
-              fprintf(fpo, toptemplate_body, hname, sortedElts[i]->name);
+              hts_template_format(fpo, toptemplate_body, hname, sortedElts[i]->name, /* EOF */ NULL);
             }
 
             /* Wipe elements */
@@ -912,9 +1024,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
       }
       // Footer
-      fprintf(fpo, toptemplate_footer,
+      hts_template_format(fpo, toptemplate_footer,
               "<!-- Mirror and index made by HTTrack Website Copier/"
-              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->");
+              HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
       fclose(fpo);
 
