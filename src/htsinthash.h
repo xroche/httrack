@@ -26,8 +26,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: httrack.c subroutines:                                 */
-/*       hash table system (fast index)                         */
+/* File: hash table system (fast index)                         */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -113,17 +112,33 @@ struct inthash_item {
   inthash_keys hashes;
 };
 
+/** Log level. **/
+typedef enum inthash_loglevel {
+  inthash_log_critical,
+  inthash_log_warning,
+  inthash_log_info,
+  inthash_log_debug,
+  inthash_log_trace
+} inthash_loglevel;
+
 /** Alias for legacy code. **/
 typedef inthash_item inthash_chain;
 
 /** Value free handler **/
-typedef void (*t_inthash_freehandler) (void *arg, void *value);
+typedef void (*t_inthash_freehandler)(void *arg, void *value);
 
 /** Name dup handler. **/
-typedef char* (*t_inthash_duphandler) (void *arg, const char *name);
+typedef char* (*t_inthash_duphandler)(void *arg, const char *name);
 
 /** Hash computation handler. **/
 typedef inthash_keys (*t_inthash_hasheshandler)(void *arg, const char *value);
+
+/** Hashtable logging handler. **/
+typedef void (*t_inthash_loghandler)(void *arg, inthash_loglevel level, 
+                                     const char* format, va_list args);
+
+/** Hashtable fatal assertion failure. **/
+typedef void (*t_inthash_asserthandler)(void *arg, const char* exp, const char* file, int line);
 
 /**
  * Value comparison handler (returns non-zero value if strings are equal).
@@ -214,6 +229,28 @@ void inthash_value_set_key_handler(inthash hashtable,
                                    t_inthash_hasheshandler hash,
                                    t_inthash_cmphandler equals,
                                    void *arg);
+
+/**
+ * Set assertion failure handler.
+ * log: handler called upon serious programming error
+ * fatal: handler called upon serious programming error
+ **/
+void inthash_set_assert_handler(inthash hashtable,
+                                t_inthash_loghandler log,
+                                t_inthash_asserthandler fatal,
+                                void *arg);
+
+/**
+ * Set the hashtable name, for degugging purpose.
+ * name: the hashtable name (ASCII or UTF-8)
+ */
+void inthash_set_name(inthash hashtable, const char *name);
+
+/**
+ * Get the hashtable name, for degugging purpose.
+ * Return NULL if no name was defined.
+ **/
+const char* inthash_get_name(inthash hashtable);
 
 /**
  * Read an integer entry from the hashtable.
@@ -308,6 +345,18 @@ inthash_item *inthash_enum_next(struct_inthash_enum * e);
  * Compute a hash, given a string value.
  **/
 inthash_keys inthash_hash_value(const char *value);
+
+/**
+ * Set default global assertion failure handler.
+ * The handler will be used if no specific handler was defined in the
+ * hashtable itself.
+ * log: handler called upon serious error log (opaque argument 
+ * is the hashtable itself)
+ * fatal: handler called upon serious programming error (opaque argument 
+ * is the hashtable itself)
+ **/
+void inthash_set_global_assert_handler(t_inthash_loghandler log,
+                                       t_inthash_asserthandler fatal);
 
 #endif
 

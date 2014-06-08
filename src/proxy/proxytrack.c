@@ -103,6 +103,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 */
 
 /* HTTrack definitions */
+#define HTSSAFE_ABORT_FUNCTION(A,B,C)
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
@@ -145,8 +146,6 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #endif
 
 /* External references */
-// htsErrorCallback htsCallbackErr = NULL;
-int htsMemoryFastXfr = 1;       /* fast xfr by default */
 void abortLog__fnc(char *msg, char *file, int line);
 void abortLog__fnc(char *msg, char *file, int line) {
   FILE *fp = fopen("CRASH.TXT", "wb");
@@ -166,7 +165,6 @@ void abortLog__fnc(char *msg, char *file, int line) {
   }
 }
 
-// HTSEXT_API t_abortLog abortLog__ = abortLog__fnc;    /* avoid VC++ inlining */
 #define webhttrack_lock(A) do{}while(0)
 
 /* Static definitions */

@@ -172,7 +172,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 #if JAVADEBUG
       printf("fopen\n");
 #endif
-      if ((fpout = FOPEN(fconv(catbuff, file), "r+b")) == NULL) {
+      if ((fpout = FOPEN(fconv(catbuff, sizeof(catbuff), file), "r+b")) == NULL) {
         //fprintf(stderr, "Cannot open input file.\n");
         sprintf(str->err_msg, "Unable to open file %s", file);
         return 0;               // une erreur..
@@ -477,7 +477,7 @@ static int tris(httrackp * opt, char *buffer) {
     if (strnotempty(type))      // type reconnu!
       return 1;
     // ajout RX 05/2001
-    else if (is_dyntype(get_ext(catbuff, buffer)))      // asp,cgi...
+    else if (is_dyntype(get_ext(catbuff, sizeof(catbuff), buffer)))      // asp,cgi...
       return 1;
   }
   return 0;

@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsthread.h"
+#include "httrack-library.h"
 
 #if USE_BEGINTHREAD
 #ifdef _WIN32
@@ -196,7 +197,7 @@ HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
   }
   assertf(*mutex != NULL);
 #ifdef _WIN32
-  assert((*mutex)->handle != NULL);
+  assertf((*mutex)->handle != NULL);
   WaitForSingleObject((*mutex)->handle, INFINITE);
 #else
   pthread_mutex_lock(&(*mutex)->handle);
@@ -206,7 +207,7 @@ HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
 HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
   assertf(mutex != NULL && *mutex != NULL);
 #ifdef _WIN32
-  assert((*mutex)->handle != NULL);
+  assertf((*mutex)->handle != NULL);
   ReleaseMutex((*mutex)->handle);
 #else
   pthread_mutex_unlock(&(*mutex)->handle);

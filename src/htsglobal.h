@@ -36,8 +36,8 @@ Please visit our Website: http://www.httrack.com
 #define HTTRACK_GLOBAL_DEFH
 
 // Version (also check external version information)
-#define HTTRACK_VERSION      "3.48-5"
-#define HTTRACK_VERSIONID    "3.48.5"
+#define HTTRACK_VERSION      "3.48-6"
+#define HTTRACK_VERSIONID    "3.48.6"
 #define HTTRACK_AFF_VERSION  "3.x"
 #define HTTRACK_LIB_VERSION  "2.0"
 
@@ -54,6 +54,19 @@ Please visit our Website: http://www.httrack.com
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
 #define SIZEOF_LONG_LONG 8
+#endif
+#endif
+
+/* GCC extension */
+#ifndef HTS_UNUSED
+#ifdef __GNUC__
+#define HTS_UNUSED __attribute__ ((unused))
+#define HTS_STATIC static __attribute__ ((unused))
+#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
+#else
+#define HTS_UNUSED
+#define HTS_STATIC static
+#define HTS_PRINTF_FUN(fmt, arg)
 #endif
 #endif
 
