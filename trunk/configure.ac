@@ -30,7 +30,7 @@ Please visit our Website: http://www.httrack.com
 AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
 VERSION_INFO="2:48:0"
 AM_MAINTAINER_MODE
 
