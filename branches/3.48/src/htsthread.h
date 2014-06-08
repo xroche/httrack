@@ -64,9 +64,6 @@ struct htsmutex_s {
 /* Library internal definictions */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API void htsthread_wait(void);
-#endif
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
 /* Locking functions */

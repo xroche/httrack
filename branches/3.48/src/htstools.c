@@ -68,16 +68,16 @@ struct find_handle_struct {
   char path[2048];
 };
 #endif
-#ifndef HTS_DEF_FWSTRUCT_topindex_chain
-#define HTS_DEF_FWSTRUCT_topindex_chain
-typedef struct topindex_chain topindex_chain;
-#endif
-struct topindex_chain {
-  int level;                    /* sort level */
-  char *category;               /* category */
-  char name[2048];              /* path */
-  struct topindex_chain *next;  /* next element */
-};
+//#ifndef HTS_DEF_FWSTRUCT_topindex_chain
+//#define HTS_DEF_FWSTRUCT_topindex_chain
+//typedef struct topindex_chain topindex_chain;
+//#endif
+//struct topindex_chain {
+//  int level;                    /* sort level */
+//  char *category;               /* category */
+//  char name[2048];              /* path */
+//  struct topindex_chain *next;  /* next element */
+//};
 
 /* Tools */
 
@@ -541,11 +541,11 @@ int verif_backblue(httrackp * opt, const char *base) {
     return 0;
   }
   if ((!*done)
-      || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), base, "backblue.gif")) !=
+      || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif")) !=
           HTS_DATA_BACK_GIF_LEN)) {
     FILE *fp =
       filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), base, "backblue.gif"));
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"));
     *done = 1;
     if (fp) {
       if (fwrite(HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN, 1, fp) !=
@@ -553,19 +553,19 @@ int verif_backblue(httrackp * opt, const char *base) {
         ret = 1;
       fclose(fp);
       usercommand(opt, 0, NULL,
-                  fconcat(OPT_GET_BUFF(opt), base, "backblue.gif"), "", "");
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"), "", "");
     } else
       ret = 1;
     //
     fp =
       filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), base, "fade.gif"));
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"));
     if (fp) {
       if (fwrite(HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN, 1, fp) !=
           HTS_DATA_FADE_GIF_LEN)
         ret = 1;
       fclose(fp);
-      usercommand(opt, 0, NULL, fconcat(OPT_GET_BUFF(opt), base, "fade.gif"),
+      usercommand(opt, 0, NULL, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"),
                   "", "");
     } else
       ret = 1;
@@ -758,7 +758,7 @@ static int sortTopIndexFnc(const void *a_, const void *b_) {
   return cmp;
 }
 
-HTSEXT_API char *hts_getcategory(const char *filename);
+//HTSEXT_API char *hts_getcategory(const char *filename);
 
 /* Note: NOT utf-8 */
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
@@ -772,16 +772,16 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
   // et templates html
   toptemplate_header =
-    readfile_or(fconcat(catbuff, binpath, "templates/topindex-header.html"),
+    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-header.html"),
                 HTS_INDEX_HEADER);
   toptemplate_body =
-    readfile_or(fconcat(catbuff, binpath, "templates/topindex-body.html"),
+    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-body.html"),
                 HTS_INDEX_BODY);
   toptemplate_bodycat =
-    readfile_or(fconcat(catbuff, binpath, "templates/topindex-bodycat.html"),
+    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-bodycat.html"),
                 HTS_INDEX_BODYCAT);
   toptemplate_footer =
-    readfile_or(fconcat(catbuff, binpath, "templates/topindex-footer.html"),
+    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-footer.html"),
                 HTS_INDEX_FOOTER);
 
   if (toptemplate_header && toptemplate_body && toptemplate_footer
@@ -793,11 +793,11 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
         rpath[strlen(rpath) - 1] = '\0';
     }
 
-    fpo = fopen(fconcat(catbuff, rpath, "/index.html"), "wb");
+    fpo = fopen(fconcat(catbuff, sizeof(catbuff), rpath, "/index.html"), "wb");
     if (fpo) {
       find_handle h;
 
-      verif_backblue(opt, concat(catbuff, rpath, "/")); // générer gif
+      verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/")); // générer gif
       // Header
       fprintf(fpo, toptemplate_header,
               "<!-- Mirror and index made by HTTrack Website Copier/"
@@ -887,8 +887,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
             for(i = 0; i < chainSize; i++) {
               char BIGSTK hname[HTS_URLMAXSIZE * 2];
 
-              strcpybuff(hname, sortedElts[i]->name);
-              escape_uri_utf(hname);
+              escape_uri_utf(sortedElts[i]->name, hname, sizeof(hname));
 
               /* Changed category */
               if (strcmp(category, sortedElts[i]->category) != 0) {
@@ -981,6 +980,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
 
     if (type == 1) {
       hashCateg = inthash_new(0);
+      inthash_set_name(hashCateg, "hashCateg");
       StringCat(categ, "Test category 1");
       StringCat(categ, "\r\nTest category 2");
     }
@@ -1111,7 +1111,7 @@ HTSEXT_API int hts_findnext(find_handle find) {
     if ((find->dirp = readdir(find->hdir)))
       if (find->dirp->d_name)
         if (!STAT
-            (concat(catbuff, find->path, find->dirp->d_name), &find->filestat))
+            (concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name), &find->filestat))
           return 1;
 #endif
   }

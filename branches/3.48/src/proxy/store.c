@@ -41,6 +41,7 @@ static long int  timezone = 0;
 #include <pthread.h>
 #endif
 
+#define HTSSAFE_ABORT_FUNCTION(A,B,C)
 #include "htsglobal.h"
 
 #define HTS_INTERNAL_BYTECODE
@@ -237,6 +238,7 @@ PT_Indexes PT_New(void) {
   PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
 
   index->cil = inthash_new(0);
+  inthash_set_name(index->cil, "index->cil");
   index->index_size = 0;
   index->index = NULL;
   return index;
@@ -252,8 +254,6 @@ void PT_Delete(PT_Indexes index) {
 int PT_RemoveIndex(PT_Indexes index, int indexId) {
   return 0;
 }
-
-#define assertf(exp)
 
 static int binput(char *buff, char *s, int max) {
   int count = 0;
@@ -433,8 +433,10 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     inthash_chain *chain;
     inthash hdupes = NULL;
 
-    if (!subtree)
+    if (!subtree) {
       hdupes = inthash_new(0);
+      inthash_set_name(hdupes, "hdupes");
+    }
     StringClear(list);
     StringClear(listindexes);
     StringClear(subitem);
@@ -552,6 +554,7 @@ PT_Index PT_LoadCache(const char *filename) {
       index->slots.common.timestamp = (time_t) time(NULL);
       index->slots.common.startUrl[0] = '\0';
       index->slots.common.hash = inthash_new(0);
+      inthash_set_name(index->slots.common.hash, "index->slots.common.hash");
       if (!_IndexFuncts[type].PT_LoadCache(index, filename)) {
         proxytrack_print_log(DEBUG,
                              "reading httrack cache (format #%d) %s : error",
@@ -1157,7 +1160,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 /* Read in memory from cache */
                 if (flags & FETCH_BODY) {
                   if (strnotempty(previous_save)) {
-                    FILE *fp = fopen(fconv(catbuff, previous_save), "rb");
+                    FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
                     if (fp != NULL) {
                       r->adr = (char *) malloc(r->size + 4);
@@ -1179,7 +1182,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                     } else {
                       r->statuscode = STATUSCODE_INVALID;
                       sprintf(r->msg, "Read error (can't open '%s') from cache",
-                              fconv(catbuff, previous_save));
+                              file_convert(catbuff, sizeof(catbuff), previous_save));
                     }
                   } else {
                     r->statuscode = STATUSCODE_INVALID;

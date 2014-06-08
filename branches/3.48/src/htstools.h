@@ -106,11 +106,6 @@ HTSEXT_API int hts_findisdir(find_handle find);
 HTSEXT_API int hts_findisfile(find_handle find);
 HTSEXT_API int hts_findissystem(find_handle find);
 
-#ifndef HTTRACK_DEFLIB
-HTSEXT_API char *hts_getcategory(const char *filename);
-HTSEXT_API char *hts_getcategories(char *path, int type);
-#endif
-
 #endif
 
 #endif

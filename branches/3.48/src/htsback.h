@@ -68,7 +68,7 @@ typedef struct htsblk htsblk;
 #ifdef HTS_INTERNAL_BYTECODE
 
 // create/destroy
-struct_back *back_new(int back_max);
+struct_back *back_new(httrackp *opt, int back_max);
 void back_free(struct_back ** sback);
 
 // backing

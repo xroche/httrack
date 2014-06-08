@@ -57,13 +57,13 @@ int hts_zunpack(char *filename, char *newfile) {
   if (filename != NULL && newfile != NULL) {
     if (filename[0] && newfile[0]) {
       char catbuff[CATBUFF_SIZE];
-      FILE *const in = FOPEN(fconv(catbuff, filename), "rb");
+      FILE *const in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
       const int fd = in != NULL ? fileno(in) : -1;
       // Note: we must dup to be able to flose cleanly.
       gzFile gz = fd != -1 ? gzdopen(dup(fd), "rb") : NULL;
 
       if (gz) {
-        FILE *const fpout = FOPEN(fconv(catbuff, newfile), "wb");
+        FILE *const fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
         int size = 0;
 
         if (fpout) {
@@ -95,8 +95,8 @@ int hts_zunpack(char *filename, char *newfile) {
 
 int hts_extract_meta(const char *path) {
   char catbuff[CATBUFF_SIZE];
-  unzFile zFile = unzOpen(fconcat(catbuff, path, "hts-cache/new.zip"));
-  zipFile zFileOut = zipOpen(fconcat(catbuff, path, "hts-cache/meta.zip"), 0);
+  unzFile zFile = unzOpen(fconcat(catbuff, sizeof(catbuff), path, "hts-cache/new.zip"));
+  zipFile zFileOut = zipOpen(fconcat(catbuff, sizeof(catbuff), path, "hts-cache/meta.zip"), 0);
 
   if (zFile != NULL && zFileOut != NULL) {
     if (unzGoToFirstFile(zFile) == Z_OK) {
