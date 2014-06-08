@@ -173,6 +173,10 @@ struct struct_inthash_enum {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Create a new hashtable, with initial bucket size of 'size'.
  * If size is 0, use the default minimal bucket size.
@@ -376,6 +380,10 @@ inthash_keys inthash_hash_value(const char *value);
  **/
 void inthash_set_global_assert_handler(t_inthash_loghandler log,
                                        t_inthash_asserthandler fatal);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

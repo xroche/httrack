@@ -59,6 +59,10 @@ Please visit our Website: http://www.httrack.com
 #define INVALID_SOCKET -1
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if HTS_USEOPENSSL
 /*
    OpensSSL crypto routines by Eric Young (eay@cryptsoft.com)
@@ -153,5 +157,9 @@ typedef enum HTTrackStatus {
   STATUS_FTP_TRANSFER = 1000,
   STATUS_FTP_READY = 1001
 } HTTrackStatus;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

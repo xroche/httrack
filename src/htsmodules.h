@@ -115,6 +115,10 @@ struct htsmoduleStruct {
 
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Used to wrap module initialization */
 /* return 1 if init was ok */
 typedef int (*t_htsWrapperInit) (char *fn, char *args);
@@ -131,6 +135,10 @@ extern int hts_parse_externals(htsmoduleStruct * str);
 
 /*extern int swf_is_available;*/
 extern int V6_is_available;
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

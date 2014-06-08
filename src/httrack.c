@@ -223,6 +223,15 @@ int main(int argc, char **argv) {
 
   signal_handlers();
   hts_init();
+
+  // Check version compatibility
+  if (hts_sizeof_opt() != sizeof(httrackp)) {
+    fprintf(stderr,
+      "incompatible current httrack library version %s, expected version %s",
+      hts_version(), HTTRACK_VERSIONID);
+    abortLog("incompatible httrack library version, please update both httrack and its library");
+  }
+
   opt = global_opt = hts_create_opt();
   assert(opt->size_httrackp == sizeof(httrackp));
 
