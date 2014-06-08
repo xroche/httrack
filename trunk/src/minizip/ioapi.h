@@ -67,6 +67,24 @@
 #endif
 #endif
 
+/* As reported by sammyx, z_crc_t and z_const are not defined in pre-1.2.70 releases of zlib */
+/* See <https://github.com/madler/zlib/commit/6c9bd474aa08312ef2e2e9655a80e18db24a1680#diff-d466aa66f7e453e0c8a7719229cff391R391> */
+#if ZLIB_VERNUM < 0x1270
+
+#ifdef Z_U4
+   typedef Z_U4 z_crc_t;
+#else
+   typedef unsigned long z_crc_t;
+#endif
+
+#if defined(ZLIB_CONST) && !defined(z_const)
+#  define z_const const
+#else
+#  define z_const
+#endif
+
+#endif
+
 /*
 #ifndef ZPOS64_T
   #ifdef _WIN32
