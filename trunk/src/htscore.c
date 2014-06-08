@@ -195,7 +195,7 @@ static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
       liensbuf->string_buffer_size = 0;
     }
 
-    // Double capacity for each new chaines block
+    // Double capacity for each new chained block
     liensbuf->string_buffer_capa = 
       liensbuf->string_buffer_capa < block_capa 
       ? block_capa : liensbuf->string_buffer_capa * 2;
@@ -258,7 +258,7 @@ static size_t hts_record_link_alloc(httrackp *opt) {
       liensbuf->lien_buffer_size = 0;
     }
 
-    // Double capacity for each new chaines block
+    // Double capacity for each new chained block
     liensbuf->lien_buffer_capa = 
       liensbuf->lien_buffer_capa < block_capa 
       ? block_capa : liensbuf->lien_buffer_capa * 2;
