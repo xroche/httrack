@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+
+# basic entities handling (with boggy entities handling)
+test "$(httrack -O /dev/null -#6 "&foo;&nbsp;th&eacute;&amp;caf&#xe9;&#e9;&#x3082;&#12398;&#x306e;&#x3051;&#x59eb;")" == "&foo; thé&café&#e9;もののけ姫"	|| exit 1
