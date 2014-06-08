@@ -15,7 +15,7 @@ DevIncludes_DATA = \
 	htsarrays.h \
 	htssafe.h
 
-INCLUDES = \
+AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
 	@V6_FLAG@ \
