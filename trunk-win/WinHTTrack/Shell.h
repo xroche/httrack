@@ -11,11 +11,9 @@
 #endif
 
 /* basic HTTrack defs */
-extern "C" {
-  #include "htsglobal.h"
-  #include "htsopt.h"
-  #include "htsdefines.h"
-}
+#include "htsnet.h"
+#include "htsopt.h"
+#include "htsdefines.h"
 
 //
 // connecté via HTTrack? (défini dans projet)
