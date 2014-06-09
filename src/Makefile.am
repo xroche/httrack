@@ -80,6 +80,11 @@ EXTRA_DIST = httrack.h webhttrack \
 		minizip/ioapi.h.diff \
 		minizip/zip.c.diff \
 		minizip/zip.h.diff \
+		minizip/ioapi.c.orig \
+		minizip/ioapi.h.orig \
+		minizip/mztools.c.orig \
+		minizip/zip.c.orig \
+		minizip/zip.h.orig \
 		minizip/MiniZip64_Changes.txt \
 		minizip/MiniZip64_info.txt \
 		proxy/AUTHORS \
