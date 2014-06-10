@@ -80,6 +80,7 @@ EXTRA_DIST = httrack.h webhttrack \
 		minizip/ioapi.h.diff \
 		minizip/zip.c.diff \
 		minizip/zip.h.diff \
+		minizip/mztools.c.diff \
 		minizip/ioapi.c.orig \
 		minizip/ioapi.h.orig \
 		minizip/mztools.c.orig \
