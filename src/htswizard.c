@@ -459,7 +459,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       question = 0;             // pas de question, résolu
 
     // former URL complète du lien actuel
-    strcpybuff(l, jump_identification(adr));
+    strcpybuff(l, jump_identification_const(adr));
     if (*fil != '/')
       strcatbuff(l, "/");
     strcatbuff(l, fil);
@@ -711,7 +711,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         forbidden_url = 1;
         HT_INSERT_FILTERS0;     // insérer en 0
         strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification(adr));
+        strcatbuff(_FILTERS[0], jump_identification_const(adr));
         if (*fil != '/')
           strcatbuff(_FILTERS[0], "/");
         strcatbuff(_FILTERS[0], fil);
@@ -727,7 +727,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0
             strcpybuff(_FILTERS[0], "-");
-            strcatbuff(_FILTERS[0], jump_identification(adr));
+            strcatbuff(_FILTERS[0], jump_identification_const(adr));
             if (*fil != '/')
               strcatbuff(_FILTERS[0], "/");
             strncatbuff(_FILTERS[0], fil, i);
@@ -744,7 +744,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         forbidden_url = 1;
         HT_INSERT_FILTERS0;     // insérer en 0                                
         strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification(adr));
+        strcatbuff(_FILTERS[0], jump_identification_const(adr));
         strcatbuff(_FILTERS[0], "*");
         break;
 
@@ -786,7 +786,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0                                
             strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification(adr));
+            strcatbuff(_FILTERS[0], jump_identification_const(adr));
             if (*fil != '/')
               strcatbuff(_FILTERS[0], "/");
             strncatbuff(_FILTERS[0], fil, i + 1);
@@ -795,7 +795,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         } else {                // autoriser domaine alors!!
           HT_INSERT_FILTERS0;   // insérer en 0                                strcpybuff(filters[filptr],"+");
           strcpybuff(_FILTERS[0], "+");
-          strcatbuff(_FILTERS[0], jump_identification(adr));
+          strcatbuff(_FILTERS[0], jump_identification_const(adr));
           strcatbuff(_FILTERS[0], "*");
         }
         break;
@@ -803,7 +803,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       case 6:                  // same domain
         HT_INSERT_FILTERS0;     // insérer en 0                                strcpybuff(filters[filptr],"+");
         strcpybuff(_FILTERS[0], "+");
-        strcatbuff(_FILTERS[0], jump_identification(adr));
+        strcatbuff(_FILTERS[0], jump_identification_const(adr));
         strcatbuff(_FILTERS[0], "*");
         break;
         //
@@ -816,7 +816,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0                                
             strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification(adr));
+            strcatbuff(_FILTERS[0], jump_identification_const(adr));
             if (*fil != '/')
               strcatbuff(_FILTERS[0], "/");
             strncatbuff(_FILTERS[0], fil, i + 1);
@@ -915,7 +915,7 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
       int size_flag = 0;
 
       // former URL complète du lien actuel
-      strcpybuff(l, jump_identification(adr));
+      strcpybuff(l, jump_identification_const(adr));
       if (*fil != '/')
         strcatbuff(l, "/");
       strcatbuff(l, fil);

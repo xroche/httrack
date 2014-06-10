@@ -243,7 +243,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 int linput_trim(FILE * fp, char *s, int max);
 int linput_cpp(FILE * fp, char *s, int max);
 void rawlinput(FILE * fp, char *s, int max);
-char *strstrcase(char *s, const char *o);
+const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
 int is_unicode_utf8(const char *buffer, const size_t size);
@@ -259,9 +259,9 @@ void give_mimext(char *s, const char *st);
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
-char *strrchr_limit(const char *s, char c, const char *limit);
-char *strstr_limit(const char *s, const char *sub, const char *limit);
-HTS_INLINE char *jump_protocol(const char *source);
+const char *strrchr_limit(const char *s, char c, const char *limit);
+char *jump_protocol(char *source);
+const char *jump_protocol_const(const char *source);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)
@@ -444,7 +444,7 @@ HTS_STATIC int strfield(const char *f, const char *s) {
     return 0;
 }
 
-HTS_STATIC int strcmpnocase(char *a, char *b) {
+HTS_STATIC int strcmpnocase(const char *a, const char *b) {
   while(*a) {
     int cmp = hichar(*a) - hichar(*b);
 

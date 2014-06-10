@@ -461,7 +461,7 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   char *a;
 
-  strcpybuff(prefix, jump_identification(adr));
+  strcpybuff(prefix, jump_identification_const(adr));
   strcatbuff(prefix, fil);
   a = strchr(prefix, '?');
   if (a)

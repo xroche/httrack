@@ -35,6 +35,8 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 
+#include <stdint.h>
+
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
 
@@ -441,7 +443,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
     const iconv_t cp = iconv_open(to, from);
 
     if (cp != (iconv_t) - 1) {
-      char *inbuf = (char *) s;
+      char *inbuf = (char*) (uintptr_t) s; /* ugly iconv api, sheesh */
       size_t inbytesleft = size;
       size_t outbufCapa = 0;
       char *outbuf = NULL;

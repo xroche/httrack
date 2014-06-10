@@ -291,7 +291,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
             e++;                /* 0 means "once" */
 
-            if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
+            if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (const char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
               strcpybuff(savelst, filename + strlen(indexpath));
             else
               strcpybuff(savelst, filename);
@@ -478,8 +478,8 @@ int strcpos(const char *adr, char c) {
 }
 
 int mystrcmp(const void *_e1, const void *_e2) {
-  char **e1 = (char **) _e1;
-  char **e2 = (char **) _e2;
+  const char *const*const e1 = (const char *const*) _e1;
+  const char *const*const e2 = (const char *const*) _e2;
 
   return strcmp(*e1, *e2);
 }

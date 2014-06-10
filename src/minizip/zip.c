@@ -33,6 +33,7 @@
 #  include <stddef.h>
 #  include <string.h>
 #  include <stdlib.h>
+#  include <stdint.h>
 #endif
 #ifdef NO_ERRNO_H
     extern int errno;
@@ -238,7 +239,7 @@ local int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len)
     }
 
     ldi = ll->last_block;
-    from_copy = (unsigned char*)buf;
+    from_copy = (const unsigned char*)buf;
 
     while (len>0)
     {
@@ -1450,7 +1451,7 @@ extern int ZEXPORT zipWriteInFileInZip (zipFile file,const void* buf,unsigned in
     else
 #endif
     {
-      zi->ci.stream.next_in = (Bytef*)buf;
+      zi->ci.stream.next_in = (void*) (uintptr_t) buf;
       zi->ci.stream.avail_in = len;
 
       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))

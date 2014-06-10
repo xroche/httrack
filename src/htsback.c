@@ -2131,7 +2131,7 @@ void back_solve(httrackp * opt, lien_back * back) {
     else
       a = back->r.req.proxy.name;
     assertf(a != NULL);
-    a = jump_protocol(a);
+    a = jump_protocol_const(a);
     if (check_hostname_dns(a)) {
       hts_log_print(opt, LOG_DEBUG, "resolved: %s", a);
     } else {
@@ -3240,7 +3240,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         fprintf(ioinfo,
                                 "[%d] response for %s%s:\r\ncode=%d\r\n",
                                 back[i].r.debugid,
-                                jump_identification(back[i].url_adr),
+                                jump_identification_const(back[i].url_adr),
                                 back[i].url_fil, back[i].r.statuscode);
                         fprintfio(ioinfo, back[i].r.adr, ">>> ");
                         fprintf(ioinfo, "\r\n");

@@ -609,7 +609,7 @@ int httpmirror(char *url1, httrackp * opt) {
   // initialiser hachage
   hash_init(opt, &hash, opt->urlhack);
   // note: we need a cast because of the const
-  hash.liens = (const lien_url ***) &opt->liens;
+  hash.liens = (const lien_url *const*const*) &opt->liens;
 
   // copier adresse(s) dans liste des adresses
   {
@@ -2483,7 +2483,7 @@ void host_ban(httrackp * opt, int ptr,
         while((heap(i)->adr[l]) && (l < 1020))
           l++;
         if ((l > 0) && (l < 1020)) {    // sécurité
-          if (strfield2(jump_identification(heap(i)->adr), host)) {    // host
+          if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr,
                           heap(i)->fil);
             hts_invalidate_link(opt, i);  // invalidate hashtable entry

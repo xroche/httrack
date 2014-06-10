@@ -164,11 +164,11 @@ int url_savename(lien_adrfilsave *const afs,
   static const char *protocol_str[] =
     { "http", "https", "ftp", "file", "unknown" };
   int protocol = PROTOCOL_HTTP;
-  const char *const adr = jump_identification(adr_complete);
+  const char *const adr = jump_identification_const(adr_complete);
   // copy of fil, used for lookups (see urlhack)
   const char *normadr = adr;
   const char *normfil = fil_complete;
-  const char *const print_adr = jump_protocol(adr);
+  const char *const print_adr = jump_protocol_const(adr);
   const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
 
   // pour changement d'extension ou de nom (content-disposition)
@@ -1239,7 +1239,7 @@ int url_savename(lien_adrfilsave *const afs,
   // (plus la peine : masqué au début)
 /*
   {
-    char* a=jump_identification(afs->save);
+    char* a = jump_identification(afs->save);
     if (a!=afs->save) {
       char BIGSTK tempo[HTS_URLMAXSIZE*2];
       char *b;
@@ -1307,9 +1307,9 @@ int url_savename(lien_adrfilsave *const afs,
     int i = 0;
 
     while(hts_tbdev[i][0]) {
-      char *a = afs->save;
+      const char *a = afs->save;
 
-      while((a = strstrcase(a, (char *) hts_tbdev[i]))) {
+      while((a = strstrcase(a, hts_tbdev[i]))) {
         switch ((int) a[strlen(hts_tbdev[i])]) {
         case '\0':
         case '/':
