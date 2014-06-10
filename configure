@@ -12068,14 +12068,14 @@ else
   :
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing=2" >&5
-$as_echo_n "checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing=2... " >&6; }
-if ${ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing" >&5
+$as_echo_n "checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing... " >&6; }
+if ${ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fstrict-aliasing -Wstrict-aliasing=2"
+  CFLAGS="$CFLAGS  -fstrict-aliasing -Wstrict-aliasing"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -12088,17 +12088,17 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2=yes
+  ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing=yes
 else
-  ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2=no
+  ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   CFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2" >&5
-$as_echo "$ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2" >&6; }
-if test x"$ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing_2" = xyes; then :
-  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing=2"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing" >&5
+$as_echo "$ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing" >&6; }
+if test x"$ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"
 else
   :
 fi
