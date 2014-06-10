@@ -978,7 +978,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
 }
 
 int inthash_write_value(inthash hashtable, inthash_key_const name,
-                        inthash_value value) {
+                        inthash_value_const value) {
   /* replace of add item */
   const int ret = inthash_write_value_(hashtable, name, value);
 
