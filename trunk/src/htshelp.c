@@ -272,7 +272,7 @@ void help_wizard(httrackp * opt) {
     if (strnotempty(str)) {
       while((a = strchr(str, ' ')))
         *a = ':';               // port
-      if (!strchr(jump_identification(str), ':')) {
+      if (!strchr(jump_identification_const(str), ':')) {
         char str2[256];
 
         printf("\nProxy port (return=8080) :");

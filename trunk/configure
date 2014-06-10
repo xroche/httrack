@@ -11778,8 +11778,9 @@ LT_CV_OBJDIR=$lt_cv_objdir
 
 ### Default CFLAGS
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
--Wmultichar -Wwrite-strings -Wcast-align -Wstrict-prototypes \
--Wmissing-prototypes -Wmissing-declarations -Wdeclaration-after-statement \
+-Wmultichar -Wwrite-strings -Wcast-qual -Wcast-align \
+-Wstrict-prototypes -Wmissing-prototypes \
+-Wmissing-declarations -Wdeclaration-after-statement \
 -Wpointer-arith -Wsequence-point -Wnested-externs \
 -D_REENTRANT"
 
@@ -11853,6 +11854,41 @@ fi
 $as_echo "$ax_cv_check_cflags___Winit_self" >&6; }
 if test x"$ax_cv_check_cflags___Winit_self" = xyes; then :
   DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Waddress" >&5
+$as_echo_n "checking whether C compiler accepts -Waddress... " >&6; }
+if ${ax_cv_check_cflags___Waddress+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Waddress"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___Waddress=yes
+else
+  ax_cv_check_cflags___Waddress=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Waddress" >&5
+$as_echo "$ax_cv_check_cflags___Waddress" >&6; }
+if test x"$ax_cv_check_cflags___Waddress" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Waddress"
 else
   :
 fi
@@ -11958,6 +11994,76 @@ fi
 $as_echo "$ax_cv_check_cflags___Wformat_nonliteral" >&6; }
 if test x"$ax_cv_check_cflags___Wformat_nonliteral" = xyes; then :
   DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat-nonliteral"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wmissing-parameter-type" >&5
+$as_echo_n "checking whether C compiler accepts -Wmissing-parameter-type... " >&6; }
+if ${ax_cv_check_cflags___Wmissing_parameter_type+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Wmissing-parameter-type"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___Wmissing_parameter_type=yes
+else
+  ax_cv_check_cflags___Wmissing_parameter_type=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Wmissing_parameter_type" >&5
+$as_echo "$ax_cv_check_cflags___Wmissing_parameter_type" >&6; }
+if test x"$ax_cv_check_cflags___Wmissing_parameter_type" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wold-style-definition" >&5
+$as_echo_n "checking whether C compiler accepts -Wold-style-definition... " >&6; }
+if ${ax_cv_check_cflags___Wold_style_definition+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Wold-style-definition"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___Wold_style_definition=yes
+else
+  ax_cv_check_cflags___Wold_style_definition=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Wold_style_definition" >&5
+$as_echo "$ax_cv_check_cflags___Wold_style_definition" >&6; }
+if test x"$ax_cv_check_cflags___Wold_style_definition" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"
 else
   :
 fi

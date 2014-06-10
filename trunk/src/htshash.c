@@ -103,11 +103,12 @@ static inthash_hashkeys key_adrfil_hashes_generic(void *arg,
                                               inthash_key_const value, 
                                               const int former) {
   hash_struct *const hash = (hash_struct*) arg;
-  const lien_url*const lien = (lien_url*) value;
+  const lien_url*const lien = (const lien_url*) value;
   const char *const adr = !former ? lien->adr : lien->former_adr;
   const char *const fil = !former ? lien->fil : lien->former_fil;
   const char *const adr_norm = adr != NULL ? 
-    ( hash->normalized  ? jump_normalized(adr) : jump_identification(adr) )
+    ( hash->normalized  ? jump_normalized_const(adr)
+                        : jump_identification_const(adr) )
     : NULL;
 
   // copy address
@@ -133,8 +134,8 @@ static int key_adrfil_equals_generic(void *arg,
                                      const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const int normalized = hash->normalized;
-  const lien_url*const a = (lien_url*) a_;
-  const lien_url*const b = (lien_url*) b_;
+  const lien_url*const a = (const lien_url*) a_;
+  const lien_url*const b = (const lien_url*) b_;
   const char *const a_adr = !former ? a->adr : a->former_adr;
   const char *const b_adr = !former ? b->adr : b->former_adr;
   const char *const a_fil = !former ? a->fil : a->former_fil;
@@ -149,8 +150,10 @@ static int key_adrfil_equals_generic(void *arg,
   assertf(b_fil != NULL);
 
   // skip scheme and authentication to the domain (possibly without www.)
-  ja = normalized ? jump_normalized(a_adr) : jump_identification(a_adr);
-  jb = normalized ? jump_normalized(b_adr) : jump_identification(b_adr);
+  ja = normalized
+    ? jump_normalized_const(a_adr) : jump_identification_const(a_adr);
+  jb = normalized
+    ? jump_normalized_const(b_adr) : jump_identification_const(b_adr);
   assertf(ja != NULL);
   assertf(jb != NULL);
   if (strcasecmp(ja, jb) != 0) {
@@ -171,7 +174,7 @@ static const char* key_adrfil_debug_print_(void *arg,
                                            inthash_key_const a_,
                                            const int former) {
   hash_struct *const hash = (hash_struct*) arg;
-  const lien_url*const a = (lien_url*) a_;
+  const lien_url*const a = (const lien_url*) a_;
   const char *const a_adr = !former ? a->adr : a->former_adr;
   const char *const a_fil = !former ? a->fil : a->former_fil;
   snprintf(hash->normfil, sizeof(hash->normfil), "%s%s", a_adr, a_fil);
@@ -327,10 +330,10 @@ void hash_write(hash_struct * hash, size_t lpos) {
   inthash_write(hash->sav, (*hash->liens)[lpos]->sav, lpos);
 
   /* second entry: URL address and path */
-  inthash_write(hash->adrfil, (char*) (*hash->liens)[lpos], lpos);
+  inthash_write(hash->adrfil, (*hash->liens)[lpos], lpos);
 
   /* third entry: URL address and path before redirect */
   if ((*hash->liens)[lpos]->former_adr) {        // former_adr existe?
-    inthash_write(hash->former_adrfil, (char*) (*hash->liens)[lpos], lpos);
+    inthash_write(hash->former_adrfil, (*hash->liens)[lpos], lpos);
   }
 }

@@ -928,7 +928,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         printf("Proxy Use: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
-        print_buffer(&bstr, "http://%s", jump_identification(adr));
+        print_buffer(&bstr, "http://%s", jump_identification_const(adr));
       } else {                  // ftp:// en proxy http
 #if HDEBUG
         printf("Proxy Use for ftp: for %s%s proxy %d port %d\n", adr, fil,
@@ -971,8 +971,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     // tester proxy authentication
     if (retour->req.proxy.active) {
       if (link_has_authorization(retour->req.proxy.name)) {     // et hop, authentification proxy!
-        const char *a = jump_identification(retour->req.proxy.name);
-        const char *astart = jump_protocol(retour->req.proxy.name);
+        const char *a = jump_identification_const(retour->req.proxy.name);
+        const char *astart = jump_protocol_const(retour->req.proxy.name);
         char autorisation[1100];
         char user_pass[256];
 
@@ -1000,7 +1000,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           )
         ) {                     // PAS file://
         print_buffer(&bstr, "Referer: http://%s%s"H_CRLF,
-                     jump_identification(referer_adr), referer_fil);
+                     jump_identification_const(referer_adr), referer_fil);
       }
     }
     // HTTP field: referer
@@ -1025,7 +1025,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       int max_cookies = 8;
 
       do {
-        b = cookie_find(b, "", jump_identification(adr), fil);  // prochain cookie satisfaisant aux conditions
+        b = cookie_find(b, "", jump_identification_const(adr), fil);  // prochain cookie satisfaisant aux conditions
         if (b != NULL) {
           max_cookies--;
           if (!cook) {
@@ -1054,7 +1054,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     }
 
     {
-      const char *real_adr = jump_identification(adr);
+      const char *real_adr = jump_identification_const(adr);
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
@@ -1103,8 +1103,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
         autorisation[0] = '\0';
         if (link_has_authorization(adr)) {      // ohh une authentification!
-          const char *a = jump_identification(adr);
-          const char *astart = jump_protocol(adr);
+          const char *a = jump_identification_const(adr);
+          const char *astart = jump_protocol_const(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
@@ -1149,7 +1149,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
   if (_DEBUG_HEAD) {
     if (ioinfo) {
       fprintf(ioinfo, "[%d] request for %s%s:\r\n", retour->debugid,
-              jump_identification(adr), fil);
+              jump_identification_const(adr), fil);
       fprintfio(ioinfo, bstr.buffer, "<<< ");
       fprintf(ioinfo, "\r\n");
       fflush(ioinfo);
@@ -1528,7 +1528,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
       // initialiser cookie lu actuellement
       if (adr)
-        strcpybuff(domain, jump_identification(adr));   // domaine
+        strcpybuff(domain, jump_identification_const(adr));   // domaine
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
@@ -2103,7 +2103,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
     const char *error = "unknown error";
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
-    const char *const iadr = jump_identification(_iadr);
+    const char *const iadr = jump_identification_const(_iadr);
 
     SOCaddr_clear(server);
 
@@ -2113,7 +2113,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 
     // tester un éventuel port
     if (port == -1) {
-      char *a = jump_toport(iadr);
+      const char *a = jump_toport_const(iadr);
 
 #if HTS_USEOPENSSL
       if (retour->ssl)
@@ -2362,9 +2362,9 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     p = url + pos;
 
     // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
-    q = strchr(jump_identification(p), '/');
+    q = strchr(jump_identification_const(p), '/');
     if (q == 0)
-      q = strchr(jump_identification(p), '?');  // http://www.foo.com?bar=1
+      q = strchr(jump_identification_const(p), '?');  // http://www.foo.com?bar=1
     if (q == 0)
       q = p + strlen(p);        // pointe sur \0
     // q pointe sur le chemin, ex: index.html?query=recherche
@@ -3123,7 +3123,7 @@ void rawlinput(FILE * fp, char *s, int max) {
 }
 
 //cherche chaine, case insensitive
-char *strstrcase(char *s, const char *o) {
+const char *strstrcase(const char *s, const char *o) {
   while(*s && strfield(s, o) == 0)
     s++;
   if (*s == '\0')
@@ -3344,24 +3344,33 @@ int ishttperror(int err) {
   return 0;
 }
 
+/* Declare a non-const version of FUN */
+#define DECLARE_NON_CONST_VERSION(FUN) \
+char *FUN(char *source) { \
+  const char *const ret = FUN ##_const(source); \
+  return ret != NULL ? source + ( ret - source ) : NULL; \
+}
+
 // retourne le pointeur ou le pointeur + offset si il existe dans la chaine un @ signifiant 
 // une identification
-HTSEXT_API char *jump_identification(const char *source) {
+HTSEXT_API const char *jump_identification_const(const char *source) {
   const char *a, *trytofind;
 
   if (strcmp(source, "file://") == 0)
-    return (char *) source;
+    return source;
   // rechercher dernier @ (car parfois email transmise dans adresse!)
   // mais sauter ftp:// éventuel
-  a = jump_protocol(source);
+  a = jump_protocol_const(source);
   trytofind = strrchr_limit(a, '@', strchr(a, '/'));
-  return (char *) ((trytofind != NULL) ? trytofind : a);
+  return trytofind != NULL ? trytofind : a;
 }
 
-HTSEXT_API char *jump_normalized(const char *source) {
+HTSEXT_API DECLARE_NON_CONST_VERSION(jump_identification)
+
+HTSEXT_API const char *jump_normalized_const(const char *source) {
   if (strcmp(source, "file://") == 0)
-    return (char *) source;
-  source = jump_identification(source);
+    return source;
+  source = jump_identification_const(source);
   if (strfield(source, "www") && source[3] != '\0') {
     if (source[3] == '.') {     // www.foo.com -> foo.com
       source += 4;
@@ -3375,12 +3384,14 @@ HTSEXT_API char *jump_normalized(const char *source) {
       }
     }
   }
-  return (char *) source;
+  return source;
 }
 
+HTSEXT_API DECLARE_NON_CONST_VERSION(jump_normalized)
+
 static int sortNormFnc(const void *a_, const void *b_) {
-  char **a = (char **) a_;
-  char **b = (char **) b_;
+  const char *const*const a = (const char *const*) a_;
+  const char *const*const b = (const char *const*) b_;
 
   return strcmp(*a + 1, *b + 1);
 }
@@ -3457,7 +3468,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
 #define endwith(a) ( (len >= (sizeof(a)-1)) ? ( strncmp(dest, a+len-(sizeof(a)-1), sizeof(a)-1) == 0 ) : 0 );
 HTSEXT_API char *adr_normalized(const char *source, char *dest) {
   /* not yet too aggressive (no com<->net<->org checkings) */
-  strcpybuff(dest, jump_normalized(source));
+  strcpybuff(dest, jump_normalized_const(source));
   return dest;
 }
 
@@ -3465,52 +3476,37 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 
 // find port (:80) or NULL if not found
 // can handle IPV6 addresses
-HTSEXT_API char *jump_toport(const char *source) {
+HTSEXT_API const char *jump_toport_const(const char *source) {
   const char *a, *trytofind;
 
-  a = jump_identification(source);
+  a = jump_identification_const(source);
   trytofind = strrchr_limit(a, ']', strchr(source, '/'));       // find last ] (http://[3ffe:b80:1234::1]:80/foo.html)
   a = strchr((trytofind) ? trytofind : a, ':');
-  return (char *) a;
+  return a;
 }
 
+HTSEXT_API DECLARE_NON_CONST_VERSION(jump_toport)
+
 // strrchr, but not too far
-char *strrchr_limit(const char *s, char c, const char *limit) {
+const char *strrchr_limit(const char *s, char c, const char *limit) {
   if (limit == NULL) {
     const char *p = strrchr(s, c);
 
-    return (char *) (p ? (p + 1) : NULL);
+    return p ? (p + 1) : NULL;
   } else {
     const char *a = NULL, *p;
 
     for(;;) {
       p = strchr((a) ? a : s, c);
       if ((p >= limit) || (p == NULL))
-        return (char *) a;
+        return a;
       a = p + 1;
     }
   }
 }
 
-// strrchr, but not too far
-char *strstr_limit(const char *s, const char *sub, const char *limit) {
-  if (limit == NULL) {
-    return strstr(s, sub);
-  } else {
-    const char *pos = strstr(s, sub);
-
-    if (pos != NULL) {
-      const char *farpos = strstr(s, limit);
-
-      if (farpos == NULL || pos < farpos)
-        return (char *) pos;
-    }
-  }
-  return NULL;
-}
-
 // retourner adr sans ftp://
-char *jump_protocol(const char *source) {
+const char *jump_protocol_const(const char *source) {
   int p;
 
   // scheme
@@ -3526,8 +3522,10 @@ char *jump_protocol(const char *source) {
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
-  return (char *) source;
+  return source;
 }
+
+DECLARE_NON_CONST_VERSION(jump_protocol)
 
 // codage base 64 a vers b
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
@@ -4668,7 +4666,7 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
   assertf(_iadr != NULL);
   assertf(addr != NULL);
 
-  strcpybuff(iadr, jump_identification(_iadr));
+  strcpybuff(iadr, jump_identification_const(_iadr));
   // couper éventuel :
   {
     char *a;
@@ -5020,7 +5018,7 @@ HTSEXT_API void hts_set_error_callback(htsErrorCallback handler) {
   htsCallbackErr = handler;
 }
 
-HTSEXT_API htsErrorCallback hts_get_error_callback() {
+HTSEXT_API htsErrorCallback hts_get_error_callback(void) {
   return htsCallbackErr;
 }
 

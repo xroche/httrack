@@ -201,7 +201,7 @@ typedef struct hash_struct hash_struct;
 #endif
 struct hash_struct {
   /* Links big array reference */
-  const lien_url ***liens;
+  const lien_url *const*const*liens;
   /* Savename (case insensitive ; lowercased) */
   inthash sav;
   /* Address and path */

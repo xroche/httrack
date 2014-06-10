@@ -194,15 +194,15 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       /* patch scheme if necessary */
       if (strfield(lien, "http:")) {
         lien += 5;
-        strcpybuff(adrfil->adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
+        strcpybuff(adrfil->adr, jump_protocol_const(origin_adr));     // même adresse ; protocole vide (http)
       } else if (strfield(lien, "https:")) {
         lien += 6;
         strcpybuff(adrfil->adr, "https://");    // même adresse forcée en https
-        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
+        strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
       } else if (strfield(lien, "ftp:")) {
         lien += 4;
         strcpybuff(adrfil->adr, "ftp://");      // même adresse forcée en ftp
-        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
+        strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
       } else {
         strcpybuff(adrfil->adr, origin_adr);    // même adresse ; et même éventuel protocole
       }
@@ -395,7 +395,7 @@ int link_has_authority(const char *lien) {
 }
 
 int link_has_authorization(const char *lien) {
-  const char *adr = jump_protocol(lien);
+  const char *adr = jump_protocol_const(lien);
   const char *firstslash = strchr(adr, '/');
   const char *detect = strchr(adr, '@');
 
@@ -748,8 +748,8 @@ int istoobig(httrackp * opt, LLint size, LLint maxhtml, LLint maxnhtml,
 
 static int sortTopIndexFnc(const void *a_, const void *b_) {
   int cmp;
-  topindex_chain **a = (topindex_chain **) a_;
-  topindex_chain **b = (topindex_chain **) b_;
+  const topindex_chain *const*const a = (const topindex_chain *const*) a_;
+  const topindex_chain *const*const b = (const topindex_chain *const*) b_;
 
   /* Category first, then name */
   if ((cmp = (*a)->level - (*b)->level) == 0) {

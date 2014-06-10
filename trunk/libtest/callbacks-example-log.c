@@ -100,9 +100,9 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   if (arg == NULL)
     arg = "log-wrapper-info";
   hts_log(opt, arg, "* plugging functions");
-  CHAIN_FUNCTION(opt, check_html, process_file, (char *) arg);
-  CHAIN_FUNCTION(opt, start, start_of_mirror, (char *) arg);
-  CHAIN_FUNCTION(opt, end, end_of_mirror, (char *) arg);
+  CHAIN_FUNCTION(opt, check_html, process_file, (void *) (uintptr_t) arg);
+  CHAIN_FUNCTION(opt, start, start_of_mirror, (void *) (uintptr_t) arg);
+  CHAIN_FUNCTION(opt, end, end_of_mirror, (void *) (uintptr_t) arg);
 
   hts_log(opt, arg, "* module successfully plugged");
   return 1;                     /* success */
