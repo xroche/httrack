@@ -70,7 +70,7 @@ AX_CHECK_COMPILE_FLAG([-Wformat=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat=2"
 AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat-nonliteral"])
 AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"])
 AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"])
-AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing=2"])
+AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"])
 AX_CHECK_LINK_FLAG([-Wl,--discard-all], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--discard-all"])
 AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--no-undefined"])
 
