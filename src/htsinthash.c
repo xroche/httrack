@@ -157,9 +157,9 @@ struct struct_inthash {
     /** How to handle values (might be NULL). **/
     struct {
       /** free() **/
-      t_inthash_freehandler free;
+      t_inthash_value_freehandler free;
       /** opaque argument **/
-      void *arg;
+      inthash_opaque arg;
     } value;
 
     /** How to handle names (might be NULL). **/
@@ -167,13 +167,13 @@ struct struct_inthash {
       /** strdup() **/
       t_inthash_duphandler dup;
       /** free() **/
-      t_inthash_freehandler free;
+      t_inthash_key_freehandler free;
       /** hash **/
       t_inthash_hasheshandler hash;
       /** comparison **/
       t_inthash_cmphandler equals;
       /** opaque argument **/
-      void *arg;
+      inthash_opaque arg;
     } key;
 
     /** How to handle fatal assertions (might be NULL). **/
@@ -183,9 +183,9 @@ struct struct_inthash {
       /** abort() **/
       t_inthash_asserthandler fatal;
       /** opaque argument **/
-      void *arg;
+      inthash_opaque arg;
       /** hashtable name for logging **/
-      const char *name;
+      inthash_key_const name;
     } error;
 
     /** How to handle pretty-print (debug) (might be NULL). **/
@@ -195,7 +195,7 @@ struct struct_inthash {
       /** value print() **/
       t_inthash_printvaluehandler value;
       /** opaque argument **/
-      void *arg;
+      inthash_opaque arg;
     } print;
   } custom;
 };
@@ -272,7 +272,7 @@ static void inthash_fail(const char* exp, const char* file, int line) {
 
 /* assert failed handler. */
 static void inthash_assert_failed(const inthash hashtable, const char* exp, const char* file, int line) {
-  const char *name = inthash_get_name(hashtable);
+  const char *const name = inthash_get_name(hashtable);
   inthash_crit(hashtable, "hashtable %s: %s failed at %s:%d", 
     name != NULL ? name : "<unknown>", exp, file, line);
   if (hashtable != NULL && hashtable->custom.error.fatal != NULL) {
@@ -311,7 +311,7 @@ const char* inthash_get_name(inthash hashtable) {
 }
 
 static void inthash_log_stats(inthash hashtable) {
-  const char *name = inthash_get_name(hashtable);
+  const char *const name = inthash_get_name(hashtable);
   inthash_info(hashtable, "hashtable %s%s%ssummary: "
                "size=%"UINT_64_FORMAT" (lg2=%"UINT_64_FORMAT") "
                "used=%"UINT_64_FORMAT" "
@@ -352,20 +352,21 @@ static void inthash_log_stats(inthash hashtable) {
                );
 }
 
-inthash_keys inthash_hash_value(const char *value) {
+/* default hash function when key is a regular C-string */
+inthash_hashkeys inthash_hash_string(const char *name) {
 #if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
   MD5_CTX ctx;
   union {
     unsigned char md5digest[16];
-    inthash_keys mhashes[2];
-    inthash_keys hashes;
+    inthash_hashkeys mhashes[2];
+    inthash_hashkeys hashes;
   } u;
 
   /* compute MD5 */
   MD5Init(&ctx, 0);
-  MD5Update(&ctx, (const unsigned char *) value,
-    (unsigned int) strlen(value));
+  MD5Update(&ctx, (const unsigned char *) name,
+    (unsigned int) strlen(name));
   MD5Final(u.md5digest, &ctx);
 
   /* mix mix mix */
@@ -381,9 +382,9 @@ inthash_keys inthash_hash_value(const char *value) {
 #elif (defined(HTS_INTHASH_USES_MURMUR))
   union {
     uint32_t result[4];
-    inthash_keys hashes;
+    inthash_hashkeys hashes;
   } u;
-  MurmurHash3_x86_128(value, (const int) strlen(value),
+  MurmurHash3_x86_128(name, (const int) strlen(name),
                       42, &u.result) ;
 
   /* mix mix mix */
@@ -400,7 +401,7 @@ inthash_keys inthash_hash_value(const char *value) {
   /* compute two Fowler-Noll-Vo hashes (64-bit FNV-1 variant) ;
      each 64-bit hash being XOR-folded into a single 32-bit hash. */
   size_t i;
-  inthash_keys hashes;
+  inthash_hashkeys hashes;
   uint64_t h1, h2;
 
   /* FNV-1, 64-bit. */
@@ -410,8 +411,8 @@ inthash_keys inthash_hash_value(const char *value) {
   /* compute the hashes ; second variant is using xored data */
   h1 = FNV1_OFFSET_BASIS;
   h2 = ~FNV1_OFFSET_BASIS;
-  for(i = 0 ; value[i] != '\0' ; i++) {
-    const unsigned char c1 = value[i];
+  for(i = 0 ; name[i] != '\0' ; i++) {
+    const unsigned char c1 = name[i];
     const unsigned char c2 = ~c1;
     h1 = ( h1 * FNV1_PRIME ) ^ c1;
     h2 = ( h2 * FNV1_PRIME ) ^ c2;
@@ -433,10 +434,10 @@ inthash_keys inthash_hash_value(const char *value) {
 #endif
 }
 
-static INTHASH_INLINE inthash_keys inthash_calc_hashes(inthash hashtable, 
-                                                       const char *value) {
+static INTHASH_INLINE inthash_hashkeys inthash_calc_hashes(inthash hashtable, 
+                                                           inthash_key_const value) {
   return hashtable->custom.key.hash == NULL 
-    ? inthash_hash_value(value)
+    ? inthash_hash_string(value)
     : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
 }
 
@@ -447,16 +448,17 @@ static INTHASH_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
 
 /* compare two keys ; by default using strcmp() */
 static INTHASH_INLINE int inthash_equals(inthash hashtable,
-                                         const char *a, const char *b) {
+                                         inthash_key_const a,
+                                         inthash_key_const b) {
   return hashtable->custom.key.equals == NULL
-    ? strcmp(a, b) == 0
+    ? strcmp((const char*) a, (const char*) b) == 0
     : hashtable->custom.key.equals(hashtable->custom.key.arg, a, b);
 }
 
 static INTHASH_INLINE int inthash_matches_(inthash hashtable,
                                            const inthash_item *const item,
-                                           const char *name,
-                                           const inthash_keys *hashes) {
+                                           inthash_key_const name,
+                                           const inthash_hashkeys *hashes) {
   return item->name != NULL
     && item->hashes.hash1 == hashes->hash1
     && item->hashes.hash2 == hashes->hash2
@@ -464,8 +466,8 @@ static INTHASH_INLINE int inthash_matches_(inthash hashtable,
 }
 
 static INTHASH_INLINE int inthash_matches(inthash hashtable, size_t pos,
-                                          const char *name,
-                                          const inthash_keys *hashes) {
+                                          inthash_key_const name,
+                                          const inthash_hashkeys *hashes) {
   const inthash_item *const item = &hashtable->items[pos];
   return inthash_matches_(hashtable, item, name, hashes);
 }
@@ -589,7 +591,7 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
   /* recompute string address */
 #define RECOMPUTE_STRING(S) do {                                     \
     if (S != NULL && S != the_empty_string) {                        \
-      const size_t offset = (S) - oldbase;                           \
+      const size_t offset = (const char*) (S) - oldbase;             \
       inthash_assert(hashtable, offset < hashtable->pool.capacity);  \
       S = &hashtable->pool.buffer[offset];                           \
       count++;                                                       \
@@ -611,7 +613,9 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
-static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
+static inthash_key inthash_dup_name_internal(inthash hashtable,
+                                             inthash_key_const name_) {
+  const char *const name = (const char*) name_;
   const size_t len = strlen(name) + 1;
   char *s;
 
@@ -643,7 +647,8 @@ static char* inthash_dup_name_internal(inthash hashtable, const char *name) {
 }
 
 /* duplicate a key. default is to use the internal pool. */
-static INTHASH_INLINE char* inthash_dup_name(inthash hashtable, const char *name) {
+static INTHASH_INLINE inthash_key inthash_dup_name(inthash hashtable,
+                                                   inthash_key_const name) {
   return hashtable->custom.key.dup == NULL
     ? inthash_dup_name_internal(hashtable, name)
     : hashtable->custom.key.dup(hashtable->custom.key.arg, name);
@@ -651,7 +656,8 @@ static INTHASH_INLINE char* inthash_dup_name(inthash hashtable, const char *name
 
 /* internal pool free handler.
    note: pointer must have been kicked from the pool first */
-static void inthash_free_key_internal(inthash hashtable, char *name) {
+static void inthash_free_key_internal(inthash hashtable, inthash_key name_) {
+  char *const name = (char*) name_;
   const size_t len = strlen(name) + 1;
 
   /* see inthash_dup_name_internal() handling */
@@ -678,7 +684,7 @@ static void inthash_free_key_internal(inthash hashtable, char *name) {
 
 /* free a key. default is to use the internal pool.
    note: pointer must have been kicked from the pool first */
-static void inthash_free_key(inthash hashtable, char *name) {
+static void inthash_free_key(inthash hashtable, inthash_key name) {
   if (hashtable->custom.key.free == NULL) {
     inthash_free_key_internal(hashtable, name);
   } else {
@@ -687,17 +693,17 @@ static void inthash_free_key(inthash hashtable, char *name) {
 }
 
 static INTHASH_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
-                                                  inthash_key hash) {
-  const inthash_key mask = POW2(lg_size) - 1;
+                                                  inthash_hashkey hash) {
+  const inthash_hashkey mask = POW2(lg_size) - 1;
   return hash & mask;
 }
 
 static INTHASH_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
-                                                 inthash_key hash) {
+                                                 inthash_hashkey hash) {
   return inthash_hash_to_pos_(hashtable->lg_size, hash);
 }
 
-int inthash_read_pvoid(inthash hashtable, const char *name, void **pvalue) {
+int inthash_read_pvoid(inthash hashtable, inthash_key_const name, void **pvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
   const int ret =
     inthash_read_value(hashtable, name, (pvalue != NULL) ? &value : NULL);
@@ -706,35 +712,36 @@ int inthash_read_pvoid(inthash hashtable, const char *name, void **pvalue) {
   return ret;
 }
 
-int inthash_write_pvoid(inthash hashtable, const char *name, void *pvalue) {
+int inthash_write_pvoid(inthash hashtable, inthash_key_const name, void *pvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
   value.ptr = pvalue;
   return inthash_write_value(hashtable, name, value);
 }
 
-void inthash_add_pvoid(inthash hashtable, const char *name, void *pvalue) {
+void inthash_add_pvoid(inthash hashtable, inthash_key_const name, void *pvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
   value.ptr = pvalue;
   inthash_write_value(hashtable, name, value);
 }
 
-int inthash_write(inthash hashtable, const char *name, intptr_t intvalue) {
+int inthash_write(inthash hashtable, inthash_key_const name, intptr_t intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
   value.intg = intvalue;
   return inthash_write_value(hashtable, name, value);
 }
 
-static void inthash_default_free_handler(void *arg, void *value) {
-  if (value)
-    free(value);
+static void inthash_default_free_handler(inthash_opaque arg,
+                                         inthash_value value) {
+  if (value.ptr != NULL)
+    free(value.ptr);
 }
 
 static void inthash_del_value_(inthash hashtable, inthash_value *pvalue) {
   if (hashtable->custom.value.free != NULL)
-    hashtable->custom.value.free(hashtable->custom.value.arg, pvalue->ptr);
+    hashtable->custom.value.free(hashtable->custom.value.arg, *pvalue);
   pvalue->ptr = NULL;
 }
 
@@ -743,8 +750,8 @@ static void inthash_del_value(inthash hashtable, size_t pos) {
 }
 
 static void inthash_del_name(inthash hashtable, inthash_item *item) {
-  const inthash_keys nullHash = INTHASH_KEYS_NULL;
-  char *const name = item->name;
+  const inthash_hashkeys nullHash = INTHASH_KEYS_NULL;
+  char *const name = (char*) item->name;
   item->name = NULL;  /* there must be no reference remaining */
   item->hashes = nullHash;
   /* free after detach (we may compact the pool) */
@@ -759,11 +766,11 @@ static void inthash_del_item(inthash hashtable, inthash_item *pitem) {
 static int inthash_add_item_(inthash hashtable, inthash_item item);
 
 /* Write (add or replace) a value in the hashtable. */
-static int inthash_write_value_(inthash hashtable, const char *name,
+static int inthash_write_value_(inthash hashtable, inthash_key_const name,
                                 inthash_value value) {
   inthash_item item;
   size_t pos;
-  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
+  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
 
   /* Statistics */
   hashtable->stats.write_count++;
@@ -808,9 +815,17 @@ static int inthash_write_value_(inthash hashtable, const char *name,
   return inthash_add_item_(hashtable, item);
 }
 
+/* Return the string representation of a key */
+static const char* inthash_print_key(inthash hashtable,
+                                     inthash_key_const name) {
+  return hashtable->custom.print.key != NULL
+    ? hashtable->custom.print.key(hashtable->custom.print.arg, name)
+    : (const char*) name;
+}
+
 /* Add a new item in the hashtable. The item SHALL NOT be alreasy present. */
 static int inthash_add_item_(inthash hashtable, inthash_item item) {
-  inthash_key cuckoo_hash, initial_cuckoo_hash;
+  inthash_hashkey cuckoo_hash, initial_cuckoo_hash;
   size_t loops;
   size_t pos;
 
@@ -831,7 +846,8 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
       cuckoo_hash = initial_cuckoo_hash = item.hashes.hash1;
       inthash_trace(hashtable,
                     "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
-                     item.name, (uint64_t) pos, cuckoo_hash);
+                     inthash_print_key(hashtable, item.name),
+                     (uint64_t) pos, cuckoo_hash);
     }
   }
 
@@ -841,7 +857,8 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
 
     inthash_trace(hashtable,
                   "\tdebug:placing cuckoo '%s' at %"UINT_64_FORMAT" (%x)", 
-                  item.name, (uint64_t) pos, cuckoo_hash);
+                  inthash_print_key(hashtable, item.name),
+                  (uint64_t) pos, cuckoo_hash);
 
     /* place at alternate free position ? */
     if (inthash_is_free(hashtable, pos)) {
@@ -911,7 +928,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
           "stash[%u]: key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
           (int) i,
           hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
-          hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+          hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
           (int) pos1, (int) pos2,
           item->hashes.hash1, item->hashes.hash2);
         if (!inthash_is_free(hashtable, pos1)) {
@@ -921,7 +938,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
           inthash_crit(hashtable, 
             "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
-            hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+            hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
             (int) pos1, (int) pos2,
             item->hashes.hash1, item->hashes.hash2);
         } else {
@@ -934,7 +951,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
           inthash_crit(hashtable, 
             "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
-            hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
+            hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
             (int) pos1, (int) pos2,
             item->hashes.hash1, item->hashes.hash2);
         } else {
@@ -960,7 +977,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
   }
 }
 
-int inthash_write_value(inthash hashtable, const char *name,
+int inthash_write_value(inthash hashtable, inthash_key_const name,
                         inthash_value value) {
   /* replace of add item */
   const int ret = inthash_write_value_(hashtable, name, value);
@@ -1020,7 +1037,7 @@ int inthash_write_value(inthash hashtable, const char *name,
       /* relocate lower half items when needed */
       for(i = 0 ; i < prev_size ; i++) {
         if (!inthash_is_free(hashtable, i)) {
-          const inthash_keys *const hashes = &hashtable->items[i].hashes;
+          const inthash_hashkeys *const hashes = &hashtable->items[i].hashes;
 
           /* currently at old position 1 */
           if (inthash_hash_to_pos_(prev_power, hashes->hash1) == i) {
@@ -1087,7 +1104,7 @@ int inthash_write_value(inthash hashtable, const char *name,
   return ret;
 }
 
-void inthash_add(inthash hashtable, const char *name, intptr_t intvalue) {
+void inthash_add(inthash hashtable, inthash_key_const name, intptr_t intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
 
   memset(&value, 0, sizeof(value));
@@ -1095,7 +1112,7 @@ void inthash_add(inthash hashtable, const char *name, intptr_t intvalue) {
   inthash_write_value(hashtable, name, value);
 }
 
-int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue) {
+int inthash_read(inthash hashtable, inthash_key_const name, intptr_t * intvalue) {
   inthash_value value = INTHASH_VALUE_NULL;
   int ret =
     inthash_read_value(hashtable, name, (intvalue != NULL) ? &value : NULL);
@@ -1105,8 +1122,8 @@ int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue) {
 }
 
 static inthash_value* inthash_read_value_(inthash hashtable,
-                                          const char *name) {
-  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
+                                          inthash_key_const name) {
+  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
   size_t pos;
 
   /* found at position 1 ? */
@@ -1136,7 +1153,7 @@ static inthash_value* inthash_read_value_(inthash hashtable,
   return NULL;
 }
 
-int inthash_read_value(inthash hashtable, const char *name,
+int inthash_read_value(inthash hashtable, inthash_key_const name,
                        inthash_value * pvalue) {
   inthash_value* const value = inthash_read_value_(hashtable, name);
   if (value != NULL) {
@@ -1148,7 +1165,7 @@ int inthash_read_value(inthash hashtable, const char *name,
   return 0;
 }
 
-static size_t inthash_inc_(inthash hashtable, const char *name,
+static size_t inthash_inc_(inthash hashtable, inthash_key_const name,
                            size_t inc) {
   inthash_value* const value = inthash_read_value_(hashtable, name);
   if (value != NULL) {
@@ -1162,20 +1179,20 @@ static size_t inthash_inc_(inthash hashtable, const char *name,
   }
 }
 
-int inthash_inc(inthash hashtable, const char *name) {
+int inthash_inc(inthash hashtable, inthash_key_const name) {
   return (int) inthash_inc_(hashtable, name, 1);
 }
 
-int inthash_dec(inthash hashtable, const char *name) {
+int inthash_dec(inthash hashtable, inthash_key_const name) {
   return (int) inthash_inc_(hashtable, name, (size_t) -1);
 }
 
-int inthash_exists(inthash hashtable, const char *name) {
+int inthash_exists(inthash hashtable, inthash_key_const name) {
   return inthash_read_value(hashtable, name, NULL);
 }
 
-static int inthash_remove_(inthash hashtable, const char *name,
-                           const inthash_keys *hashes, size_t *removed) {
+static int inthash_remove_(inthash hashtable, inthash_key_const name,
+                           const inthash_hashkeys *hashes, size_t *removed) {
   size_t pos;
 
   /* found at position 1 ? */
@@ -1217,8 +1234,8 @@ static int inthash_remove_(inthash hashtable, const char *name,
   return 0;
 }
 
-int inthash_remove(inthash hashtable, const char *name) {
-  const inthash_keys hashes = inthash_calc_hashes(hashtable, name);
+int inthash_remove(inthash hashtable, inthash_key_const name) {
+  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
   size_t removed;
   const int ret = inthash_remove_(hashtable, name, &hashes, &removed);
 
@@ -1256,7 +1273,7 @@ int inthash_remove(inthash hashtable, const char *name) {
   return ret;
 }
 
-int inthash_readptr(inthash hashtable, const char *name, intptr_t * value) {
+int inthash_readptr(inthash hashtable, inthash_key_const name, intptr_t * value) {
   int ret;
 
   *value = 0;
@@ -1324,23 +1341,23 @@ void inthash_value_is_malloc(inthash hashtable, int flag) {
   }
 }
 
-void inthash_set_name(inthash hashtable, const char *name) {
+void inthash_set_name(inthash hashtable, inthash_key_const name) {
   hashtable->custom.error.name = name;
 }
 
 void inthash_value_set_value_handler(inthash hashtable,
-                                     t_inthash_freehandler free,
-                                     void *arg) {
+                                     t_inthash_value_freehandler free,
+                                     inthash_opaque arg) {
   hashtable->custom.value.free = free;
   hashtable->custom.value.arg = arg;
 }
 
 void inthash_value_set_key_handler(inthash hashtable,
                                    t_inthash_duphandler dup,
-                                   t_inthash_freehandler free,
+                                   t_inthash_key_freehandler free,
                                    t_inthash_hasheshandler hash,
                                    t_inthash_cmphandler equals,
-                                   void *arg) {
+                                   inthash_opaque arg) {
   /* dup and free must be consistent */
   inthash_assert(hashtable, ( dup == NULL ) == ( free == NULL ) );
   hashtable->custom.key.dup = dup;
@@ -1353,7 +1370,7 @@ void inthash_value_set_key_handler(inthash hashtable,
 void inthash_set_assert_handler(inthash hashtable,
                                 t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
-                                void *arg) {
+                                inthash_opaque arg) {
   hashtable->custom.error.log = log;
   hashtable->custom.error.fatal = fatal;
   hashtable->custom.error.arg = arg;
@@ -1362,7 +1379,7 @@ void inthash_set_assert_handler(inthash hashtable,
 void inthash_set_print_handler(inthash hashtable,
                                t_inthash_printkeyhandler key,
                                t_inthash_printvaluehandler value,
-                               void *arg) {
+                               inthash_opaque arg) {
   hashtable->custom.print.key = key;
   hashtable->custom.print.value = value;
   hashtable->custom.print.arg = arg;

@@ -69,7 +69,16 @@ typedef unsigned __int64 uint64_t;
 #endif
 #include <stdarg.h>
 
-/** Value. **/
+/** Key opaque type. May be a regular 'const char*'. **/
+typedef void* inthash_key;
+
+/** Key constant (can not be modified) opaque type. **/
+typedef const void* inthash_key_const;
+
+/** Opaque user-defined pointer. **/
+typedef void* inthash_opaque;
+
+/** Value (union of any value). **/
 typedef union inthash_value {
   /** Integer value. **/
   intptr_t intg;
@@ -81,6 +90,9 @@ typedef union inthash_value {
   void *ptr;
 } inthash_value;
 
+/** Value constant. **/
+typedef const inthash_value inthash_value_const;
+
 /** NULL Value. **/
 #define INTHASH_VALUE_NULL { 0 }
 
@@ -90,13 +102,13 @@ typedef struct inthash_item inthash_item;
 #endif
 
 /** Hash key (32-bit) **/
-typedef uint32_t inthash_key;
+typedef uint32_t inthash_hashkey;
 
 /** Pair of hashes **/
-typedef struct inthash_keys {
-  inthash_key hash1;
-  inthash_key hash2;
-} inthash_keys;
+typedef struct inthash_hashkeys {
+  inthash_hashkey hash1;
+  inthash_hashkey hash2;
+} inthash_hashkeys;
 
 /** NULL pair of hashes. **/
 #define INTHASH_KEYS_NULL { 0, 0 }
@@ -104,13 +116,13 @@ typedef struct inthash_keys {
 /** Item holding a value. **/
 struct inthash_item {
   /** Key. **/
-  char *name;
+  inthash_key name;
 
   /** Value. **/
   inthash_value value;
 
   /** Hashes of the key. **/
-  inthash_keys hashes;
+  inthash_hashkeys hashes;
 };
 
 /** Log level. **/
@@ -122,35 +134,44 @@ typedef enum inthash_loglevel {
   inthash_log_trace
 } inthash_loglevel;
 
-/** Alias for legacy code. **/
-typedef inthash_item inthash_chain;
+/**  free handler. Only used when values are markes as xxc **/
+typedef void (*t_inthash_key_freehandler)(inthash_opaque arg,
+                                          inthash_key key);
 
-/** Value free handler **/
-typedef void (*t_inthash_freehandler)(void *arg, void *value);
+/** Value free handler. Only used when values are markes as xxc **/
+typedef void (*t_inthash_value_freehandler)(inthash_opaque arg,
+                                            inthash_value value);
 
-/** Name dup handler. **/
-typedef char* (*t_inthash_duphandler)(void *arg, const char *name);
+/** Key dup handler. **/
+typedef inthash_key (*t_inthash_duphandler)(inthash_opaque arg,
+                                            inthash_key_const name);
 
-/** Hash computation handler. **/
-typedef inthash_keys (*t_inthash_hasheshandler)(void *arg, const char *value);
+/** Key hash computation handler. **/
+typedef inthash_hashkeys (*t_inthash_hasheshandler)(inthash_opaque arg,
+                                                    inthash_key_const name);
 
 /** Hashtable logging handler. **/
-typedef void (*t_inthash_loghandler)(void *arg, inthash_loglevel level, 
+typedef void (*t_inthash_loghandler)(inthash_opaque arg, inthash_loglevel level, 
                                      const char* format, va_list args);
 
 /** Hashtable fatal assertion failure. **/
-typedef void (*t_inthash_asserthandler)(void *arg, const char* exp, const char* file, int line);
+typedef void (*t_inthash_asserthandler)(inthash_opaque arg, const char* exp,
+                                        const char* file, int line);
 
 /** Key printer (debug) **/
-typedef const char* (*t_inthash_printkeyhandler)(void *arg, const char *name);
+typedef const char* (*t_inthash_printkeyhandler)(inthash_opaque arg,
+                                                 inthash_key_const name);
 
 /** Value printer (debug) **/
-typedef const char* (*t_inthash_printvaluehandler)(void *arg, void *value);
+typedef const char* (*t_inthash_printvaluehandler)(inthash_opaque arg,
+                                                   inthash_value_const value);
 
 /**
  * Value comparison handler (returns non-zero value if strings are equal).
  **/
-typedef int (*t_inthash_cmphandler)(void *arg, const char *a, const char *b);
+typedef int (*t_inthash_cmphandler)(inthash_opaque arg,
+                                    inthash_key_const a,
+                                    inthash_key_const b);
 
 /** Hashtable (opaque structure). **/
 #ifndef HTS_DEF_FWSTRUCT_struct_inthash
@@ -220,8 +241,8 @@ void inthash_value_is_malloc(inthash hashtable, int flag);
  * Handler(s) MUST NOT be changed once elements have been added.
  **/
 void inthash_value_set_value_handler(inthash hashtable,
-                                     t_inthash_freehandler free,
-                                     void *arg);
+                                     t_inthash_value_freehandler free,
+                                     inthash_opaque arg);
 
 /**
  * Set handlers for keys.
@@ -236,10 +257,10 @@ void inthash_value_set_value_handler(inthash hashtable,
  **/
 void inthash_value_set_key_handler(inthash hashtable,
                                    t_inthash_duphandler dup,
-                                   t_inthash_freehandler free,
+                                   t_inthash_key_freehandler free,
                                    t_inthash_hasheshandler hash,
                                    t_inthash_cmphandler equals,
-                                   void *arg);
+                                   inthash_opaque arg);
 
 /**
  * Set assertion failure handler.
@@ -249,7 +270,7 @@ void inthash_value_set_key_handler(inthash hashtable,
 void inthash_set_assert_handler(inthash hashtable,
                                 t_inthash_loghandler log,
                                 t_inthash_asserthandler fatal,
-                                void *arg);
+                                inthash_opaque arg);
 
 /**
  * Set pretty print loggers (debug). Both handlers must return a string
@@ -261,13 +282,13 @@ void inthash_set_assert_handler(inthash hashtable,
 void inthash_set_print_handler(inthash hashtable,
                                t_inthash_printkeyhandler key,
                                t_inthash_printvaluehandler value,
-                               void *arg);
+                               inthash_opaque arg);
 
 /**
  * Set the hashtable name, for degugging purpose.
  * name: the hashtable name (ASCII or UTF-8)
  */
-void inthash_set_name(inthash hashtable, const char *name);
+void inthash_set_name(inthash hashtable, inthash_key_const name);
 
 /**
  * Get the hashtable name, for degugging purpose.
@@ -279,78 +300,78 @@ const char* inthash_get_name(inthash hashtable);
  * Read an integer entry from the hashtable.
  * Return non-zero value upon success and sets intvalue.
  **/
-int inthash_read(inthash hashtable, const char *name, intptr_t * intvalue);
+int inthash_read(inthash hashtable, inthash_key_const name, intptr_t * intvalue);
 
 /**
  * Same as inthash_read(), but return 0 is the value was zero.
  **/
-int inthash_readptr(inthash hashtable, const char *name, intptr_t * intvalue);
+int inthash_readptr(inthash hashtable, inthash_key_const name, intptr_t * intvalue);
 
 /**
  * Return non-zero value if the given entry exists.
  **/
-int inthash_exists(inthash hashtable, const char *name);
+int inthash_exists(inthash hashtable, inthash_key_const name);
 
 /**
  * Read an entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int inthash_read_value(inthash hashtable, const char *name,
-                       inthash_value * value);
+int inthash_read_value(inthash hashtable, inthash_key_const name,
+                       inthash_value *value);
 
 /**
  * Write an entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write_value(inthash hashtable, const char *name,
-                        inthash_value value);
+int inthash_write_value(inthash hashtable, inthash_key_const name,
+                        inthash_value_const value);
 /**
  * Read a pointer entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int inthash_read_pvoid(inthash hashtable, const char *name, void **value);
+int inthash_read_pvoid(inthash hashtable, inthash_key_const name, void **value);
 
 /**
  * Write a pointer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write_pvoid(inthash hashtable, const char *name, void *value);
+int inthash_write_pvoid(inthash hashtable, inthash_key_const name, void *value);
 
 /**
  * Alias to inthash_write_pvoid()
  **/
-void inthash_add_pvoid(inthash hashtable, const char *name, void *value);
+void inthash_add_pvoid(inthash hashtable, inthash_key_const name, void *value);
 
 /**
  * Write an integer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write(inthash hashtable, const char *name, intptr_t value);
+int inthash_write(inthash hashtable, inthash_key_const name, intptr_t value);
 
 /**
  * Alias to inthash_write()
  **/
-void inthash_add(inthash hashtable, const char *name, intptr_t value);
+void inthash_add(inthash hashtable, inthash_key_const name, intptr_t value);
 
 /**
  * Increment an entry value in the hashtable
  * (or create a new entry with value 1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int inthash_inc(inthash hashtable, const char *name);
+int inthash_inc(inthash hashtable, inthash_key_const name);
 
 /**
  * Decrement an entry value in the hashtable 
  * (or create a new entry with value -1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int inthash_dec(inthash hashtable, const char *name);
+int inthash_dec(inthash hashtable, inthash_key_const name);
 
 /**
  * Remove an entry from the hashtable
  * Return non-zero value if the entry was removed, zero otherwise.
  **/
-int inthash_remove(inthash hashtable, const char *name);
+int inthash_remove(inthash hashtable, inthash_key_const name);
 
 /**
  * Return a new enumerator.
@@ -365,9 +386,10 @@ struct_inthash_enum inthash_enum_new(inthash hashtable);
 inthash_item *inthash_enum_next(struct_inthash_enum * e);
 
 /**
- * Compute a hash, given a string value.
+ * Compute a hash, given a string. This is the default function used for
+ * hashing keys, which are by default strings.
  **/
-inthash_keys inthash_hash_value(const char *value);
+inthash_hashkeys inthash_hash_string(const char *value);
 
 /**
  * Set default global assertion failure handler.

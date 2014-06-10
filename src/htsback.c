@@ -113,7 +113,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     // delete stored slots
     if (sback->ready != NULL) {
       struct_inthash_enum e = inthash_enum_new(sback->ready);
-      inthash_chain *item;
+      inthash_item *item;
 
       while((item = inthash_enum_next(&e))) {
 #ifndef HTS_NO_BACK_ON_DISK
@@ -376,7 +376,7 @@ LLint back_incache(const struct_back * sback) {
 #ifdef HTS_NO_BACK_ON_DISK
   if (sback->ready != NULL) {
     struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_chain *item;
+    inthash_item *item;
 
     while((item = inthash_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
@@ -406,7 +406,7 @@ int back_done_incache(const struct_back * sback) {
     n += (int) inthash_nitems(sback->ready);
 #else
     struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_chain *item;
+    inthash_item *item;
 
     while((item = inthash_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
@@ -3979,7 +3979,7 @@ LLint back_transferred(LLint nb, struct_back * sback) {
     nb += sback->ready_size_bytes;
 #else
     struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_chain *item;
+    inthash_item *item;
 
     while((item = inthash_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
