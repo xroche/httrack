@@ -60,44 +60,50 @@ Please visit our Website: http://www.httrack.com
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 
 /* Key free handler (NOOP) ; addresses are kept */
-static void key_freehandler(void *arg, void *value) {
+static void key_freehandler(void *arg, inthash_key value) {
 }
 
 /* Key strdup (pointer copy) */
-static char* key_duphandler(void *arg, const char *name) {
+static inthash_key key_duphandler(void *arg, inthash_key_const name) {
   union {
-    const char *roname;
-    char *name;
+    inthash_key_const roname;
+    inthash_key name;
   } u;
   u.roname = name;
   return u.name;
 }
 
 /* Key sav hashes are using case-insensitive version */
-static inthash_keys key_sav_hashes(void *arg, const char *value) {
+static inthash_hashkeys key_sav_hashes(void *arg, inthash_key_const key) {
   hash_struct *const hash = (hash_struct*) arg;
-  convtolower(hash->catbuff, value);
-  return inthash_hash_value(hash->catbuff);
+  convtolower(hash->catbuff, (const char*) key);
+  return inthash_hash_string(hash->catbuff);
 }
 
 /* Key sav comparison is case-insensitive */
-static int key_sav_equals(void *arg, const char *a, const char *b) {
+static int key_sav_equals(void *arg,
+                          inthash_key_const a_,
+                          inthash_key_const b_) {
+  const char *const a = (const char*) a_;
+  const char *const b = (const char*) b_;
   return strcasecmp(a, b) == 0;
 }
 
-static const char* key_sav_debug_print(void *arg, const char *a) {
-  return a;
+static const char* key_sav_debug_print(void *arg,
+                                       inthash_key_const a) {
+  return (const char*) a;
 }
 
-static const char* value_sav_debug_print(void *arg, void *a) {
-  return (char*) a;
+static const char* value_sav_debug_print(void *arg, inthash_value_const a) {
+  return (char*) a.ptr;
 }
 
 /* Pseudo-key (lien_url structure) hash function */
-static inthash_keys key_adrfil_hashes_generic(void *arg, const char *value_, 
+static inthash_hashkeys key_adrfil_hashes_generic(void *arg,
+                                              inthash_key_const value, 
                                               const int former) {
   hash_struct *const hash = (hash_struct*) arg;
-  const lien_url*const lien = (lien_url*) value_;
+  const lien_url*const lien = (lien_url*) value;
   const char *const adr = !former ? lien->adr : lien->former_adr;
   const char *const fil = !former ? lien->fil : lien->former_fil;
   const char *const adr_norm = adr != NULL ? 
@@ -117,11 +123,13 @@ static inthash_keys key_adrfil_hashes_generic(void *arg, const char *value_,
   }
 
   // hash
-  return inthash_hash_value(hash->normfil);
+  return inthash_hash_string(hash->normfil);
 }
 
 /* Pseudo-key (lien_url structure) comparison function */
-static int key_adrfil_equals_generic(void *arg, const char *a_, const char *b_, 
+static int key_adrfil_equals_generic(void *arg,
+                                     inthash_key_const a_,
+                                     inthash_key_const b_, 
                                      const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const int normalized = hash->normalized;
@@ -159,7 +167,9 @@ static int key_adrfil_equals_generic(void *arg, const char *a_, const char *b_,
   }
 }
 
-static const char* key_adrfil_debug_print_(void *arg, const char *a_, const int former) {
+static const char* key_adrfil_debug_print_(void *arg,
+                                           inthash_key_const a_,
+                                           const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const lien_url*const a = (lien_url*) a_;
   const char *const a_adr = !former ? a->adr : a->former_adr;
@@ -168,39 +178,44 @@ static const char* key_adrfil_debug_print_(void *arg, const char *a_, const int 
   return hash->normfil;
 }
 
-static const char* key_adrfil_debug_print(void *arg, const char *a_) {
+static const char* key_adrfil_debug_print(void *arg,
+                                          inthash_key_const a_) {
   return key_adrfil_debug_print_(arg, a_, 0);
 }
 
-static const char* key_former_adrfil_debug_print(void *arg, const char *a_) {
+static const char* key_former_adrfil_debug_print(void *arg,
+                                                 inthash_key_const a_) {
   return key_adrfil_debug_print_(arg, a_, 1);
 }
 
-static const char* value_adrfil_debug_print(void *arg, void *value) {
+static const char* value_adrfil_debug_print(void *arg,
+                                            inthash_value_const value) {
   hash_struct *const hash = (hash_struct*) arg;
-  inthash_value v;
-  v.ptr = value;
-  snprintf(hash->normfil2, sizeof(hash->normfil2), "%d", (int) v.intg);
+  snprintf(hash->normfil2, sizeof(hash->normfil2), "%d", (int) value.intg);
   return hash->normfil2;
 }
 
 /* "adr"/"fil" lien_url structure members hashing function */
-static inthash_keys key_adrfil_hashes(void *arg, const char *value_) {
+static inthash_hashkeys key_adrfil_hashes(void *arg, inthash_key_const value_) {
   return key_adrfil_hashes_generic(arg, value_, 0);
 }
 
 /* "adr"/"fil" lien_url structure members comparison function */
-static int key_adrfil_equals(void *arg, const char *a, const char *b) {
+static int key_adrfil_equals(void *arg,
+                             inthash_key_const a,
+                             inthash_key_const b) {
   return key_adrfil_equals_generic(arg, a, b, 0);
 }
 
 /* "former_adr"/"former_fil" lien_url structure members hashing function */
-static inthash_keys key_former_adrfil_hashes(void *arg, const char *value_) {
+static inthash_hashkeys key_former_adrfil_hashes(void *arg, inthash_key_const value_) {
   return key_adrfil_hashes_generic(arg, value_, 1);
 }
 
 /* "former_adr"/"former_fil" lien_url structure members comparison function */
-static int key_former_adrfil_equals(void *arg, const char *a, const char *b) {
+static int key_former_adrfil_equals(void *arg,
+                                    inthash_key_const a,
+                                    inthash_key_const b) {
   return key_adrfil_equals_generic(arg, a, b, 1);
 }
 

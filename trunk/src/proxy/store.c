@@ -430,7 +430,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     String subitem = STRING_EMPTY;
     unsigned int listCount = 0;
     struct_inthash_enum en = inthash_enum_new(indexes->cil);
-    inthash_chain *chain;
+    inthash_item *chain;
     inthash hdupes = NULL;
 
     if (!subtree) {
@@ -448,7 +448,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 
       if (urlSize == 0 || strncmp(chain->name, url, urlSize) == 0) {
         if (index >= 0 && index < indexes->index_size) {
-          char *item = chain->name + urlSize;
+          char *item = (char*) chain->name + urlSize;
 
           if (*item == '/')
             item++;
@@ -570,7 +570,7 @@ PT_Index PT_LoadCache(const char *filename) {
       /* default starting URL is the first hash entry */
       if (index->slots.common.startUrl[0] == '\0') {
         struct_inthash_enum en = inthash_enum_new(index->slots.common.hash);
-        inthash_chain *chain;
+        inthash_item *chain;
 
         chain = inthash_enum_next(&en);
         if (chain != NULL && strstr(chain->name, "/robots.txt") != NULL) {
@@ -626,7 +626,7 @@ int PT_EnumCache(PT_Indexes indexes,
                  void *arg) {
   if (indexes != NULL && indexes->cil != NULL) {
     struct_inthash_enum en = inthash_enum_new(indexes->cil);
-    inthash_chain *chain;
+    inthash_item *chain;
 
     while((chain = inthash_enum_next(&en))) {
       const long int index_id = (long int) chain->value.intg;
@@ -690,7 +690,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
       && indexes != NULL) {
     PT_Index index = *pindex;
     struct_inthash_enum en = inthash_enum_new(index->slots.common.hash);
-    inthash_chain *chain;
+    inthash_item *chain;
     int index_id = indexes->index_size++;
     int nMerged = 0;
 
