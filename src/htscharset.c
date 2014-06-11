@@ -35,7 +35,17 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 
+#ifdef _WIN32
+#include <stddef.h>
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
+#elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
+  || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
+#include <inttypes.h>
+#else
 #include <stdint.h>
+#endif
+#include <stdarg.h>
 
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
