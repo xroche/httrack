@@ -1,14 +1,6 @@
 --- zip.c.orig	2014-06-10 18:55:32.778807408 +0200
-+++ zip.c	2014-06-10 22:24:28.372483395 +0200
-@@ -33,6 +33,7 @@
- #  include <stddef.h>
- #  include <string.h>
- #  include <stdlib.h>
-+#  include <stdint.h>
- #endif
- #ifdef NO_ERRNO_H
-     extern int errno;
-@@ -186,7 +187,7 @@
++++ zip.c	2014-06-11 20:27:18.355848501 +0200
+@@ -186,7 +186,7 @@
  #include "crypt.h"
  #endif
  
@@ -17,7 +9,7 @@
  {
      linkedlist_datablock_internal* ldi;
      ldi = (linkedlist_datablock_internal*)
-@@ -238,7 +239,7 @@
+@@ -238,7 +238,7 @@
      }
  
      ldi = ll->last_block;
@@ -26,7 +18,7 @@
  
      while (len>0)
      {
-@@ -637,7 +638,7 @@
+@@ -637,7 +637,7 @@
    return relativeOffset;
  }
  
@@ -35,7 +27,7 @@
  {
    int err=ZIP_OK;
    ZPOS64_T byte_before_the_zipfile;/* byte before the zipfile, (>0 for sfx)*/
-@@ -955,7 +956,7 @@
+@@ -955,7 +955,7 @@
      return zipOpen3(pathname,append,NULL,NULL);
  }
  
@@ -44,16 +36,25 @@
  {
    /* write the local header */
    int err;
-@@ -1450,7 +1451,7 @@
+@@ -1416,7 +1416,7 @@
+ #ifdef HAVE_BZIP2
+     if(zi->ci.method == Z_BZIP2ED && (!zi->ci.raw))
+     {
+-      zi->ci.bstream.next_in = (void*)buf;
++      zi->ci.bstream.next_in = buf;
+       zi->ci.bstream.avail_in = len;
+       err = BZ_RUN_OK;
+ 
+@@ -1450,7 +1450,7 @@
      else
  #endif
      {
 -      zi->ci.stream.next_in = (Bytef*)buf;
-+      zi->ci.stream.next_in = (void*) (uintptr_t) buf;
++      zi->ci.stream.next_in = buf;
        zi->ci.stream.avail_in = len;
  
        while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
-@@ -1752,7 +1753,7 @@
+@@ -1752,7 +1752,7 @@
      return zipCloseFileInZipRaw (file,0,0);
  }
  
@@ -62,7 +63,7 @@
  {
    int err = ZIP_OK;
    ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writting_offset;
-@@ -1774,7 +1775,7 @@
+@@ -1774,7 +1774,7 @@
      return err;
  }
  
@@ -71,7 +72,7 @@
  {
    int err = ZIP_OK;
  
-@@ -1813,7 +1814,8 @@
+@@ -1813,7 +1813,8 @@
    }
    return err;
  }
@@ -81,7 +82,7 @@
  {
    int err = ZIP_OK;
  
-@@ -1861,7 +1863,7 @@
+@@ -1861,7 +1862,7 @@
     return err;
  }
  
@@ -90,7 +91,7 @@
  {
    int err = ZIP_OK;
    uInt size_global_comment = 0;
-@@ -1879,6 +1881,18 @@
+@@ -1879,6 +1880,18 @@
    return err;
  }
  

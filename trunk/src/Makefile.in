@@ -343,7 +343,7 @@ AM_CPPFLAGS = \
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
-proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT
+proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT -DZLIB_CONST
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
@@ -377,7 +377,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
-libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS
+libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la

@@ -33,7 +33,6 @@
 #  include <stddef.h>
 #  include <string.h>
 #  include <stdlib.h>
-#  include <stdint.h>
 #endif
 #ifdef NO_ERRNO_H
     extern int errno;
@@ -1417,7 +1416,7 @@ extern int ZEXPORT zipWriteInFileInZip (zipFile file,const void* buf,unsigned in
 #ifdef HAVE_BZIP2
     if(zi->ci.method == Z_BZIP2ED && (!zi->ci.raw))
     {
-      zi->ci.bstream.next_in = (void*)buf;
+      zi->ci.bstream.next_in = buf;
       zi->ci.bstream.avail_in = len;
       err = BZ_RUN_OK;
 
@@ -1451,7 +1450,7 @@ extern int ZEXPORT zipWriteInFileInZip (zipFile file,const void* buf,unsigned in
     else
 #endif
     {
-      zi->ci.stream.next_in = (void*) (uintptr_t) buf;
+      zi->ci.stream.next_in = buf;
       zi->ci.stream.avail_in = len;
 
       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
