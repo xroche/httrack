@@ -304,6 +304,8 @@ static void inthash_log(const inthash hashtable, inthash_loglevel level,
 static void inthash_nolog(const inthash hashtable, const char *format, ...)
                           INTHASH_PRINTF_FUN(2, 3);
 static void inthash_nolog(const inthash hashtable, const char *format, ...) {
+  (void) hashtable;
+  (void) format;
 }
 
 const char* inthash_get_name(inthash hashtable) {
@@ -735,6 +737,7 @@ int inthash_write(inthash hashtable, inthash_key_const name, intptr_t intvalue) 
 
 static void inthash_default_free_handler(inthash_opaque arg,
                                          inthash_value value) {
+  (void) arg;
   if (value.ptr != NULL)
     free(value.ptr);
 }
