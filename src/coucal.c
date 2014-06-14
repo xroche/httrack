@@ -1,37 +1,30 @@
 /* ------------------------------------------------------------ */
 /*
-HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Coucal, Cuckoo hashing-based hashtable with stash area.
+Copyright (C) 2013-2014 Xavier Roche and other contributors
+All rights reserved.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
 
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.
+  Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
 
-Important notes:
-
-- We hereby ask people using this source NOT to use it in purpose of grabbing
-emails addresses, or collecting any other private information on persons.
-This would disgrace our work, and spoil the many hours we spent on it.
-
-Please visit our Website: http://www.httrack.com
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-/* ------------------------------------------------------------ */
-/* File: hash tables                                            */
-/* Author: Xavier Roche                                         */
-/* ------------------------------------------------------------ */
-
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,21 +54,19 @@ Please visit our Website: http://www.httrack.com
      once ]
 */
 #if (!defined(HTS_INTHASH_USES_MD5) && !defined(HTS_INTHASH_USES_MURMUR))
-#define HTS_INTHASH_USES_MD5 1
+#define HTS_INTHASH_USES_MURMUR 1
 #endif
 
-#if HTS_INTHASH_USES_MD5 == 1
-#include "md5.h"
-#elif (defined(HTS_INTHASH_USES_MURMUR))
+#if (defined(HTS_INTHASH_USES_MURMUR))
 #include "murmurhash3.h"
+#elif HTS_INTHASH_USES_MD5 == 1
+#include "md5.h"
 #else
 /* use the Openssl implementation */
-#if 0
 #include <openssl/md5.h>
 #define MD5Init MD5_Init
 #define MD5Update MD5_Update
 #define MD5Final MD5_Final
-#endif
 #endif
 
 /** Size of auxiliary stash. **/
