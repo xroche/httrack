@@ -5022,25 +5022,25 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void) {
   return htsCallbackErr;
 }
 
-static void default_inthash_asserthandler(void *arg, const char* exp, const char* file, int line) {
+static void default_coucal_asserthandler(void *arg, const char* exp, const char* file, int line) {
   abortf_(exp, file, line);
 }
 
-static int get_loglevel_from_inthash(inthash_loglevel level) {
+static int get_loglevel_from_coucal(coucal_loglevel level) {
   switch(level) {
-  case inthash_log_critical:
+  case coucal_log_critical:
     return LOG_PANIC;
     break;
-  case inthash_log_warning:
+  case coucal_log_warning:
     return LOG_WARNING;
     break;
-  case inthash_log_info:
+  case coucal_log_info:
     return LOG_INFO;
     break;
-  case inthash_log_debug:
+  case coucal_log_debug:
     return LOG_DEBUG;
     break;
-  case inthash_log_trace:
+  case coucal_log_trace:
     return LOG_TRACE;
     break;
   default:
@@ -5050,10 +5050,10 @@ static int get_loglevel_from_inthash(inthash_loglevel level) {
 }
 
 /* log to default console */
-static void default_inthash_loghandler(void *arg, inthash_loglevel level, 
+static void default_coucal_loghandler(void *arg, coucal_loglevel level, 
                                        const char* format, va_list args) {
 
-  if (level <= inthash_log_warning) {
+  if (level <= coucal_log_warning) {
     fprintf(stderr, "** warning: ");
   }
   vfprintf(stderr, format, args);
@@ -5061,23 +5061,23 @@ static void default_inthash_loghandler(void *arg, inthash_loglevel level,
 }
 
 /* log to project log */
-static void htsopt_inthash_loghandler(void *arg, inthash_loglevel level, 
+static void htsopt_coucal_loghandler(void *arg, coucal_loglevel level, 
                                       const char* format, va_list args) {
   httrackp *const opt = (httrackp*) arg;
   if (opt != NULL && opt->log != NULL) {
-    hts_log_vprint(opt, get_loglevel_from_inthash(level), 
+    hts_log_vprint(opt, get_loglevel_from_coucal(level), 
       format, args);
   } else {
-    default_inthash_loghandler(NULL, level, format, args);
+    default_coucal_loghandler(NULL, level, format, args);
   }
 }
 
 /* attach hashtable logger to project log */
-void hts_set_hash_handler(inthash hashtable, httrackp *opt) {
+void hts_set_hash_handler(coucal hashtable, httrackp *opt) {
   /* Init hashtable default assertion handler. */
-  inthash_set_assert_handler(hashtable,
-    htsopt_inthash_loghandler, 
-    default_inthash_asserthandler,
+  coucal_set_assert_handler(hashtable,
+    htsopt_coucal_loghandler, 
+    default_coucal_asserthandler,
     opt);
 }
 
@@ -5103,8 +5103,8 @@ HTSEXT_API int hts_init(void) {
   hts_debug_log_print("entering hts_init()");   /* debug */
 
   /* Init hashtable default assertion handler. */
-  inthash_set_global_assert_handler(default_inthash_loghandler, 
-    default_inthash_asserthandler);
+  coucal_set_global_assert_handler(default_coucal_loghandler, 
+    default_coucal_asserthandler);
 
   /* Init threads (lazy init) */
   htsthread_init();

@@ -60,47 +60,47 @@ Please visit our Website: http://www.httrack.com
 // recherche dans la table selon nom1,nom2 et le no d'enregistrement
 
 /* Key free handler (NOOP) ; addresses are kept */
-static void key_freehandler(void *arg, inthash_key value) {
+static void key_freehandler(void *arg, coucal_key value) {
 }
 
 /* Key strdup (pointer copy) */
-static inthash_key key_duphandler(void *arg, inthash_key_const name) {
+static coucal_key key_duphandler(void *arg, coucal_key_const name) {
   union {
-    inthash_key_const roname;
-    inthash_key name;
+    coucal_key_const roname;
+    coucal_key name;
   } u;
   u.roname = name;
   return u.name;
 }
 
 /* Key sav hashes are using case-insensitive version */
-static inthash_hashkeys key_sav_hashes(void *arg, inthash_key_const key) {
+static coucal_hashkeys key_sav_hashes(void *arg, coucal_key_const key) {
   hash_struct *const hash = (hash_struct*) arg;
   convtolower(hash->catbuff, (const char*) key);
-  return inthash_hash_string(hash->catbuff);
+  return coucal_hash_string(hash->catbuff);
 }
 
 /* Key sav comparison is case-insensitive */
 static int key_sav_equals(void *arg,
-                          inthash_key_const a_,
-                          inthash_key_const b_) {
+                          coucal_key_const a_,
+                          coucal_key_const b_) {
   const char *const a = (const char*) a_;
   const char *const b = (const char*) b_;
   return strcasecmp(a, b) == 0;
 }
 
 static const char* key_sav_debug_print(void *arg,
-                                       inthash_key_const a) {
+                                       coucal_key_const a) {
   return (const char*) a;
 }
 
-static const char* value_sav_debug_print(void *arg, inthash_value_const a) {
+static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
   return (char*) a.ptr;
 }
 
 /* Pseudo-key (lien_url structure) hash function */
-static inthash_hashkeys key_adrfil_hashes_generic(void *arg,
-                                              inthash_key_const value, 
+static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
+                                              coucal_key_const value, 
                                               const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const lien_url*const lien = (const lien_url*) value;
@@ -124,13 +124,13 @@ static inthash_hashkeys key_adrfil_hashes_generic(void *arg,
   }
 
   // hash
-  return inthash_hash_string(hash->normfil);
+  return coucal_hash_string(hash->normfil);
 }
 
 /* Pseudo-key (lien_url structure) comparison function */
 static int key_adrfil_equals_generic(void *arg,
-                                     inthash_key_const a_,
-                                     inthash_key_const b_, 
+                                     coucal_key_const a_,
+                                     coucal_key_const b_, 
                                      const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const int normalized = hash->normalized;
@@ -171,7 +171,7 @@ static int key_adrfil_equals_generic(void *arg,
 }
 
 static const char* key_adrfil_debug_print_(void *arg,
-                                           inthash_key_const a_,
+                                           coucal_key_const a_,
                                            const int former) {
   hash_struct *const hash = (hash_struct*) arg;
   const lien_url*const a = (const lien_url*) a_;
@@ -182,62 +182,62 @@ static const char* key_adrfil_debug_print_(void *arg,
 }
 
 static const char* key_adrfil_debug_print(void *arg,
-                                          inthash_key_const a_) {
+                                          coucal_key_const a_) {
   return key_adrfil_debug_print_(arg, a_, 0);
 }
 
 static const char* key_former_adrfil_debug_print(void *arg,
-                                                 inthash_key_const a_) {
+                                                 coucal_key_const a_) {
   return key_adrfil_debug_print_(arg, a_, 1);
 }
 
 static const char* value_adrfil_debug_print(void *arg,
-                                            inthash_value_const value) {
+                                            coucal_value_const value) {
   hash_struct *const hash = (hash_struct*) arg;
   snprintf(hash->normfil2, sizeof(hash->normfil2), "%d", (int) value.intg);
   return hash->normfil2;
 }
 
 /* "adr"/"fil" lien_url structure members hashing function */
-static inthash_hashkeys key_adrfil_hashes(void *arg, inthash_key_const value_) {
+static coucal_hashkeys key_adrfil_hashes(void *arg, coucal_key_const value_) {
   return key_adrfil_hashes_generic(arg, value_, 0);
 }
 
 /* "adr"/"fil" lien_url structure members comparison function */
 static int key_adrfil_equals(void *arg,
-                             inthash_key_const a,
-                             inthash_key_const b) {
+                             coucal_key_const a,
+                             coucal_key_const b) {
   return key_adrfil_equals_generic(arg, a, b, 0);
 }
 
 /* "former_adr"/"former_fil" lien_url structure members hashing function */
-static inthash_hashkeys key_former_adrfil_hashes(void *arg, inthash_key_const value_) {
+static coucal_hashkeys key_former_adrfil_hashes(void *arg, coucal_key_const value_) {
   return key_adrfil_hashes_generic(arg, value_, 1);
 }
 
 /* "former_adr"/"former_fil" lien_url structure members comparison function */
 static int key_former_adrfil_equals(void *arg,
-                                    inthash_key_const a,
-                                    inthash_key_const b) {
+                                    coucal_key_const a,
+                                    coucal_key_const b) {
   return key_adrfil_equals_generic(arg, a, b, 1);
 }
 
 void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
-  hash->sav = inthash_new(0);
-  hash->adrfil = inthash_new(0);
-  hash->former_adrfil = inthash_new(0);
+  hash->sav = coucal_new(0);
+  hash->adrfil = coucal_new(0);
+  hash->former_adrfil = coucal_new(0);
   hash->normalized = normalized;
 
   hts_set_hash_handler(hash->sav, opt);
   hts_set_hash_handler(hash->adrfil, opt);
   hts_set_hash_handler(hash->former_adrfil, opt);
 
-  inthash_set_name(hash->sav, "hash->sav");
-  inthash_set_name(hash->adrfil, "hash->adrfil");
-  inthash_set_name(hash->former_adrfil, "hash->former_adrfil");
+  coucal_set_name(hash->sav, "hash->sav");
+  coucal_set_name(hash->adrfil, "hash->adrfil");
+  coucal_set_name(hash->former_adrfil, "hash->former_adrfil");
 
   /* Case-insensitive comparison ; keys are direct char* filenames */
-  inthash_value_set_key_handler(hash->sav,
+  coucal_value_set_key_handler(hash->sav,
                                 key_duphandler,
                                 key_freehandler,
                                 key_sav_hashes,
@@ -246,13 +246,13 @@ void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
 
   /* URL-style comparison ; keys are lien_url structure pointers casted 
      to char* */
-  inthash_value_set_key_handler(hash->adrfil,
+  coucal_value_set_key_handler(hash->adrfil,
                                 key_duphandler,
                                 key_freehandler,
                                 key_adrfil_hashes,
                                 key_adrfil_equals,
                                 hash);
-  inthash_value_set_key_handler(hash->former_adrfil,
+  coucal_value_set_key_handler(hash->former_adrfil,
                                 key_duphandler,
                                 key_freehandler,
                                 key_former_adrfil_hashes,
@@ -260,15 +260,15 @@ void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
                                 hash);
 
   /* pretty-printing */
-  inthash_set_print_handler(hash->sav,
+  coucal_set_print_handler(hash->sav,
                             key_sav_debug_print,
                             value_sav_debug_print,
                             NULL);
-  inthash_set_print_handler(hash->adrfil,
+  coucal_set_print_handler(hash->adrfil,
                             key_adrfil_debug_print,
                             value_adrfil_debug_print,
                             hash);
-  inthash_set_print_handler(hash->former_adrfil,
+  coucal_set_print_handler(hash->former_adrfil,
                             key_former_adrfil_debug_print,
                             value_adrfil_debug_print,
                             hash);
@@ -276,9 +276,9 @@ void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
 
 void hash_free(hash_struct *hash) {
   if (hash != NULL) {
-    inthash_delete(&hash->sav);
-    inthash_delete(&hash->adrfil);
-    inthash_delete(&hash->former_adrfil);
+    coucal_delete(&hash->sav);
+    coucal_delete(&hash->adrfil);
+    coucal_delete(&hash->former_adrfil);
   }
 }
 
@@ -291,7 +291,7 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
   /* read */
   switch(type) {
   case HASH_STRUCT_FILENAME:
-    if (inthash_read(hash->sav, nom1, &intvalue)) {
+    if (coucal_read(hash->sav, nom1, &intvalue)) {
       return (int) intvalue;
     } else {
       return -1;
@@ -301,7 +301,7 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
     memset(&lien, 0, sizeof(lien));
     lien.adr = key_duphandler(NULL, nom1);
     lien.fil = key_duphandler(NULL, nom2);
-    if (inthash_read(hash->adrfil, (char*) &lien, &intvalue)) {
+    if (coucal_read(hash->adrfil, (char*) &lien, &intvalue)) {
       return (int) intvalue;
     } else {
       return -1;
@@ -311,7 +311,7 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
     memset(&lien, 0, sizeof(lien));
     lien.former_adr = key_duphandler(NULL, nom1);
     lien.former_fil = key_duphandler(NULL, nom2);
-    if (inthash_read(hash->former_adrfil, (char*) &lien, &intvalue)) {
+    if (coucal_read(hash->former_adrfil, (char*) &lien, &intvalue)) {
       return (int) intvalue;
     } else {
       return -1;
@@ -327,13 +327,13 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
 // enregistrement lien lpos dans les 3 tables hash1..3
 void hash_write(hash_struct * hash, size_t lpos) {
   /* first entry: destination filename (lowercased) */
-  inthash_write(hash->sav, (*hash->liens)[lpos]->sav, lpos);
+  coucal_write(hash->sav, (*hash->liens)[lpos]->sav, lpos);
 
   /* second entry: URL address and path */
-  inthash_write(hash->adrfil, (*hash->liens)[lpos], lpos);
+  coucal_write(hash->adrfil, (*hash->liens)[lpos], lpos);
 
   /* third entry: URL address and path before redirect */
   if ((*hash->liens)[lpos]->former_adr) {        // former_adr existe?
-    inthash_write(hash->former_adrfil, (*hash->liens)[lpos], lpos);
+    coucal_write(hash->former_adrfil, (*hash->liens)[lpos], lpos);
   }
 }

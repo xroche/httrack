@@ -71,11 +71,11 @@ Please visit our Website: http://www.httrack.com
 #undef HTS_INTERNAL_BYTECODE
 
 int NewLangStrSz = 1024;
-inthash NewLangStr = NULL;
+coucal NewLangStr = NULL;
 int NewLangStrKeysSz = 1024;
-inthash NewLangStrKeys = NULL;
+coucal NewLangStrKeys = NULL;
 int NewLangListSz = 1024;
-inthash NewLangList = NULL;
+coucal NewLangList = NULL;
 
 /* Language files */
 
@@ -296,7 +296,7 @@ typedef struct {
 } initStrElt;
 
 #define SET_ERROR(err) do { \
-  inthash_write(NewLangList, "error", (intptr_t)strdup(err)); \
+  coucal_write(NewLangList, "error", (intptr_t)strdup(err)); \
   error_redirect = "/server/error.html"; \
 } while(0)
 
@@ -359,18 +359,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       char tmp[32];
 
       sprintf(tmp, "%d", initInt[i].value);
-      inthash_write(NewLangList, initInt[i].name, (intptr_t) strdup(tmp));
+      coucal_write(NewLangList, initInt[i].name, (intptr_t) strdup(tmp));
     }
     for(i = 0; initOn[i]; i++) {
-      inthash_write(NewLangList, initOn[i], (intptr_t) strdup("1"));    /* "on" */
+      coucal_write(NewLangList, initOn[i], (intptr_t) strdup("1"));    /* "on" */
     }
     for(i = 0; initStr[i].name; i++) {
-      inthash_write(NewLangList, initStr[i].name,
+      coucal_write(NewLangList, initStr[i].name,
                     (intptr_t) strdup(initStr[i].value));
     }
     strcpybuff(pth, gethomedir());
     strcatbuff(pth, "/websites");
-    inthash_write(NewLangList, "path", (intptr_t) strdup(pth));
+    coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
   }
 
   /* Lock */
@@ -468,15 +468,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           char tmp[32];
 
           sprintf(tmp, "%d", commandReturn);
-          inthash_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
-          inthash_write(NewLangList, "commandReturnMsg",
+          coucal_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
+          coucal_write(NewLangList, "commandReturnMsg",
                         (intptr_t) commandReturnMsg);
-          inthash_write(NewLangList, "commandReturnCmdl",
+          coucal_write(NewLangList, "commandReturnCmdl",
                         (intptr_t) commandReturnCmdl);
         } else {
-          inthash_write(NewLangList, "commandReturn", (intptr_t) NULL);
-          inthash_write(NewLangList, "commandReturnMsg", (intptr_t) NULL);
-          inthash_write(NewLangList, "commandReturnCmdl", (intptr_t) NULL);
+          coucal_write(NewLangList, "commandReturn", (intptr_t) NULL);
+          coucal_write(NewLangList, "commandReturnMsg", (intptr_t) NULL);
+          coucal_write(NewLangList, "commandReturnCmdl", (intptr_t) NULL);
         }
       }
 
@@ -484,8 +484,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       {
         intptr_t adr = 0;
 
-        if (inthash_readptr(NewLangList, "_sid", &adr)) {
-          if (inthash_write
+        if (coucal_readptr(NewLangList, "_sid", &adr)) {
+          if (coucal_write
               (NewLangList, "sid", (intptr_t) strdup((char *) adr))) {
           }
         }
@@ -506,7 +506,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           if (strfield2(ua, "on"))      /* hack : "on" == 1 */
             ua = "1";
           unescapehttp(ua, &sua);
-          inthash_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
+          coucal_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
           s = f + 1;
         }
       }
@@ -516,8 +516,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         intptr_t adr = 0;
         intptr_t adr2 = 0;
 
-        if (inthash_readptr(NewLangList, "sid", &adr)) {
-          if (inthash_readptr(NewLangList, "_sid", &adr2)) {
+        if (coucal_readptr(NewLangList, "sid", &adr)) {
+          if (coucal_readptr(NewLangList, "_sid", &adr2)) {
             if (strcmp((char *) adr, (char *) adr2) != 0) {
               meth = 0;
             }
@@ -530,40 +530,40 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         int doLoad = 0;
         intptr_t adr = 0;
 
-        if (inthash_readptr(NewLangList, "lang", &adr)) {
+        if (coucal_readptr(NewLangList, "lang", &adr)) {
           int n = 0;
 
           if (sscanf((char *) adr, "%d", &n) == 1 && n > 0
               && n - 1 != LANG_T(path, -1)) {
             LANG_T(path, n - 1);
             /* make a backup, because the GUI will override it */
-            inthash_write(NewLangList, "lang_",
+            coucal_write(NewLangList, "lang_",
                           (intptr_t) strdup((char *) adr));
           }
         }
 
         /* Load existing project settings */
-        if (inthash_readptr(NewLangList, "loadprojname", &adr)) {
+        if (coucal_readptr(NewLangList, "loadprojname", &adr)) {
           char *pname = (char *) adr;
 
           if (*pname) {
-            inthash_write(NewLangList, "projname", (intptr_t) strdup(pname));
+            coucal_write(NewLangList, "projname", (intptr_t) strdup(pname));
           }
-          inthash_write(NewLangList, "loadprojname", (intptr_t) NULL);
+          coucal_write(NewLangList, "loadprojname", (intptr_t) NULL);
           doLoad = 1;
-        } else if (inthash_readptr(NewLangList, "loadprojcateg", &adr)) {
+        } else if (coucal_readptr(NewLangList, "loadprojcateg", &adr)) {
           char *pname = (char *) adr;
 
           if (*pname) {
-            inthash_write(NewLangList, "projcateg", (intptr_t) strdup(pname));
+            coucal_write(NewLangList, "projcateg", (intptr_t) strdup(pname));
           }
-          inthash_write(NewLangList, "loadprojcateg", (intptr_t) NULL);
+          coucal_write(NewLangList, "loadprojcateg", (intptr_t) NULL);
         }
 
         /* intial configuration */
         {
-          if (!inthash_read(NewLangList, "conf_file_loaded", NULL)) {
-            inthash_write(NewLangList, "conf_file_loaded",
+          if (!coucal_read(NewLangList, "conf_file_loaded", NULL)) {
+            coucal_write(NewLangList, "conf_file_loaded",
                           (intptr_t) strdup("true"));
             doLoad = 2;
           }
@@ -573,8 +573,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         if (!commandRunning) {
           intptr_t adrpath = 0, adrprojname = 0;
 
-          if (inthash_readptr(NewLangList, "path", &adrpath)
-              && inthash_readptr(NewLangList, "projname", &adrprojname)) {
+          if (coucal_readptr(NewLangList, "path", &adrpath)
+              && coucal_readptr(NewLangList, "projname", &adrprojname)) {
             StringClear(fspath);
             StringCat(fspath, (char *) adrpath);
             StringCat(fspath, "/");
@@ -614,7 +614,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 if (pos[0] == '0' && pos[1] == '\0')
                   *pos = '\0';  /* 0 => empty */
                 unescapeini(pos, &escline);
-                inthash_write(NewLangList, line,
+                coucal_write(NewLangList, line,
                               (intptr_t) StringAcquire(&escline));
               }
             }
@@ -630,7 +630,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         intptr_t adr = 0;
         int p = 0;
 
-        if (inthash_readptr(NewLangList, "command", &adr)) {
+        if (coucal_readptr(NewLangList, "command", &adr)) {
           if (strcmp((char *) adr, "cancel") == 0) {
             if (commandRunning) {
               if (!commandEndRequested) {
@@ -674,15 +674,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             if (!commandRunning) {
               intptr_t adrcd = 0;
 
-              if (inthash_readptr(NewLangList, "command_do", &adrcd)) {
+              if (coucal_readptr(NewLangList, "command_do", &adrcd)) {
                 intptr_t adrw = 0;
 
-                if (inthash_readptr(NewLangList, "winprofile", &adrw)) {
+                if (coucal_readptr(NewLangList, "winprofile", &adrw)) {
 
                   /* User general profile */
                   intptr_t adruserprofile = 0;
 
-                  if (inthash_readptr
+                  if (coucal_readptr
                       (NewLangList, "userprofile", &adruserprofile)
                       && adruserprofile != 0) {
                     int count = (int) strlen((char *) adruserprofile);
@@ -774,7 +774,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if (strcmp((char *) adr, "quit") == 0) {
             willexit = 1;
           }
-          inthash_write(NewLangList, "command", (intptr_t) NULL);
+          coucal_write(NewLangList, "command", (intptr_t) NULL);
         }
       }
 
@@ -827,7 +827,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             } else {
               intptr_t adr = 0;
 
-              if (inthash_readptr(NewLangList, "projpath", &adr)) {
+              if (coucal_readptr(NewLangList, "projpath", &adr)) {
                 sprintf(fsfile, "%s%s", (char *) adr, file + 9);
               }
             }
@@ -848,7 +848,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               "Server: httrack small server\r\n" "Content-type: text/plain\r\n";
 
             /* register current page */
-            inthash_write(NewLangList, "thisfile", (intptr_t) strdup(file));
+            coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
 
             /* Force GET for the last request */
             if (meth == 2 && willexit) {
@@ -863,7 +863,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               intptr_t adr = 0;
               const char *newfile = file;
 
-              if (inthash_readptr(NewLangList, "redirect", &adr) && adr != 0) {
+              if (coucal_readptr(NewLangList, "redirect", &adr) && adr != 0) {
                 const char *newadr = (char *) adr;
 
                 if (*newadr) {
@@ -879,7 +879,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   StringMemcat(headers, tmp, strlen(tmp));
                 }
               }
-              inthash_write(NewLangList, "redirect", (intptr_t) NULL);
+              coucal_write(NewLangList, "redirect", (intptr_t) NULL);
             } else if (is_html(file)) {
               int outputmode = 0;
 
@@ -983,14 +983,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       } else if (strcmp(name, "if-not-empty") == 0) {
                         intptr_t adr = 0;
 
-                        if (!inthash_readptr(NewLangList, pos2, &adr)
+                        if (!coucal_readptr(NewLangList, pos2, &adr)
                             || *((char *) adr) == 0) {
                           outputmode = -1;
                         }
                       } else if (strcmp(name, "if-empty") == 0) {
                         intptr_t adr = 0;
 
-                        if (inthash_readptr(NewLangList, pos2, &adr)
+                        if (coucal_readptr(NewLangList, pos2, &adr)
                             && *((char *) adr) != 0) {
                           outputmode = -1;
                         }
@@ -999,7 +999,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       } else if (strcmp(name, "loadhash") == 0) {
                         intptr_t adr = 0;
 
-                        if (inthash_readptr(NewLangList, "path", &adr)) {
+                        if (coucal_readptr(NewLangList, "path", &adr)) {
                           char *rpath = (char *) adr;
 
                           //find_handle h;
@@ -1012,9 +1012,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             const char *profiles = hts_getcategories(rpath, 0);
                             const char *categ = hts_getcategories(rpath, 1);
 
-                            inthash_write(NewLangList, "winprofile",
+                            coucal_write(NewLangList, "winprofile",
                                           (intptr_t) profiles);
-                            inthash_write(NewLangList, "wincateg",
+                            coucal_write(NewLangList, "wincateg",
                                           (intptr_t) categ);
                           }
                         }
@@ -1026,10 +1026,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             intptr_t adr = 0;
 
                             *pos3++ = '\0';
-                            if (inthash_readptr(NewLangList, pos2, &adr)) {
-                              inthash_write(NewLangList, pos3,
+                            if (coucal_readptr(NewLangList, pos2, &adr)) {
+                              coucal_write(NewLangList, pos3,
                                             (intptr_t) strdup((char *) adr));
-                              inthash_write(NewLangList, pos2, (intptr_t) NULL);
+                              coucal_write(NewLangList, pos2, (intptr_t) NULL);
                             }
                           }
                         }
@@ -1039,10 +1039,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                           if (pos3) {
                             *pos3++ = '\0';
-                            inthash_write(NewLangList, pos2,
+                            coucal_write(NewLangList, pos2,
                                           (intptr_t) strdup(pos3));
                           } else {
-                            inthash_write(NewLangList, pos2, (intptr_t) NULL);
+                            coucal_write(NewLangList, pos2, (intptr_t) NULL);
                           }
                         }
                       }
@@ -1063,7 +1063,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       pos2 = strchr(name, ':');
                       if (pos2 != NULL) {
                         *pos2 = '\0';
-                        if (inthash_readptr(NewLangList, name, &adr) || ztest) {
+                        if (coucal_readptr(NewLangList, name, &adr) || ztest) {
                           const char *newadr = (char *) adr;
 
                           if (!newadr)
@@ -1123,7 +1123,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                           dname[0] = '\0';
                           strncatbuff(dname, name, n2);
-                          if (inthash_readptr(NewLangList, dname, &adr)) {
+                          if (coucal_readptr(NewLangList, dname, &adr)) {
                             int n = 0;
 
                             if (sscanf((char *) adr, "%d", &n) == 1) {
@@ -1148,7 +1148,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         if (langstr == NULL || *langstr == '\0') {
                           intptr_t adr = 0;
 
-                          if (inthash_readptr(NewLangList, name, &adr)) {
+                          if (coucal_readptr(NewLangList, name, &adr)) {
                             char *newadr = (char *) adr;
 
                             langstr = newadr;
@@ -1411,12 +1411,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
 int htslang_init(void) {
   if (NewLangList == NULL) {
-    NewLangList = inthash_new(0);
-    inthash_set_name(NewLangList, "NewLangList");
+    NewLangList = coucal_new(0);
+    coucal_set_name(NewLangList, "NewLangList");
     if (NewLangList == NULL) {
       abortLog("Error in lang.h: not enough memory");
     } else {
-      inthash_value_is_malloc(NewLangList, 1);
+      coucal_value_is_malloc(NewLangList, 1);
     }
   }
   return 1;
@@ -1424,26 +1424,26 @@ int htslang_init(void) {
 
 int htslang_uninit(void) {
   if (NewLangList != NULL) {
-    inthash_delete(&NewLangList);
+    coucal_delete(&NewLangList);
   }
   return 1;
 }
 
 int smallserver_setkey(const char *key, const char *value) {
-  return inthash_write(NewLangList, key, (intptr_t) strdup(value));
+  return coucal_write(NewLangList, key, (intptr_t) strdup(value));
 }
 
 int smallserver_setkeyint(const char *key, LLint value) {
   char tmp[256];
 
   snprintf(tmp, sizeof(tmp), LLintP, value);
-  return inthash_write(NewLangList, key, (intptr_t) strdup(tmp));
+  return coucal_write(NewLangList, key, (intptr_t) strdup(tmp));
 }
 int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value) {
   char tmp[256];
 
   snprintf(tmp, sizeof(tmp), "%s%d%s", key, id, key2);
-  return inthash_write(NewLangList, tmp, (intptr_t) strdup(value));
+  return coucal_write(NewLangList, tmp, (intptr_t) strdup(value));
 }
 
 static int htslang_load(char *limit_to, const char *path) {
@@ -1456,15 +1456,15 @@ static int htslang_load(char *limit_to, const char *path) {
   //
   if (!limit_to) {
     LANG_DELETE();
-    NewLangStr = inthash_new(0);
-    NewLangStrKeys = inthash_new(0);
-    inthash_set_name(NewLangStr, "NewLangStr");
-    inthash_set_name(NewLangStrKeys, "NewLangStrKeys");
+    NewLangStr = coucal_new(0);
+    NewLangStrKeys = coucal_new(0);
+    coucal_set_name(NewLangStr, "NewLangStr");
+    coucal_set_name(NewLangStrKeys, "NewLangStrKeys");
     if ((NewLangStr == NULL) || (NewLangStrKeys == NULL)) {
       abortLog("Error in lang.h: not enough memory");
     } else {
-      inthash_value_is_malloc(NewLangStr, 1);
-      inthash_value_is_malloc(NewLangStrKeys, 1);
+      coucal_value_is_malloc(NewLangStr, 1);
+      coucal_value_is_malloc(NewLangStrKeys, 1);
     }
   }
 
@@ -1502,7 +1502,7 @@ static int htslang_load(char *limit_to, const char *path) {
 
             if (buff) {
               strcpybuff(buff, intkey);
-              inthash_add(NewLangStrKeys, key, (intptr_t) buff);
+              coucal_add(NewLangStrKeys, key, (intptr_t) buff);
             }
           }
         }                       // if
@@ -1599,7 +1599,7 @@ static int htslang_load(char *limit_to, const char *path) {
                 char *const buff = (char *) malloc(len + 1);
                 if (buff) {
                   conv_printf(value, buff);
-                  inthash_add(NewLangStr, intkey, (intptr_t) buff);
+                  coucal_add(NewLangStr, intkey, (intptr_t) buff);
                 }
               }
 
@@ -1690,8 +1690,8 @@ static void conv_printf(const char *from, char *to) {
 }
 
 static void LANG_DELETE(void) {
-  inthash_delete(&NewLangStr);
-  inthash_delete(&NewLangStrKeys);
+  coucal_delete(&NewLangStr);
+  coucal_delete(&NewLangStrKeys);
 }
 
 // sélection de la langue
@@ -1761,9 +1761,9 @@ static int QLANG_T(int l) {
 }
 
 const char* LANGSEL(const char* name) {
-  inthash_value value;
+  coucal_value value;
   if (NewLangStr != NULL 
-      && inthash_read_value(NewLangStr, name, &value) != 0
+      && coucal_read_value(NewLangStr, name, &value) != 0
       && value.ptr != NULL) {
     return (char*) value.ptr;
   } else {
@@ -1772,9 +1772,9 @@ const char* LANGSEL(const char* name) {
 }
 
 const char* LANGINTKEY(const char* name) {
-  inthash_value value;
+  coucal_value value;
   if (NewLangStrKeys != NULL
-      && inthash_read_value(NewLangStrKeys, name, &value) != 0
+      && coucal_read_value(NewLangStrKeys, name, &value) != 0
       && value.ptr != NULL) {
     return (char*) value.ptr;
   } else {

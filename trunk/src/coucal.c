@@ -92,9 +92,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 /** Hashtable. **/
-struct struct_inthash {
+struct struct_coucal {
   /** Hashtable items. **/
-  inthash_item *items;
+  coucal_item *items;
 
   /** Log-2 of the hashtable size. **/
   size_t lg_size;
@@ -105,7 +105,7 @@ struct struct_inthash {
   /** Stash area for collisions. **/
   struct {
     /** Stash items. **/
-    inthash_item items[STASH_SIZE];
+    coucal_item items[STASH_SIZE];
 
     /** Stash size (<= STASH_SIZE). **/
     size_t size;
@@ -148,52 +148,52 @@ struct struct_inthash {
     /** How to handle values (might be NULL). **/
     struct {
       /** free() **/
-      t_inthash_value_freehandler free;
+      t_coucal_value_freehandler free;
       /** opaque argument **/
-      inthash_opaque arg;
+      coucal_opaque arg;
     } value;
 
     /** How to handle names (might be NULL). **/
     struct {
       /** strdup() **/
-      t_inthash_duphandler dup;
+      t_coucal_duphandler dup;
       /** free() **/
-      t_inthash_key_freehandler free;
+      t_coucal_key_freehandler free;
       /** hash **/
-      t_inthash_hasheshandler hash;
+      t_coucal_hasheshandler hash;
       /** comparison **/
-      t_inthash_cmphandler equals;
+      t_coucal_cmphandler equals;
       /** opaque argument **/
-      inthash_opaque arg;
+      coucal_opaque arg;
     } key;
 
     /** How to handle fatal assertions (might be NULL). **/
     struct {
       /** logging **/
-      t_inthash_loghandler log;
+      t_coucal_loghandler log;
       /** abort() **/
-      t_inthash_asserthandler fatal;
+      t_coucal_asserthandler fatal;
       /** opaque argument **/
-      inthash_opaque arg;
+      coucal_opaque arg;
       /** hashtable name for logging **/
-      inthash_key_const name;
+      coucal_key_const name;
     } error;
 
     /** How to handle pretty-print (debug) (might be NULL). **/
     struct {
       /** key print() **/
-      t_inthash_printkeyhandler key;
+      t_coucal_printkeyhandler key;
       /** value print() **/
-      t_inthash_printvaluehandler value;
+      t_coucal_printvaluehandler value;
       /** opaque argument **/
-      inthash_opaque arg;
+      coucal_opaque arg;
     } print;
   } custom;
 };
 
 /* Assertion check. */
-#define inthash_assert(HASHTABLE, EXP) \
-  (void)( (EXP) || (inthash_assert_failed(HASHTABLE, #EXP, __FILE__, __LINE__), 0) )
+#define coucal_assert(HASHTABLE, EXP) \
+  (void)( (EXP) || (coucal_assert_failed(HASHTABLE, #EXP, __FILE__, __LINE__), 0) )
 
 /* Compiler-specific. */
 #ifdef __GNUC__
@@ -208,38 +208,38 @@ struct struct_inthash {
 #endif
 
 /* Logging level. */
-static void inthash_log(const inthash hashtable, inthash_loglevel level,
+static void coucal_log(const coucal hashtable, coucal_loglevel level,
                         const char *format, va_list args);
 #define DECLARE_LOG_FUNCTION(NAME, LEVEL) \
-static void NAME(const inthash hashtable, const char *format, ...) \
+static void NAME(const coucal hashtable, const char *format, ...) \
   INTHASH_PRINTF_FUN(2, 3); \
-static void NAME(const inthash hashtable, const char *format, ...) { \
+static void NAME(const coucal hashtable, const char *format, ...) { \
   va_list args; \
   va_start(args, format); \
-  inthash_log(hashtable, LEVEL, format, args); \
+  coucal_log(hashtable, LEVEL, format, args); \
   va_end(args); \
 }
 #if 0
 /* Verbose. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
-DECLARE_LOG_FUNCTION(inthash_debug, inthash_log_debug)
-DECLARE_LOG_FUNCTION(inthash_trace, inthash_log_trace)
+DECLARE_LOG_FUNCTION(coucal_crit, coucal_log_critical)
+DECLARE_LOG_FUNCTION(coucal_warning, coucal_log_warning)
+DECLARE_LOG_FUNCTION(coucal_info, coucal_log_info)
+DECLARE_LOG_FUNCTION(coucal_debug, coucal_log_debug)
+DECLARE_LOG_FUNCTION(coucal_trace, coucal_log_trace)
 #elif 0
 /* Info. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
-#define inthash_debug inthash_log
-#define inthash_trace inthash_nolog
+DECLARE_LOG_FUNCTION(coucal_crit, coucal_log_critical)
+DECLARE_LOG_FUNCTION(coucal_warning, coucal_log_warning)
+DECLARE_LOG_FUNCTION(coucal_info, coucal_log_info)
+#define coucal_debug coucal_log
+#define coucal_trace coucal_nolog
 #else
 /* No logging except stats and critical. */
-DECLARE_LOG_FUNCTION(inthash_crit, inthash_log_critical)
-DECLARE_LOG_FUNCTION(inthash_warning, inthash_log_warning)
-DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
-#define inthash_debug inthash_nolog
-#define inthash_trace inthash_nolog
+DECLARE_LOG_FUNCTION(coucal_crit, coucal_log_critical)
+DECLARE_LOG_FUNCTION(coucal_warning, coucal_log_warning)
+DECLARE_LOG_FUNCTION(coucal_info, coucal_log_info)
+#define coucal_debug coucal_nolog
+#define coucal_trace coucal_nolog
 #endif
 
 /* 2**X */
@@ -249,37 +249,37 @@ DECLARE_LOG_FUNCTION(inthash_info, inthash_log_info)
 static char the_empty_string[1] = { 0 };
 
 /* global assertion handler */
-static t_inthash_asserthandler global_assert_handler = NULL;
+static t_coucal_asserthandler global_assert_handler = NULL;
 
 /* global assertion handler */
-static t_inthash_loghandler global_log_handler = NULL;
+static t_coucal_loghandler global_log_handler = NULL;
 
 /* default assertion handler, if neither hashtable one nor global one 
    were defined */
-static void inthash_fail(const char* exp, const char* file, int line) {
+static void coucal_fail(const char* exp, const char* file, int line) {
   fprintf(stderr, "assertion '%s' failed at %s:%d\n", exp, file, line);
   abort();
 }
 
 /* assert failed handler. */
-static void inthash_assert_failed(const inthash hashtable, const char* exp, const char* file, int line) {
-  const char *const name = inthash_get_name(hashtable);
-  inthash_crit(hashtable, "hashtable %s: %s failed at %s:%d", 
+static void coucal_assert_failed(const coucal hashtable, const char* exp, const char* file, int line) {
+  const char *const name = coucal_get_name(hashtable);
+  coucal_crit(hashtable, "hashtable %s: %s failed at %s:%d", 
     name != NULL ? name : "<unknown>", exp, file, line);
   if (hashtable != NULL && hashtable->custom.error.fatal != NULL) {
     hashtable->custom.error.fatal(hashtable->custom.error.arg, exp, file, line);
   } else if (global_assert_handler != NULL) {
     global_assert_handler(hashtable, exp, file, line);
   } else {
-    inthash_fail(exp, file, line);
+    coucal_fail(exp, file, line);
   }
   abort();
 }
 
 /* Logging */
-static void inthash_log(const inthash hashtable, inthash_loglevel level,
-                        const char *format, va_list args) {
-  inthash_assert(hashtable, format != NULL);
+static void coucal_log(const coucal hashtable, coucal_loglevel level,
+                       const char *format, va_list args) {
+  coucal_assert(hashtable, format != NULL);
   if (hashtable != NULL && hashtable->custom.error.log != NULL) {
     hashtable->custom.error.log(hashtable->custom.error.arg, level, format, args);
   } else if (global_log_handler != NULL) {
@@ -292,20 +292,20 @@ static void inthash_log(const inthash hashtable, inthash_loglevel level,
 }
 
 /* No logging (should be dropped by the compiler) */
-static void inthash_nolog(const inthash hashtable, const char *format, ...)
-                          INTHASH_PRINTF_FUN(2, 3);
-static void inthash_nolog(const inthash hashtable, const char *format, ...) {
+static void coucal_nolog(const coucal hashtable, const char *format, ...)
+                         INTHASH_PRINTF_FUN(2, 3);
+static void coucal_nolog(const coucal hashtable, const char *format, ...) {
   (void) hashtable;
   (void) format;
 }
 
-const char* inthash_get_name(inthash hashtable) {
+const char* coucal_get_name(coucal hashtable) {
   return hashtable->custom.error.name;
 }
 
-static void inthash_log_stats(inthash hashtable) {
-  const char *const name = inthash_get_name(hashtable);
-  inthash_info(hashtable, "hashtable %s%s%ssummary: "
+static void coucal_log_stats(coucal hashtable) {
+  const char *const name = coucal_get_name(hashtable);
+  coucal_info(hashtable, "hashtable %s%s%ssummary: "
                "size=%"UINT_64_FORMAT" (lg2=%"UINT_64_FORMAT") "
                "used=%"UINT_64_FORMAT" "
                "stash-size=%"UINT_64_FORMAT" "
@@ -341,19 +341,19 @@ static void inthash_log_stats(inthash hashtable) {
                (uint64_t) hashtable->stats.rehash_count,
                (uint64_t) hashtable->stats.pool_compact_count,
                (uint64_t) hashtable->stats.pool_realloc_count,
-               (uint64_t) inthash_memory_size(hashtable)
+               (uint64_t) coucal_memory_size(hashtable)
                );
 }
 
 /* default hash function when key is a regular C-string */
-inthash_hashkeys inthash_hash_string(const char *name) {
+coucal_hashkeys coucal_hash_string(const char *name) {
 #if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
   MD5_CTX ctx;
   union {
     unsigned char md5digest[16];
-    inthash_hashkeys mhashes[2];
-    inthash_hashkeys hashes;
+    coucal_hashkeys mhashes[2];
+    coucal_hashkeys hashes;
   } u;
 
   /* compute MD5 */
@@ -375,7 +375,7 @@ inthash_hashkeys inthash_hash_string(const char *name) {
 #elif (defined(HTS_INTHASH_USES_MURMUR))
   union {
     uint32_t result[4];
-    inthash_hashkeys hashes;
+    coucal_hashkeys hashes;
   } u;
   MurmurHash3_x86_128(name, (const int) strlen(name),
                       42, &u.result) ;
@@ -394,7 +394,7 @@ inthash_hashkeys inthash_hash_string(const char *name) {
   /* compute two Fowler-Noll-Vo hashes (64-bit FNV-1 variant) ;
      each 64-bit hash being XOR-folded into a single 32-bit hash. */
   size_t i;
-  inthash_hashkeys hashes;
+  coucal_hashkeys hashes;
   uint64_t h1, h2;
 
   /* FNV-1, 64-bit. */
@@ -427,46 +427,46 @@ inthash_hashkeys inthash_hash_string(const char *name) {
 #endif
 }
 
-static INTHASH_INLINE inthash_hashkeys inthash_calc_hashes(inthash hashtable, 
-                                                           inthash_key_const value) {
+static INTHASH_INLINE coucal_hashkeys coucal_calc_hashes(coucal hashtable, 
+                                                         coucal_key_const value) {
   return hashtable->custom.key.hash == NULL 
-    ? inthash_hash_string(value)
+    ? coucal_hash_string(value)
     : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
 }
 
 /* position 'pos' is free ? */
-static INTHASH_INLINE int inthash_is_free(const inthash hashtable, size_t pos) {
+static INTHASH_INLINE int coucal_is_free(const coucal hashtable, size_t pos) {
   return hashtable->items[pos].name == NULL;
 }
 
 /* compare two keys ; by default using strcmp() */
-static INTHASH_INLINE int inthash_equals(inthash hashtable,
-                                         inthash_key_const a,
-                                         inthash_key_const b) {
+static INTHASH_INLINE int coucal_equals(coucal hashtable,
+                                        coucal_key_const a,
+                                        coucal_key_const b) {
   return hashtable->custom.key.equals == NULL
     ? strcmp((const char*) a, (const char*) b) == 0
     : hashtable->custom.key.equals(hashtable->custom.key.arg, a, b);
 }
 
-static INTHASH_INLINE int inthash_matches_(inthash hashtable,
-                                           const inthash_item *const item,
-                                           inthash_key_const name,
-                                           const inthash_hashkeys *hashes) {
+static INTHASH_INLINE int coucal_matches_(coucal hashtable,
+                                          const coucal_item *const item,
+                                          coucal_key_const name,
+                                          const coucal_hashkeys *hashes) {
   return item->name != NULL
     && item->hashes.hash1 == hashes->hash1
     && item->hashes.hash2 == hashes->hash2
-    && inthash_equals(hashtable, item->name, name);
+    && coucal_equals(hashtable, item->name, name);
 }
 
-static INTHASH_INLINE int inthash_matches(inthash hashtable, size_t pos,
-                                          inthash_key_const name,
-                                          const inthash_hashkeys *hashes) {
-  const inthash_item *const item = &hashtable->items[pos];
-  return inthash_matches_(hashtable, item, name, hashes);
+static INTHASH_INLINE int coucal_matches(coucal hashtable, size_t pos,
+                                         coucal_key_const name,
+                                         const coucal_hashkeys *hashes) {
+  const coucal_item *const item = &hashtable->items[pos];
+  return coucal_matches_(hashtable, item, name, hashes);
 }
 
 /* compact string pool ; does not change the capacity */
-static void inthash_compact_pool(inthash hashtable, size_t capacity) {
+static void coucal_compact_pool(coucal hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   size_t i;
   char*const old_pool = hashtable->pool.buffer;
@@ -474,7 +474,7 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   size_t count = 0;
 
   /* we manage the string pool */
-  inthash_assert(hashtable, hashtable->custom.key.dup == NULL);
+  coucal_assert(hashtable, hashtable->custom.key.dup == NULL);
 
   /* statistics */
   hashtable->stats.pool_compact_count++;
@@ -489,11 +489,11 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   hashtable->pool.size = 0;
   hashtable->pool.used = 0;
   if (hashtable->pool.buffer == NULL) {
-    inthash_debug(hashtable,
+    coucal_debug(hashtable,
       "** hashtable string pool compaction error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
-    inthash_assert(hashtable, ! "hashtable string pool compaction error");
+    coucal_assert(hashtable, ! "hashtable string pool compaction error");
   }
 
   /* relocate a string on a different pool */
@@ -506,17 +506,17 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
       char *const max_dest =                                \
         &hashtable->pool.buffer[capacity];                  \
       /* copy string */                                     \
-      inthash_assert(hashtable, dest < max_dest);           \
+      coucal_assert(hashtable, dest < max_dest);           \
       dest[0] = src[0];                                     \
       {                                                     \
         size_t i;                                           \
         for(i = 1 ; src[i - 1] != '\0' ; i++) {             \
-          inthash_assert(hashtable, &dest[i] < max_dest);   \
+          coucal_assert(hashtable, &dest[i] < max_dest);   \
           dest[i] = src[i];                                 \
         }                                                   \
         /* update pool size */                              \
         hashtable->pool.size += i;                          \
-        inthash_assert(hashtable,                           \
+        coucal_assert(hashtable,                           \
                        hashtable->pool.size <= capacity);   \
       }                                                     \
       /* update source */                                   \
@@ -541,7 +541,7 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
   /* wipe previous pool */
   free(old_pool);
 
-  inthash_debug(hashtable,
+  coucal_debug(hashtable,
                 "compacted string pool for %"UINT_64_FORMAT" strings: "
                 "%"UINT_64_FORMAT" bytes => %"UINT_64_FORMAT" bytes",
                 (uint64_t) count, (uint64_t) old_size,
@@ -549,18 +549,18 @@ static void inthash_compact_pool(inthash hashtable, size_t capacity) {
 }
 
 /* realloc (expand) string pool ; does not change the compacity */
-static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
+static void coucal_realloc_pool(coucal hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   char *const oldbase = hashtable->pool.buffer;
   size_t i;
   size_t count = 0;
 
   /* we manage the string pool */
-  inthash_assert(hashtable, hashtable->custom.key.dup == NULL);
+  coucal_assert(hashtable, hashtable->custom.key.dup == NULL);
 
   /* compact instead ? */
   if (hashtable->pool.used < ( hashtable->pool.size*3 ) / 4) {
-    inthash_compact_pool(hashtable, capacity);
+    coucal_compact_pool(hashtable, capacity);
     return ;
   }
 
@@ -574,18 +574,18 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
   hashtable->pool.buffer = realloc(hashtable->pool.buffer,
     hashtable->pool.capacity);
   if (hashtable->pool.buffer == NULL) {
-    inthash_crit(hashtable,
+    coucal_crit(hashtable,
       "** hashtable string pool allocation error: could not allocate "
       "%"UINT_64_FORMAT" bytes", 
       (uint64_t) hashtable->pool.capacity);
-    inthash_assert(hashtable, ! "hashtable string pool allocation error");
+    coucal_assert(hashtable, ! "hashtable string pool allocation error");
   }
 
   /* recompute string address */
 #define RECOMPUTE_STRING(S) do {                                     \
     if (S != NULL && S != the_empty_string) {                        \
       const size_t offset = (const char*) (S) - oldbase;             \
-      inthash_assert(hashtable, offset < hashtable->pool.capacity);  \
+      coucal_assert(hashtable, offset < hashtable->pool.capacity);  \
       S = &hashtable->pool.buffer[offset];                           \
       count++;                                                       \
     }                                                                \
@@ -601,13 +601,13 @@ static void inthash_realloc_pool(inthash hashtable, size_t capacity) {
 
 #undef RECOMPUTE_STRING
 
-  inthash_debug(hashtable, "reallocated string pool for "
+  coucal_debug(hashtable, "reallocated string pool for "
                 "%"UINT_64_FORMAT" strings: %"UINT_64_FORMAT" bytes",
                 (uint64_t) count, (uint64_t) hashtable->pool.capacity);
 }
 
-static inthash_key inthash_dup_name_internal(inthash hashtable,
-                                             inthash_key_const name_) {
+static coucal_key coucal_dup_name_internal(coucal hashtable,
+                                           coucal_key_const name_) {
   const char *const name = (const char*) name_;
   const size_t len = strlen(name) + 1;
   char *s;
@@ -615,22 +615,22 @@ static inthash_key inthash_dup_name_internal(inthash hashtable,
   /* the pool does not allow empty strings for safety purpose ; handhe that
     (keys are being emptied when free'd to detect duplicate free) */
   if (len == 1) {
-    inthash_assert(hashtable, the_empty_string[0] == '\0');
+    coucal_assert(hashtable, the_empty_string[0] == '\0');
     return the_empty_string;
   }
 
   /* expand pool capacity */
-  inthash_assert(hashtable, hashtable->pool.size <= hashtable->pool.capacity);
+  coucal_assert(hashtable, hashtable->pool.size <= hashtable->pool.capacity);
   if (hashtable->pool.capacity - hashtable->pool.size < len) {
     size_t capacity;
     for(capacity = MIN_POOL_CAPACITY ; capacity < hashtable->pool.size + len
       ; capacity <<= 1) ;
-    inthash_assert(hashtable, hashtable->pool.size < capacity);
-    inthash_realloc_pool(hashtable, capacity);
+    coucal_assert(hashtable, hashtable->pool.size < capacity);
+    coucal_realloc_pool(hashtable, capacity);
   }
 
   /* copy */
-  inthash_assert(hashtable, len + hashtable->pool.size <= hashtable->pool.capacity);
+  coucal_assert(hashtable, len + hashtable->pool.size <= hashtable->pool.capacity);
   s = &hashtable->pool.buffer[hashtable->pool.size];
   memcpy(s, name, len);
   hashtable->pool.size += len;
@@ -640,26 +640,26 @@ static inthash_key inthash_dup_name_internal(inthash hashtable,
 }
 
 /* duplicate a key. default is to use the internal pool. */
-static INTHASH_INLINE inthash_key inthash_dup_name(inthash hashtable,
-                                                   inthash_key_const name) {
+static INTHASH_INLINE coucal_key coucal_dup_name(coucal hashtable,
+                                                 coucal_key_const name) {
   return hashtable->custom.key.dup == NULL
-    ? inthash_dup_name_internal(hashtable, name)
+    ? coucal_dup_name_internal(hashtable, name)
     : hashtable->custom.key.dup(hashtable->custom.key.arg, name);
 }
 
 /* internal pool free handler.
    note: pointer must have been kicked from the pool first */
-static void inthash_free_key_internal(inthash hashtable, inthash_key name_) {
+static void coucal_free_key_internal(coucal hashtable, coucal_key name_) {
   char *const name = (char*) name_;
   const size_t len = strlen(name) + 1;
 
-  /* see inthash_dup_name_internal() handling */
+  /* see coucal_dup_name_internal() handling */
   if (len == 1 && name == the_empty_string) {
-    inthash_assert(hashtable, the_empty_string[0] == '\0');
+    coucal_assert(hashtable, the_empty_string[0] == '\0');
     return ;
   }
 
-  inthash_assert(hashtable, *name != '\0' || !"duplicate or bad string pool release");
+  coucal_assert(hashtable, *name != '\0' || !"duplicate or bad string pool release");
   hashtable->pool.used -= len;
   *name = '\0'; /* the string is now invalidated */
 
@@ -670,117 +670,117 @@ static void inthash_free_key_internal(inthash hashtable, inthash_key name_) {
     if (hashtable->pool.used < capacity / 4) {
       capacity /= 2;
     }
-    inthash_assert(hashtable, hashtable->pool.used < capacity);
-    inthash_compact_pool(hashtable, capacity);
+    coucal_assert(hashtable, hashtable->pool.used < capacity);
+    coucal_compact_pool(hashtable, capacity);
   }
 }
 
 /* free a key. default is to use the internal pool.
    note: pointer must have been kicked from the pool first */
-static void inthash_free_key(inthash hashtable, inthash_key name) {
+static void coucal_free_key(coucal hashtable, coucal_key name) {
   if (hashtable->custom.key.free == NULL) {
-    inthash_free_key_internal(hashtable, name);
+    coucal_free_key_internal(hashtable, name);
   } else {
     hashtable->custom.key.free(hashtable->custom.key.arg, name);
   }
 }
 
-static INTHASH_INLINE size_t inthash_hash_to_pos_(size_t lg_size,
-                                                  inthash_hashkey hash) {
-  const inthash_hashkey mask = POW2(lg_size) - 1;
+static INTHASH_INLINE size_t coucal_hash_to_pos_(size_t lg_size,
+                                                 coucal_hashkey hash) {
+  const coucal_hashkey mask = POW2(lg_size) - 1;
   return hash & mask;
 }
 
-static INTHASH_INLINE size_t inthash_hash_to_pos(const inthash hashtable,
-                                                 inthash_hashkey hash) {
-  return inthash_hash_to_pos_(hashtable->lg_size, hash);
+static INTHASH_INLINE size_t coucal_hash_to_pos(const coucal hashtable,
+                                                coucal_hashkey hash) {
+  return coucal_hash_to_pos_(hashtable->lg_size, hash);
 }
 
-int inthash_read_pvoid(inthash hashtable, inthash_key_const name, void **pvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+int coucal_read_pvoid(coucal hashtable, coucal_key_const name, void **pvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
   const int ret =
-    inthash_read_value(hashtable, name, (pvalue != NULL) ? &value : NULL);
+    coucal_read_value(hashtable, name, (pvalue != NULL) ? &value : NULL);
   if (pvalue != NULL)
     *pvalue = value.ptr;
   return ret;
 }
 
-int inthash_write_pvoid(inthash hashtable, inthash_key_const name, void *pvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+int coucal_write_pvoid(coucal hashtable, coucal_key_const name, void *pvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
 
   value.ptr = pvalue;
-  return inthash_write_value(hashtable, name, value);
+  return coucal_write_value(hashtable, name, value);
 }
 
-void inthash_add_pvoid(inthash hashtable, inthash_key_const name, void *pvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+void coucal_add_pvoid(coucal hashtable, coucal_key_const name, void *pvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
 
   value.ptr = pvalue;
-  inthash_write_value(hashtable, name, value);
+  coucal_write_value(hashtable, name, value);
 }
 
-int inthash_write(inthash hashtable, inthash_key_const name, intptr_t intvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+int coucal_write(coucal hashtable, coucal_key_const name, intptr_t intvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
 
   value.intg = intvalue;
-  return inthash_write_value(hashtable, name, value);
+  return coucal_write_value(hashtable, name, value);
 }
 
-static void inthash_default_free_handler(inthash_opaque arg,
-                                         inthash_value value) {
+static void coucal_default_free_handler(coucal_opaque arg,
+                                        coucal_value value) {
   (void) arg;
   if (value.ptr != NULL)
     free(value.ptr);
 }
 
-static void inthash_del_value_(inthash hashtable, inthash_value *pvalue) {
+static void coucal_del_value_(coucal hashtable, coucal_value *pvalue) {
   if (hashtable->custom.value.free != NULL)
     hashtable->custom.value.free(hashtable->custom.value.arg, *pvalue);
   pvalue->ptr = NULL;
 }
 
-static void inthash_del_value(inthash hashtable, size_t pos) {
-  inthash_del_value_(hashtable, &hashtable->items[pos].value);
+static void coucal_del_value(coucal hashtable, size_t pos) {
+  coucal_del_value_(hashtable, &hashtable->items[pos].value);
 }
 
-static void inthash_del_name(inthash hashtable, inthash_item *item) {
-  const inthash_hashkeys nullHash = INTHASH_KEYS_NULL;
+static void coucal_del_name(coucal hashtable, coucal_item *item) {
+  const coucal_hashkeys nullHash = INTHASH_KEYS_NULL;
   char *const name = (char*) item->name;
   item->name = NULL;  /* there must be no reference remaining */
   item->hashes = nullHash;
   /* free after detach (we may compact the pool) */
-  inthash_free_key(hashtable, name);
+  coucal_free_key(hashtable, name);
 }
 
-static void inthash_del_item(inthash hashtable, inthash_item *pitem) {
-  inthash_del_value_(hashtable, &pitem->value);
-  inthash_del_name(hashtable, pitem);
+static void coucal_del_item(coucal hashtable, coucal_item *pitem) {
+  coucal_del_value_(hashtable, &pitem->value);
+  coucal_del_name(hashtable, pitem);
 }
 
-static int inthash_add_item_(inthash hashtable, inthash_item item);
+static int coucal_add_item_(coucal hashtable, coucal_item item);
 
 /* Write (add or replace) a value in the hashtable. */
-static int inthash_write_value_(inthash hashtable, inthash_key_const name,
-                                inthash_value value) {
-  inthash_item item;
+static int coucal_write_value_(coucal hashtable, coucal_key_const name,
+                               coucal_value value) {
+  coucal_item item;
   size_t pos;
-  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
+  const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
 
   /* Statistics */
   hashtable->stats.write_count++;
 
   /* replace at position 1 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
-  if (inthash_matches(hashtable, pos, name, &hashes)) {
-    inthash_del_value(hashtable, pos);
+  pos = coucal_hash_to_pos(hashtable, hashes.hash1);
+  if (coucal_matches(hashtable, pos, name, &hashes)) {
+    coucal_del_value(hashtable, pos);
     hashtable->items[pos].value = value;
     return 0;  /* replaced */
   }
 
   /* replace at position 2 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes.hash2);
-  if (inthash_matches(hashtable, pos, name, &hashes)) {
-    inthash_del_value(hashtable, pos);
+  pos = coucal_hash_to_pos(hashtable, hashes.hash2);
+  if (coucal_matches(hashtable, pos, name, &hashes)) {
+    coucal_del_value(hashtable, pos);
     hashtable->items[pos].value = value;
     return 0;  /* replaced */
   }
@@ -789,9 +789,9 @@ static int inthash_write_value_(inthash hashtable, inthash_key_const name,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name, 
+      if (coucal_matches_(hashtable, &hashtable->stash.items[i], name, 
                            &hashes)) {
-        inthash_del_value_(hashtable, &hashtable->stash.items[i].value);
+        coucal_del_value_(hashtable, &hashtable->stash.items[i].value);
         hashtable->stash.items[i].value = value;
         return 0;  /* replaced */
       }
@@ -802,68 +802,68 @@ static int inthash_write_value_(inthash hashtable, inthash_key_const name,
   hashtable->stats.add_count++;
 
   /* otherwise we need to create a new item */
-  item.name = inthash_dup_name(hashtable, name);
+  item.name = coucal_dup_name(hashtable, name);
   item.value = value;
   item.hashes = hashes;
 
-  return inthash_add_item_(hashtable, item);
+  return coucal_add_item_(hashtable, item);
 }
 
 /* Return the string representation of a key */
-static const char* inthash_print_key(inthash hashtable,
-                                     inthash_key_const name) {
+static const char* coucal_print_key(coucal hashtable,
+                                    coucal_key_const name) {
   return hashtable->custom.print.key != NULL
     ? hashtable->custom.print.key(hashtable->custom.print.arg, name)
     : (const char*) name;
 }
 
 /* Add a new item in the hashtable. The item SHALL NOT be alreasy present. */
-static int inthash_add_item_(inthash hashtable, inthash_item item) {
-  inthash_hashkey cuckoo_hash, initial_cuckoo_hash;
+static int coucal_add_item_(coucal hashtable, coucal_item item) {
+  coucal_hashkey cuckoo_hash, initial_cuckoo_hash;
   size_t loops;
   size_t pos;
 
   /* place at free position 1 ? */
-  pos = inthash_hash_to_pos(hashtable, item.hashes.hash1);
-  if (inthash_is_free(hashtable, pos)) {
+  pos = coucal_hash_to_pos(hashtable, item.hashes.hash1);
+  if (coucal_is_free(hashtable, pos)) {
     hashtable->items[pos] = item;
     return 1; /* added */
   } else {
     /* place at free position 2 ? */
-    pos = inthash_hash_to_pos(hashtable, item.hashes.hash2);
-    if (inthash_is_free(hashtable, pos)) {
+    pos = coucal_hash_to_pos(hashtable, item.hashes.hash2);
+    if (coucal_is_free(hashtable, pos)) {
       hashtable->items[pos] = item;
       return 1; /* added */
     }
     /* prepare cuckoo ; let's take position 1 */
     else {
       cuckoo_hash = initial_cuckoo_hash = item.hashes.hash1;
-      inthash_trace(hashtable,
+      coucal_trace(hashtable,
                     "debug:collision with '%s' at %"UINT_64_FORMAT" (%x)", 
-                     inthash_print_key(hashtable, item.name),
+                     coucal_print_key(hashtable, item.name),
                      (uint64_t) pos, cuckoo_hash);
     }
   }
 
   /* put 'item' in place with hash 'cuckoo_hash' */
   for(loops = POW2(hashtable->lg_size) ; loops != 0 ; --loops) {
-    const size_t pos = inthash_hash_to_pos(hashtable, cuckoo_hash);
+    const size_t pos = coucal_hash_to_pos(hashtable, cuckoo_hash);
 
-    inthash_trace(hashtable,
+    coucal_trace(hashtable,
                   "\tdebug:placing cuckoo '%s' at %"UINT_64_FORMAT" (%x)", 
-                  inthash_print_key(hashtable, item.name),
+                  coucal_print_key(hashtable, item.name),
                   (uint64_t) pos, cuckoo_hash);
 
     /* place at alternate free position ? */
-    if (inthash_is_free(hashtable, pos)) {
-      inthash_trace(hashtable, "debug:free position");
+    if (coucal_is_free(hashtable, pos)) {
+      coucal_trace(hashtable, "debug:free position");
       hashtable->items[pos] = item;
       return 1; /* added */
     }
     /* then cuckoo's place it is */
     else {
       /* replace */
-      const inthash_item backup_item = hashtable->items[pos];
+      const coucal_item backup_item = hashtable->items[pos];
       hashtable->items[pos] = item;
 
       /* statistics */
@@ -873,19 +873,19 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
       item = backup_item;
 
       /* we just kicked this item from its position 1 */
-      if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash1)) {
+      if (pos == coucal_hash_to_pos(hashtable, item.hashes.hash1)) {
         /* then place it on position 2 on next run */
-        inthash_trace(hashtable, "\tdebug:position 1");
+        coucal_trace(hashtable, "\tdebug:position 1");
         cuckoo_hash = item.hashes.hash2;
       }
       /* we just kicked this item from its position 2 */
-      else if (pos == inthash_hash_to_pos(hashtable, item.hashes.hash2)) {
+      else if (pos == coucal_hash_to_pos(hashtable, item.hashes.hash2)) {
         /* then place it on position 1 on next run */
-        inthash_trace(hashtable, "\tdebug:position 2");
+        coucal_trace(hashtable, "\tdebug:position 2");
         cuckoo_hash = item.hashes.hash1;
       }
       else {
-        inthash_assert(hashtable, ! "hashtable internal error: unexpected position");
+        coucal_assert(hashtable, ! "hashtable internal error: unexpected position");
       }
 
       /* we are looping (back to same hash) */
@@ -906,7 +906,7 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
     if (hashtable->stash.size > hashtable->stats.max_stash_size) {
       hashtable->stats.max_stash_size = hashtable->stash.size;
     }
-    inthash_debug(hashtable, "used stash because of collision (%d entries)",
+    coucal_debug(hashtable, "used stash because of collision (%d entries)",
                   (int) hashtable->stash.size);
     return 1; /* added */
   } else {
@@ -915,46 +915,46 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
       && hashtable->custom.print.value != NULL) {
       size_t i;
       for(i = 0 ; i < hashtable->stash.size ; i++) {
-        inthash_item *const item = &hashtable->stash.items[i];
-        const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
-        const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-        inthash_crit(hashtable, 
+        coucal_item *const item = &hashtable->stash.items[i];
+        const size_t pos1 = coucal_hash_to_pos(hashtable, item->hashes.hash1);
+        const size_t pos2 = coucal_hash_to_pos(hashtable, item->hashes.hash2);
+        coucal_crit(hashtable, 
           "stash[%u]: key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
           (int) i,
           hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
           hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
           (int) pos1, (int) pos2,
           item->hashes.hash1, item->hashes.hash2);
-        if (!inthash_is_free(hashtable, pos1)) {
-          inthash_item *const item = &hashtable->items[pos1];
-          const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
-          const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-          inthash_crit(hashtable, 
+        if (!coucal_is_free(hashtable, pos1)) {
+          coucal_item *const item = &hashtable->items[pos1];
+          const size_t pos1 = coucal_hash_to_pos(hashtable, item->hashes.hash1);
+          const size_t pos2 = coucal_hash_to_pos(hashtable, item->hashes.hash2);
+          coucal_crit(hashtable, 
             "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
             hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
             (int) pos1, (int) pos2,
             item->hashes.hash1, item->hashes.hash2);
         } else {
-          inthash_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos1);
+          coucal_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos1);
         }
-        if (!inthash_is_free(hashtable, pos2)) {
-          inthash_item *const item = &hashtable->items[pos2];
-          const size_t pos1 = inthash_hash_to_pos(hashtable, item->hashes.hash1);
-          const size_t pos2 = inthash_hash_to_pos(hashtable, item->hashes.hash2);
-          inthash_crit(hashtable, 
+        if (!coucal_is_free(hashtable, pos2)) {
+          coucal_item *const item = &hashtable->items[pos2];
+          const size_t pos1 = coucal_hash_to_pos(hashtable, item->hashes.hash1);
+          const size_t pos2 = coucal_hash_to_pos(hashtable, item->hashes.hash2);
+          coucal_crit(hashtable, 
             "\t.. collisionning with key='%s' value='%s' pos1=%d pos2=%d hash1=%04x hash2=%04x",
             hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
             hashtable->custom.print.value(hashtable->custom.print.arg, item->value),
             (int) pos1, (int) pos2,
             item->hashes.hash1, item->hashes.hash2);
         } else {
-          inthash_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos2);
+          coucal_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos2);
         }
       }
-      //struct_inthash_enum e = inthash_enum_new(hashtable);
-      //while((item = inthash_enum_next(&e)) != NULL) {
-      //  inthash_crit(hashtable, "element key='%s' value='%s' hash1=%04x hash2=%04x",
+      //struct_coucal_enum e = coucal_enum_new(hashtable);
+      //while((item = coucal_enum_next(&e)) != NULL) {
+      //  coucal_crit(hashtable, "element key='%s' value='%s' hash1=%04x hash2=%04x",
       //    hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
       //    hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
       //    item->hashes.hash1, item->hashes.hash2);
@@ -963,18 +963,18 @@ static int inthash_add_item_(inthash hashtable, inthash_item item) {
 
     /* we are doomed. hopefully the probability is lower than being killed
        by a wandering radioactive monkey */
-    inthash_log_stats(hashtable);
-    inthash_assert(hashtable, ! "hashtable internal error: cuckoo/stash collision");
+    coucal_log_stats(hashtable);
+    coucal_assert(hashtable, ! "hashtable internal error: cuckoo/stash collision");
 
     /* not reachable code */
     return -1;
   }
 }
 
-int inthash_write_value(inthash hashtable, inthash_key_const name,
-                        inthash_value_const value) {
+int coucal_write_value(coucal hashtable, coucal_key_const name,
+                       coucal_value_const value) {
   /* replace of add item */
-  const int ret = inthash_write_value_(hashtable, name, value);
+  const int ret = coucal_write_value_(hashtable, name, value);
 
   /* added ? */
   if (ret) {
@@ -995,7 +995,7 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
       /* size before  */
       const size_t prev_power = hashtable->lg_size;
       const size_t prev_size = half_size * 2;
-      const size_t prev_alloc_size = prev_size*sizeof(inthash_item);
+      const size_t prev_alloc_size = prev_size*sizeof(coucal_item);
 
       /* size after doubling it */
       const size_t alloc_size = prev_alloc_size * 2;
@@ -1004,7 +1004,7 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
       if (hashtable->stash.size >= half_stash_size 
         && half_size > POW2(16) 
         && hashtable->used < half_size / 4) {
-          inthash_warning(hashtable, 
+          coucal_warning(hashtable, 
             "stash size still full despite %"UINT_64_FORMAT
             " elements used out of %"UINT_64_FORMAT,
             (uint64_t) hashtable->used, (uint64_t) half_size*2);
@@ -1016,13 +1016,13 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
       /* realloc */
       hashtable->lg_size++;
       hashtable->items = 
-        (inthash_item *) realloc(hashtable->items, alloc_size);
+        (coucal_item *) realloc(hashtable->items, alloc_size);
       if (hashtable->items == NULL) {
-        inthash_crit(hashtable,
+        coucal_crit(hashtable,
           "** hashtable allocation error: "
           "could not allocate %"UINT_64_FORMAT" bytes", 
           (uint64_t) alloc_size);
-        inthash_assert(hashtable, ! "hashtable allocation error");
+        coucal_assert(hashtable, ! "hashtable allocation error");
       }
 
       /* clear upper half */
@@ -1030,35 +1030,35 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
 
       /* relocate lower half items when needed */
       for(i = 0 ; i < prev_size ; i++) {
-        if (!inthash_is_free(hashtable, i)) {
-          const inthash_hashkeys *const hashes = &hashtable->items[i].hashes;
+        if (!coucal_is_free(hashtable, i)) {
+          const coucal_hashkeys *const hashes = &hashtable->items[i].hashes;
 
           /* currently at old position 1 */
-          if (inthash_hash_to_pos_(prev_power, hashes->hash1) == i) {
-            const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash1);
+          if (coucal_hash_to_pos_(prev_power, hashes->hash1) == i) {
+            const size_t pos = coucal_hash_to_pos(hashtable, hashes->hash1);
             /* no more the expected position */
             if (pos != i) {
-              inthash_assert(hashtable, pos >= prev_size);
+              coucal_assert(hashtable, pos >= prev_size);
               hashtable->items[pos] = hashtable->items[i];
               memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
             }
           }
-          else if (inthash_hash_to_pos_(prev_power, hashes->hash2) == i) {
-            const size_t pos = inthash_hash_to_pos(hashtable, hashes->hash2);
+          else if (coucal_hash_to_pos_(prev_power, hashes->hash2) == i) {
+            const size_t pos = coucal_hash_to_pos(hashtable, hashes->hash2);
             /* no more the expected position */
             if (pos != i) {
-              inthash_assert(hashtable, pos >= prev_size);
+              coucal_assert(hashtable, pos >= prev_size);
               hashtable->items[pos] = hashtable->items[i];
               memset(&hashtable->items[i], 0, sizeof(hashtable->items[i]));
             }
           }
           else {
-            inthash_assert(hashtable, ! "hashtable unexpected internal error (bad position)");
+            coucal_assert(hashtable, ! "hashtable unexpected internal error (bad position)");
           }
         }
       }
 
-      inthash_debug(hashtable,
+      coucal_debug(hashtable,
                     "expanded hashtable to %"UINT_64_FORMAT" elements",
                     (uint64_t) POW2(hashtable->lg_size));
 
@@ -1068,26 +1068,26 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
         size_t i;
 
         /* backup stash and reset it */
-        inthash_item stash[STASH_SIZE];
+        coucal_item stash[STASH_SIZE];
         memcpy(&stash, hashtable->stash.items, sizeof(hashtable->stash.items));
         hashtable->stash.size = 0;
 
         /* insert all items */
         for(i = 0 ; i < old_size ; i++) {
-          const int ret = inthash_add_item_(hashtable, stash[i]);
+          const int ret = coucal_add_item_(hashtable, stash[i]);
           if (ret == 0) {
-            inthash_assert(hashtable, ! "hashtable duplicate key when merging the stash");
+            coucal_assert(hashtable, ! "hashtable duplicate key when merging the stash");
           }
         }
 
         /* logging */
-        inthash_assert(hashtable, hashtable->stash.size <= old_size);
+        coucal_assert(hashtable, hashtable->stash.size <= old_size);
         if (hashtable->stash.size < old_size) {
-          inthash_debug(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
+          coucal_debug(hashtable, "reduced stash size from %"UINT_64_FORMAT" "
                         "to %"UINT_64_FORMAT,
                         (uint64_t) old_size, (uint64_t) hashtable->stash.size);
         } else {
-          inthash_trace(hashtable, "stash has still %"UINT_64_FORMAT" elements",
+          coucal_trace(hashtable, "stash has still %"UINT_64_FORMAT" elements",
                         (uint64_t) hashtable->stash.size);
         }
       }
@@ -1098,37 +1098,37 @@ int inthash_write_value(inthash hashtable, inthash_key_const name,
   return ret;
 }
 
-void inthash_add(inthash hashtable, inthash_key_const name, intptr_t intvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+void coucal_add(coucal hashtable, coucal_key_const name, intptr_t intvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
 
   memset(&value, 0, sizeof(value));
   value.intg = intvalue;
-  inthash_write_value(hashtable, name, value);
+  coucal_write_value(hashtable, name, value);
 }
 
-int inthash_read(inthash hashtable, inthash_key_const name, intptr_t * intvalue) {
-  inthash_value value = INTHASH_VALUE_NULL;
+int coucal_read(coucal hashtable, coucal_key_const name, intptr_t * intvalue) {
+  coucal_value value = INTHASH_VALUE_NULL;
   int ret =
-    inthash_read_value(hashtable, name, (intvalue != NULL) ? &value : NULL);
+    coucal_read_value(hashtable, name, (intvalue != NULL) ? &value : NULL);
   if (intvalue != NULL)
     *intvalue = value.intg;
   return ret;
 }
 
-static inthash_value* inthash_read_value_(inthash hashtable,
-                                          inthash_key_const name) {
-  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
+static coucal_value* coucal_read_value_(coucal hashtable,
+                                        coucal_key_const name) {
+  const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
   size_t pos;
 
   /* found at position 1 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes.hash1);
-  if (inthash_matches(hashtable, pos, name, &hashes)) {
+  pos = coucal_hash_to_pos(hashtable, hashes.hash1);
+  if (coucal_matches(hashtable, pos, name, &hashes)) {
     return &hashtable->items[pos].value;
   }
 
   /* found at position 2 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes.hash2);
-  if (inthash_matches(hashtable, pos, name, &hashes)) {
+  pos = coucal_hash_to_pos(hashtable, hashes.hash2);
+  if (coucal_matches(hashtable, pos, name, &hashes)) {
     return &hashtable->items[pos].value;
   }
 
@@ -1136,7 +1136,7 @@ static inthash_value* inthash_read_value_(inthash hashtable,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name,
+      if (coucal_matches_(hashtable, &hashtable->stash.items[i], name,
                            &hashes)) {
         return &hashtable->stash.items[i].value;
       }
@@ -1147,9 +1147,9 @@ static inthash_value* inthash_read_value_(inthash hashtable,
   return NULL;
 }
 
-int inthash_read_value(inthash hashtable, inthash_key_const name,
-                       inthash_value * pvalue) {
-  inthash_value* const value = inthash_read_value_(hashtable, name);
+int coucal_read_value(coucal hashtable, coucal_key_const name,
+                      coucal_value * pvalue) {
+  coucal_value* const value = coucal_read_value_(hashtable, name);
   if (value != NULL) {
     if (pvalue != NULL) {
       *pvalue = *value;
@@ -1159,48 +1159,48 @@ int inthash_read_value(inthash hashtable, inthash_key_const name,
   return 0;
 }
 
-static size_t inthash_inc_(inthash hashtable, inthash_key_const name,
-                           size_t inc) {
-  inthash_value* const value = inthash_read_value_(hashtable, name);
+static size_t coucal_inc_(coucal hashtable, coucal_key_const name,
+                          size_t inc) {
+  coucal_value* const value = coucal_read_value_(hashtable, name);
   if (value != NULL) {
     value->uintg += inc;
     return value->uintg;
   } else {
     /* create a new value */
-    const int ret = inthash_write(hashtable, name, inc);
-    inthash_assert(hashtable, ret);
+    const int ret = coucal_write(hashtable, name, inc);
+    coucal_assert(hashtable, ret);
     return inc;
   }
 }
 
-int inthash_inc(inthash hashtable, inthash_key_const name) {
-  return (int) inthash_inc_(hashtable, name, 1);
+int coucal_inc(coucal hashtable, coucal_key_const name) {
+  return (int) coucal_inc_(hashtable, name, 1);
 }
 
-int inthash_dec(inthash hashtable, inthash_key_const name) {
-  return (int) inthash_inc_(hashtable, name, (size_t) -1);
+int coucal_dec(coucal hashtable, coucal_key_const name) {
+  return (int) coucal_inc_(hashtable, name, (size_t) -1);
 }
 
-int inthash_exists(inthash hashtable, inthash_key_const name) {
-  return inthash_read_value(hashtable, name, NULL);
+int coucal_exists(coucal hashtable, coucal_key_const name) {
+  return coucal_read_value(hashtable, name, NULL);
 }
 
-static int inthash_remove_(inthash hashtable, inthash_key_const name,
-                           const inthash_hashkeys *hashes, size_t *removed) {
+static int coucal_remove_(coucal hashtable, coucal_key_const name,
+                          const coucal_hashkeys *hashes, size_t *removed) {
   size_t pos;
 
   /* found at position 1 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes->hash1);
-  if (inthash_matches(hashtable, pos, name, hashes)) {
-    inthash_del_item(hashtable, &hashtable->items[pos]);
+  pos = coucal_hash_to_pos(hashtable, hashes->hash1);
+  if (coucal_matches(hashtable, pos, name, hashes)) {
+    coucal_del_item(hashtable, &hashtable->items[pos]);
     *removed = pos;
     return 1;
   }
 
   /* found at position 2 ? */
-  pos = inthash_hash_to_pos(hashtable, hashes->hash2);
-  if (inthash_matches(hashtable, pos, name, hashes)) {
-    inthash_del_item(hashtable, &hashtable->items[pos]);
+  pos = coucal_hash_to_pos(hashtable, hashes->hash2);
+  if (coucal_matches(hashtable, pos, name, hashes)) {
+    coucal_del_item(hashtable, &hashtable->items[pos]);
     *removed = pos;
     return 1;
   }
@@ -1209,15 +1209,15 @@ static int inthash_remove_(inthash hashtable, inthash_key_const name,
   if (hashtable->stash.size != 0) {
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
-      if (inthash_matches_(hashtable, &hashtable->stash.items[i], name,
+      if (coucal_matches_(hashtable, &hashtable->stash.items[i], name,
                            hashes)) {
-        inthash_del_item(hashtable, &hashtable->stash.items[i]);
+        coucal_del_item(hashtable, &hashtable->stash.items[i]);
         for( ; i + 1 < hashtable->stash.size ; i++) {
           hashtable->stash.items[i] = hashtable->stash.items[i + 1];
         }
         hashtable->stash.size--;
         *removed = (size_t) -1;
-        inthash_debug(hashtable, "debug:deleted item in stash (%d entries)",
+        coucal_debug(hashtable, "debug:deleted item in stash (%d entries)",
           (int) hashtable->stash.size);
         return 1;
       }
@@ -1228,14 +1228,14 @@ static int inthash_remove_(inthash hashtable, inthash_key_const name,
   return 0;
 }
 
-int inthash_remove(inthash hashtable, inthash_key_const name) {
-  const inthash_hashkeys hashes = inthash_calc_hashes(hashtable, name);
+int coucal_remove(coucal hashtable, coucal_key_const name) {
+  const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
   size_t removed;
-  const int ret = inthash_remove_(hashtable, name, &hashes, &removed);
+  const int ret = coucal_remove_(hashtable, name, &hashes, &removed);
 
   if (ret) {
     /* item was removed: decrease count */
-    inthash_assert(hashtable, hashtable->used != 0);
+    coucal_assert(hashtable, hashtable->used != 0);
     hashtable->used--;
 
     /* can we place stash entry back to the table ? */
@@ -1243,9 +1243,9 @@ int inthash_remove(inthash hashtable, inthash_key_const name) {
       size_t i;
       for(i = 0 ; i < hashtable->stash.size ; i++) {
         const size_t pos1 =
-          inthash_hash_to_pos(hashtable, hashtable->stash.items[i].hashes.hash1);
+          coucal_hash_to_pos(hashtable, hashtable->stash.items[i].hashes.hash1);
         const size_t pos2 =
-          inthash_hash_to_pos(hashtable, hashtable->stash.items[i].hashes.hash2);
+          coucal_hash_to_pos(hashtable, hashtable->stash.items[i].hashes.hash2);
         if (pos1 == removed || pos2 == removed) {
           if (pos1 == removed) {
             hashtable->items[pos1] = hashtable->stash.items[i];
@@ -1256,7 +1256,7 @@ int inthash_remove(inthash hashtable, inthash_key_const name) {
             hashtable->stash.items[i] = hashtable->stash.items[i + 1];
           }
           hashtable->stash.size--;
-          inthash_debug(hashtable, "debug:moved item from stash (%d entries)",
+          coucal_debug(hashtable, "debug:moved item from stash (%d entries)",
             (int) hashtable->stash.size);
           break;
         }
@@ -1267,24 +1267,24 @@ int inthash_remove(inthash hashtable, inthash_key_const name) {
   return ret;
 }
 
-int inthash_readptr(inthash hashtable, inthash_key_const name, intptr_t * value) {
+int coucal_readptr(coucal hashtable, coucal_key_const name, intptr_t * value) {
   int ret;
 
   *value = 0;
-  ret = inthash_read(hashtable, name, value);
+  ret = coucal_read(hashtable, name, value);
   if (*value == 0)
     ret = 0;
   return ret;
 }
 
-inthash inthash_new(size_t initial_size) {
-  inthash hashtable = (inthash) calloc(1, sizeof(struct_inthash));
+coucal coucal_new(size_t initial_size) {
+  coucal hashtable = (coucal) calloc(1, sizeof(struct_coucal));
 
   if (hashtable) {
     size_t size;
     for(size = MIN_LG_SIZE ; POW2(size) < initial_size ; size++) ;
     if ((hashtable->items =
-         (inthash_item *) calloc(POW2(size), sizeof(inthash_item)))) {
+         (coucal_item *) calloc(POW2(size), sizeof(coucal_item)))) {
       hashtable->lg_size = size;
     }
     hashtable->used = 0;
@@ -1319,14 +1319,14 @@ inthash inthash_new(size_t initial_size) {
   return hashtable;
 }
 
-int inthash_created(inthash hashtable) {
+int coucal_created(coucal hashtable) {
   return hashtable != NULL && hashtable->items != NULL;
 }
 
-void inthash_value_is_malloc(inthash hashtable, int flag) {
+void coucal_value_is_malloc(coucal hashtable, int flag) {
   if (flag) {
     if (hashtable->custom.value.free == NULL) {
-      hashtable->custom.value.free = inthash_default_free_handler;
+      hashtable->custom.value.free = coucal_default_free_handler;
       hashtable->custom.value.arg = NULL;
     }
   } else {
@@ -1335,25 +1335,25 @@ void inthash_value_is_malloc(inthash hashtable, int flag) {
   }
 }
 
-void inthash_set_name(inthash hashtable, inthash_key_const name) {
+void coucal_set_name(coucal hashtable, coucal_key_const name) {
   hashtable->custom.error.name = name;
 }
 
-void inthash_value_set_value_handler(inthash hashtable,
-                                     t_inthash_value_freehandler free,
-                                     inthash_opaque arg) {
+void coucal_value_set_value_handler(coucal hashtable,
+                                    t_coucal_value_freehandler free,
+                                    coucal_opaque arg) {
   hashtable->custom.value.free = free;
   hashtable->custom.value.arg = arg;
 }
 
-void inthash_value_set_key_handler(inthash hashtable,
-                                   t_inthash_duphandler dup,
-                                   t_inthash_key_freehandler free,
-                                   t_inthash_hasheshandler hash,
-                                   t_inthash_cmphandler equals,
-                                   inthash_opaque arg) {
+void coucal_value_set_key_handler(coucal hashtable,
+                                  t_coucal_duphandler dup,
+                                  t_coucal_key_freehandler free,
+                                  t_coucal_hasheshandler hash,
+                                  t_coucal_cmphandler equals,
+                                  coucal_opaque arg) {
   /* dup and free must be consistent */
-  inthash_assert(hashtable, ( dup == NULL ) == ( free == NULL ) );
+  coucal_assert(hashtable, ( dup == NULL ) == ( free == NULL ) );
   hashtable->custom.key.dup = dup;
   hashtable->custom.key.free = free;
   hashtable->custom.key.hash = hash;
@@ -1361,42 +1361,42 @@ void inthash_value_set_key_handler(inthash hashtable,
   hashtable->custom.key.arg = arg;
 }
 
-void inthash_set_assert_handler(inthash hashtable,
-                                t_inthash_loghandler log,
-                                t_inthash_asserthandler fatal,
-                                inthash_opaque arg) {
+void coucal_set_assert_handler(coucal hashtable,
+                               t_coucal_loghandler log,
+                               t_coucal_asserthandler fatal,
+                               coucal_opaque arg) {
   hashtable->custom.error.log = log;
   hashtable->custom.error.fatal = fatal;
   hashtable->custom.error.arg = arg;
 }
 
-void inthash_set_print_handler(inthash hashtable,
-                               t_inthash_printkeyhandler key,
-                               t_inthash_printvaluehandler value,
-                               inthash_opaque arg) {
+void coucal_set_print_handler(coucal hashtable,
+                              t_coucal_printkeyhandler key,
+                              t_coucal_printvaluehandler value,
+                              coucal_opaque arg) {
   hashtable->custom.print.key = key;
   hashtable->custom.print.value = value;
   hashtable->custom.print.arg = arg;
 }
 
-size_t inthash_nitems(inthash hashtable) {
+size_t coucal_nitems(coucal hashtable) {
   if (hashtable != NULL)
     return hashtable->used;
   return 0;
 }
 
-size_t inthash_memory_size(inthash hashtable) {
-  const size_t size_struct = sizeof(struct_inthash);
-  const size_t hash_size = POW2(hashtable->lg_size)*sizeof(inthash_item);
+size_t coucal_memory_size(coucal hashtable) {
+  const size_t size_struct = sizeof(struct_coucal);
+  const size_t hash_size = POW2(hashtable->lg_size)*sizeof(coucal_item);
   const size_t pool_size = hashtable->pool.capacity*sizeof(char);
   return size_struct + hash_size + pool_size;
 }
 
-void inthash_delete(inthash *phashtable) {
+void coucal_delete(coucal *phashtable) {
   if (phashtable != NULL) {
-    inthash hashtable = *phashtable;
+    coucal hashtable = *phashtable;
     if (hashtable != NULL) {
-      inthash_log_stats(hashtable);
+      coucal_log_stats(hashtable);
       if (hashtable->items != NULL) {
         /* we need to delete values */
         const size_t hash_size = POW2(hashtable->lg_size);
@@ -1404,14 +1404,14 @@ void inthash_delete(inthash *phashtable) {
 
         /* wipe hashtable values (not names) */
         for(i = 0 ; i < hash_size ; i++) {
-          if (!inthash_is_free(hashtable, i)) {
-            inthash_del_value(hashtable, i);
+          if (!coucal_is_free(hashtable, i)) {
+            coucal_del_value(hashtable, i);
           }
         }
 
         /* wipe auxiliary stash values (not names) if any */
         for(i = 0 ; i < hashtable->stash.size ; i++) {
-          inthash_del_value_(hashtable, &hashtable->stash.items[i].value);
+          coucal_del_value_(hashtable, &hashtable->stash.items[i].value);
         }
       }
       /* wipe top-level */
@@ -1429,28 +1429,28 @@ void inthash_delete(inthash *phashtable) {
 
 /* Enumerator */
 
-struct_inthash_enum inthash_enum_new(inthash hashtable) {
-  struct_inthash_enum e;
+struct_coucal_enum coucal_enum_new(coucal hashtable) {
+  struct_coucal_enum e;
 
   e.index = 0;
   e.table = hashtable;
   return e;
 }
 
-inthash_item *inthash_enum_next(struct_inthash_enum * e) {
+coucal_item *coucal_enum_next(struct_coucal_enum * e) {
   const size_t hash_size = POW2(e->table->lg_size);
   for( ; e->index < hash_size 
-    && inthash_is_free(e->table, e->index) ; e->index++) ;
+    && coucal_is_free(e->table, e->index) ; e->index++) ;
   /* enumerate all table */
   if (e->index < hash_size) {
-    inthash_item *const next = &e->table->items[e->index];
+    coucal_item *const next = &e->table->items[e->index];
     e->index++;
     return next;
   }
   /* enumerate stash if present */
   else if (e->index < hash_size + e->table->stash.size) {
     const size_t index = e->index - hash_size;
-    inthash_item *const next = &e->table->stash.items[index];
+    coucal_item *const next = &e->table->stash.items[index];
     e->index++;
     return next;
   }
@@ -1460,8 +1460,8 @@ inthash_item *inthash_enum_next(struct_inthash_enum * e) {
   }
 }
 
-void inthash_set_global_assert_handler(t_inthash_loghandler log,
-                                       t_inthash_asserthandler fatal) {
+void coucal_set_global_assert_handler(t_coucal_loghandler log,
+                                      t_coucal_asserthandler fatal) {
   global_log_handler = log;
   global_assert_handler = fatal;
 }

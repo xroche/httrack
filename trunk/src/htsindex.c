@@ -144,7 +144,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   //
   //int WordIndexSize = 1024;
-  inthash WordIndexHash = NULL;
+  coucal WordIndexHash = NULL;
   FILE *tmpfp = NULL;
 
   //
@@ -190,7 +190,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Create hash structure
   // Hash tables rulez da world!
-  WordIndexHash = inthash_new(0);
+  WordIndexHash = coucal_new(0);
   if (!WordIndexHash)
     return 0;
 
@@ -252,7 +252,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           /* Store it ? */
           if (len >= KEYW_MIN_LEN) {
             hts_primindex_words++;
-            if (inthash_inc(WordIndexHash, keyword)) {  /* added new */
+            if (coucal_inc(WordIndexHash, keyword)) {  /* added new */
               fprintf(tmpfp, "%s\n", keyword);
             }
           }
@@ -285,7 +285,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
         if (strnotempty(line)) {
           intptr_t e = 0;
 
-          if (inthash_read(WordIndexHash, line, &e)) {
+          if (coucal_read(WordIndexHash, line, &e)) {
             //if (e) {
             char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
@@ -313,7 +313,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   tmpfp = NULL;
 
   // Clear hash table
-  inthash_delete(&WordIndexHash);
+  coucal_delete(&WordIndexHash);
 #endif
   return 1;
 }

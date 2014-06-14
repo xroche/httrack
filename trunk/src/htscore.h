@@ -156,7 +156,7 @@ typedef struct struct_back struct_back;
 struct struct_back {
   lien_back *lnk;
   int count;
-  inthash ready;
+  coucal ready;
   LLint ready_size_bytes;
 };
 
@@ -178,9 +178,9 @@ struct cache_back {
   FILE *txt;                    // liste des fichiers (info)
   char lastmodified[256];
   // HASH
-  inthash hashtable;
+  coucal hashtable;
   // HASH for tests (naming subsystem)
-  inthash cached_tests;
+  coucal cached_tests;
   // fichiers log optionnels
   FILE *log;
   FILE *errlog;
@@ -203,11 +203,11 @@ struct hash_struct {
   /* Links big array reference */
   const lien_url *const*const*liens;
   /* Savename (case insensitive ; lowercased) */
-  inthash sav;
+  coucal sav;
   /* Address and path */
-  inthash adrfil;
+  coucal adrfil;
   /* Former address and path */
-  inthash former_adrfil;
+  coucal former_adrfil;
   /** Buffers **/
   int normalized;
   char normfil[HTS_URLMAXSIZE * 2];

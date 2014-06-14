@@ -1079,7 +1079,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
   String profiles = STRING_EMPTY;
   char *rpath = path;
   find_handle h;
-  inthash hashCateg = NULL;
+  coucal hashCateg = NULL;
 
   if (rpath[0]) {
     if (rpath[strlen(rpath) - 1] == '/') {
@@ -1091,8 +1091,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     String iname = STRING_EMPTY;
 
     if (type == 1) {
-      hashCateg = inthash_new(0);
-      inthash_set_name(hashCateg, "hashCateg");
+      hashCateg = coucal_new(0);
+      coucal_set_name(hashCateg, "hashCateg");
       StringCat(categ, "Test category 1");
       StringCat(categ, "\r\nTest category 2");
     }
@@ -1117,8 +1117,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
                 if (n > 0) {
                   if (strfield(line2, "category=")) {
                     if (*(line2 + 9)) {
-                      if (!inthash_read(hashCateg, line2 + 9, NULL)) {
-                        inthash_write(hashCateg, line2 + 9, 0);
+                      if (!coucal_read(hashCateg, line2 + 9, NULL)) {
+                        coucal_write(hashCateg, line2 + 9, 0);
                         if (StringLength(categ) > 0) {
                           StringCat(categ, "\r\n");
                         }
@@ -1146,7 +1146,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     StringFree(iname);
   }
   if (hashCateg) {
-    inthash_delete(&hashCateg);
+    coucal_delete(&hashCateg);
     hashCateg = NULL;
   }
   if (type == 1)

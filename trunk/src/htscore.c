@@ -149,8 +149,8 @@ RUN_CALLBACK0(opt, end); \
   if (maketrack_fp){ fclose(maketrack_fp); maketrack_fp=NULL; } \
   if (opt->accept_cookie) cookie_save(opt->cookie,fconcat(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),StringBuff(opt->path_log),"cookies.txt")); \
   if (makeindex_fp) { fclose(makeindex_fp); makeindex_fp=NULL; } \
-  if (cache_hashtable) { inthash_delete(&cache_hashtable); } \
-  if (cache_tests)     { inthash_delete(&cache_tests); } \
+  if (cache_hashtable) { coucal_delete(&cache_hashtable); } \
+  if (cache_tests)     { coucal_delete(&cache_tests); } \
   if (template_header) { freet(template_header); template_header=NULL; } \
   if (template_body)   { freet(template_body); template_body=NULL; } \
   if (template_footer) { freet(template_footer); template_footer=NULL; } \
@@ -479,8 +479,8 @@ int httpmirror(char *url1, httrackp * opt) {
   //
   cache_back BIGSTK cache;
   robots_wizard BIGSTK robots;  // gestion robots.txt
-  inthash cache_hashtable = NULL;
-  inthash cache_tests = NULL;
+  coucal cache_hashtable = NULL;
+  coucal cache_tests = NULL;
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
@@ -563,8 +563,8 @@ int httpmirror(char *url1, httrackp * opt) {
   cache.ptr_ant = cache.ptr_last = 0;   // pointeur pour anticiper
 
   // initialiser hash cache
-  cache_hashtable = inthash_new(0);
-  cache_tests = inthash_new(0);
+  cache_hashtable = coucal_new(0);
+  cache_tests = coucal_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
     filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
@@ -573,9 +573,9 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   hts_set_hash_handler(cache_hashtable, opt);
   hts_set_hash_handler(cache_tests, opt);
-  inthash_set_name(cache_hashtable, "cache_hashtable");
-  inthash_set_name(cache_tests, "cache_tests");
-  inthash_value_is_malloc(cache_tests, 1);      /* malloc */
+  coucal_set_name(cache_hashtable, "cache_hashtable");
+  coucal_set_name(cache_tests, "cache_tests");
+  coucal_value_is_malloc(cache_tests, 1);      /* malloc */
   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
 

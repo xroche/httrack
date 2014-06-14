@@ -66,16 +66,16 @@ typedef unsigned __int64 uint64_t;
 #include <stdarg.h>
 
 /** Key opaque type. May be a regular 'const char*'. **/
-typedef void* inthash_key;
+typedef void* coucal_key;
 
 /** Key constant (can not be modified) opaque type. **/
-typedef const void* inthash_key_const;
+typedef const void* coucal_key_const;
 
 /** Opaque user-defined pointer. **/
-typedef void* inthash_opaque;
+typedef void* coucal_opaque;
 
 /** Value (union of any value). **/
-typedef union inthash_value {
+typedef union coucal_value {
   /** Integer value. **/
   intptr_t intg;
 
@@ -84,106 +84,106 @@ typedef union inthash_value {
 
   /** Pointer value. **/
   void *ptr;
-} inthash_value;
+} coucal_value;
 
 /** Value constant. **/
-typedef const inthash_value inthash_value_const;
+typedef const coucal_value coucal_value_const;
 
 /** NULL Value. **/
 #define INTHASH_VALUE_NULL { 0 }
 
-#ifndef HTS_DEF_FWSTRUCT_inthash_item
-#define HTS_DEF_FWSTRUCT_inthash_item
-typedef struct inthash_item inthash_item;
+#ifndef HTS_DEF_FWSTRUCT_coucal_item
+#define HTS_DEF_FWSTRUCT_coucal_item
+typedef struct coucal_item coucal_item;
 #endif
 
 /** Hash key (32-bit) **/
-typedef uint32_t inthash_hashkey;
+typedef uint32_t coucal_hashkey;
 
 /** Pair of hashes **/
-typedef struct inthash_hashkeys {
-  inthash_hashkey hash1;
-  inthash_hashkey hash2;
-} inthash_hashkeys;
+typedef struct coucal_hashkeys {
+  coucal_hashkey hash1;
+  coucal_hashkey hash2;
+} coucal_hashkeys;
 
 /** NULL pair of hashes. **/
 #define INTHASH_KEYS_NULL { 0, 0 }
 
 /** Item holding a value. **/
-struct inthash_item {
+struct coucal_item {
   /** Key. **/
-  inthash_key name;
+  coucal_key name;
 
   /** Value. **/
-  inthash_value value;
+  coucal_value value;
 
   /** Hashes of the key. **/
-  inthash_hashkeys hashes;
+  coucal_hashkeys hashes;
 };
 
 /** Log level. **/
-typedef enum inthash_loglevel {
-  inthash_log_critical,
-  inthash_log_warning,
-  inthash_log_info,
-  inthash_log_debug,
-  inthash_log_trace
-} inthash_loglevel;
+typedef enum coucal_loglevel {
+  coucal_log_critical,
+  coucal_log_warning,
+  coucal_log_info,
+  coucal_log_debug,
+  coucal_log_trace
+} coucal_loglevel;
 
 /**  free handler. Only used when values are markes as xxc **/
-typedef void (*t_inthash_key_freehandler)(inthash_opaque arg,
-                                          inthash_key key);
+typedef void (*t_coucal_key_freehandler)(coucal_opaque arg,
+                                         coucal_key key);
 
 /** Value free handler. Only used when values are markes as xxc **/
-typedef void (*t_inthash_value_freehandler)(inthash_opaque arg,
-                                            inthash_value value);
+typedef void (*t_coucal_value_freehandler)(coucal_opaque arg,
+                                           coucal_value value);
 
 /** Key dup handler. **/
-typedef inthash_key (*t_inthash_duphandler)(inthash_opaque arg,
-                                            inthash_key_const name);
+typedef coucal_key (*t_coucal_duphandler)(coucal_opaque arg,
+                                          coucal_key_const name);
 
 /** Key hash computation handler. **/
-typedef inthash_hashkeys (*t_inthash_hasheshandler)(inthash_opaque arg,
-                                                    inthash_key_const name);
+typedef coucal_hashkeys (*t_coucal_hasheshandler)(coucal_opaque arg,
+                                                  coucal_key_const name);
 
 /** Hashtable logging handler. **/
-typedef void (*t_inthash_loghandler)(inthash_opaque arg, inthash_loglevel level, 
-                                     const char* format, va_list args);
+typedef void (*t_coucal_loghandler)(coucal_opaque arg, coucal_loglevel level, 
+                                    const char* format, va_list args);
 
 /** Hashtable fatal assertion failure. **/
-typedef void (*t_inthash_asserthandler)(inthash_opaque arg, const char* exp,
-                                        const char* file, int line);
+typedef void (*t_coucal_asserthandler)(coucal_opaque arg, const char* exp,
+                                       const char* file, int line);
 
 /** Key printer (debug) **/
-typedef const char* (*t_inthash_printkeyhandler)(inthash_opaque arg,
-                                                 inthash_key_const name);
+typedef const char* (*t_coucal_printkeyhandler)(coucal_opaque arg,
+                                                coucal_key_const name);
 
 /** Value printer (debug) **/
-typedef const char* (*t_inthash_printvaluehandler)(inthash_opaque arg,
-                                                   inthash_value_const value);
+typedef const char* (*t_coucal_printvaluehandler)(coucal_opaque arg,
+                                                  coucal_value_const value);
 
 /**
  * Value comparison handler (returns non-zero value if strings are equal).
  **/
-typedef int (*t_inthash_cmphandler)(inthash_opaque arg,
-                                    inthash_key_const a,
-                                    inthash_key_const b);
+typedef int (*t_coucal_cmphandler)(coucal_opaque arg,
+                                   coucal_key_const a,
+                                   coucal_key_const b);
 
 /** Hashtable (opaque structure). **/
-#ifndef HTS_DEF_FWSTRUCT_struct_inthash
-#define HTS_DEF_FWSTRUCT_struct_inthash
-typedef struct struct_inthash struct_inthash, *inthash;
+#ifndef HTS_DEF_FWSTRUCT_struct_coucal
+#define HTS_DEF_FWSTRUCT_struct_coucal
+typedef struct struct_coucal struct_coucal, *coucal;
 #endif
 
 /** Hashtable enumeration (opaque structure). **/
-#ifndef HTS_DEF_FWSTRUCT_struct_inthash_enum
-#define HTS_DEF_FWSTRUCT_struct_inthash_enum
-typedef struct struct_inthash_enum struct_inthash_enum;
+#ifndef HTS_DEF_FWSTRUCT_struct_coucal_enum
+#define HTS_DEF_FWSTRUCT_struct_coucal_enum
+typedef struct struct_coucal_enum struct_coucal_enum;
 #endif
 
 /** Enumeration. **/
-struct struct_inthash_enum {
-  inthash table;
+struct struct_coucal_enum {
+  coucal table;
   size_t index;
 };
 
@@ -195,36 +195,42 @@ extern "C" {
  * Create a new hashtable, with initial bucket size of 'size'.
  * If size is 0, use the default minimal bucket size.
  * Return a non-NULL pointer upon success.
+ *
+ * By default, keys are supposed to be '\0'-terminated strings, which are
+ * duplicated by the library (the passed pointer does not need to be
+ * persistent), and values are opaque pointers (or integers) which are copied
+ * "as is", without further processing. Use coucal_value_set_key_handler()
+ * and coucal_value_set_value_handler() to alter this default behavior.
  **/
-inthash inthash_new(size_t size);
+coucal coucal_new(size_t size);
 
 /**
  * Was the hashtable successfully created ?
  * Return non-zero value if the hashtable is valid.
  **/
-int inthash_created(inthash hashtable);
+int coucal_created(coucal hashtable);
 
 /**
  * Delete a hashtable, freeing all entries.
  **/
-void inthash_delete(inthash * hashtable);
+void coucal_delete(coucal * hashtable);
 
 /**
  * Return the number of items in the hashtable.
  **/
-size_t inthash_nitems(inthash hashtable);
+size_t coucal_nitems(coucal hashtable);
 
 /**
  * Return the memory size taken by the hashtable.
  * (This does not take account of the possible memory taken by values)
  **/
-size_t inthash_memory_size(inthash hashtable);
+size_t coucal_memory_size(coucal hashtable);
 
 /**
- * If 'flag' is non-zero, calls inthash_value_set_value_handler() with
+ * If 'flag' is non-zero, calls coucal_value_set_value_handler() with
  * default system free() handler function, otherwise, free the value handlers.
  **/
-void inthash_value_is_malloc(inthash hashtable, int flag);
+void coucal_value_is_malloc(coucal hashtable, int flag);
 
 /**
  * Set handlers for values.
@@ -233,9 +239,9 @@ void inthash_value_is_malloc(inthash hashtable, int flag);
  * arg: opaque custom argument to be used by functions.
  * Handler(s) MUST NOT be changed once elements have been added.
  **/
-void inthash_value_set_value_handler(inthash hashtable,
-                                     t_inthash_value_freehandler free,
-                                     inthash_opaque arg);
+void coucal_value_set_value_handler(coucal hashtable,
+                                    t_coucal_value_freehandler free,
+                                    coucal_opaque arg);
 
 /**
  * Set handlers for keys.
@@ -248,22 +254,22 @@ void inthash_value_set_value_handler(inthash hashtable,
  * arg: opaque custom argument to be used by functions.
  * Handler(s) MUST NOT be changed once elements have been added.
  **/
-void inthash_value_set_key_handler(inthash hashtable,
-                                   t_inthash_duphandler dup,
-                                   t_inthash_key_freehandler free,
-                                   t_inthash_hasheshandler hash,
-                                   t_inthash_cmphandler equals,
-                                   inthash_opaque arg);
+void coucal_value_set_key_handler(coucal hashtable,
+                                  t_coucal_duphandler dup,
+                                  t_coucal_key_freehandler free,
+                                  t_coucal_hasheshandler hash,
+                                  t_coucal_cmphandler equals,
+                                  coucal_opaque arg);
 
 /**
  * Set assertion failure handler.
  * log: handler called upon serious programming error
  * fatal: handler called upon serious programming error
  **/
-void inthash_set_assert_handler(inthash hashtable,
-                                t_inthash_loghandler log,
-                                t_inthash_asserthandler fatal,
-                                inthash_opaque arg);
+void coucal_set_assert_handler(coucal hashtable,
+                               t_coucal_loghandler log,
+                               t_coucal_asserthandler fatal,
+                               coucal_opaque arg);
 
 /**
  * Set pretty print loggers (debug). Both handlers must return a string
@@ -272,117 +278,118 @@ void inthash_set_assert_handler(inthash hashtable,
  * name: handler called to print the string representation of the name
  * value: handler called to print the string representation of the value
  **/
-void inthash_set_print_handler(inthash hashtable,
-                               t_inthash_printkeyhandler key,
-                               t_inthash_printvaluehandler value,
-                               inthash_opaque arg);
+void coucal_set_print_handler(coucal hashtable,
+                              t_coucal_printkeyhandler key,
+                              t_coucal_printvaluehandler value,
+                              coucal_opaque arg);
 
 /**
  * Set the hashtable name, for degugging purpose.
  * name: the hashtable name (ASCII or UTF-8)
  */
-void inthash_set_name(inthash hashtable, inthash_key_const name);
+void coucal_set_name(coucal hashtable, coucal_key_const name);
 
 /**
  * Get the hashtable name, for degugging purpose.
  * Return NULL if no name was defined.
  **/
-const char* inthash_get_name(inthash hashtable);
+const char* coucal_get_name(coucal hashtable);
 
 /**
  * Read an integer entry from the hashtable.
  * Return non-zero value upon success and sets intvalue.
  **/
-int inthash_read(inthash hashtable, inthash_key_const name, intptr_t * intvalue);
+int coucal_read(coucal hashtable, coucal_key_const name, intptr_t * intvalue);
 
 /**
- * Same as inthash_read(), but return 0 is the value was zero.
+ * Same as coucal_read(), but return 0 is the value was zero.
  **/
-int inthash_readptr(inthash hashtable, inthash_key_const name, intptr_t * intvalue);
+int coucal_readptr(coucal hashtable, coucal_key_const name, intptr_t * intvalue);
 
 /**
  * Return non-zero value if the given entry exists.
  **/
-int inthash_exists(inthash hashtable, inthash_key_const name);
+int coucal_exists(coucal hashtable, coucal_key_const name);
 
 /**
  * Read an entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int inthash_read_value(inthash hashtable, inthash_key_const name,
-                       inthash_value *value);
+int coucal_read_value(coucal hashtable, coucal_key_const name,
+                      coucal_value *value);
 
 /**
  * Write an entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write_value(inthash hashtable, inthash_key_const name,
-                        inthash_value_const value);
+int coucal_write_value(coucal hashtable, coucal_key_const name,
+                       coucal_value_const value);
+
 /**
  * Read a pointer entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int inthash_read_pvoid(inthash hashtable, inthash_key_const name, void **value);
+int coucal_read_pvoid(coucal hashtable, coucal_key_const name, void **value);
 
 /**
  * Write a pointer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write_pvoid(inthash hashtable, inthash_key_const name, void *value);
+int coucal_write_pvoid(coucal hashtable, coucal_key_const name, void *value);
 
 /**
- * Alias to inthash_write_pvoid()
+ * Alias to coucal_write_pvoid()
  **/
-void inthash_add_pvoid(inthash hashtable, inthash_key_const name, void *value);
+void coucal_add_pvoid(coucal hashtable, coucal_key_const name, void *value);
 
 /**
  * Write an integer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int inthash_write(inthash hashtable, inthash_key_const name, intptr_t value);
+int coucal_write(coucal hashtable, coucal_key_const name, intptr_t value);
 
 /**
- * Alias to inthash_write()
+ * Alias to coucal_write()
  **/
-void inthash_add(inthash hashtable, inthash_key_const name, intptr_t value);
+void coucal_add(coucal hashtable, coucal_key_const name, intptr_t value);
 
 /**
  * Increment an entry value in the hashtable
  * (or create a new entry with value 1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int inthash_inc(inthash hashtable, inthash_key_const name);
+int coucal_inc(coucal hashtable, coucal_key_const name);
 
 /**
  * Decrement an entry value in the hashtable 
  * (or create a new entry with value -1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int inthash_dec(inthash hashtable, inthash_key_const name);
+int coucal_dec(coucal hashtable, coucal_key_const name);
 
 /**
  * Remove an entry from the hashtable
  * Return non-zero value if the entry was removed, zero otherwise.
  **/
-int inthash_remove(inthash hashtable, inthash_key_const name);
+int coucal_remove(coucal hashtable, coucal_key_const name);
 
 /**
  * Return a new enumerator.
  * Note: deleting entries is safe while enumerating, but adding entries 
  * lead to undefined enumeration behavior (yet safe).
  **/
-struct_inthash_enum inthash_enum_new(inthash hashtable);
+struct_coucal_enum coucal_enum_new(coucal hashtable);
 
 /**
  * Enumerate the next entry.
  **/
-inthash_item *inthash_enum_next(struct_inthash_enum * e);
+coucal_item *coucal_enum_next(struct_coucal_enum * e);
 
 /**
  * Compute a hash, given a string. This is the default function used for
  * hashing keys, which are by default strings.
  **/
-inthash_hashkeys inthash_hash_string(const char *value);
+coucal_hashkeys coucal_hash_string(const char *value);
 
 /**
  * Set default global assertion failure handler.
@@ -393,8 +400,8 @@ inthash_hashkeys inthash_hash_string(const char *value);
  * fatal: handler called upon serious programming error (opaque argument 
  * is the hashtable itself)
  **/
-void inthash_set_global_assert_handler(t_inthash_loghandler log,
-                                       t_inthash_asserthandler fatal);
+void coucal_set_global_assert_handler(t_coucal_loghandler log,
+                                      t_coucal_asserthandler fatal);
 
 #ifdef __cplusplus
 }
