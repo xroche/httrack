@@ -205,9 +205,9 @@ typedef struct htsmutex_s htsmutex_s, *htsmutex;
 #endif
 
 /* Hashtables */
-#ifndef HTS_DEF_FWSTRUCT_struct_inthash
-#define HTS_DEF_FWSTRUCT_struct_inthash
-typedef struct struct_inthash struct_inthash, *inthash;
+#ifndef HTS_DEF_FWSTRUCT_struct_coucal
+#define HTS_DEF_FWSTRUCT_struct_coucal
+typedef struct struct_coucal struct_coucal, *coucal;
 #endif
 
 /* Structure état du miroir */

@@ -73,11 +73,11 @@ struct_back *back_new(httrackp *opt, int back_max) {
 
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
-  sback->ready = inthash_new(0);
+  sback->ready = coucal_new(0);
   hts_set_hash_handler(sback->ready, opt);
-  inthash_set_name(sback->ready, "back_new");
+  coucal_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
-  inthash_value_is_malloc(sback->ready, 1);
+  coucal_value_is_malloc(sback->ready, 1);
   // init
   for(i = 0; i < sback->count; i++) {
     sback->lnk[i].r.location = sback->lnk[i].location_buffer;
@@ -94,7 +94,7 @@ void back_free(struct_back ** sback) {
       (*sback)->lnk = NULL;
     }
     if ((*sback)->ready != NULL) {
-      inthash_delete(&(*sback)->ready);
+      coucal_delete(&(*sback)->ready);
       (*sback)->ready_size_bytes = 0;
     }
     freet(*sback);
@@ -112,10 +112,10 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     }
     // delete stored slots
     if (sback->ready != NULL) {
-      struct_inthash_enum e = inthash_enum_new(sback->ready);
-      inthash_item *item;
+      struct_coucal_enum e = coucal_enum_new(sback->ready);
+      coucal_item *item;
 
-      while((item = inthash_enum_next(&e))) {
+      while((item = coucal_enum_next(&e))) {
 #ifndef HTS_NO_BACK_ON_DISK
         const char *filename = (char *) item->value.ptr;
 
@@ -130,7 +130,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 #endif
       }
       /* delete hashtable & content */
-      inthash_delete(&sback->ready);
+      coucal_delete(&sback->ready);
       sback->ready_size_bytes = 0;
     }
   }
@@ -182,7 +182,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
   lien_back *const back = sback->lnk;
   void *ptr = NULL;
 
-  if (inthash_read_pvoid(sback->ready, sav, &ptr)) {
+  if (coucal_read_pvoid(sback->ready, sav, &ptr)) {
     if (!getIndex) {            /* don't "pagefault" the entry */
       if (ptr != NULL) {
         return sback->count;    /* (invalid but) positive result */
@@ -228,7 +228,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
           back_clear_entry(itemback);   /* delete entry content */
           freet(itemback);      /* delete item */
           itemback = NULL;
-          inthash_remove(sback->ready, sav);    // delete item
+          coucal_remove(sback->ready, sav);    // delete item
           sback->ready_size_bytes -= back[q].r.size;    /* substract for stats */
           back_set_locked(sback, q);    /* locked */
           return q;
@@ -309,7 +309,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
           /* Create file and serialize slot */
           if ((fp = filecreate(NULL, filename)) != NULL) {
             if (back_serialize(fp, &back[i]) == 0) {
-              inthash_add_pvoid(sback->ready, back[i].url_sav, filename);
+              coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
               filename = NULL;
               sback->ready_size_bytes += back[i].r.size;        /* add for stats */
               nclean++;
@@ -340,7 +340,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #else
       itemback = calloct(1, sizeof(lien_back));
       back_move(&back[i], itemback);
-      inthash_add_pvoid(sback->ready, itemback->url_sav, itemback);
+      coucal_add_pvoid(sback->ready, itemback->url_sav, itemback);
       nclean++;
 #endif
     }
@@ -375,10 +375,10 @@ LLint back_incache(const struct_back * sback) {
   // stored (ready) slots
 #ifdef HTS_NO_BACK_ON_DISK
   if (sback->ready != NULL) {
-    struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_item *item;
+    struct_coucal_enum e = coucal_enum_new(sback->ready);
+    coucal_item *item;
 
-    while((item = inthash_enum_next(&e))) {
+    while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
 
       if (ritem->status != -1)
@@ -403,12 +403,12 @@ int back_done_incache(const struct_back * sback) {
   // stored (ready) slots
   if (sback->ready != NULL) {
 #ifndef HTS_NO_BACK_ON_DISK
-    n += (int) inthash_nitems(sback->ready);
+    n += (int) coucal_nitems(sback->ready);
 #else
-    struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_item *item;
+    struct_coucal_enum e = coucal_enum_new(sback->ready);
+    coucal_item *item;
 
-    while((item = inthash_enum_next(&e))) {
+    while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
 
       if (ritem->status == STATUS_READY)
@@ -1506,7 +1506,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
     if (cache->cached_tests != NULL) {
       intptr_t ptr = 0;
 
-      if (inthash_read(cache->cached_tests,
+      if (coucal_read(cache->cached_tests,
         concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr, fil), &ptr)) {       // gotcha
         if (ptr != 0) {
           char *text = (char *) ptr;
@@ -1544,7 +1544,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
 #if HTS_FAST_CACHE
         strcpybuff(buff, adr);
         strcatbuff(buff, fil);
-        hash_pos_return = inthash_read(cache->hashtable, buff, &hash_pos);
+        hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
 #else
         buff[0] = '\0';
         strcatbuff(buff, "\n");
@@ -3978,10 +3978,10 @@ LLint back_transferred(LLint nb, struct_back * sback) {
 #ifndef HTS_NO_BACK_ON_DISK
     nb += sback->ready_size_bytes;
 #else
-    struct_inthash_enum e = inthash_enum_new(sback->ready);
-    inthash_item *item;
+    struct_coucal_enum e = coucal_enum_new(sback->ready);
+    coucal_item *item;
 
-    while((item = inthash_enum_next(&e))) {
+    while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
 
       if ((ritem->status > 0) && (ritem->status < 99 || ritem->status >= 1000))

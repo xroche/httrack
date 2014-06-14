@@ -163,7 +163,7 @@ struct t_dnscache {
 void hts_init_htsblk(htsblk * r);
 
 // attach specific project log to hachtable logger
-void hts_set_hash_handler(inthash hashtable, httrackp *opt);
+void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
 // version
 HTSEXT_API const char* hts_version(void);
