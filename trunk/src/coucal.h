@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Implementation notes:
  * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
- * with a MD5 or FNV-1 hash function, with one additional auxiliary hash
+ * with a FNV-1 or MD5 hash function, with one additional auxiliary hash
  * function.
  * It also uses a small stash area to handle rare cases of collisions.
  * Enumeration of all key/values is possible, deletion is also possible, but

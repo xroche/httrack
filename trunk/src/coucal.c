@@ -34,11 +34,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "coucal.h"
 
-/* We use md5 as hashing function for its quality regarding diffusion and
-   collisions. MD5 is slower than other hashing functions, but is known to be
-   an excellent hashing function. FNV-1 is generally good enough for this
-   purpose, too, but the performance gain is not sufficient to use it by
-   default.
+/* We use murmur hashing by default, even if md5 can be a good candidate,
+   for its quality regarding diffusion and collisions.
+   MD5 is slower than other hashing functions, but is known to be an excellent
+   hashing function. FNV-1 is generally good enough for this purpose, too, but
+   the performance gain is not sufficient to use it by default.
 
    On several benchmarks, both MD5 and FNV were quite good (0.45 cuckoo moved
    on average for each new item inserted in the hashtable), but FNV-1 was more
