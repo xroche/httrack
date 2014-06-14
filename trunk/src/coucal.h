@@ -433,9 +433,15 @@ COUCAL_EXTERN coucal_item *coucal_enum_next(struct_coucal_enum * e);
 
 /**
  * Compute a hash, given a string. This is the default function used for
- * hashing keys, which are by default strings.
+ * hashing keys, which are by default strings. This function uses
+ * coucal_hash_data() as backend.
  **/
 COUCAL_EXTERN coucal_hashkeys coucal_hash_string(const char *value);
+
+/**
+ * Compute a hash, given an opaque buffer.
+ **/
+COUCAL_EXTERN coucal_hashkeys coucal_hash_data(const void *data, size_t size);
 
 /**
  * Set default global assertion failure handler.
