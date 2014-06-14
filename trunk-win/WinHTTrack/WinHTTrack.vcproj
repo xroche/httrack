@@ -1830,10 +1830,6 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\httrack\htsinthash.c"
-				>
-			</File>
-			<File
 				RelativePath="..\httrack\htsmd5.c"
 				>
 			</File>

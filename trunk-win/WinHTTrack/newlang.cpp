@@ -8,7 +8,7 @@
 extern "C" {
   #include "HTTrackInterface.h"
 #define HTS_INTERNAL_BYTECODE
-  #include "htsinthash.h"
+  #include "coucal.h"
 #undef HTS_INTERNAL_BYTECODE
 };
 #include "newlang.h"
@@ -21,9 +21,9 @@ extern "C" {
 
 
 int NewLangStrSz=1024;
-inthash NewLangStr=NULL;
+coucal NewLangStr=NULL;
 int NewLangStrKeysSz=1024;
-inthash NewLangStrKeys=NULL;
+coucal NewLangStrKeys=NULL;
 UINT NewLangCP = CP_THREAD_ACP;
 UINT NewLangFileCP = CP_THREAD_ACP;
 
@@ -204,21 +204,21 @@ void LANG_LOAD(char* limit_to) {
   CWaitCursor wait;
   //
   extern int NewLangStrSz;
-  extern inthash NewLangStr;
+  extern coucal NewLangStr;
   extern int NewLangStrKeysSz;
-  extern inthash NewLangStrKeys;
+  extern coucal NewLangStrKeys;
   //
   int selected_lang=LANG_T(-1);
   //
   if (!limit_to) {
     LANG_DELETE();
-    NewLangStr=inthash_new(NewLangStrSz);
-    NewLangStrKeys=inthash_new(NewLangStrKeysSz);
+    NewLangStr=coucal_new(NewLangStrSz);
+    NewLangStrKeys=coucal_new(NewLangStrKeysSz);
     if ((NewLangStr==NULL) || (NewLangStrKeys==NULL)) {
       AfxMessageBox("Error in lang.h: not enough memory");
     } else {
-      inthash_value_is_malloc(NewLangStr,1);
-      inthash_value_is_malloc(NewLangStrKeys,1);
+      coucal_value_is_malloc(NewLangStr,1);
+      coucal_value_is_malloc(NewLangStrKeys,1);
     }
   }
 
@@ -268,7 +268,7 @@ void LANG_LOAD(char* limit_to) {
             buff=(char*)malloc(len+2);
             if (buff) {
               strcpybuff(buff,intkey);
-              inthash_add(NewLangStrKeys,key,(intptr_t)buff);
+              coucal_add(NewLangStrKeys,key,(intptr_t)buff);
             }
           }
         } // if
@@ -396,7 +396,7 @@ void LANG_LOAD(char* limit_to) {
                 buff = (char*)malloc(len+2);
                 if (buff) {
                   conv_printf(value,buff);
-                  inthash_add(NewLangStr,intkey,(intptr_t)buff);
+                  coucal_add(NewLangStr,intkey,(intptr_t)buff);
                 }
               }
               
@@ -490,7 +490,7 @@ void LANG_LOAD(char* limit_to) {
                         }
                         buff[j++]='\0';
                         if (!limit_to)
-                          inthash_add(NewLangStr,name,(intptr_t)buff);
+                          coucal_add(NewLangStr,name,(intptr_t)buff);
                         else {
                           strcpybuff(limit_to,buff);
                           free(buff);
@@ -634,12 +634,12 @@ void conv_printf(char* from,char* to) {
 
 void LANG_DELETE() {
   extern int NewLangStrSz;
-  extern inthash NewLangStr;
+  extern coucal NewLangStr;
   extern int NewLangStrKeysSz;
-  extern inthash NewLangStrKeys;
+  extern coucal NewLangStrKeys;
   //
-  inthash_delete(&NewLangStr);
-  inthash_delete(&NewLangStrKeys);
+  coucal_delete(&NewLangStr);
+  coucal_delete(&NewLangStrKeys);
 }
 
 // sélection de la langue
@@ -702,7 +702,7 @@ char* LANGSEL(char* lang0,...) {
 char* LANGSEL(char* name) {
   intptr_t adr = 0;
   if (NewLangStr)
-  if (!inthash_read(NewLangStr,name,&adr))
+  if (!coucal_read(NewLangStr,name,&adr))
     adr = NULL;
   if (adr) {
     return (char*)adr;
@@ -713,7 +713,7 @@ char* LANGSEL(char* name) {
 char* LANGINTKEY(char* name) {
   intptr_t adr = 0;
   if (NewLangStrKeys)
-  if (!inthash_read(NewLangStrKeys,name,&adr))
+  if (!coucal_read(NewLangStrKeys,name,&adr))
     adr=NULL;
   if (adr) {
     return (char*)adr;
