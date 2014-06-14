@@ -350,7 +350,8 @@ static void coucal_log_stats(coucal hashtable) {
 }
 
 /* default hash function when key is a regular C-string */
-coucal_hashkeys coucal_hash_string(const char *name) {
+coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
+  const unsigned char *const data = (const unsigned char *) data_;
 #if HTS_INTHASH_USES_MD5 == 1
   /* compute a regular MD5 and extract two 32-bit integers */
   MD5_CTX ctx;
@@ -362,8 +363,7 @@ coucal_hashkeys coucal_hash_string(const char *name) {
 
   /* compute MD5 */
   MD5Init(&ctx, 0);
-  MD5Update(&ctx, (const unsigned char *) name,
-    (unsigned int) strlen(name));
+  MD5Update(&ctx, data, (unsigned int) size);
   MD5Final(u.md5digest, &ctx);
 
   /* mix mix mix */
@@ -381,7 +381,7 @@ coucal_hashkeys coucal_hash_string(const char *name) {
     uint32_t result[4];
     coucal_hashkeys hashes;
   } u;
-  MurmurHash3_x86_128(name, (const int) strlen(name),
+  MurmurHash3_x86_128(data, (const int) size,
                       42, &u.result) ;
 
   /* mix mix mix */
@@ -408,8 +408,8 @@ coucal_hashkeys coucal_hash_string(const char *name) {
   /* compute the hashes ; second variant is using xored data */
   h1 = FNV1_OFFSET_BASIS;
   h2 = ~FNV1_OFFSET_BASIS;
-  for(i = 0 ; name[i] != '\0' ; i++) {
-    const unsigned char c1 = name[i];
+  for(i = 0 ; i < size ; i++) {
+    const unsigned char c1 = data[i];
     const unsigned char c2 = ~c1;
     h1 = ( h1 * FNV1_PRIME ) ^ c1;
     h2 = ( h2 * FNV1_PRIME ) ^ c2;
@@ -429,6 +429,10 @@ coucal_hashkeys coucal_hash_string(const char *name) {
 
   return hashes;
 #endif
+}
+
+coucal_hashkeys coucal_hash_string(const char *name) {
+  return coucal_hash_data(name, strlen(name));
 }
 
 static INTHASH_INLINE coucal_hashkeys coucal_calc_hashes(coucal hashtable, 
