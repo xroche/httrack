@@ -65,6 +65,22 @@ typedef unsigned __int64 uint64_t;
 #endif
 #include <stdarg.h>
 
+/* External definitions */
+#ifndef COUCAL_EXTERN
+#ifdef _WIN32
+#ifdef COUCAL_BUILDING
+#define COUCAL_EXTERN __declspec(dllimport)
+#else
+#define COUCAL_EXTERN __declspec(dllexport)
+#endif
+#elif ( ( defined(__GNUC__) && ( __GNUC__ >= 4 ) ) \
+        || ( defined(HAVE_VISIBILITY) && HAVE_VISIBILITY ) )
+#define COUCAL_EXTERN extern __attribute__ ((visibility("default")))
+#else
+#define COUCAL_EXTERN extern
+#endif
+#endif
+
 /** Key opaque type. May be a regular 'const char*'. **/
 typedef void* coucal_key;
 
@@ -202,35 +218,35 @@ extern "C" {
  * "as is", without further processing. Use coucal_value_set_key_handler()
  * and coucal_value_set_value_handler() to alter this default behavior.
  **/
-coucal coucal_new(size_t size);
+COUCAL_EXTERN coucal coucal_new(size_t size);
 
 /**
  * Was the hashtable successfully created ?
  * Return non-zero value if the hashtable is valid.
  **/
-int coucal_created(coucal hashtable);
+COUCAL_EXTERN int coucal_created(coucal hashtable);
 
 /**
  * Delete a hashtable, freeing all entries.
  **/
-void coucal_delete(coucal * hashtable);
+COUCAL_EXTERN void coucal_delete(coucal * hashtable);
 
 /**
  * Return the number of items in the hashtable.
  **/
-size_t coucal_nitems(coucal hashtable);
+COUCAL_EXTERN size_t coucal_nitems(coucal hashtable);
 
 /**
  * Return the memory size taken by the hashtable.
  * (This does not take account of the possible memory taken by values)
  **/
-size_t coucal_memory_size(coucal hashtable);
+COUCAL_EXTERN size_t coucal_memory_size(coucal hashtable);
 
 /**
  * If 'flag' is non-zero, calls coucal_value_set_value_handler() with
  * default system free() handler function, otherwise, free the value handlers.
  **/
-void coucal_value_is_malloc(coucal hashtable, int flag);
+COUCAL_EXTERN void coucal_value_is_malloc(coucal hashtable, int flag);
 
 /**
  * Set handlers for values.
@@ -239,9 +255,9 @@ void coucal_value_is_malloc(coucal hashtable, int flag);
  * arg: opaque custom argument to be used by functions.
  * Handler(s) MUST NOT be changed once elements have been added.
  **/
-void coucal_value_set_value_handler(coucal hashtable,
-                                    t_coucal_value_freehandler free,
-                                    coucal_opaque arg);
+COUCAL_EXTERN void coucal_value_set_value_handler(coucal hashtable,
+                                                  t_coucal_value_freehandler free,
+                                                  coucal_opaque arg);
 
 /**
  * Set handlers for keys.
@@ -254,22 +270,22 @@ void coucal_value_set_value_handler(coucal hashtable,
  * arg: opaque custom argument to be used by functions.
  * Handler(s) MUST NOT be changed once elements have been added.
  **/
-void coucal_value_set_key_handler(coucal hashtable,
-                                  t_coucal_duphandler dup,
-                                  t_coucal_key_freehandler free,
-                                  t_coucal_hasheshandler hash,
-                                  t_coucal_cmphandler equals,
-                                  coucal_opaque arg);
+COUCAL_EXTERN void coucal_value_set_key_handler(coucal hashtable,
+                                                t_coucal_duphandler dup,
+                                                t_coucal_key_freehandler free,
+                                                t_coucal_hasheshandler hash,
+                                                t_coucal_cmphandler equals,
+                                                coucal_opaque arg);
 
 /**
  * Set assertion failure handler.
  * log: handler called upon serious programming error
  * fatal: handler called upon serious programming error
  **/
-void coucal_set_assert_handler(coucal hashtable,
-                               t_coucal_loghandler log,
-                               t_coucal_asserthandler fatal,
-                               coucal_opaque arg);
+COUCAL_EXTERN void coucal_set_assert_handler(coucal hashtable,
+                                             t_coucal_loghandler log,
+                                             t_coucal_asserthandler fatal,
+                                             coucal_opaque arg);
 
 /**
  * Set pretty print loggers (debug). Both handlers must return a string
@@ -278,118 +294,125 @@ void coucal_set_assert_handler(coucal hashtable,
  * name: handler called to print the string representation of the name
  * value: handler called to print the string representation of the value
  **/
-void coucal_set_print_handler(coucal hashtable,
-                              t_coucal_printkeyhandler key,
-                              t_coucal_printvaluehandler value,
-                              coucal_opaque arg);
+COUCAL_EXTERN void coucal_set_print_handler(coucal hashtable,
+                                            t_coucal_printkeyhandler key,
+                                            t_coucal_printvaluehandler value,
+                                            coucal_opaque arg);
 
 /**
  * Set the hashtable name, for degugging purpose.
  * name: the hashtable name (ASCII or UTF-8)
  */
-void coucal_set_name(coucal hashtable, coucal_key_const name);
+COUCAL_EXTERN void coucal_set_name(coucal hashtable, coucal_key_const name);
 
 /**
  * Get the hashtable name, for degugging purpose.
  * Return NULL if no name was defined.
  **/
-const char* coucal_get_name(coucal hashtable);
+COUCAL_EXTERN const char* coucal_get_name(coucal hashtable);
 
 /**
  * Read an integer entry from the hashtable.
  * Return non-zero value upon success and sets intvalue.
  **/
-int coucal_read(coucal hashtable, coucal_key_const name, intptr_t * intvalue);
+COUCAL_EXTERN int coucal_read(coucal hashtable, coucal_key_const name,
+                              intptr_t * intvalue);
 
 /**
  * Same as coucal_read(), but return 0 is the value was zero.
  **/
-int coucal_readptr(coucal hashtable, coucal_key_const name, intptr_t * intvalue);
+COUCAL_EXTERN int coucal_readptr(coucal hashtable, coucal_key_const name,
+                                intptr_t * intvalue);
 
 /**
  * Return non-zero value if the given entry exists.
  **/
-int coucal_exists(coucal hashtable, coucal_key_const name);
+COUCAL_EXTERN int coucal_exists(coucal hashtable, coucal_key_const name);
 
 /**
  * Read an entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int coucal_read_value(coucal hashtable, coucal_key_const name,
-                      coucal_value *value);
+COUCAL_EXTERN int coucal_read_value(coucal hashtable, coucal_key_const name,
+                                    coucal_value *value);
 
 /**
  * Write an entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int coucal_write_value(coucal hashtable, coucal_key_const name,
-                       coucal_value_const value);
+COUCAL_EXTERN int coucal_write_value(coucal hashtable, coucal_key_const name,
+                                     coucal_value_const value);
 
 /**
  * Read a pointer entry from the hashtable.
  * Return non-zero value upon success and sets value.
  **/
-int coucal_read_pvoid(coucal hashtable, coucal_key_const name, void **value);
+COUCAL_EXTERN int coucal_read_pvoid(coucal hashtable, coucal_key_const name,
+                                    void **value);
 
 /**
  * Write a pointer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int coucal_write_pvoid(coucal hashtable, coucal_key_const name, void *value);
+COUCAL_EXTERN int coucal_write_pvoid(coucal hashtable, coucal_key_const name,
+                                     void *value);
 
 /**
  * Alias to coucal_write_pvoid()
  **/
-void coucal_add_pvoid(coucal hashtable, coucal_key_const name, void *value);
+COUCAL_EXTERN void coucal_add_pvoid(coucal hashtable, coucal_key_const name,
+                                    void *value);
 
 /**
  * Write an integer entry to the hashtable.
  * Return non-zero value if the entry was added, zero if it was replaced.
  **/
-int coucal_write(coucal hashtable, coucal_key_const name, intptr_t value);
+COUCAL_EXTERN int coucal_write(coucal hashtable, coucal_key_const name,
+                               intptr_t value);
 
 /**
  * Alias to coucal_write()
  **/
-void coucal_add(coucal hashtable, coucal_key_const name, intptr_t value);
+COUCAL_EXTERN void coucal_add(coucal hashtable, coucal_key_const name,
+                              intptr_t value);
 
 /**
  * Increment an entry value in the hashtable
  * (or create a new entry with value 1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int coucal_inc(coucal hashtable, coucal_key_const name);
+COUCAL_EXTERN int coucal_inc(coucal hashtable, coucal_key_const name);
 
 /**
  * Decrement an entry value in the hashtable 
  * (or create a new entry with value -1 if it does not yet exist)
  * Return non-zero value if the entry was added, zero if it was changed.
  **/
-int coucal_dec(coucal hashtable, coucal_key_const name);
+COUCAL_EXTERN int coucal_dec(coucal hashtable, coucal_key_const name);
 
 /**
  * Remove an entry from the hashtable
  * Return non-zero value if the entry was removed, zero otherwise.
  **/
-int coucal_remove(coucal hashtable, coucal_key_const name);
+COUCAL_EXTERN int coucal_remove(coucal hashtable, coucal_key_const name);
 
 /**
  * Return a new enumerator.
  * Note: deleting entries is safe while enumerating, but adding entries 
  * lead to undefined enumeration behavior (yet safe).
  **/
-struct_coucal_enum coucal_enum_new(coucal hashtable);
+COUCAL_EXTERN struct_coucal_enum coucal_enum_new(coucal hashtable);
 
 /**
  * Enumerate the next entry.
  **/
-coucal_item *coucal_enum_next(struct_coucal_enum * e);
+COUCAL_EXTERN coucal_item *coucal_enum_next(struct_coucal_enum * e);
 
 /**
  * Compute a hash, given a string. This is the default function used for
  * hashing keys, which are by default strings.
  **/
-coucal_hashkeys coucal_hash_string(const char *value);
+COUCAL_EXTERN coucal_hashkeys coucal_hash_string(const char *value);
 
 /**
  * Set default global assertion failure handler.
@@ -400,8 +423,8 @@ coucal_hashkeys coucal_hash_string(const char *value);
  * fatal: handler called upon serious programming error (opaque argument 
  * is the hashtable itself)
  **/
-void coucal_set_global_assert_handler(t_coucal_loghandler log,
-                                      t_coucal_asserthandler fatal);
+COUCAL_EXTERN void coucal_set_global_assert_handler(t_coucal_loghandler log,
+                                                    t_coucal_asserthandler fatal);
 
 #ifdef __cplusplus
 }
