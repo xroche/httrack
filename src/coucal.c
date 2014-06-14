@@ -39,7 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include <assert.h>
 #include <stdarg.h>
 
-#include "htsinthash.h"
+#include "coucal.h"
 
 /* We use md5 as hashing function for its quality regarding diffusion and
    collisions. MD5 is slower than other hashing functions, but is known to be
