@@ -709,6 +709,14 @@ int coucal_read_pvoid(coucal hashtable, coucal_key_const name, void **pvalue) {
   return ret;
 }
 
+void* coucal_get_pvoid(coucal hashtable, coucal_key_const name) {
+  void *value;
+  if (!coucal_read_pvoid(hashtable, name, &value)) {
+    return NULL;
+  }
+  return value;
+}
+
 int coucal_write_pvoid(coucal hashtable, coucal_key_const name, void *pvalue) {
   coucal_value value = INTHASH_VALUE_NULL;
 
@@ -1279,6 +1287,14 @@ int coucal_readptr(coucal hashtable, coucal_key_const name, intptr_t * value) {
   if (*value == 0)
     ret = 0;
   return ret;
+}
+
+intptr_t coucal_get_intptr(coucal hashtable, coucal_key_const name) {
+  intptr_t value;
+  if (!coucal_read(hashtable, name, &value)) {
+    return 0;
+  }
+  return value;
 }
 
 coucal coucal_new(size_t initial_size) {

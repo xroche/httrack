@@ -326,7 +326,14 @@ COUCAL_EXTERN int coucal_read(coucal hashtable, coucal_key_const name,
  * Same as coucal_read(), but return 0 is the value was zero.
  **/
 COUCAL_EXTERN int coucal_readptr(coucal hashtable, coucal_key_const name,
-                                intptr_t * intvalue);
+                                 intptr_t * intvalue);
+
+/**
+ * Read an integer entry from the hashtable.
+ * Return 0 if the entry could not be found.
+ **/
+COUCAL_EXTERN intptr_t coucal_get_intptr(coucal hashtable,
+                                         coucal_key_const name);
 
 /**
  * Return non-zero value if the given entry exists.
@@ -353,6 +360,12 @@ COUCAL_EXTERN int coucal_write_value(coucal hashtable, coucal_key_const name,
  **/
 COUCAL_EXTERN int coucal_read_pvoid(coucal hashtable, coucal_key_const name,
                                     void **value);
+
+/**
+ * Read a pointer entry from the hashtable and returns its value.
+ * Return NULL if the entry could not be found.
+ **/
+COUCAL_EXTERN void* coucal_get_pvoid(coucal hashtable, coucal_key_const name);
 
 /**
  * Write a pointer entry to the hashtable.
