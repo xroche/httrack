@@ -191,9 +191,6 @@ struct struct_inthash_enum {
   size_t index;
 };
 
-/* Library internal definictions */
-#ifdef HTS_INTERNAL_BYTECODE
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -405,8 +402,6 @@ void inthash_set_global_assert_handler(t_inthash_loghandler log,
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 #endif
