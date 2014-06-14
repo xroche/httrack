@@ -31,26 +31,32 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /**
- * Library notes:
- * This small hashtable library provides key/value hashtable, with a string
- * key, and integer/pointer value (with an associated optional allocator)
- * It features O(1) average insertion, O(1) lookup, and O(1) delete.
+ * This hashtable library provides key/value hashtable, with by default a
+ * string key, and integer/pointer value (with an associated optional
+ * allocator). Both key and value can be of any type, using custom settings.
+ * By default, the string key is dup'ed using a string pool, and the opaque
+ * value is stored as-is (either the pointer, or an uintptr_t integer value).
+ * It features O(1) average insertion, and guaranteed O(1) lookup, replace,
+ * and delete operations.
  *
  * Implementation notes:
  * Implementation is auto-rehashable, and uses cuckoo hashing of size 2**n
- * with a FNV-1 or MD5 hash function, with one additional auxiliary hash
+ * with a Murmur or MD5 hash function, with one additional auxiliary hash
  * function.
  * It also uses a small stash area to handle rare cases of collisions.
  * Enumeration of all key/values is possible, deletion is also possible, but
  * currently without any auto-shrinking (ie. table will never shrink).
  * Overall, two main blocks are allocated: one for the items, and one for
  * the keys (pool).
+ * If the string pool is being used (to store dup'ed keys), deleting is only
+ * O(1) average, because the pool needs to be compacted time to time.
  *
  * References: 
  * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
  * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
- * FNV http://www.isthe.com/chongo/tech/comp/fnv/
+ * MurmurHash http://en.wikipedia.org/wiki/MurmurHash
  * MD5 http://en.wikipedia.org/wiki/MD5
+ * FNV http://www.isthe.com/chongo/tech/comp/fnv/
  **/
 
 #ifndef HTSINTHASH_DEFH
