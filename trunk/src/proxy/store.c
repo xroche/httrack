@@ -45,7 +45,7 @@ static long int  timezone = 0;
 #include "htsglobal.h"
 
 #define HTS_INTERNAL_BYTECODE
-#include "htsinthash.h"
+#include "coucal.h"
 #include "htsmd5.h"
 #undef HTS_INTERNAL_BYTECODE
 #include "../minizip/mztools.h"
