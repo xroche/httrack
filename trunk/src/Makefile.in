@@ -383,6 +383,8 @@ libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
+		murmurhash3.h.diff \
+		murmurhash3.h.orig \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
 		minizip/ioapi.c.diff \
