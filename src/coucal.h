@@ -59,8 +59,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * FNV http://www.isthe.com/chongo/tech/comp/fnv/
  **/
 
-#ifndef HTSINTHASH_DEFH
-#define HTSINTHASH_DEFH
+#ifndef COUCAL_DEFH
+#define COUCAL_DEFH
 
 /* Includes */
 #ifdef _WIN32
