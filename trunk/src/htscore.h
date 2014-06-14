@@ -123,7 +123,7 @@ typedef struct filecreate_params filecreate_params;
 
 // gestion hashage
 #include "htshash.h"
-#include "htsinthash.h"
+#include "coucal.h"
 
 #include "htsdefines.h"
 

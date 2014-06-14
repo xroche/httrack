@@ -67,7 +67,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Bypass internal definition protection */
 #define HTS_INTERNAL_BYTECODE
-#include "htsinthash.h"
+#include "coucal.h"
 #undef HTS_INTERNAL_BYTECODE
 
 int NewLangStrSz = 1024;

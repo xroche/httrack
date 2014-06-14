@@ -40,7 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
-#include "htsinthash.h"
+#include "coucal.h"
 
 /* Keyword Indexer Parameters */
 

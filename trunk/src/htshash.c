@@ -42,7 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsmd5.h"
 #include "htscore.h"
-#include "htsinthash.h"
+#include "coucal.h"
 /* END specific definitions */
 
 /* Specific macros */
