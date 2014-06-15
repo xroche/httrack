@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 Coucal, Cuckoo hashing-based hashtable with stash area.
-Copyright (C) 2013-2014 Xavier Roche and other contributors
+Copyright (C) 2013-2014 Xavier Roche (http://www.httrack.com/)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -54,9 +54,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * O(1) average, because the pool needs to be compacted time to time.
  *
  * References: 
- * Cuckoo Hashing http://www.it-c.dk/people/pagh/papers/cuckoo-jour.pdf
- * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
- * MurmurHash http://en.wikipedia.org/wiki/MurmurHash
+ *
+ * Cuckoo Hashing, by Rasmus Pagh and Flemming Friche Rodler
+ * http://www.it-c.dk/people/pagh/papers/cuckoo-jour.pdf
+ *
+ * Cuckoo Stash, by Adam Kirsch, Michael Mitzenmacher and Udi Wieder
+ * http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
+ *
+ * MurmurHash3, by Austin Appleby
+ * http://en.wikipedia.org/wiki/MurmurHash
+ *
  * MD5 http://en.wikipedia.org/wiki/MD5
  * FNV http://www.isthe.com/chongo/tech/comp/fnv/
  **/
