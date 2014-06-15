@@ -1319,19 +1319,21 @@ intptr_t coucal_get_intptr(coucal hashtable, coucal_key_const name) {
 static INTHASH_INLINE size_t coucal_get_pow2(size_t initial_size) {
   size_t size;
   for(size = MIN_LG_SIZE 
-    ; size < COUCAL_HASH_SIZE && POW2(size) < initial_size 
+    ; size <= COUCAL_HASH_SIZE && POW2(size) < initial_size
     ; size++) ;
   return size;
 }
 
 coucal coucal_new(size_t initial_size) {
   const size_t lg_size = coucal_get_pow2(initial_size);
-  coucal hashtable = 
-    lg_size < COUCAL_HASH_SIZE ? (coucal) calloc(1, sizeof(struct_coucal)) : NULL;
+  const int lg_valid = lg_size <= COUCAL_HASH_SIZE 
+    && lg_size < sizeof(size_t)*8;
+  coucal hashtable = lg_valid 
+    ? (coucal) calloc(1, sizeof(struct_coucal)) : NULL;
   coucal_item *const items = 
     (coucal_item *) calloc(POW2(lg_size), sizeof(coucal_item));
 
-  if (lg_size < COUCAL_HASH_SIZE && items != NULL && hashtable != NULL) {
+  if (lg_valid && items != NULL && hashtable != NULL) {
     hashtable->lg_size = lg_size;
     hashtable->items = items;
     hashtable->used = 0;
