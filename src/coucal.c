@@ -968,13 +968,6 @@ static int coucal_add_item_(coucal hashtable, coucal_item item) {
           coucal_crit(hashtable, "\t.. collisionning with a free slot (%d)!", (int) pos2);
         }
       }
-      //struct_coucal_enum e = coucal_enum_new(hashtable);
-      //while((item = coucal_enum_next(&e)) != NULL) {
-      //  coucal_crit(hashtable, "element key='%s' value='%s' hash1=%04x hash2=%04x",
-      //    hashtable->custom.print.key(hashtable->custom.print.arg, item->name),
-      //    hashtable->custom.print.value(hashtable->custom.print.arg, item->value.ptr),
-      //    item->hashes.hash1, item->hashes.hash2);
-      //}
     }
 
     /* we are doomed. hopefully the probability is lower than being killed
@@ -1131,20 +1124,20 @@ int coucal_read(coucal hashtable, coucal_key_const name, intptr_t * intvalue) {
   return ret;
 }
 
-static coucal_value* coucal_read_value_(coucal hashtable,
-                                        coucal_key_const name) {
-  const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
+coucal_value* coucal_fetch_value_hashes(coucal hashtable,
+                                        coucal_key_const name,
+                                        const coucal_hashkeys *hashes) {
   size_t pos;
 
   /* found at position 1 ? */
-  pos = coucal_hash_to_pos(hashtable, hashes.hash1);
-  if (coucal_matches(hashtable, pos, name, &hashes)) {
+  pos = coucal_hash_to_pos(hashtable, hashes->hash1);
+  if (coucal_matches(hashtable, pos, name, hashes)) {
     return &hashtable->items[pos].value;
   }
 
   /* found at position 2 ? */
-  pos = coucal_hash_to_pos(hashtable, hashes.hash2);
-  if (coucal_matches(hashtable, pos, name, &hashes)) {
+  pos = coucal_hash_to_pos(hashtable, hashes->hash2);
+  if (coucal_matches(hashtable, pos, name, hashes)) {
     return &hashtable->items[pos].value;
   }
 
@@ -1153,7 +1146,7 @@ static coucal_value* coucal_read_value_(coucal hashtable,
     size_t i;
     for(i = 0 ; i < hashtable->stash.size ; i++) {
       if (coucal_matches_(hashtable, &hashtable->stash.items[i], name,
-                           &hashes)) {
+                          hashes)) {
         return &hashtable->stash.items[i].value;
       }
     }
@@ -1163,9 +1156,15 @@ static coucal_value* coucal_read_value_(coucal hashtable,
   return NULL;
 }
 
+static coucal_value* coucal_fetch_value(coucal hashtable,
+                                        coucal_key_const name) {
+  const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
+  return coucal_fetch_value_hashes(hashtable, name, &hashes);
+}
+
 int coucal_read_value(coucal hashtable, coucal_key_const name,
                       coucal_value * pvalue) {
-  coucal_value* const value = coucal_read_value_(hashtable, name);
+  coucal_value* const value = coucal_fetch_value(hashtable, name);
   if (value != NULL) {
     if (pvalue != NULL) {
       *pvalue = *value;
@@ -1177,7 +1176,7 @@ int coucal_read_value(coucal hashtable, coucal_key_const name,
 
 static size_t coucal_inc_(coucal hashtable, coucal_key_const name,
                           size_t inc) {
-  coucal_value* const value = coucal_read_value_(hashtable, name);
+  coucal_value* const value = coucal_fetch_value(hashtable, name);
   if (value != NULL) {
     value->uintg += inc;
     return value->uintg;

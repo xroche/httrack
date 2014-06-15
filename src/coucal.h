@@ -423,6 +423,20 @@ COUCAL_EXTERN int coucal_inc(coucal hashtable, coucal_key_const name);
 COUCAL_EXTERN int coucal_dec(coucal hashtable, coucal_key_const name);
 
 /**
+ * Fetch an entry value from the hashtable, given a name, and its hashes.
+ * Returns NULL if the entry could not be found.
+ * The returned pointer is only valid until next call to this library, and can
+ * be used for read or write operations.
+ * The hashes MUST have been computed using either coucal_hash_string(), or
+ * coucal_hash_data(), or by copying an existing hash during an enumeration.
+ * The use of a non-matching hash is safe, but will return NULL.
+ **/
+COUCAL_EXTERN coucal_value* coucal_fetch_value_hashes(coucal hashtable,
+                                                      coucal_key_const name,
+                                                      const coucal_hashkeys
+                                                      *hashes);
+
+/**
  * Remove an entry from the hashtable
  * Return non-zero value if the entry was removed, zero otherwise.
  **/
