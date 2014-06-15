@@ -31,6 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /**
+ * Coucal, a Cuckoo-hashing-based hashtable with stash area C library.
+ *
  * This hashtable library provides key/value hashtable, with by default a
  * string key, and integer/pointer value (with an associated optional
  * allocator). Both key and value can be of any type, using custom settings.
