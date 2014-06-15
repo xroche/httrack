@@ -765,9 +765,11 @@ static void coucal_default_free_handler(coucal_opaque arg,
 }
 
 static INTHASH_INLINE void coucal_del_value_(coucal hashtable, coucal_value *pvalue) {
-  if (hashtable->custom.value.free != NULL)
-    hashtable->custom.value.free(hashtable->custom.value.arg, *pvalue);
-  pvalue->ptr = NULL;
+  if (pvalue->ptr != NULL) {
+    if (hashtable->custom.value.free != NULL)
+      hashtable->custom.value.free(hashtable->custom.value.arg, *pvalue);
+    pvalue->ptr = NULL;
+  }
 }
 
 static INTHASH_INLINE void coucal_del_value(coucal hashtable, size_t pos) {
