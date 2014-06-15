@@ -995,6 +995,10 @@ static int coucal_add_item_(coucal hashtable, coucal_item item) {
   }
 }
 
+static INTHASH_INLINE int coucal_is_acceptable_pow2(size_t lg_size) {
+  return lg_size <= COUCAL_HASH_SIZE && lg_size < sizeof(size_t)*8;
+}
+
 int coucal_write_value(coucal hashtable, coucal_key_const name,
                        coucal_value_const value) {
   /* replace of add item */
@@ -1038,8 +1042,8 @@ int coucal_write_value(coucal hashtable, coucal_key_const name,
       hashtable->stats.rehash_count++;
 
       /* realloc */
-      coucal_assert(hashtable, hashtable->lg_size < COUCAL_HASH_SIZE);
       hashtable->lg_size++;
+      coucal_assert(hashtable, coucal_is_acceptable_pow2(hashtable->lg_size));
       hashtable->items = 
         (coucal_item *) realloc(hashtable->items, alloc_size);
       if (hashtable->items == NULL) {
@@ -1326,8 +1330,7 @@ static INTHASH_INLINE size_t coucal_get_pow2(size_t initial_size) {
 
 coucal coucal_new(size_t initial_size) {
   const size_t lg_size = coucal_get_pow2(initial_size);
-  const int lg_valid = lg_size <= COUCAL_HASH_SIZE 
-    && lg_size < sizeof(size_t)*8;
+  const int lg_valid = coucal_is_acceptable_pow2(lg_size);
   coucal hashtable = lg_valid 
     ? (coucal) calloc(1, sizeof(struct_coucal)) : NULL;
   coucal_item *const items = 
