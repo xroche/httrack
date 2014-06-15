@@ -52,7 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * O(1) average, because the pool needs to be compacted time to time.
  *
  * References: 
- * Cuckoo Hashing http://en.wikipedia.org/wiki/Cuckoo_hashing
+ * Cuckoo Hashing http://www.it-c.dk/people/pagh/papers/cuckoo-jour.pdf
  * Cuckoo Stash http://research.microsoft.com/pubs/73856/stash-full.9-30.pdf
  * MurmurHash http://en.wikipedia.org/wiki/MurmurHash
  * MD5 http://en.wikipedia.org/wiki/MD5
