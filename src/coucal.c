@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 Coucal, Cuckoo hashing-based hashtable with stash area.
-Copyright (C) 2013-2014 Xavier Roche and other contributors
+Copyright (C) 2013-2014 Xavier Roche (http://www.httrack.com/)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
