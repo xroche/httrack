@@ -52,6 +52,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * the keys (pool).
  * If the string pool is being used (to store dup'ed keys), deleting is only
  * O(1) average, because the pool needs to be compacted time to time.
+ * Currently the default maximum number of elements in the hashtable is
+ * 2**31 - 1 (that is, 2,147,483,648 elements), but this default can be changed
+ * by setting COUCAL_HASH_SIZE to a higher value (64 is the only higher value
+ * currently supported), and rebuilding the library.
  *
  * References: 
  *
@@ -132,8 +136,25 @@ typedef const coucal_value coucal_value_const;
 typedef struct coucal_item coucal_item;
 #endif
 
-/** Hash key (32-bit) **/
+/** Coucal primary hash size. Default is 32-bit. **/
+#ifndef COUCAL_HASH_SIZE
+#define COUCAL_HASH_SIZE 32
+#endif
+
+/** Hash integer type. **/
+#if (COUCAL_HASH_SIZE == 32)
+
+/** 32-bit hash key. **/
 typedef uint32_t coucal_hashkey;
+
+#elif (COUCAL_HASH_SIZE == 64)
+
+/** 64-bit hash key. **/
+typedef uint64_t coucal_hashkey;
+
+#else
+#error "Unsupported COUCAL_HASH_SIZE"
+#endif
 
 /** Pair of hashes **/
 typedef struct coucal_hashkeys {
@@ -260,6 +281,12 @@ COUCAL_EXTERN size_t coucal_nitems(coucal hashtable);
  * (This does not take account of the possible memory taken by values)
  **/
 COUCAL_EXTERN size_t coucal_memory_size(coucal hashtable);
+
+/**
+ * Return the library hash size compiled.
+ * The returned value MUST match COUCAL_HASH_SIZE.
+ **/
+COUCAL_EXTERN size_t coucal_hash_size(void);
 
 /**
  * If 'flag' is non-zero, calls coucal_value_set_value_handler() with

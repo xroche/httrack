@@ -359,7 +359,9 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   MD5_CTX ctx;
   union {
     unsigned char md5digest[16];
+#if (COUCAL_HASH_SIZE == 32)
     coucal_hashkeys mhashes[2];
+#endif
     coucal_hashkeys hashes;
   } u;
 
@@ -368,9 +370,11 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   MD5Update(&ctx, data, (unsigned int) size);
   MD5Final(u.md5digest, &ctx);
 
+#if (COUCAL_HASH_SIZE == 32)
   /* mix mix mix */
   u.mhashes[0].hash1 ^= u.mhashes[1].hash1;
   u.mhashes[0].hash2 ^= u.mhashes[1].hash2;
+#endif
 
   /* do not keep identical hashes */
   if (u.hashes.hash1 == u.hashes.hash2) {
@@ -383,12 +387,13 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
     uint32_t result[4];
     coucal_hashkeys hashes;
   } u;
-  MurmurHash3_x86_128(data, (const int) size,
-                      42, &u.result) ;
+  MurmurHash3_x86_128(data, (const int) size, 42, &u.result);
 
+#if (COUCAL_HASH_SIZE == 32)
   /* mix mix mix */
   u.result[0] ^= u.result[2];
   u.result[1] ^= u.result[3];
+#endif
 
   /* do not keep identical hashes */
   if (u.hashes.hash1 == u.hashes.hash2) {
@@ -417,9 +422,17 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
     h2 = ( h2 * FNV1_PRIME ) ^ c2;
   }
 
+#if (COUCAL_HASH_SIZE == 32)
   /* XOR-folding to improve diffusion (Wikipedia) */
   hashes.hash1 = ( (uint32_t) h1 ^ (uint32_t) ( h1 >> 32 ) );
   hashes.hash2 = ( (uint32_t) h2 ^ (uint32_t) ( h2 >> 32 ) );
+#elif (COUCAL_HASH_SIZE == 64)
+  /* Direct hashes */
+  hashes.hash1 = h1;
+  hashes.hash2 = h2;
+#else
+#error "Unsupported COUCAL_HASH_SIZE"
+#endif
 
 #undef FNV1_PRIME
 #undef FNV1_OFFSET_BASIS
@@ -1025,6 +1038,7 @@ int coucal_write_value(coucal hashtable, coucal_key_const name,
       hashtable->stats.rehash_count++;
 
       /* realloc */
+      coucal_assert(hashtable, hashtable->lg_size < COUCAL_HASH_SIZE);
       hashtable->lg_size++;
       hashtable->items = 
         (coucal_item *) realloc(hashtable->items, alloc_size);
@@ -1415,6 +1429,10 @@ size_t coucal_memory_size(coucal hashtable) {
   const size_t hash_size = POW2(hashtable->lg_size)*sizeof(coucal_item);
   const size_t pool_size = hashtable->pool.capacity*sizeof(char);
   return size_struct + hash_size + pool_size;
+}
+
+size_t coucal_hash_size() {
+  return COUCAL_HASH_SIZE;
 }
 
 void coucal_delete(coucal *phashtable) {
