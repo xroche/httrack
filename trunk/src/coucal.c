@@ -1156,8 +1156,7 @@ coucal_value* coucal_fetch_value_hashes(coucal hashtable,
   return NULL;
 }
 
-static coucal_value* coucal_fetch_value(coucal hashtable,
-                                        coucal_key_const name) {
+coucal_value* coucal_fetch_value(coucal hashtable, coucal_key_const name) {
   const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
   return coucal_fetch_value_hashes(hashtable, name, &hashes);
 }
