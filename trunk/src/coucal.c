@@ -296,9 +296,11 @@ static void coucal_log(const coucal hashtable, coucal_loglevel level,
 }
 
 /* No logging (should be dropped by the compiler) */
-static void coucal_nolog(const coucal hashtable, const char *format, ...)
-                         INTHASH_PRINTF_FUN(2, 3);
-static void coucal_nolog(const coucal hashtable, const char *format, ...) {
+static INTHASH_INLINE void coucal_nolog(const coucal hashtable, 
+                                        const char *format, ...)
+                                        INTHASH_PRINTF_FUN(2, 3);
+static INTHASH_INLINE void coucal_nolog(const coucal hashtable, 
+                                        const char *format, ...) {
   (void) hashtable;
   (void) format;
 }
@@ -431,12 +433,12 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
 #endif
 }
 
-coucal_hashkeys coucal_hash_string(const char *name) {
+INTHASH_INLINE coucal_hashkeys coucal_hash_string(const char *name) {
   return coucal_hash_data(name, strlen(name));
 }
 
-static INTHASH_INLINE coucal_hashkeys coucal_calc_hashes(coucal hashtable, 
-                                                         coucal_key_const value) {
+INTHASH_INLINE coucal_hashkeys coucal_calc_hashes(coucal hashtable, 
+                                                  coucal_key_const value) {
   return hashtable->custom.key.hash == NULL 
     ? coucal_hash_string(value)
     : hashtable->custom.key.hash(hashtable->custom.key.arg, value);
@@ -749,13 +751,13 @@ static void coucal_default_free_handler(coucal_opaque arg,
     free(value.ptr);
 }
 
-static void coucal_del_value_(coucal hashtable, coucal_value *pvalue) {
+static INTHASH_INLINE void coucal_del_value_(coucal hashtable, coucal_value *pvalue) {
   if (hashtable->custom.value.free != NULL)
     hashtable->custom.value.free(hashtable->custom.value.arg, *pvalue);
   pvalue->ptr = NULL;
 }
 
-static void coucal_del_value(coucal hashtable, size_t pos) {
+static INTHASH_INLINE void coucal_del_value(coucal hashtable, size_t pos) {
   coucal_del_value_(hashtable, &hashtable->items[pos].value);
 }
 
@@ -1156,7 +1158,8 @@ coucal_value* coucal_fetch_value_hashes(coucal hashtable,
   return NULL;
 }
 
-coucal_value* coucal_fetch_value(coucal hashtable, coucal_key_const name) {
+INTHASH_INLINE coucal_value* coucal_fetch_value(coucal hashtable,
+                                                coucal_key_const name) {
   const coucal_hashkeys hashes = coucal_calc_hashes(hashtable, name);
   return coucal_fetch_value_hashes(hashtable, name, &hashes);
 }

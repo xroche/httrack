@@ -436,8 +436,8 @@ COUCAL_EXTERN coucal_value* coucal_fetch_value(coucal hashtable,
  * Returns NULL if the entry could not be found.
  * The returned pointer is only valid until next call to this library, and can
  * be used for read or write operations.
- * The hashes MUST have been computed using either coucal_hash_string(), or
- * coucal_hash_data(), or by copying an existing hash during an enumeration.
+ * The hashes MUST have been computed using coucal_calc_hashes(), or by
+ * copying an existing hash during an enumeration.
  * The use of a non-matching hash is safe, but will return NULL.
  **/
 COUCAL_EXTERN coucal_value* coucal_fetch_value_hashes(coucal hashtable,
@@ -462,6 +462,14 @@ COUCAL_EXTERN struct_coucal_enum coucal_enum_new(coucal hashtable);
  * Enumerate the next entry.
  **/
 COUCAL_EXTERN coucal_item *coucal_enum_next(struct_coucal_enum * e);
+
+/**
+ * Compute a hash of a key for the hashtable 'hashtable'.
+ * The returned hash is suitable for use with coucal_fetch_value_hashes()
+ * Note: the default implementation uses coucal_hash_string()
+ **/
+COUCAL_EXTERN coucal_hashkeys coucal_calc_hashes(coucal hashtable, 
+                                                 coucal_key_const value);
 
 /**
  * Compute a hash, given a string. This is the default function used for
