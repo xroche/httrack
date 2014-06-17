@@ -415,14 +415,15 @@ void long_to_83(int mode, char *n83, char *save) {
 
   while(*save) {
     char fn83[256], fnl[256];
-    int i = 0;
+    size_t i, j;
 
     fn83[0] = fnl[0] = '\0';
-    while((save[i]) && (save[i] != '/')) {
-      fnl[i] = save[i];
-      i++;
+    for(i = j = 0 ; save[i] && save[i] != '/' ; i++) {
+      if (j + 1 < sizeof(fnl)) {
+        fnl[j++] = save[i];
+      }
     }
-    fnl[i] = '\0';
+    fnl[j] = '\0';
     // conversion
     longfile_to_83(mode, fn83, fnl);
     strcatbuff(n83, fn83);
