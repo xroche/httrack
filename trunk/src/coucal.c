@@ -1453,7 +1453,7 @@ size_t coucal_memory_size(coucal hashtable) {
   return size_struct + hash_size + pool_size;
 }
 
-size_t coucal_hash_size() {
+size_t coucal_hash_size(void) {
   return COUCAL_HASH_SIZE;
 }
 
