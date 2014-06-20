@@ -325,6 +325,20 @@ public class HTTrackActivity extends FragmentActivity {
   }
 
   /*
+   * Create a .nomedia empty file
+   * 
+   * @param directory The target directory
+   */
+  protected static void createNoMediaFile(final File directory)
+      throws IOException {
+    final File nomedia = new File(directory, ".nomedia");
+    if (!nomedia.exists()) {
+      final FileWriter emptyFile = new FileWriter(nomedia);
+      emptyFile.close();
+    }
+  }
+
+  /*
    * Ensure the "Websites" directory exists.
    * 
    * Note: calls computeStorageTarget().
@@ -334,6 +348,18 @@ public class HTTrackActivity extends FragmentActivity {
     final File root = getProjectRootFile();
     if (root != null && mkdirs(root)) {
       Log.d(getClass().getSimpleName(), "validated " + root.getAbsolutePath());
+
+      /*
+       * Android: "Include an empty file named .nomedia in your external files
+       * directory (note the dot prefix in the filename). This prevents media
+       * scanner from reading your media files"
+       */
+      try {
+        createNoMediaFile(root);
+      } catch (final IOException io) {
+        Log.w(getClass().getSimpleName(), "could not create .nomedia file", io);
+      }
+
       return true;
     } else {
       Log.d(getClass().getSimpleName(),
