@@ -19,7 +19,10 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <jni.h>
 #include <assert.h>
 #include <pthread.h>
@@ -49,14 +52,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* redirect stdio on a log file ? */
 #define REDIRECT_STDIO_LOG_FILE
 
+/* root path */
+static char *emergencyLog = NULL;
+static char *rootPath = NULL;
+
 /* log assertion failure. */
 static void log_assert_failure(const char* exp, const char* file, int line) {
   __android_log_print(ANDROID_LOG_VERBOSE, "httrack", "assertion '%s' failed at %s:%d", exp, file, line);
 #define MKDIR_MODE (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
   /* FIXME TODO: pass the getExternalStorageDirectory() in init. */
   FILE *dumpFile;
-  (void) mkdir("/mnt/sdcard/Download/HTTrack", MKDIR_MODE);
-  dumpFile = fopen("/mnt/sdcard/Download/HTTrack/error.txt", "wb");
+  const char *const filename = emergencyLog != NULL ? emergencyLog
+    : "/mnt/sdcard/Download/HTTrack/error.txt";
+  dumpFile = fopen(filename, "wb");
   if (dumpFile != NULL) {
     fprintf(dumpFile, "assertion '%s' failed at %s:%d\n", exp, file, line);
     fclose(dumpFile);
@@ -94,8 +102,18 @@ static int get_android_prio(const int type) {
 }
 
 /* our own debugging log callabck */
-static void httrackLogCallback(httrackp *opt, int type, const char *format, va_list args) {
+static void httrackLogCallback(httrackp *opt, int type, 
+                               const char *format, va_list args) {
   __android_log_vprint(get_android_prio(type), "httrack", format, args);
+}
+
+static void debug(const char *format, ...)
+  __attribute__ ((format (printf, 1, 2)));
+static void debug(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_DEBUG, "httrack", format, args);
+  va_end(args);
 }
 
 /** Context for HTTrackLib. **/
@@ -319,6 +337,8 @@ void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass claz
     }                                                               \
   } while(0)
 
+  debug("calling Java_com_httrack_android_jni_HTTrackLib_initStatic");
+
   /* UNUSED */
   (void) clazz;
 
@@ -396,20 +416,59 @@ void Java_com_httrack_android_jni_HTTrackLib_initStatic(JNIEnv* env, jclass claz
 
   /* Register log callback */
   hts_set_log_vprint_callback(httrackLogCallback);
+}
 
-  /* redirect stdout and stderr to a log file for debugging purpose */
-#ifdef REDIRECT_STDIO_LOG_FILE
-  FILE * const log = fopen("/mnt/sdcard/Download/HTTrack/log.txt", "wb");
-  if (log != NULL) {
-    const int fd = dup(fileno(log));
-    if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
-      ASSERT_THROWS(!"could not redirect stdin/stdout");
+void Java_com_httrack_android_jni_HTTrackLib_initRootPath(JNIEnv* env, 
+                                                          jclass clazz, 
+                                                          jstring opath) {
+  if (opath != NULL) {
+    const char* path = (*env)->GetStringUTFChars(env, opath, NULL);
+
+    debug("calling Java_com_httrack_android_jni_HTTrackLib_initRootPath(%s)",
+          path);
+
+    /* Root path. */
+    if (rootPath != NULL) {
+      free(rootPath);
+      rootPath = NULL;
     }
-    fclose(log);
-    fprintf(stderr, "started stdio logging in file\n");
-  }
+    rootPath = strdup(path);
+
+    /* Emergency log. */
+    {
+      const size_t buffer_size = strlen(path) + 256;
+      char *const buffer = malloc(buffer_size);
+      if (buffer != NULL) {
+        snprintf(buffer, buffer_size, "%s/error.txt", path);
+        if (emergencyLog != NULL) {
+          free(emergencyLog);
+          emergencyLog = NULL;
+        }
+        emergencyLog = buffer;
+      }
+    }
+
+    /* Redirect stdio. */
+#ifdef REDIRECT_STDIO_LOG_FILE
+    {
+      const size_t buffer_size = strlen(path) + 256;
+      char *const buffer = malloc(buffer_size);
+      snprintf(buffer, buffer_size, "%s/log.txt", path);
+      FILE * const log = fopen(buffer, "wb");
+      if (log != NULL) {
+        const int fd = dup(fileno(log));
+        if (dup2(fd, 1) == -1 || dup2(fd, 2) == -1) {
+          ASSERT_THROWS(!"could not redirect stdin/stdout");
+        }
+        fclose(log);
+        fprintf(stderr, "started stdio logging in file\n");
+      }
+      free(buffer);
+    }
 #endif
 
+    (*env)->ReleaseStringUTFChars(env, opath, path);
+  }
 #undef ASSERT_THROWS
 #undef L
 #undef L_
@@ -422,6 +481,8 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNIEnv *env;
   } u;
   UNUSED(reserved);
+
+  debug("calling JNI_OnUnload");
 
   if ((*vm)->GetEnv(vm, &u.ptr, JNI_VERSION_1_6) != JNI_OK) {
     return ;
@@ -500,10 +561,14 @@ static jobject newStringSafe(JNIEnv *env, const char *s) {
 void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jobject object) {
   HTTrackLib_context *const context = (HTTrackLib_context*)
       calloc(sizeof(HTTrackLib_context), 1);
+
+  debug("calling Java_com_httrack_android_jni_HTTrackLib_init");
+
   if (context == NULL) {
     throwRuntimeException(env, "memory exhausted");
     return;
   }
+
   pthread_mutex_init(&context->lock, NULL);
   context->opt = NULL;
   context->stop = 0;
@@ -512,6 +577,9 @@ void Java_com_httrack_android_jni_HTTrackLib_init(JNIEnv* env, jobject object) {
 
 void Java_com_httrack_android_jni_HTTrackLib_free(JNIEnv* env, jobject object) {
   HTTrackLib_context *const context = getNativeOpt(env, object);
+
+  debug("calling Java_com_httrack_android_jni_HTTrackLib_free");
+
   if (context != NULL) {
     setNativeOpt(env, object, NULL);
     pthread_mutex_destroy(&context->lock);
@@ -827,6 +895,9 @@ jint HTTrackLib_main(JNIEnv* env, jobject object, jobjectArray stringArray) {
       object != NULL ? (*env)->GetArrayLength(env, stringArray) : 0;
   const size_t argv_size = (argc + 1) * sizeof(char*);
   char **const argv = (char**) malloc(argv_size);
+
+  debug("calling HTTrackLib_main");
+
   if (argv != NULL) {
     int i;
     int code = -1;

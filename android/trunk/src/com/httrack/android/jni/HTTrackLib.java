@@ -110,6 +110,11 @@ public class HTTrackLib {
   private native static void initStatic() throws RuntimeException;
 
   /*
+   * Initialize root path.
+   */
+  public native static void initRootPath(final String path);
+
+  /*
    * Free.
    */
   protected native void free();
