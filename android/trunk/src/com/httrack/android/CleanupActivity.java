@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 package com.httrack.android;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +37,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -187,6 +189,21 @@ public class CleanupActivity extends ListActivity {
     }
   }
 
+  /**
+   * Is this path empty ? Note: ignores .nomedia files.
+   * 
+   * @return true if the root path is empty.
+   */
+  public static boolean pathIsEmpty(final File projectRootFile) {
+    return projectRootFile != null
+        && projectRootFile.listFiles(new FilenameFilter() {
+          @Override
+          public boolean accept(final File dir, final String filename) {
+            return !filename.equals(HTTrackActivity.NOMEDIA_FILE);
+          }
+        }).length != 0;
+  }
+
   protected boolean deleteProjects() {
     boolean success = true;
     for (final int position : toBeDeleted) {
@@ -208,6 +225,31 @@ public class CleanupActivity extends ListActivity {
     }
     // Everything was deleted
     toBeDeleted.clear();
+
+    // Root path can be deleted ?
+    if (pathIsEmpty(projectRootFile)) {
+      if (deleteRecursively(projectRootFile)) {
+        Log.d(getClass().getSimpleName(), "successfully deleted root path: "
+            + projectRootFile);
+      } else {
+        Log.w(getClass().getSimpleName(), "could not delet root path: "
+            + projectRootFile);
+      }
+
+      // Delete top-level parent if a "HTTrack" folder was found. This ensure
+      // that we fully cleanup user-data.
+      final File parentRoot = projectRootFile.getParentFile();
+      if (parentRoot != null && parentRoot.getName().equals("HTTrack")
+          && pathIsEmpty(parentRoot)) {
+        if (deleteRecursively(parentRoot)) {
+          Log.d(getClass().getSimpleName(), "successfully deleted root path: "
+              + parentRoot);
+        } else {
+          Log.w(getClass().getSimpleName(), "could not delet root path: "
+              + parentRoot);
+        }
+      }
+    }
 
     // Rebuild top index
     HTTrackLib.buildTopIndex(projectRootFile, resourceFile);
