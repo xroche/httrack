@@ -1,5 +1,14 @@
 --- ioapi.c.orig	2014-06-10 18:55:32.778807408 +0200
-+++ ioapi.c	2014-06-10 20:01:51.657679218 +0200
++++ ioapi.c	2014-06-22 12:22:06.606696274 +0200
+@@ -14,7 +14,7 @@
+         #define _CRT_SECURE_NO_WARNINGS
+ #endif
+ 
+-#if defined(__APPLE__) || defined(IOAPI_NO_64)
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(IOAPI_NO_64)
+ // In darwin and perhaps other BSD variants off_t is a 64 bit value, hence no need for specific 64 bit functions
+ #define FOPEN_FUNC(filename, mode) fopen(filename, mode)
+ #define FTELLO_FUNC(stream) ftello(stream)
 @@ -73,6 +73,7 @@
      p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
      p_filefunc64_32->zfile_func64.zread_file = p_filefunc32->zread_file;
