@@ -156,10 +156,14 @@ cd ${TMP_DIR}
 (
 cd ${DEST_DIR}/lib
 if test -n "$SAVE_BUILD"; then
-	md5="$(md5sum libhttrack.so  | cut -f1 -d' ')"
+	md5="$(md5sum libhttrack.so | cut -f1 -d' ')"
+	test -n "$md5" || ! echo "could not find .so file" || exit 1
 	dest="${SAVE_BUILD}/${md5}"
 	mkdir -p "$dest"
-	echo "$md5" > libhttrack.so.md5.txt
+	echo "$md5" > ${dest}/libhttrack.so.md5.txt
+	svnversion $HTTRACK_SVN > "${dest}/revision.txt"
+	ln -sf ${dest} "${SAVE_BUILD}/latest"
+	cp -ax "$0" "${dest}/build.txt"
 fi
 for i in libhttrack libhtsjava libiconv ; do
 	${objcopy} --only-keep-debug ${i}.so ${i}.dbg
@@ -170,6 +174,8 @@ for i in libhttrack libhtsjava libiconv ; do
 		cp -ax ${i}.* "${dest}/"
 	fi
 done
-rm *.la
+rm -f *.la
 rm -rf httrack
+#cd ${DEST_DIR}
+#cp -ax include "${dest}/"
 )
