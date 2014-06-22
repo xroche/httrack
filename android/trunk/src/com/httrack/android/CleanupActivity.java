@@ -227,7 +227,8 @@ public class CleanupActivity extends ListActivity {
     toBeDeleted.clear();
 
     // Root path can be deleted ?
-    if (pathIsEmpty(projectRootFile)) {
+    final boolean deleteRootPath = pathIsEmpty(projectRootFile);
+    if (deleteRootPath) {
       if (deleteRecursively(projectRootFile)) {
         Log.d(getClass().getSimpleName(), "successfully deleted root path: "
             + projectRootFile);
@@ -249,10 +250,18 @@ public class CleanupActivity extends ListActivity {
               + parentRoot);
         }
       }
+    } else {
+      // Rebuild top index
+      HTTrackLib.buildTopIndex(projectRootFile, resourceFile);
     }
 
-    // Rebuild top index
-    HTTrackLib.buildTopIndex(projectRootFile, resourceFile);
+    // Push result
+    final Intent intent = new Intent();
+    intent.putExtra("com.httrack.android.rootPathWasDeleted", deleteRootPath);
+    setResult(Activity.RESULT_OK, intent);
+
+    // Finish
+    finish();
 
     return success;
   }

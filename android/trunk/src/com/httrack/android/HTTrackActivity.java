@@ -140,6 +140,7 @@ public class HTTrackActivity extends FragmentActivity {
   protected static final int ACTIVITY_OPTIONS = 0;
   protected static final int ACTIVITY_FILE_CHOOSER = 1;
   protected static final int ACTIVITY_PROJECT_NAME_CHOOSER = 2;
+  protected static final int ACTIVITY_CLEANUP = 3;
 
   // Process unique session ID for the fragment identifier
   protected String sessionID = "runner_task" + "_"
@@ -174,7 +175,6 @@ public class HTTrackActivity extends FragmentActivity {
   protected boolean interruptRequested;
 
   // Warn spaces in project name
-  protected static final int currentapiVersion = android.os.Build.VERSION.SDK_INT;
   protected boolean warnPreHoneycombSpaceIssue;
   protected boolean switchEmptyProjectName;
 
@@ -212,16 +212,8 @@ public class HTTrackActivity extends FragmentActivity {
     final String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state)) {
       if (android.os.Build.VERSION.SDK_INT >= VERSION_CODES.FROYO) {
-        // Starting from KitKat, it seems that we no longer have the right to
-        // create directories within the Download location!
-        // Thanks to Jay Haines for reporting the issue!
-        if (android.os.Build.VERSION.SDK_INT >= VERSION_CODES.KITKAT) {
-          return Environment
-              .getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        } else {
-          return Environment
-              .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        }
+        return Environment
+            .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
       } else {
         return Environment.getExternalStorageDirectory();
       }
@@ -234,16 +226,13 @@ public class HTTrackActivity extends FragmentActivity {
   /* Get the default root external storage. */
   private File getDefaultHTTrackPath() {
     final File rootPath = getExternalStorage();
-    final File httrackBasePath = new File(rootPath, "HTTrack");
-    
-    // Old naming
-    final File httrackOldPath = new File(httrackBasePath, "Websites");
 
-    // We now prefer to have only a single directory level. No space for old
-    // versions of Android.
-    final File httrackNewPath = new File(rootPath, "HTTrack-Websites");
-    
-    return httrackOldPath.exists() ? httrackOldPath : httrackNewPath;
+    // Naming
+    final File httrackBasePath = new File(rootPath, "HTTrack");
+    final File httrackPath = new File(httrackBasePath, "Websites");
+
+    // Take newest form unless old one exists.
+    return httrackPath;
   }
 
   /*
@@ -371,9 +360,12 @@ public class HTTrackActivity extends FragmentActivity {
    * Note: calls computeStorageTarget().
    */
   protected boolean ensureExternalStorage() {
+    Log.d("httrack", "called ensureExternalStorage");
+    
     computeStorageTarget();
+
     final File root = getProjectRootFile();
-    if (root != null && mkdirs(root)) {
+    if (root != null && mkdirsRetry(root)) {
       Log.d(getClass().getSimpleName(), "validated " + root.getAbsolutePath());
 
       /*
@@ -393,9 +385,8 @@ public class HTTrackActivity extends FragmentActivity {
 
       return true;
     } else {
-      Log.w(getClass().getSimpleName(),
-          "could not create " + root != null ? root.getAbsolutePath()
-              : "<NULL ROOTPATH!>");
+      Log.w(getClass().getSimpleName(), "could not create "
+          + (root != null ? root.getAbsolutePath() : "<NULL ROOTPATH!>"));
       return false;
     }
   }
@@ -459,7 +450,7 @@ public class HTTrackActivity extends FragmentActivity {
    * application removal.
    **/
   private File buildResourceFile() {
-    final File cache = android.os.Build.VERSION.SDK_INT >= 8 ? getExternalCacheDir()
+    final File cache = android.os.Build.VERSION.SDK_INT >= VERSION_CODES.FROYO ? getExternalCacheDir()
         : getCacheDir();
     final File rscPath = new File(cache, "resources");
     final File stampFile = new File(rscPath, "resources.stamp");
@@ -1505,6 +1496,29 @@ public class HTTrackActivity extends FragmentActivity {
     return target.mkdirs() || target.isDirectory();
   }
 
+  /** Make directorie(s) if necessary. **/
+  private static boolean mkdirsRetry(final File target) {
+    if (mkdirs(target)) {
+      return true;
+    } else {
+      Log.d("httrack", "creation of " + target + " failed, retrying ...");
+
+      final File parent = target.getParentFile();
+      if (parent != null && !parent.exists()) {
+        if (!mkdirs(parent)) {
+          Log.d("httrack", "creation of " + parent + " failed");
+        }
+      }
+      if (target.mkdir()) {
+        Log.d("httrack", "creation of " + target + " succeeded");
+        return true;
+      } else {
+        Log.d("httrack", "creation of " + target + " failed");
+        return false;
+      }
+    }
+  }
+
   /** make the given file readable/writabe. **/
   private static boolean setFileReadWrite(final File target) {
     // return target.setReadable(true) && target.setWritable(true);
@@ -1661,7 +1675,7 @@ public class HTTrackActivity extends FragmentActivity {
        * unable to browse local file:// pages embedding spaces (%20 or +)
        * Therefore, warn the user.
        */
-      warnPreHoneycombSpaceIssue = currentapiVersion < VERSION_CODES.HONEYCOMB;
+      warnPreHoneycombSpaceIssue = android.os.Build.VERSION.SDK_INT < VERSION_CODES.HONEYCOMB;
 
       /* Add text watcher for the "Next" button. */
       final AutoCompleteTextView name = AutoCompleteTextView.class.cast(this
@@ -1956,6 +1970,7 @@ public class HTTrackActivity extends FragmentActivity {
     switch (pane_id) {
     case LAYOUT_START:
       // Warn if no sdcard
+      ensureExternalStorage();
       warnIfExternalStorageUnsuitable();
       break;
     case LAYOUT_PROJECT_NAME:
@@ -2181,6 +2196,23 @@ public class HTTrackActivity extends FragmentActivity {
         name.requestFocus();
       }
       break;
+    case ACTIVITY_CLEANUP:
+      if (resultCode == Activity.RESULT_OK) {
+        final boolean rootWasDeleted = data.getBooleanExtra(
+            "com.httrack.android.rootPathWasDeleted", false);
+        // Exit because otherwise we can't recreate the directory (!)
+        if (rootWasDeleted
+            && android.os.Build.VERSION.SDK_INT >= VERSION_CODES.KITKAT) {
+          Log.w("httrack",
+              "exiting because root path was deleted (Android >= Kitkat issue)");
+          // restartActivity();
+          finish();
+          // darn, this is not clean, but otherwise restarting the activity
+          // won't be enough. I suspect FUSE-related issue here
+          System.exit(0);
+        }
+      }
+      break;
     }
   }
 
@@ -2249,13 +2281,20 @@ public class HTTrackActivity extends FragmentActivity {
     browse(getProjectRootIndexFile());
   }
 
+  /*
+   * Restart activity. (exit current app)
+   */
+  protected void restartActivity() {
+    final Intent intent = getIntent();
+    finish();
+    startActivity(intent);
+  }
+
   /**
    * "New project"
    */
   public void onNewProject(final View view) {
-    final Intent intent = getIntent();
-    finish();
-    startActivity(intent);
+    restartActivity();
   }
 
   /**
@@ -2287,7 +2326,7 @@ public class HTTrackActivity extends FragmentActivity {
       intent.putExtra("com.httrack.android.projectNames", names);
       intent.putExtra("com.httrack.android.action",
           CleanupActivity.ACTION_CLEANUP);
-      startActivity(intent);
+      startActivityForResult(intent, ACTIVITY_CLEANUP);
     }
   }
 
