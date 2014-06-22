@@ -113,6 +113,9 @@ public class HTTrackActivity extends FragmentActivity {
   // <br /> Pattern
   protected static final Pattern brHtmlPattern = Pattern.compile(Pattern
       .quote("<br />"));
+  
+  // ".nomedia" ; prevents media scanner from reading media files
+  public static final String NOMEDIA_FILE = ".nomedia";
 
   // Running instances of HTTrack (based on winprofile.ini path)
   protected static final HashSet<String> runningInstances = new HashSet<String>();
@@ -122,8 +125,10 @@ public class HTTrackActivity extends FragmentActivity {
    * <http://developer.android.com/reference/android/os/Build
    * .VERSION_CODES.html>
    */
-  private static class VERSION_CODES {
-    protected static final int HONEYCOMB = 0x0000000b;
+  protected static class VERSION_CODES {
+    public static final int FROYO = 0x00000008;
+    public static final int HONEYCOMB = 0x0000000b;
+    public static final int KITKAT = 0x00000013;
   };
 
   // Fields to restore/save state (Note: might be read-only fields)
@@ -206,9 +211,17 @@ public class HTTrackActivity extends FragmentActivity {
   private File getExternalStorage() {
     final String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state)) {
-      if (android.os.Build.VERSION.SDK_INT >= 8) {
-        return Environment
-            .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+      if (android.os.Build.VERSION.SDK_INT >= VERSION_CODES.FROYO) {
+        // Starting from KitKat, it seems that we no longer have the right to
+        // create directories within the Download location!
+        // Thanks to Jay Haines for reporting the issue!
+        if (android.os.Build.VERSION.SDK_INT >= VERSION_CODES.KITKAT) {
+          return Environment
+              .getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        } else {
+          return Environment
+              .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        }
       } else {
         return Environment.getExternalStorageDirectory();
       }
@@ -221,8 +234,16 @@ public class HTTrackActivity extends FragmentActivity {
   /* Get the default root external storage. */
   private File getDefaultHTTrackPath() {
     final File rootPath = getExternalStorage();
-    final File httrackPath = new File(rootPath, "HTTrack");
-    return new File(httrackPath, "Websites");
+    final File httrackBasePath = new File(rootPath, "HTTrack");
+    
+    // Old naming
+    final File httrackOldPath = new File(httrackBasePath, "Websites");
+
+    // We now prefer to have only a single directory level. No space for old
+    // versions of Android.
+    final File httrackNewPath = new File(rootPath, "HTTrack-Websites");
+    
+    return httrackOldPath.exists() ? httrackOldPath : httrackNewPath;
   }
 
   /*
@@ -239,6 +260,9 @@ public class HTTrackActivity extends FragmentActivity {
       projectPath = path;
     }
 
+    // Set root path for logs
+    HTTrackLib.initRootPath(projectPath.getAbsolutePath());
+    
     // Change ?
     final View view = findViewById(R.id.fieldBasePath);
     if (view != null) {
@@ -329,12 +353,15 @@ public class HTTrackActivity extends FragmentActivity {
    * 
    * @param directory The target directory
    */
-  protected static void createNoMediaFile(final File directory)
+  protected static boolean createNoMediaFile(final File directory)
       throws IOException {
-    final File nomedia = new File(directory, ".nomedia");
+    final File nomedia = new File(directory, HTTrackActivity.NOMEDIA_FILE);
     if (!nomedia.exists()) {
       final FileWriter emptyFile = new FileWriter(nomedia);
       emptyFile.close();
+      return true;
+    } else {
+      return false;
     }
   }
 
@@ -355,15 +382,20 @@ public class HTTrackActivity extends FragmentActivity {
        * scanner from reading your media files"
        */
       try {
-        createNoMediaFile(root);
+        if (createNoMediaFile(root)) {
+          Log.d(getClass().getSimpleName(), "successfully created "
+              + HTTrackActivity.NOMEDIA_FILE + " file");
+        }
       } catch (final IOException io) {
-        Log.w(getClass().getSimpleName(), "could not create .nomedia file", io);
+        Log.w(getClass().getSimpleName(), "could not create "
+            + HTTrackActivity.NOMEDIA_FILE + " file", io);
       }
 
       return true;
     } else {
-      Log.d(getClass().getSimpleName(),
-          "could not create " + root.getAbsolutePath());
+      Log.w(getClass().getSimpleName(),
+          "could not create " + root != null ? root.getAbsolutePath()
+              : "<NULL ROOTPATH!>");
       return false;
     }
   }
