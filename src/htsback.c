@@ -2780,8 +2780,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             back[i].r.is_write = 1;     // écrire
                             if (back[i].r.compressed &&
                                 /* .gz are *NOT* depacked!! */
-                                (strfield
-                                 (get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0)
+                                strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0
+                                && strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "tgz") == 0
                               ) {
                               if (create_back_tmpfile(opt, &back[i]) == 0) {
                                 assertf(back[i].tmpfile != NULL);
