@@ -429,6 +429,14 @@ if (makeindex_fp) { \
 makeindex_done=1;    /* ok c'est fait */  \
 } while(0)
 
+/* does it look like XML ? (SVG et al.) */
+static int look_like_xml(const char *s) {
+  return strncmp(s, "<?xml", 5) == 0
+    || strncmp(s, "<!-- ", 5) == 0
+    || strncmp(s, "<svg ", 5) == 0
+    ;
+}
+
 // Début de httpmirror, robot
 // url1 peut être multiple
 int httpmirror(char *url1, httrackp * opt) {
@@ -1180,8 +1188,13 @@ int httpmirror(char *url1, httrackp * opt) {
       if (!error) {
         if (r.statuscode == HTTP_OK) {  // OK (ou 304 en backing)
           if (r.adr) {          // Written file
-            if ((is_hypertext_mime(opt, r.contenttype, urlfil()))
-
+            // Buggy SVG (Smiling Spectre)
+            if (strcmp(r.contenttype, "image/svg+xml") == 0 && !look_like_xml(r.adr)) {
+              // patch it
+              strcpybuff(r.contenttype, "application/octet-stream");
+              is_binary = 1;
+            }
+            else if ((is_hypertext_mime(opt, r.contenttype, urlfil()))
                 /* Is HTML or Js, .. */
                 /* NO - real media is real media, not HTML */
                 /*|| (may_be_hypertext_mime(r.contenttype, urlfil()) && (r.adr) ) */
