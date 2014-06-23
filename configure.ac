@@ -113,6 +113,9 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 #include <netinet/in.h>
 ])
 
+# check wether misaligned access is possible or not
+AX_CHECK_ALIGNED_ACCESS_REQUIRED
+
 ### zlib
 CHECK_ZLIB()
 

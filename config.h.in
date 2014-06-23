@@ -6,6 +6,9 @@
 /* Check for ftime */
 #undef FTIME
 
+/* Define if pointers to integers require aligned access */
+#undef HAVE_ALIGNED_ACCESS_REQUIRED
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
