@@ -59,7 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #if (!defined(HTS_INTHASH_USES_MD5) && !defined(HTS_INTHASH_USES_MURMUR))
 /* Temporry: fixing Invalid address alignment issues */
-#ifdef defined(__ANDROID__)
+#if defined(__ANDROID__)
 #define HTS_INTHASH_USES_MD5 1
 #else
 #define HTS_INTHASH_USES_MURMUR 1
