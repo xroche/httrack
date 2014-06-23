@@ -162,7 +162,8 @@ if test -n "$SAVE_BUILD"; then
 	mkdir -p "$dest"
 	echo "$md5" > ${dest}/libhttrack.so.md5.txt
 	svnversion $HTTRACK_SVN > "${dest}/revision.txt"
-	ln -sf ${dest} "${SAVE_BUILD}/latest"
+	rm -f "${SAVE_BUILD}/latest"
+	ln -s ${dest} "${SAVE_BUILD}/latest"
 	cp -ax "$0" "${dest}/build.txt"
 fi
 for i in libhttrack libhtsjava libiconv ; do
