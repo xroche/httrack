@@ -57,25 +57,39 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
      filled with 4 entries ; whereas the MD5 variant did only collide
      once ]
 */
-#if (!defined(HTS_INTHASH_USES_MD5) && !defined(HTS_INTHASH_USES_MURMUR))
+#if (!defined(HTS_INTHASH_USES_MD5) \
+  && !defined(HTS_INTHASH_USES_OPENSSL_MD5) \
+  && !defined(HTS_INTHASH_USES_MURMUR) \
+  && !defined(HTS_INTHASH_USES_FNV1) \
+  )
 /* Temporry: fixing Invalid address alignment issues */
-#if (defined(__ANDROID__) || defined(HAVE_ALIGNED_ACCESS_REQUIRED))
+#if (defined(HAVE_ALIGNED_ACCESS_REQUIRED) \
+  || defined(__sparc__) \
+  || defined(mips) || defined(__mips__) || defined(MIPS) || defined(_MIPS_) \
+  || defined(arm) || defined(__arm__) || defined(ARM) || defined(_ARM_) \
+  )
+#ifndef LIBHTTRACK_EXPORTS
+#define HTS_INTHASH_USES_OPENSSL_MD5 1
+#else
 #define HTS_INTHASH_USES_MD5 1
+#endif
 #else
 #define HTS_INTHASH_USES_MURMUR 1
 #endif
 #endif
 
+/* Dispatch includes */
 #if (defined(HTS_INTHASH_USES_MURMUR))
 #include "murmurhash3.h"
-#elif HTS_INTHASH_USES_MD5 == 1
+#elif (defined(HTS_INTHASH_USES_MD5))
 #include "md5.h"
-#else
-/* use the Openssl implementation */
+#elif (defined(HTS_INTHASH_USES_OPENSSL_MD5))
 #include <openssl/md5.h>
 #define MD5Init MD5_Init
 #define MD5Update MD5_Update
 #define MD5Final MD5_Final
+#else
+#error "No hash method defined"
 #endif
 
 /** Size of auxiliary stash. **/
@@ -88,7 +102,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MIN_POOL_CAPACITY 256
 
 /* 64-bit constant */
-#if defined(WIN32)
+#if (defined(WIN32))
 #define UINT_64_CONST(X) ((uint64_t) (X))
 #define UINT_64_FORMAT "I64d"
 #elif (defined(_LP64) || defined(__x86_64__) \
@@ -359,7 +373,7 @@ static void coucal_log_stats(coucal hashtable) {
 /* default hash function when key is a regular C-string */
 coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   const unsigned char *const data = (const unsigned char *) data_;
-#if HTS_INTHASH_USES_MD5 == 1
+#if (defined(HTS_INTHASH_USES_MD5) || defined(HTS_INTHASH_USES_OPENSSL_MD5))
   /* compute a regular MD5 and extract two 32-bit integers */
   MD5_CTX ctx;
   union {
@@ -406,7 +420,7 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   }
 
   return u.hashes;
-#else
+#elif (defined(HTS_INTHASH_USES_FNV1))
   /* compute two Fowler-Noll-Vo hashes (64-bit FNV-1 variant) ;
      each 64-bit hash being XOR-folded into a single 32-bit hash. */
   size_t i;
@@ -448,6 +462,9 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   }
 
   return hashes;
+
+#else
+#error "Undefined hashing method"
 #endif
 }
 
