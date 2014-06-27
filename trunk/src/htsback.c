@@ -971,9 +971,10 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     if ((*dst)->r.adr != NULL)
       freet((*dst)->r.adr);
   }
-  if (dst != NULL)
-    freet(dst);
-  *dst = NULL;
+  if (dst != NULL) {
+    freet(*dst);
+    *dst = NULL;
+  }
   return 1;                     /* error */
 }
 
