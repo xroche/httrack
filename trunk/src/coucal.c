@@ -510,7 +510,7 @@ static INTHASH_INLINE int coucal_matches(coucal hashtable, size_t pos,
   return coucal_matches_(hashtable, item, name, hashes);
 }
 
-/* compact string pool ; does not change the capacity */
+/* compact string pool ; does not necessarily change the capacity */
 static void coucal_compact_pool(coucal hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   size_t i;
@@ -597,7 +597,6 @@ static void coucal_compact_pool(coucal hashtable, size_t capacity) {
 static void coucal_realloc_pool(coucal hashtable, size_t capacity) {
   const size_t hash_size = POW2(hashtable->lg_size);
   char *const oldbase = hashtable->pool.buffer;
-  size_t i;
   size_t count = 0;
 
   /* we manage the string pool */
@@ -636,12 +635,15 @@ static void coucal_realloc_pool(coucal hashtable, size_t capacity) {
     }                                                                \
 } while(0)
 
-  /* recompute */
-  for(i = 0 ; i < hash_size ; i++) {
-    RECOMPUTE_STRING(hashtable->items[i].name);
-  }
-  for(i = 0 ; i < hashtable->stash.size ; i++) {
-    RECOMPUTE_STRING(hashtable->stash.items[i].name);
+  /* recompute string addresses */
+  if (hashtable->pool.buffer != oldbase) {
+    size_t i;
+    for(i = 0 ; i < hash_size ; i++) {
+      RECOMPUTE_STRING(hashtable->items[i].name);
+    }
+    for(i = 0 ; i < hashtable->stash.size ; i++) {
+      RECOMPUTE_STRING(hashtable->stash.items[i].name);
+    }
   }
 
 #undef RECOMPUTE_STRING
