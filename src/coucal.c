@@ -874,7 +874,7 @@ static const char* coucal_print_key(coucal hashtable,
     : (const char*) name;
 }
 
-/* Add a new item in the hashtable. The item SHALL NOT be alreasy present. */
+/* Add a new item in the hashtable. The item SHALL NOT be already present. */
 static int coucal_add_item_(coucal hashtable, coucal_item item) {
   coucal_hashkey cuckoo_hash, initial_cuckoo_hash;
   size_t loops;
