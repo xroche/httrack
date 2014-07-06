@@ -86,11 +86,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define HashMD5Init(CTX, FLAG) MD5Init(CTX, FLAG)
 #define HashMD5Update(CTX, DATA, SIZE) MD5Update(CTX, DATA, SIZE)
 #define HashMD5Final(DIGEST, CTX) MD5Final(DIGEST, CTX)
+#define HashMD5Context MD5CTX
 #elif (defined(HTS_INTHASH_USES_OPENSSL_MD5))
 #include <openssl/md5.h>
 #define HashMD5Init(CTX, FLAG) MD5_Init(CTX)
 #define HashMD5Update(CTX, DATA, SIZE) MD5_Update(CTX, DATA, SIZE)
 #define HashMD5Final(DIGEST, CTX) MD5_Final(DIGEST, CTX)
+#define HashMD5Context MD5_CTX
 #else
 #error "No hash method defined"
 #endif
@@ -378,7 +380,7 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   const unsigned char *const data = (const unsigned char *) data_;
 #if (defined(HTS_INTHASH_USES_MD5) || defined(HTS_INTHASH_USES_OPENSSL_MD5))
   /* compute a regular MD5 and extract two 32-bit integers */
-  MD5_CTX ctx;
+  HashMD5Context ctx;
   union {
     unsigned char md5digest[16];
 #if (COUCAL_HASH_SIZE == 32)
