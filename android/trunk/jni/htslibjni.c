@@ -603,7 +603,7 @@ void Java_com_httrack_android_jni_HTTrackLib_free(JNIEnv* env, jobject object) {
           usleep(/* us ; 1/10s */100000);
         }
         assert(hts_has_stopped(context->opt));
-        debug("HTTrack thread has now ended")
+        debug("HTTrack thread has now ended");
       } else {
         debug("HTTrack thread has ended");
       }
