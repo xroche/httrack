@@ -83,11 +83,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "murmurhash3.h"
 #elif (defined(HTS_INTHASH_USES_MD5))
 #include "md5.h"
+#define HashMD5Init(CTX, FLAG) MD5Init(CTX, FLAG)
+#define HashMD5Update(CTX, DATA, SIZE) MD5Update(CTX, DATA, SIZE)
+#define HashMD5Final(DIGEST, CTX) MD5Final(DIGEST, CTX)
 #elif (defined(HTS_INTHASH_USES_OPENSSL_MD5))
 #include <openssl/md5.h>
-#define MD5Init(CTX, FLAG) MD5_Init(CTX)
-#define MD5Update MD5_Update
-#define MD5Final MD5_Final
+#define HashMD5Init(CTX, FLAG) MD5_Init(CTX)
+#define HashMD5Update(CTX, DATA, SIZE) MD5_Update(CTX, DATA, SIZE)
+#define HashMD5Final(DIGEST, CTX) MD5_Final(DIGEST, CTX)
 #else
 #error "No hash method defined"
 #endif
@@ -385,9 +388,9 @@ coucal_hashkeys coucal_hash_data(const void *data_, size_t size) {
   } u;
 
   /* compute MD5 */
-  MD5Init(&ctx, 0);
-  MD5Update(&ctx, data, (unsigned int) size);
-  MD5Final(u.md5digest, &ctx);
+  HashMD5Init(&ctx, 0);
+  HashMD5Update(&ctx, data, (unsigned int) size);
+  HashMD5Final(u.md5digest, &ctx);
 
 #if (COUCAL_HASH_SIZE == 32)
   /* mix mix mix */
