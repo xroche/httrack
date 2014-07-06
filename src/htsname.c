@@ -1691,7 +1691,7 @@ void url_savename_addstr(char *d, const char *s) {
 /* "filename" should be at least 64 bytes. */
 void url_savename_refname(const char *adr, const char *fil, char *filename) {
   unsigned char bindigest[16];
-  MD5_CTX ctx;
+  struct MD5Context ctx;
 
   MD5Init(&ctx, 0);
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
