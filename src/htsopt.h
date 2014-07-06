@@ -251,6 +251,7 @@ struct htsoptstate {
   char HTbuff[2048];
   unsigned int debug_state;
   unsigned int tmpnameid;       /* 3.41 */
+  int is_ended;                 /* 3.48-14 */
 };
 
 /* Library handles */

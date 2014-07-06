@@ -186,6 +186,7 @@ HTSEXT_API void hts_cancel_test(httrackp * opt);
 HTSEXT_API void hts_cancel_parsing(httrackp * opt);
 HTSEXT_API void hts_cancel_test(httrackp * opt);
 HTSEXT_API void hts_cancel_parsing(httrackp * opt);
+HTSEXT_API int hts_has_stopped(httrackp * opt);
 
 /* Tools */
 HTSEXT_API int structcheck(const char *path);
