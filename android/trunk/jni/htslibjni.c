@@ -116,6 +116,15 @@ static void debug(const char *format, ...) {
   va_end(args);
 }
 
+static void error(const char *format, ...)
+  __attribute__ ((format (printf, 1, 2)));
+static void error(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_ERROR, "httrack", format, args);
+  va_end(args);
+}
+
 /** Context for HTTrackLib. **/
 typedef struct HTTrackLib_context {
   pthread_mutex_t lock;
@@ -584,6 +593,17 @@ void Java_com_httrack_android_jni_HTTrackLib_free(JNIEnv* env, jobject object) {
     setNativeOpt(env, object, NULL);
     pthread_mutex_destroy(&context->lock);
     if (context->opt != NULL) {
+      /* This should never hapend */
+      if (!hts_has_stopped(context->opt)) {
+        const int timeout = 50;  /* Wait at most 5 seconds */
+        int i;
+        error("HTTrack thread is still running but the object is finalized, stopping running thread!");
+        for(i = 0 ; i < timeout && !hts_has_stopped(context->opt) ; i++) {
+          hts_request_stop(context->opt, 1);
+          usleep(/* us ; 1/10s */100000);
+        }
+        assert(hts_has_stopped(context->opt));
+      }
       hts_free_opt(context->opt);
       context->opt = NULL;
     }
