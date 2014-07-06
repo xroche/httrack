@@ -85,7 +85,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "md5.h"
 #elif (defined(HTS_INTHASH_USES_OPENSSL_MD5))
 #include <openssl/md5.h>
-#define MD5Init MD5_Init
+#define MD5Init(CTX, FLAG) MD5_Init(CTX)
 #define MD5Update MD5_Update
 #define MD5Final MD5_Final
 #else
