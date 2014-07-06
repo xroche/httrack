@@ -3657,9 +3657,19 @@ HTSEXT_API int hts_setpause(httrackp * opt, int p) {
 HTSEXT_API int hts_request_stop(httrackp * opt, int force) {
   if (opt != NULL) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+    hts_mutexlock(&opt->state.lock);
     opt->state.stop = 1;
+    hts_mutexrelease(&opt->state.lock);
   }
   return 0;
+}
+
+HTSEXT_API int hts_has_stopped(httrackp * opt) {
+  int ended;
+  hts_mutexlock(&opt->state.lock);
+  ended = opt->state.is_ended;
+  hts_mutexrelease(&opt->state.lock);
+  return ended;
 }
 
 // régler en cours de route les paramètres réglables..

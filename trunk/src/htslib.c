@@ -4518,7 +4518,7 @@ int hts_read(htsblk * r, char *buff, int size) {
 // 'RX98
 
 // 'capsule' contenant uniquement le cache
-t_dnscache *_hts_cache(httrackp * opt) {
+t_dnscache *hts_cache(httrackp * opt) {
   assertf(opt != NULL);
   if (opt->state.dns_cache == NULL) {
     opt->state.dns_cache = (t_dnscache *) malloct(sizeof(t_dnscache));
@@ -4551,9 +4551,12 @@ void hts_cache_free(t_dnscache *const root) {
 // si h_length==0 alors le nom n'existe pas dans le dns
 static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCaddr *const addr) {
   assertf(addr != NULL);
+  assertf(iadr != NULL);
+  if (*iadr == '\0') {
+    return NULL;
+  }
   for(; cache != NULL; cache = cache->n) {
     assertf(cache != NULL);
-    assertf(iadr != NULL);
     if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length > 0) {     // entrée valide
         SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
@@ -4657,9 +4660,9 @@ HTSEXT_API int check_hostname_dns(const char *const hostname) {
 // Needs locking
 // cache dns interne à HTS // ** FREE A FAIRE sur la chaine
 static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
-                                   SOCaddr *const addr, const char **error) {
+                                 SOCaddr *const addr, const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
-  t_dnscache *cache = _hts_cache(opt);  // adresse du cache
+  t_dnscache *cache = hts_cache(opt);  // adresse du cache
   SOCaddr *sa;
 
   assertf(opt != NULL);
@@ -4696,16 +4699,17 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
     /* attempt to store new entry */
     cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
     if (cache->n != NULL) {
-      strcpybuff(cache->n->iadr, iadr);
+      t_dnscache *const next = cache->n;
+      strcpybuff(next->iadr, iadr);
       if (sa != NULL) {
-        cache->n->host_length = SOCaddr_size(*sa);
-        assertf(cache->n->host_length < sizeof(cache->n->host_addr));
-        memcpy(cache->n->host_addr, &SOCaddr_sockaddr(*sa), cache->n->host_length);
+        next->host_length = SOCaddr_size(*sa);
+        assertf(next->host_length < sizeof(next->host_addr));
+        memcpy(next->host_addr, &SOCaddr_sockaddr(*sa), next->host_length);
       } else {
-        cache->n->host_addr[0] = '\0';
-        cache->n->host_length = 0;      // non existant dans le dns
+        next->host_addr[0] = '\0';
+        next->host_length = 0;      // non existant dans le dns
       }
-      cache->n->n = NULL;
+      next->n = NULL;
       return sa;
     }
 
@@ -5475,6 +5479,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->bypass_limits = 0;       // enforce limits by default
   opt->state.stop = 0;          // stopper
   opt->state.exit_xh = 0;       // abort
+  //
+  opt->state.is_ended = 0;
 
   /* Alocated buffers */
 
@@ -5538,8 +5544,13 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
 
     /* Cache */
     if (opt->state.dns_cache != NULL) {
-      t_dnscache *const root = opt->state.dns_cache;
+      t_dnscache *root;
+
+      hts_mutexlock(&opt->state.lock);
+      root = opt->state.dns_cache;
       opt->state.dns_cache = NULL;
+      hts_mutexrelease(&opt->state.lock);
+
       hts_cache_free(root);
     }
 

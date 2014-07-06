@@ -217,7 +217,7 @@ int ftp_available(void);
 
 #if HTS_DNSCACHE
 void hts_cache_free(t_dnscache *const cache);
-t_dnscache *_hts_cache(httrackp * opt);
+t_dnscache *hts_cache(httrackp * opt);
 #endif
 
 // outils divers

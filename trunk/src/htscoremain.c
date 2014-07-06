@@ -86,7 +86,11 @@ extern int IPV6_resolver;
   ptr += (int) (strlen(argv[0])+2); \
   argc++
 
-#define htsmain_free() do { if (url != NULL) { free(url); } } while(0)
+#define htsmain_free() do { \
+  if (url != NULL) { \
+    free(url); \
+  } \
+} while(0)
 
 #define ensureUrlCapacity(url, urlsize, size) do { \
   if (urlsize < size || url == NULL) { \
@@ -126,8 +130,28 @@ HTSEXT_API int hts_main(int argc, char **argv) {
   return ret;
 }
 
+static int hts_main_internal(int argc, char **argv, httrackp * opt);
+
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
+  int code;
+
+  // Set ended state (3.48-14)
+  hts_mutexlock(&opt->state.lock);
+  opt->state.is_ended = 0;
+  hts_mutexrelease(&opt->state.lock);
+
+  code = hts_main_internal(argc, argv, opt);
+
+  // Set ended state (3.48-14)
+  hts_mutexlock(&opt->state.lock);
+  opt->state.is_ended = 1;
+  hts_mutexrelease(&opt->state.lock);
+
+  return code;
+}
+
+static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char **x_argv = NULL;         // Patch pour argv et argc: en cas de récupération de ligne de commande
   char *x_argvblk = NULL;       // (reprise ou update)
   int x_ptr = 0;                // offset
