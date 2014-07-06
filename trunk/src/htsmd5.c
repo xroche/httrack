@@ -49,7 +49,7 @@ Please visit our Website: http://www.httrack.com
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
-  MD5_CTX ctx;
+  struct MD5Context ctx;
 
   MD5Init(&ctx, *((char *) &endian));
   MD5Update(&ctx, (const unsigned char *) buf, (unsigned int) len);
