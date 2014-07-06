@@ -195,13 +195,17 @@ public class CleanupActivity extends ListActivity {
    * @return true if the root path is empty.
    */
   public static boolean pathIsEmpty(final File projectRootFile) {
-    return projectRootFile != null
-        && projectRootFile.listFiles(new FilenameFilter() {
-          @Override
-          public boolean accept(final File dir, final String filename) {
-            return !filename.equals(HTTrackActivity.NOMEDIA_FILE);
-          }
-        }).length != 0;
+    if (projectRootFile != null) {
+      final File[] files = projectRootFile.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(final File dir, final String filename) {
+          return !filename.equals(HTTrackActivity.NOMEDIA_FILE);
+        }
+      });
+      return files != null && files.length == 0;
+    } else {
+      return false;
+    }
   }
 
   protected boolean deleteProjects() {
