@@ -3400,7 +3400,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   char lastc = 0;
   int gotquery = 0;
   int ampargs = 0;
-  int i, j;
+  size_t i, j;
   char *query = NULL;
 
   for(i = j = 0; source[i] != '\0'; i++) {
@@ -3422,7 +3422,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   if (ampargs > 1) {
     char **amps = malloct(ampargs * sizeof(char *));
     char *copyBuff = NULL;
-    int qLen = 0;
+    size_t qLen = 0;
 
     assertf(amps != NULL);
     gotquery = 0;
@@ -3431,7 +3431,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
         if (!gotquery) {
           gotquery = 1;
           query = &dest[i];
-          qLen = (int) strlen(query);
+          qLen = strlen(query);
         }
         assertf(j < ampargs);
         amps[j++] = &dest[i];
@@ -3454,7 +3454,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
         strcatbuff(copyBuff, "&");
       strcatbuff(copyBuff, amps[i] + 1);
     }
-    assertf((int) strlen(copyBuff) <= qLen);
+    assertf(strlen(copyBuff) == qLen);
     strcpybuff(query, copyBuff);
 
     /* Cleanup */
