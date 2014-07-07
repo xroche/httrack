@@ -3438,6 +3438,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
         dest[i] = '\0';
       }
     }
+    assertf(gotquery);
     assertf(j == ampargs);
 
     /* Sort 'em all */
