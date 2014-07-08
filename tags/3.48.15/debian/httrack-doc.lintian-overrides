@@ -1,0 +1,3 @@
+extra-license-file usr/share/httrack/html/license.txt
+duplicate-changelog-files usr/share/doc/httrack/changelog.gz usr/share/doc/httrack/history.txt.gz
+extended-description-is-probably-too-short

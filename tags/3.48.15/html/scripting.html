@@ -1,0 +1,261 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Offline Browser</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h2 align="center"><em>HTTrack Programming page - scripting</em></h2>
+
+<br>
+
+We will see here several examples, written in batch script (can be adapted to almost all batch script languages) or in C.
+
+<br><br>
+
+<br><br>
+
+<table width="100%" border="0" background="img/fade.gif">
+<tr><td>
+<b>How to get one single file</b><br><br>
+<tt>
+httrack --get http://localhost/
+</tt>
+</td></tr>
+</table>
+
+<br><br>
+
+<table width="100%" border="0" background="img/fade.gif">
+<tr><td>
+<b>How to get one single file and pipe it to stdout</b><br><br>
+<tt>
+httrack --quiet --get http://localhost/ -O tmpget -V "cat \$0" | grep -iE "TITLE"
+rm -rf tmpget
+</tt>
+</td></tr>
+</table>
+
+<br><br>
+
+<table width="100%" border="0" background="img/fade.gif">
+<tr><td>
+<b>How to search in all HTML files on a website</b><br><br>
+<tt>
+httrack --skeleton http://localhost/ -V "if grep -iE \"TITLE\" \"\$0\">/dev/null; then echo \"Match found at \$0\"; fi"<br>
+rm -rf tmpget<br>
+</tt>
+
+<br>Same thing but matches only the first file:<br>
+
+<tt>
+httrack --skeleton http://localhost/ -V "if grep -iE \"TITLE\" \"\$0\">/dev/null; then echo \"Match found at \$0\"; kill -9 \$PPID; fi"<br>
+rm -rf tmpget<br>
+</tt>
+
+</td></tr>
+</table>
+
+<br><br>
+
+<table width="100%" border="0" background="img/fade.gif">
+
+<tr><td>
+<b>Indexing a website, and using the index as a search engine</b><br><br>
+
+<tt>httrack localhost -%I</tt><br>
+
+Will generate an index.txt file, which contains all detected keywords, sorted and indexed using this format:<br>
+
+<br>
+<table border="0" bgcolor="white"><tr><td>
+<i>keyword</i><br>
+&lt;tab&gt; &nbsp; <i>number_of_hits_in_current_page_for_this_keyword</i> &nbsp; <i>page_location</i><br>
+&lt;tab&gt; &nbsp; <i>number_of_hits_in_current_page_for_this_keyword</i> &nbsp; <i>page_location</i><br>
+&lt;tab&gt; &nbsp; <i>number_of_hits_in_current_page_for_this_keyword</i> &nbsp; <i>page_location</i><br>
+...<br>
+=<i>total_number_of_hits_for_this_keyword</i><br>
+(<i>(total_number_of_hits_for_this_keyword*1000)/total_number_of_keywords</i>)<br>
+</td></tr></table>
+<br>
+
+Example:
+
+<table border="0" bgcolor="white"><tr><td>
+<pre>
+
+abilities
+	1 localhost/manual/mod/index-2.html
+	1 localhost/manual/mod/index.html
+	1 localhost/manual/mod/mod_negotiation.html
+	=3
+	(0)
+ability
+	2 localhost/manual/misc/FAQ.html
+	2 localhost/manual/suexec.html
+	1 localhost/manual/handler.html
+	1 localhost/manual/misc/security_tips.html
+	1 localhost/manual/mod/mod_rewrite.html
+	1 localhost/manual/mod/mod_setenvif.html
+	1 localhost/manual/multilogs.html
+	1 localhost/manual/netware.html
+	1 localhost/manual/new_features_1_3.html
+	1 localhost/manual/windows.html
+	=12
+	(0)
+able
+	4 localhost/manual/dso.html
+	4 localhost/manual/mod/core.html
+	3 localhost/manual/dns-caveats.html
+	3 localhost/manual/mod/mod_auth.html
+	3 localhost/manual/mod/mod_rewrite.html
+	3 localhost/manual/upgrading_to_1_3.html
+	2 localhost/manual/misc/API.html
+	2 localhost/manual/misc/FAQ.html
+	2 localhost/manual/misc/windoz_keepalive.html
+	2 localhost/manual/mod/mod_auth_db.html
+	2 localhost/manual/mod/mod_auth_dbm.html
+	1 localhost/manual/misc/descriptors.html
+	1 localhost/manual/misc/fin_wait_2.html
+	1 localhost/manual/misc/security_tips.html
+	1 localhost/manual/mod/mod_auth_digest.html
+	1 localhost/manual/mod/mod_cern_meta.html
+	1 localhost/manual/mod/mod_env.html
+	1 localhost/manual/mod/mod_example.html
+	1 localhost/manual/mod/mod_unique_id.html
+	1 localhost/manual/mod/mod_usertrack.html
+	1 localhost/manual/stopping.html
+	1 localhost/manual/suexec.html
+	1 localhost/manual/vhosts/ip-based.html
+	1 localhost/manual/windows.html
+	=43
+	(0)
+</pre>
+...
+</td></tr></table>
+<br>
+
+Script example: 
+<a href="div/search.sh">search.sh</a>
+
+</td></tr>
+</table>
+
+<br><br>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

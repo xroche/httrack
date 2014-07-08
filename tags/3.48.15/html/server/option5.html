@@ -1,0 +1,302 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+.tabCtrl {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+<script language="javascript">
+<!--
+function do_load() {
+	window.status=' ';
+${do:if-not-empty:closeme}
+	window.close();
+${do:end-if}
+${do:set:closeme:}
+}
+function do_unload() {
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">${LANG_OSFWB}</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_O2} - ${LANG_IOPT5}</em></h2>
+</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+<td>
+	<a href="/step9_opt2.html" target="_blank"
+		onClick="window.open('/step9_opt2.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>${LANG_TIPHELP}</a>
+</td>
+${do:end-if}
+</tr></table>
+
+<br>
+
+<table class="tableWidth" border="0" width="100%" cellspacing="0">
+<tr>
+
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option1.html" onClick="form.redirect.value='option1.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT1}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT1}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option2.html" onClick="form.redirect.value='option2.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT2}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT2}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option3.html" onClick="form.redirect.value='option3.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT3}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT3}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option4.html" onClick="form.redirect.value='option4.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT4}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT4}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option5.html" onClick="form.redirect.value='option5.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT5}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT5}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option11.html" onClick="form.redirect.value='option11.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT11}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT11}</a></td>
+</tr><tr>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option6.html" onClick="form.redirect.value='option6.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT6}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT6}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option7.html" onClick="form.redirect.value='option7.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT7}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT7}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option8.html" onClick="form.redirect.value='option8.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT8}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT8}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option9.html" onClick="form.redirect.value='option9.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT9}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT9}</a></td>
+<td class="tabCtrl" align="center"><a style="background:black;color: white" href="option10.html" onClick="form.redirect.value='option10.html'; form.submit(); return false;" align="center" onMouseOver="info('${LANG_IOPT10}'); return true" onMouseOut="info('&nbsp;'); return true">${LANG_IOPT10}</a></td>
+<td class="tabCtrl" align="center">&nbsp;</td>
+
+</tr>
+</table>
+
+<br><br>
+
+<table>
+<tr><td>
+
+<form method="POST" action="${thisfile}" name="form">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="redirect" value="">
+<input type="hidden" name="closeme" value="">
+
+<table border="0" width="100%" cellspacing="0">
+
+<tr><td>
+${LANG_G32}
+</td><td>
+<input name="depth" value="${depth}" size="4"
+			onMouseOver="info('${LANG_I1g}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_G32b}
+</td><td>
+<input name="depth2" value="${depth2}" size="4"
+			onMouseOver="info('${LANG_I1g2}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I50}
+</td><td>
+<input name="maxhtml" value="${maxhtml}" size="4"
+			onMouseOver="info('${LANG_I18}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I50b}
+</td><td>
+<input name="othermax" value="${othermax}" size="4"
+			onMouseOver="info('${LANG_I19}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I51}
+</td><td>
+<input name="sizemax" value="${sizemax}" size="4"
+			onMouseOver="info('${LANG_I20}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I65}
+</td><td>
+<input name="pausebytes" value="${pausebytes}" size="4"
+			onMouseOver="info('${LANG_I20b}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I52}
+</td><td>
+<input name="maxtime" value="${maxtime}" size="4"
+			onMouseOver="info('${LANG_I21}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I54}
+</td><td>
+<input name="maxrate" value="${maxrate}" size="4"
+			onMouseOver="info('${LANG_I22}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I64}
+</td><td>
+<input name="maxconn" value="${maxconn}" size="4"
+			onMouseOver="info('${LANG_I22b}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+${LANG_I64b}
+</td><td>
+<input name="maxlinks" value="${maxlinks}" size="4"
+			onMouseOver="info('${LANG_I22c}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+<tr><td>
+	<table width="100%">
+	<tr><td align="left">
+	<input type="submit" value="${LANG_OK}"
+				onClick="form.closeme.value=1; form.submit(); return false;"
+				onMouseOver="info('${LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>
+	</td><td align="right">
+	<input type="button" value="${LANG_CANCEL}"
+				onClick="window.close();"
+				onMouseOver="info('${LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>
+	</td></tr>
+	</table>
+</td></tr>
+
+</table>
+
+</form>
+
+</td></tr>
+
+</table>
+
+
+
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+
