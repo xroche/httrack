@@ -43,7 +43,7 @@ Please visit our Website: http://www.httrack.com
  * Emergency logging.
  * Default is to use libhttrack one.
  */
-#ifndef HTSSAFE_ABORT_FUNCTION
+#if (!defined(HTSSAFE_ABORT_FUNCTION) && defined(LIBHTTRACK_EXPORTS))
 
 /** Assert error callback. **/
 #ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
@@ -93,7 +93,9 @@ static HTS_UNUSED void log_abort_(const char *msg, const char *file, int line) {
 }
 
 static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
+#ifdef HTSSAFE_ABORT_FUNCTION
   HTSSAFE_ABORT_FUNCTION(exp, file, line);
+#endif
   log_abort_(exp, file, line);
   abort();
 }
