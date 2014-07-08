@@ -186,6 +186,7 @@ HTSEXT_API void hts_cancel_test(httrackp * opt);
 HTSEXT_API void hts_cancel_parsing(httrackp * opt);
 HTSEXT_API void hts_cancel_test(httrackp * opt);
 HTSEXT_API void hts_cancel_parsing(httrackp * opt);
+HTSEXT_API int hts_has_stopped(httrackp * opt);
 
 /* Tools */
 HTSEXT_API int structcheck(const char *path);
@@ -198,9 +199,12 @@ HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n);
 HTSEXT_API char *int2bytes(strc_int2bytes2 * strc, LLint n);
 HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n);
 HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n);
-HTSEXT_API char *jump_identification(const char *);
-HTSEXT_API char *jump_normalized(const char *);
-HTSEXT_API char *jump_toport(const char *);
+HTSEXT_API char *jump_identification(char *);
+HTSEXT_API const char *jump_identification_const(const char *);
+HTSEXT_API char *jump_normalized(char *);
+HTSEXT_API const char *jump_normalized_const(const char *);
+HTSEXT_API char *jump_toport(char *);
+HTSEXT_API const char *jump_toport_const(const char *);
 HTSEXT_API char *fil_normalized(const char *source, char *dest);
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
 HTSEXT_API const char *hts_rootdir(char *file);

@@ -35,6 +35,18 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 
+#ifdef _WIN32
+#include <stddef.h>
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
+#elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
+  || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
+#include <inttypes.h>
+#else
+#include <stdint.h>
+#endif
+#include <stdarg.h>
+
 int hts_isStringAscii(const char *s, size_t size) {
   size_t i;
 
@@ -441,7 +453,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
     const iconv_t cp = iconv_open(to, from);
 
     if (cp != (iconv_t) - 1) {
-      char *inbuf = (char *) s;
+      char *inbuf = (char*) (uintptr_t) s; /* ugly iconv api, sheesh */
       size_t inbytesleft = size;
       size_t outbufCapa = 0;
       char *outbuf = NULL;

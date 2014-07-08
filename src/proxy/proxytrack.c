@@ -129,7 +129,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsglobal.h"
 
 /* htsweb */
-#include "htsinthash.h"
+#include "coucal.h"
 
 /* ProxyTrack */
 #include "proxytrack.h"

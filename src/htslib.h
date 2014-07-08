@@ -163,7 +163,7 @@ struct t_dnscache {
 void hts_init_htsblk(htsblk * r);
 
 // attach specific project log to hachtable logger
-void hts_set_hash_handler(inthash hashtable, httrackp *opt);
+void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
 // version
 HTSEXT_API const char* hts_version(void);
@@ -217,7 +217,7 @@ int ftp_available(void);
 
 #if HTS_DNSCACHE
 void hts_cache_free(t_dnscache *const cache);
-t_dnscache *_hts_cache(httrackp * opt);
+t_dnscache *hts_cache(httrackp * opt);
 #endif
 
 // outils divers
@@ -243,7 +243,7 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 int linput_trim(FILE * fp, char *s, int max);
 int linput_cpp(FILE * fp, char *s, int max);
 void rawlinput(FILE * fp, char *s, int max);
-char *strstrcase(char *s, const char *o);
+const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
 int is_unicode_utf8(const char *buffer, const size_t size);
@@ -259,9 +259,9 @@ void give_mimext(char *s, const char *st);
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
-char *strrchr_limit(const char *s, char c, const char *limit);
-char *strstr_limit(const char *s, const char *sub, const char *limit);
-HTS_INLINE char *jump_protocol(const char *source);
+const char *strrchr_limit(const char *s, char c, const char *limit);
+char *jump_protocol(char *source);
+const char *jump_protocol_const(const char *source);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)
@@ -444,7 +444,7 @@ HTS_STATIC int strfield(const char *f, const char *s) {
     return 0;
 }
 
-HTS_STATIC int strcmpnocase(char *a, char *b) {
+HTS_STATIC int strcmpnocase(const char *a, const char *b) {
   while(*a) {
     int cmp = hichar(*a) - hichar(*b);
 
@@ -541,7 +541,7 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
 
 // returns (size_t) -1 upon error
 static HTS_UNUSED size_t off_t_to_size_t(off_t o) {
-  if (o >= 0 && o < ( (size_t) -1 ) / 2) {
+  if (o >= 0 && o < (off_t) ( (size_t) -1 ) / 2) {
     return (size_t) o;
   } else {
     return (size_t) -1;

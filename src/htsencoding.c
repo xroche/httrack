@@ -270,7 +270,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
         /* First character */
         if (k == 0) {
           /* New destination-centric offset of utf-8 buffer beginning */
-          if (i == lastI + 2) {  /* just read a %xx */
+          if (lastI != (size_t) -1 && i == lastI + 2) {  /* just read a %xx */
             utfBufferJ = lastJ;  /* position of % */
           } else {
             utfBufferJ = j;      /* current position otherwise */

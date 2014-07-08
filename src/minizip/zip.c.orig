@@ -186,7 +186,7 @@ typedef struct
 #include "crypt.h"
 #endif
 
-local linkedlist_datablock_internal* allocate_new_datablock(void)
+local linkedlist_datablock_internal* allocate_new_datablock()
 {
     linkedlist_datablock_internal* ldi;
     ldi = (linkedlist_datablock_internal*)
@@ -238,7 +238,7 @@ local int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len)
     }
 
     ldi = ll->last_block;
-    from_copy = (const unsigned char*)buf;
+    from_copy = (unsigned char*)buf;
 
     while (len>0)
     {
@@ -637,7 +637,7 @@ local ZPOS64_T zip64local_SearchCentralDir64(const zlib_filefunc64_32_def* pzlib
   return relativeOffset;
 }
 
-local int LoadCentralDirectoryRecord(zip64_internal* pziinit)
+int LoadCentralDirectoryRecord(zip64_internal* pziinit)
 {
   int err=ZIP_OK;
   ZPOS64_T byte_before_the_zipfile;/* byte before the zipfile, (>0 for sfx)*/
@@ -955,7 +955,7 @@ extern zipFile ZEXPORT zipOpen64 (const void* pathname, int append)
     return zipOpen3(pathname,append,NULL,NULL);
 }
 
-local int Write_LocalFileHeader(zip64_internal* zi, const char* filename, uInt size_extrafield_local, const void* extrafield_local)
+int Write_LocalFileHeader(zip64_internal* zi, const char* filename, uInt size_extrafield_local, const void* extrafield_local)
 {
   /* write the local header */
   int err;
@@ -1416,7 +1416,7 @@ extern int ZEXPORT zipWriteInFileInZip (zipFile file,const void* buf,unsigned in
 #ifdef HAVE_BZIP2
     if(zi->ci.method == Z_BZIP2ED && (!zi->ci.raw))
     {
-      zi->ci.bstream.next_in = buf;
+      zi->ci.bstream.next_in = (void*)buf;
       zi->ci.bstream.avail_in = len;
       err = BZ_RUN_OK;
 
@@ -1450,7 +1450,7 @@ extern int ZEXPORT zipWriteInFileInZip (zipFile file,const void* buf,unsigned in
     else
 #endif
     {
-      zi->ci.stream.next_in = buf;
+      zi->ci.stream.next_in = (Bytef*)buf;
       zi->ci.stream.avail_in = len;
 
       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
@@ -1752,7 +1752,7 @@ extern int ZEXPORT zipCloseFileInZip (zipFile file)
     return zipCloseFileInZipRaw (file,0,0);
 }
 
-local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip)
+int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip)
 {
   int err = ZIP_OK;
   ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writting_offset;
@@ -1774,7 +1774,7 @@ local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T z
     return err;
 }
 
-local int Write_Zip64EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_centraldir, ZPOS64_T centraldir_pos_inzip)
+int Write_Zip64EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_centraldir, ZPOS64_T centraldir_pos_inzip)
 {
   int err = ZIP_OK;
 
@@ -1813,8 +1813,7 @@ local int Write_Zip64EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_
   }
   return err;
 }
-
-local int Write_EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_centraldir, ZPOS64_T centraldir_pos_inzip)
+int Write_EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_centraldir, ZPOS64_T centraldir_pos_inzip)
 {
   int err = ZIP_OK;
 
@@ -1862,7 +1861,7 @@ local int Write_EndOfCentralDirectoryRecord(zip64_internal* zi, uLong size_centr
    return err;
 }
 
-local int Write_GlobalComment(zip64_internal* zi, const char* global_comment)
+int Write_GlobalComment(zip64_internal* zi, const char* global_comment)
 {
   int err = ZIP_OK;
   uInt size_global_comment = 0;
@@ -1878,18 +1877,6 @@ local int Write_GlobalComment(zip64_internal* zi, const char* global_comment)
       err = ZIP_ERRNO;
   }
   return err;
-}
-
-extern int ZEXPORT zipFlush (zipFile file)
-{
-    zip64_internal* zi;
-
-    if (file == NULL)
-        return ZIP_PARAMERROR;
-
-    zi = (zip64_internal*)file;
-
-    return ZFLUSH64(zi->z_filefunc,zi->filestream);
 }
 
 extern int ZEXPORT zipClose (zipFile file, const char* global_comment)

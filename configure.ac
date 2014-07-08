@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([httrack], [3.48.13], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.48.15], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2014 Xavier Roche and other contributors
@@ -52,8 +52,9 @@ AC_SUBST(VERSION_INFO)
 
 ### Default CFLAGS
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
--Wmultichar -Wwrite-strings -Wcast-align -Wstrict-prototypes \
--Wmissing-prototypes -Wmissing-declarations -Wdeclaration-after-statement \
+-Wmultichar -Wwrite-strings -Wcast-qual -Wcast-align \
+-Wstrict-prototypes -Wmissing-prototypes \
+-Wmissing-declarations -Wdeclaration-after-statement \
 -Wpointer-arith -Wsequence-point -Wnested-externs \
 -D_REENTRANT"
 AC_SUBST(DEFAULT_CFLAGS)
@@ -63,10 +64,15 @@ AC_SUBST(DEFAULT_LDFLAGS)
 ### Additional flags (if supported)
 AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"])
 AX_CHECK_COMPILE_FLAG([-Winit-self], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"])
+AX_CHECK_COMPILE_FLAG([-Wunused-but-set-parameter], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wunused-but-set-parameter"])
+AX_CHECK_COMPILE_FLAG([-Waddress], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Waddress"])
 AX_CHECK_COMPILE_FLAG([-Wuninitialized], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wuninitialized"])
 AX_CHECK_COMPILE_FLAG([-Wformat=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat=2"])
 AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat-nonliteral"])
-AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing=2"])
+AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"])
+AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"])
+AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"])
+AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"])
 AX_CHECK_LINK_FLAG([-Wl,--discard-all], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--discard-all"])
 AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--no-undefined"])
 
@@ -106,6 +112,9 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 #include <sys/types.h>
 #include <netinet/in.h>
 ])
+
+# check wether misaligned access is possible or not
+AX_CHECK_ALIGNED_ACCESS_REQUIRED
 
 ### zlib
 CHECK_ZLIB()

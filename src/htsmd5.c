@@ -49,7 +49,7 @@ Please visit our Website: http://www.httrack.com
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
   int endian = 1;
   unsigned char bindigest[16];
-  MD5_CTX ctx;
+  struct MD5Context ctx;
 
   MD5Init(&ctx, *((char *) &endian));
   MD5Update(&ctx, (const unsigned char *) buf, (unsigned int) len);
@@ -80,7 +80,7 @@ unsigned long int md5sum32(const char *buff) {
   return u.hash;
 }
 
-void md5selftest() {
+void md5selftest(void) {
   static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
   static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";
   static const char str2[] = "Hello";

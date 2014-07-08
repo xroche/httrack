@@ -86,7 +86,11 @@ extern int IPV6_resolver;
   ptr += (int) (strlen(argv[0])+2); \
   argc++
 
-#define htsmain_free() do { if (url != NULL) { free(url); } } while(0)
+#define htsmain_free() do { \
+  if (url != NULL) { \
+    free(url); \
+  } \
+} while(0)
 
 #define ensureUrlCapacity(url, urlsize, size) do { \
   if (urlsize < size || url == NULL) { \
@@ -126,8 +130,28 @@ HTSEXT_API int hts_main(int argc, char **argv) {
   return ret;
 }
 
+static int hts_main_internal(int argc, char **argv, httrackp * opt);
+
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
+  int code;
+
+  // Set ended state (3.48-14)
+  hts_mutexlock(&opt->state.lock);
+  opt->state.is_ended = 0;
+  hts_mutexrelease(&opt->state.lock);
+
+  code = hts_main_internal(argc, argv, opt);
+
+  // Set ended state (3.48-14)
+  hts_mutexlock(&opt->state.lock);
+  opt->state.is_ended = 1;
+  hts_mutexrelease(&opt->state.lock);
+
+  return code;
+}
+
+static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char **x_argv = NULL;         // Patch pour argv et argc: en cas de récupération de ligne de commande
   char *x_argvblk = NULL;       // (reprise ou update)
   int x_ptr = 0;                // offset
@@ -1984,7 +2008,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                   int found = 0;
                   char *filter = NULL;
                   cache_back cache;
-                  inthash cache_hashtable = inthash_new(0);
+                  coucal cache_hashtable = coucal_new(0);
                   int sendb = 0;
 
                   if (isdigit((unsigned char) *(com + 1))) {
@@ -2515,7 +2539,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 
                   /* successfully read */
                   if (count > 0) {
-                    inthash hashtable = inthash_new(0);
+                    coucal hashtable = coucal_new(0);
                     size_t loop;
                     for(loop = 0 ; bench[loop].type != DO_END ; loop++) {
                       size_t i;
@@ -2526,9 +2550,9 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         if (bench[loop].type == DO_ADD
                             || bench[loop].type == DO_DRY_ADD) {
                           size_t k;
-                          result = inthash_write(hashtable, name, (uintptr_t) expected);
+                          result = coucal_write(hashtable, name, (uintptr_t) expected);
                           for(k = 0 ; k < /* stash_size*2 */ 32 ; k++) {
-                            (void) inthash_write(hashtable, name, (uintptr_t) expected);
+                            (void) coucal_write(hashtable, name, (uintptr_t) expected);
                           }
                           /* revert logic */
                           if (bench[loop].type == DO_DRY_ADD) {
@@ -2538,9 +2562,9 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         else if (bench[loop].type == DO_DEL
                             || bench[loop].type == DO_DRY_DEL) {
                           size_t k;
-                          result = inthash_remove(hashtable, name);
+                          result = coucal_remove(hashtable, name);
                           for(k = 0 ; k < /* stash_size*2 */ 32 ; k++) {
-                            (void) inthash_remove(hashtable, name);
+                            (void) coucal_remove(hashtable, name);
                           }
                           /* revert logic */
                           if (bench[loop].type == DO_DRY_DEL) {
@@ -2550,7 +2574,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         else if (bench[loop].type == TEST_ADD
                             || bench[loop].type == TEST_DEL) {
                           intptr_t value = -1;
-                          result = inthash_readptr(hashtable, name, &value);
+                          result = coucal_readptr(hashtable, name, &value);
                           if (bench[loop].type == TEST_ADD && result
                               && value != expected) {
                             fprintf(stderr, "value failed for %s (expected %ld, got %ld)\n",
@@ -2573,7 +2597,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
                         }
                       }
                     }
-                    inthash_delete(&hashtable);
+                    coucal_delete(&hashtable);
                     fprintf(stderr, "all hashtable tests were successful!\n");
                   } else {
                     fprintf(stderr, "Malformed number\n");

@@ -1,5 +1,5 @@
---- zip.c.orig	2013-02-24 08:32:30.000000000 +0100
-+++ zip.c	2014-05-24 13:52:45.570151611 +0200
+--- zip.c.orig	2014-06-10 18:55:32.778807408 +0200
++++ zip.c	2014-06-11 20:27:18.355848501 +0200
 @@ -186,7 +186,7 @@
  #include "crypt.h"
  #endif
@@ -9,6 +9,15 @@
  {
      linkedlist_datablock_internal* ldi;
      ldi = (linkedlist_datablock_internal*)
+@@ -238,7 +238,7 @@
+     }
+ 
+     ldi = ll->last_block;
+-    from_copy = (unsigned char*)buf;
++    from_copy = (const unsigned char*)buf;
+ 
+     while (len>0)
+     {
 @@ -637,7 +637,7 @@
    return relativeOffset;
  }
@@ -27,6 +36,24 @@
  {
    /* write the local header */
    int err;
+@@ -1416,7 +1416,7 @@
+ #ifdef HAVE_BZIP2
+     if(zi->ci.method == Z_BZIP2ED && (!zi->ci.raw))
+     {
+-      zi->ci.bstream.next_in = (void*)buf;
++      zi->ci.bstream.next_in = buf;
+       zi->ci.bstream.avail_in = len;
+       err = BZ_RUN_OK;
+ 
+@@ -1450,7 +1450,7 @@
+     else
+ #endif
+     {
+-      zi->ci.stream.next_in = (Bytef*)buf;
++      zi->ci.stream.next_in = buf;
+       zi->ci.stream.avail_in = len;
+ 
+       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
 @@ -1752,7 +1752,7 @@
      return zipCloseFileInZipRaw (file,0,0);
  }

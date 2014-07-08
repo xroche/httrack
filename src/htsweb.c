@@ -58,7 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsthread.h"
 
 /* External modules */
-#include "htsinthash.c"
+#include "coucal.c"
 #include "htsmd5.c"
 #include "md5.c"
 
