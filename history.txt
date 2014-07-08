@@ -4,7 +4,12 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.48-13
+3.48-14
++ Fixed: buggy FFFD (replacement character) in place of leading non-ascii character such as Chinese ones (aballboy)
++ Fixed: FTBFS when compiling with zlib versions < 1.2.70 (sammyx)
++ Fixed: buggy SVG (Smiling Spectre)
++ Fixed: do not uncompress .tgz advertised as "streamed" (Smiling Spectre)
++ Fixed: NULL pointer dereferencing in back_unserialize (htsback.c:976)
 + Fixed: library development files
 + Fixed: --advanced-maxlinks broken (Localhost)
 + Fixed: -devel package should now be standalone
