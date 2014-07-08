@@ -45,7 +45,7 @@ static long int  timezone = 0;
 #include "htsglobal.h"
 
 #define HTS_INTERNAL_BYTECODE
-#include "htsinthash.h"
+#include "coucal.h"
 #include "htsmd5.h"
 #undef HTS_INTERNAL_BYTECODE
 #include "../minizip/mztools.h"
@@ -168,7 +168,7 @@ static _PT_Index_Functions _IndexFuncts[] = {
 
 #define PT_INDEX_COMMON_STRUCTURE \
 	time_t timestamp;								\
-	inthash hash;										\
+	coucal hash;										\
 	char startUrl[1024]
 
 struct _PT_Index__New {
@@ -216,7 +216,7 @@ struct _PT_Index {
 };
 
 struct _PT_Indexes {
-  inthash cil;
+  coucal cil;
   struct _PT_Index **index;
   int index_size;
 };
@@ -228,7 +228,7 @@ struct _PT_CacheItem {
 };
 
 struct _PT_Cache {
-  inthash index;
+  coucal index;
   size_t maxSize;
   size_t totalSize;
   int count;
@@ -237,8 +237,8 @@ struct _PT_Cache {
 PT_Indexes PT_New(void) {
   PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
 
-  index->cil = inthash_new(0);
-  inthash_set_name(index->cil, "index->cil");
+  index->cil = coucal_new(0);
+  coucal_set_name(index->cil, "index->cil");
   index->index_size = 0;
   index->index = NULL;
   return index;
@@ -246,7 +246,7 @@ PT_Indexes PT_New(void) {
 
 void PT_Delete(PT_Indexes index) {
   if (index != NULL) {
-    inthash_delete(&index->cil);
+    coucal_delete(&index->cil);
     free(index);
   }
 }
@@ -322,7 +322,7 @@ static void PT_Index_Delete__New(PT_Index * pindex) {
       index->zFile = NULL;
     }
     if (index->hash != NULL) {
-      inthash_delete(&index->hash);
+      coucal_delete(&index->hash);
       index->hash = NULL;
     }
     MutexFree(&index->zFileLock);
@@ -340,7 +340,7 @@ static void PT_Index_Delete__Old(PT_Index * pindex) {
       fclose(index->ndx);
     }
     if (index->hash != NULL) {
-      inthash_delete(&index->hash);
+      coucal_delete(&index->hash);
       index->hash = NULL;
     }
     MutexFree(&index->fileLock);
@@ -429,13 +429,13 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     String listindexes = STRING_EMPTY;
     String subitem = STRING_EMPTY;
     unsigned int listCount = 0;
-    struct_inthash_enum en = inthash_enum_new(indexes->cil);
-    inthash_chain *chain;
-    inthash hdupes = NULL;
+    struct_coucal_enum en = coucal_enum_new(indexes->cil);
+    coucal_item *chain;
+    coucal hdupes = NULL;
 
     if (!subtree) {
-      hdupes = inthash_new(0);
-      inthash_set_name(hdupes, "hdupes");
+      hdupes = coucal_new(0);
+      coucal_set_name(hdupes, "hdupes");
     }
     StringClear(list);
     StringClear(listindexes);
@@ -443,12 +443,12 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
     urlSize = (unsigned int) strlen(url);
-    while((chain = inthash_enum_next(&en))) {
+    while((chain = coucal_enum_next(&en))) {
       long int index = (long int) chain->value.intg;
 
       if (urlSize == 0 || strncmp(chain->name, url, urlSize) == 0) {
         if (index >= 0 && index < indexes->index_size) {
-          char *item = chain->name + urlSize;
+          char *item = (char*) chain->name + urlSize;
 
           if (*item == '/')
             item++;
@@ -462,7 +462,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
               StringClear(subitem);
               if (len > 0)
                 StringMemcat(subitem, item, len);
-              if (len == 0 || !inthash_exists(hdupes, StringBuff(subitem))) {
+              if (len == 0 || !coucal_exists(hdupes, StringBuff(subitem))) {
                 char *ptr = NULL;
 
                 ptr += StringLength(list);
@@ -473,7 +473,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
                 StringMemcat(list, "\0", 1);    /* NULL terminated strings */
                 StringMemcat(listindexes, (char*) &ptr, sizeof(ptr));
                 listCount++;
-                inthash_write(hdupes, StringBuff(subitem), 0);
+                coucal_write(hdupes, StringBuff(subitem), 0);
               }
             }
           }
@@ -484,7 +484,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
       }
     }
     StringFree(subitem);
-    inthash_delete(&hdupes);
+    coucal_delete(&hdupes);
     if (listCount > 0) {
       unsigned int i;
       void *blk;
@@ -553,8 +553,8 @@ PT_Index PT_LoadCache(const char *filename) {
       index->type = type;
       index->slots.common.timestamp = (time_t) time(NULL);
       index->slots.common.startUrl[0] = '\0';
-      index->slots.common.hash = inthash_new(0);
-      inthash_set_name(index->slots.common.hash, "index->slots.common.hash");
+      index->slots.common.hash = coucal_new(0);
+      coucal_set_name(index->slots.common.hash, "index->slots.common.hash");
       if (!_IndexFuncts[type].PT_LoadCache(index, filename)) {
         proxytrack_print_log(DEBUG,
                              "reading httrack cache (format #%d) %s : error",
@@ -569,12 +569,12 @@ PT_Index PT_LoadCache(const char *filename) {
       }
       /* default starting URL is the first hash entry */
       if (index->slots.common.startUrl[0] == '\0') {
-        struct_inthash_enum en = inthash_enum_new(index->slots.common.hash);
-        inthash_chain *chain;
+        struct_coucal_enum en = coucal_enum_new(index->slots.common.hash);
+        coucal_item *chain;
 
-        chain = inthash_enum_next(&en);
+        chain = coucal_enum_next(&en);
         if (chain != NULL && strstr(chain->name, "/robots.txt") != NULL) {
-          chain = inthash_enum_next(&en);
+          chain = coucal_enum_next(&en);
         }
         if (chain != NULL) {
           if (!link_has_authority(chain->name))
@@ -625,10 +625,10 @@ int PT_EnumCache(PT_Indexes indexes,
                  int (*callback) (void *, const char *url, PT_Element),
                  void *arg) {
   if (indexes != NULL && indexes->cil != NULL) {
-    struct_inthash_enum en = inthash_enum_new(indexes->cil);
-    inthash_chain *chain;
+    struct_coucal_enum en = coucal_enum_new(indexes->cil);
+    coucal_item *chain;
 
-    while((chain = inthash_enum_next(&en))) {
+    while((chain = coucal_enum_next(&en))) {
       const long int index_id = (long int) chain->value.intg;
       const char *const url = chain->name;
 
@@ -677,7 +677,7 @@ static int PT_LookupCache__New_u(PT_Index index_, const char *url) {
 
       if (strncmp(url, "http://", 7) == 0)
         url += 7;
-      hash_pos_return = inthash_read(index->hash, url, NULL);
+      hash_pos_return = coucal_read(index->hash, url, NULL);
       if (hash_pos_return)
         return 1;
     }
@@ -689,8 +689,8 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
   if (pindex != NULL && *pindex != NULL && (*pindex)->slots.common.hash != NULL
       && indexes != NULL) {
     PT_Index index = *pindex;
-    struct_inthash_enum en = inthash_enum_new(index->slots.common.hash);
-    inthash_chain *chain;
+    struct_coucal_enum en = coucal_enum_new(index->slots.common.hash);
+    coucal_item *chain;
     int index_id = indexes->index_size++;
     int nMerged = 0;
 
@@ -699,13 +699,13 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
                  sizeof(struct _PT_Index) * indexes->index_size)) != NULL) {
       indexes->index[index_id] = index;
       *pindex = NULL;
-      while((chain = inthash_enum_next(&en)) != NULL) {
+      while((chain = coucal_enum_next(&en)) != NULL) {
         const char *url = chain->name;
 
         if (url != NULL && url[0] != '\0') {
           intptr_t previous_index_id = 0;
 
-          if (inthash_read(indexes->cil, url, &previous_index_id)) {
+          if (coucal_read(indexes->cil, url, &previous_index_id)) {
             if (previous_index_id >= 0
                 && previous_index_id < indexes->index_size) {
               if (indexes->index[previous_index_id]->slots.common.timestamp > index->slots.common.timestamp)    // existing entry is newer
@@ -715,7 +715,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
                                    "PT_IndexMerge:Corrupted central index locator");
             }
           }
-          inthash_write(indexes->cil, chain->name, index_id);
+          coucal_write(indexes->cil, chain->name, index_id);
           nMerged++;
         }
       }
@@ -756,7 +756,7 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags) {
 
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
-    if (inthash_read(indexes->cil, url, &index_id)) {
+    if (coucal_read(indexes->cil, url, &index_id)) {
       if (index_id >= 0 && index_id <= indexes->index_size) {
         PT_Element item = PT_ReadCache(indexes->index[index_id], url, flags);
 
@@ -779,7 +779,7 @@ int PT_LookupIndex(PT_Indexes indexes, const char *url) {
 
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
-    if (inthash_read(indexes->cil, url, &index_id)) {
+    if (coucal_read(indexes->cil, url, &index_id)) {
       if (index_id >= 0 && index_id <= indexes->index_size) {
         return 1;
       } else {
@@ -890,7 +890,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
     if (zFile != NULL) {
       const char *abpath;
       int slashes;
-      inthash hashtable = index->hash;
+      coucal hashtable = index->hash;
 
       /* Compute base path for this index - the filename MUST be absolute! */
       for(slashes = 2, abpath = filename + (int) strlen(filename) - 1;
@@ -960,9 +960,9 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                   }
                 }
                 if (dataincache)
-                  inthash_add(hashtable, filenameIndex, pos);
+                  coucal_add(hashtable, filenameIndex, pos);
                 else
-                  inthash_add(hashtable, filenameIndex, -pos);
+                  coucal_add(hashtable, filenameIndex, -pos);
 
                 /* First link as starting URL */
                 if (!firstSeen) {
@@ -987,7 +987,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
         } while(unzGoToNextFile(zFile) == Z_OK);
         return 1;
       } else {
-        inthash_delete(&index->hash);
+        coucal_delete(&index->hash);
         index = NULL;
       }
     } else {
@@ -1020,7 +1020,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
   strcpy(r->location, "");
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
-  hash_pos_return = inthash_read(index->hash, url, &hash_pos);
+  hash_pos_return = coucal_read(index->hash, url, &hash_pos);
 
   if (hash_pos_return) {
     uLong posInZip;
@@ -1523,7 +1523,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
               sscanf(linepos, "%d", &pos);
 
               /* Add entry */
-              inthash_add(cache->hash, line, pos);
+              coucal_add(cache->hash, line, pos);
 
               /* First link as starting URL */
               if (!firstSeen) {
@@ -1614,7 +1614,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
   strcpy(r->location, "");
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
-  hash_pos_return = inthash_read(cache->hash, url, &hash_pos);
+  hash_pos_return = coucal_read(cache->hash, url, &hash_pos);
 
   if (hash_pos_return) {
     int pos = (int) hash_pos;   /* simply */
@@ -1848,7 +1848,7 @@ static int PT_LookupCache__Old_u(PT_Index index_, const char *url) {
       return 0;
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
-    if (inthash_read(cache->hash, url, NULL))
+    if (coucal_read(cache->hash, url, NULL))
       return 1;
   }
   return 0;
@@ -2002,7 +2002,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
 
     // Opened ?
     if (index->file != NULL) {
-      inthash hashtable = index->hash;
+      coucal hashtable = index->hash;
 
       if (readArcURLRecord(index) == 0) {
         int entries = 0;
@@ -2046,7 +2046,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
                 }
                 /*fprintf(stdout, "adding %s [%d]\n", filenameIndex, (int)fpos); */
                 if (PT_CompatibleScheme(index->filenameIndexBuff)) {
-                  inthash_add(hashtable, filenameIndex, fpos);  /* position of meta-data */
+                  coucal_add(hashtable, filenameIndex, fpos);  /* position of meta-data */
                   entries++;
                 }
               } else {
@@ -2123,7 +2123,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
   strcpy(r->location, "");
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
-  hash_pos_return = inthash_read(index->hash, url, &hash_pos);
+  hash_pos_return = coucal_read(index->hash, url, &hash_pos);
 
   if (hash_pos_return) {
     if (fseek(index->file, (long) hash_pos, SEEK_SET) == 0) {
@@ -2266,7 +2266,7 @@ static int PT_LookupCache__Arc_u(PT_Index index_, const char *url) {
       return 0;
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
-    if (inthash_read(cache->hash, url, NULL))
+    if (coucal_read(cache->hash, url, NULL))
       return 1;
   }
   return 0;

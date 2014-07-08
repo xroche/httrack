@@ -194,15 +194,15 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       /* patch scheme if necessary */
       if (strfield(lien, "http:")) {
         lien += 5;
-        strcpybuff(adrfil->adr, jump_protocol(origin_adr));     // même adresse ; protocole vide (http)
+        strcpybuff(adrfil->adr, jump_protocol_const(origin_adr));     // même adresse ; protocole vide (http)
       } else if (strfield(lien, "https:")) {
         lien += 6;
         strcpybuff(adrfil->adr, "https://");    // même adresse forcée en https
-        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
+        strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
       } else if (strfield(lien, "ftp:")) {
         lien += 4;
         strcpybuff(adrfil->adr, "ftp://");      // même adresse forcée en ftp
-        strcatbuff(adrfil->adr, jump_protocol(origin_adr));
+        strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
       } else {
         strcpybuff(adrfil->adr, origin_adr);    // même adresse ; et même éventuel protocole
       }
@@ -395,7 +395,7 @@ int link_has_authority(const char *lien) {
 }
 
 int link_has_authorization(const char *lien) {
-  const char *adr = jump_protocol(lien);
+  const char *adr = jump_protocol_const(lien);
   const char *firstslash = strchr(adr, '/');
   const char *detect = strchr(adr, '@');
 
@@ -415,14 +415,15 @@ void long_to_83(int mode, char *n83, char *save) {
 
   while(*save) {
     char fn83[256], fnl[256];
-    int i = 0;
+    size_t i, j;
 
     fn83[0] = fnl[0] = '\0';
-    while((save[i]) && (save[i] != '/')) {
-      fnl[i] = save[i];
-      i++;
+    for(i = j = 0 ; save[i] && save[i] != '/' ; i++) {
+      if (j + 1 < sizeof(fnl)) {
+        fnl[j++] = save[i];
+      }
     }
-    fnl[i] = '\0';
+    fnl[j] = '\0';
     // conversion
     longfile_to_83(mode, fn83, fnl);
     strcatbuff(n83, fn83);
@@ -748,8 +749,8 @@ int istoobig(httrackp * opt, LLint size, LLint maxhtml, LLint maxnhtml,
 
 static int sortTopIndexFnc(const void *a_, const void *b_) {
   int cmp;
-  topindex_chain **a = (topindex_chain **) a_;
-  topindex_chain **b = (topindex_chain **) b_;
+  const topindex_chain *const*const a = (const topindex_chain *const*) a_;
+  const topindex_chain *const*const b = (const topindex_chain *const*) b_;
 
   /* Category first, then name */
   if ((cmp = (*a)->level - (*b)->level) == 0) {
@@ -1079,7 +1080,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
   String profiles = STRING_EMPTY;
   char *rpath = path;
   find_handle h;
-  inthash hashCateg = NULL;
+  coucal hashCateg = NULL;
 
   if (rpath[0]) {
     if (rpath[strlen(rpath) - 1] == '/') {
@@ -1091,8 +1092,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     String iname = STRING_EMPTY;
 
     if (type == 1) {
-      hashCateg = inthash_new(0);
-      inthash_set_name(hashCateg, "hashCateg");
+      hashCateg = coucal_new(0);
+      coucal_set_name(hashCateg, "hashCateg");
       StringCat(categ, "Test category 1");
       StringCat(categ, "\r\nTest category 2");
     }
@@ -1117,8 +1118,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
                 if (n > 0) {
                   if (strfield(line2, "category=")) {
                     if (*(line2 + 9)) {
-                      if (!inthash_read(hashCateg, line2 + 9, NULL)) {
-                        inthash_write(hashCateg, line2 + 9, 0);
+                      if (!coucal_read(hashCateg, line2 + 9, NULL)) {
+                        coucal_write(hashCateg, line2 + 9, 0);
                         if (StringLength(categ) > 0) {
                           StringCat(categ, "\r\n");
                         }
@@ -1146,7 +1147,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     StringFree(iname);
   }
   if (hashCateg) {
-    inthash_delete(&hashCateg);
+    coucal_delete(&hashCateg);
     hashCateg = NULL;
   }
   if (type == 1)

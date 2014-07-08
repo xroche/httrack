@@ -145,7 +145,7 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
             // we just store statuscode + location (if any)
             if (url_save == NULL && r->statuscode / 100 >= 3) {
               // cached "fast" header doesn't yet exists
-              if (inthash_read
+              if (coucal_read
                   (cache->cached_tests,
                    concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil), NULL) == 0) {
                 char BIGSTK tempo[HTS_URLMAXSIZE * 2];
@@ -158,7 +158,7 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
                 hts_log_print(opt, LOG_DEBUG,
                               "Cached fast-header response: %s%s is %d",
                               url_adr, url_fil, (int) r->statuscode);
-                inthash_add(cache->cached_tests,
+                coucal_add(cache->cached_tests,
                             concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil),
                             (intptr_t) strdupt(tempo));
               }
@@ -646,7 +646,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   strcpybuff(r.location, "");
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
-  hash_pos_return = inthash_read(cache->hashtable, buff, &hash_pos);
+  hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
   /* avoid errors on data entries */
   if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
 #if HTS_FAST_CACHE
@@ -1029,7 +1029,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
 #if HTS_FAST_CACHE
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
-  hash_pos_return = inthash_read(cache->hashtable, buff, &hash_pos);
+  hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
 #else
   buff[0] = '\0';
   strcatbuff(buff, "\n");
@@ -1349,7 +1349,7 @@ int cache_readdata(cache_back * cache, const char *str1, const char *str2,
 
     strcpybuff(buff, str1);
     strcatbuff(buff, str2);
-    if (inthash_read(cache->hashtable, buff, &pos)) {
+    if (coucal_read(cache->hashtable, buff, &pos)) {
       if (fseek(cache->olddat, (long) ((pos > 0) ? pos : (-pos)), SEEK_SET) ==
           0) {
         INTsys len;
@@ -1642,9 +1642,9 @@ void cache_init(cache_back * cache, httrackp * opt) {
                     }
                   }
                   if (dataincache)
-                    inthash_add(cache->hashtable, filenameIndex, pos);
+                    coucal_add(cache->hashtable, filenameIndex, pos);
                   else
-                    inthash_add(cache->hashtable, filenameIndex, -pos);
+                    coucal_add(cache->hashtable, filenameIndex, -pos);
                 } else {
                   hts_log_print(opt, LOG_WARNING,
                                 "Corrupted cache meta entry #%d",
@@ -1810,7 +1810,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
                 /* read position */
                 a += binput(a, linepos, 200);
                 sscanf(linepos, "%d", &pos);
-                inthash_add(cache->hashtable, line, pos);
+                coucal_add(cache->hashtable, line, pos);
               }
             }
             /* Not needed anymore! */

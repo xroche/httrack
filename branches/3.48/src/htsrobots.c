@@ -60,7 +60,7 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
                 return -1;      // interdit
               }
             } else {            // relatif
-              if (strstrcase((char*) fil, line)) {
+              if (strstrcase(fil, line)) {
                 return -1;
               }
             }

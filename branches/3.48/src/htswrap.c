@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htswrap.h"
 #include "htshash.h"
-#include "htsinthash.h"
+#include "coucal.h"
 #include "htslib.h"
 
 HTSEXT_API int htswrap_init(void) {     // LEGACY

@@ -71,11 +71,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path);
   "\r\n"\
 
 extern int NewLangStrSz;
-extern inthash NewLangStr;
+extern coucal NewLangStr;
 extern int NewLangStrKeysSz;
-extern inthash NewLangStrKeys;
+extern coucal NewLangStrKeys;
 extern int NewLangListSz;
-extern inthash NewLangList;
+extern coucal NewLangList;
 
 extern httrackp *global_opt;
 

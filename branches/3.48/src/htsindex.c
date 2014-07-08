@@ -40,7 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
-#include "htsinthash.h"
+#include "coucal.h"
 
 /* Keyword Indexer Parameters */
 
@@ -144,7 +144,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   //
   //int WordIndexSize = 1024;
-  inthash WordIndexHash = NULL;
+  coucal WordIndexHash = NULL;
   FILE *tmpfp = NULL;
 
   //
@@ -190,7 +190,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Create hash structure
   // Hash tables rulez da world!
-  WordIndexHash = inthash_new(0);
+  WordIndexHash = coucal_new(0);
   if (!WordIndexHash)
     return 0;
 
@@ -252,7 +252,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           /* Store it ? */
           if (len >= KEYW_MIN_LEN) {
             hts_primindex_words++;
-            if (inthash_inc(WordIndexHash, keyword)) {  /* added new */
+            if (coucal_inc(WordIndexHash, keyword)) {  /* added new */
               fprintf(tmpfp, "%s\n", keyword);
             }
           }
@@ -285,13 +285,13 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
         if (strnotempty(line)) {
           intptr_t e = 0;
 
-          if (inthash_read(WordIndexHash, line, &e)) {
+          if (coucal_read(WordIndexHash, line, &e)) {
             //if (e) {
             char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
             e++;                /* 0 means "once" */
 
-            if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
+            if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (const char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
               strcpybuff(savelst, filename + strlen(indexpath));
             else
               strcpybuff(savelst, filename);
@@ -313,7 +313,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   tmpfp = NULL;
 
   // Clear hash table
-  inthash_delete(&WordIndexHash);
+  coucal_delete(&WordIndexHash);
 #endif
   return 1;
 }
@@ -478,8 +478,8 @@ int strcpos(const char *adr, char c) {
 }
 
 int mystrcmp(const void *_e1, const void *_e2) {
-  char **e1 = (char **) _e1;
-  char **e2 = (char **) _e2;
+  const char *const*const e1 = (const char *const*) _e1;
+  const char *const*const e2 = (const char *const*) _e2;
 
   return strcmp(*e1, *e2);
 }

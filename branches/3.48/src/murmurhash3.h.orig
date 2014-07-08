@@ -7,19 +7,7 @@
 // compile and run any of them on any platform, but your performance with the
 // non-native version will be less than optimal.
 
-#ifdef _WIN32
-#include <stddef.h>
-typedef __int8 int8_t;
-typedef unsigned __int8 uint8_t;
-typedef unsigned __int16 uint16_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
-  || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
-#include <inttypes.h>
-#else
 #include <stdint.h>
-#endif
 
 static uint32_t rotl32 ( uint32_t x, int8_t r )
 {

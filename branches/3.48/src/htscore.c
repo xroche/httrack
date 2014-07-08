@@ -149,8 +149,8 @@ RUN_CALLBACK0(opt, end); \
   if (maketrack_fp){ fclose(maketrack_fp); maketrack_fp=NULL; } \
   if (opt->accept_cookie) cookie_save(opt->cookie,fconcat(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),StringBuff(opt->path_log),"cookies.txt")); \
   if (makeindex_fp) { fclose(makeindex_fp); makeindex_fp=NULL; } \
-  if (cache_hashtable) { inthash_delete(&cache_hashtable); } \
-  if (cache_tests)     { inthash_delete(&cache_tests); } \
+  if (cache_hashtable) { coucal_delete(&cache_hashtable); } \
+  if (cache_tests)     { coucal_delete(&cache_tests); } \
   if (template_header) { freet(template_header); template_header=NULL; } \
   if (template_body)   { freet(template_body); template_body=NULL; } \
   if (template_footer) { freet(template_footer); template_footer=NULL; } \
@@ -429,6 +429,14 @@ if (makeindex_fp) { \
 makeindex_done=1;    /* ok c'est fait */  \
 } while(0)
 
+/* does it look like XML ? (SVG et al.) */
+static int look_like_xml(const char *s) {
+  return strncmp(s, "<?xml", 5) == 0
+    || strncmp(s, "<!-- ", 5) == 0
+    || strncmp(s, "<svg ", 5) == 0
+    ;
+}
+
 // Début de httpmirror, robot
 // url1 peut être multiple
 int httpmirror(char *url1, httrackp * opt) {
@@ -479,8 +487,8 @@ int httpmirror(char *url1, httrackp * opt) {
   //
   cache_back BIGSTK cache;
   robots_wizard BIGSTK robots;  // gestion robots.txt
-  inthash cache_hashtable = NULL;
-  inthash cache_tests = NULL;
+  coucal cache_hashtable = NULL;
+  coucal cache_tests = NULL;
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
@@ -563,8 +571,8 @@ int httpmirror(char *url1, httrackp * opt) {
   cache.ptr_ant = cache.ptr_last = 0;   // pointeur pour anticiper
 
   // initialiser hash cache
-  cache_hashtable = inthash_new(0);
-  cache_tests = inthash_new(0);
+  cache_hashtable = coucal_new(0);
+  cache_tests = coucal_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
     filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
@@ -573,9 +581,9 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   hts_set_hash_handler(cache_hashtable, opt);
   hts_set_hash_handler(cache_tests, opt);
-  inthash_set_name(cache_hashtable, "cache_hashtable");
-  inthash_set_name(cache_tests, "cache_tests");
-  inthash_value_is_malloc(cache_tests, 1);      /* malloc */
+  coucal_set_name(cache_hashtable, "cache_hashtable");
+  coucal_set_name(cache_tests, "cache_tests");
+  coucal_value_is_malloc(cache_tests, 1);      /* malloc */
   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
 
@@ -609,7 +617,7 @@ int httpmirror(char *url1, httrackp * opt) {
   // initialiser hachage
   hash_init(opt, &hash, opt->urlhack);
   // note: we need a cast because of the const
-  hash.liens = (const lien_url ***) &opt->liens;
+  hash.liens = (const lien_url *const*const*) &opt->liens;
 
   // copier adresse(s) dans liste des adresses
   {
@@ -1180,8 +1188,13 @@ int httpmirror(char *url1, httrackp * opt) {
       if (!error) {
         if (r.statuscode == HTTP_OK) {  // OK (ou 304 en backing)
           if (r.adr) {          // Written file
-            if ((is_hypertext_mime(opt, r.contenttype, urlfil()))
-
+            // Buggy SVG (Smiling Spectre)
+            if (strcmp(r.contenttype, "image/svg+xml") == 0 && !look_like_xml(r.adr)) {
+              // patch it
+              strcpybuff(r.contenttype, "application/octet-stream");
+              is_binary = 1;
+            }
+            else if ((is_hypertext_mime(opt, r.contenttype, urlfil()))
                 /* Is HTML or Js, .. */
                 /* NO - real media is real media, not HTML */
                 /*|| (may_be_hypertext_mime(r.contenttype, urlfil()) && (r.adr) ) */
@@ -2483,7 +2496,7 @@ void host_ban(httrackp * opt, int ptr,
         while((heap(i)->adr[l]) && (l < 1020))
           l++;
         if ((l > 0) && (l < 1020)) {    // sécurité
-          if (strfield2(jump_identification(heap(i)->adr), host)) {    // host
+          if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr,
                           heap(i)->fil);
             hts_invalidate_link(opt, i);  // invalidate hashtable entry
@@ -3644,9 +3657,19 @@ HTSEXT_API int hts_setpause(httrackp * opt, int p) {
 HTSEXT_API int hts_request_stop(httrackp * opt, int force) {
   if (opt != NULL) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+    hts_mutexlock(&opt->state.lock);
     opt->state.stop = 1;
+    hts_mutexrelease(&opt->state.lock);
   }
   return 0;
+}
+
+HTSEXT_API int hts_has_stopped(httrackp * opt) {
+  int ended;
+  hts_mutexlock(&opt->state.lock);
+  ended = opt->state.is_ended;
+  hts_mutexrelease(&opt->state.lock);
+  return ended;
 }
 
 // régler en cours de route les paramètres réglables..

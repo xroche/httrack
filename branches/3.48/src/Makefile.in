@@ -115,7 +115,7 @@ am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsparse.lo libhttrack_la-htsback.lo \
 	libhttrack_la-htscache.lo libhttrack_la-htscatchurl.lo \
 	libhttrack_la-htsfilters.lo libhttrack_la-htsftp.lo \
-	libhttrack_la-htshash.lo libhttrack_la-htsinthash.lo \
+	libhttrack_la-htshash.lo libhttrack_la-coucal.lo \
 	libhttrack_la-htshelp.lo libhttrack_la-htslib.lo \
 	libhttrack_la-htscoremain.lo libhttrack_la-htsname.lo \
 	libhttrack_la-htsrobots.lo libhttrack_la-htstools.lo \
@@ -143,9 +143,9 @@ httrack_OBJECTS = httrack.$(OBJEXT)
 httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
 am_proxytrack_OBJECTS = proxy/proxytrack-main.$(OBJEXT) \
 	proxy/proxytrack-proxytrack.$(OBJEXT) \
-	proxy/proxytrack-store.$(OBJEXT) \
-	proxytrack-htsinthash.$(OBJEXT) proxytrack-htsmd5.$(OBJEXT) \
-	proxytrack-md5.$(OBJEXT) minizip/proxytrack-ioapi.$(OBJEXT) \
+	proxy/proxytrack-store.$(OBJEXT) proxytrack-coucal.$(OBJEXT) \
+	proxytrack-htsmd5.$(OBJEXT) proxytrack-md5.$(OBJEXT) \
+	minizip/proxytrack-ioapi.$(OBJEXT) \
 	minizip/proxytrack-mztools.$(OBJEXT) \
 	minizip/proxytrack-unzip.$(OBJEXT) \
 	minizip/proxytrack-zip.$(OBJEXT)
@@ -343,18 +343,18 @@ AM_CPPFLAGS = \
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
-proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT
+proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	htsinthash.c htsmd5.c md5.c \
+	coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
 whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
-	htscatchurl.c htsfilters.c htsftp.c htshash.c htsinthash.c \
+	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
@@ -365,7 +365,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
-	htsfilters.h htsftp.h htsglobal.h htshash.h htsinthash.h \
+	htsfilters.h htsftp.h htsglobal.h htshash.h coucal.h \
 	htshelp.h htsindex.h htslib.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
@@ -377,18 +377,26 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
-libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS
+libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
+		murmurhash3.h.diff \
+		murmurhash3.h.orig \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
 		minizip/ioapi.c.diff \
 		minizip/ioapi.h.diff \
 		minizip/zip.c.diff \
 		minizip/zip.h.diff \
+		minizip/mztools.c.diff \
+		minizip/ioapi.c.orig \
+		minizip/ioapi.h.orig \
+		minizip/mztools.c.orig \
+		minizip/zip.c.orig \
+		minizip/zip.h.orig \
 		minizip/MiniZip64_Changes.txt \
 		minizip/MiniZip64_info.txt \
 		proxy/AUTHORS \
@@ -619,6 +627,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsweb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-coucal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsback.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsbauth.Plo@am__quote@
@@ -634,7 +643,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htshash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htshelp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsindex.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsinthash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htslib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmd5.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmodules.Plo@am__quote@
@@ -648,7 +656,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htszlib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-md5.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-punycode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsinthash.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-coucal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsmd5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-ioapi.Plo@am__quote@
@@ -743,12 +751,12 @@ libhttrack_la-htshash.lo: htshash.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htshash.lo `test -f 'htshash.c' || echo '$(srcdir)/'`htshash.c
 
-libhttrack_la-htsinthash.lo: htsinthash.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsinthash.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsinthash.Tpo -c -o libhttrack_la-htsinthash.lo `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-htsinthash.Tpo $(DEPDIR)/libhttrack_la-htsinthash.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsinthash.c' object='libhttrack_la-htsinthash.lo' libtool=yes @AMDEPBACKSLASH@
+libhttrack_la-coucal.lo: coucal.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-coucal.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-coucal.Tpo -c -o libhttrack_la-coucal.lo `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-coucal.Tpo $(DEPDIR)/libhttrack_la-coucal.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='libhttrack_la-coucal.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsinthash.lo `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-coucal.lo `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
 
 libhttrack_la-htshelp.lo: htshelp.c
 @am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htshelp.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htshelp.Tpo -c -o libhttrack_la-htshelp.lo `test -f 'htshelp.c' || echo '$(srcdir)/'`htshelp.c
@@ -960,19 +968,19 @@ proxy/proxytrack-store.obj: proxy/store.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
 
-proxytrack-htsinthash.o: htsinthash.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-htsinthash.o -MD -MP -MF $(DEPDIR)/proxytrack-htsinthash.Tpo -c -o proxytrack-htsinthash.o `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-htsinthash.Tpo $(DEPDIR)/proxytrack-htsinthash.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsinthash.c' object='proxytrack-htsinthash.o' libtool=no @AMDEPBACKSLASH@
+proxytrack-coucal.o: coucal.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-coucal.o -MD -MP -MF $(DEPDIR)/proxytrack-coucal.Tpo -c -o proxytrack-coucal.o `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-coucal.Tpo $(DEPDIR)/proxytrack-coucal.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='proxytrack-coucal.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-htsinthash.o `test -f 'htsinthash.c' || echo '$(srcdir)/'`htsinthash.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-coucal.o `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
 
-proxytrack-htsinthash.obj: htsinthash.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-htsinthash.obj -MD -MP -MF $(DEPDIR)/proxytrack-htsinthash.Tpo -c -o proxytrack-htsinthash.obj `if test -f 'htsinthash.c'; then $(CYGPATH_W) 'htsinthash.c'; else $(CYGPATH_W) '$(srcdir)/htsinthash.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-htsinthash.Tpo $(DEPDIR)/proxytrack-htsinthash.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsinthash.c' object='proxytrack-htsinthash.obj' libtool=no @AMDEPBACKSLASH@
+proxytrack-coucal.obj: coucal.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-coucal.obj -MD -MP -MF $(DEPDIR)/proxytrack-coucal.Tpo -c -o proxytrack-coucal.obj `if test -f 'coucal.c'; then $(CYGPATH_W) 'coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-coucal.Tpo $(DEPDIR)/proxytrack-coucal.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='proxytrack-coucal.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-htsinthash.obj `if test -f 'htsinthash.c'; then $(CYGPATH_W) 'htsinthash.c'; else $(CYGPATH_W) '$(srcdir)/htsinthash.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-coucal.obj `if test -f 'coucal.c'; then $(CYGPATH_W) 'coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal.c'; fi`
 
 proxytrack-htsmd5.o: htsmd5.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-htsmd5.o -MD -MP -MF $(DEPDIR)/proxytrack-htsmd5.Tpo -c -o proxytrack-htsmd5.o `test -f 'htsmd5.c' || echo '$(srcdir)/'`htsmd5.c
