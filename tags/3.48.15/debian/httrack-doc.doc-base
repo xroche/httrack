@@ -1,9 +1,0 @@
-Document: httrack-doc
-Title: httrack website copier documentation
-Author: Xavier Roche <roche@httrack.com>
-Abstract: This document describes and discuss on httrack website copier
-Section: Network/Web Browsing
-
-Format: HTML
-Index: /usr/share/doc/httrack/httrack-doc.html
-Files: /usr/share/doc/httrack/html/*.html

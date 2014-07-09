@@ -1,4 +1,0 @@
-?package(webhttrack):needs="X11" section="Applications/Network/Web Browsing" \
-        title="WebHTTrack" command="webhttrack" hints="Offline browsers" \
-        icon16x16="/usr/share/pixmaps/httrack16x16.xpm" \
-        icon32x32="/usr/share/pixmaps/httrack32x32.xpm"

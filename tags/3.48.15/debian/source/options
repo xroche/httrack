@@ -1,1 +1,0 @@
-extend-diff-ignore="(^|/)(config\.sub|config\.guess|test-driver|Makefile|.*\.in|aclocal\.m4|configure)$"
