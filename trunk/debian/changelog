@@ -1,3 +1,10 @@
+httrack (3.48.16-1) unstable; urgency=low
+
+  * Updated to 3.48.16 (3.48-16)
+    fixed FTBFS on ARM/MIPS again
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 09 Jul 2014 07:02:08 +0200
+
 httrack (3.48.15-1) unstable; urgency=low
 
   * Updated to 3.48.15 (3.48-15)
