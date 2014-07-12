@@ -134,10 +134,14 @@ libhttrack_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libhttrack_la_CFLAGS) \
 	$(CFLAGS) $(libhttrack_la_LDFLAGS) $(LDFLAGS) -o $@
 PROGRAMS = $(bin_PROGRAMS)
-am_htsserver_OBJECTS = htsserver.$(OBJEXT) htsweb.$(OBJEXT)
+am_htsserver_OBJECTS = htsserver-htsserver.$(OBJEXT) \
+	htsserver-htsweb.$(OBJEXT)
 htsserver_OBJECTS = $(am_htsserver_OBJECTS)
 htsserver_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	libhttrack.la
+htsserver_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(htsserver_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 httrack_SOURCES = httrack.c
 httrack_OBJECTS = httrack.$(OBJEXT)
 httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
@@ -344,6 +348,7 @@ httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+htsserver_CFLAGS = $(AM_CFLAGS) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
@@ -539,7 +544,7 @@ clean-binPROGRAMS:
 	rm -f $$list
 htsserver$(EXEEXT): $(htsserver_OBJECTS) $(htsserver_DEPENDENCIES) $(EXTRA_htsserver_DEPENDENCIES) 
 	@rm -f htsserver$(EXEEXT)
-	$(LINK) $(htsserver_OBJECTS) $(htsserver_LDADD) $(LIBS)
+	$(htsserver_LINK) $(htsserver_OBJECTS) $(htsserver_LDADD) $(LIBS)
 httrack$(EXEEXT): $(httrack_OBJECTS) $(httrack_DEPENDENCIES) $(EXTRA_httrack_DEPENDENCIES) 
 	@rm -f httrack$(EXEEXT)
 	$(LINK) $(httrack_OBJECTS) $(httrack_LDADD) $(LIBS)
@@ -624,8 +629,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsjava.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsweb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsserver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsweb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-coucal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@
@@ -925,6 +930,34 @@ minizip/libhttrack_la-zip.lo: minizip/zip.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='minizip/zip.c' object='minizip/libhttrack_la-zip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+
+htsserver-htsserver.o: htsserver.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -MT htsserver-htsserver.o -MD -MP -MF $(DEPDIR)/htsserver-htsserver.Tpo -c -o htsserver-htsserver.o `test -f 'htsserver.c' || echo '$(srcdir)/'`htsserver.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/htsserver-htsserver.Tpo $(DEPDIR)/htsserver-htsserver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsserver.c' object='htsserver-htsserver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -c -o htsserver-htsserver.o `test -f 'htsserver.c' || echo '$(srcdir)/'`htsserver.c
+
+htsserver-htsserver.obj: htsserver.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -MT htsserver-htsserver.obj -MD -MP -MF $(DEPDIR)/htsserver-htsserver.Tpo -c -o htsserver-htsserver.obj `if test -f 'htsserver.c'; then $(CYGPATH_W) 'htsserver.c'; else $(CYGPATH_W) '$(srcdir)/htsserver.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/htsserver-htsserver.Tpo $(DEPDIR)/htsserver-htsserver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsserver.c' object='htsserver-htsserver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -c -o htsserver-htsserver.obj `if test -f 'htsserver.c'; then $(CYGPATH_W) 'htsserver.c'; else $(CYGPATH_W) '$(srcdir)/htsserver.c'; fi`
+
+htsserver-htsweb.o: htsweb.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -MT htsserver-htsweb.o -MD -MP -MF $(DEPDIR)/htsserver-htsweb.Tpo -c -o htsserver-htsweb.o `test -f 'htsweb.c' || echo '$(srcdir)/'`htsweb.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/htsserver-htsweb.Tpo $(DEPDIR)/htsserver-htsweb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsweb.c' object='htsserver-htsweb.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -c -o htsserver-htsweb.o `test -f 'htsweb.c' || echo '$(srcdir)/'`htsweb.c
+
+htsserver-htsweb.obj: htsweb.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -MT htsserver-htsweb.obj -MD -MP -MF $(DEPDIR)/htsserver-htsweb.Tpo -c -o htsserver-htsweb.obj `if test -f 'htsweb.c'; then $(CYGPATH_W) 'htsweb.c'; else $(CYGPATH_W) '$(srcdir)/htsweb.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/htsserver-htsweb.Tpo $(DEPDIR)/htsserver-htsweb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='htsweb.c' object='htsserver-htsweb.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -c -o htsserver-htsweb.obj `if test -f 'htsweb.c'; then $(CYGPATH_W) 'htsweb.c'; else $(CYGPATH_W) '$(srcdir)/htsweb.c'; fi`
 
 proxy/proxytrack-main.o: proxy/main.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-main.o -MD -MP -MF proxy/$(DEPDIR)/proxytrack-main.Tpo -c -o proxy/proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
