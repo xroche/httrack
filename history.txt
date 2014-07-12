@@ -4,7 +4,9 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack.
 
-3.48-14
+3.48-17
++ Fixed: URL list not working anymore (tom swift)
++ Fixed: FTBFS on ARM
 + Fixed: buggy FFFD (replacement character) in place of leading non-ascii character such as Chinese ones (aballboy)
 + Fixed: FTBFS when compiling with zlib versions < 1.2.70 (sammyx)
 + Fixed: buggy SVG (Smiling Spectre)
