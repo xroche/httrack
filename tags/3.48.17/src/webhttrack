@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+# WebHTTrack launcher script
+# Initializes the htsserver GUI frontend and launch the default browser
+
+BROWSEREXE=
+SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox icecat iceweasel abrowser firebird galeon konqueror opera chrome chromium chromium-browser netscape"
+if test -n "${BROWSER}"; then
+# sensible-browser will f up if BROWSER is not set
+SRCHBROWSEREXE="xdg-open sensible-browser ${SRCHBROWSEREXE}"
+fi
+# Patch for Darwin/Mac by Ross Williams
+if test "`uname -s`" == "Darwin"; then
+# Darwin/Mac OS X uses a system 'open' command to find
+# the default browser. The -W flag causes it to wait for
+# the browser to exit
+BROWSEREXE="/usr/bin/open -W"
+fi
+BINWD=`dirname "$0"`
+SRCHPATH="$BINWD /usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin ${HOME}/usr/bin ${HOME}/bin"
+SRCHPATH="$SRCHPATH "`echo $PATH | tr ":" " "`
+SRCHDISTPATH="$BINWD/../share $BINWD/.. /usr/share /usr/local /usr /local /usr/local/share ${HOME}/usr ${HOME}/usr/share /opt/local/share /sw ${HOME}/usr/local ${HOME}/usr/share"
+
+###
+# And now some famous cuisine
+
+function log {
+echo "$0($$): $@" >&2
+return 0
+}
+
+function mozillabrowser {
+# returns 0, if the browser is mozilla type
+echo "$1" | grep -q "iceape"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "mozilla"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "netscape"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "firebird"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "firefox"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "iceweasel"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "abrowser"
+[ $? -eq 0 ] && return 0 
+echo "$1" | grep -q "icecat"
+[ $? -eq 0 ] && return 0 
+return 1;
+}
+function mozillaloaded  {
+user_name=`logname 2>/dev/null`
+if ! test -n "${user_name}"; then
+user_name=`id -un`
+fi
+if test -n "${user_name}"; then
+ps -e -U "$user_name" | grep -E "(iceape|mozilla|netscape|firebird|firefox)" | grep -qv "grep -E"
+else
+false
+fi
+}
+
+function launch_browser {
+log "launching $1"
+start_t=`date +%s`
+browser=$1
+url=$2
+moz=
+if mozillaloaded; then
+moz=1
+fi
+# launch any browser
+# if it is a mozilla like browser, check if the browser is running and use 
+# -remote if needed. Change the URL into openURL($url) too. 
+# (thanks to Torsten Werner for the patch)
+# see http://www.mozilla.org/unix/remote.html
+# 04/2006: openurl() fix from Samuel Suther
+if mozillabrowser ${browser}; then
+	if ! ${browser} -remote "openurl(${url})"; then
+		log "spawning browser.."
+		${browser} "${url}"
+	fi
+else
+	log "spawning regular browser.."
+	${browser} "${url}"
+fi
+# this is a real pain in the neck: browser can hiddenly use the -remote feature of
+# mozilla and therefore return immediately
+# this loop is the only reliable solution AFAIK
+end_t=`date +%s`
+if test -n "$start_t" -a -n "$end_t"; then
+	int_t=$[$end_t-$start_t]
+else
+	int_t=0
+fi
+if test -n "${int_t}" -a "${int_t}" -lt 60; then
+	if test -n "$moz"; then
+		log "waiting for browser to terminate.."
+		while mozillaloaded; do
+			sleep 3
+		done
+		log "browser seems to have been closed.."
+	fi
+fi
+log "browser exited"
+}
+
+# First ensure that we can launch the server
+BINPATH=
+for i in ${SRCHPATH}; do
+	! test -n "${BINPATH}" && test -x ${i}/htsserver && BINPATH=${i}
+done
+for i in ${SRCHDISTPATH}; do
+	! test -n "${DISTPATH}" && test -f "${i}/httrack/lang.def" && DISTPATH="${i}/httrack"
+done
+test -n "${BINPATH}" || ! log "could not find htsserver" || exit 1
+test -n "${DISTPATH}" || ! log "could not find httrack directory" || exit 1
+test -f ${DISTPATH}/lang.def || ! log "could not find ${DISTPATH}/lang.def" || exit 1
+test -f ${DISTPATH}/lang.indexes || ! log "could not find ${DISTPATH}/lang.indexes" || exit 1
+test -d ${DISTPATH}/lang || ! log "could not find ${DISTPATH}/lang" || exit 1
+test -d ${DISTPATH}/html || ! log "could not find ${DISTPATH}/html" || exit 1
+
+# Locale
+HTSLANG="${LC_MESSAGES}"
+! test -n "${HTSLANG}" && HTSLANG="${LC_ALL}"
+! test -n "${HTSLANG}" && HTSLANG="${LANG}"
+HTSLANG="`echo $LANG | cut -f1 -d'.' | cut -f1 -d'_'`"
+LANGN=`grep -E "^${HTSLANG}:" ${DISTPATH}/lang.indexes | cut -f2 -d':'`
+! test -n "${LANGN}" && LANGN=1
+
+# Find the browser
+# note: not all systems have sensible-browser or www-browser alternative
+# thefeore, we have to find a bit more if sensible-browser could not be found
+
+for i in ${SRCHBROWSEREXE}; do
+for j in ${SRCHPATH}; do
+if test -x ${j}/${i}; then
+BROWSEREXE=${j}/${i}
+fi
+test -n "$BROWSEREXE" && break
+done
+test -n "$BROWSEREXE" && break
+done
+test -n "$BROWSEREXE" || ! log "cound not find any suitable browser" || exit 1
+
+# "browse" command
+if test "$1" = "browse"; then
+if test -f "${HOME}/.httrack.ini"; then
+INDEXF=`cat ${HOME}/.httrack.ini | tr '\r' '\n' | grep -E "^path=" | cut -f2- -d'='`
+if test -n "${INDEXF}" -a -d "${INDEXF}" -a -f "${INDEXF}/index.html"; then
+INDEXF="${INDEXF}/index.html"
+else
+INDEXF=""
+fi
+fi
+if ! test -n "$INDEXF"; then 
+INDEXF="${HOME}/websites/index.html"
+fi
+launch_browser "${BROWSEREXE}" "file://${INDEXF}"
+exit $?
+fi
+
+# Create a temporary filename
+TMPSRVFILE="$(mktemp ${TMPDIR:-/tmp}/.webhttrack.XXXXXXXX)" || ! log "cound not create the temporary file ${TMPSRVFILE}" || exit 1
+# Launch htsserver binary and setup the server
+(${BINPATH}/htsserver "${DISTPATH}/" path "${HOME}/websites" lang "${LANGN}" $@; echo SRVURL=error) > ${TMPSRVFILE}&
+# Find the generated SRVURL
+SRVURL=
+MAXCOUNT=60
+while ! test -n "$SRVURL"; do
+MAXCOUNT=$[$MAXCOUNT - 1]
+test $MAXCOUNT -gt 0 || exit 1
+test $MAXCOUNT -lt 50 && echo "waiting for server to reply.."
+SRVURL=`grep -E URL= ${TMPSRVFILE} | cut -f2- -d=`
+test ! "$SRVURL" = "error" || ! log "could not spawn htsserver" || exit 1
+test -n "$SRVURL" || sleep 1
+done
+
+# Cleanup function
+function cleanup {
+test -n "$1" && log "nasty signal caught, cleaning up.."
+test -f ${TMPSRVFILE} && SRVPID=`grep -E PID= ${TMPSRVFILE} | cut -f2- -d=`
+test -n "${SRVPID}" && kill -9 ${SRVPID}
+test -f ${TMPSRVFILE} && rm ${TMPSRVFILE}
+test -n "$1" && log "..done"
+return 0
+}
+
+# Cleanup in case of emergency
+trap "cleanup now; exit" 1 2 3 4 5 6 7 8 9 11 13 14 15 16 19 24 25
+
+# Got SRVURL, launch browser
+launch_browser "${BROWSEREXE}" "${SRVURL}"
+
+# That's all, folks!
+trap "" 1 2 3 4 5 6 7 8 9 11 13 14 15 16 19 24 25
+cleanup
+exit 0

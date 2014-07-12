@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Deutsch
+LANGUAGE_FILE
+Deutsch
+LANGUAGE_ISO
+de
+LANGUAGE_AUTHOR
+Rainer Klueting (rk-htt at centermail.net) \r\nBastian Gorke (bastiang at yahoo.com) \r\nRudi Ferrari (Wyando at netcologne.de) \r\nMarcus Gaza (MarcusGaza at t-online.de) \r\n
+LANGUAGE_CHARSET
+ISO-8859-1
+LANGUAGE_WINDOWSID
+German (Standard)
+OK
+OK
+Cancel
+Abbrechen
+Exit
+Beenden
+Close
+Schließen
+Cancel changes
+Änderungen verwerfen
+Click to confirm
+Änderungen übernehmen
+Click to get help!
+Hilfe aufrufen
+Click to return to previous screen
+Zurück zum letzten Schritt
+Click to go to next screen
+Weiter zum nächsten Schritt
+Hide password
+Passwort nicht anzeigen
+Save project
+Projekt speichern
+Close current project?
+Aktives Projekt schließen?
+Delete this project?
+Dieses Projekt löschen?
+Delete empty project %s?
+Leeres Projekt %s löschen?
+Action not yet implemented
+Funktion noch nicht verfügbar
+Error deleting this project
+Fehler beim Löschen des Projekts
+Select a rule for the filter
+Wählen Sie eine Regel für den Filter
+Enter keywords for the filter
+Schlüsselwörter für den Filter
+Cancel
+Abbrechen
+Add this rule
+Diese Regel hinzufügen
+Please enter one or several keyword(s) for the rule
+Ein oder mehrere Schlüsselwörter für die Regel eingeben
+Add Scan Rule
+Filterregel hinzufügen
+Criterion
+Filterregel:
+String
+Schlüsselwort eingeben:
+Add
+Hinzufügen
+Scan Rules
+Filterregeln
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Verwenden Sie Platzhalter, um URLs oder verknüpfte Seiten ein- oder auszuschließen.\n\nMehrere Filterregeln hintereinander \nmüssen durch Leerzeichen getrennt sein.\nBeispiel: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Link(s) ausschließen
+Include link(s)
+Link(s) einschließen
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Tipp: Um ALLE GIF-Dateien einzuschließen, schreiben Sie z.B. +www.someweb.com/*.gif. \n(+*.gif / -*.gif schließt ALLE GIFs auf ALLEN Seiten ein/aus.)
+Save prefs
+Einstellungen speichern
+Matching links will be excluded:
+Auszuschließende Links:
+Matching links will be included:
+Einzuschließende Links:
+Example:
+Beispiel:
+gif\r\nWill match all GIF files
+gif\r\nFindet alle GIF-Dateien
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nFindet alle Dateien, die 'blue' enthalten, wie 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nFindet 'bigfile.mov', aber nicht 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nFindet alle Links zu Ordnern, deren Name 'cgi' enthält, wie /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nFindet Links zu Ordnern namens 'cgi-bin' (aber z.B. nicht zu 'cgi-bin-2')
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nFindet Links wie www.someweb.com, private.someweb.com etc.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nFindet Links wie www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nFindet Links wie www.someweb.com/... (aber nicht wie private.someweb.com/...)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nFindet Links wie www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nFindet nur die Datei 'www.test.com/test/someweb.html'. Bitte beachten: Der Pfad muss vollständig angegeben werden (URL und Pfadangabe).
+All links will match
+Alle Verknüpfungen sind eingeschlossen
+Add exclusion filter
+Ausschlussfilter hinzufügen
+Add inclusion filter
+Einschlussfilter hinzufügen
+Existing filters
+Aktuelle Filterregeln
+Cancel changes
+Änderungen verwerfen
+Save current preferences as default values
+Aktuelle Einstellungen als Standard speichern
+Click to confirm
+Zum Bestätigen klicken
+No log files in %s!
+Keine Protokolldateien in %s!
+No 'index.html' file in %s!
+Keine Datei 'index.html' in %s!
+Click to quit WinHTTrack Website Copier
+Hier klicken, um WinHTTrack Website Copier zu beenden
+View log files
+Protokolldateien anzeigen
+Browse HTML start page
+HTML-Startseite anzeigen
+End of mirror
+Kopie der Web-Site abgeschlossen
+View log files
+Protokolldateien anzeigen
+Browse Mirrored Website
+Kopierte Seiten anzeigen
+New project...
+Neues Projekt...
+View error and warning reports
+Fehler- und Hinweisprotokoll zeigen
+View report
+Protokoll zeigen
+Close the log file window
+Protokollfenster schließen
+Info type:
+Informationskategorie:
+Errors
+Fehler
+Infos
+Informationen
+Find
+Suchen
+Find a word
+Wort suchen
+Info log file
+Hinweisprotokoll
+Warning/Errors log file
+Fehler/Hinweise
+Unable to initialize the OLE system
+OLE System kann nicht gestartet werden
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack kann im angegebenen Ordner keine unterbrochene Site-Kopie finden!
+Could not connect to provider
+Keine Verbindung zum Provider
+receive
+empfangen
+request
+anfordern
+connect
+verbinden
+search
+suchen
+ready
+fertig
+error
+Fehler
+Receiving files..
+Empfang der Dateien...
+Parsing HTML file..
+Analysieren der HTML Datei...
+Purging files..
+Dateien löschen...
+Loading cache in progress..
+Zwischenspeicher wird geladen...
+Parsing HTML file (testing links)..
+Analysieren der HTML Datei (Links testen)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Pause - fortfahren mit Menübefehl [Site-Kopie]/[Übertragung anhalten]
+Finishing pending transfers - Select [Cancel] to stop now!
+Laufende Ubertragungen werden abgeschlossen - Sofortiger Stopp mit [Abbrechen]
+scanning
+scannen
+Waiting for scheduled time..
+Eingestellte Startzeit abwarten
+Connecting to provider
+Verbindung aufbauen
+[%d seconds] to go before start of operation
+[%d Sekunden] bis zum Start
+Site mirroring in progress [%s, %s bytes]
+Spiegelung der Website läuft [%s, %s Byte]
+Site mirroring finished!
+Kopiervorgang beendet
+A problem occured during the mirroring operation\n
+Beim Kopieren der Webseiten ist ein Problem aufgetreten\n
+\nDuring:\n
+\r\n\nWährend:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\r\n\nNäheres bei Bedarf im Protokoll.\n\n'Beenden' beendet WinHTTrack Website Copier.\n\nDanke, dass Sie WinHTTrack benutzt haben!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Kopiervorgang abgeschlossen.\n'Beenden' beendet WinHTTrack.\nIn den Protokolldateien können Sie prüfen, ob Probleme auftraten.\n\nDanke, dass Sie WinHTTrack benutzt haben!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * KOPIERVORGANG ABGEBROCHEN! * *\r\nDer aktuelle temporäre Cache wird für eine künftige Aktualisierung gebraucht. Er enthält nur Daten, die während der soeben abgebrochenen Sitzung heruntergeladen wurden.\r\nEin früher angelegter Cache enthält unter Umständen vollständigere Informationen; wenn Sie diese nicht verlieren wollen, müssen Sie sie wiederherstellen und den aktuellen Cache löschen.\r\n[Hinweis: Dazu werden einfach die Dateien hts-cache/new.* gelöscht]\r\n\r\nWollen Sie den vor dieser Sitzung erzeugten Cache wiederherstellen?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * FEHLER BEIM KOPIEREN! * *\r\nDie aktuelle Webseitenkopie ist leer. Wenn es sich um eine Aktualisierung gehandelt hat, ist die letzte Kopie wiederhergestellt worden.\r\nMögliche Ursachen: Entweder wurde(n) die erste(n) Seite(n) nicht gefunden, oder es gab ein Problem mit der Verbindung.\r\n=> Vergewissern Sie sich, dass die Website noch existiert, und/oder überprüfen Sie die Einstellungen für den Proxy! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\r\n\n\nTipp: Ein Klick auf [Protokoll zeigen] zeigt Warnungen und Fehlermeldungen an
+Error deleting a hts-cache/new.* file, please do it manually
+Fehler beim Löschen einer Datei hts-cache/new.*. Bitte löschen Sie von Hand.
+Do you really want to quit WinHTTrack Website Copier?
+WinHTTrack Website Copier beenden?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Webseiten-Kopiermodus -\n\nAdresse(n) in das URL-Feld eingeben
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Webseiten-Kopiermodus mit Rückfrage -\n\nAdresse(n) in das URL-Feld eingeben
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Datei-Download-Modus -\n\nDatei-Adresse(n) in das URL-Feld eingeben
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Link-Prüfmodus -\n\nZu prüfende Adresse(n) in das URL-Feld eingeben
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Aktualisierungs-Modus -\n\nBitte Adresse(n) im URL-Feld kontrollieren, bei Bedarf Parameter prüfen, dann auf 'Weiter' klicken
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Fortsetzungs-Modus (nach Abbruch) -\n\nBitte Adresse(n) im URL-Feld kontrollieren, bei Bedarf Parameter prüfen, dann auf 'Weiter' klicken
+Log files Path
+Protokollordner
+Path
+Pfad
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Link-Listen-Modus -\n\nBitte in das URL-Feld die Adressen der Seiten eintragen, deren Verknüpfungen aufgelistet werden sollen.
+New project / Import?
+Neues Projekt / Importieren?
+Choose criterion
+Aktion auswählen
+Maximum link scanning depth
+Maximale Verzweigungstiefe
+Enter address(es) here
+Adresse(n) hier eintragen
+Define additional filtering rules
+Weitere Filterregeln definieren
+Proxy Name (if needed)
+Proxy (wenn nötig)
+Proxy Port
+Proxy-Port
+Define proxy settings
+Proxy-Einstellungen festlegen
+Use standard HTTP proxy as FTP proxy
+Standard HTTP-Proxy als FTP-Proxy verwenden
+Path
+Pfad
+Select Path
+Pfad wählen
+Path
+Pfad
+Select Path
+Pfad wählen
+Quit WinHTTrack Website Copier
+WinHTTrack Website Copier beenden
+About WinHTTrack
+Über WinHTTrack
+Save current preferences as default values
+Aktuelle Einstellungen als Standard speichern
+Click to continue
+Hier klicken zum Weitermachen
+Click to define options
+Hier klicken, um Einstellungen vorzunehmen
+Click to add a URL
+Hier klicken, um URL hinzuzufügen
+Load URL(s) from text file
+URL(s) aus Textdatei laden
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack Einstellungen (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Textdatei mit Adressenliste (*.txt)|*.txt||
+File not found!
+Datei nicht gefunden!
+Do you really want to change the project name/path?
+Wollen Sie Namen und Pfad des Projektes ändern?
+Load user-default options?
+Benutzer-Standardeinstellungen laden?
+Save user-default options?
+Benutzer-Standardeinstellungen speichern?
+Reset all default options?
+Alle Standardeinstellungen zurücksetzen?
+Welcome to WinHTTrack!
+Willkommen beim WinHTTrack Website Copier!
+Action:
+Aktion:
+Max Depth
+Maximale Tiefe:
+Maximum external depth:
+Maximale externe Tiefe:
+Filters (refuse/accept links) :
+Filterregel (Links ein-/ausschließen) :
+Paths
+Pfade
+Save prefs
+Einstellungen speichern
+Define..
+Festlegen...
+Set options..
+Einstellungen...
+Preferences and mirror options:
+Einstellungen und Kopieroptionen:
+Project name
+Projektname
+Add a URL...
+URL hinzufügen...
+Web Addresses: (URL)
+Web-Adressen (URLs):
+Stop WinHTTrack?
+WinHTTrack beenden?
+No log files in %s!
+Keine Protokolldateien in %s!
+Pause Download?
+Übertragung unterbrechen?
+Stop the mirroring operation
+Kopiervorgang stoppen
+Minimize to System Tray
+Ausblenden (Symbol in Taskleiste)
+Click to skip a link or stop parsing
+Anklicken überspringt Verknüpfung oder stoppt den Vorgang
+Click to skip a link
+Anklicken überspringt Verknüpfung
+Bytes saved
+Gespeicherte Bytes:
+Links scanned
+Bearbeitete Verknüpfungen:
+Time:
+Zeit:
+Connections:
+Verbindungen:
+Running:
+Aktiv:
+Hide
+Minimieren
+Transfer rate
+Übertragungsrate:
+SKIP
+AUSLASSEN
+Information
+Information
+Files written:
+Geschriebene Dateien:
+Files updated:
+Aktualisierte Dateien:
+Errors:
+Fehler:
+In progress:
+In Bearbeitung:
+Follow external links
+Externe Verknüpfungen durchsuchen
+Test all links in pages
+Alle Verknüpfungen prüfen
+Try to ferret out all links
+Allen Verknüpfungen zu folgen versuchen
+Download HTML files first (faster)
+HTML-Dateien zuerst laden (schneller)
+Choose local site structure
+Lokale Seitenstruktur wählen
+Set user-defined structure on disk
+Lokale Seitenstruktur selbst definieren
+Use a cache for updates and retries
+Zwischenspeicher für Aktualisierungen und Wiederaufnahme nutzen
+Do not update zero size or user-erased files
+Vom Benutzer gelöschte oder leere Dateien nicht aktualisieren
+Create a Start Page
+Startseite erstellen
+Create a word database of all html pages
+Liste mit allen Wörtern in den HTML-Seiten anlegen
+Create error logging and report files
+Fehlerprotokoll und Ablaufbericht erstellen
+Generate DOS 8-3 filenames ONLY
+NUR Namen im Format DOS 8+3 generieren
+Generate ISO9660 filenames ONLY for CDROM medias
+ISO9660-Dateinamen NUR für CDROMs erzeugen
+Do not create HTML error pages
+Keine HTML-Fehlerseiten erstellen
+Select file types to be saved to disk
+Dateitypen wählen, die gespeichert werden sollen
+Select parsing direction
+Suchreihenfolge wählen
+Select global parsing direction
+Allgemeine Suchreihenfolge wählen
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Einstellen der Regeln zum Anpassen von URLs für interne (heruntergeladene) und externe (nicht heruntergeladene) Verknüpfungen
+Max simultaneous connections
+Maximale Zahl der Verbindungen
+File timeout
+Maximale Wartezeit für Dateien
+Cancel all links from host if timeout occurs
+Bei Überschreiten der Wartezeit alle Verknüpfungen zu diesem Host abbrechen
+Minimum admissible transfer rate
+Niedrigste geduldete Übertragungsrate
+Cancel all links from host if too slow
+Alle Verknüpfungen zu einem Host abbrechen, der zu langsam ist
+Maximum number of retries on non-fatal errors
+Maximale Zahl der Wiederholungsversuche bei nicht fatalem Fehler
+Maximum size for any single HTML file
+Maximale Größe einer HTML-Datei
+Maximum size for any single non-HTML file
+Maximale Größe einer Nicht-HTML-Datei
+Maximum amount of bytes to retrieve from the Web
+Maximalzahl der Bytes, die geholt werden sollen
+Make a pause after downloading this amount of bytes
+Pause einlegen, wenn die Anzahl heruntergeladener Bytes größer wird als
+Maximum duration time for the mirroring operation
+Höchstdauer des gesamten Kopiervorgangs
+Maximum transfer rate
+Maximale Übertragungsrate
+Maximum connections/seconds (avoid server overload)
+Maximalzahl der Verbindungen pro Sek. (verhindert Server-Überlastung)
+Maximum number of links that can be tested (not saved!)
+Wie viele Links sollen maximal geprüft werden? (Kein Limit für Speicherung!)
+Browser identity
+Browser-Kennung
+Comment to be placed in each HTML file
+Kommentar, einzufügen in jede HTML-Datei
+Back to starting page
+Zurück zur Startseite
+Save current preferences as default values
+Aktuelle Einstellungen als Standard speichern
+Click to continue
+Klicken, um fortzufahren
+Click to cancel changes
+Klicken, um Änderungen rückgängig zu machen
+Follow local robots rules on sites
+Lokalen Robot-Regeln auf den Seiten Folge leisten
+Links to non-localised external pages will produce error pages
+Verknüpfungen zu nicht kopierten externen Seiten führen zu Fehlerseiten
+Do not erase obsolete files after update
+Nach Aktualisierung überflüssige Dateien nicht löschen
+Accept cookies?
+Cookies annehmen?
+Check document type when unknown?
+Dokumenttyp prüfen, wenn unbekannt?
+Parse java applets to retrieve included files that must be downloaded?
+Java-Applets nach Verknüpfungen zu Dateien durchsuchen, die geladen werden müssen?
+Store all files in cache instead of HTML only
+Alle Dateien in Zwischenspeicher schreiben, nicht nur HTML-Dateien
+Log file type (if generated)
+Dateityp des Protokolls (falls generiert)
+Maximum mirroring depth from root address
+Maximale Suchtiefe ab der erste Adresse
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Maximale Suchtiefe für externe/verbotene Adressen. (Standard ist 0, also keine externe Suche.)
+Create a debugging file
+Datei für Fehlersuche erstellen
+Use non-standard requests to get round some server bugs
+Nicht-standardisierte Anfragen erzeugen (umschifft einzelne Server-Fehler)
+Use old HTTP/1.0 requests (limits engine power!)
+Alten Standard HTTP/1.0 benutzen (begrenzt das Arbeitstempo!)
+Attempt to limit retransfers through several tricks (file size test..)
+Versuche, mit verschiedenen Tricks die Zahl der Re-Transfers zu begrenzen (Prüfung der Dateigröße...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+Externe Verknüpfungen ohne Benutzername/Passwort eintragen
+Write internal links without query string
+Interne Verknüpfungen ohne Abfragetext schreiben
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Verknüpfte Nicht-HTML-Dateien laden (Bsp: .ZIP oder Bilder von außerhalb)
+Test all links (even forbidden ones)
+Alle Verknüpfungen testen (auch verbotene)
+Try to catch all URLs (even in unknown tags/code)
+Alle URLs zu finden versuchen (auch in unbekannten Tags und Scripts)
+Get HTML files first!
+HTML-Dateien zuerst laden!
+Structure type (how links are saved)
+Strukturtyp (Wie Verknüpfungen gespeichert werden)
+Use a cache for updates
+Zwischenspeicher für Aktualisierungen benutzen
+Do not re-download locally erased files
+Dateien nicht erneut laden, die lokal gelöscht wurden
+Make an index
+Index erstellen
+Make a word database
+Wortliste anlegen
+Log files
+Protokolldateien
+DOS names (8+3)
+DOS-Namen (8+3)
+ISO9660 names (CDROM)
+ISO9660-Namen (CDROM)
+No error pages
+Keine Fehlerseiten
+Primary Scan Rule
+Haupt-Filterregel
+Travel mode
+Suchmethode
+Global travel mode
+Globale Suchmethode
+These options should be modified only exceptionally
+Normalerweise solten diese Einstellungen nicht geändert werden.
+Activate Debugging Mode (winhttrack.log)
+Fehlersuch-Modus aktivieren (winhttrack.log)
+Rewrite links: internal / external
+Adressbezüge anpassen: intern / extern
+Flow control
+Flusskontrolle
+Limits
+Begrenzungen
+Identity
+Identität
+HTML footer
+HTML-Fußzeile
+N# connections
+Anzahl Verbindungen
+Abandon host if error
+Host bei Fehler aufgeben
+Minimum transfer rate (B/s)
+Minimale Übertragungsrate (B/s)
+Abandon host if too slow
+Host aufgeben, wenn zu langsam
+Configure
+Konfigurieren
+Use proxy for ftp transfers
+Proxy für FTP-Übertragungen nutzen
+TimeOut(s)
+Timeout(s)
+Persistent connections (Keep-Alive)
+Verbindungen halten (Keep-alive)
+Reduce connection time and type lookup time using persistent connections
+Offen gehaltene Verbindungen reduzieren Verbindungszeit und Zeit für Typsuche
+Retries
+Wiederholungen
+Size limit
+Größenbegrenzung
+Max size of any HTML file (B)
+Max. Anzahl Bytes von HTML-Dateien
+Max size of any non-HTML file
+Max. Größe einer Nicht-HTML-Datei
+Max site size
+Max. Größe der Website
+Max time
+Maximale Zeit
+Save prefs
+Einstellungen speichern
+Max transfer rate
+Maximale Übertragungsrate
+Follow robots.txt
+Regeln in robots.txt folgen
+No external pages
+Keine externen Seiten
+Do not purge old files
+Alte Dateien nicht löschen
+Accept cookies
+Cookies annehmen
+Check document type
+Dokumenttyp prüfen
+Parse java files
+JAVA-Dateien analysieren
+Store ALL files in cache
+ALLE Dateien zwischenspeichern
+Tolerant requests (for servers)
+Tolerante Anfragen (für Server)
+Update hack (limit re-transfers)
+Aktualisierungstrick (Re-Transfers begrenzen)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+Alte HTTP/1.0-Anfragen erzwingen (nicht 1.1)
+Max connections / seconds
+Max. Anzahl Verbindungen pro Sek.
+Maximum number of links
+Höchstzahl der Links
+Pause after downloading..
+Nach dem Download warten...
+Hide passwords
+Passwörter verbergen
+Hide query strings
+Abfragetext nicht anzeigen
+Links
+Verknüpfungen
+Build
+Struktur
+Experts Only
+Experten
+Flow Control
+Flusskontrolle
+Limits
+Grenzwerte
+Browser ID
+Browser ID
+Scan Rules
+Filterregeln
+Spider
+Spider
+Log, Index, Cache
+Protokoll, Index, Cache
+Proxy
+Proxy
+MIME Types
+MIME-Typen
+Do you really want to quit WinHTTrack Website Copier?
+WinHTTrack Website Copier beenden?
+Do not connect to a provider (already connected)
+Nicht mit Provider verbinden (schon verbunden)
+Do not use remote access connection
+Keine Remote-Access-Verbindung benutzen
+Schedule the mirroring operation
+Kopierzeitpunkt festlegen
+Quit WinHTTrack Website Copier
+WinHTTrack Website Copier beenden
+Back to starting page
+Zurück zur Startseite
+Click to start!
+Zum Starten klicken!
+No saved password for this connection!
+Kein gespeichertes Passwort für diese Verbindung!
+Can not get remote connection settings
+Verbindungseinstellungen können nicht ermittelt werden
+Select a connection provider
+Verbindungsprovider auswählen
+Start
+Start
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Bitte korrigieren Sie die Verbindungseinstellungen, wenn nötig,\nund klicken Sie auf 'Fertig stellen', um den Kopiervorgang zu starten.
+Save settings only, do not launch download now.
+Nur Einstellungen speichern; Download jetzt nicht starten
+On hold
+Angehalten
+Transfer scheduled for: (hh/mm/ss)
+Übertragung geplant für: (hh/mm/ss)
+Start
+START
+Connect to provider (RAS)
+Mit Provider verbinden (RAS)
+Connect to this provider
+Mit diesem Provider verbinden
+Disconnect when finished
+Nach der Aktion Verbindung trennen
+Disconnect modem on completion
+Modemverbindung trennen, wenn fertig
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Bitte benachrichtigen Sie uns über Fehler und Probleme)\r\n\r\nEntwicklung:\r\nOberfläche (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for German translations to:\r\nRainer Klueting (rainer@klueting.de)
+About WinHTTrack Website Copier
+Über WinHTTrack Website Copier
+Please visit our Web page
+Besuchen Sie unsere Webseite!
+Wizard query
+Assistenten-Abfrage
+Your answer:
+Ihre Antwort:
+Link detected..
+Verknüpfung gefunden...
+Choose a rule
+Regel wählen
+Ignore this link
+Diesen Link ignorieren
+Ignore directory
+Ordner ignorieren
+Ignore domain
+Domain ignorieren
+Catch this page only
+Nur diese Seite holen
+Mirror site
+Webseiten-Kopie
+Mirror domain
+Domain-Kopie
+Ignore all
+Keine Links
+Wizard query
+Assistenten-Abfrage
+NO
+NEIN
+File
+Datei
+Options
+Optionen
+Log
+Protokoll
+Window
+Fenster
+Help
+Hilfe
+Pause transfer
+Übertragung anhalten
+Exit
+Beenden
+Modify options
+Optionen ändern
+View log
+Protokoll anzeigen
+View error log
+Fehlerprotokoll anzeigen
+View file transfers
+Dateiübertragung anzeigen
+Hide
+Minimieren
+About WinHTTrack Website Copier
+Über WinHTTrack Website Copier
+Check program updates...
+Nach neuer Version suchen...
+&Toolbar
+&Werkzeugleiste
+&Status Bar
+&Statusleiste
+S&plit
+&Teilen
+File
+Datei
+Preferences
+Optionen
+Mirror
+Site-Kopie
+Log
+Protokoll
+Window
+Fenster
+Help
+Hilfe
+Exit
+Beenden
+Load default options
+Standardeinstellungen laden
+Save default options
+Standardeinstellungen speichern
+Reset to default options
+Standardeinstellungen löschen
+Load options...
+Einstellungen laden...
+Save options as...
+Einstellungen speichern als...
+Language preference...
+Spracheinstellungen...
+Contents...
+Inhalt...
+About WinHTTrack...
+Über WinHTTrack Website Copier...
+New project\tCtrl+N
+&Neues Projekt\tStrg+N
+&Open...\tCtrl+O
+Ö&ffnen...\tStrg+O
+&Save\tCtrl+S
+&Speichern\tStrg+S
+Save &As...
+Speichern &unter...
+&Delete...
+&Löschen...
+&Browse sites...
+&Webseiten anzeigen...
+User-defined structure
+Benutzerdefinierte Struktur
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tName der Datei ohne Dateityp (Bsp: Bild)\r\n%N\tName der Datei, mit Dateityp (Bsp: Bild.gif)\r\n%t\tDateityp (Bsp: gif)\r\n%p\tPfad [ohne letzten /] (Bsp: /Bilder)\r\n%h\tDomainname (Bsp: www.someweb.com)\r\n%M\tURL MD5 (128 Bits, 32 ASCII-Bytes)\r\n%Q\tAbfragetext MD5 (128 Bits, 32 ASCII-Bytes)\r\n%q\tKurzer Abfragetext MD5 (16 Bits, 4 ASCII-Bytes)\r\n\r\n%s?\tKurzname DOS(ex: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Beispiel:\t%h%p/%n%q.%t\n->\t\tc:\\Spiegelung\\www.someweb.com\\Bilder\\Bild.gif
+Proxy settings
+Proxy-Einstellungen
+Proxy address:
+Proxy-Adresse:
+Proxy port:
+Proxy-Port:
+Authentication (only if needed)
+Authentifizierung (nur wenn benötigt)
+Login
+Benutzername (Login)
+Password
+Passwort
+Enter proxy address here
+Proxy-Adresse hier eintragen
+Enter proxy port here
+Proxy-Port hier eintragen
+Enter proxy login
+Benutzernamen für Proxy hier eintragen
+Enter proxy password
+Passwort für Proxy hier eintragen
+Enter project name here
+Projektnamen hier eintragen
+Enter saving path here
+Hier den Pfad für das Projekt eintragen
+Select existing project to update
+Vorhandenes Projekt zum Aktualisieren auswählen
+Click here to select path
+Hier klicken, um einen Pfad auszuwählen
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack Projektassistent
+New project name:
+Neuer Projektname:
+Existing project name:
+Existierender Projektname:
+Project name:
+Projektname:
+Base path:
+Basisverzeichnis:
+Project category:
+
+C:\\My Web Sites
+C:\\Meine Webseiten
+Type a new project name, \r\nor select existing project to update/resume
+Neuen Projektnamen eintragen, \r\noder existierendes Projekt zum Aktualisieren oder zur Wiederaufnahme auswählen
+New project
+Neues Projekt
+Insert URL
+URL eintragen:
+URL:
+URL:
+Authentication (only if needed)
+Authentifikation (nur wenn benötigt)
+Login
+Benutzername (Login):
+Password
+Passwort:
+Forms or complex links:
+Formulare oder komplexe Links:
+Capture URL...
+Hole URL...
+Enter URL address(es) here
+URL hier eintragen
+Enter site login
+Benutzername für Web-Site
+Enter site password
+Passwort für Web-Site
+Use this capture tool for links that can only be accessed through forms or javascript code
+Verwenden Sie diese Funktion, um verknüpfte Seiten zu holen, die nur über Formulare oder JavaScript-Code zu erreichen sind.
+Choose language according to preference
+Sprache einstellen
+Catch URL!
+Diese URL holen!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Ändern Sie bitte die Proxy-Einstellungen des Browsers vorübergehend wie folgt: (Proxy-Adresse und -Port von hier kopieren)\nKlicken Sie dann im Browser auf den Schalter Submit/Absenden o.ä. des Formulars oder auf die spezielle Verknüpfung, die Sie laden wollen.
+This will send the desired link from your browser to WinHTTrack.
+Dadurch wird die verknüpfte Information vom Browser zu WinHTTrack übertragen.
+ABORT
+ABBRECHEN
+Copy/Paste the temporary proxy parameters here
+Die temporären Proxyeinstellungen von hier kopieren
+Cancel
+Abbrechen
+Unable to find Help files!
+Kann Hilfedateien nicht finden!
+Unable to save parameters!
+Kann Parameter nicht speichern!
+Please drag only one folder at a time
+Bitte immer nur einen Ordner einfügen
+Please drag only folders, not files
+Bitte nur Ordner einfügen, keine Dateien
+Please drag folders only
+Bitte nur Ordner einfügen
+Select user-defined structure?
+Benutzerdefinierte Struktur für Site-Kopie wählen?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Bitte prüfen Sie, ob die benutzerdefinierte Zeichenkette korrekt ist.\nAndernfalls entstehen unsinnige Dateinamen.
+Do you really want to use a user-defined structure?
+Möchten Sie wirklich eine benutzerdefinierte Struktur wählen?
+Too manu URLs, cannot handle so many links!!
+Zu viele URLs! So viele Links können nicht bearbeitet werden!
+Not enough memory, fatal internal error..
+Nicht genug Speicher. Kritischer interner Fehler...
+Unknown operation!
+Unbekannte Operation!
+Add this URL?\r\n
+Diese URL hinzufügen?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Warnung: Hauptprozess antwortet nicht; kann keine URLs hinzufügen.
+Type/MIME associations
+Typ/MIME-Verknüpfungen
+File types:
+Dateitypen:
+MIME identity:
+MIME-Entsprechung
+Select or modify your file type(s) here
+Dateityp(en) hier auswählen oder ändern
+Select or modify your MIME type(s) here
+MIME-Entsprechung(en) hier auswählen oder ändern
+Go up
+Nach oben
+Go down
+Nach unten
+File download information
+Informationen zum Datei-Download
+Freeze Window
+Fenster fixieren
+More information:
+Weitere Informationen:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Willkommen beim WinHTTrack Website Copier!\n\nBitte auf WEITER klicken,\n\n- um ein neues Projekt zu beginnen\n- oder einen unterbrochenen Kopiervorgang\n  wieder aufzunehmen.
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Dateityp:\nDateiname enthält:\nDiese Datei:\nPfadname enthält:\nDieser Pfad:\nLinks zu dieser Domain:\nDomainname enthält:\nLinks zu diesem Server:\nLink enthält:\nDieser Link:\nALLE LINKS
+Show all\nHide debug\nHide infos\nHide debug and infos
+Alles zeigen\nInfos für Fehlersuche speichern\nAllgemeine Hinweise speichern\nFehler und Hinweise speichern
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Site-Struktur (Standard)\nHtml in web/, Bilder und anderes in web/images/\nHtml in web/html, Bilder und anderes in web/images\nHtml in web/, Bilder und anderes in web/\nHtml in web/, Bilder und anderes in web/xxx, mit xxx wie Dateityp\nHtml in web/html, Bilder und anderes in web/xxx\nSite-Struktur, ohne www.domain.xxx/\nHtml in site_name/, Bilder und anderes in site_name/images/\nHtml in site_name/html, Bilder und anderes in site_name/images\nHtml in site_name/, Bilder und anderes in site_name/\nHtml in site_name/, Bilder und anderes in site_name/xxx\nHtml in site_name/html, Bilder und anderes in site_name/xxx\nAlle Dateien in web/, mit Zufallsnamen (Spielerei!)\nAlle Dateien in site_name/, mit Zufallsnamen (Spielerei!)\nBenutzerdefinierte Struktur...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Nur Verknüpfungen analysieren\nHTML-Dateien speichern\nNicht-HTML-Dateien speichern\nAlle Dateien speichern (Standard)\nZuerst HTML-Dateien speichern
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Im selben Ordner bleiben\nKann nach unten gehen (Standard)\nKann nach oben gehen\nKann nach oben und unten gehen
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Bei Adresse bleiben (Standard)\nIn Domain bleiben\nIn Top-Level-Domain bleiben\nFreie Suche überall im Web
+Never\nIf unknown (except /)\nIf unknown
+Nie\nWenn unbekannt (ohne /)\nWenn unbekannt
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+Regeln in robots.txt ignorieren\nrobots.txt folgen, außer Filtern\nRegeln in robots.txt folgen
+normal\nextended\ndebug
+Normal\nErweitert\nFehlersuche
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Automatische Web-Site-Kopie\nWeb-Site-Kopie mit Rückfrage\nSpezielle Dateien laden\nZu allen Links verzweigen (Kopie mehrerer Sites)\nLinks auf den Seiten testen (Lesezeichen prüfen)\n* Unterbrochenen Kopiervorgang fortsetzen\n* Vorhandene Kopie aktualisieren
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Relative URL / Absolute URL (Standard)\nAbsolute URL / Absolute URL\nAbsolute URL / Absolute URL\nUnveränderte URL / Unveränderte URL
+Open Source offline browser
+Open source Offline-Browser
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Webseiten-Kopierer/Offline-Browser. Kopien kompletter Internetangebote auf dem eigenen PC erstellen. Freeware
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline browser
+URL list (.txt)
+URL Liste (.txt)
+Previous
+Zurück
+Next
+Weiter
+URLs
+URLs
+Warning
+Warnung
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Ihr Browser unterstützt kein Javascript, oder es ist abgeschaltet. Eine bessere Darstellung erhalten Sie mit einem Javascript-fähigen Browser.
+Thank you
+Vielen Dank
+You can now close this window
+Sie können dieses Fenster jetzt schließen
+Server terminated
+Der Server wurde beendet
+A fatal error has occured during this mirror
+Fataler Fehler während der Webseiten-Kopie
