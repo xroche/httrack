@@ -964,7 +964,7 @@ static void signal_handlers(void) {
   signal(SIGCHLD, sig_ignore);  // child change status
 #endif
 #ifdef SIGABRT
-  signal(SIGABRT, sig_fatal);    // bus error
+  signal(SIGABRT, sig_fatal);    // abort
 #endif
 #ifdef SIGBUS
   signal(SIGBUS, sig_fatal);    // bus error
