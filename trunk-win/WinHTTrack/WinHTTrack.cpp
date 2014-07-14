@@ -189,15 +189,66 @@ CWinHTTrackApp theApp;
 /////////////////////////////////////////////////////////////////////////////
 // CWinHTTrackApp initialization
 
+static BOOL ShowFile(const CHAR *const filename) {
+  //Load Shell helper
+  const HRESULT hr = CoInitialize(NULL);
+  HMODULE shell = LoadLibraryA("Shell32");
+  if (shell == NULL)
+    return FALSE;
+
+  //Find functions
+  union {
+    FARPROC ptr[3];
+    struct {
+      PIDLIST_ABSOLUTE (STDAPICALLTYPE*ILCreateFromPath)(PCTSTR);
+      HRESULT (STDAPICALLTYPE*SHOpenFolderAndSelectItems)(PCIDLIST_ABSOLUTE, UINT, PCUITEMID_CHILD_ARRAY, DWORD);
+      void (STDAPICALLTYPE*ILFree)(PIDLIST_RELATIVE);
+    } fun;
+  } shfun;
+  shfun.ptr[0] = GetProcAddress(shell, "ILCreateFromPathA");
+  shfun.ptr[1] = GetProcAddress(shell, "SHOpenFolderAndSelectItems");
+  shfun.ptr[2] = GetProcAddress(shell, "ILFree");
+
+  if (shfun.ptr[0] == NULL || shfun.ptr[1] == NULL || shfun.ptr[2] == NULL)
+    return FALSE;
+
+  //Courtesy of flashk
+  //(http://stackoverflow.com/questions/9355/programatically-select-multiple-files-in-windows-explorer
+
+  //Item to be selected
+  PIDLIST_ABSOLUTE file = shfun.fun.ILCreateFromPath(filename);
+
+  //Perform selection
+  const HRESULT success = shfun.fun.SHOpenFolderAndSelectItems(file, 0, NULL, 0);
+
+  //Free resources
+  shfun.fun.ILFree(file);
+
+  // Free shell32
+  FreeLibrary(shell);
+  if (SUCCEEDED(hr))
+    CoUninitialize();
+
+  return SUCCEEDED(success);
+}
+
 void InitCBErrMsg(const char* msg, const char* file, int line) {
   // Produce audit file
-  FILE *const fp = fopen("CRASH.TXT", "wb");
-  if (fp != NULL) {
-    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n",
-            file, line);
-    fprintf(fp, "Reason:\r\n%s\r\n", msg);
-    fflush(fp);
-    fclose(fp);
+  const size_t filename_max = 32;
+  CHAR path[MAX_PATH + 1 + filename_max];
+  if (GetTempPath(sizeof(path) - filename_max, path) != 0) {
+    FILE *fp;
+    strcat(path, "CRASH.TXT");
+    if ((fp = fopen(path, "wb")) != NULL) {
+      fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n",
+        file, line);
+      fprintf(fp, "Reason:\r\n%s\r\n", msg);
+      fflush(fp);
+      fclose(fp);
+    }
+    (void) ShowFile(path);
+  } else {
+    strcpy(path, "[unable to save]");
   }
 
   // Display message box
@@ -205,12 +256,13 @@ void InitCBErrMsg(const char* msg, const char* file, int line) {
   st.Format("A fatal error has occured\r\n%s"
     "\r\nin file '%s', line %d\r\n"
     "Please report the problem at http://forum.httrack.com\r\n"
-    "using the CRASH.TXT file generated in the WinHTTrack directory\r\n"
-    "Thank you!", msg, file, line);
+    "using the %s file generated\r\n"
+    "Thank you!", msg, file, line, path);
   AfxMessageBox(st, MB_OK|MB_APPLMODAL|MB_SYSTEMMODAL|MB_ICONSTOP);
 }
 void InitCBErr() {
   hts_set_error_callback(InitCBErrMsg);
+  InitCBErrMsg("lol", "trololo.c", 1234);
 }
 
 int Eval_Exception( void );
