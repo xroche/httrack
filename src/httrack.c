@@ -69,6 +69,9 @@ static int linput(FILE * fp, char *s, int max);
 #include <unistd.h>
 #endif
 #include <ctype.h>
+#ifdef __linux
+#include <execinfo.h>
+#endif
 /* END specific definitions */
 
 static void __cdecl htsshow_init(t_hts_callbackarg * carg);
@@ -833,6 +836,60 @@ static void sig_ask(int code) { // demander
   }
 }
 #endif
+
+#undef FD_ERR
+#define FD_ERR 2
+
+static void print_backtrace(void) {
+#ifdef __linux
+  void *stack[256];
+  const int size = backtrace(stack, sizeof(stack)/sizeof(stack[0]));
+  if (size != 0) {
+    backtrace_symbols_fd(stack, size, FD_ERR);
+  }
+#else
+  const char msg[] = "No stack trace available on this OS :(\n";
+  write(FD_ERR, msg, sizeof(msg) - 1);
+#endif
+}
+
+static size_t print_num(char *buffer, int num) {
+  size_t i, j;
+  if (num < 0) {
+    *(buffer++) = '\n';
+    num = -num;
+  }
+  for(i = 0 ; num != 0 || i == 0 ; i++, num /= 10) {
+    buffer[i] = '0' + ( num % 10 );
+  }
+  for(j = 0 ; j < i ; j++) {
+    const char c = buffer[i - j - 1];
+    buffer[i - j - 1] = buffer[j];
+    buffer[j] = c;
+  }
+  buffer[i] = '\0';
+  return i;
+}
+
+static void sig_fatal(int code) {
+  const char msg[] = "\nCaught signal ";
+  char buffer[256];
+  size_t size;
+
+  signal(code, SIG_DFL);
+  signal(SIGABRT, SIG_DFL);
+
+  memcpy(buffer, msg, sizeof(msg) - 1);
+  size = sizeof(msg) - 1;
+  size += print_num(&buffer[size], code);
+  buffer[size++] = '\n';
+  write(FD_ERR, buffer, size);
+  print_backtrace();
+  abort();
+}
+
+#undef FD_ERR
+
 static void sig_brpipe(int code) {      // treat if necessary
   signal(code, sig_brpipe);
 }
@@ -905,6 +962,21 @@ static void signal_handlers(void) {
 #endif
   signal(SIGPIPE, sig_brpipe);  // broken pipe (write into non-opened socket)
   signal(SIGCHLD, sig_ignore);  // child change status
+#endif
+#ifdef SIGABRT
+  signal(SIGABRT, sig_fatal);    // bus error
+#endif
+#ifdef SIGBUS
+  signal(SIGBUS, sig_fatal);    // bus error
+#endif
+#ifdef SIGILL
+  signal(SIGILL, sig_fatal);    // illegal instruction
+#endif
+#ifdef SIGSEGV
+  signal(SIGSEGV, sig_fatal);   // segmentation violation
+#endif
+#ifdef SIGSTKFLT
+  signal(SIGSTKFLT, sig_fatal); // stack fault
 #endif
 }
 
