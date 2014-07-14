@@ -856,7 +856,7 @@ static void print_backtrace(void) {
 static size_t print_num(char *buffer, int num) {
   size_t i, j;
   if (num < 0) {
-    *(buffer++) = '\n';
+    *(buffer++) = '-';
     num = -num;
   }
   for(i = 0 ; num != 0 || i == 0 ; i++, num /= 10) {
