@@ -650,6 +650,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\CrashReport.h"
+				>
+			</File>
+			<File
 				RelativePath="DialogContainer.h"
 				>
 			</File>
@@ -1268,6 +1272,10 @@
 						BrowseInformation="1"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\CrashReport.cpp"
+				>
 			</File>
 			<File
 				RelativePath="DialogContainer.cpp"
