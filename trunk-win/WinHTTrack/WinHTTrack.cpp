@@ -258,7 +258,7 @@ static BOOL PrintStack(char *const print_buffer,
   if (dbghelp == NULL)
     return FALSE;
   union {
-    FARPROC ptr[8];
+    FARPROC ptr[9];
     struct {
       BOOL (WINAPI * SymInitialize)(HANDLE, PCTSTR, BOOL);
       BOOL (WINAPI * StackWalk64)(DWORD, HANDLE, HANDLE, LPSTACKFRAME64, PVOID, PREAD_PROCESS_MEMORY_ROUTINE64, PFUNCTION_TABLE_ACCESS_ROUTINE64, PGET_MODULE_BASE_ROUTINE64, PTRANSLATE_ADDRESS_ROUTINE64);
@@ -268,6 +268,7 @@ static BOOL PrintStack(char *const print_buffer,
       DWORD (WINAPI * UnDecorateSymbolName)(PCTSTR, PTSTR, DWORD, DWORD);
       BOOL (WINAPI * EnumerateLoadedModules64)(HANDLE, PENUMLOADED_MODULES_CALLBACK64, PVOID);
       BOOL (WINAPI * SymGetLineFromAddr64)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
+      BOOL (WINAPI * SymGetModuleInfo64)(HANDLE, DWORD64, PIMAGEHLP_MODULE64);
     } fun;
   } sym = {
     GetProcAddress(dbghelp, "SymInitialize"),
@@ -277,7 +278,8 @@ static BOOL PrintStack(char *const print_buffer,
     GetProcAddress(dbghelp, "SymFromAddr"),
     GetProcAddress(dbghelp, "UnDecorateSymbolName"),
     GetProcAddress(dbghelp, "EnumerateLoadedModules64"),
-    GetProcAddress(dbghelp, "SymGetLineFromAddr64")
+    GetProcAddress(dbghelp, "SymGetLineFromAddr64"),
+    GetProcAddress(dbghelp, "SymGetModuleInfo64")
   };
   if (sym.ptr[0] == NULL)
     return FALSE;
@@ -365,8 +367,13 @@ static BOOL PrintStack(char *const print_buffer,
   pSymbol->MaxNameLen = MAX_SYM_NAME;
   pSymbol->SizeOfStruct = sizeof(*pSymbol);
 
-  PIMAGEHLP_LINE64 pIHLine = (PIMAGEHLP_LINE64) calloc(sizeof(*pIHLine), 1);
-  pIHLine->SizeOfStruct = sizeof(*pIHLine);
+  IMAGEHLP_LINE64 pIHLine;
+  ZeroMemory(&pIHLine, sizeof(pIHLine));
+  pIHLine.SizeOfStruct = sizeof(pIHLine);
+
+  IMAGEHLP_MODULE64 pIHModule;
+  ZeroMemory(&pIHModule, sizeof(pIHModule));
+  pIHModule.SizeOfStruct = sizeof(pIHModule);
 
   CHAR *undecoratedName = (CHAR*) malloc(MAX_SYM_NAME);
 
@@ -374,9 +381,15 @@ static BOOL PrintStack(char *const print_buffer,
   for(SIZE_T i = 0 ; i < StackCount ; i++) {
     const char *function = "unknown";
     const char *file = "";
+    const char *module = "";
     int line = 0;
 
     const DWORD64 dwAddr = Stack[i];
+
+    if (sym.fun.SymGetModuleInfo64 != NULL
+      && sym.fun.SymGetModuleInfo64(hProcess, dwAddr, &pIHModule)) {
+      module = pIHModule.ModuleName;
+    }
 
     DWORD64 displacement;
     if (sym.fun.SymFromAddr != NULL
@@ -390,17 +403,18 @@ static BOOL PrintStack(char *const print_buffer,
 
     DWORD wdisplacement = (DWORD) displacement;
     if (sym.fun.SymGetLineFromAddr64 != NULL
-      && sym.fun.SymGetLineFromAddr64(hProcess, dwAddr, &wdisplacement, pIHLine)) {
-      if (pIHLine->FileName != NULL) {
-        file = pIHLine->FileName;
-        line = (int) pIHLine->LineNumber;
+      && sym.fun.SymGetLineFromAddr64(hProcess, dwAddr, &wdisplacement, &pIHLine)) {
+      if (pIHLine.FileName != NULL) {
+        file = pIHLine.FileName;
+        line = (int) pIHLine.LineNumber;
       }
     }
 
     char lines[32];
     sprintf(lines, "%d", line);
 
-    if (print_buffer_size - print_buffer_offs < strlen(function) + strlen(file) + strlen(lines) + 8)
+    if (print_buffer_size - print_buffer_offs 
+      < strlen(function) + strlen(file) + strlen(lines) + strlen(module) + 8)
       break;
 
 #undef ADD_STR
@@ -416,12 +430,16 @@ static BOOL PrintStack(char *const print_buffer,
       ADD_STR(lines);
       ADD_STR(")");
     }
+    if (module != NULL && module[0] != '\0') {
+      ADD_STR(" [");
+      ADD_STR(module);
+      ADD_STR("]");
+    }
     ADD_STR("\r\n");
 #undef ADD_STR
   }
 
   free(pSymbol);
-  free(pIHLine);
   free(undecoratedName);
 
   FreeLibrary(kernel32);
