@@ -89,14 +89,8 @@ static BOOL ShowFile(const CHAR *const filename) {
   return SUCCEEDED(success);
 }
 
-static CRITICAL_SECTION DbgHelpLock;
-
-static void PrintStackInit() {
-  InitializeCriticalSection(&DbgHelpLock);
-}
-
-static BOOL PrintStack(char *const print_buffer, 
-                       const size_t print_buffer_size) {
+static BOOL PrintStack_(char *const print_buffer, 
+                        const size_t print_buffer_size) {
   HMODULE kernel32 = LoadLibraryA("Kernel32");
   if (kernel32 == NULL)
     return FALSE;
@@ -192,7 +186,6 @@ static BOOL PrintStack(char *const print_buffer,
   // SymInitialize( GetCurrentProcess(), NULL, TRUE ) has 
   // already been called.
   //
-  EnterCriticalSection( &DbgHelpLock );
   while(StackCount < sizeof(Stack) / sizeof(Stack[0])
     && sym.fun.StackWalk64 != NULL
     && sym.fun.StackWalk64(MachineType,
@@ -213,7 +206,6 @@ static BOOL PrintStack(char *const print_buffer,
   {
     Stack[StackCount++] = StackFrame.AddrPC.Offset;
   }
-  LeaveCriticalSection( &DbgHelpLock );
 
   // Now print information
   PSYMBOL_INFO pSymbol = (PSYMBOL_INFO) calloc(sizeof(*pSymbol) + MAX_SYM_NAME + 1, 1);
@@ -299,6 +291,20 @@ static BOOL PrintStack(char *const print_buffer,
   FreeLibrary(dbghelp);
 
   return TRUE;
+}
+
+static CRITICAL_SECTION DbgHelpLock;
+
+static void PrintStackInit() {
+  InitializeCriticalSection(&DbgHelpLock);
+}
+
+static BOOL PrintStack(char *const print_buffer, 
+                       const size_t print_buffer_size) {
+  EnterCriticalSection( &DbgHelpLock );
+  BOOL ret = PrintStack_(print_buffer, print_buffer_size);
+  LeaveCriticalSection( &DbgHelpLock );
+  return ret;
 }
 
 void CrashReportReportEx(const char* msg, const char* file, int line, const char *trace) {
