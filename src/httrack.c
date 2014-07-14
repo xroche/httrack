@@ -837,6 +837,43 @@ static void sig_ask(int code) { // demander
 }
 #endif
 
+static void sig_brpipe(int code) {      // treat if necessary
+  signal(code, sig_brpipe);
+}
+static void sig_doback(int blind) {     // mettre en backing 
+  int out = -1;
+
+  //
+  printf("\nMoving into background to complete the mirror...\n");
+  fflush(stdout);
+
+  if (global_opt != NULL) {
+    // suppress logging and asking lousy questions
+    global_opt->quiet = 1;
+    global_opt->verbosedisplay = 0;
+  }
+
+  if (!blind)
+    out = open("hts-nohup.out", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+  if (out == -1)
+    out = open("/dev/null", O_WRONLY, S_IRUSR | S_IWUSR);
+  dup2(out, 0);
+  dup2(out, 1);
+  dup2(out, 2);
+  //
+  switch (fork()) {
+  case 0:
+    break;
+  case -1:
+    fprintf(stderr, "Error: can not fork process\n");
+    break;
+  default:                     // pere
+    _exit(0);
+    break;
+  }
+}
+#endif
+
 #undef FD_ERR
 #define FD_ERR 2
 
@@ -889,43 +926,6 @@ static void sig_fatal(int code) {
 }
 
 #undef FD_ERR
-
-static void sig_brpipe(int code) {      // treat if necessary
-  signal(code, sig_brpipe);
-}
-static void sig_doback(int blind) {     // mettre en backing 
-  int out = -1;
-
-  //
-  printf("\nMoving into background to complete the mirror...\n");
-  fflush(stdout);
-
-  if (global_opt != NULL) {
-    // suppress logging and asking lousy questions
-    global_opt->quiet = 1;
-    global_opt->verbosedisplay = 0;
-  }
-
-  if (!blind)
-    out = open("hts-nohup.out", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
-  if (out == -1)
-    out = open("/dev/null", O_WRONLY, S_IRUSR | S_IWUSR);
-  dup2(out, 0);
-  dup2(out, 1);
-  dup2(out, 2);
-  //
-  switch (fork()) {
-  case 0:
-    break;
-  case -1:
-    fprintf(stderr, "Error: can not fork process\n");
-    break;
-  default:                     // pere
-    _exit(0);
-    break;
-  }
-}
-#endif
 
 static void sig_leave(int code) {
   if (global_opt != NULL && global_opt->state._hts_in_mirror) {
