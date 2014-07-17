@@ -536,21 +536,20 @@ void longfile_to_83(int mode, char *n83, char *save) {
 // écrire backblue.gif
 /* Note: utf-8 */
 int verif_backblue(httrackp * opt, const char *base) {
-  int *done = &opt->state.verif_backblue_done;
   int ret = 0;
 
   //
   if (!base) {                  // init
-    *done = 0;
+    opt->state.verif_backblue_done = 0;
     return 0;
   }
-  if ((!*done)
+  if ((!opt->state.verif_backblue_done)
       || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif")) !=
           HTS_DATA_BACK_GIF_LEN)) {
     FILE *fp =
       filecreate(&opt->state.strc,
                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"));
-    *done = 1;
+    opt->state.verif_backblue_done = 1;
     if (fp) {
       if (fwrite(HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN, 1, fp) !=
           HTS_DATA_BACK_GIF_LEN)
@@ -579,12 +578,12 @@ int verif_backblue(httrackp * opt, const char *base) {
 
 // flag
 int verif_external(httrackp * opt, int nb, int test) {
-  int *status = &opt->state.verif_external_status;
-
+  const int flag = 1 << nb;
+  int *const status = &opt->state.verif_external_status;
   if (!test)
-    status[nb] = 0;             // reset
-  else if (!status[nb]) {
-    status[nb] = 1;
+    *status &= ~flag;             // reset
+  else if ((*status & flag) == 0) {
+    *status |= flag;
     return 1;
   }
   return 0;
