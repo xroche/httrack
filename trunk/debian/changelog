@@ -1,7 +1,7 @@
 httrack (3.48.18-1) unstable; urgency=low
 
   * Updated to 3.48.18 (3.48-18)
-    closes:#nnn
+    closes:#755107
 
  -- Xavier Roche <xavier@debian.org>  Thu, 17 Jul 2014 21:35:10 +0200
 
