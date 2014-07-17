@@ -4564,11 +4564,11 @@ static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCadd
   }
   for(; cache != NULL; cache = cache->next) {
     assertf(cache != NULL);
-    assert(cache->iadr != NULL);
-    assert(cache->iadr == (const char*) cache + sizeof(t_dnscache));
+    assertf(cache->iadr != NULL);
+    assertf(cache->iadr == (const char*) cache + sizeof(t_dnscache));
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
       if (cache->host_length != 0) {     // entrée valide
-        assert(cache->host_length <= sizeof(cache->host_addr));
+        assertf(cache->host_length <= sizeof(cache->host_addr));
         SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
         return addr;
       } else {                  // erreur dans le dns, déja vérifié
