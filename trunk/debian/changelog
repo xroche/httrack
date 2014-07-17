@@ -1,3 +1,10 @@
+httrack (3.48.18-1) unstable; urgency=low
+
+  * Updated to 3.48.18 (3.48-18)
+    closes:#nnn
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 17 Jul 2014 21:35:10 +0200
+
 httrack (3.48.17-1) unstable; urgency=low
 
   * Updated to 3.48.17 (3.48-17)
