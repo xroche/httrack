@@ -148,12 +148,10 @@ struct OLD_htsblk {
 typedef struct t_dnscache t_dnscache;
 #endif
 struct t_dnscache {
-  struct t_dnscache *n;
-  int host_length;              // 4 normalement - ==0  alors en cours de résolution
-  char host_addr[HTS_MAXADDRLEN];       // 4 octets (v4), ou 16 octets (v6)
-  // ou >16 si sockaddr
-  //                 ==-1 alors erreur (host n'éxiste pas)
-  char iadr[1024];
+  struct t_dnscache *next;
+  const char *iadr;
+  size_t host_length;                   // length ; (4 or 16) ; 0 for error
+  char host_addr[HTS_MAXADDRLEN];
 };
 
 /* Library internal definictions */
