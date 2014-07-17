@@ -1,8 +1,8 @@
 ; HTTrack Website Copier - x64 edition
 
 [Setup]
-AppVerName=WinHTTrack Website Copier 3.47-27 (x64)
-AppVersion=3.47.27
+AppVerName=WinHTTrack Website Copier 3.48-18 (x64)
+AppVersion=3.48.18
 AppName=WinHTTrack Website Copier
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -31,7 +31,7 @@ SignedUninstaller=yes
 ; Tools/Configure Sign Tools.../Add:
 ; Name of the sign tool: signtool
 ; Command of the sign tool: "C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe" $p
-SignTool=signtool sign /f $qZ:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx$q /d $qHTTrack Website Copier Installer (x64)$q /t http://timestamp.verisign.com/scripts/timstamp.dll $f
+SignTool=signtool sign /f $qZ:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx$q /d $qHTTrack Website Copier Installer (x64)$q /du http://www.httrack.com/ /t http://timestamp.verisign.com/scripts/timstamp.dll $f
 
 [Tasks]
 Name: "regfiles"; Description: "Register WinHTTrack file types and program setup"; GroupDescription: "Setup:"; MinVersion: 4,4
