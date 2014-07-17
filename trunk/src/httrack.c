@@ -920,7 +920,7 @@ static void sig_fatal(int code) {
   size = sizeof(msg) - 1;
   size += print_num(&buffer[size], code);
   buffer[size++] = '\n';
-  write(FD_ERR, buffer, size);
+  (void) (write(FD_ERR, buffer, size) == size);
   print_backtrace();
   abort();
 }
