@@ -4526,6 +4526,8 @@ t_dnscache *hts_cache(httrackp * opt) {
     memset(opt->state.dns_cache, 0, sizeof(t_dnscache));
   }
   assertf(opt->state.dns_cache != NULL);
+  /* first entry is NULL */
+  assertf(opt->state.dns_cache->iadr == NULL);
   return opt->state.dns_cache;
 }
 
@@ -4534,8 +4536,8 @@ void hts_cache_free(t_dnscache *const root) {
   if (root != NULL) {
     t_dnscache *cache;
     for(cache = root; cache != NULL; ) {
-      t_dnscache *const next = cache->n;
-      cache->n = NULL;
+      t_dnscache *const next = cache->next;
+      cache->next = NULL;
       freet(cache);
       cache = next;
     }
@@ -4556,14 +4558,19 @@ static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCadd
   if (*iadr == '\0') {
     return NULL;
   }
-  for(; cache != NULL; cache = cache->n) {
+  /* first entry is empty */
+  if (cache->iadr == NULL) {
+    cache = cache->next;
+  }
+  for(; cache != NULL; cache = cache->next) {
     assertf(cache != NULL);
-    if (cache->iadr != NULL && strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
-      if (cache->host_length > 0) {     // entrée valide
+    assert(cache->iadr != NULL);
+    assert(cache->iadr == (const char*) cache + sizeof(t_dnscache));
+    if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
+      if (cache->host_length != 0) {     // entrée valide
+        assert(cache->host_length <= sizeof(cache->host_addr));
         SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
         return addr;
-      } else if (cache->host_length == 0) {     // en cours
-        return NULL;
       } else {                  // erreur dans le dns, déja vérifié
         SOCaddr_clear(*addr);
         return addr;
@@ -4684,8 +4691,11 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
   if (sa != NULL) {
     return SOCaddr_is_valid(*sa) ? sa : NULL;
   } else {                      // non présent dans le cache dns, tester
+    const size_t iadr_len = strlen(iadr) + 1;
+    char *block;
+
     // find queue
-    for(; cache->n != NULL; cache = cache->n) ;
+    for(; cache->next != NULL; cache = cache->next) ;
 
 #if DEBUGDNS
     printf("resolving (not cached) %s\n", iadr);
@@ -4698,19 +4708,21 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
 #endif
 
     /* attempt to store new entry */
-    cache->n = (t_dnscache *) calloct(1, sizeof(t_dnscache));
-    if (cache->n != NULL) {
-      t_dnscache *const next = cache->n;
-      strcpybuff(next->iadr, iadr);
+    block = malloct(sizeof(t_dnscache) + iadr_len);
+    cache->next = (t_dnscache *) block;
+    if (cache->next != NULL) {
+      t_dnscache *const next = cache->next;
+      char *str = block + sizeof(t_dnscache);
+      memcpy(str, iadr, iadr_len);
+      next->iadr = str;
       if (sa != NULL) {
         next->host_length = SOCaddr_size(*sa);
-        assertf(next->host_length < sizeof(next->host_addr));
+        assertf(next->host_length <= sizeof(next->host_addr));
         memcpy(next->host_addr, &SOCaddr_sockaddr(*sa), next->host_length);
       } else {
-        next->host_addr[0] = '\0';
         next->host_length = 0;      // non existant dans le dns
       }
-      next->n = NULL;
+      next->next = NULL;
       return sa;
     }
 
