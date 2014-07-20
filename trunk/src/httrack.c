@@ -910,6 +910,8 @@ static size_t print_num(char *buffer, int num) {
 
 static void sig_fatal(int code) {
   const char msg[] = "\nCaught signal ";
+  const char msgreport[] =
+    "\nPlease report the problem at http://forum.httrack.com\n";
   char buffer[256];
   size_t size;
 
@@ -922,6 +924,8 @@ static void sig_fatal(int code) {
   buffer[size++] = '\n';
   (void) (write(FD_ERR, buffer, size) == size);
   print_backtrace();
+  (void) (write(FD_ERR, msgreport, sizeof(msgreport) - 1)
+    == sizeof(msgreport) - 1);
   abort();
 }
 
