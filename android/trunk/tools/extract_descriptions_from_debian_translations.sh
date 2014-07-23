@@ -2,6 +2,8 @@
 #
 
 # Extract descriptions from the Debian Description Translation Project
+# See <http://ftp.debian.org/debian/dists/sid/main/i18n/>
+# bunzip2 *.bz2
 
 project=httrack
 
