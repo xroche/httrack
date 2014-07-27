@@ -99,7 +99,7 @@ BOOL Cinfoend::OnInitDialog()
   SetIcon(httrack_icon,false);
   SetIcon(httrack_icon,true);  
   EnableToolTips(true);     // TOOL TIPS
-  SetForegroundWindow();   // yop en premier plan!
+  //SetForegroundWindow();   // yop en premier plan!
 
   // Patcher l'interface pour les Français ;-)
   if (LANG_T(-1)) {    // Patcher en français
