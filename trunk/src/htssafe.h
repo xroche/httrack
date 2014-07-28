@@ -130,7 +130,7 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
  */
 #define strncatbuff(A, B, N) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? ( (N) != (size_t) -1 ? strncat(A, B, N) : strcat(A, B) ) \
+  ? strncat(A, B, N) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
