@@ -130,6 +130,16 @@ HTSEXT_API int hts_main(int argc, char **argv) {
   return ret;
 }
 
+// very minimalistic internal tests
+static void basic_selftests(void) {
+  // BUG 756328
+  const char *const source = "/intent/tweet?url=https%3A%2F%2Fwww.httrack.com%2Fvacatures%2F1562519%2Fmedewerker-data-services&text=Medewerker+Data+Services&via=httrackcom";
+  char buffer[1024];
+  fil_normalized(source, buffer);
+  // MD5 selftests
+  md5selftest();
+}
+
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 
 // Main, récupère les paramètres et appelle le robot
@@ -2432,7 +2442,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '7':  // hashtable selftest: httrack -#7 nb_entries
-                md5selftest();
+                basic_selftests();
                 if (++na < argc) {
                   char *const snum = strdup(argv[na]);
                   unsigned long count = 0;
