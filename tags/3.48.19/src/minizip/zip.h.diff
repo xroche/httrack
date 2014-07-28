@@ -1,0 +1,26 @@
+--- zip.h.orig	2010-02-15 12:58:22.000000000 +0100
++++ zip.h	2014-05-24 13:47:52.838188589 +0200
+@@ -144,6 +144,11 @@
+                                    zipcharpc* globalcomment,
+                                    zlib_filefunc64_def* pzlib_filefunc_def));
+ 
++extern zipFile ZEXPORT zipOpen3 OF((const void *pathname,
++                                    int append,
++                                    zipcharpc* globalcomment,
++                                    zlib_filefunc64_32_def* pzlib_filefunc64_32_def));
++
+ extern int ZEXPORT zipOpenNewFileInZip OF((zipFile file,
+                        const char* filename,
+                        const zip_fileinfo* zipfi,
+@@ -311,6 +316,11 @@
+   Write data in the zipfile
+ */
+ 
++extern int ZEXPORT zipFlush OF((zipFile file));
++/*
++  Flush the zipfile output
++*/
++
+ extern int ZEXPORT zipCloseFileInZip OF((zipFile file));
+ /*
+   Close the current file in the zipfile

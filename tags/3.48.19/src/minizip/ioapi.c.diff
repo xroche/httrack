@@ -1,0 +1,66 @@
+--- ioapi.c.orig	2014-06-10 18:55:32.778807408 +0200
++++ ioapi.c	2014-06-22 12:22:06.606696274 +0200
+@@ -14,7 +14,7 @@
+         #define _CRT_SECURE_NO_WARNINGS
+ #endif
+ 
+-#if defined(__APPLE__) || defined(IOAPI_NO_64)
++#if defined(__APPLE__) || defined(__ANDROID__) || defined(IOAPI_NO_64)
+ // In darwin and perhaps other BSD variants off_t is a 64 bit value, hence no need for specific 64 bit functions
+ #define FOPEN_FUNC(filename, mode) fopen(filename, mode)
+ #define FTELLO_FUNC(stream) ftello(stream)
+@@ -73,6 +73,7 @@
+     p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
+     p_filefunc64_32->zfile_func64.zread_file = p_filefunc32->zread_file;
+     p_filefunc64_32->zfile_func64.zwrite_file = p_filefunc32->zwrite_file;
++    p_filefunc64_32->zfile_func64.zflush_file = p_filefunc32->zflush_file;
+     p_filefunc64_32->zfile_func64.ztell64_file = NULL;
+     p_filefunc64_32->zfile_func64.zseek64_file = NULL;
+     p_filefunc64_32->zfile_func64.zclose_file = p_filefunc32->zclose_file;
+@@ -89,6 +90,8 @@
+ static uLong   ZCALLBACK fwrite_file_func OF((voidpf opaque, voidpf stream, const void* buf,uLong size));
+ static ZPOS64_T ZCALLBACK ftell64_file_func OF((voidpf opaque, voidpf stream));
+ static long    ZCALLBACK fseek64_file_func OF((voidpf opaque, voidpf stream, ZPOS64_T offset, int origin));
++static int     ZCALLBACK fflush_file_func OF((voidpf opaque, voidpf stream));
++
+ static int     ZCALLBACK fclose_file_func OF((voidpf opaque, voidpf stream));
+ static int     ZCALLBACK ferror_file_func OF((voidpf opaque, voidpf stream));
+ 
+@@ -206,6 +209,12 @@
+     return ret;
+ }
+ 
++static int ZCALLBACK fflush_file_func (voidpf opaque, voidpf stream)
++{
++    int ret;
++    ret = fflush((FILE *)stream);
++    return ret;
++}
+ 
+ static int ZCALLBACK fclose_file_func (voidpf opaque, voidpf stream)
+ {
+@@ -221,14 +230,14 @@
+     return ret;
+ }
+ 
+-void fill_fopen_filefunc (pzlib_filefunc_def)
+-  zlib_filefunc_def* pzlib_filefunc_def;
++void fill_fopen_filefunc (zlib_filefunc_def* pzlib_filefunc_def)
+ {
+     pzlib_filefunc_def->zopen_file = fopen_file_func;
+     pzlib_filefunc_def->zread_file = fread_file_func;
+     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
+     pzlib_filefunc_def->ztell_file = ftell_file_func;
+     pzlib_filefunc_def->zseek_file = fseek_file_func;
++    pzlib_filefunc_def->zflush_file = fflush_file_func;
+     pzlib_filefunc_def->zclose_file = fclose_file_func;
+     pzlib_filefunc_def->zerror_file = ferror_file_func;
+     pzlib_filefunc_def->opaque = NULL;
+@@ -241,6 +250,7 @@
+     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
+     pzlib_filefunc_def->ztell64_file = ftell64_file_func;
+     pzlib_filefunc_def->zseek64_file = fseek64_file_func;
++    pzlib_filefunc_def->zflush_file = fflush_file_func;
+     pzlib_filefunc_def->zclose_file = fclose_file_func;
+     pzlib_filefunc_def->zerror_file = ferror_file_func;
+     pzlib_filefunc_def->opaque = NULL;

@@ -1,0 +1,932 @@
+LANGUAGE_NAME
+Greek
+LANGUAGE_FILE
+Greek
+LANGUAGE_ISO
+el
+LANGUAGE_AUTHOR
+Michael Papadakis (mikepap at freemail dot gr)\r\n
+LANGUAGE_CHARSET
+ISO-8859-7
+LANGUAGE_WINDOWSID
+Greek
+OK
+Εντάξει
+Cancel
+’κυρο
+Exit
+Έξοδος
+Close
+Κλείσιμο
+Cancel changes
+Ακύρωση αλλαγών
+Click to confirm
+Κλικ για επιβεβαίωση
+Click to get help!
+Κλικ για να πάρετε βοήθεια!
+Click to return to previous screen
+Κλικ για να επιστρέψετε στην προηγούμενη οθόνη
+Click to go to next screen
+Κλικ για να πάτε στην επόμενη οθόνη
+Hide password
+Απόκρυψη συνθηματικού
+Save project
+Αποθήκευση εργασίας
+Close current project?
+Θα κλείσετε την παρούσα εργασία;
+Delete this project?
+Θα σβήσετε την παρούσα εργασία;
+Delete empty project %s?
+Σβήσιμο της κενής εργασίας %s;
+Action not yet implemented
+Η ενέργεια αυτή δεν έχει υλοποιηθεί ακόμα
+Error deleting this project
+Πρόβλημα κατά το σβήσιμο αυτής της εργασίας
+Select a rule for the filter
+Επιλέξτε ένα κανόνα για το φίλτρο
+Enter keywords for the filter
+Τοποθετήστε λέξεις-κλειδιά για το φίλτρο
+Cancel
+’κυρο
+Add this rule
+Πρόσθεση αυτού του κανόνα
+Please enter one or several keyword(s) for the rule
+Παρακαλώ τοποθετήστε μία ή περισσότερες λέξεις-κλειδιά για τον κανόνα
+Add Scan Rule
+Πρόσθεση κανόνα ψαξίματος
+Criterion
+Κριτήριο
+String
+Φράση
+Add
+Πρόσθεση
+Scan Rules
+Κανόνες Αναζήτησης
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Χρήση μπαλαντέρ για τον αποκλεισμό ή την αποδοχή URLs ή links.\nΜπορείτε να βάλετε αρκετές φράσεις ανίχνευσης στην ίδια γραμμή.\nΧρησιμοποιήστε κενά για διαχωρισμό.\n\nΠχ: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Links που αποκλείονται
+Include link(s)
+Περιλαμβανόμενα links
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Συμβουλή: Για να συμπεριλάβετε όλα τα αρχεία GIF, χρησιμοποιήστε κάτι σαν +www.someweb.com/*.gif. \n(+*.gif / -*.gif θα συμπεριλάβει/αποκλείσει όλα τα GIFs από όλες τις τοποθεσίες)
+Save prefs
+Αποθήκευση προτιμήσεων
+Matching links will be excluded:
+Τα links που ταιριάζουν θα αποκλειστούν
+Matching links will be included:
+Τα links που ταιριάζουν θα συμπεριληφθούν
+Example:
+Παράδειγμα:
+gif\r\nWill match all GIF files
+gif\r\nΘα ταιριάξει όλα τα αρχεία GIF
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nΘα βρει όλα τα αρχεία με τη φράση 'blue' όπως το 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nΘα ταιριάξει το αρχείο 'bigfile.mov', αλλά όχι το 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nΘα βρεί links με όνομα φακέλου που περιέχει το 'cgi', όπως /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nΘα βρεί links με όνομα φακέλου που ταιριάζει με όλο το 'cgi-bin', αλλά όχι το 'cgi-bin-2'
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nΘα βρεί links που περιέχουν τη φράση, σαν τα www.someweb.com, private.someweb.com κλπ.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nΘα βρεί links σε φακέλους που περιέχουν τη φράση, σαν τα www.someweb.com, www.someweb.edu, private.someweb.otherweb.com κλπ.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nΘα βρεί links που ταιριάζουν με όλο το 'www.someweb.com', αλλά όχι το 'private.someweb.com'.
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nΘα βρεί links που περιέχουν τη φράση οπουδήποτε στο URL, όπως τα www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html κλπ.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nΘα βρεί μόνο το αρχείο 'www.test.com/test/someweb.html'. Προσέξτε ότι θα πρέπει να γράψετε όλη τη διαδρομή.
+All links will match
+Όλα τα links θα ταιριάξουν
+Add exclusion filter
+Πρόσθεση φίλτρου απόρριψης
+Add inclusion filter
+Πρόσθεση φίλτρου αποδοχής
+Existing filters
+Υπάρχοντα φίλτρα
+Cancel changes
+Ακύρωση αλλαγών
+Save current preferences as default values
+Αποθήκευση τωρινών προτιμήσεων ως προεπιλογή
+Click to confirm
+Κλικ για επιβεβαίωση
+No log files in %s!
+Δεν υπάρχει αρχείο γεγονότων στο %s!
+No 'index.html' file in %s!
+Δεν υπάρχει αρχείο 'index.html' στο %s!
+Click to quit WinHTTrack Website Copier
+Κλικ για να εγκαταλείψετε το WinHTTrack Website Copier
+View log files
+Αρχείο γεγονότων
+Browse HTML start page
+’νοιγμα της αρχικής σελίδας
+End of mirror
+Τέλος αντιγραφής
+View log files
+Αρχείο γεγονότων
+Browse Mirrored Website
+Αντιγραμμένος τόπος
+New project...
+Νέα εργασία...
+View error and warning reports
+Προβολή αναφοράς προβλημάτων και προειδοποιήσεων
+View report
+Προβολή αναφοράς
+Close the log file window
+Κλείσιμο του παραθύρου του αρχείου γεγονότων
+Info type:
+Τύπος πληροφοριών:
+Errors
+Λάθη
+Infos
+Πληροφορίες
+Find
+Αναζήτηση
+Find a word
+Αναζήτηση λέξης
+Info log file
+Αρχείο καταγραφής πληροφοριών
+Warning/Errors log file
+Προειδοποιήσεις/Λάθη
+Unable to initialize the OLE system
+Αδύνατη η αρχικοποίηση του συστήματος OLE
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+Το WinHTTrack δεν βρήκε κανένα μισοτελειωμένο αρχείο cache στον καθορισμένο φάκελο!
+Could not connect to provider
+Αδύνατη η δημιουργία σύνδεσης
+receive
+λήψη
+request
+αίτηση
+connect
+σύνδεση
+search
+αναζήτηση
+ready
+αναμονή
+error
+λάθος
+Receiving files..
+Λήψη αρχείων..
+Parsing HTML file..
+Πάρσιμο αρχείου HTML...
+Purging files..
+Σβήσιμο αρχείων..
+Loading cache in progress..
+Φόρτωμα της cache σε εξέλιξη...
+Parsing HTML file (testing links)..
+Πάρσιμο αρχείου HTML (έλεγχος των links)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Παύση - Επιλέξτε [Αντίγραφο]/[Παύση κατεβάσματος] για συνέχεια της διαδικασίας
+Finishing pending transfers - Select [Cancel] to stop now!
+Τελείωμα ενεργών μεταφορών - Επιλέξτε [Ακύρωση] για να άμεση διακοπή!
+scanning
+σάρωση
+Waiting for scheduled time..
+Αναμονή προγραμματισμένης ώρας...
+Transferring data..
+Μεταφορά δεδομένων...
+Connecting to provider
+Επιχειρείται σύνδεση
+[%d seconds] to go before start of operation
+Ακόμα [%d δευτερόλεπτα] για την εκκίνηση της διαδικασίας
+Site mirroring in progress [%s, %s bytes]
+Αντιγραφή τοποθεσίας σε εξέλιξη [%s, %s bytes]
+Site mirroring finished!
+Η αντιγραφή της τοποθεσίας τελείωσε!
+A problem occured during the mirroring operation\n
+Δημιουργήθηκε ένα πρόβλημα κατά την διαδικασία αντιγραφής\n
+\nDuring:\n
+\nΚατα τη διάρκεια:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nΔείτε το αρχείο γεγονότων αν είναι απαραίτητο.\n\nΚλικ στο ΤΕΛΟΣ για να εγκαταλείψετε το WinHTTrack Website Copier.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Η διαδικασία αντιγραφής τέλειωσε.\nΚλικ στο Έξοδος για να εγκαταλείψετε το WinHTTrack.\nΔείτε το αρχείο γεγονότων αν είναι απαραίτητο, έτσι ώστε να επιβεβαιώσετε ότι όλα είναι εντάξει.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * Η ΑΝΤΙΓΡΑΦΗ ΕΓΚΑΤΑΛΕΙΦΘΗΚΕ! * *\r\nΗ παρούσα προσωρινή cache είναι απαραίτητη για κάθε λειτουργία ανανέωσης και περιλαμβάνει μόνο δεδομένα που κατέβηκαν κατά τη διάρκεια της τωρινής εγκαταλελειμένης περιόδου.\r\nΗ προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες. Αν δεν θέλετε να χάσετε αυτές τις πληροφορίες, πρέπει να να τις ανακτήσετε και να διαγράψετε την παρούσα cache.\r\n[Σημείωση: Αυτό μπορεί να γίνει εύκολα σβήνοντας τα αρχεία hts-cache/new.*]\r\n\r\nΝομίζετε πως η προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες και θέλετε να την ανακτήσετε;
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * ΣΦΑΛΜΑ ΑΝΤΙΓΡΑΦΗΣ * *\r\nΤο WinHTTrack ανακάλυψε πως το παρόν αντίγραφο είναι άδειο. Αν ήταν μια ανανέωση, το προηγούμενο αντίγραφο ανακτήθηκε.\r\nΛόγος: Οι πρώτη(ες) σελίδα(ες) είτε δεν βρέθηκαν ή υπήρξε πρόβλημα κατά την σύνδεση.\r\n=> Επιβεβαιώστε ότι η τοποθεσία υπάρχει ακόμα και/ή ελέγξτε τις ρυθμίσεις του proxy σας! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nΣυμβουλή: Κλικ στο [Προβολή αρχείο γεγονότων] για να δείτε μηνύματα προειδοποιήσεων ή λαθών
+Error deleting a hts-cache/new.* file, please do it manually
+Σφάλμα κατά το σβήσιμο ενός hts-cache/new.* αρχείου, παρακαλώ κάντε το μόνοι σας
+Do you really want to quit WinHTTrack Website Copier?
+Θέλετε πράγματι να εγκαταλείψετε το WinHTTrack Website Copier;
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Κατάσταση αντιγραφής -\n\nΤοποθετείστε διεύθυνση(εις) στη θέση URL
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Κατάσταση βοηθού με αλληλεπίδραση (ερωτήσεις) --\n\nΤοποθετείστε διεύθυνση(εις) στη θέση URL
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Κατάσταση κατεβάσματος αρχείου -\n\nΤοποθετείστε διεύθυνση(εις) αρχείου στη θέση URL
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Κατάσταση ελέγχου link -\n\nΤοποθετείστε διεύθυνση(εις) με link(s) για έλεγχο στη θέση URL
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Κατάσταση ενημέρωσης -\n\nΕπιβεβαιώστε την(τις) διεύθυνση(εις) στη θέση URL, ελέγξτε τις παραμέτρους αν είναι απαραίτητο και μετά κλικ στο 'Επόμενο'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Κατάσταση συνέχισης (Η διαδικασία διακόπηκε) -\n\nΕπιβεβαιώστε διεύθυνση(εις) στη θέση URL, ελέγξτε τις παραμέτρους αν είναι απαραίτητο και μετά κλικ στο 'Επόμενο'.
+Log files Path
+Διαδρομή αρχείου γεγονότων
+Path
+Διαδρομή
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Κατάσταση λίστας των links -\n\nΧρησιμοποιήστε τη θέση URL για να βάλετε διεύθυνση(εις) από σελίδα(ες) που περιέχει(ουν) links για αντιγραφή.
+New project / Import?
+Νέα εργασία / Εισαγωγή;
+Choose criterion
+Επιλέξτε κριτήριο
+Maximum link scanning depth
+Μέγιστο βάθος ψαξίματος link
+Enter address(es) here
+Τοποθετήστε διεύθυνση(εις) εδώ
+Define additional filtering rules
+Ορίστε πρόσθετους κανόνες φιλτραρίσματος
+Proxy Name (if needed)
+Όνομα Proxy (αν χρειάζεται)
+Proxy Port
+Port του proxy
+Define proxy settings
+Ορισμός ρυθμίσεων proxy
+Use standard HTTP proxy as FTP proxy
+Χρήση κανονικού HTTP proxy, σαν FTP proxy
+Path
+Διαδρομή
+Select Path
+Επιλογή διαδρομής
+Path
+Διαδρομή
+Select Path
+Επιλογή διαδρομής
+Quit WinHTTrack Website Copier
+Εγκατάλειψη του WinHTTrack Website Copier
+About WinHTTrack
+Σχετικά με το WinHTTrack
+Save current preferences as default values
+Αποθήκευση των τωρινών ρυθμίσεων ως προεπιλογή
+Click to continue
+Κλικ για συνέχεια
+Click to define options
+Κλικ για ορισμό ρυθμίσεων
+Click to add a URL
+Κλικ για πρόσθεση ενός URL
+Load URL(s) from text file
+Φόρτωμα URL(s) από αρχείο κειμένου
+WinHTTrack preferences (*.opt)|*.opt||
+Προτιμήσεις WinHTTrack (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Λίστα διευθύνσεων  (*.txt)|*.txt||
+File not found!
+Το αρχείο δεν βρέθηκε!
+Do you really want to change the project name/path?
+Θέλετε πράγματι να αλλάξετε όνομα/διαδρομή της εργασίας;
+Load user-default options?
+Φόρτωμα των προρυθμισμένων επιλογών χρήστη;
+Save user-default options?
+Αποθήκευση των προρυθμισμένων επιλογών χρήστη;
+Reset all default options?
+Επανατοποθέτηση όλων των προρυθμισμένων επιλογών;
+Welcome to WinHTTrack!
+Καλώς ήρθατε στο WinHTTrack!
+Action:
+Ενέργεια:
+Max Depth
+Μέγιστο βάθος
+Maximum external depth:
+Μέγιστο εξωτερικό βάθος
+Filters (refuse/accept links) :
+Φίλτρα (άρνηση/αποδοχή links) :
+Paths
+Διαδρομές
+Save prefs
+Αποθήκευση προτιμήσεων
+Define..
+Ορισμός...
+Set options..
+Τοποθέτηση ρυθμίσεων...
+Preferences and mirror options:
+Προτιμήσεις και επιλογές αντιγραφής
+Project name
+Όνομα εργασίας
+Add a URL...
+Πρόσθεση ενός URL...
+Web Addresses: (URL)
+Διευθύνσεις Web: (URL)
+Stop WinHTTrack?
+Σταμάτημα του WinHTTrack;
+No log files in %s!
+Δεν υπάρχει αρχείο γεγονότων στο %s!
+Pause Download?
+Παύση κατεβάσματος;
+Stop the mirroring operation
+Σταμάτημα της διαδικασίας αντιγραφής
+Minimize to System Tray
+Ελαχιστοποίηση στην μπάρα συστήματος
+Click to skip a link or stop parsing
+Κλικ για παράκαμψη ενός link ή σταμάτημα παρσίματος
+Click to skip a link
+Κλικ για παράκαμψη ενός link
+Bytes saved
+Σωσμένα bytes
+Links scanned
+Σαρωμένα links
+Time:
+Χρόνος:
+Connections:
+Συνδέσεις:
+Running:
+Μεταφορές
+Hide
+Απόκρυψη
+Transfer rate
+Ταχύτητα
+SKIP
+ΠΑΡΑΛΕΙΨΗ
+Information
+Πληροφορίες
+Files written:
+Σώθηκαν:
+Files updated:
+Ενημερώσεις:
+Errors:
+Λάθη:
+In progress:
+Ενέργειες:
+Follow external links
+Ακολούθηση εξωτερικών links
+Test all links in pages
+Έλεγχος όλων των links στις σελίδες
+Try to ferret out all links
+Προσπάθεια ανακάλυψης όλων των links
+Download HTML files first (faster)
+Κατέβασμα των αρχείων HTML πρώτα (γρηγορότερο)
+Choose local site structure
+Επιλέξτε τοπική δομή του δικτυακού τόπου
+Set user-defined structure on disk
+Εφαρμογή δομής στον δίσκο που ορίστηκε από το χρήστη
+Use a cache for updates and retries
+Χρήση της cache για ενημερώσεις και επαναλήψεις
+Do not update zero size or user-erased files
+Να μην ενημερωθούν τα αρχεία μηδενικού μεγέθους ή τα σβησμένα από τον χρήστη
+Create a Start Page
+Δημιουργία αρχικής σελίδας
+Create a word database of all html pages
+Δημιουργία λίστας λέξεων από όλες τις σελίδες html
+Create error logging and report files
+Δημιουργία αρχείου καταγραφής λαθών και αναφοράς
+Generate DOS 8-3 filenames ONLY
+Δημιουργία ΜΟΝΟ ονομάτων αρχείων DOS 8-3
+Generate ISO9660 filenames ONLY for CDROM medias
+Δημιουργία ΜΟΝΟ ονομάτων αρχείων ISO9660, για δίσκους CD
+Do not create HTML error pages
+Να μη δημιουργηθούν HTML σελίδες λαθών
+Select file types to be saved to disk
+Επιλέξτε τύπους αρχείων που θα σωθούν στο δίσκο
+Select parsing direction
+Επιλέξτε κατεύθυνση παρσίματος
+Select global parsing direction
+Επιλέξτε γενική κατεύθυνση παρσίματος
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Ρυθμίστε τους κανόνες ξαναγραψίματος των URL για τα εσωτερικά links (τα κατεβασμένα) και τα εξωτερικά links (τα μη κατεβασμένα)
+Max simultaneous connections
+Μέγιστες ταυτόχρονες συνδέσεις
+File timeout
+Χρονικό περιθώριο αρχείου
+Cancel all links from host if timeout occurs
+Ακύρωση όλων των links από την τοποθεσία αν ξεπεραστεί το χρονικό περιθώριο
+Minimum admissible transfer rate
+Ελάχιστος αποδεκτός ρυθμός μεταφοράς
+Cancel all links from host if too slow
+Ακύρωση όλων των links από την τοποθεσία αν είναι πολύ αργή
+Maximum number of retries on non-fatal errors
+Μέγιστος αριθμός επαναλήψεων σε μη καταστροφικά λάθη
+Maximum size for any single HTML file
+Μέγιστο μέγεθος για κάθε ένα αρχείο HTML
+Maximum size for any single non-HTML file
+Μέγιστο μέγεθος για κάθε ένα αρχείο που δεν είναι HTML
+Maximum amount of bytes to retrieve from the Web
+Μέγιστος όγκος από bytes που θα σωθούν από το Web
+Make a pause after downloading this amount of bytes
+Παύση μετά το κατέβασμα αυτού του ποσού από bytes
+Maximum duration time for the mirroring operation
+Μέγιστη διάρκεια για την διαδικασία αντιγραφής
+Maximum transfer rate
+Μέγιστος ρυθμός μεταφοράς
+Maximum connections/seconds (avoid server overload)
+Μέγιστες συνδέσεις/δευτερόλεπτο (αποφύγετε υπερφόρτωση του εξυπηρετητή)
+Maximum number of links that can be tested (not saved!)
+Μέγιστος αριθμός από links που μπορούν να δοκιμαστούν (δεν σώζεται!)
+Browser identity
+Ταυτότητα που θα δηλώνει ο εξερευνητής
+Comment to be placed in each HTML file
+Σχόλια που θα τοποθετηθούν σε κάθε αρχείο HTML
+Back to starting page
+Πίσω στην αρχική σελίδα
+Save current preferences as default values
+Αποθήκευση των τωρινών προτιμήσεων ως προτοποθετημένων τιμών
+Click to continue
+Κλικ για συνέχεια
+Click to cancel changes
+Κλικ για ακύρωση αλλαγών
+Follow local robots rules on sites
+Ακολούθηση τοπικών κανόνων ρομπότ στις τοποθεσίες
+Links to non-localised external pages will produce error pages
+Τα links σε μη τοπικές εξωτερικές σελίδες θα δημιουργήσουν σελίδες σφαλμάτων
+Do not erase obsolete files after update
+Τα παλιά αρχεία να μην σβήνονται μετά από ενημέρωση
+Accept cookies?
+Αποδοχή των cookies
+Check document type when unknown?
+Έλεγχος τύπου εγγράφου όταν είναι άγνωστο
+Parse java applets to retrieve included files that must be downloaded?
+Πάρσιμο εφαρμογών java για να ανακτηθούν τα συμπεριλαμβανόμενα αρχεία που πρέπει να κατέβουν
+Store all files in cache instead of HTML only
+Αποθήκευση όλων των αρχείων στην cache αντί για HTML μόνο
+Log file type (if generated)
+Τύπος αρχείου γεγονότων (αν θα δημιουργηθεί)
+Maximum mirroring depth from root address
+Μέγιστο βάθος αντιγραφής από την ριζική διεύθυνση
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Μέγιστο βάθος αντιγραφής για εξωτερικές/απαγορευμένες διευθύνσεις (0, δηλαδή τίποτα, είναι η προεπιλογή)
+Create a debugging file
+Δημιουργία αρχείου αποσφαλμάτωσης
+Use non-standard requests to get round some server bugs
+Χρήση μη συνηθισμένων αιτήσεων για αποφυγή μερικών προβλημάτων εξυπηρετητών
+Use old HTTP/1.0 requests (limits engine power!)
+Χρήση παλιών HTTP/1.0 αιτήσεων (περιορίζει την ισχύ της μηχανής!)
+Attempt to limit retransfers through several tricks (file size test..)
+Προσπάθεια να περιοριστούν οι ανανεώσεις μέσω διαφόρων τρικ (έλεγχος μεγέθους αρχείου...)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Προσπάθεια περιορισμού του αριθμού των links θεωρώντας ίδια αυτά που μοιάζουν αρκετά (www.foo.com==foo.com, http=https ..)
+Write external links without login/password
+Γράψιμο εξωτερικών links χωρίς το όνομα χρήστη/συνθηματικό
+Write internal links without query string
+Γράψιμο εσωτερικών links χωρίς φράση αναζήτησης
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Κατέβασμα μη-HTML αρχείων σχετικά με ένα link, πχ: εξωτερικά .ZIP ή φωτογραφίες
+Test all links (even forbidden ones)
+Έλεγχος όλων των links (ακόμα και των απαγορευμένων)
+Try to catch all URLs (even in unknown tags/code)
+Προσπάθεια να παρθούν όλα τα URLs (ακόμα και σε άγνωστα  tags/κώδικα)
+Get HTML files first!
+Κατέβασμα αρχικά των αρχείων HTML!
+Structure type (how links are saved)
+Τύπος δομής (πως σώζονται τα links)
+Use a cache for updates
+Χρήση της cache για ενημερώσεις
+Do not re-download locally erased files
+Τα τοπικά σβησμένα αρχεία να μην ξανακατέβουν
+Make an index
+Δημιουργία ευρετηρίου
+Make a word database
+Δημιουργία βάσης-δεδομένων λέξεων
+Log files
+Αρχείο γεγονότων
+DOS names (8+3)
+Ονόματα DOS (8+3)
+ISO9660 names (CDROM)
+Ονόματα ISO9660 (CDROM)
+No error pages
+Χωρίς σελίδες σφαλμάτων
+Primary Scan Rule
+Βασικός κανόνας ψαξίματος
+Travel mode
+Στυλ ταξιδιού
+Global travel mode
+Γενικό στυλ ταξιδιού
+These options should be modified only exceptionally
+Αυτές οι επιλογές πρέπει να τροποποιούνται σπάνια
+Activate Debugging Mode (winhttrack.log)
+Ενεργοποίηση κατάστασης αποσφαλμάτωσης (winhttrack.log)
+Rewrite links: internal / external
+Ξαναγράψιμο των links: εσωτερικά/εξωτερικά
+Flow control
+Έλεγχος ροής
+Limits
+Όρια
+Identity
+Ταυτότητα
+HTML footer
+Σημείωση HTML
+N# connections
+Αριθμός συνδέσεων
+Abandon host if error
+Εγκατάλειψη τοποθεσίας σε σφάλμα
+Minimum transfer rate (B/s)
+Ελάχιστος ρυθμός μεταφοράς
+Abandon host if too slow
+Εγκατάλειψη τοποθεσίας αν είναι πολύ αργή
+Configure
+Ρύθμιση
+Use proxy for ftp transfers
+Χρήση proxy για ftp μεταφορές
+TimeOut(s)
+Χρονικό περιθώριο
+Persistent connections (Keep-Alive)
+Συνεχείς συνδέσεις (διατήρηση)
+Reduce connection time and type lookup time using persistent connections
+Μείωση χρόνου σύνδεσης και τύπου αναζήτησης τοποθεσιών, κάνοντας χρήση συνεχών συνδέσεων
+Retries
+Προσπάθειες
+Size limit
+Όριο μεγέθους
+Max size of any HTML file (B)
+Μέγιστο μέγεθος για κάθε HTML
+Max size of any non-HTML file
+Μέγιστο μέγεθος για κάθε μη HTML αρχείο
+Max site size
+Μέγιστο μέγεθος δικτυακού τόπου
+Max time
+Μέγιστος χρόνος
+Save prefs
+Αποθήκευση προτιμήσεων
+Max transfer rate
+Μέγιστος ρυθμός μεταφοράς
+Follow robots.txt
+Ακολούθησε το robots.txt
+No external pages
+Χωρίς εξωτερικές σελίδες
+Do not purge old files
+Τα παλιά αρχεία να μην σβήνονται
+Accept cookies
+Αποδοχή των cookies
+Check document type
+Έλεγχος τύπου εγγράφου
+Parse java files
+Πάρσιμο αρχείων java
+Store ALL files in cache
+Αποθήκευση ΌΛΩΝ των αρχείων στην cache
+Tolerant requests (for servers)
+Ανεκτικότητα στις αιτήσεις (για εξυπηρετητή)
+Update hack (limit re-transfers)
+Τρικ ανανέωσης (περιορισμός ανανεώσεων)
+URL hacks (join similar URLs)
+Τρικ για τα URLs (θεωρούνται ίδια τα παρόμοια)
+Force old HTTP/1.0 requests (no 1.1)
+Εξαναγκασμός παλιών HTTP/1.0 αιτήσεων (όχι 1.1)
+Max connections / seconds
+Μέγιστες συνδέσεις / δευτερόλεπτο
+Maximum number of links
+Μέγιστος αριθμός από links
+Pause after downloading..
+Παύση μετά το κατέβασμα...
+Hide passwords
+Απόκρυψη λέξεων-κλειδιών
+Hide query strings
+Απόκρυψη χαρακτήρων αναζήτησης
+Links
+Links
+Build
+Δημιουργία
+Experts Only
+Μόνο για έμπειρους
+Flow Control
+Έλεγχος μεταφορών
+Limits
+Όρια
+Browser ID
+Ταυτότητα εξερευνητή
+Scan Rules
+Κανόνες ψαξίματος
+Spider
+Ανιχνευτής
+Log, Index, Cache
+Αρχείο καταγραφής, Περιεχόμενα, Cache
+Proxy
+Proxy
+MIME Types
+Τύποι MIME
+Do you really want to quit WinHTTrack Website Copier?
+Θέλετε πράγματι να εγκαταλείψετε το WinHTTrack Website Copier;
+Do not connect to a provider (already connected)
+Να μην γίνει σύνδεση (υπάρχει ήδη)
+Do not use remote access connection
+Να μη γίνει χρήση απομακρυσμένης σύνδεσης
+Schedule the mirroring operation
+Προγραμματισμός (χρονικά) της διαδικασίας αντιγραφής
+Quit WinHTTrack Website Copier
+Εγκατάλειψη του WinHTTrack Website Copier
+Back to starting page
+Πίσω στην αρχική σελίδα
+Click to start!
+Κλικ για έναρξη!
+No saved password for this connection!
+Δεν υπάρχει αποθηκευμένο συνθηματικό για αυτή τη σύνδεση!
+Can not get remote connection settings
+Αδύνατη η λήψη των ρυθμίσεων της απομακρυσμένης σύνδεσης
+Select a connection provider
+Επιλέξτε σύνδεση
+Start
+Έναρξη
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Παρακαλώ ρυθμίστε τις παραμέτρους της σύνδεσης αν είναι απαραίτητο και μετά πατήστε ΤΕΛΟΣ για να ξεκινήσει η διαδικασία αντιγραφής.
+Save settings only, do not launch download now.
+Αποθήκευση των ρυθμίσεων, χωρίς έναρξη μεταφοράς.
+On hold
+Αναμονή
+Transfer scheduled for: (hh/mm/ss)
+Η μεταφορά προγραμματίστηκε για: (hh/mm/ss)
+Start
+Έναρξη
+Connect to provider (RAS)
+Σύνδεση με το Internet
+Connect to this provider
+Επιλογή σύνδεσης
+Disconnect when finished
+Αποσύνδεση στο τέλος
+Disconnect modem on completion
+Αποσύνδεση του modem στο τέλος
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Παρακαλώ να μας ενημερώσετε για κάθε πρόβλημα ή bug)\r\n\r\nΑνάπτυξη:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Greek translations to:\r\nMichael Papadakis (mikepap at freemail dot gr)
+About WinHTTrack Website Copier
+Σχετικά με το WinHTTrack Website Copier
+Please visit our Web page
+Παρακαλώ επισκευθείτε την σελίδα μας
+Wizard query
+Αναζήτηση με βοηθό
+Your answer:
+Η απάντησή σας:
+Link detected..
+Ανακαλύφθηκε link.
+Choose a rule
+Επιλέξτε κανόνα
+Ignore this link
+Αγνόηση αυτού του link
+Ignore directory
+Αγνόηση φακέλου
+Ignore domain
+Αγνόηση του domain
+Catch this page only
+Πάρσιμο μόνο αυτής της σελίδας
+Mirror site
+Αντιγραφή τοποθεσίας
+Mirror domain
+Αντιγραφή του domain
+Ignore all
+Αγνόηση όλων
+Wizard query
+Αναζήτηση με βοηθό
+NO
+ΟΧΙ
+File
+Αρχείο
+Options
+Επιλογές
+Log
+Αρχείο γεγονότων
+Window
+Παράθυρο
+Help
+Βοήθεια
+Pause transfer
+Παύση μεταφοράς
+Exit
+Έξοδος
+Modify options
+Τροποποίηση επιλογών
+View log
+Προβολή αρχείου γεγονότων
+View error log
+Προβολή λαθών
+View file transfers
+Προβολή μεταφορών αρχείων
+Hide
+Απόκρυψη
+About WinHTTrack Website Copier
+Σχετικά με το WinHTTrack Website Copier
+Check program updates...
+Έλεγχος για νέα έκδοση του προγράμματος...
+&Toolbar
+&Μπάρα εργαλείων
+&Status Bar
+Μπάρα &κατάστασης
+S&plit
+&Χώρισμα
+File
+Αρχείο
+Preferences
+Προτιμήσεις
+Mirror
+Αντίγραφο
+Log
+Αρχείο γεγονότων
+Window
+Παράθυρο
+Help
+Βοήθεια
+Exit
+Έξοδος
+Load default options
+Φόρτωμα προεπιλεγμένων ρυθμίσεων
+Save default options
+Αποθήκευση προεπιλεγμένων ρυθμίσεων
+Reset to default options
+Επαναφορά στις προεπιλεγμένες ρυθμίσεις
+Load options...
+Φόρτωμα ρυθμίσεων...
+Save options as...
+Αποθήκευση ρυθμίσεων ως...
+Language preference...
+Προτίμηση γλώσσας...
+Contents...
+Περιεχόμενα...
+About WinHTTrack...
+Σχετικά με το WinHTTrack...
+New project\tCtrl+N
+Νέα εργασία\tCtrl+N
+&Open...\tCtrl+O
+’&νοιγμα...\tCtrl+O
+&Save\tCtrl+S
+&Αποθήκευση\tCtrl+S
+Save &As...
+Αποθήκευση &ως...
+&Delete...
+&Διαγραφή...
+&Browse sites...
+&Πλοήγηση τοποθεσιών...
+User-defined structure
+Δομή ορισμένη από τον χρήστη
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tΌνομα αρχείου χωρίς τον τύπο του (πχ: image)\r\n%N\tΌνομα αρχείου με τον τύπο του (πχ: image.gif)\r\n%t\tΤύπος αρχείου μόνο (πχ: gif)\r\n%p\tΔιαδρομή [χωρίς / στο τέλος] (πχ: /someimages)\r\n%h\tΌνομα τοποθεσίας (πχ: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 φράση αναζήτησης (128 bits, 32 ascii bytes)\r\n%q\tMD5 μικρή φράση αναζήτησης (16 bits, 4 ascii bytes)\r\n\r\n%s?\tΜικρό όνομα όπως στο DOS (πχ: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Παράδειγμα:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Ρυθμίσεις proxy
+Proxy address:
+Διεύθυνση proxy:
+Proxy port:
+Port του proxy:
+Authentication (only if needed)
+Αυθεντικοποίηση (μόνο αν χρειάζεται)
+Login
+Όνομα χρήστη
+Password
+Κωδικός
+Enter proxy address here
+Τοποθετείστε την διεύθυνση του proxy εδώ
+Enter proxy port here
+Τοποθετείστε την port του proxy εδώ
+Enter proxy login
+Τοποθετείστε το όνομα χρήστη του proxy
+Enter proxy password
+Τοποθετείστε το συνθηματικό του proxy
+Enter project name here
+Τοποθετείστε το όνομα της εργασίας εδώ
+Enter saving path here
+Τοποθετείστε τη διαδρομή αποθήκευσης εδώ
+Select existing project to update
+Επιλογή εργασίας για ανανέωση
+Click here to select path
+Κλικ εδώ για επιλογή διαδρομής
+Select or create a new category name, to sort your mirrors in categories
+Επιλέξτε ή δημιουργήστε ένα νέο όνομα κατηγορία, για να κατατάξετε τα αντίγραφά σας σε κατηγορίες
+HTTrack Project Wizard...
+Βοηθός δημιουργίας εργασίας HTTrack...
+New project name:
+Νέο όνομα εργασίας:
+Existing project name:
+Υπάρχων όνομα εργασίας:
+Project name:
+Όνομα εργασίας:
+Base path:
+Αρχική διαδρομή:
+Project category:
+Κατηγορία εργασίας:
+C:\\My Web Sites
+C:\\Οι Τοποθεσίες μου
+Type a new project name, \r\nor select existing project to update/resume
+Τοποθετείστε ένα νέο όνομα εργασίας, \r\nή επιλέξτε μία υπάρχουσα εργασία για ανανέωση/συνέχιση
+New project
+Νέα εργασία
+Insert URL
+Τοποθέτηση URL
+URL:
+URL:
+Authentication (only if needed)
+Αυθεντικοποίηση (μόνο αν χρειάζεται)
+Login
+Όνομα χρήστη
+Password
+Κωδική λέξη
+Forms or complex links:
+Φόρμες ή σύνθετα links:
+Capture URL...
+Σύλληψη URL...
+Enter URL address(es) here
+Τοποθετείστε URL διεύθυνση(εις) εδώ
+Enter site login
+Τοποθετείστε όνομα χρήστη για την τοποθεσία
+Enter site password
+Τοποθετείστε συνθηματικό για την τοποθεσία
+Use this capture tool for links that can only be accessed through forms or javascript code
+Χρησιμοποιήστε αυτό το εργαλείο σύλληψης για links που μπορούν να προσπελαστούν μόνο μέσα από φόρμες ή κώδικα javascript
+Choose language according to preference
+Επιλογή γλώσσας σύμφωνα με την προτίμηση
+Catch URL!
+Σύλληψη URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Παρακαλώ τοποθετείστε προσωρινά τις ρυθμίσεις proxy του browser σας στις ακόλουθες τιμές (Αντιγράψτε/Επικολλήστε διεύθυνση proxy και port).\nΜετά κλικ στο κουμπί αποστολής της φόρμας, στην σελίδα του browser σας ή κλικ στο συγκεκριμένο link που θέλετε να συλληφθεί.
+This will send the desired link from your browser to WinHTTrack.
+Αυτό θα στείλει το επιθυμητό link από τον browser σας στο WinHTTrack.
+ABORT
+ΜΑΤΑΙΩΣΗ
+Copy/Paste the temporary proxy parameters here
+Αντιγραφή/Επικόλληση των προσωρινών παραμέτρων του proxy εδώ
+Cancel
+Ακύρωση
+Unable to find Help files!
+Αδύνατη η εύρεση αρχείων βοηθείας!
+Unable to save parameters!
+Αδύνατη η αποθήκευση των παραμέτρων!
+Please drag only one folder at a time
+Σας παρακαλώ να τραβάτε μόνο ένα φάκελο τη φορά
+Please drag only folders, not files
+Σας παρακαλώ να τραβάτε μόνο φακέλους, όχι αρχεία
+Please drag folders only
+Σας παρακαλώ να τραβάτε μόνο φακέλους
+Select user-defined structure?
+Επιλογή δομής ορισμένης από τον χρήστη
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Παρακαλώ επιβεβαιώστε πως η ορισμένη φράση από τον χρήστη είναι σωστή,\nαλλιώς τα ονόματα αρχείων θα είναι λανθασμένα!
+Do you really want to use a user-defined structure?
+Θέλετε πράγματι να χρησιμοποιήσετε μία δομή ορισμένη από τον χρήστη;
+Too manu URLs, cannot handle so many links!!
+Πάρα πολλά URLs, δεν είναι δυνατή η διαχείριση τόσων πολλών links!
+Not enough memory, fatal internal error..
+Δεν υπάρχει αρκετή μνήμη, εσωτερικό καταστροφικό σφάλμα...
+Unknown operation!
+’γνωστη λειτουργία!
+Add this URL?\r\n
+Πρόσθεση αυτού του URL;\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Προειδοποίηση: Το κυρίως process ακόμα δεν ανταποκρίνεται, δεν γίνεται να προστεθούν URL(s)...
+Type/MIME associations
+Τύπος/MIME διασυνδέσεις
+File types:
+Τύποι αρχείων:
+MIME identity:
+Ταυτότητα MIME:
+Select or modify your file type(s) here
+Επιλογή ή τροποποίηση του(ων) αρχείου(ων) εδώ
+Select or modify your MIME type(s) here
+Επιλογή ή τροποποίηση του(ων) MIME τύπου(ων) εδώ
+Go up
+Πήγαινε πάνω
+Go down
+Πήγαινε κάτω
+File download information
+Πληροφορίες κατεβάσματος αρχείου
+Freeze Window
+Πάγωμα παραθύρου
+More information:
+Περισσότερες πληροφορίες
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Καλώς ήρθατε στο WinHTTrack Website Copier!\n\nΠαρακαλώ κάντε κλικ στο κουμπί Επόμενο για να\n\n- ξεκινήσετε μία νέα εργασία\n- ή να συνεχίσετε μία προηγούμενη εργασία
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Αρχεία με κατάληξη:\nΑρχεία που περιλαμβάνουν:\nΌνομα αρχείου:\nΦάκελοι που περιλαμβάνουν:\nΌνομα φακέλου:\nLinks σε αυτό το domain:\nLinks σε domains που περιλαμβάνουν:\nLinks από αυτήν την τοποθεσία:\nLinks που περιλαμβάνουν:\nΑυτό το link:\nΟΛΑ ΤΑ LINKS
+Show all\nHide debug\nHide infos\nHide debug and infos
+Προβολή όλων\nΑπόκρυψη αποσφαλμάτωσης\nΑπόκρυψη πληροφοριών\nΑπόκρυψη αποσφαλμ. και πληροφ.
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Δομή τοποθεσίας (προεπιλογή)\nHtml στο web/, εικόνες/άλλα στο web/images/\nHtml στο web/html, εικόνες/άλλα στο web/images/\nHtml στο web/, εικόνες/άλλα στο web/\nHtml στο web/, εικόνες/άλλα στο web/xxx/, όπου xxx η κατάληξη αρχείου\nHtml στο web/html/, εικόνες/άλλα στο web/xxx/\nΔομή τοποθεσίας, χωρίς www.domain.xxx/\nHtml στο όνομα_τόπου/, εικόνες/άλλα στο όνομα_τόπου/images/\nHtml στο όνομα_τόπου/html/, εικόνες/άλλα στο όνομα_τόπου/images/\nHtml στο όνομα_τόπου/, εικόνες/άλλα στο όνομα_τόπου/\nHtml στο όνομα_τόπου/, εικόνες/άλλα στο όνομα_τόπου/xxx/\nHtml στο όνομα_τόπου/html/, εικόνες/άλλα στο όνομα_τόπου/xxx/\nΌλα τα αρχεία στο web/, με τυχαία ονόματα (gadget !)\nΌλα τα αρχεία στο όνομα_τόπου/, με τυχαία ονόματα (gadget !)\nΔομή καθορισμένη από τον χρήστη...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Μόνο ψάξιμο\nΑποθήκευση αρχείων html\nΑποθήκευση αρχείων εκτός από html\nΑποθήκευση όλων (προεπιλογή)\nΑποθήκευση πρώτα αρχείων html
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Παραμονή στον ίδιο φάκελο\nΜπορεί να πάει κάτω (προεπιλογή)\nΜπορεί να πάει πάνω\nΜπορεί να πάει και πάνω και κάτω
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Παραμονή στην ίδια διεύθυνση (προεπιλογή)\nΠαραμονή στο ίδιο domain\nΠαραμονή στο ίδιο domain 1ου επιπέδου\nΟπουδήποτε στο Web
+Never\nIf unknown (except /)\nIf unknown
+Ποτέ\nΣε άγνωστα (εκτός /)\nΣε άγνωστα
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+χωρίς κανόνες robots.txt\nrobots.txt εκτός βοηθού\nχρήση κανόνων robots.txt
+normal\nextended\ndebug
+κανονικό\nεκτεταμένο\nαποσφαλμάτωσης
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Κατέβασμα τοποθεσίας(ών)\nΚατέβασμα τοποθεσίας(ών) + ερωτήσεις\nΚατέβασμα ξεχωριστών αρχείων\nΚατέβασμα όλων των τόπων στις σελίδες (πολλαπλά αντίγραφα)\nΈλεγχος links στις σελίδες (έλεγχος αγαπημένων)\n* Συνέχιση μισοτελειωμένου κατεβάσματος\n* Ανανέωση υπάρχουσας τοποθεσίας
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Σχετικό URI / Απόλυτο URL (προεπιλογή)\nΑπόλυτο URL / Απόλυτο URL\nΑπόλυτο URI / Απόλυτο URL\nΠρωτότυπο URL / Πρωτότυπο URL
+Open Source offline browser
+Εξερευνητής ανοιχτού κώδικα χωρίς ανάγκη σύνδεσης
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Website Copier/Offline Browser. Αντιγράψτε απομακρυσμένες τοποθεσίες στον υπολογιστή σας. Ελεύθερα-Δωρεάν.
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline browser
+URL list (.txt)
+Λίστα URL (.txt)
+Previous
+Προηγούμενο
+Next
+Επόμενο
+URLs
+URLs
+Warning
+Προειδοποίηση
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Ο εξερευνητής σας δεν (φαίνεται να) υποστηρίζει javascript. Για καλύτερα αποτελέσματα, παρακαλώ χρησιμοποιήστε έναν javascript-ενεργό εξερευνητή.
+Thank you
+Σας ευχαριστώ
+You can now close this window
+Τώρα μπορείτε να κλείσετε αυτό το παράθυρο
+Server terminated
+Ακυρώθηκε από τον εξυπηρετητή
+A fatal error has occured during this mirror
+Ένα καταστροφικό σφάλμα προκλήθηκε κατά την αντιγραφή αυτού του τόπου
