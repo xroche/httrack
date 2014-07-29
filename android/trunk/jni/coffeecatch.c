@@ -1005,12 +1005,22 @@ uintptr_t coffeecatch_get_backtrace(ssize_t index) {
  * Get the program counter, given a pointer to a ucontext_t context.
  **/
 static uintptr_t coffeecatch_get_pc_from_ucontext(const ucontext_t *uc) {
-#ifdef __arm__
+#if (defined(__arm__))
   return uc->uc_mcontext.arm_pc;
 #elif (defined(__x86_64__))
   return uc->uc_mcontext.gregs[REG_RIP];
 #elif (defined(__i386))
   return uc->uc_mcontext.gregs[REG_EIP];
+#elif (defined (__ppc__)) || (defined (__powerpc__))
+  return uc->uc_mcontext.regs->nip;
+#elif (defined(__hppa__))
+  return uc->uc_mcontext.sc_iaoq[0] & ~0x3UL;
+#elif (defined(__sparc__) && defined (__arch64__))
+  return uc->uc_mcontext.mc_gregs[MC_PC];
+#elif (defined(__sparc__) && !defined (__arch64__))
+  return uc->uc_mcontext.gregs[REG_PC];
+#elif (defined(__mips__))
+  return uc->uc_mcontext.gregs[31];
 #else
 #error "Architecture is unknown, please report me!"
 #endif
