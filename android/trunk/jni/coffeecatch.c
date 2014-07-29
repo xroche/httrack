@@ -76,7 +76,11 @@ static void print(const char *const s) {
 /* Signals to be caught. */
 #define SIG_CATCH_COUNT 7
 static const int native_sig_catch[SIG_CATCH_COUNT + 1]
-  = { SIGABRT, SIGILL, SIGTRAP, SIGBUS, SIGFPE, SIGSEGV, SIGSTKFLT, 0 };
+  = { SIGABRT, SIGILL, SIGTRAP, SIGBUS, SIGFPE, SIGSEGV
+#ifdef SIGSTKFLT
+    , SIGSTKFLT
+#endif
+    , 0 };
 
 /* Maximum value of a caught signal. */
 #define SIG_NUMBER_MAX 32
