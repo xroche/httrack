@@ -752,7 +752,11 @@ static int coffeecatch_handler_cleanup() {
       }
     }
 
-    /* Initialize thread var. */
+    /* Free old structure. */
+    free(native_code_g.sa_old);
+    native_code_g.sa_old = NULL;
+
+    /* Delete thread var. */
     if (pthread_key_delete(native_code_thread) != 0) {
       assert(! "pthread_key_delete() failed");
     }
