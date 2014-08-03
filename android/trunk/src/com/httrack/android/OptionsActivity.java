@@ -26,6 +26,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import com.httrack.android.HTTrackActivity.VERSION_CODES;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -38,6 +40,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 
 /**
@@ -51,6 +54,9 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       LinksTab.class, BuildTab.class, BrowserId.class, Spider.class,
       Proxy.class, LogIndexCache.class, MimeDefs.class, ExpertsOnly.class };
 
+  /* List of all tabs instances. */
+  protected Tab[] tabInstances;
+
   // The parent map
   protected final OptionsMapper mapper = new OptionsMapper();
 
@@ -61,13 +67,27 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   // Current activity class
   protected Class<?> activityClass;
 
+  // Current activity instance
+  protected Tab activityInstance;
+
   // use large screen ? (tablets)
   protected boolean isTabletMode;
 
   /**
    * The tab activit(ies) common interface.
    */
-  public abstract static interface Tab {
+  public abstract static class Tab {
+    /** Constructor. **/
+    public Tab() {
+    }
+
+    /** Called when displaying the tab. **/
+    public void onShow(final View view) {
+    }
+
+    /** Called when hiding the tab. **/
+    public void onHide(final View view) {
+    }
   }
 
   /**
@@ -100,7 +120,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Title(R.string.scan_rules)
   @ActivityId(R.layout.activity_options_scanrules)
   @Fields({ R.id.editRules })
-  public static class ScanRulesTab implements Tab {
+  public static class ScanRulesTab extends Tab {
   }
 
   @Title(R.string.limits)
@@ -109,7 +129,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       R.id.editMaxSizeOther, R.id.editSiteSizeLimit, R.id.editMaxTimeOverall,
       R.id.editMaxTransferRate, R.id.editMaxConnectionsSecond,
       R.id.editMaxNumberLinks })
-  public static class LimitsTab implements Tab {
+  public static class LimitsTab extends Tab {
   }
 
   @Title(R.string.flow_control)
@@ -117,14 +137,14 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Fields({ R.id.editNumberOfConnections, R.id.checkPersistentConnections,
       R.id.editTimeout, R.id.checkRemoveHostIfTimeout, R.id.editRetries,
       R.id.editMinTransferRate, R.id.checkRemoveHostIfSlow })
-  public static class FlowControlTab implements Tab {
+  public static class FlowControlTab extends Tab {
   }
 
   @Title(R.string.links)
   @ActivityId(R.layout.activity_options_links)
   @Fields({ R.id.checkDetectAllLinks, R.id.checkGetNonHtmlNear,
       R.id.checkTestAllLinks, R.id.checkGetHtmlFirst })
-  public static class LinksTab implements Tab {
+  public static class LinksTab extends Tab {
   }
 
   @Title(R.string.build)
@@ -133,14 +153,14 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       R.id.checkNoExternalPages, R.id.checkHidePasswords,
       R.id.checkHideQueryStrings, R.id.checkDoNotPurge, R.id.radioBuild,
       R.id.editCustomBuild })
-  public static class BuildTab implements Tab {
+  public static class BuildTab extends Tab {
   }
 
   @Title(R.string.browser_id)
   @ActivityId(R.layout.activity_options_browserid)
   @Fields({ R.id.editBrowserIdentity, R.id.editHtmlFooter,
       R.id.editAcceptLanguage, R.id.editOtherHeaders, R.id.editDefaultReferer })
-  public static class BrowserId implements Tab {
+  public static class BrowserId extends Tab {
   }
 
   @Title(R.string.spider)
@@ -148,13 +168,13 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Fields({ R.id.checkAcceptCookies, R.id.radioCheckDocumentType,
       R.id.checkParseJavaFiles, R.id.radioSpider, R.id.checkUpdateHacks,
       R.id.checkUrlHacks, R.id.checkTolerentRequests, R.id.checkForceHttp10 })
-  public static class Spider implements Tab {
+  public static class Spider extends Tab {
   }
 
   @Title(R.string.proxy)
   @ActivityId(R.layout.activity_options_proxy)
   @Fields({ R.id.editProxy, R.id.editProxyPort, R.id.checkUseProxyForFtp })
-  public static class Proxy implements Tab {
+  public static class Proxy extends Tab {
   }
 
   @Title(R.string.log_index_cache)
@@ -163,7 +183,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       R.id.checkDoNotRedownloadLocallErasedFiles, R.id.checkCreateLogFiles,
       R.id.radioVerbosity, R.id.checkUseIndex, R.id.checkUseWordIndex,
       R.id.checkUseMailIndex })
-  public static class LogIndexCache implements Tab {
+  public static class LogIndexCache extends Tab {
   }
 
   @Title(R.string.type_mime_associations)
@@ -173,7 +193,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
       R.id.editMimeDef4, R.id.editExtDef5, R.id.editMimeDef5, R.id.editExtDef6,
       R.id.editMimeDef6, R.id.editExtDef7, R.id.editMimeDef7, R.id.editExtDef8,
       R.id.editMimeDef8 })
-  public static class MimeDefs implements Tab {
+  public static class MimeDefs extends Tab {
   }
 
   @Title(R.string.experts_only)
@@ -181,7 +201,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @Fields({ R.id.checkUseCacheForUpdates, R.id.radioPrimaryScanRule,
       R.id.textTravelMode, R.id.radioTravelMode, R.id.radioGlobalTravelMode,
       R.id.radioRewriteLinks, R.id.checkActivateDebugging })
-  public static class ExpertsOnly implements Tab {
+  public static class ExpertsOnly extends Tab {
   }
 
   /*
@@ -215,6 +235,17 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     // Create tabs
     final LinearLayout scroll = LinearLayout.class
         .cast(findViewById(R.id.layout));
+
+    // Create tab instances
+    tabInstances = new Tab[tabClasses.length];
+    for (int i = 0; i < tabClasses.length; i++) {
+      // Create instance
+      try {
+        tabInstances[i] = tabClasses[i].newInstance();
+      } catch (final Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
 
     // Add all buttons linking to options
     for (int i = 0; i < tabClasses.length; i++) {
@@ -357,6 +388,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     }
     // Leave sub-activity (activityClass != null)
     else {
+      notifyHideTab();
       save();
       activityClass = null;
       setViewMenu();
@@ -458,6 +490,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   protected void closeRightPane() {
     // Remove right view ?
     if (isTabletMode && activityClass != null) {
+      notifyHideTab();
       final ViewGroup group = ViewGroup.class.cast(findViewById(R.id.right));
       save();
       group.removeAllViews();
@@ -465,10 +498,28 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
     }
   }
 
+  // Notify a tab it is going to be hidden
+  protected void notifyHideTab() {
+    // Notify hide
+    if (activityInstance != null) {
+      activityInstance.onHide(getTabView());
+      activityInstance = null;
+    }
+  }
+
+  // Get tab's view
+  protected View getTabView() {
+    return isTabletMode ? findViewById(R.id.right)
+        : findViewById(android.R.id.content);
+  }
+
   /*
    * Set pane #N (0..nb_panes).
    */
   protected void setPane(final int position) {
+    // Notify hide
+    notifyHideTab();
+
     // Close right pane if necessary
     closeRightPane();
 
@@ -482,6 +533,7 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
     // Pickup corresponding class
     activityClass = tabClasses[position];
+    activityInstance = tabInstances[position];
 
     // Set current view, current activity title, and load field(s)
     if (!isTabletMode) {
@@ -497,6 +549,9 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
 
     // Load fields
     load();
+
+    // Notify show
+    activityInstance.onShow(getTabView());
   }
 
   @Override
