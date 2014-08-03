@@ -121,6 +121,17 @@ public class OptionsActivity extends Activity implements View.OnClickListener {
   @ActivityId(R.layout.activity_options_scanrules)
   @Fields({ R.id.editRules })
   public static class ScanRulesTab extends Tab {
+    @Override
+    public void onShow(final View view) {
+      super.onShow(view);
+      // Fixes
+      // "Keyboard not shown when clicking on an EditText view on Gingerbread"
+      if (android.os.Build.VERSION.SDK_INT < VERSION_CODES.HONEYCOMB) {
+        final EditText edit = EditText.class.cast(view
+            .findViewById(R.id.editRules));
+        edit.clearFocus();
+      }
+    }
   }
 
   @Title(R.string.limits)
