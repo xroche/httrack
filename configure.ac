@@ -149,9 +149,16 @@ if test x"$https_support" = x"no"; then
 AC_MSG_NOTICE([disabling https support])
 AC_DEFINE(HTS_USEOPENSSL, 0)
 else
+SAVE_LIBS=$LIBS
+AC_CHECK_LIB(crypto, EVP_get_digestbyname,
+	[
+	OPENSSL_LIBS="-lcrypto"
+	]
+	)
+LIBS="$LIBS $OPENSSL_LIBS"
 AC_CHECK_LIB(ssl, SSL_library_init,
 	[
-	OPENSSL_LIBS="-lcrypto -lssl"
+	OPENSSL_LIBS="$OPENSSL_LIBS -lssl"
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
@@ -162,6 +169,7 @@ AC_CHECK_LIB(ssl, SSL_library_init,
 	fi
 	]
 	)
+LIBS=$SAVE_LIBS
 AC_SUBST(OPENSSL_LIBS)
 fi
 
