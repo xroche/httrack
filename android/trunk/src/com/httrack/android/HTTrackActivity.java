@@ -1880,6 +1880,9 @@ public class HTTrackActivity extends FragmentActivity {
   private void setProgressLinesInternal(final String[] lines) {
     // Get line divider position of the bottom coordinate
     final View lineDivider = findViewById(R.id.buttonStop);
+    if (lineDivider == null) {
+      return ;
+    }
     final int[] textPosition = new int[2];
     final int[] linePosition = new int[2];
     lineDivider.getLocationInWindow(linePosition);
