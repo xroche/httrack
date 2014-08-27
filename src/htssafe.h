@@ -178,7 +178,7 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 /** strnlen replacement (autotools). **/
 static HTS_UNUSED size_t rpl_strnlen(const char *s, size_t maxlen) {
   size_t i;
-  for(i = 0 ; s[i] != '\0' && i < maxlen ; i++) ;
+  for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
   return i;
 }
 
