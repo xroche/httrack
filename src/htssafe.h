@@ -175,6 +175,13 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
+/** strnlen replacement (autotools). **/
+static HTS_UNUSED size_t rpl_strnlen(const char *s, size_t maxlen) {
+  size_t i;
+  for(i = 0 ; s[i] != '\0' && i < maxlen ; i++) ;
+  return i;
+}
+
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
   size_t size;
