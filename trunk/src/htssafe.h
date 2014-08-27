@@ -176,11 +176,13 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 /** strnlen replacement (autotools). **/
-static HTS_UNUSED size_t rpl_strnlen(const char *s, size_t maxlen) {
+#if ( ! defined(WIN32) && ! defined(HAVE_STRNLEN) )
+static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
   size_t i;
   for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
   return i;
 }
+#endif
 
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
