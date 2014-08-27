@@ -33,6 +33,7 @@ AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
 VERSION_INFO="2:48:0"
 AM_MAINTAINER_MODE
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -118,6 +119,9 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 
 # check wether misaligned access is possible or not
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
+
+# check for various headers
+AC_CHECK_HEADERS([execinfo.h])
 
 ### zlib
 CHECK_ZLIB()
@@ -233,6 +237,9 @@ AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
 
 ### Check for snprintf
 AC_FUNC_SNPRINTF()
+
+### Check for strnlen
+AC_FUNC_STRNLEN()
 
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
