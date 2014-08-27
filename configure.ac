@@ -239,7 +239,8 @@ AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
 AC_FUNC_SNPRINTF()
 
 ### Check for strnlen
-AC_FUNC_STRNLEN()
+AC_CHECK_LIB(c, strnlen, [
+AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
