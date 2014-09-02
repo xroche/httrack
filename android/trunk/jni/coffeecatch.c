@@ -640,6 +640,71 @@ static int coffeecatch_handler_setup_global(void) {
 }
 
 /**
+ * Free a native_code_handler_struct structure.
+ **/
+static int coffeecatch_native_code_handler_struct_free(native_code_handler_struct *const t) {
+  int code = 0;
+
+  if (t == NULL) {
+    return -1;
+  }
+
+  /* Restore previous alternative stack. */
+  if (sigaltstack(&t->stack_old, NULL) != 0) {
+    code = -1;
+  }
+
+  /* Free alternative stack */
+  if (t->stack_buffer != NULL) {
+    free(t->stack_buffer);
+    t->stack_buffer = NULL;
+    t->stack_buffer_size = 0;
+  }
+
+  /* Free structure. */
+  free(t);
+
+  return code;
+}
+
+/**
+ * Create a native_code_handler_struct structure.
+ **/
+static native_code_handler_struct* coffeecatch_native_code_handler_struct_init(void) {
+  stack_t stack;
+  native_code_handler_struct *const t =
+    calloc(sizeof(native_code_handler_struct), 1);
+
+  if (t == NULL) {
+    return NULL;
+  }
+
+  DEBUG(print("installing thread alternative stack\n"));
+
+  /* Initialize structure */
+  t->stack_buffer_size = SIG_STACK_BUFFER_SIZE;
+  t->stack_buffer = malloc(t->stack_buffer_size);
+  if (t->stack_buffer == NULL) {
+    coffeecatch_native_code_handler_struct_free(t);
+    return NULL;
+  }
+
+  /* Setup alternative stack. */
+  memset(&stack, 0, sizeof(stack));
+  stack.ss_sp = t->stack_buffer;
+  stack.ss_size = t->stack_buffer_size;
+  stack.ss_flags = 0;
+
+  /* Install alternative stack. This is thread-safe */
+  if (sigaltstack(&stack, &t->stack_old) != 0) {
+    coffeecatch_native_code_handler_struct_free(t);
+    return NULL;
+  }
+
+  return t;
+}
+
+/**
  * Acquire the crash handler for the current thread.
  * The coffeecatch_handler_cleanup() must be called to release allocated
  * resources.
@@ -665,32 +730,18 @@ static int coffeecatch_handler_setup(int setup_thread) {
 
   /* Initialize locals. */
   if (setup_thread && coffeecatch_get() == NULL) {
-    stack_t stack;
     native_code_handler_struct *const t =
-      calloc(sizeof(native_code_handler_struct), 1);
+      coffeecatch_native_code_handler_struct_init();
+
+    if (t == NULL) {
+      return -1;
+    }
 
     DEBUG(print("installing thread alternative stack\n"));
 
-    /* Initialize structure */
-    t->stack_buffer_size = SIG_STACK_BUFFER_SIZE;
-    t->stack_buffer = malloc(t->stack_buffer_size);
-    if (t->stack_buffer == NULL) {
-      return -1;
-    }
-  
-    /* Setup alternative stack. */
-    memset(&stack, 0, sizeof(stack));
-    stack.ss_sp = t->stack_buffer;
-    stack.ss_size = t->stack_buffer_size;
-    stack.ss_flags = 0;
-
-    /* Install alternative stack. This is thread-safe */
-    if (sigaltstack(&stack, &t->stack_old) != 0) {
-      return -1;
-    }
-
     /* Set thread-specific value. */
     if (pthread_setspecific(native_code_thread, t) != 0) {
+      coffeecatch_native_code_handler_struct_free(t);
       return -1;
     }
 
@@ -719,20 +770,10 @@ static int coffeecatch_handler_cleanup() {
       assert(! "pthread_setspecific() failed");
     }
 
-    /* Restore previous alternative stack. */
-    if (sigaltstack(&t->stack_old, NULL) != 0) {
+    /* Free handler and reset slternate stack */
+    if (coffeecatch_native_code_handler_struct_free(t) != 0) {
       return -1;
     }
-
-    /* Free alternative stack */
-    if (t->stack_buffer != NULL) {
-      free(t->stack_buffer);
-      t->stack_buffer = NULL;
-      t->stack_buffer_size = 0;
-    }
-
-    /* Free structure. */
-    free(t);
 
     DEBUG(print("removed thread alternative stack\n"));
   }
