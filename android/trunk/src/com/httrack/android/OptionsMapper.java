@@ -377,6 +377,35 @@ public class OptionsMapper {
   }
 
   /**
+   * Parse an integer.
+   * 
+   * @param value
+   *          The integer value
+   * @param defaultValue
+   *          Default value on error or out-of-range
+   * @return The parsed value, or defaultValue on error
+   */
+  public static int parseInt(final String value, final int defaultValue) {
+    try {
+      return Integer.parseInt(value);
+    } catch (final NumberFormatException nfe) {
+      Log.d(OptionsMapper.class.getSimpleName(), "format number exception", nfe);
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Parse an integer.
+   * 
+   * @param value
+   *          The integer value
+   * @return The parsed value, or 999999999 on error
+   */
+  public static int parseInt(final String value) {
+    return parseInt(value, 999999999);
+  }
+
+  /**
    * Options mapper interface.
    */
   public static interface OptionMapper {
@@ -503,7 +532,7 @@ public class OptionsMapper {
           final List<String> commandline, final String value) {
         if (value != null && value.length() != 0
             && patternDigits.matcher(value).matches()) {
-          MaxSizeHandler.this.maxHtml = Integer.parseInt(value);
+          MaxSizeHandler.this.maxHtml = OptionsMapper.parseInt(value);
         }
       }
 
@@ -523,7 +552,7 @@ public class OptionsMapper {
           final List<String> commandline, final String value) {
         if (value != null && value.length() != 0
             && patternDigits.matcher(value).matches()) {
-          MaxSizeHandler.this.maxNonHtml = Integer.parseInt(value);
+          MaxSizeHandler.this.maxNonHtml = OptionsMapper.parseInt(value);
         }
       }
 
