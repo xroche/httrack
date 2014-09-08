@@ -30,6 +30,9 @@
 #define USE_CORKSCREW
 #endif
 
+/* #undef NO_USE_SIGALTSTACK */
+/* #undef USE_SILENT_SIGALTSTACK */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -399,11 +402,13 @@ static void coffeecatch_call_old_signal_handler(const int code, siginfo_t *const
 
 /* Unflag "on stack" */
 static void coffeecatch_revert_alternate_stack(void) {
+#ifndef NO_USE_SIGALTSTACK
   stack_t ss;
   if (sigaltstack(NULL, &ss) == 0) {
     ss.ss_flags &= ~SS_ONSTACK;
     sigaltstack (&ss, NULL);
   }
+#endif
 }
 
 /* Try to jump to userland. */
@@ -649,10 +654,14 @@ static int coffeecatch_native_code_handler_struct_free(native_code_handler_struc
     return -1;
   }
 
+#ifndef NO_USE_SIGALTSTACK
   /* Restore previous alternative stack. */
-  if (sigaltstack(&t->stack_old, NULL) != 0) {
+  if (t->stack_old.ss_sp != NULL && sigaltstack(&t->stack_old, NULL) != 0) {
+#ifndef USE_SILENT_SIGALTSTACK
     code = -1;
+#endif
   }
+#endif
 
   /* Free alternative stack */
   if (t->stack_buffer != NULL) {
@@ -695,11 +704,15 @@ static native_code_handler_struct* coffeecatch_native_code_handler_struct_init(v
   stack.ss_size = t->stack_buffer_size;
   stack.ss_flags = 0;
 
+#ifndef NO_USE_SIGALTSTACK
   /* Install alternative stack. This is thread-safe */
   if (sigaltstack(&stack, &t->stack_old) != 0) {
+#ifndef USE_SILENT_SIGALTSTACK
     coffeecatch_native_code_handler_struct_free(t);
     return NULL;
+#endif
   }
+#endif
 
   return t;
 }
