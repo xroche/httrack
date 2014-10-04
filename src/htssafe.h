@@ -176,7 +176,7 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 /** strnlen replacement (autotools). **/
-#if ( ! defined(WIN32) && ! defined(HAVE_STRNLEN) )
+#if ( ! defined(_WIN32) && ! defined(HAVE_STRNLEN) )
 static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
   size_t i;
   for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
