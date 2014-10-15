@@ -101,7 +101,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 }
 
 /**
- * Check wether 'VAR' is of type char[].
+ * Check whether 'VAR' is of type char[].
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 /* Note: char[] and const char[] are compatible */
