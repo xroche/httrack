@@ -77,6 +77,13 @@ Please visit our Website: http://www.httrack.com
 #else
 #endif
 
+#undef DEBUG
+#if 0
+#define DEBUG(A) do { A; } while(0)
+#else
+#define DEBUG(A) do {} while(0)
+#endif
+
 static htsmutex refreshMutex = HTSMUTEX_INIT;
 
 static int help_server(char *dest_path, int defaultPort);
@@ -91,10 +98,59 @@ static void htsweb_sig_brpipe(int code) {
   /* ignore */
 }
 
+/* Number of background threads */
+static int background_threads = 0;
+
+/* Server/client ping handling */
+static htsmutex pingMutex = HTSMUTEX_INIT;
+static unsigned int pingId = 0;
+static unsigned int getPingId(void) {
+  unsigned int id;
+  hts_mutexlock(&pingMutex);
+  id = pingId;
+  hts_mutexrelease(&pingMutex);
+  return id;
+}
+static void ping(void) {
+  hts_mutexlock(&pingMutex);
+  pingId++;
+  hts_mutexrelease(&pingMutex);
+}
+
+static void client_ping(void *pP) {
+#ifndef _WIN32
+  /* Timeout to 120s ; normally client pings every 30 second */
+  static int timeout = 120;
+  /* Wait for parent to die (legacy browser mode). */
+  const pid_t ppid = (pid_t) (uintptr_t) pP;
+  while (!kill(ppid, 0)) {
+    sleep(1);
+  }
+  /* Parent (webhttrack script) is dead: is client pinging ? */
+  for(;;) {
+    unsigned int id = getPingId();
+    sleep(timeout);
+    if (getPingId() == id) {
+      break;
+    }
+  }
+  /* Die! */
+  fprintf(stderr,
+          "Parent process %d died, and client did not ping for %ds: exiting!\n",
+          (int) ppid, timeout);
+  exit(EXIT_FAILURE);
+#endif
+}
+
+static void pingHandler(void*arg) {
+  ping();
+}
+
 int main(int argc, char *argv[]) {
   int i;
   int ret = 0;
   int defaultPort = 0;
+  int parentPid = 0;
 
   printf("Initialzing the server..\n");
 
@@ -120,7 +176,7 @@ int main(int argc, char *argv[]) {
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr,
-            "usage: %s [--port <port>] <path-to-html-root-dir> [key value [key value]..]\n",
+            "usage: %s [--port <port>] [--ppid parent-pid] <path-to-html-root-dir> [key value [key value]..]\n",
             argv[0]);
     fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
     return 1;
@@ -200,14 +256,22 @@ int main(int argc, char *argv[]) {
 
   /* set commandline keys */
   for(i = 2; i < argc; i += 2) {
-    if (strcmp(argv[i], "--port") == 0) {
+    if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
       if (sscanf(argv[i + 1], "%d", &defaultPort) != 1 || defaultPort < 0
           || defaultPort >= 65535) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;
       }
-    } else {
+    } else if (strcmp(argv[i], "--ppid") == 0 && i + 1 < argc) {
+      if (sscanf(argv[i + 1], "%u", &parentPid) != 1) {
+        fprintf(stderr, "couldn't set the parent PID to %s\n", argv[i + 1]);
+        return -1;
+      }
+    } else if (i + 1 < argc) {
       smallserver_setkey(argv[i], argv[i + 1]);
+    } else {
+      fprintf(stderr, "Error in commandline!\n");
+      return -1;
     }
   }
 
@@ -215,6 +279,13 @@ int main(int argc, char *argv[]) {
 #ifndef _WIN32
   signal(SIGPIPE, htsweb_sig_brpipe);   // broken pipe (write into non-opened socket)
 #endif
+
+  /* pinger */
+  if (parentPid > 0) {
+    hts_newthread(client_ping, (void *) (uintptr_t) parentPid);
+    background_threads++; /* Do not wait for this thread! */
+    smallserver_setpinghandler(pingHandler, NULL);
+  }
 
   /* launch */
   ret = help_server(argv[1], defaultPort);
@@ -292,6 +363,7 @@ static void back_launch_cmd(void *pP) {
 
   /* finished */
   commandEnd = 1;
+  DEBUG(fprintf(stderr, "commandEnd=1\n"));
 
   /* free */
   free(cmd);
@@ -301,7 +373,9 @@ static void back_launch_cmd(void *pP) {
 
 void webhttrack_main(char *cmd) {
   commandRunning = 1;
+  DEBUG(fprintf(stderr, "commandRunning=1\n"));
   hts_newthread(back_launch_cmd, (void *) strdup(cmd));
+  background_threads++; /* Do not wait for this thread! */
 }
 
 void webhttrack_lock(void) {
@@ -339,8 +413,11 @@ static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   CHAIN_FUNCTION(opt, sendhead, htsshow_sendheader, NULL);
   CHAIN_FUNCTION(opt, receivehead, htsshow_receiveheader, NULL);
 
+  /* Rock'in! */
   ret = hts_main2(argc, argv, opt);
-  htsthread_wait_n(1);
+
+  /* Wait for pending threads to finish */
+  htsthread_wait_n(background_threads);
 
   return ret;
 }
@@ -404,12 +481,14 @@ void __cdecl htsshow_init(t_hts_callbackarg * carg) {
 void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
 }
 int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
+  DEBUG(fprintf(stderr, "htsshow_start()\n"));
   return 1;
 }
 int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
   return htsshow_start(carg, opt);
 }
 int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
+  DEBUG(fprintf(stderr, "htsshow_end()\n"));
   return 1;
 }
 int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg, httrackp * opt,

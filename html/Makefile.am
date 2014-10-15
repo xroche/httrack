@@ -20,7 +20,7 @@ HelpHtmldiv_DATA = div/search.sh
 HelpHtmlimg_DATA  = img/*
 HelpHtmlimages_DATA = images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
-WebHtml_DATA = server/*.html
+WebHtml_DATA = server/*.html server/*.js server/*.css
 WebHtmlimages_DATA = server/images/*
 WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
@@ -41,6 +41,6 @@ EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 install-data-hook:
 	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
 		( cd $(DESTDIR)$(prefix)/share/httrack \
-			&& $(LN_S) $(htmldir) html \
+			&& $(LN_S) ../doc/httrack html \
 		) \
 	fi

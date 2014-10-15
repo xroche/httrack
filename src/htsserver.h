@@ -91,6 +91,7 @@ extern httrackp *global_opt;
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
+extern void smallserver_setpinghandler(void (*fun)(void*), void*arg);
 extern int smallserver_setkey(const char *key, const char *value);
 extern int smallserver_setkeyint(const char *key, LLint value);
 extern int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value);

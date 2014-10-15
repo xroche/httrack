@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([httrack], [3.48.18], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.48.20], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2014 Xavier Roche and other contributors
@@ -33,6 +33,7 @@ AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
 VERSION_INFO="2:48:0"
 AM_MAINTAINER_MODE
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -119,6 +120,9 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 # check wether misaligned access is possible or not
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 
+# check for various headers
+AC_CHECK_HEADERS([execinfo.h])
+
 ### zlib
 CHECK_ZLIB()
 
@@ -149,9 +153,16 @@ if test x"$https_support" = x"no"; then
 AC_MSG_NOTICE([disabling https support])
 AC_DEFINE(HTS_USEOPENSSL, 0)
 else
+SAVE_LIBS=$LIBS
+AC_CHECK_LIB(crypto, EVP_get_digestbyname,
+	[
+	OPENSSL_LIBS="-lcrypto"
+	]
+	)
+LIBS="$LIBS $OPENSSL_LIBS"
 AC_CHECK_LIB(ssl, SSL_library_init,
 	[
-	OPENSSL_LIBS="-lcrypto -lssl"
+	OPENSSL_LIBS="$OPENSSL_LIBS -lssl"
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
@@ -162,6 +173,7 @@ AC_CHECK_LIB(ssl, SSL_library_init,
 	fi
 	]
 	)
+LIBS=$SAVE_LIBS
 AC_SUBST(OPENSSL_LIBS)
 fi
 
@@ -225,6 +237,10 @@ AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
 
 ### Check for snprintf
 AC_FUNC_SNPRINTF()
+
+### Check for strnlen
+AC_CHECK_LIB(c, strnlen, [
+AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
