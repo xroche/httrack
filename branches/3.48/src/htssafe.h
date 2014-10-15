@@ -101,7 +101,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 }
 
 /**
- * Check wether 'VAR' is of type char[].
+ * Check whether 'VAR' is of type char[].
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 /* Note: char[] and const char[] are compatible */
@@ -136,6 +136,18 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
 
 /**
+ * Append characters of "B" to "A".
+ * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
+ * is assumed to be the capacity of this array.
+ */
+#define strcatbuff(A, B) \
+  ( HTS_IS_NOT_CHAR_BUFFER(A) \
+  ? strcat(A, B) \
+  : strncat_safe_(A, sizeof(A), B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+
+/**
  * Copy characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
@@ -146,15 +158,6 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   : strcpy_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
-
-/* note: "size_t is an unsigned integral type" */
-
-/**
- * Append characters of "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
- * is assumed to be the capacity of this array.
- */
-#define strcatbuff(A, B) strncatbuff(A, B, (size_t) -1)
 
 /**
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
@@ -172,6 +175,15 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
 
+/** strnlen replacement (autotools). **/
+#if ( ! defined(_WIN32) && ! defined(HAVE_STRNLEN) )
+static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
+  size_t i;
+  for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
+  return i;
+}
+#endif
+
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
   size_t size;
@@ -188,6 +200,7 @@ static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t 
                                                  const char *exp, const char *file, int line) {
   const size_t source_len = strlen_safe_(source, sizeof_source, file, line);
   const size_t dest_len = strlen_safe_(dest, sizeof_dest, file, line);
+  /* note: "size_t is an unsigned integral type" ((size_t) -1 is positive) */
   const size_t source_copy = source_len <= n ? source_len : n;
   const size_t dest_final_len = dest_len + source_copy;
   assertf__(dest_final_len < sizeof_dest, exp, file, line);

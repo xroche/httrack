@@ -2,9 +2,10 @@
 HTTrack Website Copier release history:
 --------------------------------------
 
-This file lists all changes and fixes that have been made for HTTrack.
-
-3.48-18
+This file lists all changes and fixes that have been made for HTTrack
+3.48-20
++ Fixed: webhttrack incompatibility with Chrome
++ Fixed: assertion failure at htslib.c:3458 (strlen(copyBuff) == qLen) seen on Linux
 + Fixed: infamous crashes inside the DNS cache due to a corruption within the option structure (E.Kalinowski/karbofos)
 + New: added minimalistic crash reporting on Windows and Linux
 + Fixed: URL list not working anymore (tom swift)
