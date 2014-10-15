@@ -92,19 +92,29 @@ int commandReturnSet = 0;
 
 httrackp *global_opt = NULL;
 
+static void (*pingFun)(void*) = NULL;
+static void* pingFunArg = NULL;
+
 /* Extern */
 extern void webhttrack_main(char *cmd);
 extern void webhttrack_lock(void);
 extern void webhttrack_release(void);
 
 static int is_image(const char *file) {
-  return ((strstr(file, ".gif") != NULL));
+  return strstr(file, ".gif") != NULL
+         || strstr(file, ".png") != NULL;
 }
 static int is_text(const char *file) {
   return ((strstr(file, ".txt") != NULL));
 }
 static int is_html(const char *file) {
   return ((strstr(file, ".htm") != NULL));
+}
+static int is_css(const char *file) {
+  return ((strstr(file, ".css") != NULL));
+}
+static int is_js(const char *file) {
+  return ((strstr(file, ".js") != NULL));
 }
 
 static void sig_brpipe(int code) {
@@ -408,6 +418,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
     /* Accept */
     while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
+
+    /* Ping */
+    if (pingFun != NULL) {
+      pingFun(pingFunArg);
+    }
 
     /* Lock */
     webhttrack_lock();
@@ -811,12 +826,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             virtualpath = 1;
           }
 
+          /* override */
           if (commandRunning) {
-            if (!is_image(file)) {
+            if (is_html(file)) {
               file = "/server/refresh.html";
             }
           } else if (commandEnd && !virtualpath && !willexit) {
-            if (!is_image(file)) {
+            if (is_html(file)) {
               file = "/server/finished.html";
             }
           }
@@ -843,9 +859,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             char ok_img[] =
               "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
               "Server: httrack small server\r\n" "Content-type: image/gif\r\n";
+            char ok_js[] =
+              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
+              "Server: httrack small server\r\n" "Content-type: text/javascript\r\n";
+            char ok_css[] =
+              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
+              "Server: httrack small server\r\n" "Content-type: text/css\r\n";
             char ok_text[] =
               "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
               "Server: httrack small server\r\n" "Content-type: text/plain\r\n";
+            char ok_unknown[] =
+              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
+              "Server: httrack small server\r\n" "Content-type: application/octet-stream\r\n";
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -911,6 +936,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                     name[0] = '\0';
                     strncatbuff(name, str, n);
+
                     if (strncmp(name, "/*", 2) == 0) {
                       /* comments */
                     } else if ((p = strfield(name, "html:"))) {
@@ -1179,6 +1205,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               StringCat(output, "&gt;");
                             } else if (outputmode && a[0] == '&') {
                               StringCat(output, "&amp;");
+                            } else if (outputmode && a[0] == '\'') {
+                              StringCat(output, "&#39;");
                             } else if (outputmode == 3 && a[0] == ' ') {
                               StringCat(output, "%20");
                             } else if (outputmode >= 2
@@ -1252,6 +1280,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             case '&':
                               StringCat(tmpbuff, "&amp;");
                               break;
+                            case '\'':
+                              StringCat(tmpbuff, "&#39;");
+                              break;
                             default:
                               StringMemcat(tmpbuff, fstr, 1);
                               break;
@@ -1292,17 +1323,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 assert(len == (int) StringLength(output));
               }
 #endif
-            } else if (is_text(file)) {
-              StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
-              while(!feof(fp)) {
-                int n = (int) fread(line, 1, sizeof(line) - 2, fp);
-
-                if (n > 0) {
-                  StringMemcat(output, line, n);
-                }
-              }
             } else {
-              StringMemcat(headers, ok_img, sizeof(ok_img) - 1);
+              if (is_text(file)) {
+                StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
+              } else if (is_js(file)) {
+                StringMemcat(headers, ok_js, sizeof(ok_js) - 1);
+              } else if (is_css(file)) {
+                StringMemcat(headers, ok_css, sizeof(ok_css) - 1);
+              } else if (is_image(file)) {
+                StringMemcat(headers, ok_img, sizeof(ok_img) - 1);
+              } else {
+                StringMemcat(headers, ok_unknown, sizeof(ok_unknown) - 1);
+              }
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
 
@@ -1312,6 +1344,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               }
             }
             fclose(fp);
+          } else if (strcmp(file, "/ping") == 0
+                     || strncmp(file, "/ping?", 6) == 0) {
+            char error_hdr[] =
+              "HTTP/1.0 200 Pong\r\n" "Server: httrack small server\r\n"
+              "Content-type: text/html\r\n";
+
+            StringCat(headers, error_hdr);
           } else {
             char error_hdr[] =
               "HTTP/1.0 404 Not Found\r\n" "Server: httrack small server\r\n"
@@ -1427,6 +1466,11 @@ int htslang_uninit(void) {
     coucal_delete(&NewLangList);
   }
   return 1;
+}
+
+void smallserver_setpinghandler(void (*fun)(void*), void*arg) {
+  pingFun = fun;
+  pingFunArg = arg;
 }
 
 int smallserver_setkey(const char *key, const char *value) {
