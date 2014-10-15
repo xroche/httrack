@@ -1,0 +1,107 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+function do_load() {
+	window.status=' ';
+}
+function do_unload() {
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">${LANG_OSFWB}</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_O1}</em></h2>
+</td>
+</tr></table>
+
+<br>
+
+<table class="tableWidth" border="0" width="100%" cellspacing="0">
+<tr><td class="tabCtrl" align="left">
+<a style="background:black;color: white" 
+${do:output-mode:html-urlescaped}
+  href="file://${path}/"
+${do:output-mode:}
+  target="_new">
+${LANG_D8}
+</a>
+</td></tr>
+
+<tr><td class="tabCtrl" align="left">
+${do:loadhash}
+<form method="GET" action="" name="form">
+		${LANG_S11b}
+		<select name="name"
+		        onChange="window.open('file://${path}/' + form.name.value + '/index.html')">
+		<option value="">&nbsp;</option>
+		${liststr:winprofile}
+		</select>
+</form>
+</td></tr>
+
+</table>
+
+<br><br>
+
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

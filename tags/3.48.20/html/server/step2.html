@@ -1,0 +1,287 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+function do_unload() {
+}
+function do_load() {
+	window.status=' ';
+	form.projname.select();
+}
+function key_event(event) {
+  if (event && event.keyCode && (event.keyCode == 13 || event.keyCode == 10)) { 
+    form.nextBtn.click(); 
+    return false;
+  }
+  return true;
+}
+function checkname() {
+  if (form.projname.value != '') {
+    return true;
+  }
+  window.status='${LANG_S1}';
+  form.projname.select();
+  return false;
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();" onKeyPress="return key_event(event);">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+	<td id="subTitle" align="right">
+		<a href="/server/file.html" target="_blank"
+			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O1}
+		</a>
+	</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+	<td id="subTitle">|</td>
+	<td id="subTitle" align="right">
+		<a href="/index.html" target="_blank"
+			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O5}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${fexist:index.html:LANG_G42}</em></h2>
+</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+<td>
+	<a href="/step1.html" target="_blank"
+		onClick="window.open('/step1.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>${LANG_TIPHELP}</a>
+</td>
+${do:end-if}
+</tr></table>
+
+${/* Default values for empty settings */}
+${do:set:cache:1}
+
+${/* Convert winprofile.ini into internal variables */}
+${do:copy:CurrentUrl:urls}
+${do:copy:Category:projcateg}
+${do:copy:CurrentAction:todo}
+${do:copy:CurrentURLList:filelist}
+${do:copy:Proxy:proxy}
+${do:copy:Port:port}
+${do:copy:Near:link}
+${do:copy:Test:testall}
+${do:copy:ParseAll:parseall}
+${do:copy:HTMLFirst:htmlfirst}
+${do:copy:Cache:cache}
+${do:copy:NoRecatch:norecatch}
+${do:copy:Dos:dos}
+${do:copy:Index:index}
+${do:copy:WordIndex:index2}
+${do:copy:Log:logf}
+${do:copy:RemoveTimeout:remt}
+${do:copy:RemoveRateout:rems}
+${do:copy:KeepAlive:ka}
+${do:copy:FollowRobotsTxt:robots}
+${do:copy:NoErrorPages:errpage}
+${do:copy:NoExternalPages:external}
+${do:copy:NoPwdInPages:hidepwd}
+${do:copy:NoQueryStrings:hidequery}
+${do:copy:NoPurgeOldFiles:nopurge}
+${do:copy:Cookies:cookies}
+${do:copy:CheckType:checktype}
+${do:copy:ParseJava:parsejava}
+${do:copy:HTTP10:http10}
+${do:copy:TolerantRequests:toler}
+${do:copy:UpdateHack:updhack}
+${do:copy:URLHack:urlhack}
+${do:copy:StoreAllInCache:cache2}
+${do:copy:LogType:logtype}
+${do:copy:UseHTTPProxyForFTP:ftpprox}
+${do:copy:Build:build}
+${do:copy:PrimaryScan:filter}
+${do:copy:Travel:travel}
+${do:copy:GlobalTravel:travel2}
+${do:copy:RewriteLinks:travel3}
+${do:copy:BuildString:BuildString}
+${do:copy:MaxHtml:maxhtml}
+${do:copy:MaxOther:othermax}
+${do:copy:MaxAll:sizemax}
+${do:copy:MaxWait:pausebytes}
+${do:copy:Sockets:connexion}
+${do:copy:Retry:retry}
+${do:copy:MaxTime:maxtime}
+${do:copy:TimeOut:timeout}
+${do:copy:RateOut:rate}
+${do:copy:UserID:user}
+${do:copy:Footer:footer}
+${do:copy:MaxRate:maxrate}
+${do:copy:WildCardFilters:url2}
+${do:copy:Proxy:proxy}
+${do:copy:Port:port}
+${do:copy:Depth:depth}
+${do:copy:ExtDepth:depth2}
+${do:copy:MaxConn:maxconn}
+${do:copy:MaxLinks:maxlinks}
+${do:copy:MIMEDefsExt1:ext1}
+${do:copy:MIMEDefsExt2:ext2}
+${do:copy:MIMEDefsExt3:ext3}
+${do:copy:MIMEDefsExt4:ext4}
+${do:copy:MIMEDefsExt5:ext5}
+${do:copy:MIMEDefsExt6:ext6}
+${do:copy:MIMEDefsExt7:ext7}
+${do:copy:MIMEDefsExt8:ext8}
+${do:copy:MIMEDefsMime1:mime1}
+${do:copy:MIMEDefsMime2:mime2}
+${do:copy:MIMEDefsMime3:mime3}
+${do:copy:MIMEDefsMime4:mime4}
+${do:copy:MIMEDefsMime5:mime5}
+${do:copy:MIMEDefsMime6:mime6}
+${do:copy:MIMEDefsMime7:mime7}
+${do:copy:MIMEDefsMime8:mime8}
+${/* End convert winprofile.ini into internal variables */}
+
+
+<br>
+
+<form method="POST" action="step3.html" name="form">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="redirect" value="">
+<input type="hidden" name="todo" value="1">
+${do:if-project-file-exists:/hts-cache/winprofile.ini}
+<input type="hidden" name="todo" value="7">
+${do:end-if}
+${do:if-project-file-exists:/hts-in_progress.lock}
+<input type="hidden" name="todo" value="6">
+${do:end-if}
+
+<table border="0" width="100%">
+<tr><td>
+
+
+${do:loadhash}
+
+		${LANG_S11b}
+		<select name="loadprojname" onChange="form.redirect.value='step2.html'; form.submit()">
+		<option value="">&nbsp;</option>
+		${liststr:winprofile}
+		</select>
+
+<br>
+
+		${LANG_S11}
+		<input name="projname" value="${projname}"
+			onMouseOver="info('${html:html:LANG_S1}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+
+<br>
+
+<table border="0">
+<tr><td>
+
+		${LANG_S13}
+		<select name="loadprojcateg" onChange="form.redirect.value='step2.html'; form.submit()">
+		<option value="">&nbsp;</option>
+		${liststr:wincateg}
+		</select>
+</td><td>
+		<input name="projcateg" value="${projcateg}"
+			onMouseOver="info('${html:html:LANG_S5}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+
+</td></tr></table>
+
+<br>
+		${LANG_S12}
+		<input name="path" value="${path}"
+			onMouseOver="info('${html:html:LANG_S2}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+		<input type="button" value="refresh" onClick="form.redirect.value='step2.html'; form.submit()">
+
+	</td></tr>
+
+	<tr><td>
+		<table width="100%" border="0"><tr><td align="left">
+			<input type="submit" value=" << ${LANG_PREVIOUS} " onClick="form.redirect.value='index.html'; form.submit()"
+			onMouseOver="info('${html:html:LANG_TIPPREV}'); return true" onMouseOut="info('&nbsp;'); return true"			
+			>
+		</td><td align="right">
+			<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> " onClick="return checkname();" default
+			onMouseOver="info('${html:html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+			>
+		</td></tr></table>
+
+${do:if-not-empty:urls}
+<br>
+<h2>${LANG_URLS}:</h2><br>
+<h3><pre>${urls}</pre></h3>
+<br>
+${do:end-if:}
+
+</td></tr>
+</table>
+
+</form>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

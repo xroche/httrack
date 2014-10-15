@@ -1,0 +1,7 @@
+# format version number, currently 3; this line is compulsory!
+version=3
+
+# main httrack.com download page ; fetch the mirror version number
+http://www.httrack.com/page/2/en/index.html\
+	.*/httrack-([\d\.]+).tar.gz
+

@@ -1,0 +1,322 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+function do_load() {
+	window.status=' ';
+}
+function do_unload() {
+}
+function key_event(event) {
+  if (event && event.keyCode && event.keyCode == 10) { 
+    form.nextBtn.click(); 
+    return false;
+  }
+  return true;
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();" onKeyPress="return key_event(event);">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+	<td id="subTitle" align="right">
+		<a href="/server/file.html" target="_blank"
+			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O1}
+		</a>
+	</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+	<td id="subTitle">|</td>
+	<td id="subTitle" align="right">
+		<a href="/index.html" target="_blank"
+			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O5}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>Start</em></h2>
+</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+<td>
+	<a href="/step3.html" target="_blank"
+		onClick="window.open('/step3.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>${LANG_TIPHELP}</a>
+</td>
+${do:end-if}
+</tr></table>
+
+<br>
+
+<form method="POST" name="form" action="step4.html">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="redirect" value="">
+<input type="hidden" name="projpath" value="${path}/${projname}/">
+
+<input type="hidden" name="command_arg_profile" value="path,lang">
+
+<table border="0" width="100%">
+<tr><td>
+
+</td></tr>
+
+<tr><td>
+<input type="radio" name="command_do" value="start" checked><b>${LANG_J10}</b>
+</td></tr>
+<tr><td>
+<input type="radio" name="command_do" value="save">${LANG_J10b}
+</td></tr>
+<tr><td>
+
+${/* Real commands and ini file generated below */}
+
+<!-- engine commandline -->
+${do:output-mode:html}
+<textarea name="command" cols="50" rows="4" style="visibility:hidden">
+httrack \
+	--quiet \
+	--build-top-index \
+	${test:todo:--mirror:--mirror:--mirror-wizard:--get:--mirrorlinks:--testlinks:--continue:--update}
+	${urls}
+	${test:filelist:-%L "}${filelist}${test:filelist:"}
+	--path "${html:path}/${html:projname}" 
+\
+	${test:parseall:--near}
+	${test:link:--test}
+	${test:testall:--extended-parsing}
+	${test:htmlfirst::--priority=7}
+\
+${do:if-not-empty:BuildString}
+	--structure "${BuildString}"
+${do:end-if}
+	${test:build:-N0:-N0:-N1:-N2:-N3:-N4:-N5:-N100:-N101:-N102:-N103:-N104:-N105:-N99:-N199:}
+\
+	${ztest:dos::--long-names=0:--long-names=2}
+	${test:robots:--robots=0:--robots=0:--robots=1:--robots=2}
+	${test:errpage:--generate-errors:--generate-errors=0}
+	${test:external:--replace-external}
+	${test:hidepwd:--disable-passwords}
+	${test:hidequery:--include-query-string=1:--include-query-string=0}
+	${test:nopurge:--purge-old=1:--purge-old=0}
+\
+	${test:cache:--cache=0:}
+	${test:filter::--priority=0:--priority=1:--priority=2:--priority=7}
+	${test:travel::--stay-on-same-dir:--can-go-down:--can-go-up:--can-go-up-and-down}
+	${test:travel2::--stay-on-same-address:--stay-on-same-domain:--stay-on-same-tld:--go-everywhere}
+	${test:travel3::--keep-links=0:--keep-links:--keep-links=3:--keep-links=4}
+	${test:windebug:--debug-headers}
+\
+	${test:connexion:--sockets=}${connexion}
+	${test:ka:--keep-alive}
+	${test:timeout:--timeout=}${timeout}
+	${test:remt:--host-control=1}
+	${test:retry:--retries=}${retry}
+	${test:rate:--min-rate=}${rate}
+	${test:rems:--host-control=2}
+\
+	${test:depth:--depth=}${depth}
+	${test:depth2:--ext-depth=}${depth2}
+	${test:maxhtml:--max-files=,}${maxhtml}
+	${test:othermax:--max-files=}${othermax}
+	${test:sizemax:--max-files=}${sizemax}
+	${test:pausebytes:--max-pause=}${pausebytes}
+	${test:maxtime:--max-time=}${maxtime}
+	${test:maxrate:--max-rate=}${maxrate}
+	${test:maxconn:--connection-per-second=}${maxconn}
+	${test:maxlinks:--advanced-maxlinks=}${maxlinks}
+\
+	--user-agent "${html:user}"
+	--footer "${html:footer}"
+\
+	${url2}
+\
+	${test:cookies:--cookies=0:}
+	${test:parsejava:--parse-java=0:}
+	${test:updhack:--updatehack}
+	${test:urlhack:--urlhack=0:--urlhack}
+	${test:toler:--tolerant}
+	${test:http10:--http-10}
+	${test:cache2:--store-all-in-cache}
+	${test:norecatch:--do-not-recatch}
+	${test:logf:--single-log}
+	${test:logtype:::--extra-log:--debug-log}
+	${test:index:--index=0:}
+	${test:index2:--search-index=0:--search-index}
+	${test:prox:--proxy "}${prox}${test:prox:\3A}${portprox}${test:prox:"}
+	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
+</textarea>
+
+<!-- winprofile.ini -->
+${do:output-mode:inifile}
+<textarea name="winprofile" cols="50" rows="4" style="visibility:hidden">
+CurrentUrl=${urls}
+Category=${projcateg}
+CurrentAction=${todo}
+CurrentURLList=${filelist}
+Proxy=${proxy}
+Port=${port}
+Near=${ztest:link:0:1}
+Test=${ztest:testall:0:1}
+ParseAll=${ztest:parseall:0:1}
+HTMLFirst=${ztest:htmlfirst:0:1}
+Cache=${ztest:cache:0:1}
+NoRecatch=${ztest:norecatch:0:1}
+Dos=${dos
+Index=${ztest:index:0:1}
+WordIndex=${ztest:index2:0:1}
+Log=${ztest:logf:0:1:2}
+RemoveTimeout=${ztest:remt:0:1}
+RemoveRateout=${ztest:rems:0:1}
+KeepAlive=${ztest:ka:0:1}
+FollowRobotsTxt=${robots}
+NoErrorPages=${ztest:errpage:0:1}
+NoExternalPages=${ztest:external:0:1}
+NoPwdInPages=${ztest:hidepwd:0:1}
+NoQueryStrings=${ztest:hidequery:0:1}
+NoPurgeOldFiles=${ztest:nopurge:0:1}
+Cookies=${ztest:cookies:0:1}
+CheckType=${ztest:checktype:0:1:2}
+ParseJava=${ztest:parsejava:0:1}
+HTTP10=${ztest:http10:0:1}
+TolerantRequests=${ztest:toler:0:1}
+UpdateHack=${ztest:updhack:0:1}
+URLHack=${ztest:urlhack:0:1}
+StoreAllInCache=${ztest:cache2:0:1}
+LogType=${logtype}
+UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
+Build=${build}
+PrimaryScan=${filter}
+Travel=${travel}
+GlobalTravel=${travel2}
+RewriteLinks=${travel3}
+BuildString=${BuildString}
+MaxHtml=${maxhtml}
+MaxOther=${othermax}
+MaxAll=${sizemax}
+MaxWait=${pausebytes}
+Sockets=${connexion}
+Retry=${retry}
+MaxTime=${maxtime}
+TimeOut=${timeout}
+RateOut=${rate}
+UserID=${user}
+Footer=${footer}
+MaxRate=${maxrate}
+WildCardFilters=${url2}
+Proxy=${proxy}
+Port=${port}
+Depth=${depth}
+ExtDepth=${depth2}
+MaxConn=${maxconn}
+MaxLinks=${maxlinks}
+MIMEDefsExt1=${ext1}
+MIMEDefsExt2=${ext2}
+MIMEDefsExt3=${ext3}
+MIMEDefsExt4=${ext4}
+MIMEDefsExt5=${ext5}
+MIMEDefsExt6=${ext6}
+MIMEDefsExt7=${ext7}
+MIMEDefsExt8=${ext8}
+MIMEDefsMime1=${mime1}
+MIMEDefsMime2=${mime2}
+MIMEDefsMime3=${mime3}
+MIMEDefsMime4=${mime4}
+MIMEDefsMime5=${mime5}
+MIMEDefsMime6=${mime6}
+MIMEDefsMime7=${mime7}
+MIMEDefsMime8=${mime8}
+</textarea>
+${do:output-mode:}
+<!-- winprofile.ini -->
+
+<!-- httrack.ini -->
+${do:output-mode:inifile}
+<textarea name="userprofile" cols="50" rows="4" style="visibility:hidden">
+path=${path}
+lang=${lang_}
+</textarea>
+${do:output-mode:}
+<!-- httrack.ini -->
+
+</td></tr><tr><td>
+		<table width="100%" border="0"><tr><td align="left">
+			<input type="submit" value=" << ${LANG_PREVIOUS} " onClick="form.command.value=''; form.redirect.value='step3.html'; form.submit()"
+			onMouseOver="info('${html:LANG_TIPPREV}'); return true" onMouseOut="info('&nbsp;'); return true"			
+			>
+		</td><td align="right">
+			<input name="nextBtn" type="submit" value=" ${LANG_J9} >> "
+			onMouseOver="info('${html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+			>
+		</td></tr></table>
+
+</td></tr>
+</table>
+
+</form>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

@@ -1,0 +1,144 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>HTTrack Website Copier - Offline Browser</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+function do_load() {
+	window.status=' ';
+}
+function do_unload() {
+}
+function key_event(event) {
+  if (event && event.keyCode && (event.keyCode == 13 || event.keyCode == 10)) { 
+    form.nextBtn.click();
+    return false;
+  }
+  return true;
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load(); return true" onUnload="do_unload();" onKeyPress="return key_event(event);">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+	<td id="subTitle" align="right">
+		<a href="/server/file.html" target="_blank"
+			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O1}
+		</a>
+	</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+	<td id="subTitle">|</td>
+	<td id="subTitle" align="right">
+		<a href="/index.html" target="_blank"
+			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O5}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_G30}</em></h2>
+</td>
+</tr></table>
+
+${html:LANG_Y1}
+
+<noscript>
+<h2>
+<br>
+${LANG_WARNING}!!
+</h2>
+<font color="red">
+${LANG_NOJS}
+</font>
+<br>
+${LANG_THANKYOU}!
+</noscript>
+
+<br><br>
+
+<form method="POST" action="step2.html" name="form">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="redirect" value="">
+
+<table border="0" width="100%">
+	<tr><td align="right">
+	${LANG_P15} 
+		<select name="lang" onChange="form.redirect.value='index.html'; form.submit()">
+		<option value=0></option>
+		${list:#iso}
+		</select>
+	</td></tr>
+
+
+	<tr><td align="right">
+		<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> "
+			onMouseOver="info('${html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+	</td></tr>
+</table>
+
+</form>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

@@ -1,0 +1,170 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+
+// initialize wparent to false if necessary (Konqueror bug workaround)
+if ((typeof wparent) == "undefined") {
+	wparent=false;
+}
+
+function do_load() {
+	window.status=' ';
+}
+function do_unload() {
+}
+function do_add() {
+	if (wparent)
+		pparent = wparent;
+	else if (parent && parent.document)
+		pparent = parent.document;
+	if (pparent
+	    && pparent.form
+	    && pparent.form.urls
+		&& document.form.urladr.value.length > 0
+		) {
+		str = "";
+		if (pparent.form.urls.value.length > 0) {
+			pparent.form.urls.value += "\r\n";
+		}
+		str="http://";
+		if (document.form.urllogin.value.length > 0) {
+			str += document.form.urllogin.value;
+			str += ":";
+			str += document.form.urlpass.value;
+			str += "@";
+		}
+		str += document.form.urladr.value;
+		pparent.form.urls.value += str;
+		return 1;
+	} else {
+		alert('Javascript error, or parent window lost');
+	}
+	return 0;
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+	<td id="subTitle" align="right">
+		<a href="/server/file.html" target="_blank"
+			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O1}
+		</a>
+	</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+	<td id="subTitle">|</td>
+	<td id="subTitle" align="right">
+		<a href="/index.html" target="_blank"
+			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O5}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_G43}</em></h2>
+</td><td>
+	<a href="/index.html" target="_blank">${LANG_TIPHELP}</a>
+</td></tr></table>
+
+<br>
+
+
+<form action="${thisfile}" name="form">
+<table width="100%">
+<tr><td>${LANG_T2}</td><td>http://<input name="urladr"
+			onMouseOver="info('${html:LANG_T10}'); return true" onMouseOut="info('&nbsp;'); return true"
+></td></tr>
+<tr><td colspan=2>
+
+<table width="100%">
+<th>${LANG_T4}</th>
+<tr><td>${LANG_T5}:</td><td><input name="urllogin"
+			onMouseOver="info('${html:LANG_T12}'); return true" onMouseOut="info('&nbsp;'); return true"
+></td></tr>
+<tr><td>${LANG_T6}:</td><td><input name="urlpass"
+			onMouseOver="info('${html:LANG_T13}'); return true" onMouseOut="info('&nbsp;'); return true"
+></td></tr>
+<tr><td>${LANG_T7}:</td><td><input type="button" value="${LANG_T8}" onClick="alert('not yet implemented!')"
+			onMouseOver="info('${html:LANG_T14}'); return true" onMouseOut="info('&nbsp;'); return true"
+></td></tr>
+</table>
+
+</td></tr>
+
+<tr><td>
+<input type="button" value="OK" onClick="if (do_add()) { window.close(); }"
+			onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+</td></tr>
+
+</table>
+</form>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

@@ -1,0 +1,151 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+function do_load() {
+	window.status=' ';
+${do:if-not-empty:closeme}
+	window.close();
+${do:end-if}
+${do:set:closeme:}
+}
+function do_unload() {
+}
+function info(str) {
+	window.status = str;
+}
+function str_replace(str,from,to) {
+	r = str;
+	st = r.indexOf(from);
+	while (st>=0)
+	{
+		r = r.substring(0,st) + to + r.substring(st+from.length,r.length);
+		st = r.indexOf(from,st+to.length);
+	}
+	return r;
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">${LANG_OSFWB}</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_Q1}</em></h2>
+</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+<td>
+	<a href="/step9_opt5.html" target="_blank"
+		onClick="window.open('/step9_opt5.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>${LANG_TIPHELP}</a>
+</td>
+${do:end-if}
+</tr></table>
+
+<br>
+
+<table>
+<tr><td>
+
+<form method="POST" action="${thisfile}" name="form">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="redirect" value="">
+<input type="hidden" name="closeme" value="">
+
+<input name="BuildString" size="60" value="${BuildString}">
+
+<br>
+
+${LANG_O2}:
+<br>
+<pre>
+${LANG_Q2}
+
+${LANG_Q3}
+</pre>
+
+<br>
+
+<tr><td>
+	<table width="100%">
+	<tr><td align="left">
+	<input type="submit" value="${LANG_OK]" 
+${do:output-mode:html-urlescaped}
+		onClick="if (confirm(str_replace(str_replace('${LANG_DIAL7}', '%20', ' '), '%0a', ' '))) { form.closeme.value=1; form.submit(); } return false;"
+${do:output-mode:}
+				onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>
+	</td><td align="right">
+	<input type="button" value="${LANG_CANCEL}"
+				onClick="window.close();"
+				onMouseOver="info('${html:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>
+	</td></tr>
+	</table>
+</td></tr>
+
+</form>
+
+</td></tr>
+
+</table>
+
+
+
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

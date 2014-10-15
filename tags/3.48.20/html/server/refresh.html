@@ -1,0 +1,215 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
+	<meta name="description" content="${LANG_METADESC}" />
+	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<META http-equiv="refresh" content="30; URL=finished.html">
+	<title>'${projname}' - HTTrack Website Copier</title>
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript">
+<!--
+var freeze=0;
+setTimeout(do_refresh, 1000);
+function do_load() {
+	window.status=' ';
+	enable_timer();
+}
+function disable_timer() {
+	if (freeze == 0) {
+		freeze=1;
+	}
+}
+function lock_timer() {
+	freeze=2;
+}
+function enable_timer() {
+	if (freeze == 1) {
+		freeze=0;
+	}
+}
+function unlock_timer() {
+	freeze=0;
+}
+function do_confirm(str) {
+	lock_timer();
+	ret=confirm(str);
+	if (!ret) {
+		unlock_timer();
+	}
+	return ret;
+}
+function do_unload() {
+}
+function info(str) {
+	window.status = str;
+}
+function do_refresh() {
+	if (!freeze) {
+		document.location.reload();
+	} else {
+		setTimeout(do_refresh, 1000);
+	}
+}
+function no_refresh() {
+}
+// -->
+</script>
+
+</head>
+<body onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+	<td id="subTitle" align="right">
+		<a href="/server/file.html" target="_blank"
+			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O1}
+		</a>
+	</td>
+${/* show help only if available */}
+${do:if-file-exists:html/index.html}
+	<td id="subTitle">|</td>
+	<td id="subTitle" align="right">
+		<a href="/index.html" target="_blank"
+			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			style="color:#FFFFFF"
+		>
+		${LANG_O5}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_H20}</em></h2>
+</td><td>
+</td></tr></table>
+
+<br>
+
+<table border="0" width="100%">
+
+<tr>
+<td>${LANG_H8}</td><td>${info.stat_bytes}</td>
+<td>${LANG_H9}</td><td>${info.lien_n}/${info.lien_tot} (+${info.stat_back})</td>
+</tr><tr>
+<td>${LANG_H10}</td><td>${info.stat_time_str}</td>
+<td>${LANG_H17}</td><td>${info.stat_written}</td>
+</tr><tr>
+<td>${LANG_H14}</td><td>${info.irate} (${info.rate})</td>
+<td>${LANG_H18}</td><td>${info.stat_updated}</td>
+</tr><tr>
+<td>${LANG_H11}</td><td>${info.stat_nsocket}</td>
+<td>${LANG_H19}</td><td>${info.stat_errors}</td>
+</tr>
+
+</tr>
+</table>
+
+<br>
+
+<table border="0" width="100%">
+<tr>
+<td>
+
+${LANG_H20} ${info.currentjob}
+
+</td>
+</tr>
+</table>
+
+<br>
+
+<form method="POST" action="step4.html" name="form">
+<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="command" value="">
+
+<table border="0" width="100%">
+
+<tr><td>${info.state[0]}</td><td>${info.name[0]}</td><td>${info.file[0]}</td><td>${info.size[0]}/${info.sizetot[0]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[0]}'; form.submit()" onMouseOver="info('${html:LANG_H6}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[1]}</td><td>${info.name[1]}</td><td>${info.file[1]}</td><td>${info.size[1]}/${info.sizetot[1]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[1]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[2]}</td><td>${info.name[2]}</td><td>${info.file[2]}</td><td>${info.size[2]}/${info.sizetot[2]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[2]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[3]}</td><td>${info.name[3]}</td><td>${info.file[3]}</td><td>${info.size[3]}/${info.sizetot[3]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[3]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[4]}</td><td>${info.name[4]}</td><td>${info.file[4]}</td><td>${info.size[4]}/${info.sizetot[4]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[4]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[5]}</td><td>${info.name[5]}</td><td>${info.file[5]}</td><td>${info.size[5]}/${info.sizetot[5]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[5]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[6]}</td><td>${info.name[6]}</td><td>${info.file[6]}</td><td>${info.size[6]}/${info.sizetot[6]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[6]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[7]}</td><td>${info.name[7]}</td><td>${info.file[7]}</td><td>${info.size[7]}/${info.sizetot[7]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[7]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[8]}</td><td>${info.name[8]}</td><td>${info.file[8]}</td><td>${info.size[8]}/${info.sizetot[8]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[8]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[9]}</td><td>${info.name[9]}</td><td>${info.file[9]}</td><td>${info.size[9]}/${info.sizetot[9]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[9]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[10]}</td><td>${info.name[10]}</td><td>${info.file[10]}</td><td>${info.size[10]}/${info.sizetot[10]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[10]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[11]}</td><td>${info.name[11]}</td><td>${info.file[11]}</td><td>${info.size[11]}/${info.sizetot[11]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[11]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[12]}</td><td>${info.name[12]}</td><td>${info.file[12]}</td><td>${info.size[12]}/${info.sizetot[12]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[12]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${info.state[13]}</td><td>${info.name[13]}</td><td>${info.file[13]}</td><td>${info.size[13]}/${info.sizetot[13]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${info.url_sav[13]}'; form.submit()" onMouseOver="info('${html:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+
+</table>
+
+<table border="0" width="100%">
+<tr><td>
+
+</td></tr><tr><td>
+
+</td></tr><tr><td>
+
+		<table width="100%" border="0"><tr><td align="left">
+		&nbsp;
+		</td><td align="right">
+			<input type="submit" value=" ${LANG_V4} " 
+				onMouseOver="disable_timer(); info('${LANG_D3}'); return true" 
+				onMouseOut="info('&nbsp;'); enable_timer(); return true"
+				onClick="if (do_confirm('${LANG_G1}')) { form.command.value='cancel'; form.submit(); } return false"
+			>
+		</td></tr></table>
+
+</td></tr>
+</table>
+
+</form>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

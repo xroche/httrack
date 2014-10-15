@@ -1,0 +1,591 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Offline Browser</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h3>For HTTrack users:</h3>
+<ul>
+<li><a href="#USERS">Advice & what <u>not</u> to do when you are using HTTrack</a></li>
+</ul>
+<br>
+
+<h3>For webmasters having problems with bandwidth abuse / other abuses related to HTTrack:</h3>
+<ul>
+<li><a href="#WEBMASTERS">Abuse FAQ for <u>webmasters</a></u></li>
+</ul>
+
+<br><br>
+<table width="100%" height="100%" border="0" cellspacing="0" cellpadding="0"><tr><td valign="top" align="left">
+
+<a name="USERS"></a>
+
+
+
+<!-- ------------------------------------------------------------ -->
+
+
+
+<h2 align="center"><em>Advice & what <u>not</u> to do</em></h2>
+
+<center><h3>Please follow these <i>common sense</i> rules to avoid any network abuse</h3></center>
+
+<br>
+
+<ul>
+<li>Do not overload the websites!</li>
+<br>
+Downloading a site can overload it, if you have a fast pipe, or if you capture too many simultaneous cgi (dynamically generated pages).
+<br>
+<ul>
+<li>Do not download too large websites: use filters</li>
+<li>Do not use too many simultaneous connections</li>
+<li>Use bandwidth limits</li>
+<li>Use connection limits</li>
+<li>Use size limits</li>
+<li>Use time limits</li>
+<li>Only disable robots.txt rules with great care</li>
+<li>Try not to download during working hours</li>
+<li>Check your mirror transfer rate/size</li>
+<li>For large mirrors, first ask the webmaster of the site</li>
+</ul>
+<br>
+<li>Ensure that you can copy the website</li>
+<ul>
+<li>Are the pages copyrighted?</li>
+<li>Can you copy them only for private purpose?</li>
+<li>Do not make online mirrors unless you are authorized to do so</li>
+</ul>
+<br>
+<li>Do not overload your network</li>
+<ul>
+<li>Is your (corporate, private..) network connected through dialup ISP?</li>
+<li>Is your network bandwidth limited (and expensive)?</li>
+<li>Are you slowing down the traffic?</li>
+</ul>
+<br>
+<li>Do not steal private information</li>
+<ul>
+<li>Do not grab emails</li>
+<li>Do not grab private information</li>
+</ul>
+</ul>
+
+</table>
+<br><br>
+<table width="100%" height="100%" border="0" cellspacing="0" cellpadding="0"><tr><td valign="top" align="left">
+
+<a name="WEBMASTERS"></a>
+
+
+
+<!-- ------------------------------------------------------------ -->
+
+
+
+<h2 align="center"><em>Abuse FAQ for <u>webmasters</u></em></h2>
+
+<center><h3>How to limit network abuse
+<br>
+HTTrack Website Copier FAQ (updated - DRAFT)
+</h3></center>
+
+<br>
+Q: <strong>How to block offline browsers, like HTTrack?</strong><br>
+<br>
+A: <strong>This is a complex question, let's study it</strong><br>
+<br>
+First, there are several different reasons for that<br>
+Why do you want to block offline browsers? :<br>
+<br>
+<ol>
+<li><a href="#ABUSE1">Because a large part of your bandwidth is used by some users, who are slowing down the rest</a></li>
+<li><a href="#ABUSE2">Because of copyright questions (you do not want people to copy parts of your website)</a></li>
+<li><a href="#ABUSE3">Because of privacy (you do not want email grabbers to steal all your user's emails)</a></li>
+</ol>
+<br>
+<br>
+<ol>
+
+<a name="ABUSE1"></a>
+<li>Bandwidth abuse:<br>
+<br>
+Many Webmasters are concerned about bandwidth abuse, even if this problem is caused by
+a minority of people. Offline browsers tools, like HTTrack, can be used in a WRONG way,
+and
+therefore are sometimes considered as a potential danger.<br>
+But before thinking that all offline browsers are BAD, consider this: 
+students, teachers, IT consultants, websurfers and many people who like your website, may
+want to copy
+parts of it, for their work, their studies, to teach or demonstrate to people during class
+school or
+shows. They might do that because they are connected through expensive modem connection,
+or because they would like to consult pages while travelling, or archive sites that may be
+removed
+one day, make some data mining, comiling information (&quot;if only I could find this
+website I saw one day..&quot;). <br>
+There are many good reasons to mirror websites, and this helps many good people.<br>
+As a webmaster, you might be interested to use such tools, too: test broken links, move a
+website to 
+another location, control which external links are put on your website for legal/content
+control, 
+test the webserver response and performances, index it..<br>
+<br>
+Anyway, bandwidth abuse can be a problem. If your site is regularly &quot;clobbered&quot;
+by evil downloaders, you have <br>
+various solutions. You have radical solutions, and intermediate solutions. I strongly
+recomment not to use<br>
+radical solutions, because of the previous remarks (good people often mirror websites).<br>
+<br>
+In general, for all solutions,<br>
+the good thing: it will limit the bandwidth abuse<br>
+the bad thing: depending on the solution, it will be either a small constraint, or a fatal
+nuisance (you'll get 0 visitors)<br>
+or, to be extreme: if you unplug the wire, there will be no bandwidth abuse<br>
+<br>
+<ol type="a">
+
+<li>Inform people, explain why (&quot;please do not clobber the bandwidth&quot;)<br>
+Good: Will work with good people. Many good people just don't KNOW that they can slow down
+a network.<br>
+Bad: Will **only** work with good people<br>
+How to do: Obvious - place a note, a warning, an article, a draw, a poeme or whatever you
+want<br>
+<br>
+</li><li>Use &quot;robots.txt&quot; file<br>
+Good: Easy to setup<br>
+Bad: Easy to override<br>
+How to do: Create a robots.txt file on top dir, with proper parameters<br>
+Example:<br>
+&nbsp;&nbsp;&nbsp; User-agent: *<br>
+<br>
+&nbsp;&nbsp;&nbsp; Disallow: /bigfolder<br>
+<br>
+</li><li>Ban registered offline-browsers User-agents<br>
+Good: Easy to setup<br>
+Bad: Radical, and easy to override<br>
+How to do: Filter the &quot;User-agent&quot; HTTP header field<br>
+<br>
+</li><li>Limit the bandwidth per IP (or by folders)<br>
+Good: Efficient<br>
+Bad: Multiple users behind proxies will be slow down, not really easy to setup<br>
+How to do: Depends on webserver. Might be done with low-level IP rules (QoS)<br>
+<br>
+</li><li>Priorize small files, against large files<br>
+Good: Efficient if large files are the cause of abuse<br>
+Bad: Not always efficient<br>
+How to do: Depends on the webserver<br>
+<br>
+</li><li>Ban abuser IPs<br>
+Good: Immediate solution<br>
+Bad: Annoying to do, useless for dynamic IPs, and not very user friendly<br>
+How to do: Either ban IP's on the firewall, or on the webserver (see ACLs)<br>
+<br>
+</li><li>Limit abusers IPs<br>
+Good: Intermediate and immediate solution<br>
+Bad: Annoying to do, useless for dynamic IPs, and annoying to maintain..<br>
+How to do: Use routine QoS (fair queuing), or webserver options<br>
+<br>
+</li><li>Use technical tricks (like javascript) to hide URLs<br>
+Good: Efficient<br>
+Bad: The most efficient tricks will also cause your website to he heavy, and not
+user-friendly (and therefore less attractive, even for surfing users). Remember: clients
+or visitors might want to consult offline your website. Advanced users will also be still
+able to note the URLs and catch them. Will not work on non-javascript browsers. It will
+not work if the user clicks 50 times and put downloads in background with a standard
+browser<br>
+How to do: Most offline browsers (I would say all, but let's say most) are unable to
+&quot;understand&quot; javascript/java properly. Reason: very tricky to handle!<br>
+Example: <br>
+You can replace:<br>
+
+<tt>
+&nbsp;&nbsp;&nbsp; &lt;a href=&quot;bigfile.zip&quot;&gt;Foo&lt;/a&gt;<br>
+</tt>
+
+by:<br>
+<tt>
+&nbsp;&nbsp;&nbsp; &lt;script language=&quot;javascript&quot;&gt;<br>
+&nbsp;&nbsp;&nbsp; &lt;!--<br>
+&nbsp;&nbsp;&nbsp; document.write('&lt;a h' + 're' + 'f=&quot;');<br>
+&nbsp;&nbsp;&nbsp; document.write('bigfile' + '.' + 'zip&quot;&gt;');<br>
+&nbsp;&nbsp;&nbsp; // --&gt;<br>
+&nbsp;&nbsp;&nbsp; &lt;/script&gt;<br>
+&nbsp;&nbsp;&nbsp; Foo<br>
+&nbsp;&nbsp;&nbsp; &lt;/a&gt;<br>
+</tt>
+<br>
+You can also use java-based applets. I would say that it is the &quot;best of the
+horrors&quot;. A big, fat, slow, bogus java applet. Avoid!<br>
+<br>
+</li><li>Use technical tricks to lag offline browsers<br>
+Good: Efficient<br>
+Bad: Can be avoided by advanced users, annoying to maintain, AND potentially worst that
+the illness (cgi's are often taking some CPU usage). . It will not work if the user clicks
+50 times and put downloads in background with a standard browser<br>
+How to do: Create fake empty links that point to cgi's, with long delays<br>
+Example: Use things like 
+
+<tt>
+&lt;ahref=&quot;slow.cgi?p=12786549&quot;&gt;&lt;nothing&gt;&lt;/a&gt; (example in php:)<br>
+&nbsp;&nbsp;&nbsp; &lt;?php<br>
+&nbsp;&nbsp;&nbsp; for($i=0;$i&lt;10;$i++) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sleep(6);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; echo &quot; &quot;;<br>
+&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp; ?&gt;<br>
+</tt>
+
+<br>
+</li><li>Use technical tricks to temporarily ban IPs<br>
+Good: Efficient<br>
+Bad: Radical (your site will only be available online for all users), not easy to setup<br>
+How to to: Create fake links with &quot;killing&quot; targets<br>
+Example: Use things like &lt;a href=&quot;killme.cgi&quot;&gt;&lt;nothing&gt;&lt;/a&gt;
+(again an example in php:)<br>
+<tt>
+<pre>
+&lt;?php
+	// Add IP.
+	add_temp_firewall_rule($REMOTE_ADDR,"30s");
+?&gt;
+function add_temp_firewall_rule($addr) {
+	// The chain chhttp is flushed in a cron job to avoid ipchains overflow
+    system("/usr/bin/sudo -u root /sbin/ipchains -I 1 chhttp -p tcp -s ".$addr." --dport 80 -j REJECT");
+    syslog("user rejected due to too many copy attemps : ".$addr);
+}
+
+<pre>
+
+</tt>
+<br>
+<br>
+</li>
+</ol>
+
+<a name="ABUSE2"></a>
+<li>Copyright issues<br>
+<br>
+You do not want people to &quot;steal&quot; your website, or even copy parts of it. First,
+stealing a website does not<br>
+require to have an offline browser. Second, direct (and credited) copy is sometimes better
+than disguised <br>
+plagiarism. Besides, several previous remarks are also interesting here: the more
+protected your website will be,<br>
+the potentially less attractive it will also be. There is no perfect solution, too. A
+webmaster asked me one day<br>
+to give him a solution to prevent any website copy. Not only for offline browsers, but
+also against &quot;save as&quot;, <br>
+cut and paste, print.. and print screen. I replied that is was not possible, especially
+for the print screen - and<br>
+that another potential threat was the evil photographer. Maybe with a &quot;this document
+will self-destruct in 5 seconds..&quot;<br>
+or by shooting users after consulting the document.<br>
+More seriously, once a document is being placed on a website, there will always be the
+risks of copy (or plagiarism)<br>
+<br>
+To limit the risk, previous a- and h- solutions, in &quot;bandwidth abuse&quot; section,
+can be used<br>
+<br>
+<br>
+</li>
+
+<a name="ABUSE3"></a>
+<li>Privacy<br>
+<br>
+Might be related to section 2.<br>
+But the greatest risk is maybe email grabbers. <br>
+<br>
+<ol type="a">
+<li>A solution can be to use javascript to hide emails. <br>
+Good: Efficient<br>
+Bad: Non-javascript browsers will not have the "clickable" link<br>
+How to do: Use javascript to build mailto: links<br>
+Example:<br>
+<tt>
+&nbsp;&nbsp;&nbsp; &lt;script language=&quot;javascript&quot;&gt;<br>
+&nbsp;&nbsp;&nbsp; &lt;!--<br>
+&nbsp;&nbsp;&nbsp; function FOS(host,nom,info) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; var s;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (info == &quot;&quot;) info=nom+&quot;@&quot;+host;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; s=&quot;mail&quot;;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; document.write(&quot;&lt;a href='&quot;+s+&quot;to:&quot;+nom+&quot;@&quot;+host+&quot;'&gt;&quot;+info+&quot;&lt;/a&gt;&quot;);<br>
+&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp; FOS('mycompany.com','smith?subject=Hi, John','Click here to email me!')<br>
+&nbsp;&nbsp;&nbsp; // --&gt;<br>
+&nbsp;&nbsp;&nbsp; &lt;/script&gt;<br>
+&nbsp;&nbsp;&nbsp; &lt;noscript&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;smith at mycompany dot com<br>
+&nbsp;&nbsp;&nbsp; &lt;/noscript&gt;<br>
+</tt>
+<br>
+</li><li>Another one is to create images of emails<br>
+Good: Efficient, does not require javascript<br>
+Bad: There is still the problem of the link (mailto:), images are bigger than text, and it can cause problems for blind people (a good solution is use an ALT attribute with the email written like "smith at mycompany dot com")<br>
+How to do: Not so obvious of you do not want to create images by yourself<br>
+Example: (php, Unix)<br>
+
+<tt>
+&lt;?php<br>
+/*<br>
+Email contact displayer<br>
+Usage: email.php3?id=&lt;4 bytes of user's md5&gt;<br>
+The &lt;4 bytes of user's md5&gt; can be calculated using the 2nd script (see below)<br>
+Example: http://yourhost/email.php3?id=91ff1a48<br>
+*/<br>
+$domain=&quot;mycompany.com&quot;;<br>
+$size=12;<br>
+<br>
+/* Find the user in the system database */<br>
+if (!$id)<br>
+&nbsp;&nbsp;exit;<br>
+unset($email);<br>
+unset($name);<br>
+unset($pwd);<br>
+unset($apwd);<br>
+$email=&quot;&quot;;<br>
+$name=&quot;&quot;;<br>
+$fp=@fopen(&quot;/etc/passwd&quot;,&quot;r&quot;);<br>
+if ($fp) {<br>
+&nbsp;&nbsp;$pwd=@fread($fp,filesize(&quot;/etc/passwd&quot;));<br>
+&nbsp;&nbsp;@fclose($fp);<br>
+}<br>
+$apwd=split(&quot;\n&quot;,$pwd);<br>
+foreach($apwd as $line) {<br>
+&nbsp;&nbsp;$fld=split(&quot;:&quot;,$line);<br>
+&nbsp;&nbsp;if (substr(md5($fld[0]),0,8) == $id) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$email=$fld[0].&quot;@&quot;.$domain;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$nm=substr($fld[4],0,strpos($fld[4],&quot;,&quot;));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$name=$email;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if ($nm)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name=&quot;\&quot;&quot;.$nm.&quot;\&quot; &lt;&quot;.$email.&quot;&gt;&quot;;<br>
+&nbsp;&nbsp;}<br>
+}<br>
+if (!$name)<br>
+&nbsp;&nbsp;exit;<br>
+<br>
+/* Create and show the image */<br>
+Header (&quot;Content-type: image/gif&quot;);<br>
+$im = imagecreate ($size*strlen($name), $size*1.5);<br>
+$black = ImageColorAllocate ($im, 255, 255, 255);<br>
+$white = ImageColorAllocate ($im, 0,0,0);<br>
+ImageTTFText($im, $size, 0, 0, $size , $white,
+&quot;/usr/share/enlightenment/E-docs/aircut3.ttf&quot;,$name);<br>
+ImageGif ($im);<br>
+ImageDestroy ($im);<br>
+?&gt;<br>
+<br>
+</tt>
+
+The script to find the id:<br>
+<br>
+
+<tt>
+#!/bin/sh<br>
+<br>
+# small script for email.php3<br>
+echo &quot;Enter login:&quot;<br>
+read login<br>
+echo &quot;The URL is:&quot;<br>
+printf &quot;http://yourhost/email.php3?id=&quot;<br>
+printf $login|md5sum|cut -c1-8<br>
+echo <br>
+<br>
+</tt>
+
+</li><li>You can also create temporary email aliases, each week, for all users<br>
+Good: Efficient, and you can give your real email in your reply-to address<br>
+Bad: Temporary emails<br>
+How to do: Not so hard todo<br>
+Example: (script &amp; php, Unix)<br>
+
+<tt>
+#!/bin/sh<br>
+#<br>
+# Anonymous random aliases for all users<br>
+# changed each week, to avoid spam problems<br>
+# on websites<br>
+# (to put into /etc/cron.weekly/)<br>
+<br>
+# Each alias is regenerated each week, and valid for 2 weeks<br>
+<br>
+# prefix for all users<br>
+# must not be the prefix of another alias!<br>
+USER_PREFIX=&quot;user-&quot;<br>
+<br>
+# valid for 2 weeks<br>
+ALIAS_VALID=2<br>
+<br>
+# random string<br>
+SECRET=&quot;my secret string `hostname -f`&quot;<br>
+<br>
+# build<br>
+grep -vE &quot;^$USER_PREFIX&quot; /etc/aliases &gt; /etc/aliases.new<br>
+for i in `cut -f1 -d':' /etc/passwd`; do<br>
+&nbsp;&nbsp;if test `id -u $i` -ge 500; then<br>
+&nbsp;&nbsp;&nbsp;&nbsp;off=0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;while test &quot;$off&quot; -lt $ALIAS_VALID; do<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;THISWEEK=&quot;`date +'%Y'` $[`date +'%U'`-$off]&quot;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SECRET=&quot;`echo \&quot;$SECRET $i $THISWEEK\&quot; | md5sum | cut -c1-4`&quot;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FIRST=`echo $i | cut -c1-3`<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAME=&quot;$USER_PREFIX$FIRST$SECRET&quot;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;$NAME : $i&quot; &gt;&gt; /etc/aliases.new<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;off=$[$off+1]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;done<br>
+&nbsp;&nbsp;fi<br>
+done<br>
+<br>
+# move file<br>
+mv -f /etc/aliases /etc/aliases.old<br>
+mv -f /etc/aliases.new /etc/aliases<br>
+<br>
+# update aliases<br>
+newaliases<br>
+<br>
+</tt>
+
+And then, put the email address in your pages through:
+<br>
+<br>
+
+<tt>
+&lt;a href="mailto:&lt;?php<br>
+&nbsp;&nbsp;&nbsp; $user="smith";<br>
+&nbsp;&nbsp;&nbsp; $alias=exec("grep ".$user." /etc/aliases | cut -f1 -d' ' | head -n1");<br>
+&nbsp;&nbsp;&nbsp; print $alias;<br>
+?&gt;@mycompany.com&gt;>
+</tt>
+
+</li>
+</ol>
+
+</li>
+
+
+<!-- ------------------------------------------------------------ -->
+
+
+
+</table>
+
+<br>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+
+

@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Eesti
+LANGUAGE_FILE
+Eesti
+LANGUAGE_ISO
+et
+LANGUAGE_AUTHOR
+Tõnu Virma\r\n
+LANGUAGE_CHARSET
+ISO-8859-4
+LANGUAGE_WINDOWSID
+Estonian
+OK
+OK
+Cancel
+Loobu
+Exit
+Välju
+Close
+Sulge
+Cancel changes
+Loobu muudatuste tegemisest
+Click to confirm
+Kliki kinnitamiseks
+Click to get help!
+Kliki abi saamiseks!
+Click to return to previous screen
+Tagasi eelmisele ekraanile
+Click to go to next screen
+Edasi järgmisele ekraanile
+Hide password
+Peida parool
+Save project
+Salvesta projekt
+Close current project?
+Kas sulgeda käesolev projekt?
+Delete this project?
+Kas kustutada see projekt?
+Delete empty project %s?
+Kas kustutada tühi projekt %s?
+Action not yet implemented
+Tegevus ei ole veel lõpetatud
+Error deleting this project
+Viga selle projekti kustutamisel
+Select a rule for the filter
+Vali filtreerimisreegel
+Enter keywords for the filter
+Sisesta märksõnad filtri jaoks
+Cancel
+Loobu
+Add this rule
+Lisa see reegel
+Please enter one or several keyword(s) for the rule
+Sisesta palun üks või mitu märksõna reegli jaoks
+Add Scan Rule
+Lisa filtreerimisreegel
+Criterion
+Kriteerium:
+String
+Märksõna:
+Add
+Lisa
+Scan Rules
+Filtrid
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Kasuta asendajaid URL-ide või linkide välja- või kaasaarvamiseks.\nÜhele reale võib panna mitu skaneerimisstringi.\nEraldajana kasuta tühikuid.\n\nNäiteks: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Välja arvata lingid
+Include link(s)
+Kaasa arvata lingid
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Vihje: Et saada KÕIK GIF-failid kaasa arvatud, kasuta midagi taolist +www.someweb.com/*.gif. \n(+*.gif / -*.gif arvab kaasa/välja KÕIK GIF-id KÕIKIDEST saitidest)
+Save prefs
+Salvesta häälestus
+Matching links will be excluded:
+Vastavad lingid tuleb välja arvata:
+Matching links will be included:
+Vastavad lingid tuleb kaasa arvata:
+Example:
+Näidis:
+gif\r\nWill match all GIF files
+gif\r\nleiab kõik GIF-failid
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\nleiab kõik failid, mis sisaldavad alamstringi 'blue', nagu 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\nleiab faili 'bigfile.mov', aga mitte 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\nleiab lingid, mille kaustanimes sisaldub 'cgi' nagu /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\nleiab lingid, mille kaustanimeks on terve 'cgi-bin' string (aga mitte cgi-bin-2, näiteks)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nleiab seda alamstringi sisaldavad lingid, nagu www.someweb.com, private.someweb.com jne.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nleiab seda alamstringi sisaldavad lingid, nagu www.someweb.com, www.someweb.edu, private.someweb.otherweb.com jne.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nleiab lingid, mis vastavad alamstringile 'www.someweb.com' (aga mitte linke, nagu private.someweb.com/..)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nleiab kõik seda alamstringi sisaldavad lingid, nagu www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html jne.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nleiab ainult faili 'www.test.com/test/someweb.html'. Sisestada tuleb täielik asukoht (URL + faili asukoht)
+All links will match
+Kõik lingid leitakse
+Add exclusion filter
+Lisa väljaarvamisfilter
+Add inclusion filter
+Lisa kaasaarvamisfilter
+Existing filters
+Olemasolevad filtrid
+Cancel changes
+Loobu muudatustest
+Save current preferences as default values
+Salvesta praegune häälestus vaikeväärtusena
+Click to confirm
+Kliki kinnituseks
+No log files in %s!
+%s ei ole ühtegi logifaili!
+No 'index.html' file in %s!
+%s ei ole faili 'index.html'!
+Click to quit WinHTTrack Website Copier
+Kliki WinHTTrack Website Copier'i sulgemiseks
+View log files
+Vaata logifaile
+Browse HTML start page
+Vaata HTML alguslehekülge
+End of mirror
+Veebikopeerimine lõpetatud
+View log files
+Vaata logifaile
+Browse Mirrored Website
+Sirvi kopeeritud veebisaiti
+New project...
+Uus projekt...
+View error and warning reports
+Vaata vea- ja hoiatusteraportit
+View report
+Vaata raportit
+Close the log file window
+Sulge logifaili aken
+Info type:
+Informatsiooni tüüp:
+Errors
+Vead
+Infos
+Info
+Find
+Otsi
+Find a word
+Otsi sõna
+Info log file
+Info logifail
+Warning/Errors log file
+Hoiatuste ja vigade logifail
+Unable to initialize the OLE system
+OLE süsteemi ei saa käivitada
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack ei leidnud määratud kaustast ühtegi katkestatud tirimise cache-faili!
+Could not connect to provider
+Ei saa luua ühendust
+receive
+vastuvõtt
+request
+päring
+connect
+ühendus
+search
+otsimine
+ready
+valmis
+error
+viga
+Receiving files..
+Failide vastuvõtmine...
+Parsing HTML file..
+HTML faili analüüsimine...
+Purging files..
+Failide hävitamine...
+Loading cache in progress..
+Cache'i laadimine..
+Parsing HTML file (testing links)..
+HTML faili analüüsimine (linkide testimine)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Paus - Jätkamiseks vali [Saidikopeerimine]/[Peata ülekanne]
+Finishing pending transfers - Select [Cancel] to stop now!
+Pooleliolevate ülekannete lõpetamine - Kliki [Cancel], et lõpetada kohe!
+scanning
+skaneerimine
+Waiting for scheduled time..
+Etteantud aja ootamine...
+Connecting to provider
+Ühendusevõtmine
+[%d seconds] to go before start of operation
+[%d sekundit] jäänud operatsiooni alguseni
+Site mirroring in progress [%s, %s bytes]
+Saidi kopeerimine [%s, %s baiti]
+Site mirroring finished!
+Saidikopeerimine on lõpetatud!
+A problem occured during the mirroring operation\n
+Saidikopeerimise käigus tekkis probleem\n
+\nDuring:\n
+\nOperatsioonil:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+\nVaata logifaili kui tarvis.\n\nKliki FINISH, et sulgeda WinHTTrack Website Copier.\n\nTänan WinHTTrack'i kasutamise eest!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Kopeerimisoperatsioon on lõpetatud.\nKliki Välju, et sulgeda WinHTTrack.\nVaata logifaili veendumaks, et kõik on korras.\n\nTänan WinHTTrack'i kasutamise eest!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * KOPEERIMINE KATKESTATUD! * *\r\nPraegune ajutine cache on vajalik igasuguse uuendamise jaoks ja sisaldab ainult käesoleva katkestatud seansi jooksul tiritud andmeid.\r\nEelmine cache võib sisaldada põhjalikumat informatsiooni; kui sa ei taha seda informatsiooni kaotada, tuleb see taastada ja kustutada praegune cache.\r\n[Märkus: Seda on siin lihtne teha, kustutades hts-cache/new.* failid]\r\n\r\nKas arvad, et eelmine cache võib sisaldada põhjalikumat informatsiooni, ja kas tahad seda taastada?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * KOPEERIMISE VIGA! * *\r\nHTTrack leidis, et praegune veebikoopia on tühi. Kui see on uuendus, taastatakse eelmine koopia.\r\nPõhjus: esimest lehekülge ei leitud, või on ühenduse probleemid.\r\n=> Veendu, et veebisait ikka alles on, ja/või kontrolli proxy seadistust! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\n\nVihje: Hoiatuste ja veateadete nägemiseks kliki [Vaata logifaili]
+Error deleting a hts-cache/new.* file, please do it manually
+Viga hts-cache/new.* faili kustutamisel, palun tee seda käsitsi
+Do you really want to quit WinHTTrack Website Copier?
+Kas sa tõesti tahad lõpetada WinHTTrack Website Copier'i kasutamise?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- Kopeerimine -\n\nSisesta aadress(id) URL-i kasti
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Interaktiivne nõustaja (küsimused) -\n\nSisesta aadress(id) URL-i kasti
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Failide tirimine -\n\nSisesta faili(de) aadress(id) URL-i kasti
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Linkide testimine -\n\nSisesta testitavaid linke sisaldava(te) leh(ted)e aadress(id) URL-i kasti
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Uuendamine -\n\nKontrolli aadressi URL-i kastis ja parameetreid kui tarvis, seejärel kliki nuppu 'NEXT'
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Jätkamine (katkestamise järel) -\n\nKontrolli aadressi URL-i kastis ja parameetreid kui tarvis, seejärel kliki nuppu 'NEXT'
+Log files Path
+Logifailide asukoht
+Path
+Asukoht
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+- Linkide listi järgi kopeerimine -\n\nSisesta URL-i kasti kopeeritavaid linke sisaldava(te) leh(ted)e aadress(id)
+New project / Import?
+Uus projekt / importida?
+Choose criterion
+Vali tegevus
+Maximum link scanning depth
+Linkide maksimaalne skaneerimissügavus
+Enter address(es) here
+Sisesta aadress(id) siia
+Define additional filtering rules
+Defineeri täiendavad filtreerimisreeglid
+Proxy Name (if needed)
+Proxy nimi (kui tarvis)
+Proxy Port
+Proxy port
+Define proxy settings
+Defineeri proxy seaded
+Use standard HTTP proxy as FTP proxy
+Kasuta standardset HTTP proxyt FTP proxyna
+Path
+Asukoht
+Select Path
+Vali asukoht
+Path
+Asukoht
+Select Path
+Vali asukoht
+Quit WinHTTrack Website Copier
+Lõpeta WinHTTrack Website Copier'i kasutamine
+About WinHTTrack
+Info WinHTTrack'i kohta
+Save current preferences as default values
+Salvesta praegune häälestus vaikeväärtusena
+Click to continue
+Kliki jätkamiseks
+Click to define options
+Kliki seadete defineerimiseks
+Click to add a URL
+Kliki URL-i lisamiseks
+Load URL(s) from text file
+Laadi URL(-id) tekstifailist
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack'i häälestus (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Addressinimekirja tekstifail (*.txt)|*.txt||
+File not found!
+Faili ei leia!
+Do you really want to change the project name/path?
+Kas sa tõesti tahad muuta projekti nime/asukohta?
+Load user-default options?
+Kas laadida kasutaja vaikimisi seaded?
+Save user-default options?
+Kas salvestada kasutaja vaikimisi seaded?
+Reset all default options?
+Kas taastada kõik vaikimisi seaded?
+Welcome to WinHTTrack!
+Tere tulemast WinHTTrack'i!
+Action:
+Tegevus:
+Max Depth
+Maksimaalne sügavus:
+Maximum external depth:
+Maksimaalne väline sügavus:
+Filters (refuse/accept links) :
+Filtrid (linkide välja-/kaasaarvamiseks):
+Paths
+Asukohad
+Save prefs
+Salvesta seaded
+Define..
+Defineeri...
+Set options..
+Defineeri seaded...
+Preferences and mirror options:
+Kopeerimise häälestus:
+Project name
+Projekti nimi
+Add a URL...
+Lisa URL...
+Web Addresses: (URL)
+Veebiaadressid: (URL)
+Stop WinHTTrack?
+Kas peatada WinHTTrack?
+No log files in %s!
+%s ei ole ühtegi logifaili!
+Pause Download?
+Kas peatada tirimine?
+Stop the mirroring operation
+Peata kopeerimine
+Minimize to System Tray
+Minimeeri süsteemialasse
+Click to skip a link or stop parsing
+Kliki lingi vahelejätmiseks või kopeerimise peatamiseks
+Click to skip a link
+Kliki lingi vahelejätmiseks
+Bytes saved
+Salvestatud baite:
+Links scanned
+Skaneeritud linke:
+Time:
+Aeg:
+Connections:
+Ühendusi:
+Running:
+Käimas on:
+Hide
+Peida
+Transfer rate
+Ülekandekiirus:
+SKIP
+Jäta vahele
+Information
+Informatsioon
+Files written:
+Faile kirjutatud:
+Files updated:
+Faile uuendatud:
+Errors:
+Vigu:
+In progress:
+Tegevus:
+Follow external links
+Järgi välislinke
+Test all links in pages
+Testi kõik lingid lehekülgedel
+Try to ferret out all links
+Püüa välja nuhkida kõik lingid
+Download HTML files first (faster)
+Tiri HTML-failid kõigepealt (kiirem)
+Choose local site structure
+Vali kohaliku saidi struktuur
+Set user-defined structure on disk
+Defineeri oma saidistruktuur kettal
+Use a cache for updates and retries
+Kasuta cache'i uuenduste ja korduste tarvis
+Do not update zero size or user-erased files
+Ära uuenda nullsuurusega või kasutaja poolt kustutatud faile
+Create a Start Page
+Tee alguslehekülg
+Create a word database of all html pages
+Loo kõigi HTML-lehekülgede sõnade andmebaas
+Create error logging and report files
+Tee vealogi ja raporti failid
+Generate DOS 8-3 filenames ONLY
+Genereeri AINULT DOS-i 8-3 failinimed
+Generate ISO9660 filenames ONLY for CDROM medias
+Genereeri AINULT ISO9660 failinimed CDROM-i jaoks
+Do not create HTML error pages
+Ära genereeri HTML vealehekülgi
+Select file types to be saved to disk
+Vali kettale salvestatavad failitüübid
+Select parsing direction
+Vali linkide järgimise suund
+Select global parsing direction
+Vali globaalne linkide järgimise suund
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Määra URL-ide ümberkirjutamise reeglid siselinkidele (mida tiritakse) ja välislinkidele (mida ei tirita)
+Max simultaneous connections
+Maksimaalselt ühendusi üheaegselt
+File timeout
+Maksimaalne faili ooteaeg
+Cancel all links from host if timeout occurs
+Tühista kõik selle hosti lingid, kui ooteaeg läbi saab
+Minimum admissible transfer rate
+Minimaalne lubatav ülekandekiirus
+Cancel all links from host if too slow
+Tühista kõik selle hosti lingid, kui on liiga aeglane
+Maximum number of retries on non-fatal errors
+Maksimaalne korduste arv mittefataalse vea korral
+Maximum size for any single HTML file
+Ühe HTML-faili maksimaalne suurus
+Maximum size for any single non-HTML file
+Ühe mitte-HTML faili maksimaalne suurus
+Maximum amount of bytes to retrieve from the Web
+Maksimaalne veebist välja otsitav baitide kogus
+Make a pause after downloading this amount of bytes
+Tee paus pärast selle baidikoguse tirimist
+Maximum duration time for the mirroring operation
+Kopeerimisoperatsiooni maksimaalne kestus
+Maximum transfer rate
+Maksimaalne ülekandekiirus
+Maximum connections/seconds (avoid server overload)
+Maksimum ühendusi sekundis (vältimaks serveri ülekoormust)
+Maximum number of links that can be tested (not saved!)
+Maksimaalne testitavate (mitte salvestatavate!) linkide hulk
+Browser identity
+Brauseri identiteet
+Comment to be placed in each HTML file
+Kommentaar, mis lisatakse igale HTML-failile
+Back to starting page
+Tagasi alguslehele
+Save current preferences as default values
+Salvesta praegune häälestus vaikeväärtusena
+Click to continue
+Kliki jätkamiseks
+Click to cancel changes
+Kliki muudatustest loobumiseks
+Follow local robots rules on sites
+Järgi saitide kohalikke robotireegleid
+Links to non-localised external pages will produce error pages
+Lingid kopeerimata välislehekülgedele tekitavad vealehekülgi
+Do not erase obsolete files after update
+Ära kustuta vananenud faile peale uuendamist
+Accept cookies?
+Kas aktsepteerida küpsiseid?
+Check document type when unknown?
+Kas kontrollida dokumendi tüüpi, kui on tundmatu?
+Parse java applets to retrieve included files that must be downloaded?
+Kas analüüsida java aplette vajalike lisafailide väljaotsimiseks?
+Store all files in cache instead of HTML only
+Säilitada kõik failid cache'is, mitte ainult HTML-i kujul
+Log file type (if generated)
+Logifaili tüüp (kui on genereeritud)
+Maximum mirroring depth from root address
+Maksimaalne kopeerimissügavus algusaadressi suhtes
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Väliste/keelatud aadresside maksimaalne kopeerimissügavus (vaikimisi 0, s.t. üldse mitte)
+Create a debugging file
+Tee veakontrollifail
+Use non-standard requests to get round some server bugs
+Kasuta mittestandardset päringut mõnest serveri veast möödapääsemiseks
+Use old HTTP/1.0 requests (limits engine power!)
+Kasuta vana HTTP/1.0 päringut (piirab mootori võimalusi!)
+Attempt to limit retransfers through several tricks (file size test..)
+Püüa piirata korduvaid ülekandeid mitmesuguste trikkidega (failisuuruse test..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+
+Write external links without login/password
+Kirjuta välislingid ilma sisselogimise/paroolita
+Write internal links without query string
+Kirjuta siselingid ilma päringustringita
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Tiri mitte-HTML failid, nt välised ZIP-failid või pildid
+Test all links (even forbidden ones)
+Testi kõik lingid (ka keelatud)
+Try to catch all URLs (even in unknown tags/code)
+Püüa kätte saada kõik URL-id (ka tundmatud sildid/koodid)
+Get HTML files first!
+Tiri HTML-failid kõigepealt!
+Structure type (how links are saved)
+Struktuuritüüp (kuidas lingid salvestatakse)
+Use a cache for updates
+Kasuta cache'i uuenduste jaoks
+Do not re-download locally erased files
+Ära tiri uuesti kohalikke kustutatud faile
+Make an index
+Tee indeks
+Make a word database
+Tee sõnade andmebaas
+Log files
+Logifailid
+DOS names (8+3)
+DOS-i nimed (8+3)
+ISO9660 names (CDROM)
+ISO9660 nimed (CDROM)
+No error pages
+Ilma vealehekülgedeta
+Primary Scan Rule
+Peamine filter
+Travel mode
+Liikumisviis
+Global travel mode
+Globaalne liikumisviis
+These options should be modified only exceptionally
+Neid seadeid muuda ainult erandkorras
+Activate Debugging Mode (winhttrack.log)
+Aktiveeri veakontrolliolek (winhttrack.log)
+Rewrite links: internal / external
+Linkide muutmine: siselingid / välislingid
+Flow control
+Vookontroll
+Limits
+Piirangud
+Identity
+Identiteet
+HTML footer
+HTML-i jalus
+N# connections
+Ühenduste arv
+Abandon host if error
+Hülga host vea korral
+Minimum transfer rate (B/s)
+Minimaalne ülekandekiirus
+Abandon host if too slow
+Hülga host, kui on liiga aeglane
+Configure
+Konfigureeri
+Use proxy for ftp transfers
+Kasuta FTP ülekannete jaoks proxyt
+TimeOut(s)
+Ooteaeg
+Persistent connections (Keep-Alive)
+Püsivad ühendused
+Reduce connection time and type lookup time using persistent connections
+Vähenda ühenduse aega ja tüübiotsingu aega, kasutades püsivaid ühendusi
+Retries
+Kordusi
+Size limit
+Suuruse piirang
+Max size of any HTML file (B)
+HTML-faili maksimaalne suurus
+Max size of any non-HTML file
+Mitte-HTML faili maksimaalne suurus
+Max site size
+Saidi maksimaalne suurus
+Max time
+Maksimaalne aeg
+Save prefs
+Salvesta häälestus
+Max transfer rate
+Maksimaalne ülekandekiirus
+Follow robots.txt
+Järgi robots.txt reegleid
+No external pages
+Ilma välislehekülgedeta
+Do not purge old files
+Ära hävita vanu faile
+Accept cookies
+Aktsepteeri küpsiseid
+Check document type
+Kontrolli dokumenditüüpe
+Parse java files
+Analüüsi Java faile
+Store ALL files in cache
+Säilita KÕIK failid cache'is
+Tolerant requests (for servers)
+Tolerantsed päringud (serverite jaoks)
+Update hack (limit re-transfers)
+Update hack (piirab korduvaid ülekandeid)
+URL hacks (join similar URLs)
+
+Force old HTTP/1.0 requests (no 1.1)
+Kasuta vana HTTP/1.0 päringut (mitte 1.1)
+Max connections / seconds
+Maksimaalselt ühendusi sekundis
+Maximum number of links
+Maksimaalne linkide arv
+Pause after downloading..
+Paus peale ... tirimist
+Hide passwords
+Peida paroolid
+Hide query strings
+Peida päringustringid
+Links
+Lingid
+Build
+Struktuur
+Experts Only
+Ekspertidele
+Flow Control
+Vookontroll
+Limits
+Piirangud
+Browser ID
+Brauser
+Scan Rules
+Filtrid
+Spider
+Spider
+Log, Index, Cache
+Logi, indeks, cache
+Proxy
+Proxy
+MIME Types
+
+Do you really want to quit WinHTTrack Website Copier?
+Kas sa tõesti tahad lõpetada WinHTTrack Website Copier'i kasutamise?
+Do not connect to a provider (already connected)
+Ära ühenda ühendusepakkujaga (juba ühendatud)
+Do not use remote access connection
+Ära kasuta kaugjuurdepääsuga ühendust
+Schedule the mirroring operation
+Programmeeri kopeerimisoperatsioon
+Quit WinHTTrack Website Copier
+Lõpeta WinHTTrack Website Copier'i kasutamine
+Back to starting page
+Tagasi algusleheküljele
+Click to start!
+Kliki käivitamiseks!
+No saved password for this connection!
+Selle ühenduse jaoks pole salvestatud parooli!
+Can not get remote connection settings
+Kaugühenduse seadeid ei saa kätte
+Select a connection provider
+Vali ühendusepakkuja
+Start
+Start
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Palun täpsusta ühenduse parameetreid, kui tarvis,\nsiis vajuta FINISH kopeerimisoperatsiooni käivitamiseks.
+Save settings only, do not launch download now.
+Salvesta seaded ainult. Ära alusta tirimist praegu.
+On hold
+Ootel
+Transfer scheduled for: (hh/mm/ss)
+Ülekanne on programmeeritud: (hh/mm/ss)
+Start
+Start
+Connect to provider (RAS)
+Ühenda ühendusepakkujaga (RAS)
+Connect to this provider
+Ühenda selle ühendusepakkujaga
+Disconnect when finished
+Lahuta ühendus, kui on lõpetatud
+Disconnect modem on completion
+Lahuta modem lõpetamisel
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Palun teata meile igast veast või probleemist)\r\n\r\nArendajad:\r\nKasutajaliides (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nEestikeelne tõlge: Tõnu Virma
+About WinHTTrack Website Copier
+Info WinHTTrack Website Copier'i kohta
+Please visit our Web page
+Külasta palun meie veebilehekülge!
+Wizard query
+Nõustaja päring
+Your answer:
+Sinu vastus:
+Link detected..
+Leitud link...
+Choose a rule
+Vali reegel
+Ignore this link
+Ignoreeri seda linki
+Ignore directory
+Ignoreeri kausta
+Ignore domain
+Ignoreeri domeeni
+Catch this page only
+Võta ainult see lehekülg
+Mirror site
+Saidi kopeerimine
+Mirror domain
+Domeeni kopeerimine
+Ignore all
+Ignoreeri kõiki
+Wizard query
+Nõustaja päring
+NO
+EI
+File
+Fail
+Options
+Seaded
+Log
+Logi
+Window
+Aken
+Help
+Abi
+Pause transfer
+Peata ülekanne
+Exit
+Välju
+Modify options
+Muuda seadeid
+View log
+Vaata logi
+View error log
+Vaata vealogi
+View file transfers
+Vaata failiülekandeid
+Hide
+Peida
+About WinHTTrack Website Copier
+&WinHTTrack Website Copier'i info
+Check program updates...
+Leia &uuemat versiooni...
+&Toolbar
+&Nupuriba
+&Status Bar
+&Staatuseriba
+S&plit
+&Jaota
+File
+&Fail
+Preferences
+&Häälestus
+Mirror
+&Saidikopeerimine
+Log
+&Logi
+Window
+A&ken
+Help
+Abi
+Exit
+Välju
+Load default options
+Laadi vaikimisi seaded
+Save default options
+Salvesta vaikimisi seaded
+Reset to default options
+Taasta vaikimisi seaded
+Load options...
+Laadi seaded...
+Save options as...
+Salvesta seaded faili...
+Language preference...
+Keele valik...
+Contents...
+Indeks
+About WinHTTrack...
+Info WinHTTrack'i kohta...
+New project\tCtrl+N
+&Uus projekt\tCtrl+N
+&Open...\tCtrl+O
+&Ava...\tCtrl+O
+&Save\tCtrl+S
+&Salvesta\tCtrl+S
+Save &As...
+Salvesta &failina...
+&Delete...
+&Kustuta...
+&Browse sites...
+Si&rvi saite...
+User-defined structure
+Kasutaja-defineeritud struktuur
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\tFaili nimi ilma laiendita (nt: image)\r\n%N\tFaili nimi koos laiendiga (nt: image.gif)\r\n%t\tFaili laiend ainult (nt: gif)\r\n%p\tAsukoht [ilma /-ta lõpus] (nt: /someimages)\r\n%h\tHosti nimi (nt: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tDOS-i lühinimi (nt: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Näidis:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Proxy seaded
+Proxy address:
+Proxy aadress:
+Proxy port:
+Proxy port:
+Authentication (only if needed)
+Identifitseerimine (vajaduse korral)
+Login
+Kasutajanimi
+Password
+Parool
+Enter proxy address here
+Sisesta proxy aadress siia
+Enter proxy port here
+Sisesta proxy port siia
+Enter proxy login
+Sisesta proxy kasutajanimi
+Enter proxy password
+Sisesta proxy parool
+Enter project name here
+Sisesta siia projekti nimi
+Enter saving path here
+Sisesta siia asukoht projekti salvestamiseks
+Select existing project to update
+Vali olemasolev projekt uuendamiseks
+Click here to select path
+Kliki siin asukoha valimiseks
+Select or create a new category name, to sort your mirrors in categories
+
+HTTrack Project Wizard...
+HTTrack'i projektinõustaja
+New project name:
+Uue projekti nimi:
+Existing project name:
+Olemasoleva projekti nimi:
+Project name:
+Projekti nimi:
+Base path:
+Baas-asukoht:
+Project category:
+
+C:\\My Web Sites
+C:\\Minu veebisaidid
+Type a new project name, \r\nor select existing project to update/resume
+Sisesta uue projekti nimi, \r\nvõi vali olemasolev projekt uuendamiseks/jätkamiseks
+New project
+Uus projekt
+Insert URL
+Sisesta URL
+URL:
+URL:
+Authentication (only if needed)
+Identifitseerimine (vajaduse korral)
+Login
+Kasutajanimi
+Password
+Parool
+Forms or complex links:
+Vormid või keerulised lingid:
+Capture URL...
+Püüa URL...
+Enter URL address(es) here
+Sisesta URL aadress(id) siia
+Enter site login
+Sisesta saidi kasutajanimi
+Enter site password
+Sisesta saidi parool
+Use this capture tool for links that can only be accessed through forms or javascript code
+Kasuta seda püüdevahendit linkide korral, millele pääseb ligi ainult vormide või javascripti koodide kaudu
+Choose language according to preference
+Vali kasutuskeel
+Catch URL!
+Püüa URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Palun sea oma brauseri proxy häälestus ajutiselt järgmistele väärtustele (kopeeri/kleebi proxy aadress ja port).\nSiis kliki vormi SUBMIT-nuppu brauseri leheküljel, või kliki spetsiifilist linki, mida tahad püüda.
+This will send the desired link from your browser to WinHTTrack.
+See saadab soovitud lingi sinu brauserist WinHTTrack'ile.
+ABORT
+LOOBU
+Copy/Paste the temporary proxy parameters here
+Kopeeri/kleebi ajutised proxy parameetrid siit
+Cancel
+Loobu
+Unable to find Help files!
+Abiinfo faile ei leia!
+Unable to save parameters!
+Parameetreid ei saa salvestada!
+Please drag only one folder at a time
+Palun lohista ainult üks kaust korraga
+Please drag only folders, not files
+Palun lohista ainult kaustu, mitte faile
+Please drag folders only
+Palun lohista ainult kaustu
+Select user-defined structure?
+Kas valida kasutaja-defineeritud struktuur?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Palun veendu, et kasutaja defineeritud stringid on ikka korrektsed,\nvastasel juhul tulevad failinimed vigased!
+Do you really want to use a user-defined structure?
+Kas sa tõesti tahad valida kasutaja-defineeritud struktuuri?
+Too manu URLs, cannot handle so many links!!
+Liiga palju URL-e. Nii palju linke ei suuda käsitleda!!
+Not enough memory, fatal internal error..
+Mälu ei ole piisavalt, fataalne sisemine viga...
+Unknown operation!
+Tundmatu operatsioon!
+Add this URL?\r\n
+Kas lisada see URL?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Hoiatus: põhiprotsess ei reageeri ikka veel, ei saa lisada URL-e...
+Type/MIME associations
+Tüüp/MIME seosed
+File types:
+Failitüübid:
+MIME identity:
+MIME identiteet:
+Select or modify your file type(s) here
+Vali või muuda oma failitüüpe siin
+Select or modify your MIME type(s) here
+Vali või muuda oma MIME-tüüpe siin
+Go up
+Mine üles
+Go down
+Mine alla
+File download information
+Failitirimise informatsioon
+Freeze Window
+Fikseeri aken
+More information:
+Täiendav informatsioon:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Tere tulemast WinHTTrack Website Copier'i!\n\nPalun kliki NEXT-nuppu, et\n\n- alustada uut projekti või\n- jätkata pooleliolevat tirimist
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Failinimed laiendiga:\nFailinimed, mis sisaldavad:\nSee failinimi:\nKaustanimed, mis sisaldavad:\nSee kaustanimi:\nLingid selles domeenis:\nLingid domeenides, mis sisaldavad:\nLingid sellest hostist:\nLingid, mis sisaldavad:\nSee link:\nKÕIK LINGID
+Show all\nHide debug\nHide infos\nHide debug and infos
+Näita kõik\nPeida veakontroll\nPeida info\nPeida veakontroll ja info
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Saidi struktuur (vaikimisi)\nHtml -> web/,          pildid/teised failid -> web/images/\nHtml -> web/html/,  pildid/teised -> web/images/\nHtml -> web/,          pildid/teised -> web/\nHtml -> web/,          pildid/teised -> web/xxx/  (kus xxx on faili laiend)\nHtml -> web/html/,  pildid/teised -> web/xxx/\nSaidi struktuur, ilma www.domain.xxx/\nHtml -> saidi_nimi/,          pildid/teised failid -> saidi_nimi/images/\nHtml -> saidi_nimi/html/,  pildid/teised -> saidi_nimi/images/\nHtml -> saidi_nimi/,          pildid/teised -> saidi_nimi/\nHtml -> saidi_nimi/,          pildid/teised -> saidi_nimi/xxx/\nHtml -> saidi_nimi/html/,  pildid/teised -> saidi_nimi/xxx/\nKõik failid -> web/  (juhuslike nimedega)\nKõik failid -> saidi_nimi/  (juhuslike nimedega)\nKasutaja defineeritud struktuur...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Skaneeri ainult\nSalvesta HTML-failid\nSalvesta mitte-HTML failid\nSalvesta kõik failid (vaikimisi)\nSalvesta HTML-failid kõigepealt
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Jää samasse kausta\nVõib minna alla (vaikimisi)\nVõib minna üles\nVõib minna nii üles kui alla
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Jää samale aadressile (vaikimisi)\nJää samasse domeeni\nJää samasse üladomeeni\n Mine igale poole veebis
+Never\nIf unknown (except /)\nIf unknown
+Mitte kunagi\nKui on tundmatu (v.a. /)\nKui on tundmatu
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+ilma robots.txt reegliteta\nrobots.txt v.a. nõustaja\njärgi robots.txt reegleid
+normal\nextended\ndebug
+normaalne\nlaiendatud\nveakontrolliga
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Tiri veebisaidid\nTiri veebisaidid + küsimused\nTiri eraldi failid\nTiri kõik saidid lehtedel (hulgikopeerimine)\nTesti lingid lehtedel (järjehoidjate test)\n* Jätka katkestatud tirimist\n* Uuenda olemasolevat
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Suhteline URI / Absoluutne URL (vaikimisi)\nAbsoluutne URL / Absoluutne URL\nAbsoluutne URI / Absoluutne URL\nAlgne URL / Algne URL
+Open Source offline browser
+
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+
+httrack, winhttrack, webhttrack, offline browser
+
+URL list (.txt)
+
+Previous
+
+Next
+
+URLs
+
+Warning
+
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+
+Thank you
+
+You can now close this window
+
+Server terminated
+
+A fatal error has occured during this mirror
+
