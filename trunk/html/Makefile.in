@@ -104,13 +104,12 @@ am__installdirs = "$(DESTDIR)$(HelpHtmldir)" \
 	"$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" \
 	"$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" \
 	"$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" \
-	"$(DESTDIR)$(WebHtmlsfxdir)" "$(DESTDIR)$(WebIcon16x16dir)" \
-	"$(DESTDIR)$(WebIcon32x32dir)" "$(DESTDIR)$(WebIcon48x48dir)" \
-	"$(DESTDIR)$(WebPixmapdir)"
+	"$(DESTDIR)$(WebIcon16x16dir)" "$(DESTDIR)$(WebIcon32x32dir)" \
+	"$(DESTDIR)$(WebIcon48x48dir)" "$(DESTDIR)$(WebPixmapdir)"
 DATA = $(HelpHtml_DATA) $(HelpHtmlTxt_DATA) $(HelpHtmldiv_DATA) \
 	$(HelpHtmlimages_DATA) $(HelpHtmlimg_DATA) \
 	$(HelpHtmlroot_DATA) $(VFolderEntry_DATA) $(WebHtml_DATA) \
-	$(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) $(WebIcon16x16_DATA) \
+	$(WebHtmlimages_DATA) $(WebIcon16x16_DATA) \
 	$(WebIcon32x32_DATA) $(WebIcon48x48_DATA) $(WebPixmap_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
@@ -253,7 +252,6 @@ HelpHtmlimagesdir = $(HelpHtmldir)/images
 HelpHtmlTxtdir = $(HelpHtmldir)
 WebHtmldir = $(HelpHtmldir)/server
 WebHtmlimagesdir = $(HelpHtmldir)/server/images
-WebHtmlsfxdir = $(HelpHtmldir)/server/sfx
 WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
@@ -267,7 +265,6 @@ HelpHtmlimages_DATA = images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = server/*.html server/*.js server/*.css
 WebHtmlimages_DATA = server/images/*
-WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
@@ -277,7 +274,7 @@ WebIcon32x32_DATA = server/div/32x32/*.png
 WebIcon48x48_DATA = server/div/48x48/*.png
 VFolderEntry_DATA = server/div/*.desktop
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
-	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
+	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
 	$(VFolderEntry_DATA) \
 	httrack.css
@@ -510,27 +507,6 @@ uninstall-WebHtmlimagesDATA:
 	@list='$(WebHtmlimages_DATA)'; test -n "$(WebHtmlimagesdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	dir='$(DESTDIR)$(WebHtmlimagesdir)'; $(am__uninstall_files_from_dir)
-install-WebHtmlsfxDATA: $(WebHtmlsfx_DATA)
-	@$(NORMAL_INSTALL)
-	@list='$(WebHtmlsfx_DATA)'; test -n "$(WebHtmlsfxdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(WebHtmlsfxdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(WebHtmlsfxdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(WebHtmlsfxdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(WebHtmlsfxdir)" || exit $$?; \
-	done
-
-uninstall-WebHtmlsfxDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(WebHtmlsfx_DATA)'; test -n "$(WebHtmlsfxdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(WebHtmlsfxdir)'; $(am__uninstall_files_from_dir)
 install-WebIcon16x16DATA: $(WebIcon16x16_DATA)
 	@$(NORMAL_INSTALL)
 	@list='$(WebIcon16x16_DATA)'; test -n "$(WebIcon16x16dir)" || list=; \
@@ -656,7 +632,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(HelpHtmldir)" "$(DESTDIR)$(HelpHtmlTxtdir)" "$(DESTDIR)$(HelpHtmldivdir)" "$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" "$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" "$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" "$(DESTDIR)$(WebHtmlsfxdir)" "$(DESTDIR)$(WebIcon16x16dir)" "$(DESTDIR)$(WebIcon32x32dir)" "$(DESTDIR)$(WebIcon48x48dir)" "$(DESTDIR)$(WebPixmapdir)"; do \
+	for dir in "$(DESTDIR)$(HelpHtmldir)" "$(DESTDIR)$(HelpHtmlTxtdir)" "$(DESTDIR)$(HelpHtmldivdir)" "$(DESTDIR)$(HelpHtmlimagesdir)" "$(DESTDIR)$(HelpHtmlimgdir)" "$(DESTDIR)$(HelpHtmlrootdir)" "$(DESTDIR)$(VFolderEntrydir)" "$(DESTDIR)$(WebHtmldir)" "$(DESTDIR)$(WebHtmlimagesdir)" "$(DESTDIR)$(WebIcon16x16dir)" "$(DESTDIR)$(WebIcon32x32dir)" "$(DESTDIR)$(WebIcon48x48dir)" "$(DESTDIR)$(WebPixmapdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -713,9 +689,9 @@ install-data-am: install-HelpHtmlDATA install-HelpHtmlTxtDATA \
 	install-HelpHtmldivDATA install-HelpHtmlimagesDATA \
 	install-HelpHtmlimgDATA install-HelpHtmlrootDATA \
 	install-VFolderEntryDATA install-WebHtmlDATA \
-	install-WebHtmlimagesDATA install-WebHtmlsfxDATA \
-	install-WebIcon16x16DATA install-WebIcon32x32DATA \
-	install-WebIcon48x48DATA install-WebPixmapDATA
+	install-WebHtmlimagesDATA install-WebIcon16x16DATA \
+	install-WebIcon32x32DATA install-WebIcon48x48DATA \
+	install-WebPixmapDATA
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
 install-dvi: install-dvi-am
@@ -764,9 +740,9 @@ uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	uninstall-HelpHtmldivDATA uninstall-HelpHtmlimagesDATA \
 	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
 	uninstall-VFolderEntryDATA uninstall-WebHtmlDATA \
-	uninstall-WebHtmlimagesDATA uninstall-WebHtmlsfxDATA \
-	uninstall-WebIcon16x16DATA uninstall-WebIcon32x32DATA \
-	uninstall-WebIcon48x48DATA uninstall-WebPixmapDATA
+	uninstall-WebHtmlimagesDATA uninstall-WebIcon16x16DATA \
+	uninstall-WebIcon32x32DATA uninstall-WebIcon48x48DATA \
+	uninstall-WebPixmapDATA
 
 .MAKE: install-am install-data-am install-strip
 
@@ -777,24 +753,22 @@ uninstall-am: uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	install-HelpHtmlimagesDATA install-HelpHtmlimgDATA \
 	install-HelpHtmlrootDATA install-VFolderEntryDATA \
 	install-WebHtmlDATA install-WebHtmlimagesDATA \
-	install-WebHtmlsfxDATA install-WebIcon16x16DATA \
-	install-WebIcon32x32DATA install-WebIcon48x48DATA \
-	install-WebPixmapDATA install-am install-data install-data-am \
-	install-data-hook install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am uninstall \
-	uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
+	install-WebIcon16x16DATA install-WebIcon32x32DATA \
+	install-WebIcon48x48DATA install-WebPixmapDATA install-am \
+	install-data install-data-am install-data-hook install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	uninstall uninstall-HelpHtmlDATA uninstall-HelpHtmlTxtDATA \
 	uninstall-HelpHtmldivDATA uninstall-HelpHtmlimagesDATA \
 	uninstall-HelpHtmlimgDATA uninstall-HelpHtmlrootDATA \
 	uninstall-VFolderEntryDATA uninstall-WebHtmlDATA \
-	uninstall-WebHtmlimagesDATA uninstall-WebHtmlsfxDATA \
-	uninstall-WebIcon16x16DATA uninstall-WebIcon32x32DATA \
-	uninstall-WebIcon48x48DATA uninstall-WebPixmapDATA \
-	uninstall-am
+	uninstall-WebHtmlimagesDATA uninstall-WebIcon16x16DATA \
+	uninstall-WebIcon32x32DATA uninstall-WebIcon48x48DATA \
+	uninstall-WebPixmapDATA uninstall-am
 
 
 install-data-hook:
