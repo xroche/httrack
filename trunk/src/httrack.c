@@ -887,7 +887,9 @@ static void print_backtrace(void) {
   }
 #else
   const char msg[] = "No stack trace available on this OS :(\n";
-  write(FD_ERR, msg, sizeof(msg) - 1);
+  if (write(FD_ERR, msg, sizeof(msg) - 1) != sizeof(msg) - 1) {
+    /* sorry GCC */
+  }
 #endif
 }
 

@@ -4692,7 +4692,6 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
     return SOCaddr_is_valid(*sa) ? sa : NULL;
   } else {                      // non présent dans le cache dns, tester
     const size_t iadr_len = strlen(iadr) + 1;
-    char *block;
 
     // find queue
     for(; cache->next != NULL; cache = cache->next) ;
@@ -4708,11 +4707,11 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
 #endif
 
     /* attempt to store new entry */
-    block = malloct(sizeof(t_dnscache) + iadr_len);
-    cache->next = (t_dnscache *) block;
+    cache->next = malloct(sizeof(t_dnscache) + iadr_len);
     if (cache->next != NULL) {
       t_dnscache *const next = cache->next;
-      char *str = block + sizeof(t_dnscache);
+      char *const block = (char*) cache->next;
+      char *const str = block + sizeof(t_dnscache);
       memcpy(str, iadr, iadr_len);
       next->iadr = str;
       if (sa != NULL) {
