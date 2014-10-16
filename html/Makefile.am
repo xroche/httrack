@@ -7,7 +7,6 @@ HelpHtmlimagesdir = $(HelpHtmldir)/images
 HelpHtmlTxtdir = $(HelpHtmldir)
 WebHtmldir = $(HelpHtmldir)/server
 WebHtmlimagesdir = $(HelpHtmldir)/server/images
-WebHtmlsfxdir = $(HelpHtmldir)/server/sfx
 WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
@@ -22,7 +21,6 @@ HelpHtmlimages_DATA = images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = server/*.html server/*.js server/*.css
 WebHtmlimages_DATA = server/images/*
-WebHtmlsfx_DATA = server/sfx/*
 # note: converted & normalized by
 # ico2xpm favicon.ico -o httrack.xpm
 # mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
@@ -33,7 +31,7 @@ WebIcon48x48_DATA = server/div/48x48/*.png
 VFolderEntry_DATA = server/div/*.desktop
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
-	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) $(WebHtmlsfx_DATA) \
+	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
 	$(VFolderEntry_DATA) \
 	httrack.css
