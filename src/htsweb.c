@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
   /* launch */
   ret = help_server(argv[1], defaultPort);
 
-  htsthread_wait();
+  htsthread_wait_n(background_threads - 1);
   hts_uninit();
 
 #ifdef _WIN32
