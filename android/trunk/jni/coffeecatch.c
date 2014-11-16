@@ -88,7 +88,7 @@ static const int native_sig_catch[SIG_CATCH_COUNT + 1]
 /* Maximum value of a caught signal. */
 #define SIG_NUMBER_MAX 32
 
-#if (defined(__ANDROID__) && (!defined(__BIONIC_HAVE_UCONTEXT_T)))
+#if defined(__ANDROID__)
 #ifndef ucontext_h_seen
 #define ucontext_h_seen
 
@@ -99,6 +99,7 @@ static const int native_sig_catch[SIG_CATCH_COUNT + 1]
 
 /* Taken from richard.quirk's header file. (Android does not have it) */
 
+#if !defined(__BIONIC_HAVE_UCONTEXT_T)
 typedef struct ucontext {
   unsigned long uc_flags;
   struct ucontext *uc_link;
@@ -106,6 +107,7 @@ typedef struct ucontext {
   struct sigcontext uc_mcontext;
   unsigned long uc_sigmask;
 } ucontext_t;
+#endif
 
 #elif defined(__i386__)
 
@@ -161,12 +163,14 @@ enum {
   REG_SS,
 };
 
+#if !defined(__BIONIC_HAVE_UCONTEXT_T)
 typedef struct ucontext {
   uint32_t uc_flags;
   struct ucontext* uc_link;
   stack_t uc_stack;
   mcontext_t uc_mcontext;
 } ucontext_t;
+#endif
 
 #elif defined(__mips__)
 
@@ -193,12 +197,14 @@ typedef struct {
   uint32_t lo3;
 } mcontext_t;
 
+#if !defined(__BIONIC_HAVE_UCONTEXT_T)
 typedef struct ucontext {
   uint32_t uc_flags;
   struct ucontext* uc_link;
   stack_t uc_stack;
   mcontext_t uc_mcontext;
 } ucontext_t;
+#endif
 
 #else
 #error "Architecture is not supported (unknown ucontext layout)"
