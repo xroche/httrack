@@ -386,7 +386,7 @@
 				OutputFile="O:\HTTrack\httrack\x64\WinHTTrack.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz64;C:\Dev\openssl\lib\out32dll;C:\temp\Releaselib"
+				AdditionalLibraryDirectories="C:\Dev\openssl\lib;C:\temp\release_libz64;C:\Dev\openssl\lib\out32dll;C:\temp\Releaselib64"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="O:\HTTrack\httrack\x64\WinHTTrack.pdb"
 				SubSystem="2"
