@@ -1157,6 +1157,27 @@ static int coffeecatch_is_dll(const char *name) {
   return 0;
 }
 
+/* Demangle a symbol (NULL if error) using libgccdemangle, if available */
+static char* demangle_symbol(const char *symbol) {
+  static void *libgccdemangle = NULL;
+  static int probed = 0;
+  static char* (*cxa_demangle)(const char *, char *, size_t *, int *) = NULL;
+  if (!probed) {
+    probed = 1;
+    libgccdemangle = dlopen("libgccdemangle.so", RTLD_LAZY | RTLD_LOCAL);
+    if (libgccdemangle != NULL) {
+      cxa_demangle = dlsym(libgccdemangle, "__cxa_demangle");
+    } else {
+      DEBUG(print("libgccdemangle.so could not be loaded\n"));
+    }
+  }
+  if (cxa_demangle != NULL) {
+    int status = -4;
+    return cxa_demangle(symbol, NULL, NULL, &status);
+  }
+  return NULL;
+}
+
 /* Extract a line information on a PC address. */
 static void format_pc_address_cb(uintptr_t pc, 
                                  void (*fun)(void *arg, const char *module, 
@@ -1175,7 +1196,10 @@ static void format_pc_address_cb(uintptr_t pc,
          TODO FIXME to be investigated. */
       const uintptr_t addr_to_use = coffeecatch_is_dll(info.dli_fname)
         ? addr_rel : pc;
-      fun(arg, info.dli_fname, addr_to_use, info.dli_sname, offs);
+      char *const demangled = demangle_symbol(info.dli_sname);
+      const char *symbol = demangled != NULL ? demangled : info.dli_sname;
+      fun(arg, info.dli_fname, addr_to_use, symbol, offs);
+      free(demangled);
     } else {
       fun(arg, NULL, pc, NULL, 0);
     }
@@ -1347,7 +1371,11 @@ void coffeecatch_get_backtrace_info(void (*fun)(void *arg,
     }
 #endif
     for(i = 0; i < t->frames_size; i++) {
+#ifdef USE_CORKSCREW
       const uintptr_t pc = t->frames[i].absolute_pc;
+#else
+      const uintptr_t pc = t->frames[i];
+#endif
       format_pc_address_cb(pc, fun, arg);
     }
   }
