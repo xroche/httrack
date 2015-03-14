@@ -1,9 +1,8 @@
-= HTTrack Website Copier - Development Repository =
+# HTTrack Website Copier - Development Repository =
 
-== About ==
+## About
 _Copy websites to your computer (Offline browser)_
 
-http://www.httrack.com/images/screenshot_01.jpg
 <img src="http://www.httrack.com/htsw/screenshot_w1.jpg" width="34%">
 
 *HTTrack* is an _offline browser_ utility, allowing you to download a World Wide website from the Internet to a local directory, building recursively all directories, getting html, images, and other files from the server to your computer.
@@ -14,14 +13,14 @@ HTTrack can also update an existing mirrored site, and resume interrupted downlo
 
 *WinHTTrack* is the Windows 2000/XP/Vista/Seven release of HTTrack, and *WebHTTrack* the Linux/Unix/BSD release. 
 
-== Website ==
+## Website
 
 *Main Website:*
 http://www.httrack.com/
 
-== Compile trunk release ==
-{{{
+## Compile trunk release
+```sh
 git clone https://github.com/xroche/httrack.git
 cd httrack
 ./configure --prefix=$HOME/usr && make -j8 && make install
-}}}
+```
