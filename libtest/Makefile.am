@@ -1,7 +1,7 @@
 
 exemplesdir = $(datadir)/httrack/libtest
 exemples_DATA = *.c *.h *.txt
-EXTRA_DIST = $(exemples_DATA)
+EXTRA_DIST = $(exemples_DATA) libtest.mak libtest.vcproj
 
 AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \

@@ -333,7 +333,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 exemplesdir = $(datadir)/httrack/libtest
 exemples_DATA = *.c *.h *.txt
-EXTRA_DIST = $(exemples_DATA)
+EXTRA_DIST = $(exemples_DATA) libtest.mak libtest.vcproj
 AM_CPPFLAGS = @DEFAULT_CFLAGS@ @THREADS_CFLAGS@ @V6_FLAG@ @LFS_FLAG@ \
 	-DPREFIX=\""$(prefix)"\" -DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DDATADIR=\""$(datadir)"\" -DLIBDIR=\""$(libdir)"\" -I../src
