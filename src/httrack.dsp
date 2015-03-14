@@ -117,11 +117,11 @@ LINK32=link.exe
 # Name "httrack - Win32 Release avec debug"
 # Begin Source File
 
-SOURCE=.\httrack.c
+SOURCE=httrack.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\httrack.h
+SOURCE=httrack.h
 # End Source File
 # End Target
 # End Project
