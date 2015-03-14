@@ -1,4 +1,4 @@
-# HTTrack Website Copier - Development Repository =
+# HTTrack Website Copier - Development Repository
 
 ## About
 _Copy websites to your computer (Offline browser)_
