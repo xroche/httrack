@@ -293,7 +293,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="C:\Dev\httrack;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
 				PreprocessorDefinitions="NO_MALLOCT;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -347,7 +347,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copying proxytrack to separate package"
-				CommandLine="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe&quot; sign /f &quot;Z:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx&quot; /t http://timestamp.verisign.com/scripts/timstamp.dll $(TargetPath)&#x0D;&#x0A;copy /Y &quot;O:\HTTrack\httrack\proxytrack.exe&quot; &quot;O:\ProxyTrack\proxytrack\proxytrack.exe&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\proxy\*.c&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\proxy\*.h&quot;  &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\src\proxy\*.vcproj&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\proxy\*.txt&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;"
+				CommandLine="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Bin\signtool.exe&quot; sign /f &quot;Z:\Mes Documents\certificats\httrack-com\httrack-signing-certificate.pfx&quot; /t http://timestamp.verisign.com/scripts/timstamp.dll $(TargetPath)&#x0D;&#x0A;copy /Y &quot;O:\HTTrack\httrack\proxytrack.exe&quot; &quot;O:\ProxyTrack\proxytrack\proxytrack.exe&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\src\proxy\*.c&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\src\proxy\*.h&quot;  &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\src\proxy\*.vcproj&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;copy /Y &quot;C:\Dev\httrack\src\proxy\*.txt&quot; &quot;O:\ProxyTrack\proxytrack\src\&quot;&#x0D;&#x0A;"
 			/>
 		</Configuration>
 	</Configurations>
