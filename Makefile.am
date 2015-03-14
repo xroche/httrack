@@ -5,4 +5,4 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
-		httrack-doc.html lang.def
+		httrack-doc.html lang.def README.md

@@ -97,4 +97,5 @@ EXTRA_DIST = httrack.h webhttrack \
 		proxy/proxystrings.h \
 		proxy/proxytrack.h \
 		proxy/store.h \
+		proxy/proxytrack.vcproj \
 		*.dsw *.dsp *.vcproj

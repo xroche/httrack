@@ -3,7 +3,7 @@ AC_PREREQ(2.59)
 AC_INIT([httrack], [3.48.20], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2014 Xavier Roche and other contributors
+Copyright (C) 1998-2015 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
