@@ -45,7 +45,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;;C:\Dev\httrack\src\coucal"
 				PreprocessorDefinitions="NO_MALLOCT;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -128,7 +128,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;;C:\Dev\httrack\src\coucal"
 				PreprocessorDefinitions="NO_MALLOCT;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -209,7 +209,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;;C:\Dev\httrack\src\coucal"
 				PreprocessorDefinitions="NO_MALLOCT;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -293,7 +293,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="C:\Dev\httrack\src;&quot;C:\Dev\zlib-1.2.8&quot;;C:\Dev\minizip;&quot;C:\Dev\openssl-1.0.1j\include&quot;;C:\Dev\httrack\src\coucal"
 				PreprocessorDefinitions="NO_MALLOCT;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -360,7 +360,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\coucal.c"
+				RelativePath="..\coucal\coucal.c"
 				>
 			</File>
 			<File

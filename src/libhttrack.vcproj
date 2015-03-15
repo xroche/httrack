@@ -54,7 +54,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;;coucal"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -154,7 +154,7 @@
 				Optimization="3"
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;;coucal"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -252,7 +252,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;;coucal"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -350,7 +350,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;"
+				AdditionalIncludeDirectories="&quot;C:\Dev\zlib-1.2.8&quot;;&quot;C:\Dev\openssl-1.0.1j\include&quot;;coucal"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;_CRT_SECURE_NO_WARNINGS"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -423,7 +423,7 @@
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
 			<File
-				RelativePath=".\coucal.c"
+				RelativePath=".\coucal\coucal.c"
 				>
 			</File>
 			<File
@@ -1765,7 +1765,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\coucal.h"
+				RelativePath=".\coucal\coucal.h"
 				>
 			</File>
 			<File
