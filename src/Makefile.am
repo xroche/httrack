@@ -23,7 +23,8 @@ AM_CPPFLAGS = \
 	-DPREFIX=\""$(prefix)"\" \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DDATADIR=\""$(datadir)"\" \
-	-DLIBDIR=\""$(libdir)"\"
+	-DLIBDIR=\""$(libdir)"\" \
+	-I \""$(srcdir)/coucal"\"
 
 bin_PROGRAMS = proxytrack httrack htsserver
 
@@ -38,14 +39,14 @@ lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	coucal.c htsmd5.c md5.c \
+	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
 whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
-	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal.c \
+	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
@@ -56,7 +57,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
-	htsfilters.h htsftp.h htsglobal.h htshash.h coucal.h \
+	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htslib.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
