@@ -115,7 +115,7 @@ am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsparse.lo libhttrack_la-htsback.lo \
 	libhttrack_la-htscache.lo libhttrack_la-htscatchurl.lo \
 	libhttrack_la-htsfilters.lo libhttrack_la-htsftp.lo \
-	libhttrack_la-htshash.lo libhttrack_la-coucal.lo \
+	libhttrack_la-htshash.lo coucal/libhttrack_la-coucal.lo \
 	libhttrack_la-htshelp.lo libhttrack_la-htslib.lo \
 	libhttrack_la-htscoremain.lo libhttrack_la-htsname.lo \
 	libhttrack_la-htsrobots.lo libhttrack_la-htstools.lo \
@@ -147,9 +147,9 @@ httrack_OBJECTS = httrack.$(OBJEXT)
 httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
 am_proxytrack_OBJECTS = proxy/proxytrack-main.$(OBJEXT) \
 	proxy/proxytrack-proxytrack.$(OBJEXT) \
-	proxy/proxytrack-store.$(OBJEXT) proxytrack-coucal.$(OBJEXT) \
-	proxytrack-htsmd5.$(OBJEXT) proxytrack-md5.$(OBJEXT) \
-	minizip/proxytrack-ioapi.$(OBJEXT) \
+	proxy/proxytrack-store.$(OBJEXT) \
+	coucal/proxytrack-coucal.$(OBJEXT) proxytrack-htsmd5.$(OBJEXT) \
+	proxytrack-md5.$(OBJEXT) minizip/proxytrack-ioapi.$(OBJEXT) \
 	minizip/proxytrack-mztools.$(OBJEXT) \
 	minizip/proxytrack-unzip.$(OBJEXT) \
 	minizip/proxytrack-zip.$(OBJEXT)
@@ -342,7 +342,9 @@ AM_CPPFLAGS = \
 	-DPREFIX=\""$(prefix)"\" \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DDATADIR=\""$(datadir)"\" \
-	-DLIBDIR=\""$(libdir)"\"
+	-DLIBDIR=\""$(libdir)"\" \
+	-I"$(abs_srcdir)" \
+	-I"$(abs_srcdir)/coucal"
 
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
@@ -353,13 +355,13 @@ lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	coucal.c htsmd5.c md5.c \
+	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
 whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
-	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal.c \
+	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
@@ -370,7 +372,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
 	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
-	htsfilters.h htsftp.h htsglobal.h htshash.h coucal.h \
+	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htslib.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h \
 	htsopt.h htsrobots.h htsthread.h  \
@@ -378,7 +380,7 @@ libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htsstrings.h htsarrays.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
-	md5.h murmurhash3.h \
+	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
@@ -388,8 +390,8 @@ libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 EXTRA_DIST = httrack.h webhttrack \
-		murmurhash3.h.diff \
-		murmurhash3.h.orig \
+		coucal/murmurhash3.h.diff \
+		coucal/murmurhash3.h.orig \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
 		minizip/ioapi.c.diff \
@@ -411,6 +413,7 @@ EXTRA_DIST = httrack.h webhttrack \
 		proxy/proxytrack.h \
 		proxy/store.h \
 		proxy/proxytrack.vcproj \
+		coucal/* \
 		*.dsw *.dsp *.vcproj
 
 all: all-am
@@ -481,6 +484,14 @@ clean-libLTLIBRARIES:
 	done
 libhtsjava.la: $(libhtsjava_la_OBJECTS) $(libhtsjava_la_DEPENDENCIES) $(EXTRA_libhtsjava_la_DEPENDENCIES) 
 	$(libhtsjava_la_LINK) -rpath $(libdir) $(libhtsjava_la_OBJECTS) $(libhtsjava_la_LIBADD) $(LIBS)
+coucal/$(am__dirstamp):
+	@$(MKDIR_P) coucal
+	@: > coucal/$(am__dirstamp)
+coucal/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) coucal/$(DEPDIR)
+	@: > coucal/$(DEPDIR)/$(am__dirstamp)
+coucal/libhttrack_la-coucal.lo: coucal/$(am__dirstamp) \
+	coucal/$(DEPDIR)/$(am__dirstamp)
 minizip/$(am__dirstamp):
 	@$(MKDIR_P) minizip
 	@: > minizip/$(am__dirstamp)
@@ -561,6 +572,8 @@ proxy/proxytrack-proxytrack.$(OBJEXT): proxy/$(am__dirstamp) \
 	proxy/$(DEPDIR)/$(am__dirstamp)
 proxy/proxytrack-store.$(OBJEXT): proxy/$(am__dirstamp) \
 	proxy/$(DEPDIR)/$(am__dirstamp)
+coucal/proxytrack-coucal.$(OBJEXT): coucal/$(am__dirstamp) \
+	coucal/$(DEPDIR)/$(am__dirstamp)
 minizip/proxytrack-ioapi.$(OBJEXT): minizip/$(am__dirstamp) \
 	minizip/$(DEPDIR)/$(am__dirstamp)
 minizip/proxytrack-mztools.$(OBJEXT): minizip/$(am__dirstamp) \
@@ -610,6 +623,9 @@ uninstall-whttrackrunSCRIPTS:
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f coucal/libhttrack_la-coucal.$(OBJEXT)
+	-rm -f coucal/libhttrack_la-coucal.lo
+	-rm -f coucal/proxytrack-coucal.$(OBJEXT)
 	-rm -f minizip/libhttrack_la-ioapi.$(OBJEXT)
 	-rm -f minizip/libhttrack_la-ioapi.lo
 	-rm -f minizip/libhttrack_la-mztools.$(OBJEXT)
@@ -633,7 +649,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsserver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsweb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-coucal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsback.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsbauth.Plo@am__quote@
@@ -662,9 +677,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htszlib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-md5.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-punycode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-coucal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-htsmd5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxytrack-md5.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@coucal/$(DEPDIR)/libhttrack_la-coucal.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@coucal/$(DEPDIR)/proxytrack-coucal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-ioapi.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-mztools.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@minizip/$(DEPDIR)/libhttrack_la-unzip.Plo@am__quote@
@@ -757,12 +773,12 @@ libhttrack_la-htshash.lo: htshash.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htshash.lo `test -f 'htshash.c' || echo '$(srcdir)/'`htshash.c
 
-libhttrack_la-coucal.lo: coucal.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-coucal.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-coucal.Tpo -c -o libhttrack_la-coucal.lo `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libhttrack_la-coucal.Tpo $(DEPDIR)/libhttrack_la-coucal.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='libhttrack_la-coucal.lo' libtool=yes @AMDEPBACKSLASH@
+coucal/libhttrack_la-coucal.lo: coucal/coucal.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT coucal/libhttrack_la-coucal.lo -MD -MP -MF coucal/$(DEPDIR)/libhttrack_la-coucal.Tpo -c -o coucal/libhttrack_la-coucal.lo `test -f 'coucal/coucal.c' || echo '$(srcdir)/'`coucal/coucal.c
+@am__fastdepCC_TRUE@	$(am__mv) coucal/$(DEPDIR)/libhttrack_la-coucal.Tpo coucal/$(DEPDIR)/libhttrack_la-coucal.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal/coucal.c' object='coucal/libhttrack_la-coucal.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-coucal.lo `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o coucal/libhttrack_la-coucal.lo `test -f 'coucal/coucal.c' || echo '$(srcdir)/'`coucal/coucal.c
 
 libhttrack_la-htshelp.lo: htshelp.c
 @am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htshelp.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htshelp.Tpo -c -o libhttrack_la-htshelp.lo `test -f 'htshelp.c' || echo '$(srcdir)/'`htshelp.c
@@ -1002,19 +1018,19 @@ proxy/proxytrack-store.obj: proxy/store.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxy/proxytrack-store.obj `if test -f 'proxy/store.c'; then $(CYGPATH_W) 'proxy/store.c'; else $(CYGPATH_W) '$(srcdir)/proxy/store.c'; fi`
 
-proxytrack-coucal.o: coucal.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-coucal.o -MD -MP -MF $(DEPDIR)/proxytrack-coucal.Tpo -c -o proxytrack-coucal.o `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-coucal.Tpo $(DEPDIR)/proxytrack-coucal.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='proxytrack-coucal.o' libtool=no @AMDEPBACKSLASH@
+coucal/proxytrack-coucal.o: coucal/coucal.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT coucal/proxytrack-coucal.o -MD -MP -MF coucal/$(DEPDIR)/proxytrack-coucal.Tpo -c -o coucal/proxytrack-coucal.o `test -f 'coucal/coucal.c' || echo '$(srcdir)/'`coucal/coucal.c
+@am__fastdepCC_TRUE@	$(am__mv) coucal/$(DEPDIR)/proxytrack-coucal.Tpo coucal/$(DEPDIR)/proxytrack-coucal.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal/coucal.c' object='coucal/proxytrack-coucal.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-coucal.o `test -f 'coucal.c' || echo '$(srcdir)/'`coucal.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o coucal/proxytrack-coucal.o `test -f 'coucal/coucal.c' || echo '$(srcdir)/'`coucal/coucal.c
 
-proxytrack-coucal.obj: coucal.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-coucal.obj -MD -MP -MF $(DEPDIR)/proxytrack-coucal.Tpo -c -o proxytrack-coucal.obj `if test -f 'coucal.c'; then $(CYGPATH_W) 'coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal.c'; fi`
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/proxytrack-coucal.Tpo $(DEPDIR)/proxytrack-coucal.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal.c' object='proxytrack-coucal.obj' libtool=no @AMDEPBACKSLASH@
+coucal/proxytrack-coucal.obj: coucal/coucal.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT coucal/proxytrack-coucal.obj -MD -MP -MF coucal/$(DEPDIR)/proxytrack-coucal.Tpo -c -o coucal/proxytrack-coucal.obj `if test -f 'coucal/coucal.c'; then $(CYGPATH_W) 'coucal/coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal/coucal.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) coucal/$(DEPDIR)/proxytrack-coucal.Tpo coucal/$(DEPDIR)/proxytrack-coucal.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='coucal/coucal.c' object='coucal/proxytrack-coucal.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o proxytrack-coucal.obj `if test -f 'coucal.c'; then $(CYGPATH_W) 'coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -c -o coucal/proxytrack-coucal.obj `if test -f 'coucal/coucal.c'; then $(CYGPATH_W) 'coucal/coucal.c'; else $(CYGPATH_W) '$(srcdir)/coucal/coucal.c'; fi`
 
 proxytrack-htsmd5.o: htsmd5.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxytrack-htsmd5.o -MD -MP -MF $(DEPDIR)/proxytrack-htsmd5.Tpo -c -o proxytrack-htsmd5.o `test -f 'htsmd5.c' || echo '$(srcdir)/'`htsmd5.c
@@ -1105,6 +1121,7 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf coucal/.libs coucal/_libs
 	-rm -rf minizip/.libs minizip/_libs
 install-DevIncludesDATA: $(DevIncludes_DATA)
 	@$(NORMAL_INSTALL)
@@ -1245,6 +1262,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f coucal/$(DEPDIR)/$(am__dirstamp)
+	-rm -f coucal/$(am__dirstamp)
 	-rm -f minizip/$(DEPDIR)/$(am__dirstamp)
 	-rm -f minizip/$(am__dirstamp)
 	-rm -f proxy/$(DEPDIR)/$(am__dirstamp)
@@ -1259,7 +1278,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
+	-rm -rf ./$(DEPDIR) coucal/$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1305,7 +1324,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
+	-rm -rf ./$(DEPDIR) coucal/$(DEPDIR) minizip/$(DEPDIR) proxy/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

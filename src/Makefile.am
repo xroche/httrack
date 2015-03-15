@@ -24,7 +24,8 @@ AM_CPPFLAGS = \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DDATADIR=\""$(datadir)"\" \
 	-DLIBDIR=\""$(libdir)"\" \
-	-I \""$(srcdir)/coucal"\"
+	-I"$(abs_srcdir)" \
+	-I"$(abs_srcdir)/coucal"
 
 bin_PROGRAMS = proxytrack httrack htsserver
 
@@ -65,7 +66,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsstrings.h htsarrays.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
-	md5.h murmurhash3.h \
+	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
@@ -76,8 +77,8 @@ libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \
-		murmurhash3.h.diff \
-		murmurhash3.h.orig \
+		coucal/murmurhash3.h.diff \
+		coucal/murmurhash3.h.orig \
 		minizip/iowin32.c \
 		minizip/iowin32.h \
 		minizip/ioapi.c.diff \
@@ -99,4 +100,5 @@ EXTRA_DIST = httrack.h webhttrack \
 		proxy/proxytrack.h \
 		proxy/store.h \
 		proxy/proxytrack.vcproj \
+		coucal/* \
 		*.dsw *.dsp *.vcproj
