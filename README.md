@@ -20,7 +20,7 @@ http://www.httrack.com/
 
 ## Compile trunk release
 ```sh
-git clone https://github.com/xroche/httrack.git
+git clone https://github.com/xroche/httrack.git --recurse
 cd httrack
 ./configure --prefix=$HOME/usr && make -j8 && make install
 ```
