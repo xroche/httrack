@@ -66,9 +66,6 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 #include <time.h>
-#ifdef __ANDROID__
-static long int  timezone = 0;
-#endif
 #include <stdarg.h>
 
 #include <sys/timeb.h>
@@ -82,6 +79,10 @@ static long int  timezone = 0;
 #endif /* _WIN32 */
 
 #include <sys/stat.h>
+
+#ifdef __ANDROID__
+#define timezone 0
+#endif
 /* END specific definitions */
 
 /* Windows might be missing va_copy */
@@ -760,7 +761,7 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
       // et ensuite le corps
       // si POST on ne réceptionne rien du tout, c'est après que l'on fera
       // une réception standard pour récupérer l'en tête
-      if ((treat) && (waitconnect)) {   // traiter (attendre!) en-tête        
+      if ((treat) && (waitconnect)) {   // traiter (attendre!) en-tête
         // Réception de la status line et de l'en-tête (norme RFC1945)
 
         // status-line à récupérer
@@ -2293,7 +2294,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #endif
 
     // A partir de maintenant, on peut envoyer et recevoir des données
-    // via le flot identifié par soc (socket): write(soc,adr,taille) et 
+    // via le flot identifié par soc (socket): write(soc,adr,taille) et
     // read(soc,adr,taille)
 
   } else {                      // on doit ouvrir un fichier local!
