@@ -39,6 +39,6 @@ EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 install-data-hook:
 	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
 		( cd $(DESTDIR)$(prefix)/share/httrack \
-			&& $(LN_S) ../doc/httrack html \
+			&& $(LN_S) $(htmldir) html \
 		) \
 	fi
