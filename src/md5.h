@@ -17,7 +17,7 @@ typedef unsigned long uint32;
 #error undefined: SIZEOF_LONG
 #endif
 
-typedef struct MD5Context {
+struct MD5Context {
   union {
     unsigned char ui8[64];
     uint32 ui32[16];
@@ -25,7 +25,7 @@ typedef struct MD5Context {
   uint32 buf[4];
   uint32 bits[2];
   int doByteReverse;
-} MD5CTX;
+};
 
 void MD5Init(struct MD5Context *context, int brokenEndian);
 void MD5Update(struct MD5Context *context, unsigned char const *buf,
