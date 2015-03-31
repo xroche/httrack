@@ -382,7 +382,7 @@
 				OutputFile="C:\temp\httrack64\libhttrack.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories="C:\temp\release_libz64\;&quot;C:\Dev\openssl-1.0.1j\x64\lib&quot;"
+				AdditionalLibraryDirectories="C:\temp\debug_libz64;&quot;C:\Dev\openssl-1.0.1j\x64\lib&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="C:\temp\Debuglib/libhttrack.pdb"
 				GenerateMapFile="true"
