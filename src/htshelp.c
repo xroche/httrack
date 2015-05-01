@@ -299,7 +299,7 @@ void help_wizard(httrackp * opt) {
     // Options
     do {
       printf
-        ("\nYou can define additional options, such as recurse level (-r<number>), separed by blank spaces\n");
+        ("\nYou can define additional options, such as recurse level (-r<number>), separated by blank spaces\n");
       printf("To see the option list, type help\n");
       printf("Additional options (return=none) :");
       linput(stdin, str, 250);
