@@ -1,7 +1,7 @@
 HTTrack Website Copier - Install notes
 --------------------------------------
 
-On most systems (including GNU/Linux), installing can be easily acheived using the following command:
+On most systems (including GNU/Linux), installing can be easily achieved using the following command:
 
 ./configure && make && make install
 -or- (if not compiling as root)
