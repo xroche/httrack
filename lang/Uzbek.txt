@@ -1,0 +1,930 @@
+LANGUAGE_NAME
+Uzbek Latin
+LANGUAGE_FILE
+Uzbek Latin
+LANGUAGE_ISO
+uz
+LANGUAGE_AUTHOR
+Shamsiddinov Zafar (zfrx94 at mail.ru) \r\n
+LANGUAGE_CHARSET
+windows-1251
+LANGUAGE_WINDOWSID
+Uzbek Latin
+OK
+OK
+Cancel
+Bekor qilmoq
+Exit
+Chiqish
+Close
+Yopmoq
+Cancel changes
+OТzgarishlarni bekor qilmoq
+Click to confirm
+Tasdiqlamoq
+Click to get help!
+Yordam olmoq
+Click to return to previous screen
+Ortga qaytmoq
+Click to go to next screen
+Keyingi ekranga oТtish
+Hide password
+Parolni berkitmoq
+Save project
+Loyihani saqlamoq
+Close current project?
+Joriy loyiha yopilsinmi?
+Delete this project?
+Ushbu loyiha oТchirilsinmi?
+Delete empty project %s?
+BoТsh %s loyihasi oТchirilsinmi?
+Action not yet implemented
+Hozircha tadbiq etilmagan
+Error deleting this project
+Loyihani oТchirishda xatolik
+Select a rule for the filter
+Filtr turini tanlamoq
+Enter keywords for the filter
+Filtr uchun qiymat kiritish
+Cancel
+Bekor qilmoq
+Add this rule
+Bu shartni qoТshmoq
+Please enter one or several keyword(s) for the rule
+Filtr shartini kiriting
+Add Scan Rule
+Filtr qoТshmoq
+Criterion
+Turni tanlamoq:
+String
+Qiymat kiritish:
+Add
+QoТshmoq
+Scan Rules
+Filtrlar
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Niqobdan foydalanib siz bir necha manzillarni bira yoТla mustasno/yoqishingiz mumkin\nFiltrlarni ajratish uchun vergul yoki probeldan foydalaning.\nMasalan: +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
+Exclude links
+Mustasno qilmoq...
+Include link(s)
+Yoqmoq...
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Maslahat: Agar hamma gif-fayllarni koТchirib olmoqchi boТlsangiz, unda +www.someweb.com/*.gif. filtrdan foydalaning.\n(+*.gif / -*.gif  barcha gif-fayllarni barcha saytlardan, koТchirib olishni ruxsat etadi/taqiqlaydi.)
+Save prefs
+Moslashtirishni saqlamoq
+Matching links will be excluded:
+Ћинки, удовлетвор€ющие этому условию будут исключены:
+Matching links will be included:
+Ћинки, удовлетвор€ющие этому условию будут включены:
+Example:
+Masalan:
+gif\r\nWill match all GIF files
+gif\r\nHamma gif fayllarni aniqlaydi (yoki GIF)
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+blue\r\n'blue' nomi ostidagi hamma fayllarni topadi, masalan 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+bigfile.mov\r\n'bigfile.mov' faylini topadi, ammo 'bigfile2.mov' faylini emas
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi\r\n'cgi' satriostidagilarni topadi, /cgi-bin/somecgi.cgi ga oТxshash
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+cgi-bin\r\n'cgi-bin' jildi tarkibidagi manzillarni tutib olmoq (lekin cgi-bin-2 emas, masalan)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb.com\r\nwww.someweb.com, private.someweb.com v. b. shunga oТxshash havolalarni tutib olmoq
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nќтловит адреса типа www.someweb.com, www.someweb.edu, private.someweb.otherweb.com и т.д.\r\n
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+www.someweb.com\r\nќтловит адреса, такие как www.someweb.com/... (но не такие, как private.someweb.com/..)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nќтловит все линки такие, как www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html и т.п.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+www.test.com/test/someweb.html\r\nќтловит только www.test.com/test/someweb.html. «аметим, что необходимо указать полный адрес ресурса - хост (www.xxx.yyy) и путь (/test/someweb.html)
+All links will match
+Barcha havolarga ruxsat etilgan
+Add exclusion filter
+Mustasno filtrni qoТshmoq
+Add inclusion filter
+Faol filtrni qoТshmoq
+Existing filters
+QoТshimcha filtrlar
+Cancel changes
+OТzgarishlarni bekor qilmoq
+Save current preferences as default values
+Joriy sozlanmani odatiy tarzda saqlamoq
+Click to confirm
+Tasdiqlamoq
+No log files in %s!
+%s-da log fayl mavjud emas!
+No 'index.html' file in %s!
+%s-da index.html fayli mavjud emas!
+Click to quit WinHTTrack Website Copier
+WinHTTrack Website Copier dasturidan chiqish
+View log files
+Log fayllarni koТrish
+Browse HTML start page
+BoshlangТich html sahifani namoyish etmoq
+End of mirror
+KoТzgu yaratish bajarildi
+View log files
+Log fayllarni koТrish
+Browse Mirrored Website
+KoТzguni koТrish
+New project...
+Yangi loyiha...
+View error and warning reports
+Xatolik va ogohlantirishlar haqidagi hisobotni koТrish
+View report
+Hisobotni koТrish
+Close the log file window
+Log oynasini yopish
+Info type:
+MaТlumot turi:
+Errors
+Xatolar
+Infos
+MaТlumot
+Find
+Izlash
+Find a word
+SoТzni izlash
+Info log file
+Log-fayl haqida
+Warning/Errors log file
+Xatolar/Ogohlatirishlar log fayli
+Unable to initialize the OLE system
+OLE tizimiga kirib boТlmadi
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+WinHTTrack koТrsatilgan jilddan bekor qilingan yuklama keshini topa olmadi!
+Could not connect to provider
+Provayder bilan bogТlanishning imkoni yoТq
+receive
+olindi
+request
+soТrov
+connect
+bog'lanish
+search
+izlash
+ready
+tayyor
+error
+xatolik
+Receiving files..
+Fayllar olinmoqda..
+Parsing HTML file..
+HTML fayli tahlil qilinmoqda...
+Purging files..
+Fayllar oТchirilmoqda...
+Loading cache in progress..
+Keshni yuklash ketmoqda..
+Parsing HTML file (testing links)..
+HTML fayli analizlanmoqda (havolalar tekshirilmoqda)...
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+ToТxtatildi (davomo etish uchun [KoТzgu]ni/[KoТchirishni toТxtatib turish]ni tanlang)
+Finishing pending transfers - Select [Cancel] to stop now!
+KoТchirishni kechiktirish tugatilmoqda - bekor qilish uchun, Cancelni bosing!
+scanning
+tekshirilmoqda
+Waiting for scheduled time..
+Tayinlangan vaqt boshlanishu kutilmoqda..
+Connecting to provider
+Provayder bilan bogТlanilmoqda
+[%d seconds] to go before start of operation
+Boshlanishiga [%d soniya] qoldi
+Site mirroring in progress [%s, %s bytes]
+KoТzgu yaratilmoqda [%s, %s bayt]
+Site mirroring finished!
+KoТzgu yaratish bajarildi!
+A problem occured during the mirroring operation\n
+KoТchirib olish jarayonida xatolik yuz berdi\n
+\nDuring:\n
+Davomida:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+Agar, zarurat boТlsa, log faylni koТring.\n\nWinHTTrack chiqish uchun OKni bosing.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+KoТzgu yaratish bajarildi.\nDasturdan chiqish uchun OKni bosing.\nKoТchirib olish muvaffaqiyatli bajarilganligini koТrish uchun log fayl(lar)ni koТring.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
+* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
+* * KOТCHIRIB OLISH BEKOR QILINDI! * *\r\n¬ременный кэш, созданный во врем€ текущей сессий, содержит данные, загруженные только во врем€ данной сессии и потребуетс€ только в случае возобновлени€ закачки.\r\nќднако, предыдущий кэш может содержать более полную информацию. ≈сли вы не хотите потер€ть эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Ёто можно легко сделать пр€мо здесь, удалив файлы hts-cache/new.]\r\n\r\n—читаете ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * XATOLIK! * *\r\nJoriy koТzgu - boТsh. Agar yangilanadigan boТlsa, oldingi koТzgu tiklanadi.\r\nSababi: birinchi sahifa(lar) topilmadi yoki bogТlanib boТlmadi.\r\n=> Veb-saytning mavjudligiga ishonch hosil qiling, и/yoki proksi-serverning oТrnatilganligini tekshiring! <=
+\n\nTip: Click [View log file] to see warning or error messages
+\nMaslahat: Xatolik va ogohlantirishlar haqidagi xabarni koТrish uchun [log faylni koТrish]ni bosing.
+Error deleting a hts-cache/new.* file, please do it manually
+hts-cache/new.* faylini oТchirishda xatolik, iltimos, uni oТzingiz oТchiring.\r\n
+Do you really want to quit WinHTTrack Website Copier?
+Siz haqiqatan ham WinHTTrackdan chiqishni xohlaysizmi?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+- KoТzgulashtirish rejimi -\n\nURL maydoniga manzil(lar)ni kiriting.
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- Interfaol rejimi - 'Wizard' uslubida koТzgu yaratish (soТrovlar boТlishi mumkin) -\n\nURL maydoniga manzil(lar)ni kiriting.
+- File Download Mode -\n\nEnter file address(es) in URL box
+- Alohida fayllarni koТchirib olish rejimi -\n\nURL maydoniga manzil(lar)ni kiriting.
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Havolalarni sinash rejimi-\n\nSinab koТrishni xohlasangiz, URL'lari mavjud sahifa manzilini kiriting.
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Yangilash rejimi -\n\nURL maydonidagi manzil(lar)ni tekshiring, soТngra 'Keyingi' tugmasini bosing.
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Olding hosil qilingan koТzguni davom etirish rejimi -\n\nURL maydonidagi manzil(lar)ni tekshiring, soТngra 'Keyingi' tugmasini bosing.
+Log files Path
+Log fayl yoТlagi
+Path
+YoТlak
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+RoТyxatdan koТzgu yaratish rejimi-\n\nKoТzgu yaratish uchun URL maydoniga manzil(lar), sahifa(lar)ni kiriting.
+New project / Import?
+Yangi loyiha / import qilinsinmi?
+Choose criterion
+Amalni tanlang
+Maximum link scanning depth
+Tekshirish maksimal teranligi
+Enter address(es) here
+Manzilni kiriting
+Define additional filtering rules
+QoТshimcha filtrni tayinlang
+Proxy Name (if needed)
+Proksi nomi, agar kerak boТlsa
+Proxy Port
+Proksi-server porti raqami
+Define proxy settings
+Proksini oТrnatishni tayinlang
+Use standard HTTP proxy as FTP proxy
+HTTP proksini FTP proksiday ishlatish
+Path
+YoТlak
+Select Path
+YoТlakni tanlang
+Path
+YoТlak
+Select Path
+YoТlakni tanlang
+Quit WinHTTrack Website Copier
+WinHTTrack Website Copierdan chiqish
+About WinHTTrack
+WinHTTrack dasturi haqida
+Save current preferences as default values
+Joriy oТrnatishni odatiy qilib saqlamoq
+Click to continue
+Davom etirmoq
+Click to define options
+KoТchirish parametrini belgilamoq
+Click to add a URL
+URL qoТshmoq
+Load URL(s) from text file
+Matnli fayldan URL(lar)ni yuklamoq
+WinHTTrack preferences (*.opt)|*.opt||
+WinHTTrack sozlanmalari (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Manzillar roТyxati matnli fayli(*.txt)|*.txt||
+File not found!
+Fayl topilmadi!
+Do you really want to change the project name/path?
+Loyiha/yoТlak nomini oТzgartirishni xohlaysizmi?
+Load user-default options?
+Sukut boТyicha oТrnatish yuklansinmi?
+Save user-default options?
+Sozlanmalar saqlansinmi?
+Reset all default options?
+Sukut boТyicha barcha parametrlar qayta oТrnatilsinmi?
+Welcome to WinHTTrack!
+WinHTTrackga xush kelibsiz!
+Action:
+Faoliyatlar turi:
+Max Depth
+Maks. teranlik:
+Maximum external depth:
+Tashqi saytlarning maksimal teranligi:
+Filters (refuse/accept links) :
+Filtrlar (havolalarni yoqmoq/oТchirib qoТymoq)
+Paths
+YoТlaklar
+Save prefs
+Sozlanmalarni saqlamoq
+Define..
+Belgilamoq...
+Set options..
+Parametrlarni moslamoq...
+Preferences and mirror options:
+KoТchirib olish parametrlarini moslash:
+Project name
+Loyiha nomi
+Add a URL...
+URLga qoТshmoq...
+Web Addresses: (URL)
+Veb manzil: (URL)
+Stop WinHTTrack?
+WinHTTrack toТxtatilsinmi?
+No log files in %s!
+%s da log fayllar yoТq!
+Pause Download?
+KoТchirib olish toТxtatib turilsinmi?
+Stop the mirroring operation
+KoТchirib olishni toТxtatish
+Minimize to System Tray
+Tizim treyiga berkitmoq
+Click to skip a link or stop parsing
+Havolani oТtkazib yuborish yoki fayl analizini toТxtatish
+Click to skip a link
+Havolani oТtkazib yuborish
+Bytes saved
+Saqlangan bayt:
+Links scanned
+Tekshirilgan havolalar:
+Time:
+Vaqt:
+Connections:
+BogТlanish:
+Running:
+Holati:
+Hide
+Berkitmoq
+Transfer rate
+KoТchirib olish tezligi:
+SKIP
+OТTKAZIB YUBORISH
+Information
+Ma'lumot
+Files written:
+Saqlangan fayllar:
+Files updated:
+Yangilangan fayllar:
+Errors:
+Xatoliklar:
+In progress:
+Prossesda:
+Follow external links
+Tashqi havoladan fayllarni olmoq
+Test all links in pages
+Sahifadangi barcha fayllarni tekshirmoq
+Try to ferret out all links
+Barcha havolalarni aniqlashga harakat qilmoq
+Download HTML files first (faster)
+Avval HTML-fayllarni koТchirib olmoq (tez)
+Choose local site structure
+Saytning mahalliy strukturasini tanlamoq
+Set user-defined structure on disk
+Tayinlangan saytning mahalliy strukturasini oТrnatmoq
+Use a cache for updates and retries
+»спользовать кэш дл€ обновлени€ и докачки
+Do not update zero size or user-erased files
+Ќе качать файлы, которые были однажды скачаны, даже если они нулевой длины или удалены
+Create a Start Page
+BoshlangТich sahifani yaratmoq
+Create a word database of all html pages
+—оздать базу данных слов, содержащихс€ в html-страницах
+Create error logging and report files
+—оздать лог файлы с информацией о работе и ошибках
+Generate DOS 8-3 filenames ONLY
+—оздавать файлы в DOS-формате 8.3
+Generate ISO9660 filenames ONLY for CDROM medias
+—оздавать имена файлов в стандарте ISO9660 только дл€ CDROM
+Do not create HTML error pages
+html-xatoliklari fayllarini yozmaslik
+Select file types to be saved to disk
+Diskka saqlash uchun fayl turini tanlang
+Select parsing direction
+¬ыберите направление продвижени€ по сайту
+Select global parsing direction
+¬ыберите глобальное направление продвижени€ по сайту
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+”становить правила переименовани€ линков как дл€ внутренних (закачиваемых) так и дл€ внешних (не загружаемых) адресов
+Max simultaneous connections
+ћаксимальное число соединений
+File timeout
+ћаксимальное врем€ не активности закачки
+Cancel all links from host if timeout occurs
+¬ случае превышени€ времени ожидани€ отменить все линки с данного хоста
+Minimum admissible transfer rate
+ћинимально допустима€ скорость закачки
+Cancel all links from host if too slow
+¬ случае, если хост слишком медленный, отменить все линки с данного хоста
+Maximum number of retries on non-fatal errors
+ћаксимальное число повторных попыток, в случае не фатальных ошибок.
+Maximum size for any single HTML file
+ћаксимальный размер любого html-файла
+Maximum size for any single non-HTML file
+ћаксимальный размер любого не HTML-файла
+Maximum amount of bytes to retrieve from the Web
+ћаксимальное количество байт, допустимых дл€ закачки
+Make a pause after downloading this amount of bytes
+ѕосле загрузки указанного числа байтов, сделать паузу
+Maximum duration time for the mirroring operation
+ћакс. продолжительность зеркализации
+Maximum transfer rate
+ћакс. скорость закачки
+Maximum connections/seconds (avoid server overload)
+ћакс. количество соединений в секунду (не перегружать сервер)
+Maximum number of links that can be tested (not saved!)
+ћаксимальное число тестируемых линков (тестируемых, а не сохран€емых!)
+Browser identity
+»дентификаци€ броузера (строка User-Agent)
+Comment to be placed in each HTML file
+ омментарий, размещаемый в каждом HTML файле
+Back to starting page
+BoshlangТich sahifaga oТtish
+Save current preferences as default values
+—охранить настройки как значени€ по умолчанию
+Click to continue
+Davom etmoq
+Click to cancel changes
+OТzgarishlarni bekor qilish
+Follow local robots rules on sites
+ѕодчин€тьс€ правилам дл€ роботов, устанавливаемым сайтами
+Links to non-localised external pages will produce error pages
+ѕо ссылкам на внешние страницы (не скачанные) будет переход к страницам ошибок
+Do not erase obsolete files after update
+Ќе удал€ть старые файлы после процедуры обновлени€ зеркала
+Accept cookies?
+–азрешить cookies?
+Check document type when unknown?
+ѕровер€ть тип документа, в случае когда он не известен?
+Parse java applets to retrieve included files that must be downloaded?
+јнализировать €ва-апплеты с целью определени€ включаемые файлов?
+Store all files in cache instead of HTML only
+ѕринудительно сохран€ть все файлы в кэше, а не только файлы HTML
+Log file type (if generated)
+“ип log фала
+Maximum mirroring depth from root address
+ћакс. глубина создани€ зеркала от начального адреса
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+ћаксимальна€ глубина закачки дл€ внешних/запрещенных адресов (0, т.е., нет ограничений, это значение поумолчанию)
+Create a debugging file
+—оздать файл с отладочной информацией
+Use non-standard requests to get round some server bugs
+ѕопытатьс€ обойти ошибки некоторых серверов, использу€ не стандартные запросы
+Use old HTTP/1.0 requests (limits engine power!)
+»спользовать старый протокол HTTP/1.0 (ограничит возможности программы!)
+Attempt to limit retransfers through several tricks (file size test..)
+ѕопытка ограничить перекачку испольу€ некоторые приемы (тест на размер файла..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+ќграничить число линков, удал€€ аналогичные линки (www.foo.com==foo.com, http=https ..)
+Write external links without login/password
+—охран€ть внешние линки без логина/парол€
+Write internal links without query string
+—охран€ть внутренние линки усеченно (до занака ?)
+Get non-HTML files related to a link, eg external .ZIP or pictures
+html fayllarga yaqin boТlmagan havolalarni koТchirib olmaslik (msln.: tashqi .ZIP yoki graf. fayllar)
+Test all links (even forbidden ones)
+Barcha havolalarni sinab koТrmoq (hatto taqiqlanganlarini ham)
+Try to catch all URLs (even in unknown tags/code)
+—таратьс€ определ€ть все URL'ы (даже в неопознанных тэгах/скриптах)
+Get HTML files first!
+ѕолучить вначале HTML файлы!
+Structure type (how links are saved)
+“ип локальной структуры зеркала (способ сохранени€ файлов)
+Use a cache for updates
+»спользовать кэш дл€ обновлени€
+Do not re-download locally erased files
+Ќе качать заново локально удаленные файлы
+Make an index
+Indeks yaratmoq
+Make a word database
+SoТz bazasini yaratmoq
+Log files
+Log fayllar
+DOS names (8+3)
+DOS-fayllar formati (8+3)
+ISO9660 names (CDROM)
+ISO9660 standartidagi nomlar (CDROM)
+No error pages
+Xatosiz sahifalar
+Primary Scan Rule
+Asosiy filtr
+Travel mode
+Tekshirish rejimi
+Global travel mode
+Global tekshiruv rejimi
+These options should be modified only exceptionally
+ ак правило, эти настройки измен€ть не следует
+Activate Debugging Mode (winhttrack.log)
+Tuzatish rejimini yoqmoq (winhttrack.log)
+Rewrite links: internal / external
+Havolalarni qayta nomlamoq: ichki/tashqi
+Flow control
+Tekshrish yoТnalishi nazorati
+Limits
+Cheklovlar
+Identity
+Identifikator
+HTML footer
+Quyi HTML kolontitul
+N# connections
+N# bogТlanish
+Abandon host if error
+ѕрекратить закачку с хоста, в случае ошибки
+Minimum transfer rate (B/s)
+ћинимальна€ скорость закачки (B/s)
+Abandon host if too slow
+ѕрекратить закачку с хоста, если она слишком медленна€
+Configure
+Moslamoq
+Use proxy for ftp transfers
+»спользовать прокси дл€ ftp-закачки
+TimeOut(s)
+Taym-out
+Persistent connections (Keep-Alive)
+ѕосто€нные соединени€ (Keep-Alive)
+Reduce connection time and type lookup time using persistent connections
+”меньшить времена соединени€ и обращени€ использу€ посто€нные соединени€
+Retries
+ѕовторные попытки
+Size limit
+ќграничение по размеру
+Max size of any HTML file (B)
+ћакс. размер html-файла:
+Max size of any non-HTML file
+ћакс. размер не-html:
+Max site size
+ћакс. размер сайта
+Max time
+ћакс. врем€ закачки
+Save prefs
+Sozlanmani saqlash
+Max transfer rate
+ћакс. скорость закачки
+Follow robots.txt
+—ледовать правилам из robots.txt
+No external pages
+Tashqi havolalarsiz
+Do not purge old files
+Ќе удал€ть старые файлы
+Accept cookies
+–азрешить cookies
+Check document type
+ѕровер€ть тип документа
+Parse java files
+јнализ €ва файлов
+Store ALL files in cache
+—охран€ть ¬—≈ файлы в кэше
+Tolerant requests (for servers)
+“олерантные запросы (к серверам)
+Update hack (limit re-transfers)
+Update hack (ограничение повторных закачек)
+URL hacks (join similar URLs)
+’ак URL (объеденить аналогичные URLs)
+Force old HTTP/1.0 requests (no 1.1)
+»спользовать старый протокол HTTP/1.0 (не 1.1)
+Max connections / seconds
+ћакс. число соединений/сек.
+Maximum number of links
+ћаксимальное число линков
+Pause after downloading..
+ѕауза после загрузки...
+Hide passwords
+Parollarni berkitmoq
+Hide query strings
+—пр€тать запросную часть строки (все, что после знака ?)
+Links
+Havolalar
+Build
+—труктура
+Experts Only
+Ёксперт
+Flow Control
+”правление закачкой
+Limits
+ќграничени€
+Browser ID
+»дентификаци€
+Scan Rules
+‘ильтры
+Spider
+ ачалка
+Log, Index, Cache
+Ћог, »ндекс.  эш
+Proxy
+ѕрокси
+MIME Types
+MIME Types (“ипы файлов)
+Do you really want to quit WinHTTrack Website Copier?
+¬ы действительно хотите завершить работу с программой?
+Do not connect to a provider (already connected)
+Ќе соедин€тьс€ с провайдером (соединение уже установлено)
+Do not use remote access connection
+Ќе испоьзовать удаленной соединени€
+Schedule the mirroring operation
+«акачка по расписанию
+Quit WinHTTrack Website Copier
+¬ыйти из WinHTTrack Website Copier
+Back to starting page
+Ќазад к начальной странице
+Click to start!
+Start!
+No saved password for this connection!
+Ќет сохраненного парол€ дл€ этого соединени€
+Can not get remote connection settings
+Ќе могу получить установки удаленного соединени€
+Select a connection provider
+¬ыберите провайдера, к которому установить соединение
+Start
+Boshlamoq
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+¬ы можете или начать закачку, нажав кнопку —“ј–“, или можете задать дополнительные параметры соединени€
+Save settings only, do not launch download now.
+“олько сохранить установки, не начинать закачку.
+On hold
+«адержка
+Transfer scheduled for: (hh/mm/ss)
+∆дем до: (hh/mm/ss)
+Start
+Ќачать!
+Connect to provider (RAS)
+—оединитьс€ с провайдером (RAS)
+Connect to this provider
+—оединитьс€ с этим провайдером
+Disconnect when finished
+ќтсоединитьс€ при завершении
+Disconnect modem on completion
+ќтсоеденить при завершении
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(—ообщите нам пожалуйста о замеченных проблемах и ошибках)\r\n\r\n–азработка:\r\n»нтерфейс (Windows): Xavier Roche\r\n ачалка (spider): Xavier Roche\r\nѕарсер €ва-классов: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Russian translations to:\r\nAndrei Iliev (andreiiliev@mail.ru)
+About WinHTTrack Website Copier
+ќ программе WinHTTrack Website Copier
+Please visit our Web page
+ѕожалуйста, посетите нашу веб-страницу
+Wizard query
+¬опрос мастера
+Your answer:
+Javobingiz:
+Link detected..
+Ќайден линк..
+Choose a rule
+Qoidani tanlang
+Ignore this link
+»гнорировать этот линк
+Ignore directory
+»гнорировать директорию
+Ignore domain
+»гнорировать домен
+Catch this page only
+—качать только эту страничку
+Mirror site
+«еркализовать сайт
+Mirror domain
+«еркализовать домен
+Ignore all
+»гнорировать все
+Wizard query
+¬опрос мастера
+NO
+YOТQ
+File
+Fayl
+Options
+Tanlovlar
+Log
+Log
+Window
+Oyna
+Help
+Yordam
+Pause transfer
+ѕриостановить закачку
+Exit
+Chiqish
+Modify options
+»зменить настройки
+View log
+Logni koТrmoq
+View error log
+Log xatolarni koТrmoq
+View file transfers
+Fayllarni uzatish prossesini koТrmoq
+Hide
+Berkitmoq
+About WinHTTrack Website Copier
+Dastur haqida...
+Check program updates...
+ѕроверить наличие обновленний программы...
+&Toolbar
+Uskunalar paneli
+&Status Bar
+Holat paneli
+S&plit
+Ajratmoq
+File
+Fayl
+Preferences
+Sozlanmalar
+Mirror
+KoТzgu
+Log
+Log
+Window
+ќкно
+Help
+ѕомощь
+Exit
+¬ыход
+Load default options
+«агрузить значени€ параметров по умолчанию
+Save default options
+—охранить значени€ по умолчанию
+Reset to default options
+ќчистить значени€ по умолчанию
+Load options...
+«агрузить настройки...
+Save options as...
+—охранить настройки как...
+Language preference...
+Tilni tanlash
+Contents...
+Mundarija...
+About WinHTTrack...
+WinHTTrack haqida...
+New project\tCtrl+N
+Yangi loyiha\tCtrl+N
+&Open...\tCtrl+O
+&Ochmoq...\tCtrl+O
+&Save\tCtrl+S
+&Saqlamoq\tCtrl+S
+Save &As...
+Quyidagidek &saqlamoq...
+&Delete...
+&OТchirmoq...
+&Browse sites...
+&Saytlarni koТrish...
+User-defined structure
+«адание структуры
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+%n\t»м€ файла без расширени€ (напр.: image)\r\n%N\t»м€ файла с расширением (напр.: image.gif)\r\n%t\t–асширение файла (напр.: gif)\r\n%p\tѕуть к файлу [без оканчивающего /] (напр.: /someimages)\r\n%h\t»м€ хоста (напр.: www.someweb.com)\r\n%M\tURL MD5 (128 bits, 32 ascii bytes)\r\n%Q\tquery string MD5 (128 bits, 32 ascii bytes)\r\n%q\tsmall query string MD5 (16 bits, 4 ascii bytes)\r\n\r\n%s?\tDOS'кое им€ (напр: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Masalan:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Proksini moslash
+Proxy address:
+Proksi manzili:
+Proxy port:
+Port raqami:
+Authentication (only if needed)
+јутентификаци€ (если требуетс€)
+Login
+Login
+Password
+Parol
+Enter proxy address here
+¬ведите адрес прокси сервера
+Enter proxy port here
+¬ведите номер порта прокси сервера
+Enter proxy login
+¬ведите логин прокси
+Enter proxy password
+¬ведите пароль дл€ прокси сервера
+Enter project name here
+¬ведите им€ проекта
+Enter saving path here
+”кажите каталог дл€ сохранени€ проекта
+Select existing project to update
+ƒл€ обновлени€ проекта, выберите его из списка
+Click here to select path
+¬ыбрать каталог проекта
+Select or create a new category name, to sort your mirrors in categories
+¬ыбрать или создать новую категорию дл€ сортировки зеркал по категори€м
+HTTrack Project Wizard...
+HTTrack loyiha yaratuvchisi...
+New project name:
+Yangi loyiha nomi:
+Existing project name:
+Mavjud loyiha nomi:
+Project name:
+Loyiha nomi:
+Base path:
+Jild:
+Project category:
+Loyiha kategoriyasi:
+C:\\My Web Sites
+C:\\Veb saytlarim
+Type a new project name, \r\nor select existing project to update/resume
+Yangi loyiha nomini kiriting, \r\nyoki mavjud loyihani yangilash/davom etirish uchun tanlang
+New project
+Yangi loyiha
+Insert URL
+URLni qoТymoq
+URL:
+URL:
+Authentication (only if needed)
+Autentifikatsiya (agar kerak boТlsa)
+Login
+Login:
+Password
+Parol:
+Forms or complex links:
+Murakkab havolalar:
+Capture URL...
+«асечь URL...
+Enter URL address(es) here
+URL manzilni kiriting
+Enter site login
+¬ведите логин дл€ доступа к сайту
+Enter site password
+¬ведите пароль дл€ доступа к сайту
+Use this capture tool for links that can only be accessed through forms or javascript code
+»спользуйте это средство дл€ отлова динамических URL (javascript, формы и т.п.)
+Choose language according to preference
+¬ыбор €зыка
+Catch URL!
+URLni tuting!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+¬ременно установите в настройках прокси вашего броузера указанные ниже значени€ адреса и номера порта.\n«атем, в броузере выполните необходимые действи€ (послать форму, активизировать скрипт и т.п.) .
+This will send the desired link from your browser to WinHTTrack.
+“аким образом вы сможете передать желаемый линк из браузера в HTTrack.
+ABORT
+Bekor qilmoq
+Copy/Paste the temporary proxy parameters here
+Vaqtinchalik proksi sozlamasini nusxalamoq/qoТymoq
+Cancel
+Bekor qilmoq
+Unable to find Help files!
+Ќе найдены файлы помощи!
+Unable to save parameters!
+Parametrlarni saqlashning imkoni yoТq!
+Please drag only one folder at a time
+Iltimos, faqat bitta jildni surib olib keling
+Please drag only folders, not files
+Iltimos, faqat fayllarni jildni surib olib keling, fayllarni emas
+Please drag folders only
+Iltimos, faqat jildlarni surib olib keling
+Select user-defined structure?
+¬ыбрать заданную вами структуру?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+ѕроверьте, что определенна€ вами структура правильна, в противном случае, имена файлов будут непредсказуемы
+Do you really want to use a user-defined structure?
+¬ы действительно хотите выбрать заданную структуру?
+Too manu URLs, cannot handle so many links!!
+—лишком много URL'ов, не могу обработать такое количество линков!
+Not enough memory, fatal internal error..
+Xotira yetarli emas, jiddiy ichki xatolik...
+Unknown operation!
+Noma'lum operatsiya
+Add this URL?\r\n
+Ushbu URL qoТshilsinmi?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Diqqat: soТrovlarga javob bermayapti, URLlarni qoТshishning imkoni yoТq...
+Type/MIME associations
+—оответсвие типу файлов (Type/MIME)
+File types:
+Fayl turlari:
+MIME identity:
+MIME identity
+Select or modify your file type(s) here
+¬ыбрать или изменить типы файлов
+Select or modify your MIME type(s) here
+Fayllar turini tanlamoq yoki oТzgartirmoq
+Go up
+Yuqoriga
+Go down
+Pastga
+File download information
+Yuklab olingan fayl haqida
+Freeze Window
+Oynani qotirib qoТymoq
+More information:
+QoТshimcha maТlumot:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+ƒобро пожаловать в программу WinHTTrack Website Copier!\n\nѕожалуйста нажмите кнопку ƒјЋ≈≈ дл€ того, чтобы\n\n- начать новый проект\n- или возобновить частичную закачку
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+»мена файлов с раширением:\n»мена файлов, содержащие:\nЁтот файл:\n»мена фолдеров содержат:\nЁтот фолдер:\nЋинки из этого домена:\nЋинки из доменов, содержащие:\nЋинки из этого хоста:\nЋинки содержащие:\nЁтот линк:\n¬—≈ Ћ»Ќ »
+Show all\nHide debug\nHide infos\nHide debug and infos
+ѕоказать все\n—пр€тать отладку\n—пр€тать инфо\n—пр€тать отладку и инфо
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+—труктура сайта (по умолчанию)\nHtml/, файлы изображений/другие файлы/файлы изображений/\nHtml/html, файлы изображений/другие файлы/файлы изображений\nHtml/, файлы изображений/другие файлы/\nHtml/, файлы изображений/другие файлы/xxx, где xxx - расширение файла\nHtml, файлы изображений/другие файлы/xxx\n—труктура сайта без www.domain.xxx/\nHtml в site_name/ файлы изображений/другие файлы в site_name/файлы изображений/\nHtml в site_name/html, файлы изображений/другие файлы в site_name/файлы изображений\nHtml в site_name/, файлы изображений/другие файлы в site_name/\nHtml в site_name/, файлы изображений/другие файлы в site_name/xxx\nHtml в site_name/html, файлы изображений/другие файлы в site_name/xxx\n¬се файлы из веба/, с произвольными именами (новинка !)\n¬се файлы из site_name/, с произвольными именами (новинка !)\n«аданна€ пользователем структура...
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+“олько сканировать\n—охран€ть html файлы\n—охран€ть не html файлы\n—охран€ть все файлы (по умолчанию)\n—охран€ть вначале html файлы
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+ќставатьс€ в тойже директории\nћожно двигатьс€ вниз (по умолчанию)\nћожно двигатьс€ вверх\nћожно двигатьс€ вверх и вниз
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+ќставатьс€ на том же адресе (по умолчанию)\nќставатьс€ на том же домене\nќставатьс€ на том же домене верхнего уровн€\n»дти куда угодно
+Never\nIf unknown (except /)\nIf unknown
+Hech qachon\nAgar noma'lum boТlsa (/ dan boshqasi)\nAgar noma'lum boТlsa
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+Ќе подчин€тьс€ правилам robots.txt\nrobots.txt кроме ћастера\nподчин€тьс€ правилам robots.txt
+normal\nextended\ndebug
+Odatiy\nkengaytirilgan\ntuzatish
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Sayt(lar)ni koТchirib olish\nSayt(lar)ni koТchirib olmoq +savollar\nAlohida fayllarni yuklab olmoq\nBarcha saytlarni sahifalari bilan koТchirib olish (bir necha koТzgu)\nHavolalarni sahifasi bilan sinamoq (xatchoТp testi)\n* ToТxtatilganni davom etirmoq\n* Mavjud yuklamani yangilamoq
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+ќтносительный URI / јбсолютный URL (по умолчанию)\nјбсолютный URL / јбсолютный URL\nјбсолютный URI / јбсолютный URL\nѕервоначальный URL / ѕервоначальный URL
+Open Source offline browser
+Open Source offlayn brauzer
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Veb-saytlarni oluvchi/Offlayn brauzer. Kompyuteringizga veb-saytlarni koТchirib beradi. Bepul.
+httrack, winhttrack, webhttrack, offline browser
+httrack, winhttrack, webhttrack, offline browser
+URL list (.txt)
+URLlar roТyxati (.txt)
+Previous
+Ortga
+Next
+Keyingi
+URLs
+URLs
+Warning
+Ogohlatirish
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+¬аш браузер или не поддерживает javascript или его поддержка выключена. ƒл€ получени€ наилучшего результата активизируйте поддержку javascript.
+Thank you
+Rahmat
+You can now close this window
+Endi bu oynani yopsangiz boТladi
+Server terminated
+Server terminated
+A fatal error has occured during this mirror
+Joriy koТchirish vaqtida jiddiy xatolik yuz berdi
