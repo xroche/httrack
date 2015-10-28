@@ -30,14 +30,14 @@ return 0
 }
 
 function launch_browser {
-log "launching $1"
+log "Launching $1"
 browser=$1
 url=$2
-log "spawning browser.."
+log "Spawning browser.."
 ${browser} "${url}"
 # note: browser can hiddenly use the -remote feature of
 # mozilla and therefore return immediately
-log "browser (or helper) exited"
+log "Browser (or helper) exited"
 }
 
 # First ensure that we can launch the server
@@ -48,12 +48,12 @@ done
 for i in ${SRCHDISTPATH}; do
 	! test -n "${DISTPATH}" && test -f "${i}/httrack/lang.def" && DISTPATH="${i}/httrack"
 done
-test -n "${BINPATH}" || ! log "could not find htsserver" || exit 1
-test -n "${DISTPATH}" || ! log "could not find httrack directory" || exit 1
-test -f ${DISTPATH}/lang.def || ! log "could not find ${DISTPATH}/lang.def" || exit 1
-test -f ${DISTPATH}/lang.indexes || ! log "could not find ${DISTPATH}/lang.indexes" || exit 1
-test -d ${DISTPATH}/lang || ! log "could not find ${DISTPATH}/lang" || exit 1
-test -d ${DISTPATH}/html || ! log "could not find ${DISTPATH}/html" || exit 1
+test -n "${BINPATH}" || ! log "Could not find htsserver" || exit 1
+test -n "${DISTPATH}" || ! log "Could not find httrack directory" || exit 1
+test -f ${DISTPATH}/lang.def || ! log "Could not find ${DISTPATH}/lang.def" || exit 1
+test -f ${DISTPATH}/lang.indexes || ! log "Could not find ${DISTPATH}/lang.indexes" || exit 1
+test -d ${DISTPATH}/lang || ! log "Could not find ${DISTPATH}/lang" || exit 1
+test -d ${DISTPATH}/html || ! log "Could not find ${DISTPATH}/html" || exit 1
 
 # Locale
 HTSLANG="${LC_MESSAGES}"
@@ -76,7 +76,7 @@ test -n "$BROWSEREXE" && break
 done
 test -n "$BROWSEREXE" && break
 done
-test -n "$BROWSEREXE" || ! log "cound not find any suitable browser" || exit 1
+test -n "$BROWSEREXE" || ! log "Could not find any suitable browser" || exit 1
 
 # "browse" command
 if test "$1" = "browse"; then
@@ -96,7 +96,7 @@ exit $?
 fi
 
 # Create a temporary filename
-TMPSRVFILE="$(mktemp ${TMPDIR:-/tmp}/.webhttrack.XXXXXXXX)" || ! log "cound not create the temporary file ${TMPSRVFILE}" || exit 1
+TMPSRVFILE="$(mktemp ${TMPDIR:-/tmp}/.webhttrack.XXXXXXXX)" || ! log "Could not create the temporary file ${TMPSRVFILE}" || exit 1
 # Launch htsserver binary and setup the server
 (${BINPATH}/htsserver "${DISTPATH}/" --ppid "$$" path "${HOME}/websites" lang "${LANGN}" $@; echo SRVURL=error) > ${TMPSRVFILE}&
 # Find the generated SRVURL
@@ -107,18 +107,18 @@ MAXCOUNT=$[$MAXCOUNT - 1]
 test $MAXCOUNT -gt 0 || exit 1
 test $MAXCOUNT -lt 50 && echo "waiting for server to reply.."
 SRVURL=`grep -E URL= ${TMPSRVFILE} | cut -f2- -d=`
-test ! "$SRVURL" = "error" || ! log "could not spawn htsserver" || exit 1
+test ! "$SRVURL" = "error" || ! log "Could not spawn htsserver" || exit 1
 test -n "$SRVURL" || sleep 1
 done
 
 # Cleanup function
 function cleanup {
-test -n "$1" && log "nasty signal caught, cleaning up.."
+test -n "$1" && log "Nasty signal caught, cleaning up.."
 # Do not kill if browser exited (chrome bug issue) ; server will die itself
 test -n "$1" && test -f ${TMPSRVFILE} && SRVPID=`grep -E PID= ${TMPSRVFILE} | cut -f2- -d=`
 test -n "${SRVPID}" && kill -9 ${SRVPID}
 test -f ${TMPSRVFILE} && rm ${TMPSRVFILE}
-test -n "$1" && log "..done"
+test -n "$1" && log "..Done"
 return 0
 }
 
