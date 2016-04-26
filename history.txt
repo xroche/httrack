@@ -3,6 +3,11 @@ HTTrack Website Copier release history:
 --------------------------------------
 
 This file lists all changes and fixes that have been made for HTTrack
+
+3.48-22
++ Fixed: on Windows, fixed possible DLL local injection (Tunisian Cyber)
++ Fixed: various typos
+
 3.48-21
 + Fixed: Google RPMs use /usr/bin/google-chrome as program location (Cickumqt)
 + Fixed: Fixed htsserver not dying (immediately) on quit
