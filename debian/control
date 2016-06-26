@@ -2,7 +2,7 @@ Source: httrack
 Section: web
 Priority: optional
 Maintainer: Xavier Roche <roche@httrack.com>
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 Build-Depends: debhelper (>= 8.0.0), dh-autoreconf, autotools-dev, autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev
 Homepage: http://www.httrack.com
 Vcs-Git: https://github.com/xroche/httrack.git
