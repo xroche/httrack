@@ -1,3 +1,10 @@
+httrack (3.48.23-1) unstable; urgency=medium
+
+  * Updated to 3.48.23 (3.48-23)
+    closes:#828344
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 26 Jun 2016 14:15:46 +0200
+
 httrack (3.48.22-1) unstable; urgency=medium
 
   * Updated to 3.48.22 (3.48-22)

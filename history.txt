@@ -4,6 +4,9 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.48-23
++ Fixed: on Linux, FTBFS with openssl 1.1.0
+
 3.48-22
 + Fixed: on Windows, fixed possible DLL local injection (Tunisian Cyber)
 + Fixed: various typos
