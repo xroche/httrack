@@ -160,7 +160,7 @@ AC_CHECK_LIB(crypto, EVP_get_digestbyname,
 	]
 	)
 LIBS="$LIBS $OPENSSL_LIBS"
-AC_CHECK_LIB(ssl, SSL_library_init,
+AC_CHECK_LIB(ssl, SSL_CTX_new,
 	[
 	OPENSSL_LIBS="$OPENSSL_LIBS -lssl"
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
