@@ -3,7 +3,7 @@ httrack (3.48.24-1) unstable; urgency=low
   * Removed recommends non-existing package (libssl1.0.0)
     closes:#835258
 
- -- Xavier Roche <roche@proliant.localnet>  Wed, 24 Aug 2016 09:04:28 +0200
+ -- Xavier Roche <xavier@debian.org>  Wed, 24 Aug 2016 09:04:28 +0200
 
 httrack (3.48.23-1) unstable; urgency=medium
 
