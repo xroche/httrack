@@ -60,7 +60,6 @@ Section: libs
 Replaces: libhttrack1
 Conflicts: libhttrack1
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Recommends: libssl1.0.0
 Description: Httrack website copier library
  This package is the library part of httrack, website copier and mirroring
  utility
@@ -69,7 +68,6 @@ Package: libhttrack-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends}, ${shlibs:Depends}, zlib1g-dev
-Recommends: libssl1.0.0
 Description: Httrack website copier includes and development files
  This package adds supplemental files for using the httrack website copier
  library
