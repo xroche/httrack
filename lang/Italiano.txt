@@ -41,7 +41,7 @@ Eliminare il progetto vuoto %s?
 Action not yet implemented
 Azione non ancora possibile
 Error deleting this project
-C'Ã¨ stato un errore durante l'eliminazione di questo progetto
+C'è stato un errore durante l'eliminazione di questo progetto
 Select a rule for the filter
 Seleziona le regole per il filtro
 Enter keywords for the filter
@@ -51,7 +51,7 @@ Annulla
 Add this rule
 Aggiungi questa regola
 Please enter one or several keyword(s) for the rule
-Inserisci una o piÃ¹ parola(e) chiave
+Inserisci una o più parola(e) chiave
 Add Scan Rule
 Aggiungi un filtro
 Criterion
@@ -69,7 +69,7 @@ Escludi i collegamenti
 Include link(s)
 Accetta i collegamenti
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-Suggerimento: Se vuoi accettare tutti i file gif sulle pagine web, usa qualcosa come +www.pagina.com/*.gif \n((+*.gif accetterÃ /rifiuterÃ  TUTTI i file gif su TUTTE le pagine)
+Suggerimento: Se vuoi accettare tutti i file gif sulle pagine web, usa qualcosa come +www.pagina.com/*.gif \n((+*.gif accetterà/rifiuterà TUTTI i file gif su TUTTE le pagine)
 Save prefs
 Salva impostazioni
 Matching links will be excluded:
@@ -79,25 +79,25 @@ I collegamenti soggetti a questa regola verranno accettati
 Example:
 Esempio:
 gif\r\nWill match all GIF files
-gif\r\nTroverÃ  tutti i file gif
+gif\r\nTroverà tutti i file gif
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
-blue\r\nTroverÃ  tutti i file contenenti 'blue', es. 'bluesky-small.jpeg'
+blue\r\nTroverà tutti i file contenenti 'blue', es. 'bluesky-small.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
-bigfile.mov\r\nTroverÃ  il file 'bigfile.mov', ma non 'bigfile2.mov'
+bigfile.mov\r\nTroverà il file 'bigfile.mov', ma non 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nTroverÃ  i collegamenti con la cartella contenente 'cgi', es. /cgi-bin/somecgi.cgi
+cgi\r\nTroverà i collegamenti con la cartella contenente 'cgi', es. /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\nTroverÃ  i collegamenti con la cartella contenente 'cgi-bin' (ma non cgi-bin-2, per esempio)
+cgi-bin\r\nTroverà i collegamenti con la cartella contenente 'cgi-bin' (ma non cgi-bin-2, per esempio)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
-someweb.com\r\nTroverÃ  tutti i collegamenti come www.someweb.com, private.someweb.com etc.
+someweb.com\r\nTroverà tutti i collegamenti come www.someweb.com, private.someweb.com etc.
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
-someweb\r\nTroverÃ  tutti i collegamenti come www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+someweb\r\nTroverà tutti i collegamenti come www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
 www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
-www.someweb.com\r\nTroverÃ  tutti i collegamenti come www.someweb.com/... (ma non collegamenti come private.someweb.com/..)
+www.someweb.com\r\nTroverà tutti i collegamenti come www.someweb.com/... (ma non collegamenti come private.someweb.com/..)
 someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
-someweb\r\nTroverÃ  tutti i collegamenti come www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+someweb\r\nTroverà tutti i collegamenti come www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
 www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
-www.test.com/test/someweb.html\r\nTroverÃ  soltanto il collegamenti www.test.com/test/someweb.html. Nota che bisogna inserire sia l'indirizo (www.xxx.yyy), che il percorso (/test/someweb.html)
+www.test.com/test/someweb.html\r\nTroverà soltanto il collegamenti www.test.com/test/someweb.html. Nota che bisogna inserire sia l'indirizo (www.xxx.yyy), che il percorso (/test/someweb.html)
 All links will match
 Tutti i collegamenti verranno rifiutati/accettati
 Add exclusion filter
@@ -153,7 +153,7 @@ File di log degli errori
 Unable to initialize the OLE system
 Impossibile inizializzare il sistema OLE
 WinHTTrack could not find any interrupted download file cache in the specified folder!
-Non c'Ã¨ cache nella cartella indicata\nWinHTTracknon ha trovato nessun mirror interrotto!
+Non c'è cache nella cartella indicata\nWinHTTracknon ha trovato nessun mirror interrotto!
 Could not connect to provider
 Impossibile stabilire la connessione con il provider
 receive
@@ -195,21 +195,21 @@ Mirror in corso [%s, %s bytes]
 Site mirroring finished!
 Mirror del sito completato!
 A problem occured during the mirroring operation\n
-C'Ã¨ stato un problema durante il mirror\n
+C'è stato un problema durante il mirror\n
 \nDuring:\n
 Durante:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
 Verifica il log se necessario.\n\nClicca OK per uscire da WinHTTrack.\n\nGrazie per aver usato WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-Il mirror Ã¨ finito.\nClicca OK per uscire da WinHTTrack.\nGuarda i file log per assicurarti che tutto Ã¨ andato a buon fine.\n\nGrazie per aver usato WinHTTrack!
+Il mirror è finito.\nClicca OK per uscire da WinHTTrack.\nGuarda i file log per assicurarti che tutto è andato a buon fine.\n\nGrazie per aver usato WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * MIRROR INTERROTTO! * *\r\nLa cache corrente Ã¨ necessaria per le operazioni di aggiornamento e contiene solo i dati scaricati durante questa sessione interrotta.\r\nLa cache precedente potrebbe contenere informazioni piÃ¹ complete; se non vuoi perdere quelle informazioni, devi ripristinarla e cancellare la cache corrente.\r\n[Nota: per fare questo, cancella il contenuto della cartella hts-cache del mirror]\r\n\r\nPensi che la cache precedente possa contenere informazioni piÃ¹ complete e vuoi ripristinarla?
+* * MIRROR INTERROTTO! * *\r\nLa cache corrente è necessaria per le operazioni di aggiornamento e contiene solo i dati scaricati durante questa sessione interrotta.\r\nLa cache precedente potrebbe contenere informazioni più complete; se non vuoi perdere quelle informazioni, devi ripristinarla e cancellare la cache corrente.\r\n[Nota: per fare questo, cancella il contenuto della cartella hts-cache del mirror]\r\n\r\nPensi che la cache precedente possa contenere informazioni più complete e vuoi ripristinarla?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * ERRORE NEL MIRROR! * *\r\nHTTrack ha stabilito che il mirror attuale Ã¨ vuoto. Se questo Ã¨ un aggiornamento, il mirror precedente Ã¨ stato ripristinato.\r\nMotivo: la prima pagina(e) non Ã¨ stata trovata oppure c'Ã¨ stato un problema durante la connessione\r\n=> Assicurati che il sito esista ancora, e/o verificate le vostre impostazioni del proxy! <=
+* * ERRORE NEL MIRROR! * *\r\nHTTrack ha stabilito che il mirror attuale è vuoto. Se questo è un aggiornamento, il mirror precedente è stato ripristinato.\r\nMotivo: la prima pagina(e) non è stata trovata oppure c'è stato un problema durante la connessione\r\n=> Assicurati che il sito esista ancora, e/o verificate le vostre impostazioni del proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nSuggerimento: Clicca [Visualizza filr di log] per vedere i messaggi di avvertimento o di errore
 Error deleting a hts-cache/new.* file, please do it manually
-Errore durante la cancellazione del contenuto della cartella hts-cache, Ã¨ necessario completare l'operazione manualmente
+Errore durante la cancellazione del contenuto della cartella hts-cache, è necessario completare l'operazione manualmente
 Do you really want to quit WinHTTrack Website Copier?
 Vuoi veramente uscire da WinHTTrack?
 - Mirroring Mode -\n\nEnter address(es) in URL box
@@ -235,7 +235,7 @@ Nuovo progetto / importare?
 Choose criterion
 Scegli l'azione
 Maximum link scanning depth
-Massima profonditÃ  dei link
+Massima profondità dei link
 Enter address(es) here
 Inserisci gli indirizzi qui
 Define additional filtering rules
@@ -289,9 +289,9 @@ Benvenuto in WinHTTrack!
 Action:
 Azione:
 Max Depth
-Massima profonditÃ :
+Massima profondità:
 Maximum external depth:
-Massima profonditÃ  esterna:
+Massima profondità esterna:
 Filters (refuse/accept links) :
 Filtri (rifiutare/accettare i collegamenti) :
 Paths
@@ -337,7 +337,7 @@ In esecuzione:
 Hide
 Nascondi
 Transfer rate
-VelocitÃ  di trasferimento
+Velocità di trasferimento
 SKIP
 SALTA
 Information
@@ -357,7 +357,7 @@ Verifica tutti i collegamenti nelle pagine
 Try to ferret out all links
 Cerca di trovare tutti i collegamenti
 Download HTML files first (faster)
-Scarica prima i file HTML (piÃ¹ veloce)
+Scarica prima i file HTML (più veloce)
 Choose local site structure
 Scegli la struttura del sito in locale
 Set user-defined structure on disk
@@ -391,11 +391,11 @@ Numero massimo di connessioni
 File timeout
 Massimo tempo d'attesa per un file
 Cancel all links from host if timeout occurs
-Annulla tutti i collegamenti dal host se c'Ã¨ timeout
+Annulla tutti i collegamenti dal host se c'è timeout
 Minimum admissible transfer rate
 Minimo transfer rate ammesso
 Cancel all links from host if too slow
-Annulla tutti i collegamenti dal host se Ã¨ troppo lento
+Annulla tutti i collegamenti dal host se è troppo lento
 Maximum number of retries on non-fatal errors
 Massimo numero di tentativi nel caso di un errore non fatale
 Maximum size for any single HTML file
@@ -405,7 +405,7 @@ La dimensione massima per un file
 Maximum amount of bytes to retrieve from the Web
 Massima dimensione del mirror
 Make a pause after downloading this amount of bytes
-Pausa dopo aver ricevuto questa quantitÃ  di byte
+Pausa dopo aver ricevuto questa quantità di byte
 Maximum duration time for the mirroring operation
 Tempo massimo del mirror
 Maximum transfer rate
@@ -415,9 +415,9 @@ Limite delle connessioni al secondo (per evitare il sovraccarico del server)
 Maximum number of links that can be tested (not saved!)
 Massimo numero di link che possono essere testati (non salvati!)
 Browser identity
-IdentitÃ  del browser
+Identità del browser
 Comment to be placed in each HTML file
-PiÃ¨ di pagina per ogni file HTML
+Piè di pagina per ogni file HTML
 Back to starting page
 Torna alla pagina iniziale
 Save current preferences as default values
@@ -443,15 +443,15 @@ Tieni tutti i file nella cache, invece dei soli file HTML
 Log file type (if generated)
 Tieni il tipo di file nel log se generato
 Maximum mirroring depth from root address
-Massima profonditÃ  del mirror dai primi indirizzi
+Massima profondità del mirror dai primi indirizzi
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
-Massima profonditÃ  del mirror per indirizzi esterni/vietati  (0, Ã¨ l'impostazione predefinita)
+Massima profondità del mirror per indirizzi esterni/vietati  (0, è l'impostazione predefinita)
 Create a debugging file
 Crea un file di debug
 Use non-standard requests to get round some server bugs
 Cerca di evitare alcuni bug dei server usando richieste non standard
 Use old HTTP/1.0 requests (limits engine power!)
-Usa richieste HTTP/1.0, limita le capacitÃ  del motore!
+Usa richieste HTTP/1.0, limita le capacità del motore!
 Attempt to limit retransfers through several tricks (file size test..)
 Tentativo di limitare il numero di ripetizioni dei trasferimenti, usando alcuni truchi (test della dimensione del file..)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
@@ -503,17 +503,17 @@ Controllo di flusso
 Limits
 Limiti
 Identity
-IdentitÃ 
+Identità
 HTML footer
-PiÃ¨ di pagina HTML
+Piè di pagina HTML
 N# connections
-NÂ° di connessioni
+N° di connessioni
 Abandon host if error
 Abbandona il host nel caso di errore
 Minimum transfer rate (B/s)
 Transfer rate minimo (B/s)
 Abandon host if too slow
-Abbandona il host se Ã¨ troppo lento
+Abbandona il host se è troppo lento
 Configure
 Configurazione
 Use proxy for ftp transfers
@@ -539,7 +539,7 @@ Tempo massimo
 Save prefs
 Salva impostazioni
 Max transfer rate
-VelocitÃ  di trasferimento massima
+Velocità di trasferimento massima
 Follow robots.txt
 Segui robots.txt
 No external pages
@@ -563,7 +563,7 @@ URL hacks (join similar URLs)
 Force old HTTP/1.0 requests (no 1.1)
 Forza richieste HTTP/1.0 (non 1.1)
 Max connections / seconds
-NÂ° massimo di connessioni al secondo
+N° massimo di connessioni al secondo
 Maximum number of links
 Massimo numero di link
 Pause after downloading..
@@ -583,7 +583,7 @@ Controllo di flusso
 Limits
 Limiti
 Browser ID
-IdentitÃ  del browser
+Identità del browser
 Scan Rules
 Filtri
 Spider
@@ -597,7 +597,7 @@ Tipi MIME
 Do you really want to quit WinHTTrack Website Copier?
 Vuoi veramente uscire da WinHTTrack?
 Do not connect to a provider (already connected)
-Non effettuare la connessione al provider (giÃ  connesso)
+Non effettuare la connessione al provider (già connesso)
 Do not use remote access connection
 Non usare la connessione di accesso remoto
 Schedule the mirroring operation
@@ -609,7 +609,7 @@ Torna alla pagina iniziale
 Click to start!
 Clicca per iniziare!
 No saved password for this connection!
-Non c'Ã¨ nessuna password salvata per questa connessione
+Non c'è nessuna password salvata per questa connessione
 Can not get remote connection settings
 Impossibile ottenere i parametri della connessione
 Select a connection provider
@@ -633,7 +633,7 @@ Connessione a questo provider:
 Disconnect when finished
 Disconnetti alla fine
 Disconnect modem on completion
-Disconnetti il modem quando il mirror Ã¨ finito
+Disconnetti il modem quando il mirror è finito
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
 \r\n(informateci degli errori o problemi)\r\n\rSviluppo:\r\nInterfacccia: Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Italian translations to:\r\nWitold Krakowski (wkrakowski@libero.it)
 About WinHTTrack Website Copier
@@ -645,7 +645,7 @@ La domanda del wizard
 Your answer:
 La vostra risposta:
 Link detected..
-Ãˆ stato trovato un collegamento
+È stato trovato un collegamento
 Choose a rule
 Scegli una regola
 Ignore this link
@@ -817,7 +817,7 @@ Inserisci il login del sito
 Enter site password
 Inserisci la password del sito
 Use this capture tool for links that can only be accessed through forms or javascript code
-Usa questo tool per prelevare i collegamenti ai quali si puÃ² accedere solo tramite formule o collegamenti javascript
+Usa questo tool per prelevare i collegamenti ai quali si può accedere solo tramite formule o collegamenti javascript
 Choose language according to preference
 Seleziona la lingua
 Catch URL!
@@ -825,7 +825,7 @@ Preleva l'URL!
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
 Temporaneamente inserisci le seguenti impostazioni per il proxy (copia/incolla l'indirizzo e il port del proxy).\nQuindi, nella tua pagina del browser clicca sul pulsante ok della form, oppure clicca sul collegamento specifico che vuoi prelevare.
 This will send the desired link from your browser to WinHTTrack.
-Questo preleverÃ  il coolegamento desiderato dal tuo browser a HTTrack.
+Questo preleverà il coolegamento desiderato dal tuo browser a HTTrack.
 ABORT
 ANNULLA
 Copy/Paste the temporary proxy parameters here
@@ -845,11 +845,11 @@ Trascina solo una cartella
 Select user-defined structure?
 Selezionare la struttura definita dall'utente?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Assicurati che la stringa definita dall'utente Ã¨ corretta\nSe non Ã¨ corretta, i nomi dei file saranno errati!
+Assicurati che la stringa definita dall'utente è corretta\nSe non è corretta, i nomi dei file saranno errati!
 Do you really want to use a user-defined structure?
 Vuoi veramente selezionare la struttura definita dall'utente?
 Too manu URLs, cannot handle so many links!!
-Troppi URL, il programma non puÃ² servire cosÃ¬ tanti collegamenti!
+Troppi URL, il programma non può servire così tanti collegamenti!
 Not enough memory, fatal internal error..
 Troppa poca memoria, errore interno fatale...
 Unknown operation!
@@ -857,13 +857,13 @@ Operazione sconosciuta!
 Add this URL?\r\n
 Aggiungere questo URL?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
-Attenzione: il processo principale non risponde, non Ã¨ possibile aggiungere URL.
+Attenzione: il processo principale non risponde, non è possibile aggiungere URL.
 Type/MIME associations
 Corrispondenze tipo/MIME
 File types:
 Tipi di file
 MIME identity:
-IdentitÃ  MIME
+Identità MIME
 Select or modify your file type(s) here
 Seleziona o modifica i tuoi tipi di file qui
 Select or modify your MIME type(s) here
@@ -871,13 +871,13 @@ Seleziona o modifica i tuoi tipi MIME qui
 Go up
 Vai su
 Go down
-Vai giÃ¹
+Vai giù
 File download information
 Informazioni sullo scaricamento dei file
 Freeze Window
 Congela la finestra
 More information:
-PiÃ¹ informazioni:
+Più informazioni:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
 Benvenuti nel WinHTTrack Website Copier!\n\nClicca sul pulsante NEXT per iniziare o continuare un progetto
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
@@ -885,11 +885,11 @@ Tipi di file con l'estensione:\nNomi di file contenenti:\nQuesto nome di file:\n
 Show all\nHide debug\nHide infos\nHide debug and infos
 Mostra tutto\nNascondi il debug\nNascondi le informazioni\nNascondi il debug e le informazioni
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Struttura del sito (default)\nHtml nel web,      immagini/altri file nel web/immagini/\nHtml nel web/html,  immagini/altro nel web/immagini\nHtml nel web/,        immagini/altro nel web/\nHtml nel web/,        immagini/altro nel web/xxx, dove xxx Ã¨ l'estensione del file\nHtml nel web/html,   immagini/altro nel web/xxx\nStruttura del sito, senza www.dominio.xxx/\nHtml nel nome_del_sito/,immagini/altri file nel nome_del_sito/immagini/\nHtml nel nome_del_sito/html,immagini/altro nel nome_del file/immagini\nHtml nel nome_del_sito/,immagini/altro nel nome_del_sito/\nHtml nel nome_del_sito/,immagini/altro nel nome_del_sito/xxx\nHtml nel nome_del_sito/html,immagini/altro nel nome_del_sito/xxx\nTutti i file nel web/,con nomi casuali\nTutti i file nel nome_del_sito/,con nomi casuali\nStruttura definita dall'utente..
+Struttura del sito (default)\nHtml nel web,      immagini/altri file nel web/immagini/\nHtml nel web/html,  immagini/altro nel web/immagini\nHtml nel web/,        immagini/altro nel web/\nHtml nel web/,        immagini/altro nel web/xxx, dove xxx è l'estensione del file\nHtml nel web/html,   immagini/altro nel web/xxx\nStruttura del sito, senza www.dominio.xxx/\nHtml nel nome_del_sito/,immagini/altri file nel nome_del_sito/immagini/\nHtml nel nome_del_sito/html,immagini/altro nel nome_del file/immagini\nHtml nel nome_del_sito/,immagini/altro nel nome_del_sito/\nHtml nel nome_del_sito/,immagini/altro nel nome_del_sito/xxx\nHtml nel nome_del_sito/html,immagini/altro nel nome_del_sito/xxx\nTutti i file nel web/,con nomi casuali\nTutti i file nel nome_del_sito/,con nomi casuali\nStruttura definita dall'utente..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Soltanto scanning\nSalva file html\nSalva file non-html\nSalva tutti i file (default)\nSalva prima i file HTML
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
-Non uscire dalla directory\nPuoi andare giÃ¹ nella struttura (default)\nPuoi salire\nPuoi sia scendere che salire
+Non uscire dalla directory\nPuoi andare giù nella struttura (default)\nPuoi salire\nPuoi sia scendere che salire
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
 Rimani nell'indirizzo indicato (default)\nRimani nello stesso dominio\nRimani nello stesso dominio di livello superiore\nVai dovunque sia necessario nel web
 Never\nIf unknown (except /)\nIf unknown
@@ -927,4 +927,4 @@ Puoi chiudere questa finestra adesso
 Server terminated
 Server disconnesso
 A fatal error has occured during this mirror
-Si Ã¨ verificato un errore fatale durante la copia
+Si è verificato un errore fatale durante la copia
