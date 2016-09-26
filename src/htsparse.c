@@ -699,7 +699,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               break;
             case 1:
               // And the closing comment info tag
-              if ((p = strfield(html, "</html") != 0)) {
+              if ((p = strfield(html, "</html")) != 0) {
                 emited_footer++;
               } else {
                 p = 0;
