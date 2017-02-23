@@ -121,7 +121,7 @@ that it is so rich with features that I could never really figure out
 precisely the right thing to do at any given point.  I was using
 recepies rather than knowledge to get the job done - and I was pestering
 the authors for those recepies.  After a few days of very helpful
-assistance from the authors I volenteered to write a users manual for
+assistance from the authors I volunteered to write a users manual for
 httrack - and here it is.  I hope it gets the job done.
 
 <hr>
@@ -645,14 +645,14 @@ be mirrored, while the '-w' option does not ask this question but asks
 the remainder of the questions required to mirror the site.
 
 <p align=justify> The -g option allows you to get the files exactly as
-they are and store them in the currant directory.  This is handy for a
+they are and store them in the current directory.  This is handy for a
 relatively small collection of information where organization isn't
 important.  With this option, the html files will not even be parsed to
 look for other URLs.  This option is useful for getting isolated files
 (e.g., httrack -g www.mydrivers.com/drivers/windrv32.exe). 
 
 
-<p align=justify> If I start a collection process and it fails for ome
+<p align=justify> If I start a collection process and it fails for one
 reason or another - such as me interrupting it because I am running out
 of disk space - or a network outage - then I can restart the process by
 using the -i option:
@@ -859,20 +859,20 @@ With 48 sockets: 1,30MB/s
 With 128 sockets: 0,93MB/s
 </pre></ul>
 
-<p align=justify> The timeout option causes downloads to time out after
-a non-response from a download attempt.  30 seconds is pretty reasonable
-for many sites.  You might want to increase the number of retries as
-well so that you try again and again after such timeouts. 
-
-<pre><b><i>
-httrack http://www.shoesizes.com -O /tmp/shoesizes -%c20
-</i></b></pre>
-
 <p align=justify> This limits the number of connections per second.  It
 is similar to the above option but allows the pace to be controlled
 rather than the simultanaety.  It is particulsrly useful for long-term
 pulls at low rates that allow little impact on remote infrastructure.
 The default is 10 connections per second.
+
+<pre><b><i>
+httrack http://www.shoesizes.com -O /tmp/shoesizes -%c20
+</i></b></pre>
+
+<p align=justify> The timeout option causes downloads to time out after
+a non-response from a download attempt.  30 seconds is pretty reasonable
+for many sites.  You might want to increase the number of retries as
+well so that you try again and again after such timeouts. 
 
 <pre><b><i>
 httrack http://www.shoesizes.com -O /tmp/shoesizes -T30
@@ -910,7 +910,7 @@ httrack http://www.shoesizes.com -O /tmp/shoesizes -H3
 
 <p align=justify> Of course these options can be combined to provide a
 powerful set of criteria for when to continue a download and when to
-give it up, how hard to push other sites.  and how much to stress
+give it up, how hard to push other sites, and how much to stress
 infrastructures. 
 
 <hr>
@@ -944,7 +944,7 @@ javascript imported files (.js) are not currently searched for URLs.
 httrack http://www.shoesizes.com -O /tmp/shoesizes '%P0'
 </i></b></pre>
 
-<p align=justify> Now here is a classic bit of cleaverness that 'does
+<p align=justify> Now here is a classic bit of cleverness that 'does
 the right thing' for some cases.  In this instance, we are asking
 httrack to get images - like gif and jpeg files that are used by a web
 page in its display, even though we would not normally get them.  For
@@ -1517,7 +1517,7 @@ httrack http://www.shoesizes.com -O /tmp/shoesizes -I0
 httrack http://www.shoesizes.com -O /tmp/shoesizes %v
 </i></b></pre>
 
-<p align=justify> Animated information when using consol-based version,
+<p align=justify> Animated information when using console-based version,
 example:
 <pre>
 17/95: localhost/manual/handler.html (6387 bytes) - OK
@@ -2219,7 +2219,7 @@ and so on...
 </b></i></pre>
 
 <p align=justify> In these cases, there is a small probability of a hash
-collision forlarge numbers of files.
+collision for large numbers of files.
 
 <hr>
 
