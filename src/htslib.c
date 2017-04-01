@@ -68,7 +68,7 @@ Please visit our Website: http://www.httrack.com
 #include <time.h>
 #include <stdarg.h>
 
-#include <sys/timeb.h>
+#include <sys/time.h>
 #include <fcntl.h>
 
 // pour utimbuf
@@ -2575,11 +2575,13 @@ TStamp time_local(void) {
 // number of millisec since 1970
 HTSEXT_API TStamp mtime_local(void) {
 #ifndef HTS_DO_NOT_USE_FTIME
-  struct timeb B;
+  struct timeval tv;
+  if (gettimeofday(&tv, NULL) != 0) {
+    assert(! "gettimeofday");
+  }
 
-  ftime(&B);
-  return (TStamp) (((TStamp) B.time * (TStamp) 1000)
-                   + ((TStamp) B.millitm));
+  return (TStamp) (((TStamp) tv.tv_sec * (TStamp) 1000)
+                   + ((TStamp) tv.tv_usec / (TStamp) 1000000));
 #else
   // not precise..
   return (TStamp) (((TStamp) time_local() * (TStamp) 1000)
