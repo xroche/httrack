@@ -1,3 +1,9 @@
+httrack (3.49-1) unstable; urgency=low
+
+  * Updated to 3.49.1 (3.49-1)
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 01 Apr 2017 22:09:48 +0200
+
 httrack (3.48.24-1) unstable; urgency=low
 
   * Removed recommends non-existing package (libssl1.0.0)
