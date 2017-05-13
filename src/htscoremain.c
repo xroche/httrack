@@ -2996,7 +2996,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         }
       }
 
-      strcpy(n_lock,
+      strcpybuff(n_lock,
              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                      "hts-in_progress.lock"));
       //sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
