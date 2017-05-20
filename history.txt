@@ -4,7 +4,8 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
-3.49-1
+3.49-2
++ Fixed: Buffer overflow in output option commandline argument (VL-ID 2068) (Hosein Askari)
 + Fixed: Minor fixes
 
 3.48-23
