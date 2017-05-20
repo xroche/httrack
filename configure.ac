@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([httrack], [3.49.1], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.2], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
