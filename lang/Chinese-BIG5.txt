@@ -11,920 +11,920 @@ BIG5
 LANGUAGE_WINDOWSID
 Chinese (Taiwan)
 OK
-½T©w
+ç¢ºå®š
 Cancel
-¨ú®ø
+å–æ¶ˆ
 Exit
-Â÷¶}
+é›¢é–‹
 Close
-Ãö³¬
+é—œé–‰
 Cancel changes
-¨ú®øÅÜ§ó
+å–æ¶ˆè®Šæ›´
 Click to confirm
-ÂIÀ»¥H½T»{
+é»é¸ä»¥ç¢ºèª
 Click to get help!
-ÂIÀ»¥HÀò¨ú»¡©ú!
+é»é¸ä»¥å–å¾—èªªæ˜!
 Click to return to previous screen
-ÂIÀ»¥Hªğ¦^«e¤@­¶
+é»é¸ä»¥å›åˆ°å‰ä¸€é 
 Click to go to next screen
-ÂIÀ»¥H¨ì¹F¤U¤@­¶
+é»é¸ä»¥åˆ°é”ä¸‹ä¸€é 
 Hide password
-ÁôÂÃ±K½X
+éš±è—å¯†ç¢¼
 Save project
-«O¦s±M®×
+å„²å­˜å°ˆæ¡ˆ
 Close current project?
-¬O§_Ãö³¬·í«e±M®×?
+æ˜¯å¦é—œé–‰ç•¶å‰å°ˆæ¡ˆ?
 Delete this project?
-§R°£¦¹±M®×?
+åˆªé™¤æ­¤å°ˆæ¡ˆ?
 Delete empty project %s?
-§R°£ªÅªº±M®× %s?
+åˆªé™¤ç©ºçš„å°ˆæ¡ˆ %s?
 Action not yet implemented
-¾Ş§@¤´¥¼°õ¦æ
+å‹•ä½œä»æœªåŸ·è¡Œ
 Error deleting this project
-§R°£¸Ó±M®×®É¥X¿ù
+åˆªé™¤æ­¤å°ˆæ¡ˆæ™‚å‡ºéŒ¯
 Select a rule for the filter
-¬°¹LÂo¾¹¿ï¨ú³W«h
+ç‚ºç¯©é¸å™¨é¸å–è¦å‰‡
 Enter keywords for the filter
-¬°¹LÂo¾¹¿é¤JÃöÁäµü
+ç‚ºç¯©é¸å™¨è¼¸å…¥é—œéµè©
 Cancel
-¨ú®ø
+å–æ¶ˆ
 Add this rule
-¼W¥[¸Ó³W«h
+æ–°å¢æ­¤è¦å‰‡
 Please enter one or several keyword(s) for the rule
-½Ğ¬°¦¹³W«h¿é¤J¤@¦Ü´X­ÓÃöÁäµü
+è«‹ç‚ºæ­¤è¦å‰‡è¼¸å…¥ä¸€è‡³å¹¾å€‹é—œéµå­—
 Add Scan Rule
-¼W¥[±½´y³W«h
+æ–°å¢æƒæè¦å‰‡
 Criterion
-·Ç«h
+æº–å‰‡
 String
-¦r¦ê
+å­—ä¸²
 Add
-¼W¥[
+æ–°å¢
 Scan Rules
-±½´y³W«h
+æƒæè¦å‰‡
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-¨Ï¥Î¸U¥Î¦r¤¸¥H¥]§t©Î±Æ°£URLs©ÎÃìµ².\n¦h­Ó³W©w±½´y³W«hªº¦r¦ê¥i¼g¦b¦P¤@¦æ.\n¨Ï¥ÎªÅ¥ÕÁä§@¬°¤À¹j²Å¸¹.\n\n¨Ò¦p: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+ä½¿ç”¨è¬ç”¨å­—å…ƒä»¥åŒ…å«æˆ–æ’é™¤URLsæˆ–é€£çµ.\nå¤šå€‹è¦å®šæƒæè¦å‰‡çš„å­—ä¸²å¯å¯«åœ¨åŒä¸€è¡Œ.\nä½¿ç”¨ç©ºç™½éµä½œç‚ºåˆ†éš”ç¬¦è™Ÿ.\n\nä¾‹å¦‚: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
-±Æ°£Ãìµ²
+æ’é™¤é€£çµ
 Include link(s)
-¥]§tÃìµ²
+åŒ…å«é€£çµ
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-´£¥Ü: ±ı¥]§t¬Yºô°ì¦WºÙ¤Uªº©Ò¦³GIFÀÉ®×, ¥i¿é¤J +www.someweb.com/*.gif. \n(+*.gif / -*.gif ±N¥]§t/±Æ°£¨Ó¦Û©Ò¦³¯¸ÂIªºGIFÀÉ®×)
+æç¤º: æ¬²åŒ…å«æŸç¶²åŸŸåç¨±ä¸‹çš„æ‰€æœ‰GIFæª”æ¡ˆ, å¯è¼¸å…¥ +www.someweb.com/*.gif. \n(+*.gif / -*.gif å°‡åŒ…å«/æ’é™¤ä¾†è‡ªæ‰€æœ‰ç¶²ç«™çš„GIFæª”æ¡ˆ)
 Save prefs
-«O¦s³]©w
+å„²å­˜è¨­å®š
 Matching links will be excluded:
-¤Ç°tªºÃìµ²±N³Q±Æ°£:
+åŒ¹é…çš„é€£çµå°‡è¢«æ’é™¤:
 Matching links will be included:
-¤Ç°tªºÃìµ²±N³Q¥]§t:
+åŒ¹é…çš„é€£çµå°‡è¢«åŒ…å«:
 Example:
-¨Ò¦p:
+ç¯„ä¾‹:
 gif\r\nWill match all GIF files
-gif\r\n±N¤Ç°t©Ò¦³GIFÀÉ®×
+gif\r\nå°‡åŒ¹é…æ‰€æœ‰GIFæª”æ¡ˆ
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
-blue\r\n±N´M§ä¨ì©Ò¦³¥]§t'blue' ªºÀÉ®×, ½Ñ¦p 'bluesky-small.jpeg'
+blue\r\nå°‡å°‹æ‰¾åˆ°æ‰€æœ‰åŒ…å«'blue' çš„æª”æ¡ˆ, è«¸å¦‚ 'bluesky-small.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
-bigfile.mov\r\n±N¤Ç°tÀÉ®× 'bigfile.mov', ¦ı¤£¥]¬A 'bigfile2.mov'
+bigfile.mov\r\nå°‡åŒ¹é…æª”æ¡ˆ 'bigfile.mov', ä½†ä¸åŒ…æ‹¬ 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\n±N´M§ä¨ìÀÉ®×§¨¦W¤º¥]§t'cgi' ªºÃìµ², ½Ñ¦p /cgi-bin/somecgi.cgi
+cgi\r\nå°‡å°‹æ‰¾åˆ°è³‡æ–™å¤¾åç¨±å…§åŒ…å«'cgi' çš„é€£çµ, è«¸å¦‚ /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\n±N´M§ä¨ìÀÉ®×§¨¦W¤º¥]§t'cgi-bin' ªºÃìµ² (¦ıcgi-bin-2 °£¥~)
+cgi-bin\r\nå°‡å°‹æ‰¾åˆ°è³‡æ–™å¤¾åç¨±å…§åŒ…å«'cgi-bin' çš„é€£çµ (ä½†cgi-bin-2 é™¤å¤–)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
-someweb.com\r\n±N´M§ä¨ì¥]§t½Ñ¦pwww.someweb.com, private.someweb.com µ¥ªºÃìµ²
+someweb.com\r\nå°‡å°‹æ‰¾åˆ°åŒ…å«è«¸å¦‚www.someweb.com, private.someweb.com ç­‰çš„é€£çµ
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
-someweb\r\n±N´M§ä¨ì¥]§t½Ñ¦pwww.someweb.com, www.someweb.edu, private.someweb.otherweb.com µ¥ªºÃìµ²
+someweb\r\nå°‡å°‹æ‰¾åˆ°åŒ…å«è«¸å¦‚www.someweb.com, www.someweb.edu, private.someweb.otherweb.com ç­‰çš„é€£çµ
 www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
-www.someweb.com\r\n±N´M§ä¨ì¥]§t'www.someweb.com' ªºÃìµ² (¦ı¤£¥]¬Aprivate.someweb.com/ µ¥)
+www.someweb.com\r\nå°‡å°‹æ‰¾åˆ°åŒ…å«'www.someweb.com' çš„é€£çµ (ä½†ä¸åŒ…æ‹¬private.someweb.com/ ç­‰)
 someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
-someweb\r\n±N´M§ä¨ì¥ô¦ó½Ñ¦p¥H¤UªºÃìµ²: www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html µ¥
+someweb\r\nå°‡å°‹æ‰¾åˆ°ä»»ä½•è«¸å¦‚ä»¥ä¸‹çš„é€£çµ: www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html ç­‰
 www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
-www.test.com/test/someweb.html\r\n±N¶È´M§ä¨ì'www.test.com/test/someweb.html' ÀÉ®×. ª`·N½Ğ¿é¤J§¹¾ãªº¸ô®|.
+www.test.com/test/someweb.html\r\nå°‡åƒ…å°‹æ‰¾åˆ°'www.test.com/test/someweb.html' æª”æ¡ˆ. æ³¨æ„è«‹è¼¸å…¥å®Œæ•´çš„è·¯å¾‘.
 All links will match
-©Ò¦³ªºÃìµ²³£±N¤Ç°t
+æ‰€æœ‰çš„é€£çµéƒ½å°‡åŒ¹é…
 Add exclusion filter
-¬°¹LÂo¾¹¼W¥[±Æ°£³W«h
+ç‚ºç¯©é¸å™¨æ–°å¢æ’é™¤è¦å‰‡
 Add inclusion filter
-¬°¹LÂo¾¹¼W¥[¥]§t³W«h
+ç‚ºç¯©é¸å™¨æ–°å¢åŒ…å«è¦å‰‡
 Existing filters
-¤w©w¨îªº¹LÂo¦r¦ê
+å·²è‡ªè¨‚çš„ç¯©é¸å­—ä¸²
 Cancel changes
-¨ú®øÅÜ§ó
+å–æ¶ˆè®Šæ›´
 Save current preferences as default values
-±N·í«e³]©w¦s¬°¹w³]­È
+å°‡ç•¶å‰è¨­å®šå­˜ç‚ºé è¨­å€¼
 Click to confirm
-ÂIÀ»¥H½T»{
+é»é¸ä»¥ç¢ºèª
 No log files in %s!
-%s ¤ºµL¤é»xÀÉ®×!
+%s å…§ç„¡è¨˜éŒ„æª”!
 No 'index.html' file in %s!
-%s ¤ºµL'index.html' ÀÉ®×!
+%s å…§ç„¡'index.html' æª”!
 Click to quit WinHTTrack Website Copier
-ÂIÀ»¥HÂ÷¶}WinHTTrack Website Copier
+é»é¸ä»¥é›¢é–‹WinHTTrack Website Copier
 View log files
-¬d¬İ¤é»xÀÉ®×
+æª¢è¦–è¨˜éŒ„æª”
 Browse HTML start page
-ÂsÄı HTML °_©l­¶
+ç€è¦½ HTML èµ·å§‹ç¶²é 
 End of mirror
-Ãè¹³µ²§ô
+é¡åƒçµæŸ
 View log files
-¬d¬İ¤é»xÀÉ®×
+æª¢è¦–è¨˜éŒ„æª”
 Browse Mirrored Website
-ÂsÄı¤wÃè¹³ªººô¯¸
+ç€è¦½å·²é¡åƒçš„ç¶²ç«™
 New project...
-·sªº±M®×...
+æ–°çš„å°ˆæ¡ˆ...
 View error and warning reports
-¬d¬İ¿ù»~¤ÎÄµ§i³ø§i
+æª¢è¦–éŒ¯èª¤åŠè­¦å‘Šå ±å‘Š
 View report
-¬d¬İ³ø§i
+æª¢è¦–å ±å‘Š
 Close the log file window
-Ãö³¬¤é»xÀÉ®×µøµ¡
+é—œé–‰è¨˜éŒ„æª”è¦–çª—
 Info type:
-°T®§Ãş«¬:
+è³‡è¨Šé¡å‹:
 Errors
-¿ù»~
+éŒ¯èª¤
 Infos
-°T®§
+è³‡è¨Š
 Find
-´M§ä
+å°‹æ‰¾
 Find a word
-´M§ä¤@­Ó³æµü
+å°‹æ‰¾ä¸€å€‹å–®è©
 Info log file
-°T®§¤é»xÀÉ®×
+è³‡è¨Šè¨˜éŒ„æª”
 Warning/Errors log file
-Äµ§i/¿ù»~¤é»xÀÉ®×
+è­¦å‘Š/éŒ¯èª¤è¨˜éŒ„æª”
 Unable to initialize the OLE system
-µLªkªì©l¤ÆOLE¨t²Î
+ç„¡æ³•åˆå§‹åŒ–OLEç³»çµ±
 WinHTTrack could not find any interrupted download file cache in the specified folder!
-WinHTTrack ¥¼¯à¦b«ü©wÀÉ®×§¨¤º§ä¨ì³Q¤¤Â_ªºÀÉ®×¤U¸ütemp°Ï!
+WinHTTrack æœªèƒ½åœ¨æŒ‡å®šè³‡æ–™å¤¾å…§æ‰¾åˆ°è¢«ä¸­æ–·çš„æª”æ¡ˆä¸‹è¼‰tempå€!
 Could not connect to provider
-µLªk³s½u¨ìºô¸ô
+ç„¡æ³•é€£ç·šè‡³ç¶²è·¯
 receive
-±µ¦¬
+æ¥æ”¶
 request
-­n¨D
+è¦æ±‚
 connect
-³s½u
+é€£ç·š
 search
-´M§ä
+å°‹æ‰¾
 ready
-´Nºü
+å°±ç·’
 error
-¿ù»~
+éŒ¯èª¤
 Receiving files..
-±µ¦¬ÀÉ®×..
+æ¥æ”¶æª”æ¡ˆ..
 Parsing HTML file..
-¤ÀªRHTMLÀÉ®×..
+åˆ†æHTMLæª”æ¡ˆ..
 Purging files..
-²M°£ÀÉ®×..
+æ¸…é™¤æª”æ¡ˆ..
 Loading cache in progress..
-§Ö¨ú°O¾ĞÅé¸ü¤J¤¤..
+å¿«å–è¨˜æ†¶é«”è¼‰å…¥ä¸­..
 Parsing HTML file (testing links)..
-¤ÀªRHTMLÀÉ®× (´ú¸ÕÃìµ²)..
+åˆ†æHTMLæª”æ¡ˆ (æ¸¬è©¦é€£çµ)..
 Pause - Toggle [Mirror]/[Pause download] to resume operation
-Ãè¹³¼È°± - ¤Á´«[Ãè¹³]/[¼È°±¤U¸ü]¥HÄ~Äò¾Ş§@
+é¡åƒæš«åœ - åˆ‡æ›[é¡åƒ]/[æš«åœä¸‹è¼‰]ä»¥ç¹¼çºŒæ“ä½œ
 Finishing pending transfers - Select [Cancel] to stop now!
-µ²§ô³B²z¤¤ªºÂà²¾ - ²{¦b¿ï¾Ü[¨ú®ø]¨Ó°±¤î
+çµæŸè™•ç†ä¸­çš„è½‰ç§» - ç¾åœ¨é¸æ“‡[å–æ¶ˆ]ä¾†åœæ­¢
 scanning
-±½´y
+æƒæ
 Waiting for scheduled time..
-µ¥«İ¹w©wªº®É¶¡..
+ç­‰å¾…é å®šçš„æ™‚é–“..
 Connecting to provider
-¥¿¦b³s½uºô¸ô
+æ­£åœ¨é€£ç·šç¶²è·¯
 [%d seconds] to go before start of operation
-Â÷¾Ş§@¶}©lÁÙ¦³[%d ¬í]
+é›¢æ“ä½œé–‹å§‹é‚„æœ‰[%d ç§’]
 Site mirroring in progress [%s, %s bytes]
-¯¸ÂIÃè¹³¶i¦æ¤¤ [%s, %s byts]
+ç¶²ç«™é¡åƒé€²è¡Œä¸­ [%s, %s byts]
 Site mirroring finished!
-¯¸ÂIÃè¹³§¹²¦!
+ç¶²ç«™é¡åƒå®Œç•¢!
 A problem occured during the mirroring operation\n
-Ãè¹³®Éµo¥Í¿ù»~\n
+é¡åƒæ™‚ç™¼ç”ŸéŒ¯èª¤\n
 \nDuring:\n
-\nµo¥Í¦b¥H¤U´Á¶¡:\n
+\nç™¼ç”Ÿåœ¨ä»¥ä¸‹æœŸé–“:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-\n¦p¦³»İ­n½Ğ¬İ¤é»xÀÉ®×.\n\nÂIÀ»'µ²§ô'¥HÂ÷¶}WinHTTrack Website Copier.\n\nÁÂÁÂ¨Ï¥ÎWinHTTrack!
+\nå¦‚æœ‰éœ€è¦è«‹çœ‹è¨˜éŒ„æª”.\n\né»é¸'çµæŸ'ä»¥é›¢é–‹WinHTTrack Website Copier.\n\nè¬è¬ä½¿ç”¨WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-Ãè¹³§¹¦¨.\nÂIÀ»'½T©w'¥HÂ÷¶}WinHTTrack.\n¦p¦³»İ­n½Ğ¬İ¤é»xÀÉ®×, ¥H½T«O¸UµL¤@¥¢.\n\nÁÂÁÂ¨Ï¥ÎWinHTTrack!
+é¡åƒå®Œæˆ.\né»é¸'ç¢ºå®š'ä»¥é›¢é–‹WinHTTrack.\nå¦‚æœ‰éœ€è¦è«‹çœ‹è¨˜éŒ„æª”, ä»¥ç¢ºä¿è¬ç„¡ä¸€å¤±.\n\nè¬è¬ä½¿ç”¨WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * Ãè¹³³Q¨ú®ø! * *\r\n·í«eÁ{®Éªº¹w¦s°Ï¬°¤é«á§ó·s©Ò»İ, ¶È¦s¦³¦¹¦¸³Q¤¤Â_ªºÃè¹³´Á¶¡¤º¤U¸üªº¼Æ¾Ú.\r\n¦Ó­ì¦³¹w¦s°Ï¥i¯à·|¦s¦³§ó§¹¾ãªº¤º®e; ¦pªG§A¤£·Q¥¢¥h­ì¦³ªº¼Æ¾Ú, ½Ğ«ì´_¤§, ¦}§R°£·í«e¹w¦s°Ï.\r\n[ª`: ±ı§R°£·í«e¹w¦s°Ï, ¶È»İ§R°£¥H¤UÀÉ®×: hts-cache/new.*]\r\n\r\n§A¬O§_ªÖ©w­ì¦³¹w¦s°Ï¦s¦³§ó§¹¾ãªº¤º®e, ¦}§Æ±æ«ì´_¤§?
+* * é¡åƒè¢«å–æ¶ˆ! * *\r\nç•¶å‰è‡¨æ™‚çš„é å­˜å€ç‚ºæ—¥å¾Œæ›´æ–°æ‰€éœ€, åƒ…å­˜æœ‰æ­¤æ¬¡è¢«ä¸­æ–·çš„é¡åƒæœŸé–“å…§ä¸‹è¼‰çš„è³‡æ–™.\r\nè€ŒåŸæœ‰é å­˜å€å¯èƒ½æœƒå­˜æœ‰æ›´å®Œæ•´çš„å…§å®¹; å¦‚æœä½ ä¸æƒ³å¤±å»åŸæœ‰çš„è³‡æ–™, è«‹å¾©åŸä¹‹, å¹¶åˆªé™¤ç•¶å‰é å­˜å€.\r\n[æ³¨: æ¬²åˆªé™¤ç•¶å‰é å­˜å€, åƒ…éœ€åˆªé™¤ä»¥ä¸‹æª”æ¡ˆ: hts-cache/new.*]\r\n\r\nä½ æ˜¯å¦è‚¯å®šåŸæœ‰é å­˜å€å­˜æœ‰æ›´å®Œæ•´çš„å…§å®¹, å¹¶å¸Œæœ›å¾©åŸä¹‹?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * Ãè¹³¥X¿ù!* *\r\nHTTrackÀË´ú¨ì·í«eÃè¹³¥¼Àx¦s¥ô¦ó¼Æ¾Ú. ­Y¨Ï¥Îªº§ó·s¼Ò¦¡, «h«e¤@¦¸Ãè¹³¤w³Q«ì´_.\r\n­ì¦]: ­º­¶¥¼¯à§ä¨ì, ©Îµo¥Í³s½u¿ù»~.\r\n=> ½Ğ½T©w±ıÃè¹³ªººô¯¸¦s¦b, ¦}/©ÎÀË¬dproxy³]©w! <=
+* * é¡åƒå‡ºéŒ¯!* *\r\nHTTrackæª¢æ¸¬åˆ°ç•¶å‰é¡åƒæœªå„²å­˜ä»»ä½•è³‡æ–™. è‹¥ä½¿ç”¨çš„æ›´æ–°æ¨¡å¼, å‰‡å‰ä¸€æ¬¡é¡åƒå·²è¢«å¾©åŸ.\r\nåŸå› : é¦–é æœªèƒ½æ‰¾åˆ°, æˆ–ç™¼ç”Ÿé€£ç·šéŒ¯èª¤.\r\n=> è«‹ç¢ºå®šæ¬²é¡åƒçš„ç¶²ç«™å­˜åœ¨, å¹¶/æˆ–æª¢æŸ¥Proxyè¨­å®š! <=
 \n\nTip: Click [View log file] to see warning or error messages
-\n\n´£¥Ü: ÂIÀ» [¬d¬İ¤é»xÀÉ®×] ¥H¬d¬İÄµ§i©Î¿ù»~®ø®§
+\n\næç¤º: é»é¸ [æª¢è¦–è¨˜éŒ„æª”] ä»¥æŸ¥é–±è­¦å‘Šæˆ–éŒ¯èª¤è¨Šæ¯
 Error deleting a hts-cache/new.* file, please do it manually
-§R°£hts-cache/new.* ÀÉ®×®É¥X¿ù, ½Ğ¤â¤u§R°£
+åˆªé™¤hts-cache/new.* æª”æ¡ˆæ™‚å‡ºéŒ¯, è«‹æ‰‹å·¥åˆªé™¤
 Do you really want to quit WinHTTrack Website Copier?
-¯uªº­nÂ÷¶}WinHTTrack Website Copier ¶Ü?
+çœŸçš„è¦é›¢é–‹WinHTTrack Website Copier å—?
 - Mirroring Mode -\n\nEnter address(es) in URL box
-- Ãè¹³¼Ò¦¡ -\n\n½Ğ¦bURL®Ø¤º¿é¤Jºô§}
+- é¡åƒæ¨¡å¼ -\n\nè«‹åœ¨URLæ–¹å¡Šå…§è¼¸å…¥ç¶²å€
 - Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
-- ¥æ¤¬ºëÆF¼Ò¦¡ (µo°İ) -\n\n½Ğ¦bURL®Ø¤º¿é¤Jºô§}
+- äº¤äº’ç²¾éˆæ¨¡å¼ (ç™¼å•) -\n\nè«‹åœ¨URLæ–¹å¡Šå…§è¼¸å…¥ç¶²å€
 - File Download Mode -\n\nEnter file address(es) in URL box
-- ÀÉ®×¤U¸ü¼Ò¦¡ -\n\n½Ğ¦bURL®Ø¤º¿é¤JÀÉ®×ºô§}
+- æª”æ¡ˆä¸‹è¼‰æ¨¡å¼ -\n\nè«‹åœ¨URLæ¡†å…§è¼¸å…¥æª”æ¡ˆç¶²å€
 - Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
-- Ãìµ²´ú¸Õ¼Ò¦¡ -\n\n½Ğ¦bURL®Ø¤º¿é¤J§t¦³Ãìµ²ªºWeb­¶ºô§}
+- é€£çµæ¸¬è©¦æ¨¡å¼ -\n\nè«‹åœ¨URLæ–¹å¡Šå…§è¼¸å…¥å«æœ‰é€£çµçš„Webé ç¶²å€
 - Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- §ó·s¼Ò¦¡ -\n\n½Ğ®Ö¹ïURL®ØùØªººô§}, ¦p¦³»İ­n½ĞÀË¬d¿ï¶µ, µM«áÂIÀ»'Next'
+- æ›´æ–°æ¨¡å¼ -\n\nè«‹æ ¸å°URLæ–¹å¡Šå…§çš„ç¶²å€, å¦‚æœ‰éœ€è¦è«‹æª¢æŸ¥é¸é …, ç„¶å¾Œé»é¸'Next'
 - Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Ä~Äò¼Ò¦¡ (³Q¤¤Â_ªº¾Ş§@) -\n\n½Ğ®Ö¹ïURL®ØùØªººô§}, ¦p¦³»İ­n½ĞÀË¬d¿ï¶µ, µM«áÂIÀ»'Next'
+- ç¹¼çºŒæ¨¡å¼ (è¢«ä¸­æ–·çš„æ“ä½œ) -\n\nè«‹æ ¸å°URLæ–¹å¡Šå…§çš„ç¶²å€, å¦‚æœ‰éœ€è¦è«‹æª¢æŸ¥é¸é …, ç„¶å¾Œé»é¸'Next'
 Log files Path
-¤é»xÀÉ®×¸ô®|
+è¨˜éŒ„æª”è·¯å¾‘
 Path
-¸ô®|
+è·¯å¾‘
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-- Ãìµ²ªí¼Ò¦¡ -\n\n½Ğ¦bURL®Ø¤º¿é¤J­¶­±ªººô§}, ­¶­±¤¤§t¦³Ãìµ²ªº¦Cªí, ¦Cªí¤¤©Ò¦³Ãìµ²§¡·|³QÃè¹³
+- é€£çµæ¸…å–®æ¨¡å¼ -\n\nè«‹åœ¨URLæ–¹å¡Šå…§è¼¸å…¥é é¢çš„ç¶²å€, é é¢ä¸­å«æœ‰é€£çµçš„æ¸…å–®, æ¸…å–®ä¸­æ‰€æœ‰é€£çµå‡æœƒè¢«é¡åƒ
 New project / Import?
-·sªº±M®× / ¾É¤J?
+æ–°çš„å°ˆæ¡ˆ / åŒ¯å…¥?
 Choose criterion
-¿ï¨ú±N¶i¦æªº¾Ş§@ªºÃş«¬
+é¸å–å°‡é€²è¡Œçš„æ“ä½œçš„é¡å‹
 Maximum link scanning depth
-³Ì¤jÃìµ²±½´y²`«×
+æœ€å¤§é€£çµæƒææ·±åº¦
 Enter address(es) here
-½Ğ¦b¦¹¿é¤Jºô§}
+è«‹åœ¨æ­¤è¼¸å…¥ç¶²å€
 Define additional filtering rules
-©w¸qªş¥[¹LÂo¾¹³W«h
+å®šç¾©é™„åŠ ç¯©é¸å™¨è¦å‰‡
 Proxy Name (if needed)
-proxyºô§}(¦p­Y»İ­n)
+Proxyåç¨±(å¦‚è‹¥éœ€è¦)
 Proxy Port
-proxy³s±µ°ğ
+Proxyé€£æ¥åŸ 
 Define proxy settings
-©w¸qproxy¦øªA¾¹³]©w
+å®šç¾©Proxyä¼ºæœå™¨è¨­å®š
 Use standard HTTP proxy as FTP proxy
-¨Ï¥Î¼Ğ·ÇHTTP proxy ´À¥N FTP proxy
+ä½¿ç”¨æ¨™æº–HTTP Proxyæ›¿ä»£FTP Proxy
 Path
-¸ô®|
+è·¯å¾‘
 Select Path
-¿ï¾Ü¸ô®|
+é¸æ“‡è·¯å¾‘
 Path
-¸ô®|
+è·¯å¾‘
 Select Path
-¿ï¾Ü¸ô®|
+é¸æ“‡è·¯å¾‘
 Quit WinHTTrack Website Copier
-Â÷¶}WinHTTrack Website Copier
+é›¢é–‹WinHTTrack Website Copier
 About WinHTTrack
-Ãö©óWinHTTrack
+é—œæ–¼WinHTTrack
 Save current preferences as default values
-«O¦s·í«e³]©w¬°¹w³]­È
+å„²å­˜ç•¶å‰è¨­å®šç‚ºé è¨­å€¼
 Click to continue
-ÂIÀ»¥HÄ~Äò
+é»é¸ä»¥ç¹¼çºŒ
 Click to define options
-ÂIÀ»¥H³]©w¿ï¶µ
+é»é¸ä»¥è¨­å®šé¸é …
 Click to add a URL
-ÂIÀ»¥H¼W¥[URL
+é»é¸ä»¥æ–°å¢URL
 Load URL(s) from text file
-±q¤å¥»ÀÉ®×¤¤¸ü¤JURL(s)
+å¾æ–‡å­—æª”ä¸­è¼‰å…¥URL(s)
 WinHTTrack preferences (*.opt)|*.opt||
-WinHTTrack³]©wÀÉ®× (*.opt)|*.opt||
+WinHTTrackè¨­å®šæª”æ¡ˆ (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
-ºô§}¦Cªí¤å¥»ÀÉ®× (*.txt)|*.txt||
+ç¶²å€æ¸…å–®æ–‡å­—æª” (*.txt)|*.txt||
 File not found!
-ÀÉ®×¥¼§ä¨ì!
+æœªç™¼ç¾æª”æ¡ˆ!
 Do you really want to change the project name/path?
-¯uªº­n§ïÅÜ±M®×ªº¦WºÙ©Î¸ô®|¶Ü?
+çœŸçš„è¦è®Šæ›´å°ˆæ¡ˆçš„åç¨±æˆ–è·¯å¾‘å—?
 Load user-default options?
-¸ü¤J¨Ï¥ÎªÌ©w¸qªº¹w³]¿ï¶µ¶Ü?
+è¼‰å…¥ä½¿ç”¨è€…å®šç¾©çš„é è¨­é¸é …å—?
 Save user-default options?
-¦s¬°¨Ï¥ÎªÌ©w¸qªº¹w³]¿ï¶µ¶Ü?
+å­˜ç‚ºä½¿ç”¨è€…å®šç¾©çš„é è¨­é¸é …å—?
 Reset all default options?
-±N©Ò¦³¿ï¶µ«ì´_¨ì³Ìªì³]©w¶Ü?
+å°‡æ‰€æœ‰é¸é …é‡è¨­è‡³é è¨­å—?
 Welcome to WinHTTrack!
-Åwªï¨Ï¥ÎWinHTTrack!
+æ­¡è¿ä½¿ç”¨WinHTTrackï¼
 Action:
-¾Ş§@:
+å‹•ä½œ:
 Max Depth
-³Ì¤j²`«×
+æœ€å¤§æ·±åº¦
 Maximum external depth:
-³Ì¤j¥~³¡Ãìµ²²`«×
+æœ€å¤§å¤–éƒ¨é€£çµæ·±åº¦
 Filters (refuse/accept links) :
-¹LÂo¾¹ (±Æ°£/¥]§tÃìµ²):
+ç¯©é¸å™¨ (æ’é™¤/åŒ…å«é€£çµ):
 Paths
-¸ô®|
+è·¯å¾‘
 Save prefs
-«O¦s³]©w
+å„²å­˜è¨­å®š
 Define..
-©w¸q..
+å®šç¾©..
 Set options..
-¿ï¶µ..
+é¸é …..
 Preferences and mirror options:
-¿ï¶µ³]©w:
+é¸é …è¨­å®š:
 Project name
-±M®×¦WºÙ
+å°ˆæ¡ˆåç¨±
 Add a URL...
-¼W¥[URL..
+æ–°å¢URL..
 Web Addresses: (URL)
-Webºô§}: (URL)
+Webç¶²å€: (URL)
 Stop WinHTTrack?
-°±¤îWinHTTrack?
+åœæ­¢WinHTTrack?
 No log files in %s!
-%s ¤ºµL¤é»xÀÉ®×!
+%s å…§ç„¡è¨˜éŒ„æª”ï¼
 Pause Download?
-¼È°±¤U¸ü?
+æš«åœä¸‹è¼‰?
 Stop the mirroring operation
-°±¤îÃè¹³
+åœæ­¢é¡åƒ
 Minimize to System Tray
-³Ì¤p¤Æ¦Ü¨t²Î¤u¨ã¦C
+æœ€å°åŒ–è‡³ç³»çµ±å·¥å…·åˆ—
 Click to skip a link or stop parsing
-ÂIÀ»¥H¸õ¹L¤@­ÓÃìµ²©Î°±¤î¤ÀªR
+é»é¸ä»¥è·³éä¸€å€‹é€£çµæˆ–åœæ­¢åˆ†æ
 Click to skip a link
-ÂIÀ»¥H¸õ¹L¤@­ÓÃìµ²
+é»é¸ä»¥è·³éä¸€å€‹é€£çµ
 Bytes saved
-¤w«O¦sbyts:
+å·²å„²å­˜byts:
 Links scanned
-¤w±½´yÃìµ²:
+å·²æƒæé€£çµ:
 Time:
-®É¶¡:
+æ™‚é–“:
 Connections:
-³s½u:
+é€£ç·š:
 Running:
-¹B¦æ:
+åŸ·è¡Œ:
 Hide
-ÁôÂÃ
+éš±è—
 Transfer rate
-¶Ç¿é³t²v:
+å‚³è¼¸é€Ÿç‡:
 SKIP
-¸õ¹L
+è·³é
 Information
-°T®§
+è³‡è¨Š
 Files written:
-¤wÀx¦sÀÉ®×:
+å·²å„²å­˜æª”æ¡ˆ:
 Files updated:
-¤w§ó·sÀÉ®×:
+å·²æ›´æ–°æª”æ¡ˆ:
 Errors:
-¿ù»~:
+éŒ¯èª¤:
 In progress:
-¶iµ{¤¤:
+é€²è¡Œä¸­:
 Follow external links
-¸òÀH¥~³¡Ãìµ²
+è·Ÿéš¨å¤–éƒ¨é€£çµ
 Test all links in pages
-´ú¸Õ­¶­±¤¤ªº©Ò¦³Ãìµ²
+æ¸¬è©¦é é¢ä¸­çš„æ‰€æœ‰é€£çµ
 Try to ferret out all links
-ºÉ¥i¯à¬d¥X©Ò¦³Ãìµ²
+ç›¡å¯èƒ½æŸ¥å‡ºæ‰€æœ‰é€£çµ
 Download HTML files first (faster)
-¥ı¤U¸üHTMLÀÉ®× (§ó§Ö)
+å…ˆä¸‹è¼‰HTMLæª”æ¡ˆ (æ›´å¿«)
 Choose local site structure
-¿ï¾Ü¥»¦a¯¸ÂIµ²ºc
+é¸æ“‡æœ¬æ©Ÿç¶²ç«™çµæ§‹
 Set user-defined structure on disk
-³]©w¦bºÏºĞ¤Wªº¨Ï¥ÎªÌ¦Û©wµ²ºc
+è¨­å®šåœ¨ç£ç¢Ÿä¸Šçš„ä½¿ç”¨è€…å®šç¾©çµæ§‹
 Use a cache for updates and retries
-¨Ï¥Î¹w¦s°Ï, ¥Î©ó§ó·s©M­«¸Õ
+ä½¿ç”¨é å­˜å€, ç”¨æ–¼æ›´æ–°èˆ‡é‡è©¦
 Do not update zero size or user-erased files
-¤£§ó·s¹sbytsÀÉ®×©Î¥Ñ¨Ï¥ÎªÌ§R°£ªºÀÉ®×
+ä¸æ›´æ–°é›¶bytsæª”æ¡ˆæˆ–ç”±ä½¿ç”¨è€…åˆªé™¤çš„æª”æ¡ˆ
 Create a Start Page
-·s¼W¤@­Ó°_©l­¶­±
+æ–°å¢ä¸€å€‹èµ·å§‹ç¶²é 
 Create a word database of all html pages
-¬°©Ò¦³html­¶«Ø³y¤@­Ó¤å¦r¼Æ¾Ú®w
+ç‚ºæ‰€æœ‰htmlé å»ºç«‹ä¸€å€‹æ–‡å­—è³‡æ–™åº«
 Create error logging and report files
-·s¼W¿ù»~°O¿ı¤Î³ø§iÀÉ®×
+æ–°å¢éŒ¯èª¤è¨˜éŒ„åŠå ±å‘Šæª”
 Generate DOS 8-3 filenames ONLY
-¶È²£¥ÍDOS¤Uªº8-3ÀÉ®×¦W®æ¦¡
+åƒ…ç”¢ç”ŸDOSä¸‹çš„8-3æª”æ¡ˆåç¨±æ ¼å¼
 Generate ISO9660 filenames ONLY for CDROM medias
-¶È²£¥Í°ßÅª¥úºĞ¥ÎªºISO9660®æ¦¡¤UªºÀÉ®×¦W
+åƒ…ç”¢ç”Ÿå”¯è®€å…‰ç¢Ÿç”¨çš„ISO9660æ ¼å¼ä¸‹çš„æª”æ¡ˆåç¨±
 Do not create HTML error pages
-¤£·s¼WHTML¿ù»~­¶­±
+ä¸æ–°å¢HTMLéŒ¯èª¤é é¢
 Select file types to be saved to disk
-¿ï¾Ü±N³Q¦sÀÉªºÀÉ®×Ãş«¬
+é¸æ“‡å°‡è¢«å­˜æª”çš„æª”æ¡ˆé¡å‹
 Select parsing direction
-¿ï¾Ü¤ÀªR¤è¦ì
+é¸æ“‡åˆ†ææ–¹ä½
 Select global parsing direction
-¿ï¾Ü¥ş¤è¦ì¤ÀªR
+é¸æ“‡å…¨æ–¹ä½åˆ†æ
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-³]©w¤º³¡Ãìµ²(¤w¤U¸ü)¤Î¥~³¡Ãìµ²(¥¼¤U¸ü)ªºURL§ï¼g³W«h
+è¨­å®šå…§éƒ¨é€£çµ(å·²ä¸‹è¼‰)åŠå¤–éƒ¨é€£çµ(æœªä¸‹è¼‰)çš„URLæ”¹å¯«è¦å‰‡
 Max simultaneous connections
-³Ì¦h¦P®É³s½u¼Æ
+æœ€å¤šåŒæ™‚é€£ç·šæ•¸
 File timeout
-ÀÉ®×¶W®É
+æª”æ¡ˆé€¾æ™‚
 Cancel all links from host if timeout occurs
-­Y¶W®Éµo¥Í, ¨ú®ø©Ò¦³¨Ó¦Û¥D¾÷ªºÃìµ²
+è‹¥è¶…æ™‚ç™¼ç”Ÿ, å–æ¶ˆæ‰€æœ‰ä¾†è‡ªä¸»æ©Ÿçš„é€£çµ
 Minimum admissible transfer rate
-³Ì¤p©Ò¤¹³\ªº¶Ç¿é³t²v
+æœ€å°æ‰€å…è¨±çš„å‚³è¼¸é€Ÿç‡
 Cancel all links from host if too slow
-­Y¶Ç¿é¹LºC, ¨ú®ø©Ò¦³¨Ó¦Û¥D¾÷ªºÃìµ²
+è‹¥å‚³è¼¸éæ…¢, å–æ¶ˆæ‰€æœ‰ä¾†è‡ªä¸»æ©Ÿçš„é€£çµ
 Maximum number of retries on non-fatal errors
-³Ì¦h­«¸Õ¦¸¼Æ (µo¥Í«D­P©R¿ù»~®É)
+æœ€å¤šé‡è©¦æ¬¡æ•¸ (ç™¼ç”Ÿéè‡´å‘½éŒ¯èª¤æ™‚)
 Maximum size for any single HTML file
-³æ­ÓHTMLÀÉ®×©Ò¤¹³\ªº³Ì¤jsize
+å–®å€‹HTMLæª”æ¡ˆæ‰€å…è¨±çš„æœ€å¤§size
 Maximum size for any single non-HTML file
-³æ­Ó«DHTMLÀÉ®×©Ò¤¹³\ªº³Ì¤jsize
+å–®å€‹éHTMLæª”æ¡ˆæ‰€å…è¨±çš„æœ€å¤§size
 Maximum amount of bytes to retrieve from the Web
-³Ì¦h©Ò¤¹³\±qWeb±µ¦¬ªºbyts
+æœ€å¤šæ‰€å…è¨±å¾Webæ¥æ”¶çš„byts
 Make a pause after downloading this amount of bytes
-¦b¤U¸ü³o¦ì¤¸²Õ¶q«á¼È°±
+åœ¨ä¸‹è¼‰æ­¤ä½å…ƒçµ„é‡å¾Œæš«åœ
 Maximum duration time for the mirroring operation
-Ãè¹³¹Lµ{©Ò¤¹³\ªº³Ìªø®É¶¡
+é¡åƒéç¨‹æ‰€å…è¨±çš„æœ€é•·æ™‚é–“
 Maximum transfer rate
-³Ì¤j©Ò­­¨îªº¶Ç¿é³t²v
+æœ€å¤§æ‰€é™åˆ¶çš„å‚³è¼¸é€Ÿç‡
 Maximum connections/seconds (avoid server overload)
-¨C¬í³Ì¦h¦P®É³sµ²¼Æ (¨¾¤î¦øªA¾¹¶W¸ü)
+æ¯ç§’æœ€å¤šåŒæ™‚é€£çµæ•¸ (é˜²æ­¢ä¼ºæœå™¨è¶…è¼‰)
 Maximum number of links that can be tested (not saved!)
-³Ì¤jÃìµ²´ú¸Õ¼Æ(¤£«O¦s!)
+æœ€å¤§é€£çµæ¸¬è©¦æ•¸(ä¸å„²å­˜ï¼)
 Browser identity
-ÂsÄı¾¹¨­¥÷
+ç€è¦½å™¨èº«åˆ†
 Comment to be placed in each HTML file
-¦b¨C­ÓHTMLÀÉ®×ùØ¼W¥[ªºª`ÄÀ
+åœ¨æ¯å€‹HTMLæª”æ¡ˆè£¡å¢åŠ çš„æ³¨é‡‹
 Back to starting page
-¦^¨ì°_©l­¶­±
+å›åˆ°èµ·å§‹ç¶²é 
 Save current preferences as default values
-±N·í«e³]©w¦s¬°¹w³]­È
+å°‡ç•¶å‰è¨­å®šå­˜ç‚ºé è¨­å€¼
 Click to continue
-ÂIÀ»¥HÄ~Äò
+é»é¸ä»¥ç¹¼çºŒ
 Click to cancel changes
-ÂIÀ»¥H¨ú®ø§ï°Ê
+é»é¸ä»¥å–æ¶ˆè®Šæ›´
 Follow local robots rules on sites
-¿í±qºô¯¸ªºrobots³W«h
+éµå¾ç¶²ç«™çš„robotsè¦å‰‡
 Links to non-localised external pages will produce error pages
-¥¼¥»¦a¤Æªº¥~³¡­¶­±Ãìµ²±N²£¥Í¿ù»~­¶­±
+æœªåœ¨åœ°åŒ–çš„å¤–éƒ¨é é¢é€£çµå°‡ç”¢ç”ŸéŒ¯èª¤é é¢
 Do not erase obsolete files after update
-§ó·s«á¤£§R°£¼o±óªºÀÉ®×
+æ›´æ–°å¾Œä¸åˆªé™¤å»¢æ£„çš„æª”æ¡ˆ
 Accept cookies?
-¬O§_±µ¦¬cookies?
+æ˜¯å¦æ¥å—cookies?
 Check document type when unknown?
-¬O§_ÀË¬d¥¼ª¾ÀÉ®×Ãş«¬?
+æ˜¯å¦æª¢æŸ¥æœªçŸ¥æª”æ¡ˆé¡å‹?
 Parse java applets to retrieve included files that must be downloaded?
-¬O§_¤ÀªRjavaÀ³¥Îµ{§Ç¥H¨ú¦^¨ä¤¤¥]§tªºÀÉ®×?
+æ˜¯å¦åˆ†æjavaæ‡‰ç”¨ç¨‹å¼ä»¥å–å›å…¶ä¸­åŒ…å«çš„æª”æ¡ˆ?
 Store all files in cache instead of HTML only
-±N©Ò¦³ÀÉ®×¶È«O¦s¦b¹w¦s°ÏùØ («DHTML)
+å°‡æ‰€æœ‰æª”æ¡ˆåƒ…å„²å­˜åœ¨é å­˜å€è£¡ (éHTML)
 Log file type (if generated)
-¤é»xÀÉ®×Ãş«¬ (­Y¦³)
+è¨˜éŒ„æª”é¡å‹ (è‹¥æœ‰)
 Maximum mirroring depth from root address
-±qºô§}®Ú³¡¶}©l³Ì¤jªºÃè¹³²`«×
+å¾ç¶²å€æ ¹éƒ¨é–‹å§‹æœ€å¤§çš„é¡åƒæ·±åº¦
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
 Maximum mirroring depth for external/fodbidden addresses (0, that is, none, is the default)
 Create a debugging file
-·s¼W¤@­Ó°»¿ùÀÉ®×
+æ–°å¢ä¸€å€‹åµéŒ¯æª”æ¡ˆ
 Use non-standard requests to get round some server bugs
-¨Ï¥Î«D¼Ğ·Ç­n¨D¥HÁ×§K¬Y¨Ç¦øªA¾¹¿ù»~
+ä½¿ç”¨éæ¨™æº–è¦æ±‚ä»¥é¿å…æŸäº›ä¼ºæœå™¨éŒ¯èª¤
 Use old HTTP/1.0 requests (limits engine power!)
-¨Ï¥ÎÂÂªº HTTP/1.0 ­n¨D (±N­­¨îÃè¹³¯à¤O!)
+ä½¿ç”¨èˆŠçš„ HTTP/1.0 è¦æ±‚ (å°‡é™åˆ¶é¡åƒèƒ½åŠ›!)
 Attempt to limit retransfers through several tricks (file size test..)
-¸Õ¥H­Y¤z¤èªk­­¨î¦A¶Ç°e (¦p³q¹LÀÉ®×¤j¤p´ú¸Õ)
+è©¦ä»¥è‹¥å¹²æ–¹æ³•é™åˆ¶å†å‚³é€ (å¦‚é€šéæª”æ¡ˆå¤§å°æ¸¬è©¦)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
 
 Write external links without login/password
-¼g¤J¥~³¡Ãìµ²®É¤£¥]¬Aµn¤J/±K½X
+å¯«å…¥å¤–éƒ¨é€£çµæ™‚ä¸åŒ…æ‹¬ç™»å…¥/å¯†ç¢¼
 Write internal links without query string
-¼g¤J¤º³¡Ãìµ²®É¤£¥]¬A¬d¸ß¦r¦ê
+å¯«å…¥å…§éƒ¨é€£çµæ™‚ä¸åŒ…æ‹¬æŸ¥è©¢å­—ä¸²
 Get non-HTML files related to a link, eg external .ZIP or pictures
-«O¦s©Ò¦³«ü¦V«DHTMLÀÉ®×ªºÃìµ², ¨Ò¦p¥~³¡ªºZIPÀÉ®×©Î¹Ï¤ùÀÉ®×
+å„²å­˜æ‰€æœ‰æŒ‡å‘éHTMLæª”æ¡ˆçš„é€£çµ, ä¾‹å¦‚å¤–éƒ¨çš„ZIPæª”æˆ–åœ–æª”
 Test all links (even forbidden ones)
-´ú¸Õ©Ò¦³Ãìµ² (§Y¨Ï³Q¸T¤îªº)
+æ¸¬è©¦æ‰€æœ‰é€£çµ (å³ä½¿è¢«ç¦æ­¢çš„)
 Try to catch all URLs (even in unknown tags/code)
-¸Õ¹Ï§ì¨ú©Ò¦³ªºURLs (§Y¨Ï¦s¦b©ó¥¼ª¾ªº¼ĞÃ±©Î¥N½X¤º)
+è©¦åœ–æŠ“å–æ‰€æœ‰çš„URLs (å³ä½¿å­˜åœ¨æ–¼æœªçŸ¥çš„æ¨™ç°½æˆ–ä»£ç¢¼å…§)
 Get HTML files first!
-­º¥ı«O¦sHTMLÀÉ®×!
+é¦–å…ˆå„²å­˜HTMLæª”æ¡ˆ!
 Structure type (how links are saved)
-µ²ºcÃş«¬ (Ãìµ²«O¦sªº¤è¦¡)
+çµæ§‹é¡å‹ (é€£çµå„²å­˜çš„æ–¹å¼)
 Use a cache for updates
-¨Ï¥Î¹w¦s°Ï¥H«K¤é«á§ó·s
+ä½¿ç”¨é å­˜å€ä»¥ä¾¿æ—¥å¾Œæ›´æ–°
 Do not re-download locally erased files
-¤£¦A¤U¸ü¦b¥»¦a¤w³Q§R°£ªºÀÉ®×
+ä¸å†ä¸‹è¼‰åœ¨æœ¬æ©Ÿå·²è¢«åˆªé™¤çš„æª”æ¡ˆ
 Make an index
-·s¼W¤@­Ó index.html ÀÉ®×
+æ–°å¢ä¸€å€‹ index.html æª”æ¡ˆ
 Make a word database
-«Ø³y¤@­Ó¤å¦r¼Æ¾Ú®w
+å»ºç«‹ä¸€å€‹æ–‡å­—è³‡æ–™åº«
 Log files
-¤é»xÀÉ®×
+è¨˜éŒ„æª”
 DOS names (8+3)
-DOS ÀÉ®×¦W®æ¦¡ (8+3)
+DOS æª”æ¡ˆåç¨±æ ¼å¼ (8+3)
 ISO9660 names (CDROM)
-ISO9660®æ¦¡¤UªºÀÉ®×¦W(°ßÅª¥úºĞ)
+ISO9660æ ¼å¼ä¸‹çš„æª”æ¡ˆåç¨±(å”¯è®€å…‰ç¢Ÿ)
 No error pages
-°£¥h¿ù»~­¶
+é™¤å»éŒ¯èª¤é 
 Primary Scan Rule
-­º­n±½´y³W«h
+é¦–è¦æƒæè¦å‰‡
 Travel mode
-¦æ¶i¼Ò¦¡
+è¡Œé€²æ¨¡å¼
 Global travel mode
-¥ş§½¦æ¶i¼Ò¦¡
+å…¨é«”è¡Œé€²æ¨¡å¼
 These options should be modified only exceptionally
-¥H¤U¿ï¶µ¥u¦b¯S®í±¡ªp¤U­×§ï
+ä»¥ä¸‹é¸é …åªåœ¨ç‰¹æ®Šæƒ…æ³ä¸‹ä¿®æ”¹
 Activate Debugging Mode (winhttrack.log)
-±Ò°Ê½Õ¸Õ¼Ò¦¡ (·s¼Wwinhttrack.log)
+å•Ÿå‹•èª¿è©¦æ¨¡å¼ (æ–°å¢winhttrack.log)
 Rewrite links: internal / external
-§ï¼gÃìµ² : ¤º³¡/¥~³¡
+æ”¹å¯«é€£çµ : å…§éƒ¨/å¤–éƒ¨
 Flow control
-¬y¶q±±¨î
+æµé‡æ§åˆ¶
 Limits
-­­¨î
+é™åˆ¶
 Identity
-¨­¥÷
+èº«åˆ†
 HTML footer
-HTML­¶¸}
+HTMLé å°¾
 N# connections
-³s½u¼Æ
+é€£ç·šæ•¸
 Abandon host if error
-­Yµo¥Í¿ù»~, «h©ñ±ó©M¥D¾÷ªº³s½u
+è‹¥ç™¼ç”ŸéŒ¯èª¤, å‰‡æ”¾æ£„èˆ‡ä¸»æ©Ÿçš„é€£ç·š
 Minimum transfer rate (B/s)
-³Ì¤p¶Ç¿é²v (byts/¬í)
+æœ€å°å‚³è¼¸ç‡ (byts/ç§’)
 Abandon host if too slow
-­Y¶Ç¿é¹LºC, «h©ñ±ó©M¥D¾÷ªº³s½u
+è‹¥å‚³è¼¸éæ…¢, å‰‡æ”¾æ£„èˆ‡ä¸»æ©Ÿçš„é€£ç·š
 Configure
-°t¸m
+è¨­å®š
 Use proxy for ftp transfers
-¨Ï¥Îproxy¶i¦æftp¶Ç¿é
+ä½¿ç”¨Proxyé€²è¡Œftpå‚³è¼¸
 TimeOut(s)
-¶W®É
+é€¾æ™‚
 Persistent connections (Keep-Alive)
-«ùÄò³s±µ(«O«ù±µ³q)
+æŒçºŒé€£ç·š(ä¿æŒæ¥é€š)
 Reduce connection time and type lookup time using persistent connections
-«ùÄò³s±µ®ÉÁYµu³s±µ®É¶¡©M¿é¤J«ùÄò³s±µ¬d§ä®É¶¡
+æŒçºŒé€£ç·šæ™‚ç¸®çŸ­é€£ç·šæ™‚é–“èˆ‡è¼¸å…¥æŒçºŒé€£ç·šæŸ¥é–±æ™‚é–“
 Retries
-­«¸Õ
+é‡è©¦
 Size limit
-¤j¤p­­¨î
+å¤§å°é™åˆ¶
 Max size of any HTML file (B)
-³æ­ÓHTMLÀÉ®×ªº³Ì¤jsize
+å–®å€‹HTMLæª”æ¡ˆçš„æœ€å¤§size
 Max size of any non-HTML file
-³æ­Ó«DHTMLÀÉ®×ªº³Ì¤jsize
+å–®å€‹éHTMLæª”æ¡ˆçš„æœ€å¤§size
 Max site size
-Ãè¹³¯¸ÂI³Ì¤jsize
+é¡åƒç¶²ç«™æœ€å¤§size
 Max time
-³Ìªø®É¶¡
+æœ€é•·æ™‚é–“
 Save prefs
-«O¦s³]©w
+å„²å­˜è¨­å®š
 Max transfer rate
-³Ì¤j¶Ç¿é³t²v
+æœ€å¤§å‚³è¼¸é€Ÿç‡
 Follow robots.txt
-¿í¦u robots.txt ³W«h
+éµå®ˆ robots.txt è¦å‰‡
 No external pages
-¤£²£¥Í¥~³¡­¶­±
+ä¸ç”¢ç”Ÿå¤–éƒ¨é é¢
 Do not purge old files
-¤£²M°£¼o±óÀÉ®×
+ä¸æ¸…é™¤å»¢æ£„æª”æ¡ˆ
 Accept cookies
-±µ¦¬cookies
+æ¥å—cookies
 Check document type
-ÀË¬dÀÉ®×Ãş«¬
+æª¢æŸ¥æª”æ¡ˆé¡å‹
 Parse java files
-¤ÀªRjavaÀÉ®×
+åˆ†æjavaæª”æ¡ˆ
 Store ALL files in cache
-«O¦s©Ò¦³ÀÉ®×¦b¹w¦s°Ï¤º
+å„²å­˜æ‰€æœ‰æª”æ¡ˆåœ¨é å­˜å€å…§
 Tolerant requests (for servers)
-¤¹³\¹ï¦øªA¾¹ªº«Dºë½T­n¨D
+å…è¨±å°ä¼ºæœå™¨çš„éç²¾ç¢ºè¦æ±‚
 Update hack (limit re-transfers)
-§ó·s®É±Ä¨ú¨ä¥L¤èªk¨¾¤î­«½Æ¤U¸ü
+æ›´æ–°æ™‚æ¡å–å…¶ä»–æ–¹æ³•é˜²æ­¢é‡è¤‡ä¸‹è¼‰
 URL hacks (join similar URLs)
 
 Force old HTTP/1.0 requests (no 1.1)
-±j¨î¨Ï¥ÎÂÂªºHTTP/1.0­n¨D (¤£±Ä¥Î1.1)
+å¼·åˆ¶ä½¿ç”¨èˆŠçš„HTTP/1.0è¦æ±‚ (ä¸æ¡ç”¨1.1)
 Max connections / seconds
-¨C¬í³Ì¦h³s½u¼Æ
+æ¯ç§’æœ€å¤šé€£ç·šæ•¸
 Maximum number of links
-³Ì¤jÃìµ²¼Æ
+æœ€å¤§é€£çµæ•¸é‡
 Pause after downloading..
-¨C¦¸¤U¸ü«á¼È°±..
+æ¯æ¬¡ä¸‹è¼‰å¾Œæš«åœ..
 Hide passwords
-ÁôÂÃ±K½X
+éš±è—å¯†ç¢¼
 Hide query strings
-ÁôÂÃ¬d¸ß¦r¦ê
+éš±è—æŸ¥è©¢å­—ä¸²
 Links
-Ãìµ²
+é€£çµ
 Build
-ºc³y
+çµ„å»º
 Experts Only
-°ª¯Å
+é€²éš
 Flow Control
-¬y¶q±±¨î
+æµé‡æ§åˆ¶
 Limits
-­­¨î
+é™åˆ¶
 Browser ID
-ÂsÄı¾¹¼ĞÃÑ
+ç€è¦½å™¨æ¨™è­˜
 Scan Rules
-±½´y³W«h
+æƒæè¦å‰‡
 Spider
-·j´M
+èœ˜è››
 Log, Index, Cache
-¤é»x, ¯Á¤Ş, ¹w¦s°Ï
+è¨˜éŒ„, ç´¢å¼•, é å­˜å€
 Proxy
-proxy
+Proxy
 MIME Types
-MIME Ãş«¬
+MIME é¡å‹
 Do you really want to quit WinHTTrack Website Copier?
-¯uªº­nÂ÷¶}WinHTTrack Website Copier ¶Ü?
+çœŸçš„è¦é›¢é–‹WinHTTrack Website Copier å—?
 Do not connect to a provider (already connected)
-¤w³s½u¨ìºô¸ô
+å·²é€£ç·šè‡³ç¶²è·¯
 Do not use remote access connection
-¤£¨Ï¥Î»·ºİ³s½u
+ä¸ä½¿ç”¨é ç«¯é€£ç·š
 Schedule the mirroring operation
-¹w©w¶i¦æÃè¹³ªº®É¶¡
+é å®šé€²è¡Œé¡åƒçš„æ™‚é–“
 Quit WinHTTrack Website Copier
-Â÷¶}WinHTTrack Website Copier
+é›¢é–‹WinHTTrack Website Copier
 Back to starting page
-¦^¨ì°_©l­¶­±
+å›åˆ°èµ·å§‹ç¶²é 
 Click to start!
-ÂIÀ»¥H¶}©l!
+é»é¸ä»¥é–‹å§‹!
 No saved password for this connection!
-¸Ó³s½u¯Ê¤Ö¤w«O¦sªº±K½X!
+æ­¤é€£ç·šç¼ºå°‘å·²å„²å­˜çš„å¯†ç¢¼!
 Can not get remote connection settings
-µLªkÀò¨ú»·ºİ³s½uªº³]©w
+ç„¡æ³•å–å¾—é ç«¯é€£ç·šçš„è¨­å®š
 Select a connection provider
-½Ğ¿ï¾Ü¤@­Ó³s½u
+è«‹é¸æ“‡ä¸€å€‹é€£ç·š
 Start
-¶}©l
+é–‹å§‹
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-¦p¦³»İ­n½Ğ­×§ï³s½u°Ñ¼Æ,\nµM«á«ö '§¹¦¨' ¶}©lÃè¹³
+å¦‚æœ‰éœ€è¦è«‹ä¿®æ”¹é€£ç·šåƒæ•¸,\nç„¶å¾ŒæŒ‰ 'å®Œæˆ' é–‹å§‹é¡åƒ
 Save settings only, do not launch download now.
-¤£¥ß§Y¶i¦æÃè¹³, ¶È«O¦s·í«e³]©w
+ä¸ç«‹å³é€²è¡Œé¡åƒ, åƒ…å„²å­˜ç•¶å‰è¨­å®š
 On hold
-±¾°_
+æ›èµ·
 Transfer scheduled for: (hh/mm/ss)
-¹w©wÃè¹³¶}©l©ó: (ÂI/¤À/¬í)
+é å®šé¡åƒé–‹å§‹æ–¼: (é»/åˆ†/ç§’)
 Start
-¶}©l
+é–‹å§‹
 Connect to provider (RAS)
-³s½u¨ìºô¸ô(»·ºİ³s½u¦øªA¾¹)
+é€£ç·šè‡³ç¶²è·¯(é ç«¯é€£ç·šä¼ºæœå™¨)
 Connect to this provider
-¨Ï¥Î¸Ó³s½u:
+ä½¿ç”¨æ­¤é€£ç·š:
 Disconnect when finished
-§¹¦¨®É¤ÁÂ_³s½u
+å®Œæˆæ™‚åˆ‡æ–·é€£ç·š
 Disconnect modem on completion
-§¹¦¨®É¤ÁÂ_¼Æ¾Ú¾÷
+å®Œæˆæ™‚åˆ‡æ–·æ•¸æ“šæ©Ÿ
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(¦³¥ô¦óµ{§Ç¿ù»~©Î°İÃD½ĞÁpµ¸§Ú­Ì)\r\n\r\n¶}µo:\r\n¬É­±³]­p (Windows): Xavier Roche\r\n¤ÀªR¤ŞÀº: Xavier Roche\r\nJava¤ÀªR¤ŞÀº: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\n·PÁÂ:\r\nDavid Hing Cheong Hung (DAVEHUNG@mtr.com.hk) ´£¨ÑÂ½Ä¶
+\r\n(æœ‰ä»»ä½•ç¨‹å¼è‡­èŸ²æˆ–å•é¡Œè«‹è¯çµ¡æˆ‘å€‘)\r\n\r\né–‹ç™¼:\r\nä»‹é¢è¨­è¨ˆ (Windows): Xavier Roche\r\nåˆ†æå¼•æ“: Xavier Roche\r\nJavaåˆ†æå¼•æ“: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\næ„Ÿè¬:\r\nDavid Hing Cheong Hung (DAVEHUNG@mtr.com.hk) ã€LNDDYL (https://github.com/LNDDYL) æä¾›ç¿»è­¯
 About WinHTTrack Website Copier
-Ãö©óWinHTTrack Website Copier
+é—œæ–¼WinHTTrack Website Copier
 Please visit our Web page
-½Ğ³X°İ§Ú­Ìªº­º­¶
+è«‹é€ è¨ªæˆ‘å€‘çš„é¦–é 
 Wizard query
-ºëÆF´£°İ
+ç²¾éˆæå•
 Your answer:
-§Aªºµª®×:
+ä½ çš„ç­”æ¡ˆ:
 Link detected..
-ÀË´ú¨ìÃìµ²..
+æª¢æ¸¬åˆ°é€£çµ..
 Choose a rule
-½Ğ¿ï¾Ü³W«h
+è«‹é¸æ“‡è¦å‰‡
 Ignore this link
-©¿²¤¦¹Ãìµ²
+å¿½ç•¥æ­¤é€£çµ
 Ignore directory
-©¿²¤¦¹¥Ø¿ı
+å¿½ç•¥æ­¤ç›®éŒ„
 Ignore domain
-©¿²¤¦¹ºô°ì¦WºÙ
+å¿½ç•¥æ­¤ç¶²åŸŸåç¨±
 Catch this page only
-¶È¤U¸ü¦¹­¶
+åƒ…ä¸‹è¼‰æ­¤é 
 Mirror site
-Ãè¹³¯¸ÂI
+é¡åƒç¶²ç«™
 Mirror domain
-Ãè¹³ºô°ì¦WºÙ
+é¡åƒç¶²åŸŸåç¨±
 Ignore all
-¥ş³¡¥G²¤
+å…¨éƒ¨ä¹ç•¥
 Wizard query
-ºëÆF´£°İ
+ç²¾éˆæå•
 NO
-§_
+å¦
 File
-ÀÉ®×
+æª”æ¡ˆ
 Options
-¿ï¶µ
+é¸é …
 Log
-¤é»x
+è¨˜éŒ„
 Window
-µøµ¡
+è¦–çª—
 Help
-»¡©ú
+èªªæ˜
 Pause transfer
-¼È°±¶Ç¿é
+æš«åœå‚³è¼¸
 Exit
-Â÷¶}
+é›¢é–‹
 Modify options
-­×§ï¿ï¶µ
+ä¿®æ”¹é¸é …
 View log
-¬d¬İ¤é»x
+æª¢è¦–è¨˜éŒ„
 View error log
-¬d¬İ¿ù»~¤é»x
+æª¢è¦–éŒ¯èª¤è¨˜éŒ„
 View file transfers
-¬d¬İÀÉ®×¶Ç¿é
+æª¢è¦–æª”æ¡ˆå‚³è¼¸
 Hide
-ÁôÂÃ
+éš±è—
 About WinHTTrack Website Copier
-Ãö©óWinHTTrack Website Copier
+é—œæ–¼WinHTTrack Website Copier
 Check program updates...
-ÀË¬dª©¥»§ó·s...
+æª¢æŸ¥ç‰ˆæœ¬æ›´æ–°...
 &Toolbar
-¤u¨ãÄæ
+å·¥å…·åˆ—
 &Status Bar
-ª¬ºAÄæ
+ç‹€æ…‹åˆ—
 S&plit
-¤À³Î
+åˆ†å‰²
 File
-ÀÉ®×
+æª”æ¡ˆ
 Preferences
-³]©w
+è¨­å®š
 Mirror
-Ãè¹³
+é¡åƒ
 Log
-¤é»x
+è¨˜éŒ„
 Window
-µøµ¡
+è¦–çª—
 Help
-»¡©ú
+èªªæ˜
 Exit
-Â÷¶}
+é›¢é–‹
 Load default options
-¸ü¤J¦Û©w¹w³]¿ï¶µ
+è¼‰å…¥é è¨­é¸é …
 Save default options
-¦s¬°¦Û©w¹w³]¿ï¶µ
+å­˜ç‚ºé è¨­é¸é …
 Reset to default options
-«ì´_­ì©l³]©w
+é‡è¨­é è¨­é¸é …
 Load options...
-¸ü¤J¿ï¶µ...
+è¼‰å…¥é¸é …...
 Save options as...
-«O¦s¿ï¶µ...
+å„²å­˜é¸é …...
 Language preference...
-¬É­±»y¨¥³]©w...
+ä»‹é¢èªè¨€è¨­å®š...
 Contents...
-¤º®e...
+å…§å®¹...
 About WinHTTrack...
-Ãö©óWinHTTrack...
+é—œæ–¼WinHTTrack...
 New project\tCtrl+N
-·sªº±M®×\tCtrl+N
+æ–°çš„å°ˆæ¡ˆ\tCtrl+N
 &Open...\tCtrl+O
-&¥´¶}...\tCtrl+O
+&é–‹å•Ÿ...\tCtrl+O
 &Save\tCtrl+S
-&«O¦s\tCtrl+S
+&å„²å­˜\tCtrl+S
 Save &As...
-«O¦s¿ï¶µ...
+å„²å­˜ç‚º...
 &Delete...
-&§R°£...
+&åˆªé™¤...
 &Browse sites...
-&ÂsÄı¤wÃè¹³¯¸ÂI...
+&ç€è¦½å·²é¡åƒç¶²ç«™...
 User-defined structure
-¨Ï¥ÎªÌ¦Û©wµ²ºc
+ä½¿ç”¨è€…å®šç¾©çµæ§‹
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\t¤£§t°ÆÀÉ¦WªºÀÉ®×¦W(¦p: image)\r\n%N\t§t¦³°ÆÀÉ¦WªºÀÉ®×¦W(¦p: image.gif)\r\n%t\t¶ÈÂX®i¦W(¦p: gif)\r\n%p\t¸ô®|[µL§ÀÀH'/'] (¦p: /someimages)\r\n%h\t¥D¾÷¦W(¦p: www.someweb.com)\r\n%M\tMD5 URL (128¦ì, 32 ascii byts)\r\n%Q\tMD5 query string (128¦ì, 32 ascii byts)\r\n%q\tMD5 small query string (16¦ì, 4 ascii byts)\r\n\r\n%s?\tµuÀÉ®×¦W(¦p: %sN)
+%n\tä¸å«å‰¯æª”åçš„æª”æ¡ˆåç¨±(å¦‚: image)\r\n%N\tå«æœ‰å‰¯æª”åçš„æª”æ¡ˆåç¨±(å¦‚: image.gif)\r\n%t\tåƒ…å‰¯æª”å(å¦‚: gif)\r\n%p\tè·¯å¾‘[ç„¡å°¾éš¨'/'] (å¦‚: /someimages)\r\n%h\tä¸»æ©Ÿå(å¦‚: www.someweb.com)\r\n%M\tMD5 URL (128ä½, 32 ascii byts)\r\n%Q\tMD5 query string (128ä½, 32 ascii byts)\r\n%q\tMD5 small query string (16ä½å…ƒ, 4 ascii byts)\r\n\r\n%s?\tçŸ­æª”æ¡ˆåç¨±(å¦‚: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
-¨Ò¦p:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+ä¾‹å¦‚:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
 Proxy settings
-proxy³]©w
+Proxyè¨­å®š
 Proxy address:
-proxyºô§}:
+Proxyç¶²å€:
 Proxy port:
-proxy³s±µ°ğ:
+Proxyé€£æ¥åŸ :
 Authentication (only if needed)
-¨­¥÷Åçµı (¦p­Y»İ­n)
+èº«åˆ†é©—è¨¼ (å¦‚è‹¥éœ€è¦)
 Login
-µn¿ı
+ç™»å…¥
 Password
-±K½X
+å¯†ç¢¼
 Enter proxy address here
-¦b¦¹¿é¤Jproxyºô§}
+åœ¨æ­¤è¼¸å…¥Proxyç¶²å€
 Enter proxy port here
-¦b¦¹¿é¤Jproxy³s±µ°ğ
+åœ¨æ­¤è¼¸å…¥Proxyé€£æ¥åŸ 
 Enter proxy login
-¿é¤Jproxy¦øªA¾¹µn¿ı°T®§
+è¼¸å…¥Proxyä¼ºæœå™¨ç™»å…¥åç¨±
 Enter proxy password
-¿é¤Jproxy¦øªA¾¹©Ò»İ±K½X
+è¼¸å…¥Proxyä¼ºæœå™¨æ‰€éœ€å¯†ç¢¼
 Enter project name here
-¦b¦¹¿é¤J±M®×¦W
+åœ¨æ­¤è¼¸å…¥å°ˆæ¡ˆåç¨±
 Enter saving path here
-¦b¦¹¿é¤J«O¦s¸ô®|
+åœ¨æ­¤è¼¸å…¥å„²å­˜è·¯å¾‘
 Select existing project to update
-½Ğ¿ï¾Ü¤@­Ó¤w¦³ªº±M®×¥H§ó·s
+è«‹é¸æ“‡ä¸€å€‹å·²æœ‰çš„å°ˆæ¡ˆä»¥æ›´æ–°
 Click here to select path
-ÂIÀ»¦¹³B¥H¿ï¾Ü¸ô®|
+é»é¸æ­¤è™•ä»¥é¸æ“‡è·¯å¾‘
 Select or create a new category name, to sort your mirrors in categories
 
 HTTrack Project Wizard...
-HTTrack ±M®×ºëÆF...
+HTTrack å°ˆæ¡ˆç²¾éˆ...
 New project name:
-·s±M®×ªº¦WºÙ:
+æ–°å°ˆæ¡ˆçš„åç¨±:
 Existing project name:
-²{¦³±M®×ªº¦WºÙ:
+ç¾æœ‰å°ˆæ¡ˆçš„åç¨±:
 Project name:
-±M®×¦WºÙ:
+å°ˆæ¡ˆåç¨±:
 Base path:
-Á`¦sÀÉ¸ô®|:
+ç¸½å­˜æª”è·¯å¾‘:
 Project category:
 
 C:\\My Web Sites
 C:\\My Websites
 Type a new project name, \r\nor select existing project to update/resume
-½ĞÁä¤J¤@­Ó·sªº±M®×¦W, \r\n©Î¿ï¾Ü¤w¦³±M®×¥H§ó·s©ÎÄ~Äò
+è«‹è¼¸å…¥ä¸€å€‹æ–°çš„å°ˆæ¡ˆåç¨±, \r\næˆ–é¸æ“‡å·²æœ‰å°ˆæ¡ˆä»¥æ›´æ–°æˆ–ç¹¼çºŒ
 New project
-·sªº±M®×
+æ–°çš„å°ˆæ¡ˆ
 Insert URL
-´¡¤JURL
+æ’å…¥URL
 URL:
-URLºô§}:
+URLç¶²å€:
 Authentication (only if needed)
-¨­¥÷Åçµı (¦p­Y»İ­n)
+èº«åˆ†é©—è¨¼ (å¦‚è‹¥éœ€è¦)
 Login
-µn¿ı
+ç™»å…¥
 Password
-±K½X
+å¯†ç¢¼
 Forms or complex links:
-ªí®æ©Î´_ÂøÃìµ²:
+è¡¨å–®æˆ–å¾©é›œé€£çµ:
 Capture URL...
-§ì¨úURLºô§}...
+æŠ“å–URLç¶²å€...
 Enter URL address(es) here
-½Ğ¦b¦¹¿é¤JURLºô§}
+è«‹åœ¨æ­¤è¼¸å…¥URLç¶²å€
 Enter site login
-½Ğ¿é¤J¯¸ÂIµn¿ı¦W
+è«‹è¼¸å…¥ç¶²ç«™ç™»å…¥åç¨±
 Enter site password
-½Ğ¿é¤J¯¸ÂIµn¿ı±K½X
+è«‹è¼¸å…¥ç¶²ç«™ç™»å…¥å¯†ç¢¼
 Use this capture tool for links that can only be accessed through forms or javascript code
-¨Ï¥Î¦¹¤u¨ã§ì¨ú¥u¯à³q¹Lªí®æ©Îjava¥N½X«ô³X¹LªºÃìµ²
+ä½¿ç”¨æ­¤å·¥å…·æŠ“å–åªèƒ½é€éè¡¨å–®æˆ–javaä»£ç¢¼å­˜å–éçš„é€£çµ
 Choose language according to preference
-½Ğ®Ú¾Ú­Ó¤H³ß¦n¿ï¾Ü¬É­±»y¨¥
+è«‹æ ¹æ“šå€‹äººåå¥½é¸æ“‡ä»‹é¢èªè¨€
 Catch URL!
-§ì¨úURLºô§}!
+æŠ“å–URLç¶²å€!
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
-½Ğ¥ı¼È®É±NÂsÄı¾¹ªºproxy³]¬°¦p¤U¼Æ­È(½Æ»s/¶K¤Wproxyºô§}©M³s±µ°ğ).\nµM«áÂIÀ»ÂsÄı¾¹­¶­±¤Wªí®æªºSUBMIT«ö¶s, ©ÎÂIÀ»·Q­n§ì¨úªºÃìµ²
+è«‹å…ˆæš«æ™‚å°‡ç€è¦½å™¨çš„Proxyè¨­ç‚ºå¦‚ä¸‹æ•¸å€¼(è¤‡è£½/è²¼ä¸ŠProxyç¶²å€èˆ‡é€£æ¥åŸ ).\nç„¶å¾Œé»é¸ç€è¦½å™¨é é¢ä¸Šè¡¨å–®çš„SUBMITæŒ‰éˆ•, æˆ–é»é¸æƒ³è¦æŠ“å–çš„é€£çµ
 This will send the desired link from your browser to WinHTTrack.
-©Ò»İªºÃìµ²±N±qÂsÄı¾¹³Q°e¦ÜWinHTTrack.
+æ‰€éœ€çš„é€£çµå°‡å¾ç€è¦½å™¨è¢«å‚³é€è‡³WinHTTrack.
 ABORT
-©ñ±ó
+æ”¾æ£„
 Copy/Paste the temporary proxy parameters here
-¦b¦¹½Æ»s/¶K¤W¼È®Éªºproxy°Ñ¼Æ
+åœ¨æ­¤è¤‡è£½/è²¼ä¸Šæš«æ™‚çš„Proxyåƒæ•¸
 Cancel
-¨ú®ø
+å–æ¶ˆ
 Unable to find Help files!
-µLªk§ä¨ì»¡©úÀÉ®×!
+ç„¡æ³•æ‰¾åˆ°èªªæ˜æª”æ¡ˆ!
 Unable to save parameters!
-µLªk«O¦s°Ñ¼Æ!
+ç„¡æ³•å„²å­˜åƒæ•¸!
 Please drag only one folder at a time
-½Ğ¨C¦¸¥u©ì¦²¤@­ÓÀÉ®×§¨
+è«‹æ¯æ¬¡åªæ‹–æ›³ä¸€å€‹è³‡æ–™å¤¾
 Please drag only folders, not files
-½Ğ¤£­n©ì¦²ÀÉ®×, ¥u©ì¦²ÀÉ®×§¨
+è«‹ä¸è¦æ‹–æ›³æª”æ¡ˆ, åªæ‹–æ›³è³‡æ–™å¤¾
 Please drag folders only
-½Ğ¥u©ì¦²ÀÉ®×§¨
+è«‹åªæ‹–æ›³è³‡æ–™å¤¾
 Select user-defined structure?
-¿ï¾Ü¨Ï¥ÎªÌ¦Û©wµ²ºc¶Ü?
+é¸æ“‡ä½¿ç”¨è€…è‡ªå®šçµæ§‹å—?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-½Ğ½T«O¨Ï¥ÎªÌ©w¸qªº¦r¦êªº¥¿½T©Ê,\n§_«h²£¥ÍÀÉ®×¦W®É¥i¯à¥X¿ù!
+è«‹ç¢ºä¿ä½¿ç”¨è€…å®šç¾©çš„å­—ä¸²çš„æ­£ç¢ºæ€§,\nå¦å‰‡ç”¢ç”Ÿæª”æ¡ˆåç¨±æ™‚å¯èƒ½å‡ºéŒ¯!
 Do you really want to use a user-defined structure?
-¯uªº­n¨Ï¥Î¨Ï¥ÎªÌ¦Û©wµ²ºc¶Ü?
+çœŸçš„è¦ä½¿ç”¨ä½¿ç”¨è€…è‡ªå®šçµæ§‹å—?
 Too manu URLs, cannot handle so many links!!
-¹L¦hURLºô§}, µLªk³B²z!!
+éå¤šURLç¶²å€, ç„¡æ³•è™•ç†!!
 Not enough memory, fatal internal error..
-°O¾ĞÅé¤£¨¬, µo¥Í­P©Rªº¤º³¡¿ù»~!
+è¨˜æ†¶é«”ä¸è¶³, ç™¼ç”Ÿè‡´å‘½çš„å…§éƒ¨éŒ¯èª¤!
 Unknown operation!
-¥¼ª¾¾Ş§@!
+æœªçŸ¥æ“ä½œ!
 Add this URL?\r\n
-¼W¥[¦¹URL?
+æ–°å¢æ­¤URL?
 Warning: main process is still not responding, cannot add URL(s)..
-Äµ§i: ¥D¶iµ{¥¼¦³¦^À³, ¤£¯à¼W¥[URL(s)..
+è­¦å‘Š: ä¸»é€²ç¨‹æœªæœ‰å›æ‡‰, ä¸èƒ½æ–°å¢URL(s)..
 Type/MIME associations
-Ãş«¬/MIME ÁpÃ´
+é¡å‹/MIME è¯ç¹«
 File types:
-ÀÉ®×Ãş«¬:
+æª”æ¡ˆé¡å‹:
 MIME identity:
 MIME identity
 Select or modify your file type(s) here
-¦b³o¸Ì¿ï¾Ü©Î­×§ï§AªºÀÉ®×Ãş«¬
+åœ¨é€™è£¡é¸æ“‡æˆ–ä¿®æ”¹ä½ çš„æª”æ¡ˆé¡å‹
 Select or modify your MIME type(s) here
-¦b³o¸Ì¿ï¾Ü©Î­×§ï§Aªº MIME Ãş«¬
+åœ¨é€™è£¡é¸æ“‡æˆ–ä¿®æ”¹ä½ çš„ MIME é¡å‹
 Go up
-©¹¤W
+å¾€ä¸Š
 Go down
-©¹¤U
+å¾€ä¸‹
 File download information
-ÀÉ®×¤U¸ü°T®§
+æª”æ¡ˆä¸‹è¼‰è³‡è¨Š
 Freeze Window
-Âê©wµøµ¡°T®§
+é–å®šè¦–çª—è³‡è¨Š
 More information:
-§ó¦h°T®§:
+æ›´å¤šè³‡è¨Š:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Åwªï¨Ï¥Î WinHTTrack ºô¯¸«ş¨©¾¹!\n\n½ĞÂIÀ»'NEXT'«ö¶s¥h\n\n-¶}©l¤@­Ó·s±M®×\n- ©Î Ä~Äò¤@­Ó¥¼§¹¦¨ªº¤U¸ü
+æ­¡è¿ä½¿ç”¨ WinHTTrack ç¶²ç«™è¤‡è£½å™¨!\n\nè«‹é»é¸'NEXT'æŒ‰éˆ•å»\n\n-é–‹å§‹ä¸€å€‹æ–°å°ˆæ¡ˆ\n- æˆ– ç¹¼çºŒä¸€å€‹æœªå®Œæˆçš„ä¸‹è¼‰
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-ÀÉ®×¦W¤¤¥]§t°ÆÀÉ¦W:\nÀÉ®×¦W¤¤¥]§t:\n¦¹ÀÉ®×¦W:\nÀÉ®×§¨¦W¤¤¥]§t:\n¦¹ÀÉ®×§¨¦W:\n¦¹ºô°ì¦WºÙ:\nºô°ì¦WºÙ¤¤¥]§t:\n¦¹¥D¾÷:\nÃìµ²¤¤¥]§t:\n¦¹Ãìµ²:\n©Ò¦³Ãìµ²
+æª”æ¡ˆåç¨±ä¸­åŒ…å«å‰¯æª”å:\næª”æ¡ˆåç¨±ä¸­åŒ…å«:\næ­¤æª”æ¡ˆåç¨±:\nè³‡æ–™å¤¾åç¨±ä¸­åŒ…å«:\næ­¤è³‡æ–™å¤¾åç¨±:\næ­¤ç¶²åŸŸåç¨±:\nç¶²åŸŸåç¨±ä¸­åŒ…å«:\næ­¤ä¸»æ©Ÿ:\né€£çµä¸­åŒ…å«:\næ­¤é€£çµ:\næ‰€æœ‰é€£çµ
 Show all\nHide debug\nHide infos\nHide debug and infos
-Åã¥Ü¥ş³¡¤º®e\nÁôÂÃ¿ù»~\nÁôÂÃ®ø®§\nÁôÂÃ¿ù»~©M®ø®§
+é¡¯ç¤ºå…¨éƒ¨å…§å®¹\néš±è—éŒ¯èª¤\néš±è—æ¶ˆæ¯\néš±è—éŒ¯èª¤èˆ‡è³‡è¨Š
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-¯¸ÂI­ì¦³µ²ºc(¹w³])\nhtmlÀÉ®×¦bweb/, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bweb/images/\nhtmlÀÉ®×¦bweb/html, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bweb/images\nhtmlÀÉ®×¦bweb/, ¹Ï¤ù©M¨ä¥LÀÉ®×¤]¦bweb/\nhtmlÀÉ®×¦bweb/, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bweb/xxx, xxx¬°ÀÉ®×°ÆÀÉ¦W\nhtmlÀÉ®×¦bweb/html, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bweb/xxx\n¯¸ÂI­ì¦³µ²ºc(¥h±¼www.domain.xxx/)\nhtmlÀÉ®×¦bsite_name/, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bsite_name/images/\nhtmlÀÉ®×¦bsite_name/html, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bsite_name/images\nhtmlÀÉ®×¦bsite_name/, ¹Ï¤ù©M¨ä¥LÀÉ®×¤]¦bsite_name/\nhtmlÀÉ®×¦bsite_name/, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bsite_name/xxx\nhtmlÀÉ®×¦bsite_name/html, ¹Ï¤ù©M¨ä¥LÀÉ®×¦bsite_name/xxx\n©Ò¦³ÀÉ®×¦bweb/, ÀÉ®×¦W¥ô·N²£¥Í\n©Ò¦³ÀÉ®×¦bsite_name/, ÀÉ®×¦W¥ô·N²£¥Í\n¨Ï¥ÎªÌ¦Û©wµ²ºc..
+ç¶²ç«™åŸæœ‰çµæ§‹(é è¨­)\nhtmlæª”æ¡ˆåœ¨web/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨web/images/\nhtmlæª”æ¡ˆåœ¨web/html, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨web/images\nhtmlæª”æ¡ˆåœ¨web/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆä¹Ÿåœ¨web/\nhtmlæª”æ¡ˆåœ¨web/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨web/xxx, xxxç‚ºæª”æ¡ˆå‰¯æª”å\nhtmlæª”æ¡ˆåœ¨web/html, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨web/xxx\nç¶²ç«™åŸæœ‰çµæ§‹(å»æ‰www.domain.xxx/)\nhtmlæª”æ¡ˆåœ¨site_name/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨site_name/images/\nhtmlæª”æ¡ˆåœ¨site_name/html, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨site_name/images\nhtmlæª”æ¡ˆåœ¨site_name/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆä¹Ÿåœ¨site_name/\nhtmlæª”æ¡ˆåœ¨site_name/, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨site_name/xxx\nhtmlæª”æ¡ˆåœ¨site_name/html, åœ–ç‰‡èˆ‡å…¶ä»–æª”æ¡ˆåœ¨site_name/xxx\næ‰€æœ‰æª”æ¡ˆåœ¨web/, æª”æ¡ˆåç¨±ä»»æ„ç”¢ç”Ÿ\næ‰€æœ‰æª”æ¡ˆåœ¨site_name/, æª”æ¡ˆåç¨±ä»»æ„ç”¢ç”Ÿ\nä½¿ç”¨è€…è‡ªå®šçµæ§‹..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-¥u°µ±½´y\n¥u«O¦shtmlÀÉ®×\n¥u«O¦s«DhtmlÀÉ®×\n«O¦s©Ò¦³ÀÉ®× (¹w³])\n¥ı«O¦shtmlÀÉ®×
+åªåšæƒæ\nåªå„²å­˜htmlæª”æ¡ˆ\nåªå„²å­˜éhtmlæª”æ¡ˆ\nå„²å­˜æ‰€æœ‰æª”æ¡ˆ (é è¨­)\nå…ˆå„²å­˜htmlæª”æ¡ˆ
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
-°±¯d©ó¦P¤@¥Ø¿ı\n¤¹³\©¹¤U¶i¦æ (¹w³])\n¤¹³\©¹¤W¶i¦æ\n¤W¤U³£¤¹³\¶i¦æ
+åœç•™æ–¼åŒä¸€ç›®éŒ„\nå…è¨±å¾€ä¸‹é€²è¡Œ (é è¨­)\nå…è¨±å¾€ä¸Šé€²è¡Œ\nä¸Šä¸‹éƒ½å…è¨±é€²è¡Œ
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
-°±¯d©ó¦P¤@ºô§} (¹w³])\n°±¯d©ó¦P¤@ºô°ì¦WºÙ\n°±¯d©ó¦P¤@³»¯Åºô°ì¦WºÙ\n¥ô¦óºô¸ôºô§}
+åœç•™æ–¼åŒä¸€ç¶²å€ (é è¨­)\nåœç•™æ–¼åŒä¸€ç¶²åŸŸåç¨±\nåœç•™æ–¼åŒä¸€é ‚ç´šç¶²åŸŸåç¨±\nä»»ä½•ç¶²è·¯ç¶²å€
 Never\nIf unknown (except /)\nIf unknown
-±q¤£\n¦pªG¥¼ª¾ (/ °£¥~)\n¦pªG¥¼ª¾
+å¾ä¸\nå¦‚æœæœªçŸ¥ (/ é™¤å¤–)\nå¦‚æœæœªçŸ¥
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-¤£¿í¦urobots.txt\n¿í¦u¹LÂo¾¹Àu¥ı©órobots.txt\n§¹¥ş¿í¦urobots.txt
+ä¸éµå®ˆrobots.txt\néµå®ˆéæ¿¾å™¨å„ªå…ˆæ–¼robots.txt\nå®Œå…¨éµå®ˆrobots.txt
 normal\nextended\ndebug
-´¶³q¤é»x\nÂX¥R¤é»x\n°»¿ù¤é»x
+æ™®é€šè¨˜éŒ„\næ“´å……è¨˜éŒ„\nåµéŒ¯è¨˜éŒ„
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-¤U¸üºô¯¸\n¤U¸üºô¯¸ + ´£°İ\n¤U¸ü­Ó§OÀÉ®×\n¤U¸ü­¶­±¤¤ªº©Ò¦³¯¸ÂI (¦h­ÓÃè¹³)\n´ú¸Õ­¶­±¤¤ªºÃìµ² (®ÑÃ±´ú¸Õ)\n* Ä~Äò³Q¤¤Â_ªºÃè¹³\n* §ó·s¤w¦³Ãè¹³
+ä¸‹è¼‰ç¶²ç«™\nä¸‹è¼‰ç¶²ç«™ + æå•\nä¸‹è¼‰å€‹åˆ¥æª”æ¡ˆ\nä¸‹è¼‰é é¢ä¸­çš„æ‰€æœ‰ç¶²ç«™ (å¤šå€‹é¡åƒ)\næ¸¬è©¦é é¢ä¸­çš„é€£çµ (æ›¸ç°½æ¸¬è©¦)\n* ç¹¼çºŒè¢«ä¸­æ–·çš„é¡åƒ\n* æ›´æ–°å·²æœ‰é¡åƒ
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
-¬Û¹ï URI / µ´¹ï URL (¹w³])\nµ´¹ï URL / µ´¹ï URL\nµ´¹ï URI / µ´¹ï URL\n­ì¥»ªº URL / ­ì¥»ªº URL
+ç›¸å° URI / çµ•å° URL (é è¨­)\nçµ•å° URL / çµ•å° URL\nçµ•å° URI / çµ•å° URL\nåŸæœ¬çš„ URL / åŸæœ¬çš„ URL
 Open Source offline browser
-¶}©ñ­ì©lÀÉÂ÷½u¾\Äı¾¹
+é–‹æ”¾åŸå§‹æª”é›¢ç·šç€è¦½å™¨
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-ºô¯¸«ş¨©¾¹/Â÷½u¾\Äı¾¹,§K¶O«ş¨©»·ºİºô¯¸¨ì§Aªº¹q¸£
+ç¶²ç«™è¤‡è£½å™¨/é›¢ç·šç€è¦½å™¨,å…è²»è¤‡è£½é ç«¯ç¶²ç«™åˆ°ä½ çš„é›»è…¦
 httrack, winhttrack, webhttrack, offline browser
-httrack, winhttrack, webhttrack, Â÷½u¾\Äı¾¹
+httrack, winhttrack, webhttrack, é›¢ç·šç€è¦½å™¨
 URL list (.txt)
-URL ªí (.txt)
+URL æ¸…å–® (.txt)
 Previous
-¤W¤@¨B
+ä¸Šä¸€æ­¥
 Next
-¤U¤@¨B
+ä¸‹ä¸€æ­¥
 URLs
 URLs
 Warning
-Äµ§i
+è­¦å‘Š
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-§Aªº¾\Äı¾¹²{®É¤£¤ä´© javascript.¦p»İ§ó¨Î®ÄªG½Ğ¥Î¤ä´© javascript ªº¾\Äı¾¹
+ä½ çš„ç€è¦½å™¨ç¾æ™‚ä¸æ”¯æ´ javascript.å¦‚éœ€æ›´ä½³æ•ˆæœè«‹ç”¨æ”¯æ´ javascript çš„ç€è¦½å™¨
 Thank you
-¦hÁÂ
+å¤šè¬
 You can now close this window
-§A²{¦b¥i¥HÃö³¬³oµøµ¡
+ä½ ç¾åœ¨å¯ä»¥é—œé–‰é€™è¦–çª—
 Server terminated
-¦øªA¾¹¤w²×¤î
+ä¼ºæœå™¨å·²çµ‚æ­¢
 A fatal error has occured during this mirror
-³oÃè¹³µo¥Í¤F¤£¥i¦^´_ªº¿ù»~
+é€™é¡åƒç™¼ç”Ÿäº†ä¸å¯å›å¾©çš„éŒ¯èª¤
