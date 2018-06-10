@@ -1582,7 +1582,6 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 
       if (n >= 20) {
         enum {
-          ICP_OP_MIN = 0,
           ICP_OP_INVALID = 0,
           ICP_OP_QUERY = 1,
           ICP_OP_HIT = 2,
@@ -1606,7 +1605,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 
         buffer[bufferSize] = '\0';      /* Ensure payload is NULL terminated */
         if (Message_Length <= bufferSize - 20) {
-          if (Opcode >= ICP_OP_MIN && Opcode <= ICP_OP_MAX) {
+          if (Opcode <= ICP_OP_MAX) {
             if (Version == 2) {
               switch (Opcode) {
               case ICP_OP_QUERY:

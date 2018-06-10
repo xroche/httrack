@@ -258,7 +258,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 
           if (tab[i].type == HTS_CLASS) {
 
-            if ((tab[i].index1 < header.count) && (tab[i].index1 >= 0)) {
+            if (tab[i].index1 < header.count) {
 
               if ((tab[i].index1 != SClass) && (tab[i].index1 != Class)
                   && (tab[tab[i].index1].name[0] != '[')) {
