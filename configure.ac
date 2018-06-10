@@ -57,6 +57,7 @@ DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
 -Wstrict-prototypes -Wmissing-prototypes \
 -Wmissing-declarations -Wdeclaration-after-statement \
 -Wpointer-arith -Wsequence-point -Wnested-externs \
+-Wtype-limits \
 -D_REENTRANT"
 AC_SUBST(DEFAULT_CFLAGS)
 DEFAULT_LDFLAGS=""
