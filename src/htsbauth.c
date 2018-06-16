@@ -1,6 +1,6 @@
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2017 Xavier Roche and other contributors
+Copyright (C) 1998-2018 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
