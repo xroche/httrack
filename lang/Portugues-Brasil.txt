@@ -147,9 +147,9 @@ Localizar
 Find a word
 Localizar uma palavra
 Info log file
-Informações do relatório
+Arquivo de registro de informações
 Warning/Errors log file
-Atenção/Erros de relatório
+Aviso/Arquivo de registro de erros
 Unable to initialize the OLE system
 Não foi possível iniciar o sistema OLE
 WinHTTrack could not find any interrupted download file cache in the specified folder!
@@ -171,7 +171,7 @@ erro
 Receiving files..
 Recebendo arquivos...
 Parsing HTML file..
-Analizando arquivo HTML...
+Analisando arquivo HTML...
 Purging files..
 Limpando arquivos...
 Loading cache in progress..
@@ -183,9 +183,9 @@ Pausa - Escolher [Cópia do site]/[Suspender download] para prosseguir operação
 Finishing pending transfers - Select [Cancel] to stop now!
 Finalizando transferências pendentes - Selecione [Cancelar] para parar agora!
 scanning
-analizando
+analisando
 Waiting for scheduled time..
-Aguardando horário programado para iniciar...
+Aguardando horário agendado...
 Transferring data..
 Transferindo dados..
 Connecting to provider
@@ -372,6 +372,8 @@ Create a Start Page
 Criar uma página inicial
 Create a word database of all html pages
 Criar uma base de dados da palavra de todas páginas HTML
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Criar arquivo de e-mail RFC822 completo (MHT/EML) do espelho
 Create error logging and report files
 Criar relatórios de erros e informações
 Generate DOS 8-3 filenames ONLY
@@ -420,6 +422,12 @@ Browser identity
 Indentidade do navegador
 Comment to be placed in each HTML file
 Notas de rodapé em cada arquivo HTML
+Languages accepted by the browser
+Idiomas aceitos pelo navegador
+Additional HTTP headers to be sent in each requests
+Cabeçalhos HTTP adicionais para serem enviados em cada solicitação
+HTTP referer to be sent for initial URLs
+Referenciador HTTP a ser enviado para URLs iniciais
 Back to starting page
 Voltar à página inicial
 Save current preferences as default values
@@ -480,6 +488,8 @@ Make an index
 Criar um índice
 Make a word database
 Criar um banco de dados de palavras
+Build a mail archive
+Criar um arquivo de mensagens
 Log files
 Relatórios
 DOS names (8+3)
@@ -508,6 +518,12 @@ Identity
 Identificação
 HTML footer
 Rodapé do HTML
+Languages
+Idiomas
+Additional HTTP Headers
+Cabeçalhos HTTP adicionais
+Default referer URL
+URL de referência padrão
 N# connections
 Número de conexões
 Abandon host if error
@@ -889,7 +905,7 @@ Exibir tudo\nOcultar erros\nOcultar informações\nOcultar erros e informações
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
 Estrutura do site (padrão)\nHtml na web/,       imagens/outros arquivos na web/imagens/\nHtml na web/html,   imagens/outros na web/imagens\nHtml na web/,       imagens/outros na web/\nHtml na web/,       imagens/outros na web/xxx, quando xxx é a extensão do arquivo\nHtml na web/html,   imagens/outros na web/xxx\nEstrutura do site, sem www.dominio.xxx/\nHtml no nome_do_site/, imagens/outros no nome_do_site/imagens/\nHtml no nome_do_site/html, imagens/outros no nome_do_site/imagens\nHtml no nome_do_site/, imagens/outros no nome_do_site/\nHtml no nome_do_site/, imagens/outros no nome_do_site/xxx\nHtml no nome_do_site/html, imagens/outros no nome_do_site/xxx\nTodos os arquivos na web/, com nomes aleatórios (gadget !)\nTodos os arquivos no nome_do_site/, com nomes aleatórios (gadget !)\nEstrutura definida pelo usuário..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-Somente analizar\nArmazenar arquivos html\nArmazenar arquivos não html\nAmazenar todos os arquivos (padrão)\nArmazenar arquivos html primeiro
+Somente analisar\nArmazenar arquivos html\nArmazenar arquivos não html\nAmazenar todos os arquivos (padrão)\nArmazenar arquivos html primeiro
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
 Permanecer no mesmo diretório\nPermite ir para abaixo (padrão)\nPermite ir para cima\nPermite ir para cima & para baixo
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
@@ -925,8 +941,38 @@ Seu Navegador atualmente não suporta javascript. Para melhores resultados, favor
 Thank you
 Obrigado
 You can now close this window
-Vocë pode fechar esta janela agora
+Você pode fechar esta janela agora
 Server terminated
 Servidor finalizado
 A fatal error has occured during this mirror
 Um erro fatal ocorreu durante este espelho
+View Documentation
+Exibir documentação
+Go To HTTrack Website
+Ir Para o Site do HTTrack
+Go To HTTrack Forum
+Ir Para o Fórum do HTTrack
+View License
+Exibir Licença
+Beware: you local browser might be unable to browse files with embedded filenames
+Cuidado: seu navegador local pode não conseguir procurar arquivos com nomes de arquivos incorporados
+Recreated HTTrack internal cached resources
+Recursos em cache internos do HTTrack recriados
+Could not create internal cached resources
+Não foi possível criar recursos em cache internos
+Could not get the system external storage directory
+Não foi possível obter o diretório de armazenamento externo do sistema
+Could not write to:
+Não foi possível gravar em:
+Read-only media (SDCARD)
+Mídia somente leitura (SDCARD)
+No storage media (SDCARD)
+Nenhuma mídia de armazenamento (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+O HTTrack pode não conseguir baixar sites até que esse problema seja corrigido
+HTTrack: mirror '%s' stopped!
+HTTrack: espelho '%s' interrompido!
+Click on this notification to restart the interrupted mirror
+Clique nesta notificação para reiniciar o espelho interrompido
+HTTrack: could not save profile for '%s'!
+HTTrack: não foi possível salvar o perfil para '%s'!
