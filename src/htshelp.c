@@ -182,7 +182,7 @@ void help_wizard(httrackp * opt) {
   printf("\n");
   printf("Welcome to HTTrack Website Copier (Offline Browser) " HTTRACK_VERSION
          "%s\n", hts_get_version_info(opt));
-  printf("Copyright (C) 1998-2017 Xavier Roche and other contributors\n");
+  printf("Copyright (C) 1998-2018 Xavier Roche and other contributors\n");
 #ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");

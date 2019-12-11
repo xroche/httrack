@@ -1,6 +1,6 @@
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2017 Xavier Roche and other contributors
+Copyright (C) 1998-2018 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -133,7 +133,7 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
   const size_t n = strlen(chk_dom);
   const size_t m = strlen(domain);
   const size_t l = n < m ? n : m;
-  size_t i;
+  long i;
   for (i = l - 1; i >= 0; i--) {
     if (chk_dom[n - i - 1] != domain[m - i - 1]) {
       return 1;
