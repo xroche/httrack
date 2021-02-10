@@ -23,7 +23,7 @@ Cancel changes
 Click to confirm
 Подтвердить
 Click to get help!
-Получить справку
+Справка
 Click to return to previous screen
 Вернуться назад
 Click to go to next screen
@@ -39,9 +39,9 @@ Delete this project?
 Delete empty project %s?
 Удалить пустой проект %s?
 Action not yet implemented
-Пока не реализовано
+Действие не реализовано
 Error deleting this project
-Ошибка удаления проекта
+Ошибка удаления этого проекта
 Select a rule for the filter
 Выбрать тип фильтра
 Enter keywords for the filter
@@ -51,11 +51,11 @@ Cancel
 Add this rule
 Добавить это условие
 Please enter one or several keyword(s) for the rule
-Введите значения условий фильтра
+Введите одно или несколько значений условий фильтра
 Add Scan Rule
 Добавить фильтр
 Criterion
-Выбрать тип:
+Выбрать критерии:
 String
 Ввести значение:
 Add
@@ -63,19 +63,19 @@ Add
 Scan Rules
 Фильтры
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Используя маски вы можете исключить/включить сразу несколько адресов\nКак разделитель фильтров используйте запятые или пробелы.\nПример: +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
+Используя маски вы можете исключить/включить сразу несколько адресов или ссылок.\nКак разделитель фильтров используйте запятые или пробелы.\nПример: +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
 Exclude links
-Исключить...
+Исключить
 Include link(s)
-Включить...
+Включить
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-Совет: Если вы хотите скачать все gif-файлы, используйте, например, такой фильтр +www.someweb.com/*.gif. \n(+*.gif / -*.gif разрешает/запрещает для скачивания ВСЕ gif-файлы на ВСЕХ сайтах)
+Совет: Как пример если вы хотите скачать все включенные gif-файлы, используйте такой фильтр +www.someweb.com/*.gif. \n(+*.gif / -*.gif разрешает/запрещает для скачивания ВСЕ gif-файлы на ВСЕХ сайтах)
 Save prefs
 Сохранить настройки
 Matching links will be excluded:
-Линки, удовлетворяющие этому условию будут исключены:
+Ссылки подходящие под это условие будут исключены:
 Matching links will be included:
-Линки, удовлетворяющие этому условию будут включены:
+Ссылки подходящие под это условие будут включены:
 Example:
 Пример:
 gif\r\nWill match all GIF files
@@ -83,9 +83,9 @@ gif\r\nОбнаружит все gif (или GIF) файлы
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
 blue\r\nОтловит все файлы, содержащие в имени подстроку 'blue', например 'bluesky-small.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
-bigfile.mov\r\nОтловит файл 'bigfile.mov', но, в тоже время, пропустит файл 'bigfile2.mov'
+bigfile.mov\r\nОтловит файл 'bigfile.mov', но, в то же время, пропустит файл 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nОтловит адреса, содержащие каталоги с подстрокой 'cgi', такие как /cgi-bin/somecgi.cgi
+cgi\r\nОтловит адреса, содержащие каталоги с подстрокой 'cgi', такие, как /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
 cgi-bin\r\nОтловит адреса, содержащие каталог 'cgi-bin' (но не cgi-bin-2, например)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
@@ -109,7 +109,7 @@ Existing filters
 Cancel changes
 Отменить изменения
 Save current preferences as default values
-Сохранить текущие настройки как значения по умолчанию
+Сохранить текущие изменения как по умолчанию
 Click to confirm
 Подтвердить
 No log files in %s!
@@ -117,7 +117,7 @@ No log files in %s!
 No 'index.html' file in %s!
 Отсутствует файл index.html в %s!
 Click to quit WinHTTrack Website Copier
-Выйти из программы WinHTTrack Website Copier
+Выйти из программы
 View log files
 Просмотр лог файлов
 Browse HTML start page
@@ -181,7 +181,7 @@ Parsing HTML file (testing links)..
 Pause - Toggle [Mirror]/[Pause download] to resume operation
 Остановлено (для продолжения выберите [Зеркало]/[Приостановить закачку])
 Finishing pending transfers - Select [Cancel] to stop now!
-Завершаются отложенные закачки - чтобы прервать, нажмите Cancel!
+Завершаются отложенные закачки — чтобы прервать, нажмите Cancel!
 scanning
 сканируем
 Waiting for scheduled time..
@@ -205,11 +205,11 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * ЗАКАЧКА ПРЕРВАНА! * *\r\nВременный кэш, созданный во время текущей сессий, содержит данные, загруженные только во время данной сессии и потребуется только в случае возобновления закачки.\r\nОднако, предыдущий кэш может содержать более полную информацию. Если вы не хотите потерять эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Это можно легко сделать прямо здесь, удалив файлы hts-cache/new.]\r\n\r\nСчитаете ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * ОШИБКА! * *\r\nТекущее зеркало - пусто. Если это было обновление, предыдущая версия зеркала восстановлена.\r\nПричина: первая страница(ы) или не найдена, или были проблемы с соединением.\r\n=> Убедитесь, что вебсайт все еще существует, и/или проверьте установки прокси-сервера! <=
+* * ОШИБКА! * *\r\nТекущее зеркало — пусто. Если это было обновление, предыдущая версия зеркала восстановлена.\r\nПричина: первая страница(ы) или не найдена, или были проблемы с соединением.\r\n=> Убедитесь, что вебсайт все еще существует, и/или проверьте установки прокси-сервера! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nПодсказка: Для просмотра сообщений об ошибках и предупреждений нажмите [Просмотр лог файла]
 Error deleting a hts-cache/new.* file, please do it manually
-Ошибка удаления файла hts-cache/new.* , пожалуйста, удалите его вручную.\r\n
+Ошибка удаления файла hts-cache/new.*\r\nПожалуйста, удалите файл вручную.\r\n
 Do you really want to quit WinHTTrack Website Copier?
 Вы действительно хотите выйти из WinHTTrack?
 - Mirroring Mode -\n\nEnter address(es) in URL box
@@ -319,7 +319,7 @@ Pause Download?
 Stop the mirroring operation
 Прервать закачку
 Minimize to System Tray
-Спрятать в системный трэй
+Спрятать в системный трей
 Click to skip a link or stop parsing
 Пропустить линк или прервать анализ файла
 Click to skip a link
@@ -327,7 +327,7 @@ Click to skip a link
 Bytes saved
 Сохранено байт:
 Links scanned
-Просканировано линков:
+Просканировано ссылок:
 Time:
 Время:
 Connections:
@@ -363,7 +363,7 @@ Choose local site structure
 Set user-defined structure on disk
 Установить заданную локальную структуру сайта
 Use a cache for updates and retries
-Использовать кэш для обновления и докачки
+Использовать кэш для обновления и повторов скачивания
 Do not update zero size or user-erased files
 Не качать файлы, которые были однажды скачаны, даже если они нулевой длины или удалены
 Create a Start Page
@@ -407,7 +407,7 @@ Maximum amount of bytes to retrieve from the Web
 Make a pause after downloading this amount of bytes
 После загрузки указанного числа байтов, сделать паузу
 Maximum duration time for the mirroring operation
-Макс. продолжительность зеркализации
+Макс. продолжительность процесса создания зеркал
 Maximum transfer rate
 Макс. скорость закачки
 Maximum connections/seconds (avoid server overload)
@@ -445,7 +445,7 @@ Log file type (if generated)
 Maximum mirroring depth from root address
 Макс. глубина создания зеркала от начального адреса
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
-Максимальная глубина закачки для внешних/запрещенных адресов (0, т.е., нет ограничений, это значение поумолчанию)
+Максимальная глубина закачки для внешних/запрещенных адресов (0, т.е., нет ограничений, это значение по умолчанию)
 Create a debugging file
 Создать файл с отладочной информацией
 Use non-standard requests to get round some server bugs
@@ -453,19 +453,19 @@ Use non-standard requests to get round some server bugs
 Use old HTTP/1.0 requests (limits engine power!)
 Использовать старый протокол HTTP/1.0 (ограничит возможности программы!)
 Attempt to limit retransfers through several tricks (file size test..)
-Попытка ограничить перекачку испольуя некоторые приемы (тест на размер файла..)
+Попытка ограничить перекачку используя некоторые приемы (тест на размер файла..)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
 Ограничить число линков, удаляя аналогичные линки (www.foo.com==foo.com, http=https ..)
 Write external links without login/password
 Сохранять внешние линки без логина/пароля
 Write internal links without query string
-Сохранять внутренние линки усеченно (до занака ?)
+Сохранять внутренние линки усеченно (до знака ?)
 Get non-HTML files related to a link, eg external .ZIP or pictures
 Качать не-html файлы вблизи ссылки (напр.: внешние .ZIP или граф. файлы)
 Test all links (even forbidden ones)
 Проверять все линки (даже запрещенные к закачке)
 Try to catch all URLs (even in unknown tags/code)
-Стараться определять все URL'ы (даже в неопознанных тэгах/скриптах)
+Стараться определять все URL'ы (даже в неопознанных тегах/скриптах)
 Get HTML files first!
 Получить вначале HTML файлы!
 Structure type (how links are saved)
@@ -599,7 +599,7 @@ Do you really want to quit WinHTTrack Website Copier?
 Do not connect to a provider (already connected)
 Не соединяться с провайдером (соединение уже установлено)
 Do not use remote access connection
-Не испоьзовать удаленной соединения
+Не использовать удаленной соединения
 Schedule the mirroring operation
 Закачка по расписанию
 Quit WinHTTrack Website Copier
@@ -633,9 +633,9 @@ Connect to this provider
 Disconnect when finished
 Отсоединиться при завершении
 Disconnect modem on completion
-Отсоеденить при завершении
+Отсоединить при завершении
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Сообщите нам пожалуйста о замеченных проблемах и ошибках)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nКачалка (spider): Xavier Roche\r\nПарсер ява-классов: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Russian translations to:\r\nAndrei Iliev (andreiiliev@mail.ru)
+\r\n(Сообщите нам, пожалуйста, о замеченных проблемах и ошибках)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nКачалка (spider): Xavier Roche\r\nПарсер ява-классов: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Russian translations to:\r\nAndrei Iliev (andreiiliev@mail.ru)
 About WinHTTrack Website Copier
 О программе WinHTTrack Website Copier
 Please visit our Web page
@@ -657,9 +657,9 @@ Ignore domain
 Catch this page only
 Скачать только эту страничку
 Mirror site
-Зеркализовать сайт
+Сделать зеркало сайту
 Mirror domain
-Зеркализовать домен
+Сделать зеркало домену
 Ignore all
 Игнорировать все
 Wizard query
@@ -693,9 +693,9 @@ Hide
 About WinHTTrack Website Copier
 О программе...
 Check program updates...
-Проверить наличие обновленний программы...
+Проверить наличие обновлений программы...
 &Toolbar
-Панель инструпентов
+Панель инструментов
 &Status Bar
 Панель состояния
 S&plit
