@@ -901,6 +901,8 @@ int url_savename(lien_adrfilsave *const afs,
               strncatbuff(b, nom_pos, 8);
           }
           b += strlen(b);       // pointer à la fin
+          *b = '.';
+          ++b;
           // RECOPIE NOM + EXT
           *b = '\0';
           if (dot_pos) {
