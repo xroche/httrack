@@ -115,6 +115,8 @@ const char *hts_detect[] = {
   "archive",
   "background",
   "data",                       // OBJECT
+  "data-src",
+  "data-srcset",
   "dynsrc",
   "lowsrc",
   "profile",                    // element META
