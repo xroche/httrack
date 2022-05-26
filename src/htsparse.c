@@ -386,6 +386,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       //
       int emited_footer = 0;    // emitted footer comment tag(s) count
+      int emited_footer_todo = 0; // Flag pour mise à jour différée
 
       //
       int parent_relative = 0;  // the parent is the base path (.js, .css..)
@@ -685,15 +686,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             case 0:
               // We are looking for the first head so that we can declare the HTTP-headers charset early
               // Emit as soon as we see the first <head>, <meta>, or <body> tag.
-              // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
-              if ((p = strfield(html, "<head>")) != 0
-                  || ((p = strfield(html, "<head")) != 0 && isspace(html[p]))
-                  || (p = strfield(html, "<body>")) != 0
+              if ((p = strfield(html, "<body>")) != 0
                   || ((p = strfield(html, "<body")) != 0 && isspace(html[p]))
                   || ((p = strfield(html, "<meta")) != 0 && isspace(html[p]))
+                  || (emited_footer_todo == 2)
                 ) {
                 emited_footer++;
+                p = 1; // fake value, but not 0
               } else {
+                if ((p = strfield(html, "<head>")) != 0
+                  || ((p = strfield(html, "<head")) != 0 && isspace(html[p]))) {
+                  // mémorise qu'à la fermeture du tag, il faudra sortir le code 
+                  emited_footer_todo = 1;
+                }
                 p = 0;
               }
               break;
@@ -765,6 +770,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
           } else if (!incomment) {
             intag = 0;          //inquote=0;
+            if (emited_footer_todo) {
+              emited_footer_todo = 2; // A afficher au prochain
+            }
 
             // entrée dans du javascript?
             // on parse ICI car il se peut qu'on ait eu a parser les src=.. dedans
