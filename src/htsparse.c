@@ -662,6 +662,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           /* Meta ? */
           if (check_tag(intag_start, "meta")) {
             int pos;
+            int please_skip_tag = 0;
 
             // <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
             if ((pos = rech_tageq_all(html, "http-equiv"))) {
@@ -673,10 +674,42 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   intag_ctype = 1;
                   //NOPE-we do not convert the whole page actually
                   //intag_start[1] = 'X';
+                  if ((emited_footer > 0) || (emited_footer_todo > 0)) {
+                    // Skip this tag that is redundant
+                    please_skip_tag = 1;
+                  }
                 } else if (strfield(token, "refresh")) {
                   intag_ctype = 2;
                 }
               }
+            }
+            else if ((pos = rech_tageq_all(html, "charset"))) {
+              if ((emited_footer > 0) || (emited_footer_todo > 0)) {
+                // Skip this tag that is redundant
+                please_skip_tag = 1;
+              }
+            }
+
+            if (please_skip_tag == 1) {
+              if (html - r->adr < r->size) {
+                /* Not on a starting tag yet */
+                const char *adr_next = html + 1;
+
+                while(*adr_next != '<' && (adr_next - r->adr) < r->size) {
+                  adr_next++;
+                }
+                /* Jump to near end (index hack) */
+                if (!adr_next || *adr_next != '<') {
+                  if (html - r->adr < r->size - 4
+                      && r->size > 4
+                    ) {
+                    html = r->adr + r->size - 2;
+                  }
+                } else {
+                  html = adr_next;
+                }
+              }
+              lastsaved = html;
             }
           }
 
