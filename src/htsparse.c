@@ -388,6 +388,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int emited_footer = 0;    // emitted footer comment tag(s) count
       int emited_footer_todo = 0; // Flag pour mise à jour différée
 
+      int skip_until_end_of_tag = 0; // Skip until the > of the end of tag ?
+      
       //
       int parent_relative = 0;  // the parent is the base path (.js, .css..)
 
@@ -713,6 +715,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
           }
 
+          if (check_tag(intag_start, "base")) {
+            // Base tag will be empty so don't write it
+            html += 5;
+            lastsaved = html;
+          }
+
           if (opt->getmode & 1) {       // sauver html
             p = 0;
             switch (emited_footer) {
@@ -831,6 +839,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
               }
             }
+
+            if (skip_until_end_of_tag == 1) {
+              html++;
+              lastsaved = html;
+              skip_until_end_of_tag = 0;
+            }
+
           } else {              /* end of comment? */
             // vérifier fermeture correcte
             if ((*(html - 1) == '-') && (*(html - 2) == '-')) {
@@ -2577,6 +2592,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // écrire lien
                     if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
                       lastsaved = eadr - 1 + 1; // sauter "
+                      if (check_tag(intag_start, "base")) {
+                        // Skip until the end of the tag
+                        skip_until_end_of_tag = 1;
+                      }
                     }
                     /* */
                     else if (opt->urlmode == 0) {       // URL absolue dans tous les cas
