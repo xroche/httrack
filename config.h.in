@@ -51,10 +51,6 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define to 1 or 0, depending whether the compiler supports simple visibility
-   declarations. */
-#undef HAVE_VISIBILITY
-
 /* Define to 1 if you have the `vsnprintf' function. */
 #undef HAVE_VSNPRINTF
 
@@ -76,8 +72,7 @@
 /* Check for libsocket */
 #undef LIBSOCKET
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Name of package */
