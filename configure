@@ -9392,10 +9392,6 @@ _lt_linker_boilerplate=`cat conftest.err`
 $RM -r conftest*
 
 
-## CAVEAT EMPTOR:
-## There is no encapsulation within the following macros, do not change
-## the running order or otherwise move them around unless you know exactly
-## what you are doing...
 if test -n "$compiler"; then
 
 lt_prog_compiler_no_builtin_flag=
@@ -13627,6 +13623,41 @@ else
   :
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstack-protector" >&5
+$as_echo_n "checking whether C compiler accepts -fstack-protector... " >&6; }
+if ${ax_cv_check_cflags___fstack_protector+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fstack-protector"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fstack_protector=yes
+else
+  ax_cv_check_cflags___fstack_protector=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fstack_protector" >&5
+$as_echo "$ax_cv_check_cflags___fstack_protector" >&6; }
+if test "x$ax_cv_check_cflags___fstack_protector" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"
+else
+  :
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,--discard-all" >&5
 $as_echo_n "checking whether the linker accepts -Wl,--discard-all... " >&6; }
 if ${ax_cv_check_ldflags___Wl___discard_all+:} false; then :
@@ -13695,6 +13726,78 @@ fi
 $as_echo "$ax_cv_check_ldflags___Wl___no_undefined" >&6; }
 if test "x$ax_cv_check_ldflags___Wl___no_undefined" = xyes; then :
   DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--no-undefined"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,-z,relro -Wl,-z,now" >&5
+$as_echo_n "checking whether the linker accepts -Wl,-z,relro -Wl,-z,now... " >&6; }
+if ${ax_cv_check_ldflags___Wl__z_relro__Wl__z_now+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  -Wl,-z,relro -Wl,-z,now"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ax_cv_check_ldflags___Wl__z_relro__Wl__z_now=yes
+else
+  ax_cv_check_ldflags___Wl__z_relro__Wl__z_now=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&5
+$as_echo "$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&6; }
+if test "x$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" = xyes; then :
+  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,-z,relro -Wl,-z,now"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,-z,noexecstack" >&5
+$as_echo_n "checking whether the linker accepts -Wl,-z,noexecstack... " >&6; }
+if ${ax_cv_check_ldflags___Wl__z_noexecstack+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  -Wl,-z,noexecstack"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ax_cv_check_ldflags___Wl__z_noexecstack=yes
+else
+  ax_cv_check_ldflags___Wl__z_noexecstack=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_noexecstack" >&5
+$as_echo "$ax_cv_check_ldflags___Wl__z_noexecstack" >&6; }
+if test "x$ax_cv_check_ldflags___Wl__z_noexecstack" = xyes; then :
+  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,-z,noexecstack"
 else
   :
 fi
