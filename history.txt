@@ -4,6 +4,15 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-3
++ Fixed: Corrections and updates of the Brazilian Portuguese translations (Paulo Neto)
++ Fixed: Fixed for Android
++ Fixed: Add mimetypes for documents (Pablo Castellano)
++ Fixed: Add firefox-developer-edition (sickcodes)
++ New: Support data-src and data-srcset for img (Brian 'Redbeard' Harrington)
++ Fixed: When using the '%N' structure naming key, separate the filename and extension with a dot (Steve Mokris)
++ Fixed: Multiple build updates
+
 3.49-2
 + Fixed: Buffer overflow in output option commandline argument (VL-ID 2068) (Hosein Askari)
 + Fixed: Minor fixes
