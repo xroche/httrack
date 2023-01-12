@@ -1,4 +1,4 @@
-<!-- Creator     : groff version 1.22.2 -->
+<!-- Creator     : groff version 1.22.4 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -42,7 +42,7 @@
 </h2>
 
 
-<p style="margin-left:11%; margin-top: 1em">httrack &minus;
+<p style="margin-left:11%; margin-top: 1em">httrack -
 offline browser : copy websites to a local directory</p>
 
 <h2>SYNOPSIS
@@ -51,100 +51,55 @@ offline browser : copy websites to a local directory</p>
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>httrack [
-url ]... [ &minus;filter ]... [ +filter ]... [ &minus;O,
-&minus;&minus;path</b> ] [ <b>&minus;w,
-&minus;&minus;mirror</b> ] [ <b>&minus;W,
-&minus;&minus;mirror&minus;wizard</b> ] [ <b>&minus;g,
-&minus;&minus;get&minus;files</b> ] [ <b>&minus;i,
-&minus;&minus;continue</b> ] [ <b>&minus;Y,
-&minus;&minus;mirrorlinks</b> ] [ <b>&minus;P,
-&minus;&minus;proxy</b> ] [ <b>&minus;%f,
-&minus;&minus;httpproxy&minus;ftp[=N]</b> ] [ <b>&minus;%b,
-&minus;&minus;bind</b> ] [ <b>&minus;rN,
-&minus;&minus;depth[=N]</b> ] [ <b>&minus;%eN,
-&minus;&minus;ext&minus;depth[=N]</b> ] [ <b>&minus;mN,
-&minus;&minus;max&minus;files[=N]</b> ] [ <b>&minus;MN,
-&minus;&minus;max&minus;size[=N]</b> ] [ <b>&minus;EN,
-&minus;&minus;max&minus;time[=N]</b> ] [ <b>&minus;AN,
-&minus;&minus;max&minus;rate[=N]</b> ] [ <b>&minus;%cN,
-&minus;&minus;connection&minus;per&minus;second[=N]</b> ] [
-<b>&minus;GN, &minus;&minus;max&minus;pause[=N]</b> ] [
-<b>&minus;cN, &minus;&minus;sockets[=N]</b> ] [
-<b>&minus;TN, &minus;&minus;timeout[=N]</b> ] [
-<b>&minus;RN, &minus;&minus;retries[=N]</b> ] [
-<b>&minus;JN, &minus;&minus;min&minus;rate[=N]</b> ] [
-<b>&minus;HN, &minus;&minus;host&minus;control[=N]</b> ] [
-<b>&minus;%P, &minus;&minus;extended&minus;parsing[=N]</b> ]
-[ <b>&minus;n, &minus;&minus;near</b> ] [ <b>&minus;t,
-&minus;&minus;test</b> ] [ <b>&minus;%L,
-&minus;&minus;list</b> ] [ <b>&minus;%S,
-&minus;&minus;urllist</b> ] [ <b>&minus;NN,
-&minus;&minus;structure[=N]</b> ] [ <b>&minus;%D,
-&minus;&minus;cached&minus;delayed&minus;type&minus;check</b>
-] [ <b>&minus;%M, &minus;&minus;mime&minus;html</b> ] [
-<b>&minus;LN, &minus;&minus;long&minus;names[=N]</b> ] [
-<b>&minus;KN, &minus;&minus;keep&minus;links[=N]</b> ] [
-<b>&minus;x, &minus;&minus;replace&minus;external</b> ] [
-<b>&minus;%x, &minus;&minus;disable&minus;passwords</b> ] [
-<b>&minus;%q,
-&minus;&minus;include&minus;query&minus;string</b> ] [
-<b>&minus;o, &minus;&minus;generate&minus;errors</b> ] [
-<b>&minus;X, &minus;&minus;purge&minus;old[=N]</b> ] [
-<b>&minus;%p, &minus;&minus;preserve</b> ] [ <b>&minus;%T,
-&minus;&minus;utf8&minus;conversion</b> ] [ <b>&minus;bN,
-&minus;&minus;cookies[=N]</b> ] [ <b>&minus;u,
-&minus;&minus;check&minus;type[=N]</b> ] [ <b>&minus;j,
-&minus;&minus;parse&minus;java[=N]</b> ] [ <b>&minus;sN,
-&minus;&minus;robots[=N]</b> ] [ <b>&minus;%h,
-&minus;&minus;http&minus;10</b> ] [ <b>&minus;%k,
-&minus;&minus;keep&minus;alive</b> ] [ <b>&minus;%B,
-&minus;&minus;tolerant</b> ] [ <b>&minus;%s,
-&minus;&minus;updatehack</b> ] [ <b>&minus;%u,
-&minus;&minus;urlhack</b> ] [ <b>&minus;%A,
-&minus;&minus;assume</b> ] [ <b>&minus;@iN,
-&minus;&minus;protocol[=N]</b> ] [ <b>&minus;%w,
-&minus;&minus;disable&minus;module</b> ] [ <b>&minus;F,
-&minus;&minus;user&minus;agent</b> ] [ <b>&minus;%R,
-&minus;&minus;referer</b> ] [ <b>&minus;%E,
-&minus;&minus;from</b> ] [ <b>&minus;%F,
-&minus;&minus;footer</b> ] [ <b>&minus;%l,
-&minus;&minus;language</b> ] [ <b>&minus;%a,
-&minus;&minus;accept</b> ] [ <b>&minus;%X,
-&minus;&minus;headers</b> ] [ <b>&minus;C,
-&minus;&minus;cache[=N]</b> ] [ <b>&minus;k,
-&minus;&minus;store&minus;all&minus;in&minus;cache</b> ] [
-<b>&minus;%n, &minus;&minus;do&minus;not&minus;recatch</b> ]
-[ <b>&minus;%v, &minus;&minus;display</b> ] [ <b>&minus;Q,
-&minus;&minus;do&minus;not&minus;log</b> ] [ <b>&minus;q,
-&minus;&minus;quiet</b> ] [ <b>&minus;z,
-&minus;&minus;extra&minus;log</b> ] [ <b>&minus;Z,
-&minus;&minus;debug&minus;log</b> ] [ <b>&minus;v,
-&minus;&minus;verbose</b> ] [ <b>&minus;f,
-&minus;&minus;file&minus;log</b> ] [ <b>&minus;f2,
-&minus;&minus;single&minus;log</b> ] [ <b>&minus;I,
-&minus;&minus;index</b> ] [ <b>&minus;%i,
-&minus;&minus;build&minus;top&minus;index</b> ] [
-<b>&minus;%I, &minus;&minus;search&minus;index</b> ] [
-<b>&minus;pN, &minus;&minus;priority[=N]</b> ] [
-<b>&minus;S,
-&minus;&minus;stay&minus;on&minus;same&minus;dir</b> ] [
-<b>&minus;D, &minus;&minus;can&minus;go&minus;down</b> ] [
-<b>&minus;U, &minus;&minus;can&minus;go&minus;up</b> ] [
-<b>&minus;B,
-&minus;&minus;can&minus;go&minus;up&minus;and&minus;down</b>
-] [ <b>&minus;a,
-&minus;&minus;stay&minus;on&minus;same&minus;address</b> ] [
-<b>&minus;d,
-&minus;&minus;stay&minus;on&minus;same&minus;domain</b> ] [
-<b>&minus;l,
-&minus;&minus;stay&minus;on&minus;same&minus;tld</b> ] [
-<b>&minus;e, &minus;&minus;go&minus;everywhere</b> ] [
-<b>&minus;%H, &minus;&minus;debug&minus;headers</b> ] [
-<b>&minus;%!,
-&minus;&minus;disable&minus;security&minus;limits</b> ] [
-<b>&minus;V, &minus;&minus;userdef&minus;cmd</b> ] [
-<b>&minus;%W, &minus;&minus;callback</b> ] [ <b>&minus;K,
-&minus;&minus;keep&minus;links[=N]</b> ] [</p>
+url ]... [ -filter ]... [ +filter ]... [ -O, --path</b> ] [
+<b>-w, --mirror</b> ] [ <b>-W, --mirror-wizard</b> ] [
+<b>-g, --get-files</b> ] [ <b>-i, --continue</b> ] [ <b>-Y,
+--mirrorlinks</b> ] [ <b>-P, --proxy</b> ] [ <b>-%f,
+--httpproxy-ftp[=N]</b> ] [ <b>-%b, --bind</b> ] [ <b>-rN,
+--depth[=N]</b> ] [ <b>-%eN, --ext-depth[=N]</b> ] [ <b>-mN,
+--max-files[=N]</b> ] [ <b>-MN, --max-size[=N]</b> ] [
+<b>-EN, --max-time[=N]</b> ] [ <b>-AN, --max-rate[=N]</b> ]
+[ <b>-%cN, --connection-per-second[=N]</b> ] [ <b>-GN,
+--max-pause[=N]</b> ] [ <b>-cN, --sockets[=N]</b> ] [
+<b>-TN, --timeout[=N]</b> ] [ <b>-RN, --retries[=N]</b> ] [
+<b>-JN, --min-rate[=N]</b> ] [ <b>-HN,
+--host-control[=N]</b> ] [ <b>-%P,
+--extended-parsing[=N]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
+--test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S, --urllist</b>
+] [ <b>-NN, --structure[=N]</b> ] [ <b>-%D,
+--cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
+] [ <b>-LN, --long-names[=N]</b> ] [ <b>-KN,
+--keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
+<b>-%x, --disable-passwords</b> ] [ <b>-%q,
+--include-query-string</b> ] [ <b>-o, --generate-errors</b>
+] [ <b>-X, --purge-old[=N]</b> ] [ <b>-%p, --preserve</b> ]
+[ <b>-%T, --utf8-conversion</b> ] [ <b>-bN,
+--cookies[=N]</b> ] [ <b>-u, --check-type[=N]</b> ] [ <b>-j,
+--parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
+<b>-%h, --http-10</b> ] [ <b>-%k, --keep-alive</b> ] [
+<b>-%B, --tolerant</b> ] [ <b>-%s, --updatehack</b> ] [
+<b>-%u, --urlhack</b> ] [ <b>-%A, --assume</b> ] [ <b>-@iN,
+--protocol[=N]</b> ] [ <b>-%w, --disable-module</b> ] [
+<b>-F, --user-agent</b> ] [ <b>-%R, --referer</b> ] [
+<b>-%E, --from</b> ] [ <b>-%F, --footer</b> ] [ <b>-%l,
+--language</b> ] [ <b>-%a, --accept</b> ] [ <b>-%X,
+--headers</b> ] [ <b>-C, --cache[=N]</b> ] [ <b>-k,
+--store-all-in-cache</b> ] [ <b>-%n, --do-not-recatch</b> ]
+[ <b>-%v, --display</b> ] [ <b>-Q, --do-not-log</b> ] [
+<b>-q, --quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
+--debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
+--file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
+--index</b> ] [ <b>-%i, --build-top-index</b> ] [ <b>-%I,
+--search-index</b> ] [ <b>-pN, --priority[=N]</b> ] [ <b>-S,
+--stay-on-same-dir</b> ] [ <b>-D, --can-go-down</b> ] [
+<b>-U, --can-go-up</b> ] [ <b>-B, --can-go-up-and-down</b> ]
+[ <b>-a, --stay-on-same-address</b> ] [ <b>-d,
+--stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
+] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
+--debug-headers</b> ] [ <b>-%!,
+--disable-security-limits</b> ] [ <b>-V, --userdef-cmd</b> ]
+[ <b>-%W, --callback</b> ] [ <b>-K, --keep-links[=N]</b> ]
+[</p>
 
 <h2>DESCRIPTION
 <a name="DESCRIPTION"></a>
@@ -175,29 +130,27 @@ www.someweb.com/bob/ and only this site</p>
 
 <p style="margin-left:11%;"><b>httrack www.someweb.com/bob/
 www.anothertest.com/mike/ +*.com/*.jpg <br>
-&minus;mime:application/*</b></p>
+-mime:application/*</b></p>
 
 <p style="margin-left:22%;">mirror the two sites together
 (with shared links) and accept any .jpg files on .com
 sites</p>
 
 <p style="margin-left:11%;"><b>httrack
-www.someweb.com/bob/bobby.html +* &minus;r6</b></p>
+www.someweb.com/bob/bobby.html +* -r6</b></p>
 
 <p style="margin-left:22%;">means get all files starting
-from bobby.html, with 6 link&minus;depth, and possibility of
-going everywhere on the web</p>
+from bobby.html, with 6 link-depth, and possibility of going
+everywhere on the web</p>
 
 <p style="margin-left:11%;"><b>httrack
-www.someweb.com/bob/bobby.html &minus;&minus;spider &minus;P
-<br>
+www.someweb.com/bob/bobby.html --spider -P <br>
 proxy.myhost.com:8080</b></p>
 
 <p style="margin-left:22%;">runs the spider on
 www.someweb.com/bob/bobby.html using a proxy</p>
 
-<p style="margin-left:11%;"><b>httrack
-&minus;&minus;update</b></p>
+<p style="margin-left:11%;"><b>httrack --update</b></p>
 
 <p style="margin-left:22%;">updates a mirror in the current
 folder</p>
@@ -207,8 +160,7 @@ folder</p>
 <p style="margin-left:22%;">will bring you to the
 interactive mode</p>
 
-<p style="margin-left:11%;"><b>httrack
-&minus;&minus;continue</b></p>
+<p style="margin-left:11%;"><b>httrack --continue</b></p>
 
 <p style="margin-left:22%;">continues a mirror in the
 current folder</p>
@@ -228,14 +180,13 @@ options:</b></p>
 <td width="3%">
 
 
-<p>&minus;O</p></td>
+<p>-O</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
-<p>path for mirror/logfiles+cache (&minus;O path
-mirror[,path cache and logfiles]) (&minus;&minus;path
-&lt;param&gt;)</p> </td></tr>
+<p>path for mirror/logfiles+cache (-O path mirror[,path
+cache and logfiles]) (--path &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Action
@@ -248,61 +199,60 @@ options:</b></p>
 <td width="3%">
 
 
-<p style="margin-top: 1em">&minus;w</p></td>
+<p style="margin-top: 1em">-w</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">*mirror web sites
-(&minus;&minus;mirror)</p> </td></tr>
+<p style="margin-top: 1em">*mirror web sites (--mirror)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="3%">
 
 
-<p>&minus;W</p></td>
+<p>-W</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
-<p>mirror web sites, semi&minus;automatic (asks questions)
-(&minus;&minus;mirror&minus;wizard)</p> </td></tr>
+<p>mirror web sites, semi-automatic (asks questions)
+(--mirror-wizard)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="3%">
 
 
-<p>&minus;g</p></td>
+<p>-g</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
 <p>just get files (saved in the current directory)
-(&minus;&minus;get&minus;files)</p> </td></tr>
+(--get-files)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="3%">
 
 
-<p>&minus;i</p></td>
+<p>-i</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
 <p>continue an interrupted mirror using the cache
-(&minus;&minus;continue)</p> </td></tr>
+(--continue)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="3%">
 
 
-<p>&minus;Y</p></td>
+<p>-Y</p></td>
 <td width="8%"></td>
 <td width="78%">
 
 
 <p>mirror ALL links located in the first level pages
-(mirror links) (&minus;&minus;mirrorlinks)</p></td></tr>
+(mirror links) (--mirrorlinks)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Proxy
@@ -315,38 +265,37 @@ options:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;P</p></td>
+<p style="margin-top: 1em">-P</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">proxy use (&minus;P proxy:port
-or &minus;P user:pass@proxy:port) (&minus;&minus;proxy
-&lt;param&gt;)</p> </td></tr>
+<p style="margin-top: 1em">proxy use (-P proxy:port or -P
+user:pass@proxy:port) (--proxy &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%f</p></td>
+<p>-%f</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>*use proxy for ftp (f0 don t use)
-(&minus;&minus;httpproxy&minus;ftp[=N])</p> </td></tr>
+(--httpproxy-ftp[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%b</p></td>
+<p>-%b</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>use this local hostname to make/send requests (&minus;%b
-hostname) (&minus;&minus;bind &lt;param&gt;)</p></td></tr>
+<p>use this local hostname to make/send requests (-%b
+hostname) (--bind &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Limits
@@ -359,43 +308,43 @@ options:</b></p>
 <td width="9%">
 
 
-<p style="margin-top: 1em">&minus;rN</p></td>
+<p style="margin-top: 1em">-rN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">set the mirror depth to N (*
-r9999) (&minus;&minus;depth[=N])</p></td></tr>
+r9999) (--depth[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;%eN</p></td>
+<p>-%eN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>set the external links depth to N (* %e0)
-(&minus;&minus;ext&minus;depth[=N])</p> </td></tr>
+(--ext-depth[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;mN</p></td>
+<p>-mN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
-<p>maximum file length for a non&minus;html file
-(&minus;&minus;max&minus;files[=N])</p> </td></tr>
+<p>maximum file length for a non-html file
+(--max-files[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;mN,N2</p></td>
+<p>-mN,N2</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -406,61 +355,61 @@ r9999) (&minus;&minus;depth[=N])</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;MN</p></td>
+<p>-MN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>maximum overall size that can be uploaded/scanned
-(&minus;&minus;max&minus;size[=N])</p> </td></tr>
+(--max-size[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;EN</p></td>
+<p>-EN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>maximum mirror time in seconds (60=1 minute, 3600=1
-hour) (&minus;&minus;max&minus;time[=N])</p></td></tr>
+hour) (--max-time[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;AN</p></td>
+<p>-AN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>maximum transfer rate in bytes/seconds (1000=1KB/s max)
-(&minus;&minus;max&minus;rate[=N])</p> </td></tr>
+(--max-rate[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;%cN</p></td>
+<p>-%cN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>maximum number of connections/seconds (*%c10)
-(&minus;&minus;connection&minus;per&minus;second[=N])</p> </td></tr>
+(--connection-per-second[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;GN</p></td>
+<p>-GN</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>pause transfer if N bytes reached, and wait until lock
-file is deleted (&minus;&minus;max&minus;pause[=N])</p></td></tr>
+file is deleted (--max-pause[=N])</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Flow
@@ -473,62 +422,61 @@ control:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;cN</p></td>
+<p style="margin-top: 1em">-cN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">number of multiple connections
-(*c8) (&minus;&minus;sockets[=N])</p></td></tr>
+(*c8) (--sockets[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;TN</p></td>
+<p>-TN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>timeout, number of seconds after a non&minus;responding
-link is shutdown (&minus;&minus;timeout[=N])</p></td></tr>
+<p>timeout, number of seconds after a non-responding link
+is shutdown (--timeout[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;RN</p></td>
+<p>-RN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>number of retries, in case of timeout or non&minus;fatal
-errors (*R1) (&minus;&minus;retries[=N])</p></td></tr>
+<p>number of retries, in case of timeout or non-fatal
+errors (*R1) (--retries[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;JN</p></td>
+<p>-JN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>traffic jam control, minimum transfert rate
-(bytes/seconds) tolerated for a link
-(&minus;&minus;min&minus;rate[=N])</p> </td></tr>
+(bytes/seconds) tolerated for a link (--min-rate[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;HN</p></td>
+<p>-HN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>host is abandonned if: 0=never, 1=timeout, 2=slow,
-3=timeout or slow (&minus;&minus;host&minus;control[=N])</p></td></tr>
+3=timeout or slow (--host-control[=N])</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Links
@@ -541,63 +489,61 @@ options:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;%P</p></td>
+<p style="margin-top: 1em">-%P</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">*extended parsing, attempt to
 parse all links, even in unknown tags or Javascript (%P0 don
-t use) (&minus;&minus;extended&minus;parsing[=N])</p></td></tr>
+t use) (--extended-parsing[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;n</p></td>
+<p>-n</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>get non&minus;html files near an html file (ex: an image
-located outside) (&minus;&minus;near)</p></td></tr>
+<p>get non-html files near an html file (ex: an image
+located outside) (--near)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;t</p></td>
+<p>-t</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>test all URLs (even forbidden ones)
-(&minus;&minus;test)</p> </td></tr>
+<p>test all URLs (even forbidden ones) (--test)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%L</p></td>
+<p>-%L</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>&lt;file&gt; add all URL located in this text file (one
-URL per line) (&minus;&minus;list &lt;param&gt;)</p></td></tr>
+URL per line) (--list &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%S</p></td>
+<p>-%S</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>&lt;file&gt; add all scan rules located in this text
-file (one scan rule per line) (&minus;&minus;urllist
-&lt;param&gt;)</p> </td></tr>
+file (one scan rule per line) (--urllist &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Build
@@ -610,31 +556,30 @@ options:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;NN</p></td>
+<p style="margin-top: 1em">-NN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">structure type (0 *original
-structure, 1+: see below) (&minus;&minus;structure[=N])</p></td></tr>
+structure, 1+: see below) (--structure[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;or</p></td>
+<p>-or</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>user defined structure (&minus;N
-&quot;%h%p/%n%q.%t&quot;)</p> </td></tr>
+<p>user defined structure (-N &quot;%h%p/%n%q.%t&quot;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%N</p></td>
+<p>-%N</p></td>
 <td width="7%"></td>
 <td width="78%">
 
@@ -647,46 +592,44 @@ t use, %N1 use for unknown extensions, * %N2 always use)</p></td></tr>
 <td width="4%">
 
 
-<p>&minus;%D</p></td>
+<p>-%D</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>cached delayed type check, don t wait for remote type
 during updates, to speedup them (%D0 wait, * %D1 don t wait)
-(&minus;&minus;cached&minus;delayed&minus;type&minus;check)</p> </td></tr>
+(--cached-delayed-type-check)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%M</p></td>
+<p>-%M</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>generate a RFC MIME&minus;encapsulated
-full&minus;archive (.mht)
-(&minus;&minus;mime&minus;html)</p> </td></tr>
+<p>generate a RFC MIME-encapsulated full-archive (.mht)
+(--mime-html)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;LN</p></td>
+<p>-LN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>long names (L1 *long names / L0 8&minus;3 conversion /
-L2 ISO9660 compatible)
-(&minus;&minus;long&minus;names[=N])</p> </td></tr>
+<p>long names (L1 *long names / L0 8-3 conversion / L2
+ISO9660 compatible) (--long-names[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;KN</p></td>
+<p>-KN</p></td>
 <td width="7%"></td>
 <td width="78%">
 
@@ -694,93 +637,91 @@ L2 ISO9660 compatible)
 <p>keep original links (e.g. http://www.adr/link) (K0
 *relative link, K absolute links, K4 original links, K3
 absolute URI links, K5 transparent proxy link)
-(&minus;&minus;keep&minus;links[=N])</p> </td></tr>
+(--keep-links[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;x</p></td>
+<p>-x</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>replace external html links by error pages
-(&minus;&minus;replace&minus;external)</p> </td></tr>
+(--replace-external)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%x</p></td>
+<p>-%x</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>do not include any password for external password
-protected websites (%x0 include)
-(&minus;&minus;disable&minus;passwords)</p> </td></tr>
+protected websites (%x0 include) (--disable-passwords)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%q</p></td>
+<p>-%q</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>*include query string for local files (useless, for
 information purpose only) (%q0 don t include)
-(&minus;&minus;include&minus;query&minus;string)</p> </td></tr>
+(--include-query-string)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;o</p></td>
+<p>-o</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>*generate output html file in case of error (404..) (o0
-don t generate) (&minus;&minus;generate&minus;errors)</p></td></tr>
+don t generate) (--generate-errors)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;X</p></td>
+<p>-X</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>*purge old files after update (X0 keep delete)
-(&minus;&minus;purge&minus;old[=N])</p> </td></tr>
+(--purge-old[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%p</p></td>
+<p>-%p</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>preserve html files as is (identical to &minus;K4
-&minus;%F &quot;&quot; ) (&minus;&minus;preserve)</p></td></tr>
+<p>preserve html files as is (identical to -K4 -%F
+&quot;&quot; ) (--preserve)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%T</p></td>
+<p>-%T</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>links conversion to UTF&minus;8
-(&minus;&minus;utf8&minus;conversion)</p> </td></tr>
+<p>links conversion to UTF-8 (--utf8-conversion)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Spider
@@ -793,166 +734,163 @@ options:</b></p>
 <td width="6%">
 
 
-<p style="margin-top: 1em">&minus;bN</p></td>
+<p style="margin-top: 1em">-bN</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">accept cookies in cookies.txt
-(0=do not accept,* 1=accept) (&minus;&minus;cookies[=N])</p></td></tr>
+(0=do not accept,* 1=accept) (--cookies[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;u</p></td>
+<p>-u</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>check document type if unknown (cgi,asp..) (u0 don t
 check, * u1 check but /, u2 check always)
-(&minus;&minus;check&minus;type[=N])</p> </td></tr>
+(--check-type[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;j</p></td>
+<p>-j</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>*parse Java Classes (j0 don t parse, bitmask: |1 parse
 default, |2 don t parse .class |4 don t parse .js |8 don t
-be aggressive) (&minus;&minus;parse&minus;java[=N])</p></td></tr>
+be aggressive) (--parse-java[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;sN</p></td>
+<p>-sN</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>follow robots.txt and meta robots tags
 (0=never,1=sometimes,* 2=always, 3=always (even strict
-rules)) (&minus;&minus;robots[=N])</p></td></tr>
+rules)) (--robots[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%h</p></td>
+<p>-%h</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>force HTTP/1.0 requests (reduce update features, only
-for old servers or proxies)
-(&minus;&minus;http&minus;10)</p> </td></tr>
+for old servers or proxies) (--http-10)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%k</p></td>
+<p>-%k</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>use keep&minus;alive if possible, greately reducing
-latency for small files and test requests (%k0 don t use)
-(&minus;&minus;keep&minus;alive)</p> </td></tr>
+<p>use keep-alive if possible, greately reducing latency
+for small files and test requests (%k0 don t use)
+(--keep-alive)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%B</p></td>
+<p>-%B</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>tolerant requests (accept bogus responses on some
-servers, but not standard!) (&minus;&minus;tolerant)</p></td></tr>
+servers, but not standard!) (--tolerant)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%s</p></td>
+<p>-%s</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>update hacks: various hacks to limit re&minus;transfers
-when updating (identical size, bogus response..)
-(&minus;&minus;updatehack)</p> </td></tr>
+<p>update hacks: various hacks to limit re-transfers when
+updating (identical size, bogus response..)
+(--updatehack)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%u</p></td>
+<p>-%u</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>url hacks: various hacks to limit duplicate URLs (strip
-//, www.foo.com==foo.com..) (&minus;&minus;urlhack)</p></td></tr>
+//, www.foo.com==foo.com..) (--urlhack)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%A</p></td>
+<p>-%A</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>assume that a type (cgi,asp..) is always linked with a
-mime type (&minus;%A
-php3,cgi=text/html;dat,bin=application/x&minus;zip)
-(&minus;&minus;assume &lt;param&gt;)</p></td></tr>
+mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip)
+(--assume &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;can</p></td>
+<p>-can</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>also be used to force a specific file type:
-&minus;&minus;assume foo.cgi=text/html</p></td></tr>
+<p>also be used to force a specific file type: --assume
+foo.cgi=text/html</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;@iN</p></td>
+<p>-@iN</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6
-only) (&minus;&minus;protocol[=N])</p></td></tr>
+only) (--protocol[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%w</p></td>
+<p>-%w</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>disable a specific external mime module (&minus;%w
-htsswf &minus;%w htsjava)
-(&minus;&minus;disable&minus;module &lt;param&gt;)</p></td></tr>
+<p>disable a specific external mime module (-%w htsswf -%w
+htsjava) (--disable-module &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Browser
@@ -965,89 +903,88 @@ ID:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;F</p></td>
+<p style="margin-top: 1em">-F</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">user&minus;agent field sent in
-HTTP headers (&minus;F &quot;user&minus;agent name&quot;)
-(&minus;&minus;user&minus;agent &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%R</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>default referer field sent in HTTP headers
-(&minus;&minus;referer &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%E</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>from email address sent in HTTP headers
-(&minus;&minus;from &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%F</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>footer string in Html code (&minus;%F &quot;Mirrored
-[from host %s [file %s [at %s]]]&quot; (&minus;&minus;footer
+<p style="margin-top: 1em">user-agent field sent in HTTP
+headers (-F &quot;user-agent name&quot;) (--user-agent
 &lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%l</p></td>
+<p>-%R</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>preffered language (&minus;%l &quot;fr, en, jp, *&quot;
-(&minus;&minus;language &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%a</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>accepted formats (&minus;%a
-&quot;text/html,image/png;q=0.9,*/*;q=0.1&quot;
-(&minus;&minus;accept &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="11%"></td>
-<td width="4%">
-
-
-<p>&minus;%X</p></td>
-<td width="7%"></td>
-<td width="78%">
-
-
-<p>additional HTTP header line (&minus;%X
-&quot;X&minus;Magic: 42&quot; (&minus;&minus;headers
+<p>default referer field sent in HTTP headers (--referer
 &lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>-%E</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>from email address sent in HTTP headers (--from
+&lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>-%F</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>footer string in Html code (-%F &quot;Mirrored [from
+host %s [file %s [at %s]]]&quot; (--footer
+&lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>-%l</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>preffered language (-%l &quot;fr, en, jp, *&quot;
+(--language &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>-%a</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>accepted formats (-%a
+&quot;text/html,image/png;q=0.9,*/*;q=0.1&quot; (--accept
+&lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="11%"></td>
+<td width="4%">
+
+
+<p>-%X</p></td>
+<td width="7%"></td>
+<td width="78%">
+
+
+<p>additional HTTP header line (-%X &quot;X-Magic: 42&quot;
+(--headers &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Log, index,
@@ -1060,166 +997,162 @@ cache</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;C</p></td>
+<p style="margin-top: 1em">-C</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">create/use a cache for updates
 and retries (C0 no cache,C1 cache is prioritary,* C2 test
-update before) (&minus;&minus;cache[=N])</p></td></tr>
+update before) (--cache[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;k</p></td>
+<p>-k</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>store all files in cache (not useful if files on disk)
-(&minus;&minus;store&minus;all&minus;in&minus;cache)</p> </td></tr>
+(--store-all-in-cache)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%n</p></td>
+<p>-%n</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>do not re&minus;download locally erased files
-(&minus;&minus;do&minus;not&minus;recatch)</p> </td></tr>
+<p>do not re-download locally erased files
+(--do-not-recatch)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%v</p></td>
+<p>-%v</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>display on screen filenames downloaded (in realtime)
-&minus; * %v1 short version &minus; %v2 full animation
-(&minus;&minus;display)</p> </td></tr>
+<p>display on screen filenames downloaded (in realtime) - *
+%v1 short version - %v2 full animation (--display)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;Q</p></td>
+<p>-Q</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>no log &minus; quiet mode
-(&minus;&minus;do&minus;not&minus;log)</p> </td></tr>
+<p>no log - quiet mode (--do-not-log)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;q</p></td>
+<p>-q</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>no questions &minus; quiet mode
-(&minus;&minus;quiet)</p> </td></tr>
+<p>no questions - quiet mode (--quiet)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;z</p></td>
+<p>-z</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>log &minus; extra infos
-(&minus;&minus;extra&minus;log)</p> </td></tr>
+<p>log - extra infos (--extra-log)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;Z</p></td>
+<p>-Z</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>log &minus; debug (&minus;&minus;debug&minus;log)</p></td></tr>
+<p>log - debug (--debug-log)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;v</p></td>
+<p>-v</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>log on screen (&minus;&minus;verbose)</p></td></tr>
+<p>log on screen (--verbose)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;f</p></td>
+<p>-f</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>*log in files (&minus;&minus;file&minus;log)</p></td></tr>
+<p>*log in files (--file-log)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;f2</p></td>
+<p>-f2</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>one single log file (&minus;&minus;single&minus;log)</p></td></tr>
+<p>one single log file (--single-log)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;I</p></td>
+<p>-I</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>*make an index (I0 don t make) (&minus;&minus;index)</p></td></tr>
+<p>*make an index (I0 don t make) (--index)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%i</p></td>
+<p>-%i</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>make a top index for a project folder (* %i0 don t make)
-(&minus;&minus;build&minus;top&minus;index)</p> </td></tr>
+(--build-top-index)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%I</p></td>
+<p>-%I</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p>make an searchable index for this mirror (* %I0 don t
-make) (&minus;&minus;search&minus;index)</p></td></tr>
+make) (--search-index)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Expert
@@ -1232,19 +1165,19 @@ options:</b></p>
 <td width="6%">
 
 
-<p style="margin-top: 1em">&minus;pN</p></td>
+<p style="margin-top: 1em">-pN</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">priority mode: (* p3)
-(&minus;&minus;priority[=N])</p> </td></tr>
+(--priority[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;p0</p></td>
+<p>-p0</p></td>
 <td width="5%"></td>
 <td width="78%">
 
@@ -1255,7 +1188,7 @@ options:</b></p>
 <td width="6%">
 
 
-<p>&minus;p1</p></td>
+<p>-p1</p></td>
 <td width="5%"></td>
 <td width="78%">
 
@@ -1266,7 +1199,7 @@ options:</b></p>
 <td width="6%">
 
 
-<p>&minus;p2</p></td>
+<p>-p2</p></td>
 <td width="5%"></td>
 <td width="78%">
 
@@ -1277,7 +1210,7 @@ options:</b></p>
 <td width="6%">
 
 
-<p>&minus;*p3</p></td>
+<p>-*p3</p></td>
 <td width="5%"></td>
 <td width="78%">
 
@@ -1288,7 +1221,7 @@ options:</b></p>
 <td width="6%">
 
 
-<p>&minus;p7</p></td>
+<p>-p7</p></td>
 <td width="5%"></td>
 <td width="78%">
 
@@ -1299,109 +1232,102 @@ options:</b></p>
 <td width="6%">
 
 
-<p>&minus;S</p></td>
+<p>-S</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>stay on the same directory
-(&minus;&minus;stay&minus;on&minus;same&minus;dir)</p> </td></tr>
+<p>stay on the same directory (--stay-on-same-dir)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;D</p></td>
+<p>-D</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>*can only go down into subdirs
-(&minus;&minus;can&minus;go&minus;down)</p> </td></tr>
+<p>*can only go down into subdirs (--can-go-down)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;U</p></td>
+<p>-U</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>can only go to upper directories
-(&minus;&minus;can&minus;go&minus;up)</p> </td></tr>
+<p>can only go to upper directories (--can-go-up)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;B</p></td>
+<p>-B</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>can both go up&amp;down into the directory structure
-(&minus;&minus;can&minus;go&minus;up&minus;and&minus;down)</p> </td></tr>
+(--can-go-up-and-down)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;a</p></td>
+<p>-a</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>*stay on the same address
-(&minus;&minus;stay&minus;on&minus;same&minus;address)</p> </td></tr>
+<p>*stay on the same address (--stay-on-same-address)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;d</p></td>
+<p>-d</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>stay on the same principal domain
-(&minus;&minus;stay&minus;on&minus;same&minus;domain)</p> </td></tr>
+(--stay-on-same-domain)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;l</p></td>
+<p>-l</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>stay on the same TLD (eg: .com)
-(&minus;&minus;stay&minus;on&minus;same&minus;tld)</p> </td></tr>
+<p>stay on the same TLD (eg: .com) (--stay-on-same-tld)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;e</p></td>
+<p>-e</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>go everywhere on the web
-(&minus;&minus;go&minus;everywhere)</p> </td></tr>
+<p>go everywhere on the web (--go-everywhere)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;%H</p></td>
+<p>-%H</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>debug HTTP headers in logfile
-(&minus;&minus;debug&minus;headers)</p> </td></tr>
+<p>debug HTTP headers in logfile (--debug-headers)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Guru
@@ -1414,223 +1340,218 @@ options: (do NOT use if possible)</b></p>
 <td width="6%">
 
 
-<p style="margin-top: 1em">&minus;#X</p></td>
+<p style="margin-top: 1em">-#X</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">*use optimized engine (limited
-memory boundary checks)
-(&minus;&minus;fast&minus;engine)</p> </td></tr>
+memory boundary checks) (--fast-engine)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#0</p></td>
+<p>-#0</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>filter test (&minus;#0 *.gif www.bar.com/foo.gif )
-(&minus;&minus;debug&minus;testfilters &lt;param&gt;)</p></td></tr>
+<p>filter test (-#0 *.gif www.bar.com/foo.gif )
+(--debug-testfilters &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#1</p></td>
+<p>-#1</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>simplify test (&minus;#1 ./foo/bar/../foobar)</p></td></tr>
+<p>simplify test (-#1 ./foo/bar/../foobar)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#2</p></td>
+<p>-#2</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>type test (&minus;#2 /foo/bar.php)</p></td></tr>
+<p>type test (-#2 /foo/bar.php)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#C</p></td>
+<p>-#C</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>cache list (&minus;#C *.com/spider*.gif
-(&minus;&minus;debug&minus;cache &lt;param&gt;)</p></td></tr>
+<p>cache list (-#C *.com/spider*.gif (--debug-cache
+&lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#R</p></td>
+<p>-#R</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>cache repair (damaged cache)
-(&minus;&minus;repair&minus;cache)</p> </td></tr>
+<p>cache repair (damaged cache) (--repair-cache)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#d</p></td>
+<p>-#d</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>debug parser (&minus;&minus;debug&minus;parsing)</p></td></tr>
+<p>debug parser (--debug-parsing)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#E</p></td>
+<p>-#E</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>extract new.zip cache meta&minus;data in meta.zip</p></td></tr>
+<p>extract new.zip cache meta-data in meta.zip</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#f</p></td>
+<p>-#f</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>always flush log files
-(&minus;&minus;advanced&minus;flushlogs)</p> </td></tr>
+<p>always flush log files (--advanced-flushlogs)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#FN</p></td>
+<p>-#FN</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>maximum number of filters
-(&minus;&minus;advanced&minus;maxfilters[=N])</p> </td></tr>
+(--advanced-maxfilters[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#h</p></td>
+<p>-#h</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>version info (&minus;&minus;version)</p></td></tr>
+<p>version info (--version)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#K</p></td>
+<p>-#K</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>scan stdin (debug)
-(&minus;&minus;debug&minus;scanstdin)</p> </td></tr>
+<p>scan stdin (debug) (--debug-scanstdin)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#L</p></td>
+<p>-#L</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>maximum number of links (&minus;#L1000000)
-(&minus;&minus;advanced&minus;maxlinks[=N])</p> </td></tr>
+<p>maximum number of links (-#L1000000)
+(--advanced-maxlinks[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#p</p></td>
+<p>-#p</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>display ugly progress information
-(&minus;&minus;advanced&minus;progressinfo)</p> </td></tr>
+(--advanced-progressinfo)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#P</p></td>
+<p>-#P</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>catch URL (&minus;&minus;catch&minus;url)</p></td></tr>
+<p>catch URL (--catch-url)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#R</p></td>
+<p>-#R</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>old FTP routines (debug)
-(&minus;&minus;repair&minus;cache)</p> </td></tr>
+<p>old FTP routines (debug) (--repair-cache)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#T</p></td>
+<p>-#T</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>generate transfer ops. log every minutes
-(&minus;&minus;debug&minus;xfrstats)</p> </td></tr>
+(--debug-xfrstats)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#u</p></td>
+<p>-#u</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
-<p>wait time (&minus;&minus;advanced&minus;wait)</p></td></tr>
+<p>wait time (--advanced-wait)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="6%">
 
 
-<p>&minus;#Z</p></td>
+<p>-#Z</p></td>
 <td width="5%"></td>
 <td width="78%">
 
 
 <p>generate transfer rate statictics every minutes
-(&minus;&minus;debug&minus;ratestats)</p> </td></tr>
+(--debug-ratestats)</p> </td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Dangerous
@@ -1644,18 +1565,17 @@ doing)</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;%!</p></td>
+<p style="margin-top: 1em">-%!</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">bypass built&minus;in security
-limits aimed to avoid bandwidth abuses (bandwidth,
-simultaneous connections)
-(&minus;&minus;disable&minus;security&minus;limits)</p> </td></tr>
+<p style="margin-top: 1em">bypass built-in security limits
+aimed to avoid bandwidth abuses (bandwidth, simultaneous
+connections) (--disable-security-limits)</p></td></tr>
 </table>
 
-<p style="margin-left:11%;">&minus;IMPORTANT</p>
+<p style="margin-left:11%;">-IMPORTANT</p>
 
 <p style="margin-left:22%;">NOTE: DANGEROUS OPTION, ONLY
 SUITABLE FOR EXPERTS</p>
@@ -1667,7 +1587,7 @@ SUITABLE FOR EXPERTS</p>
 <td width="6%">
 
 
-<p>&minus;USE</p></td>
+<p>-USE</p></td>
 <td width="5%"></td>
 <td width="30%">
 
@@ -1678,7 +1598,7 @@ SUITABLE FOR EXPERTS</p>
 </table>
 
 
-<p style="margin-left:11%; margin-top: 1em"><b>Command&minus;line
+<p style="margin-left:11%; margin-top: 1em"><b>Command-line
 specific options:</b></p>
 
 <table width="100%" border="0" rules="none" frame="void"
@@ -1688,27 +1608,26 @@ specific options:</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;V</p></td>
+<p style="margin-top: 1em">-V</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
 <p style="margin-top: 1em">execute system command after
-each files ($0 is the filename: &minus;V &quot;rm \$0&quot;)
-(&minus;&minus;userdef&minus;cmd &lt;param&gt;)</p></td></tr>
+each files ($0 is the filename: -V &quot;rm \$0&quot;)
+(--userdef-cmd &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;%W</p></td>
+<p>-%W</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>use an external library function as a wrapper (&minus;%W
-myfoo.so[,myparameters]) (&minus;&minus;callback
-&lt;param&gt;)</p> </td></tr>
+<p>use an external library function as a wrapper (-%W
+myfoo.so[,myparameters]) (--callback &lt;param&gt;)</p></td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Details:
@@ -1721,19 +1640,18 @@ Option N</b></p>
 <td width="9%">
 
 
-<p style="margin-top: 1em">&minus;N0</p></td>
+<p style="margin-top: 1em">-N0</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">Site&minus;structure
-(default)</p> </td></tr>
+<p style="margin-top: 1em">Site-structure (default)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;N1</p></td>
+<p>-N1</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1744,7 +1662,7 @@ Option N</b></p>
 <td width="9%">
 
 
-<p>&minus;N2</p></td>
+<p>-N2</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1755,7 +1673,7 @@ Option N</b></p>
 <td width="9%">
 
 
-<p>&minus;N3</p></td>
+<p>-N3</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1766,7 +1684,7 @@ Option N</b></p>
 <td width="9%">
 
 
-<p>&minus;N4</p></td>
+<p>-N4</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1779,7 +1697,7 @@ example)</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N5</p></td>
+<p>-N5</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1790,7 +1708,7 @@ example)</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N99</p></td>
+<p>-N99</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1801,18 +1719,18 @@ example)</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N100</p></td>
+<p>-N100</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
-<p>Site&minus;structure, without www.domain.xxx/</p></td></tr>
+<p>Site-structure, without www.domain.xxx/</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;N101</p></td>
+<p>-N101</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1824,7 +1742,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N102</p></td>
+<p>-N102</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1836,7 +1754,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N103</p></td>
+<p>-N103</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1848,7 +1766,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N104</p></td>
+<p>-N104</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1860,7 +1778,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N105</p></td>
+<p>-N105</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1872,7 +1790,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N199</p></td>
+<p>-N199</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1884,7 +1802,7 @@ by the site s name</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N1001</p></td>
+<p>-N1001</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1896,7 +1814,7 @@ directory</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N1002</p></td>
+<p>-N1002</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1908,7 +1826,7 @@ directory</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N1003</p></td>
+<p>-N1003</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1920,7 +1838,7 @@ directory (option set for g option)</p></td></tr>
 <td width="9%">
 
 
-<p>&minus;N1004</p></td>
+<p>-N1004</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1932,7 +1850,7 @@ directory</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N1005</p></td>
+<p>-N1005</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1944,7 +1862,7 @@ directory</p> </td></tr>
 <td width="9%">
 
 
-<p>&minus;N1099</p></td>
+<p>-N1099</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -1954,7 +1872,7 @@ directory</p> </td></tr>
 </table>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Details:
-User&minus;defined option N</b> <br>
+User-defined option N</b> <br>
 %n Name of file without file type (ex: image) <br>
 %N Name of file, including file type (ex: image.gif) <br>
 %t File type (ex: gif) <br>
@@ -1971,8 +1889,8 @@ User&minus;defined option N</b> <br>
 extraction</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Details:
-User&minus;defined option N and advanced variable
-extraction</b> <br>
+User-defined option N and advanced variable extraction</b>
+<br>
 %[param:before:after:empty:notfound]</p>
 
 <table width="100%" border="0" rules="none" frame="void"
@@ -1982,7 +1900,7 @@ extraction</b> <br>
 <td width="9%">
 
 
-<p style="margin-top: 1em">&minus;param</p></td>
+<p style="margin-top: 1em">-param</p></td>
 <td width="2%"></td>
 <td width="24%">
 
@@ -1992,7 +1910,7 @@ extraction</b> <br>
 </td></tr>
 </table>
 
-<p style="margin-left:11%;">&minus;before</p>
+<p style="margin-left:11%;">-before</p>
 
 <p style="margin-left:22%;">: string to prepend if the
 parameter was found</p>
@@ -2004,7 +1922,7 @@ parameter was found</p>
 <td width="9%">
 
 
-<p>&minus;after</p></td>
+<p>-after</p></td>
 <td width="2%"></td>
 <td width="69%">
 
@@ -2014,7 +1932,7 @@ parameter was found</p>
 </td></tr>
 </table>
 
-<p style="margin-left:11%;">&minus;notfound</p>
+<p style="margin-left:11%;">-notfound</p>
 
 <p style="margin-left:22%;">: string replacement if the
 parameter could not be found</p>
@@ -2026,7 +1944,7 @@ parameter could not be found</p>
 <td width="9%">
 
 
-<p>&minus;empty</p></td>
+<p>-empty</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -2037,7 +1955,7 @@ parameter could not be found</p>
 <td width="9%">
 
 
-<p>&minus;all</p></td>
+<p>-all</p></td>
 <td width="2%"></td>
 <td width="78%">
 
@@ -2056,66 +1974,65 @@ Option K</b></p>
 <td width="4%">
 
 
-<p style="margin-top: 1em">&minus;K0</p></td>
+<p style="margin-top: 1em">-K0</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p style="margin-top: 1em">foo.cgi?q=45 &minus;&gt;
+<p style="margin-top: 1em">foo.cgi?q=45 -&gt;
 foo4B54.html?q=45 (relative URI, default)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;K</p></td>
+<p>-K</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>&minus;&gt; http://www.foobar.com/folder/foo.cgi?q=45
-(absolute URL) (&minus;&minus;keep&minus;links[=N])</p></td></tr>
+<p>-&gt; http://www.foobar.com/folder/foo.cgi?q=45
+(absolute URL) (--keep-links[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;K3</p></td>
+<p>-K3</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>&minus;&gt; /folder/foo.cgi?q=45 (absolute URI)</p></td></tr>
+<p>-&gt; /folder/foo.cgi?q=45 (absolute URI)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;K4</p></td>
+<p>-K4</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>&minus;&gt; foo.cgi?q=45 (original URL)</p></td></tr>
+<p>-&gt; foo.cgi?q=45 (original URL)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="4%">
 
 
-<p>&minus;K5</p></td>
+<p>-K5</p></td>
 <td width="7%"></td>
 <td width="78%">
 
 
-<p>&minus;&gt;
-http://www.foobar.com/folder/foo4B54.html?q=45 (transparent
-proxy URL)</p></td></tr>
+<p>-&gt; http://www.foobar.com/folder/foo4B54.html?q=45
+(transparent proxy URL)</p></td></tr>
 </table>
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>Shortcuts:</b>
 <br>
-&minus;&minus;mirror</p>
+--mirror</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; *make a mirror of
 site(s) (default)</p>
@@ -2127,76 +2044,75 @@ site(s) (default)</p>
 <td width="9%">
 
 
-<p>&minus;&minus;get</p></td>
+<p>--get</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>&lt;URLs&gt; get the files indicated, do not seek other
-URLs (&minus;qg)</p></td></tr>
+URLs (-qg)</p></td></tr>
 <tr valign="top" align="left">
 <td width="11%"></td>
 <td width="9%">
 
 
-<p>&minus;&minus;list</p></td>
+<p>--list</p></td>
 <td width="2%"></td>
 <td width="78%">
 
 
 <p>&lt;text file&gt; add all URL located in this text file
-(&minus;%L)</p> </td></tr>
+(-%L)</p> </td></tr>
 </table>
 
-<p style="margin-left:11%;">&minus;&minus;mirrorlinks</p>
+<p style="margin-left:11%;">--mirrorlinks</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; mirror all links
-in 1st level pages (&minus;Y)</p>
+in 1st level pages (-Y)</p>
 
-<p style="margin-left:11%;">&minus;&minus;testlinks</p>
+<p style="margin-left:11%;">--testlinks</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; test links in
-pages (&minus;r1p0C0I0t)</p>
+pages (-r1p0C0I0t)</p>
 
-<p style="margin-left:11%;">&minus;&minus;spider</p>
+<p style="margin-left:11%;">--spider</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; spider site(s), to
-test links: reports Errors &amp; Warnings
-(&minus;p0C0I0t)</p>
+test links: reports Errors &amp; Warnings (-p0C0I0t)</p>
 
-<p style="margin-left:11%;">&minus;&minus;testsite</p>
+<p style="margin-left:11%;">--testsite</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; identical to
-&minus;&minus;spider</p>
+--spider</p>
 
-<p style="margin-left:11%;">&minus;&minus;skeleton</p>
+<p style="margin-left:11%;">--skeleton</p>
 
 <p style="margin-left:22%;">&lt;URLs&gt; make a mirror, but
-gets only html files (&minus;p1)</p>
+gets only html files (-p1)</p>
 
-<p style="margin-left:11%;">&minus;&minus;update</p>
+<p style="margin-left:11%;">--update</p>
 
 <p style="margin-left:22%;">update a mirror, without
-confirmation (&minus;iC2)</p>
+confirmation (-iC2)</p>
 
-<p style="margin-left:11%;">&minus;&minus;continue</p>
+<p style="margin-left:11%;">--continue</p>
 
 <p style="margin-left:22%;">continue a mirror, without
-confirmation (&minus;iC1)</p>
+confirmation (-iC1)</p>
 
-<p style="margin-left:11%;">&minus;&minus;catchurl</p>
+<p style="margin-left:11%;">--catchurl</p>
 
 <p style="margin-left:22%;">create a temporary proxy to
 capture an URL or a form post URL</p>
 
-<p style="margin-left:11%;">&minus;&minus;clean</p>
+<p style="margin-left:11%;">--clean</p>
 
 <p style="margin-left:22%;">erase cache &amp; log files</p>
 
-<p style="margin-left:11%;">&minus;&minus;http10</p>
+<p style="margin-left:11%;">--http10</p>
 
 <p style="margin-left:22%;">force http/1.0 requests
-(&minus;%h)</p>
+(-%h)</p>
 
 <p style="margin-left:11%; margin-top: 1em"><b>Details:
 Option %W: External callbacks prototypes <br>
@@ -2241,8 +2157,8 @@ file.</p>
 
 
 <p style="margin-left:11%; margin-top: 1em">Errors/Warnings
-are reported to <i>hts&minus;log.txt</i> by default, or to
-stderr if the <i>-v</i> option was specified.</p>
+are reported to <i>hts-log.txt</i> by default, or to stderr
+if the <i>-v</i> option was specified.</p>
 
 <h2>LIMITS
 <a name="LIMITS"></a>
@@ -2286,7 +2202,7 @@ other information you deem necessary.</p>
 
 
 <p style="margin-left:11%; margin-top: 1em">Copyright (C)
-1998-2017 Xavier Roche and other contributors</p>
+1998-2023 Xavier Roche and other contributors</p>
 
 <p style="margin-left:11%; margin-top: 1em">This program is
 free software: you can redistribute it and/or modify it

@@ -1,3 +1,9 @@
+httrack (3.49.3-1) unstable; urgency=low
+
+  * Updated to 3.49.3 (3.49-3)
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 12 Jan 2023 22:10:03 +0100
+
 httrack (3.49.2-1) unstable; urgency=medium
 
   * Fixed buffer overflow in output option commandline argument (VL-ID 2068) (Hosein Askari)
