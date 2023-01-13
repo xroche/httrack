@@ -13693,7 +13693,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl___discard_all" >&5
 $as_echo "$ax_cv_check_ldflags___Wl___discard_all" >&6; }
 if test "x$ax_cv_check_ldflags___Wl___discard_all" = xyes; then :
-  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--discard-all"
+  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--discard-all"
 else
   :
 fi
@@ -13729,7 +13729,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl___no_undefined" >&5
 $as_echo "$ax_cv_check_ldflags___Wl___no_undefined" >&6; }
 if test "x$ax_cv_check_ldflags___Wl___no_undefined" = xyes; then :
-  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,--no-undefined"
+  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--no-undefined"
 else
   :
 fi
@@ -13765,7 +13765,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&5
 $as_echo "$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&6; }
 if test "x$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" = xyes; then :
-  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,-z,relro -Wl,-z,now"
+  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro -Wl,-z,now"
 else
   :
 fi
@@ -13801,7 +13801,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_noexecstack" >&5
 $as_echo "$ax_cv_check_ldflags___Wl__z_noexecstack" >&6; }
 if test "x$ax_cv_check_ldflags___Wl__z_noexecstack" = xyes; then :
-  DEFAULT_LDLAGS="$DEFAULT_LDLAGS -Wl,-z,noexecstack"
+  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,noexecstack"
 else
   :
 fi
