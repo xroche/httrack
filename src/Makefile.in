@@ -182,10 +182,13 @@ htsserver_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	libhttrack.la
 htsserver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(htsserver_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+	$(CFLAGS) $(htsserver_LDFLAGS) $(LDFLAGS) -o $@
 httrack_SOURCES = httrack.c
-httrack_OBJECTS = httrack.$(OBJEXT)
+httrack_OBJECTS = httrack-httrack.$(OBJEXT)
 httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
+httrack_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(httrack_CFLAGS) \
+	$(CFLAGS) $(httrack_LDFLAGS) $(LDFLAGS) -o $@
 am_proxytrack_OBJECTS = proxy/proxytrack-main.$(OBJEXT) \
 	proxy/proxytrack-proxytrack.$(OBJEXT) \
 	proxy/proxytrack-store.$(OBJEXT) \
@@ -198,7 +201,7 @@ proxytrack_OBJECTS = $(am_proxytrack_OBJECTS)
 proxytrack_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 proxytrack_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(proxytrack_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+	$(CFLAGS) $(proxytrack_LDFLAGS) $(LDFLAGS) -o $@
 SCRIPTS = $(whttrackrun_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -217,7 +220,7 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/htsjava.Plo \
 	./$(DEPDIR)/htsserver-htsserver.Po \
-	./$(DEPDIR)/htsserver-htsweb.Po ./$(DEPDIR)/httrack.Po \
+	./$(DEPDIR)/htsserver-htsweb.Po ./$(DEPDIR)/httrack-httrack.Po \
 	./$(DEPDIR)/libhttrack_la-htsalias.Plo \
 	./$(DEPDIR)/libhttrack_la-htsback.Plo \
 	./$(DEPDIR)/libhttrack_la-htsbauth.Plo \
@@ -322,6 +325,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_PIE = @CFLAGS_PIE@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -349,6 +353,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LDFLAGS_PIE = @LDFLAGS_PIE@
 LFS_FLAG = @LFS_FLAG@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
@@ -475,8 +480,12 @@ AM_CPPFLAGS = \
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
-proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
-htsserver_CFLAGS = $(AM_CFLAGS) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
+proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
@@ -694,7 +703,7 @@ htsserver$(EXEEXT): $(htsserver_OBJECTS) $(htsserver_DEPENDENCIES) $(EXTRA_htsse
 
 httrack$(EXEEXT): $(httrack_OBJECTS) $(httrack_DEPENDENCIES) $(EXTRA_httrack_DEPENDENCIES) 
 	@rm -f httrack$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(httrack_OBJECTS) $(httrack_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(httrack_LINK) $(httrack_OBJECTS) $(httrack_LDADD) $(LIBS)
 proxy/$(am__dirstamp):
 	@$(MKDIR_P) proxy
 	@: > proxy/$(am__dirstamp)
@@ -771,7 +780,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsjava.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsserver.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsweb.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack-httrack.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsback.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsbauth.Plo@am__quote@ # am--include-marker
@@ -1105,6 +1114,20 @@ htsserver-htsweb.obj: htsweb.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -c -o htsserver-htsweb.obj `if test -f 'htsweb.c'; then $(CYGPATH_W) 'htsweb.c'; else $(CYGPATH_W) '$(srcdir)/htsweb.c'; fi`
 
+httrack-httrack.o: httrack.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(httrack_CFLAGS) $(CFLAGS) -MT httrack-httrack.o -MD -MP -MF $(DEPDIR)/httrack-httrack.Tpo -c -o httrack-httrack.o `test -f 'httrack.c' || echo '$(srcdir)/'`httrack.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/httrack-httrack.Tpo $(DEPDIR)/httrack-httrack.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='httrack.c' object='httrack-httrack.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(httrack_CFLAGS) $(CFLAGS) -c -o httrack-httrack.o `test -f 'httrack.c' || echo '$(srcdir)/'`httrack.c
+
+httrack-httrack.obj: httrack.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(httrack_CFLAGS) $(CFLAGS) -MT httrack-httrack.obj -MD -MP -MF $(DEPDIR)/httrack-httrack.Tpo -c -o httrack-httrack.obj `if test -f 'httrack.c'; then $(CYGPATH_W) 'httrack.c'; else $(CYGPATH_W) '$(srcdir)/httrack.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/httrack-httrack.Tpo $(DEPDIR)/httrack-httrack.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='httrack.c' object='httrack-httrack.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(httrack_CFLAGS) $(CFLAGS) -c -o httrack-httrack.obj `if test -f 'httrack.c'; then $(CYGPATH_W) 'httrack.c'; else $(CYGPATH_W) '$(srcdir)/httrack.c'; fi`
+
 proxy/proxytrack-main.o: proxy/main.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(proxytrack_CFLAGS) $(CFLAGS) -MT proxy/proxytrack-main.o -MD -MP -MF proxy/$(DEPDIR)/proxytrack-main.Tpo -c -o proxy/proxytrack-main.o `test -f 'proxy/main.c' || echo '$(srcdir)/'`proxy/main.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) proxy/$(DEPDIR)/proxytrack-main.Tpo proxy/$(DEPDIR)/proxytrack-main.Po
@@ -1413,7 +1436,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/htsjava.Plo
 	-rm -f ./$(DEPDIR)/htsserver-htsserver.Po
 	-rm -f ./$(DEPDIR)/htsserver-htsweb.Po
-	-rm -f ./$(DEPDIR)/httrack.Po
+	-rm -f ./$(DEPDIR)/httrack-httrack.Po
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsalias.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsback.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsbauth.Plo
@@ -1505,7 +1528,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/htsjava.Plo
 	-rm -f ./$(DEPDIR)/htsserver-htsserver.Po
 	-rm -f ./$(DEPDIR)/htsserver-htsweb.Po
-	-rm -f ./$(DEPDIR)/httrack.Po
+	-rm -f ./$(DEPDIR)/httrack-httrack.Po
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsalias.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsback.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsbauth.Plo

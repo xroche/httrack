@@ -673,6 +673,8 @@ V6_FLAG
 OPENSSL_LIBS
 HTTPS_SUPPORT
 AM_CFLAGS
+LDFLAGS_PIE
+CFLAGS_PIE
 DEFAULT_LDFLAGS
 DEFAULT_CFLAGS
 VERSION_INFO
@@ -13734,14 +13736,14 @@ else
   :
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,-z,relro -Wl,-z,now" >&5
-$as_echo_n "checking whether the linker accepts -Wl,-z,relro -Wl,-z,now... " >&6; }
-if ${ax_cv_check_ldflags___Wl__z_relro__Wl__z_now+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,-z,relro,-z,now" >&5
+$as_echo_n "checking whether the linker accepts -Wl,-z,relro,-z,now... " >&6; }
+if ${ax_cv_check_ldflags___Wl__z_relro__z_now+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
   ax_check_save_flags=$LDFLAGS
-  LDFLAGS="$LDFLAGS  -Wl,-z,relro -Wl,-z,now"
+  LDFLAGS="$LDFLAGS  -Wl,-z,relro,-z,now"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -13754,18 +13756,18 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ax_cv_check_ldflags___Wl__z_relro__Wl__z_now=yes
+  ax_cv_check_ldflags___Wl__z_relro__z_now=yes
 else
-  ax_cv_check_ldflags___Wl__z_relro__Wl__z_now=no
+  ax_cv_check_ldflags___Wl__z_relro__z_now=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
   LDFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&5
-$as_echo "$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" >&6; }
-if test "x$ax_cv_check_ldflags___Wl__z_relro__Wl__z_now" = xyes; then :
-  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro -Wl,-z,now"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl__z_relro__z_now" >&5
+$as_echo "$ax_cv_check_ldflags___Wl__z_relro__z_now" >&6; }
+if test "x$ax_cv_check_ldflags___Wl__z_relro__z_now" = xyes; then :
+  DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro,-z,now"
 else
   :
 fi
@@ -13805,6 +13807,83 @@ if test "x$ax_cv_check_ldflags___Wl__z_noexecstack" = xyes; then :
 else
   :
 fi
+
+
+### PIE
+CFLAGS_PIE=""
+LDFLAGS_PIE=""
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fpie -pie" >&5
+$as_echo_n "checking whether C compiler accepts -fpie -pie... " >&6; }
+if ${ax_cv_check_cflags___fpie__pie+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fpie -pie"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fpie__pie=yes
+else
+  ax_cv_check_cflags___fpie__pie=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fpie__pie" >&5
+$as_echo "$ax_cv_check_cflags___fpie__pie" >&6; }
+if test "x$ax_cv_check_cflags___fpie__pie" = xyes; then :
+  CFLAGS_PIE="-fpie -pie"
+else
+  :
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -pie" >&5
+$as_echo_n "checking whether the linker accepts -pie... " >&6; }
+if ${ax_cv_check_ldflags___pie+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  -pie"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ax_cv_check_ldflags___pie=yes
+else
+  ax_cv_check_ldflags___pie=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___pie" >&5
+$as_echo "$ax_cv_check_ldflags___pie" >&6; }
+if test "x$ax_cv_check_ldflags___pie" = xyes; then :
+  LDFLAGS_PIE="-pie"
+else
+  :
+fi
+
+
 
 
 ## Export all symbols for backtraces
