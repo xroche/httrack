@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Probíhá stahování stránek [%s, %s bajtù]
 Site mirroring finished!
 Stahování stránek skonèeno!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Pøi stahování se vyskytl problém\n
 \nDuring:\n
 \nBìhem:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Stahování skonèeno.\nKlikni na Konec pro ukonèení programu WinHTTrack.\nZobraz si protokoly pro kontrolu chyb pøi stahování.\n\nDíky za použití programu WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * STAHOVÁNÍ ZRUŠENO! * *\r\nPro pokraèování stahování je zapotøebí lokální cache, obsahující stažená data.\r\nPøedchozí cache mùže obsahovat více informací. Pokud je nechceš ztratit, musíš ji obnovit a smazat aktuální cache.\r\n[Poznámka: To mùže být provedeno teï smazáním hts-cache/new.* souborù]\r\n\r\nMyslíš, že cache obsahuje více informací a pøeješ si ji obnovit?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * CHYBA PØI STAHOVÁNÍ! * *\r\nHTTrack zjistil, že se nestáhla žádná data. Pokud se jednalo o aktualizaci, pak pøedešlá data byla obnovena.\r\nDùvod: Nemohla být nalezena první stránka nebo se vyskytl problém se spojením.\r\n=>Provìø zda zadaná adresa existuje anebo zkontroluj nastavení proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nTip: Klikni [Zobraz protokoly] pro zobrazení upozornìní a chyb
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 

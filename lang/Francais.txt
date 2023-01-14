@@ -196,7 +196,7 @@ Site mirroring in progress [%s, %s bytes]
 Copie du site en cours (%s, %s octets)
 Site mirroring finished!
 Copie du site terminée!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Incident durant la copie du site\n
 \nDuring:\n
 Durant:\n
@@ -206,7 +206,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 la copie du site est terminée\nCliquez sur OK pour quitter WinHTTrack\nConsultez au besoin les fichiers journaux pour vérifier que tout s'est bien passé\n\nMerci d'utiliser WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * COPIE INTERROMPUE! * *\r\nLe cache temporaire actuel est nécessaire pour toute mise à jour et ne contient que les données téléchargées durant la présente session interrompue.\r\nIl est possible que le cache précédent contienne des données plus complètes; si vous ne voulez pas perdre ces données, vous devez le restaurer et effacer le cache actuel.\r\n[Note: Cette opération peut être facilement effectuée ici en effacant les fichiers hts-cache/new.*]\r\n\r\nPensez-vous que le cache précédent pourrait contenir des informations plus complètes, et voulez-vous le restaurer?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ERREUR DE COPIE! * *\r\nHTTrack a détecté que la copie courante était vide. Si il s'agissait d'une mise à jour, l'ancienne copie a été restaurée.\r\nRaison: soit la (les) première(s) page(s) n'ont pu être téléchargées, soit un problème de connexion est survenu.\r\n=> Vérifiez que le site existe toujours, et/ou vérifiez les réglages du proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nConseil: sélectionnez la commande 'Voir le fichier journal' pour visionner les messages d'erreur et d'avertissement
@@ -936,7 +936,7 @@ You can now close this window
 Vous pouvez maintenant fermer cette fenêtre
 Server terminated
 Serveur arrêté
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Une erreur critique est intervenue durant l'aspiration
 View Documentation
 Lire la documentation

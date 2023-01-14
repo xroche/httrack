@@ -196,7 +196,7 @@ Site mirroring in progress [%s, %s bytes]
 Sivun peilaus käynnissä [%s, %s tavua]
 Site mirroring finished!
 Sivun peilaus valmis!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Ongelma peilausoperaation aikana\n
 \nDuring:\n
 \nAikana:\n
@@ -206,7 +206,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Peilausoperaatio valmis.\nPaina poistu sulkeaksesi WinHTTrackin.\nKatso lokitiedosto(j)a varmistaaksesi, että kaikki on kunnossa.\n\nKiitoksia WinHTTrackin käytöstä!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * PEILI KESKEYTETTY! * *\r\nNykyistä välimuistia tarvitaan päivitysoperaatioihin ja se sisältää tietoa vain äsken keskeytetystä imuroinnista.\r\nAiempi välimuisti saattaa sisältää täydellisempää tietoa; jos et halua menettää tätä tietoa, sinun pitää palauttaa se ja poistaa nykyinen välimuisti.\r\n[Huomaa: Tämän voi helposti tehdä nyt poistamalla hts-cache/new.*-tiedostot]\r\n\r\nLuuletko, että edellinen välimuisti sisältäisi täydellisempää tietoa, ja että haluat palauttaa sen?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * PEILIVIRHE! * *\r\nHTTrack huomasi, että nykyinen peili on tyhjä. Jos se oli päivitys, edellinen peli on palautettu.\r\nSyy: ensimmäiset sivut eivät löytyneet tai tapahtui yhteysvirhe.\r\n=> Varmista että nettisivu on yhä olemassa ja tarkista välityspalvelinasetuksesi! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nVinkki: Paina [Näytä lokitiedosto] nähdäksesi varoitus- ja virheviestit
@@ -928,6 +928,6 @@ You can now close this window
 Voit nyt sulkea tämän ikkunan
 Server terminated
 Palvelin lopetettu
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Tällä peilillä tapahtui vakava virhe
 

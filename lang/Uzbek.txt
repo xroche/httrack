@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 KoТzgu yaratilmoqda [%s, %s bayt]
 Site mirroring finished!
 KoТzgu yaratish bajarildi!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 KoТchirib olish jarayonida xatolik yuz berdi\n
 \nDuring:\n
 Davomida:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 KoТzgu yaratish bajarildi.\nDasturdan chiqish uchun OKni bosing.\nKoТchirib olish muvaffaqiyatli bajarilganligini koТrish uchun log fayl(lar)ni koТring.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * KOТCHIRIB OLISH BEKOR QILINDI! * *\r\n¬ременный кэш, созданный во врем€ текущей сессий, содержит данные, загруженные только во врем€ данной сессии и потребуетс€ только в случае возобновлени€ закачки.\r\nќднако, предыдущий кэш может содержать более полную информацию. ≈сли вы не хотите потер€ть эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Ёто можно легко сделать пр€мо здесь, удалив файлы hts-cache/new.]\r\n\r\n—читаете ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * XATOLIK! * *\r\nJoriy koТzgu - boТsh. Agar yangilanadigan boТlsa, oldingi koТzgu tiklanadi.\r\nSababi: birinchi sahifa(lar) topilmadi yoki bogТlanib boТlmadi.\r\n=> Veb-saytning mavjudligiga ishonch hosil qiling, и/yoki proksi-serverning oТrnatilganligini tekshiring! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nMaslahat: Xatolik va ogohlantirishlar haqidagi xabarni koТrish uchun [log faylni koТrish]ni bosing.
@@ -926,5 +926,5 @@ You can now close this window
 Endi bu oynani yopsangiz boТladi
 Server terminated
 Server terminated
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Joriy koТchirish vaqtida jiddiy xatolik yuz berdi

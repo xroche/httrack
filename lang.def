@@ -257,7 +257,7 @@ Site mirroring in progress [%s, %s bytes]
 LANG_F18b
 Site mirroring finished!
 LANG_F19
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 LANG_F20
 \nDuring:\n
 LANG_F21
@@ -267,7 +267,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 LANG_F22b
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 LANG_F22c
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 LANG_F23
 \n\nTip: Click [View log file] to see warning or error messages
 LANG_F24
@@ -1005,4 +1005,4 @@ You can now close this window
 LANG_SERVEND
 Server terminated
 LANG_FATALERR
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror

@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 A copiar (%s, %s Bytes)
 Site mirroring finished!
 Cópia terminada
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Ocorreu um problema durante a cópia\n
 \nDuring:\n
 Durante:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Cópia terminada.\nClique OK para sair.\nVeja o relatório para verificar se não há erros.\n\nObrigado por usar o WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * CÓPIA INTERROMPIDA! * *\r\nA cache temporária actual é necessária para actualização e só contém os dados carregados durante a sessão em curso.\r\nÉ possível que a cache anterior contenha dados mais completos; para não perder esses dados, deve restaurá-la e apagar a cache actual.\r\n[Nota: Esta operação pode ser facilmente executada aqui apagando os ficheiros hts-cache/new.*]\r\n\r\nPensa que a cache anterior pode conter informações mais completas e quer restaurá-la?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ERRO DE CÓPIA! * *\r\nHTTrack detectou que a cópia actual está vazia. Se fez uma actualização, a cópia anterior foi restaurada.\r\nRazão: a primeira página não foi encontrada ou ocorreu um problema na conexão.\r\n=> Certifique-se de que o site existe e confirme as configurações do proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nSugestão:Clique [Ver relatório] para ver os avisos e as mensagens de erro
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 

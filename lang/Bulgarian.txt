@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Прогрес на създаването на огледалния сайт [%s, %s байта]
 Site mirroring finished!
 Съдаването на огледалния сайт завърши!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Възникна проблем по време на създаването на огледалния сайт\n
 \nDuring:\n
 \nПо време на:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Създаването на огледалния сайт завърши!\nКликни Изход за затваряне на WinHTTrack.\nВижте log-файловете да са се уверите, че всичко е наред.\n\nБлагодарим, Ви, че използвате WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * КОПИРАНЕТО ПРЕКЪСНАТО! * *\r\nТекущият временен кеш е необходим за всякакви обновления и съдържа само данни свалени по време на тази прекъсната сесия.\r\nВъзможно е предшестващият кеш да съдържа по-пълна информация; ако не желаете за загубите тази информация, трябва да я възстановите и изтриете текущия кеш.\r\n[Забележка: Това може да бъде постигнато лесно чрез изтриване на hts-cache/new.* файловете]\r\n\r\nПредполагате ли, че предшестващия кеш съдържа по пълна информация и желаете ли да я възстановите?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ГРЕШКА ПРИ КОПИРАНЕТО! * *\r\nТекущият сайт е празен.Ако действието е било обновление, то предходното огледално копие е възстановено.\r\nПричина: първата страница(и) или не бе открита, или е възникнал проблем с връзката.\r\n=>Уверете се, че този сайт все още съществува и/или проверете Вашите proxy настройки! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nСъвет: Кликни [Виж log-файл] за предупредителните съобщения или съобщенията за грешки
@@ -926,5 +926,5 @@ You can now close this window
 Сега можете да затворите този прозорец
 Server terminated
 Сървърът не отговаря
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Фатална грешка при създаването на този огледален сайт

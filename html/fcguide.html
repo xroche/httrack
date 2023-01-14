@@ -221,7 +221,7 @@ Flow control:
   TN timeout, number of seconds after a non-responding link is shutdown (--timeout)
   RN number of retries, in case of timeout or non-fatal errors (*R1) (--retries[=N])
   JN traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link (--min-rate[=N])
-  HN host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (--host-control[=N])
+  HN host is abandoned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (--host-control[=N])
 
 Links options:
  %P *extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don't use) (--extended-parsing[=N])
@@ -299,7 +299,7 @@ Guru options: (do NOT use)
  #R  Old FTP routines (debug)
  #T  Generate transfer ops. log every minutes
  #u  Wait time
- #Z  Generate transfer rate statictics every minutes
+ #Z  Generate transfer rate statistics every minutes
  #!  Execute a shell command (-#! "echo hello")
 
 Command-line specific options:
@@ -315,18 +315,18 @@ Details: Option N
   N5 Images/other in web/xxx and HTML in web/HTML
   N99 All files in web/, with random names (gadget !)
   N100 Site-structure, without www.domain.xxx/
-  N101 Identical to N1 exept that "web" is replaced by the site's name
-  N102 Identical to N2 exept that "web" is replaced by the site's name
-  N103 Identical to N3 exept that "web" is replaced by the site's name
-  N104 Identical to N4 exept that "web" is replaced by the site's name
-  N105 Identical to N5 exept that "web" is replaced by the site's name
-  N199 Identical to N99 exept that "web" is replaced by the site's name
-  N1001 Identical to N1 exept that there is no "web" directory
-  N1002 Identical to N2 exept that there is no "web" directory
-  N1003 Identical to N3 exept that there is no "web" directory (option set for g option)
-  N1004 Identical to N4 exept that there is no "web" directory
-  N1005 Identical to N5 exept that there is no "web" directory
-  N1099 Identical to N99 exept that there is no "web" directory
+  N101 Identical to N1 except that "web" is replaced by the site's name
+  N102 Identical to N2 except that "web" is replaced by the site's name
+  N103 Identical to N3 except that "web" is replaced by the site's name
+  N104 Identical to N4 except that "web" is replaced by the site's name
+  N105 Identical to N5 except that "web" is replaced by the site's name
+  N199 Identical to N99 except that "web" is replaced by the site's name
+  N1001 Identical to N1 except that there is no "web" directory
+  N1002 Identical to N2 except that there is no "web" directory
+  N1003 Identical to N3 except that there is no "web" directory (option set for g option)
+  N1004 Identical to N4 except that there is no "web" directory
+  N1005 Identical to N5 except that there is no "web" directory
+  N1099 Identical to N99 except that there is no "web" directory
 Details: User-defined option N
   %n Name of file without file type (ex: image) (--do-not-recatch)
   %N Name of file, including file type (ex: image.gif)
@@ -825,7 +825,7 @@ Flow control:
   TN timeout, number of seconds after a non-responding link is shutdown
   RN number of retries, in case of timeout or non-fatal errors (*R1)
   JN traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link
-  HN host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow
+  HN host is abandoned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow
 </i></b>
 
 <p align=justify> This example allows up to 128 simultaneous downloads. 
@@ -1070,18 +1070,18 @@ Details: Option N
   N5 Images/other in web/xxx and HTML in web/HTML
   N99 All files in web/, with random names (gadget !)
   N100 Site-structure, without www.domain.xxx/
-  N101 Identical to N1 exept that "web" is replaced by the site's name
-  N102 Identical to N2 exept that "web" is replaced by the site's name
-  N103 Identical to N3 exept that "web" is replaced by the site's name
-  N104 Identical to N4 exept that "web" is replaced by the site's name
-  N105 Identical to N5 exept that "web" is replaced by the site's name
-  N199 Identical to N99 exept that "web" is replaced by the site's name
-  N1001 Identical to N1 exept that there is no "web" directory
-  N1002 Identical to N2 exept that there is no "web" directory
-  N1003 Identical to N3 exept that there is no "web" directory (option set for g option)
-  N1004 Identical to N4 exept that there is no "web" directory
-  N1005 Identical to N5 exept that there is no "web" directory
-  N1099 Identical to N99 exept that there is no "web" directory
+  N101 Identical to N1 except that "web" is replaced by the site's name
+  N102 Identical to N2 except that "web" is replaced by the site's name
+  N103 Identical to N3 except that "web" is replaced by the site's name
+  N104 Identical to N4 except that "web" is replaced by the site's name
+  N105 Identical to N5 except that "web" is replaced by the site's name
+  N199 Identical to N99 except that "web" is replaced by the site's name
+  N1001 Identical to N1 except that there is no "web" directory
+  N1002 Identical to N2 except that there is no "web" directory
+  N1003 Identical to N3 except that there is no "web" directory (option set for g option)
+  N1004 Identical to N4 except that there is no "web" directory
+  N1005 Identical to N5 except that there is no "web" directory
+  N1099 Identical to N99 except that there is no "web" directory
 </i></b></pre>
 </ul>
 
@@ -1783,7 +1783,7 @@ based authentication)
 <p align=justify> "On hold" option, in seconds
 
 <pre>
- #Z  Generate transfer rate statictics every minutes
+ #Z  Generate transfer rate statistics every minutes
 </pre>
 
 <p align=justify> Generate a log file with transfer statistics

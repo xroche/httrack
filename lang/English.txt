@@ -196,8 +196,8 @@ Site mirroring in progress [%s, %s bytes]
 Site mirroring in progress [%s, %s bytes]
 Site mirroring finished!
 Site mirroring finished!
-A problem occured during the mirroring operation\n
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 \nDuring:\n
 \nDuring:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
@@ -206,8 +206,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nTip: Click [View log file] to see warning or error messages
 Error deleting a hts-cache/new.* file, please do it manually
@@ -944,8 +944,8 @@ You can now close this window
 You can now close this window
 Server terminated
 Server terminated
-A fatal error has occured during this mirror
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
+A fatal error has occurred during this mirror
 View Documentation
 View Documentation
 Go To HTTrack Website

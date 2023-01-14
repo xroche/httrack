@@ -45,7 +45,7 @@ These options may not be necessary for a normal usage. But they can solve severa
 
 - If you need more than 100,000 links: -#L1000000 (1,000,000 links)
 - If you need more than 500 filters: -#F1000 (1,000 filters)
-- If you need transfer rate statictics every minutes: -#Z
+- If you need transfer rate statistics every minutes: -#Z
 - If you need transfer operations statistics every minutes: -#T
 - If you want log files to be refreshed after every line: -#f
 

@@ -48,7 +48,7 @@ Please visit our Website: http://www.httrack.com
 
 /*
   Unpack file into a new file
-  Return value: size of the new file, or -1 if an error occured
+  Return value: size of the new file, or -1 if an error occurred
 */
 /* Note: utf-8 */
 int hts_zunpack(char *filename, char *newfile) {

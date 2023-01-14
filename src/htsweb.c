@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
   int defaultPort = 0;
   int parentPid = 0;
 
-  printf("Initialzing the server..\n");
+  printf("Initializing the server..\n");
 
 #ifdef _WIN32
   {

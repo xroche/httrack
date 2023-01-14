@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Volcado en ejecución [%s, %s bytes]
 Site mirroring finished!
 ¡Copia del sitio finalizada!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Ha ocurrido un problema durante el volcado\n
 \nDuring:\n
 \nDurante:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 El volcado ha finalizado.\nPulse OK para salir de WinHTTrack\n\nConsulte los ficheros de auditoría para verificar que todo ha salido bien\n\n¡Gracias por utilizar WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * ¡COPIA INTERRUMPIDA! * *\r\nEs necesario el cache temporal actual para cualquier operación de actualización y solamente contiene datos bajados durante la presente sesión abortada.\r\nEl antiguo cache puede contener datos más completos; si vd. no desea perder dichos datos, deberá que restaurarlo y excluir el cache actual.\r\n[Nota: Esto puede hacerse fácilmente aquí excluyendo el hts-cache/nuevo.* ficheros]\r\n\r\n¿Cree que el antiguo cache puede contener datos más completos, y desea restaurarlo?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ¡ERROR DE VOLCADO! * *\r\nHTTrack ha detectado que el volcado actual está vacío. Si se trataba de una actualización, el volcado anterior ha sido recuperado.\r\nRazón: no se ha(n) encontrado la(s) primera(s) página(s), o ha habido un problema de conexión.\r\n=> Asegúrese de que el sitio web existe aún, y/o compruebe los ajustes de su proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nConsejo: Pulse [Ver ficheros auditoría] para ver los errores y mensajes
@@ -926,5 +926,5 @@ You can now close this window
 Ya puede cerrar esta ventana
 Server terminated
 Servidor desconectado
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Ha ocurrido un error fatal durante esta copia

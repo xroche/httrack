@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Создается зеркало [%s, %s байт]
 Site mirroring finished!
 Создание зеркала завершено!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 В процессе закачки произошла ошибка\n
 \nDuring:\n
 В течение:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Создание зеркала завершено.\nДля выхода из программы нажмите кнопку OK.\nДля проверки успешности закачки посмотрите лог файл(ы).\n\nСпасибо за использование WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * ЗАКАЧКА ПРЕРВАНА! * *\r\nВременный кэш, созданный во время текущей сессий, содержит данные, загруженные только во время данной сессии и потребуется только в случае возобновления закачки.\r\nОднако, предыдущий кэш может содержать более полную информацию. Если вы не хотите потерять эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Это можно легко сделать прямо здесь, удалив файлы hts-cache/new.]\r\n\r\nСчитаете ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ОШИБКА! * *\r\nТекущее зеркало - пусто. Если это было обновление, предыдущая версия зеркала восстановлена.\r\nПричина: первая страница(ы) или не найдена, или были проблемы с соединением.\r\n=> Убедитесь, что вебсайт все еще существует, и/или проверьте установки прокси-сервера! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nПодсказка: Для просмотра сообщений об ошибках и предупреждений нажмите [Просмотр лог файла]
@@ -926,5 +926,5 @@ You can now close this window
 Теперь Вы можете закрыть это окно
 Server terminated
 Server terminated
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Во время текущей закачки произошла фатальная ошибка

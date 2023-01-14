@@ -603,7 +603,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   deletesoc(soc_dat);
                   soc_dat = INVALID_SOCKET;
                   //
-                  snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s",
+                  snprintf(back->r.msg, sizeof(back->r.msg), "RETR command error: %s",
                           linejmp(line));
                   // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode = STATUSCODE_INVALID;
@@ -657,7 +657,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 back->r.statuscode = STATUSCODE_INVALID;
               }
             } else {
-              snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s", linejmp(line));
+              snprintf(back->r.msg, sizeof(back->r.msg), "RETR command error: %s", linejmp(line));
               // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode = STATUSCODE_INVALID;
             }

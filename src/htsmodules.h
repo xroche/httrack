@@ -78,7 +78,7 @@ struct htsmoduleStruct {
 
   /* Write-only */
   const char *wrapper_name;     /* name of wrapper (static string) */
-  char *err_msg;                /* if an error occured, the error message (max. 1KB) */
+  char *err_msg;                /* if an error occurred, the error message (max. 1KB) */
 
   /* Read/Write */
   int relativeToHtmlLink;       /* set this to 1 if all urls you pass to addLink

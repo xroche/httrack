@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Во тек е копирање на сајтот [%s, %s бајти]
 Site mirroring finished!
 Копирањето на сајтот е завршено!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Се појави проблем при копирањето на сајтот\n
 \nDuring:\n
 \nВо тек:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Копирањето на сајтот заврши.\nКликни Излез за исклучување на WinHTTrack.\nВиди ги log датотеките за да провериш дали се е в ред.\n\nБлагодариме за користењето на WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 ** КОПИРАЊЕТО Е ПРЕКИНАТО!**\r\nСегашниот temporary кеш е потребен за секоја update операција и ги содржи само податоците симнати при сегашната прекината сесија.\r\nБившиот кеш може да содржи комплетни информации; ако не сакате да ги зигубите тие информации, морате да ги повратите и да го избришете сегашниот кеш\r\n[Совет: Ова може лесно да се направи овде преку бришење на hts-cache/new.* датотеките]\r\n\r\nМислите ли дека бившиот кеш може да содржи комплетни информации, и дали сакате да ги повратите?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 **ГРЕШКА ПРИ КОПИРАЊЕТО**\r\nHTTrack откри дека сегашниот кеш е празен. Ако бил update, претходната копија е повратена.\r\nПричина: првите страници или не можат да бидат пронајдени, или се случиј проблем со конекцијата.\r\n=> Осигурете се дали веб сајтот сеуште постои, и/или проверете ги вашите proxy сетинзи!<=
 \n\nTip: Click [View log file] to see warning or error messages
 n\nСовет: Кликни [Види ја log датотеката] за да видите пораки за грешки или предупредување
@@ -926,5 +926,5 @@ You can now close this window
 Можете да го затворите овој прозорец
 Server terminated
 Серверот е прекинат
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Настана фатална грешка при овој mirror

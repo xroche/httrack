@@ -425,7 +425,7 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
         if (!feof(fp)) {
           trans.type = -1;
         } else {
-          sprintf(str->err_msg, "Internal stucture error (ASCII)");
+          sprintf(str->err_msg, "Internal structure error (ASCII)");
           *error = 1;
         }
         return (trans);

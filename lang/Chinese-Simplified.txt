@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 站点镜像进行中 [%s, %s 字节]
 Site mirroring finished!
 站点镜像完毕!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 镜像时发生错误\n
 \nDuring:\n
 \n发生在以下期间:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 镜像完成.\n点击'确定'以退出WinHTTrack.\n如有需要请看日志文件, 以确保万无一失.\n\n谢谢使用WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * 镜像被取消! * *\r\n当前临时的预存区为日后更新所需, 仅存有此次被中断的镜像期间内下载的数据.\r\n而原有预存区可能会存有更完整的内容; 如果你不想失去原有的数据, 请恢复之, 并删除当前预存区.\r\n[注: 欲删除当前预存区, 仅需删除以下文件: hts-cache/new.*]\r\n\r\n你是否肯定原有预存区存有更完整的内容, 并希望恢复之?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * 镜像出错!* *\r\nHTTrack检测到当前镜像未储存任何数据. 若使用的更新模式, 则前一次镜像已被恢复.\r\n=> 原因: 首页未能找到, 或发生连接错误.\r\n请确定欲镜像的网站存在, 并/或检查代理设置! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\n提示: 点击 [察看日志文件] 以察看警告或错误消息
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 

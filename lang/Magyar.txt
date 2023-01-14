@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 A tükrözés folyamatban [%s, %s bájt]
 Site mirroring finished!
 A webhely tükrözése befejezõdött
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 A tükrözés közben hiba történt\n
 \nDuring:\n
 \nKözben:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 A tükrözés befejezõdött.\nKattintson az OK gombra a WinHTTrack bezárásához.\nNézze meg a naplófájl(oka)t, ha szükséges, hogy meggyõzõdjön róla, minden rendben van-e.\n\nKöszönet a WinHTTrack használatáért!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * TÜKRÖZÉS MEGSZAKÍTVA! * *\r\nA frissítéshez az aktuális ideiglenes gyorsítótárra van szükség, és csak az imént megszakított mûvelettel letöltött adatokat tartalmazza.\r\nA régi gyorsítótár bizonyára több információt tartalmaz; ha nem akarja elveszíteni azt az információt, vissza kell állítania és törölnie a jelenlegi gyorsítótárat.\r\n[Megjegyzés: Ez könnyen elvégezhetõ itt a hts-cache/new fájlok* törlésével.]\r\n\r\nÚgy gondolja, hogy a régi gyorsítótár teljesebb információt tartalmazhat, és vissza kívánja állítani?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * TÜKRÖZÉSI HIBA! * *\r\nA HTTrack felismerte, hogy az aktuális tükrözés üres. Ha frissítés volt, vissza lett állítva az elõzõ tükrözés.\r\nOk: az elsõ oldal(ak) vagy nem találhatók, vagy csatlakozási probléma lépett föl.\r\n=> Nézze meg, hogy a webhely létezik-e még, és/vagy ellenõrizze a proxy beállításokat! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nTipp: Kattintson a [Naplófájl megjelenítése] menüpontra a figyelmeztetések vagy hibaüzenetek megtekintéséhez
@@ -926,5 +926,5 @@ You can now close this window
 Mostmár bezárhatja ezt az ablakot
 Server terminated
 A kiszolgáló befejezte a kapcsolatot
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Végzetes hiba történt a tükrözés közben
