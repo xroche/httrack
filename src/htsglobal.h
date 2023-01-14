@@ -208,9 +208,9 @@ Please visit our Website: http://www.httrack.com
 
 /* Copyright (C) 1998-2017 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
-#define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/"HTTRACK_AFF_VERSION" "HTTRACK_AFF_AUTHORS", %s -->"
+#define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION " " HTTRACK_AFF_AUTHORS ", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
-#define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version="HTTRACK_VERSIONID"&VersionStr="HTTRACK_VERSION"&Platform=%d&Language=%s"
+#define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID "&VersionStr=" HTTRACK_VERSION "&Platform=%d&Language=%s"
 
 #define H_CRLF "\x0d\x0a"
 #define CRLF   "\x0d\x0a"
