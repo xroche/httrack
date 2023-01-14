@@ -101,7 +101,7 @@ install: build
 	mkdir -p $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest
 	mv $(CURDIR)/debian/httrack/usr/share/httrack/libtest/lib* \
 		$(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest
-	ln -s ../../../share/httrack/libtest/readme.txt \
+	ln -s /usr/share/httrack/libtest/readme.txt \
 		 $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest/readme.txt
 
 	# Lintian overrides
