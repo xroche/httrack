@@ -93,10 +93,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "config.h"
 
-#ifndef FTIME
-#define HTS_DO_NOT_USE_FTIME
-#endif
-
 #ifndef SETUID
 #define HTS_DO_NOT_USE_UID
 #endif

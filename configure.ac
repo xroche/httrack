@@ -239,10 +239,6 @@ AC_DEFINE(DLLIB, 1,[Check for dlopen in c])], AC_MSG_WARN([*** not found * this 
 AC_SUBST(DL_LIBS)
 fi
 
-### Check for ftime
-AC_CHECK_LIB(c, ftime, [
-AC_DEFINE(FTIME, 1,[Check for ftime])], AC_MSG_RESULT([not found]))
-
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [
 AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))

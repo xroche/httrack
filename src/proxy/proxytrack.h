@@ -35,16 +35,12 @@ Please visit our Website: http://www.httrack.com
 #include "store.h"
 
 #include <sys/stat.h>
-#ifndef HTS_DO_NOT_USE_FTIME
 #ifdef _WIN32
 #include <sys/utime.h>
 #else
 #include <utime.h>
 #endif
 #include <sys/timeb.h>
-#else
-#include <utime.h>
-#endif
 #ifndef _WIN32
 #include <pthread.h>
 #endif
@@ -378,17 +374,7 @@ HTS_UNUSED static struct tm PT_GetTime(time_t t) {
 HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   struct utimbuf tim;
 
-#ifndef HTS_DO_NOT_USE_FTIME
-  struct timeb B;
-
-  memset(&B, 0, sizeof(B));
-  B.timezone = 0;
-  ftime(&B);
-  tim.actime = tim.modtime = mktime(tm_time) - B.timezone * 60;
-#else
-  // bogus time (GMT/local)..
-  tim.actime = tim.modtime = mktime(tm_time);
-#endif
+  tim.actime = tim.modtime = timegm(tm_time);
   return utime(file, &tim);
 }
 HTS_UNUSED static int set_filetime_time_t(const char *file, time_t t) {

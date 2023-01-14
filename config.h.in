@@ -3,9 +3,6 @@
 /* Check for dlopen in c */
 #undef DLLIB
 
-/* Check for ftime */
-#undef FTIME
-
 /* Define if pointers to integers require aligned access */
 #undef HAVE_ALIGNED_ACCESS_REQUIRED
 
