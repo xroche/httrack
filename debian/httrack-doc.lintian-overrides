@@ -1,2 +1,3 @@
 duplicate-changelog-files usr/share/doc/httrack/changelog.gz usr/share/doc/httrack/history.txt.gz
+package-contains-documentation-outside-usr-share-doc usr/share/httrack/*
 extended-description-is-probably-too-short
