@@ -1,2 +1,5 @@
-library-not-linked-against-libc usr/lib/*/httrack/libtest/libfilename.so.1.0.0
-breakout-link *
+libhttrack-dev: breakout-link *
+libhttrack-dev: hardening-no-fortify-functions usr/lib/x86_64-linux-gnu/httrack/libtest/*
+libhttrack-dev: library-not-linked-against-libc usr/lib/*/httrack/libtest/libfilename.so.1.0.0
+libhttrack-dev: package-contains-documentation-outside-usr-share-doc usr/share/httrack/libtest/readme.txt
+libhttrack-dev: package-name-defined-in-config-h usr/include/httrack/config.h

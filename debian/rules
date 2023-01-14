@@ -100,14 +100,7 @@ install: build
 	ln -s /usr/share/httrack/libtest/readme.txt \
 		 $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest/readme.txt
 
-	# Lintian overrides
-	mkdir -p $(CURDIR)/debian/httrack/usr/share/lintian/overrides
-	cp $(CURDIR)/debian/httrack.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
-	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
-	cp $(CURDIR)/debian/httrack-doc.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
+	dh_lintian
 
 	dh_movefiles --sourcedir=debian/httrack
 
