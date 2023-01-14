@@ -1,3 +1,10 @@
+httrack (3.49.4-1) unstable; urgency=low
+
+  * Updated to 3.49.4 (3.49-4)
+    closes:#1021492
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 14 Jan 2023 17:24:31 +0100
+
 httrack (3.49.3-1) unstable; urgency=low
 
   * Updated to 3.49.3 (3.49-3)
