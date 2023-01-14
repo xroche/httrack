@@ -81,10 +81,6 @@ install: build
 	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
 		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
 
-	# place libraries and cleanup
-	mkdir -p $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/
-	mv $(CURDIR)/debian/httrack/usr/bin/htsserver \
-		$(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/
 	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
 	rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/*.la
 	rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/*.la
