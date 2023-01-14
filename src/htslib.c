@@ -5507,7 +5507,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->maxcache = 1048576 * 32; // a peu près 32Mo en cache max -- OPTION NON PARAMETRABLE POUR L'INSTANT --
   //opt->maxcache_anticipate=256;  // maximum de liens à anticiper
   opt->maxtime = -1;            // temps max en secondes
-  opt->maxrate = 25000;         // taux maxi
+  opt->maxrate = 100000;        // taux maxi
   opt->maxconn = 5.0;           // nombre connexions/s
   opt->waittime = -1;           // wait until.. hh*3600+mm*60+ss
   //

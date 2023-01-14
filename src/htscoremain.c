@@ -3164,8 +3164,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       "* security warning: maximum number of simultaneous connections limited to %d to avoid server overload",
                       (int) opt->maxsoc);
       }
-      if (opt->maxrate <= 0 || opt->maxrate > 250000) {
-        opt->maxrate = 250000;
+      if (opt->maxrate <= 0 || opt->maxrate > 10000000) {
+        opt->maxrate = 10000000;
         hts_log_print(opt, LOG_WARNING,
                       "* security warning: maximum bandwidth limited to %d to avoid server overload",
                       (int) opt->maxrate);
