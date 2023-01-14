@@ -333,8 +333,8 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
             free(filename);
         } else {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                        "engine: warning: serialize error for %s%s to %s: memory full",
-                        back[i].url_adr, back[i].url_fil, filename);
+                        "engine: warning: serialize error for %s%s: memory full",
+                        back[i].url_adr, back[i].url_fil);
         }
       }
 #else
