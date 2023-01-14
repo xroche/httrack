@@ -13699,6 +13699,41 @@ else
   :
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fcf-protection" >&5
+$as_echo_n "checking whether C compiler accepts -fcf-protection... " >&6; }
+if ${ax_cv_check_cflags___fcf_protection+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fcf-protection"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fcf_protection=yes
+else
+  ax_cv_check_cflags___fcf_protection=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fcf_protection" >&5
+$as_echo "$ax_cv_check_cflags___fcf_protection" >&6; }
+if test "x$ax_cv_check_cflags___fcf_protection" = xyes; then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"
+else
+  :
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,--discard-all" >&5
 $as_echo_n "checking whether the linker accepts -Wl,--discard-all... " >&6; }
 if ${ax_cv_check_ldflags___Wl___discard_all+:} false; then :
