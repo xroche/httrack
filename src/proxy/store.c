@@ -1130,7 +1130,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   sprintf(previous_save, "%s%s", index->path,
                           previous_save_ + index->fixedPath);
                 } else {
-                  sprintf(r->msg, "Bogus fixePath prefix for %s (prefixLen=%d)",
+                  snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                           previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
                 }
@@ -1178,7 +1178,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                       fclose(fp);
                     } else {
                       r->statuscode = STATUSCODE_INVALID;
-                      sprintf(r->msg, "Read error (can't open '%s') from cache",
+                      snprintf(r->msg, sizeof(r->msg), "Read error (can't open '%s') from cache",
                               file_convert(catbuff, sizeof(catbuff), previous_save));
                     }
                   } else {
@@ -1745,7 +1745,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                 sprintf(previous_save, "%s%s", index->path,
                         previous_save_ + index->fixedPath);
               } else {
-                sprintf(r->msg, "Bogus fixePath prefix for %s (prefixLen=%d)",
+                snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                         previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
               }

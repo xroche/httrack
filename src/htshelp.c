@@ -320,7 +320,7 @@ void help_wizard(httrackp * opt) {
       printf("\n");
       if (strlen(stropt) == 1)
         stropt[0] = '\0';       // aucune
-      sprintf(cmd, "%s %s %s %s", urls, stropt, stropt2, strwild);
+      snprintf(cmd, sizeof(cmd), "%s %s %s %s", urls, stropt, stropt2, strwild);
       printf("---> Wizard command line: httrack %s\n\n", cmd);
       printf("Ready to launch the mirror? (Y/n) :");
       fflush(stdout);
@@ -423,7 +423,7 @@ void help_catchurl(const char *dest_path) {
       int i = 0;
 
       do {
-        sprintf(dest, "%s%s%d", dest_path, "hts-post", i);
+        snprintf(dest, sizeof(dest), "%s%s%d", dest_path, "hts-post", i);
         i++;
       } while(fexist(dest));
       {
@@ -439,7 +439,7 @@ void help_catchurl(const char *dest_path) {
         char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
 
         inplace_escape_check_url(dest, sizeof(dest));
-        sprintf(finalurl, "%s" POSTTOK "file:%s", url, dest);
+        snprintf(finalurl, sizeof(finalurl), "%s" POSTTOK "file:%s", url, dest);
         printf("\nThe URL is: \"%s\"\n", finalurl);
         printf("You can capture it through: httrack \"%s\"\n", finalurl);
       }
@@ -480,14 +480,14 @@ void help(const char *app, int more) {
   if (more)
     infomsg("1");
   if (more != 2) {
-    sprintf(info,
+    snprintf(info, sizeof(info),
             "HTTrack version " HTTRACK_VERSION "%s",
             hts_is_available());
     infomsg(info);
 #ifdef HTTRACK_AFF_WARNING
     infomsg("NOTE: " HTTRACK_AFF_WARNING);
 #endif
-    sprintf(info,
+    snprintf(info, sizeof(info),
             "\tusage: %s <URLs> [-option] [+<URL_FILTER>] [-<URL_FILTER>] [+<mime:MIME_FILTER>] [-<mime:MIME_FILTER>]",
             app);
     infomsg(info);
@@ -792,7 +792,7 @@ void help(const char *app, int more) {
   infomsg("example: httrack --continue");
   infomsg("continues a mirror in the current folder");
   infomsg("");
-  sprintf(info, "HTTrack version " HTTRACK_VERSION "%s",
+  snprintf(info, sizeof(info), "HTTrack version " HTTRACK_VERSION "%s",
           hts_is_available());
   infomsg(info);
   infomsg("Copyright (C) 1998-2017 Xavier Roche and other contributors");

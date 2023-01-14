@@ -268,7 +268,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 
                   tempo[0] = '\0';
 
-                  sprintf(tempo, "%s.class", tab[tab[i].index1].name);
+                  snprintf(tempo, sizeof(tempo), "%s.class", tab[tab[i].index1].name);
 #if JAVADEBUG
                   printf("add %s\n", tempo);
 #endif
