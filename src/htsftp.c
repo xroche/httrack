@@ -113,9 +113,9 @@ void launch_ftp(FTPDownloadStruct * params) {
 
 // pour l'arrêt du ftp
 #ifdef _WIN32
-#define _T_SOC_close(soc)  closesocket(soc); soc=INVALID_SOCKET;
+#define _T_SOC_close(soc)  do { closesocket(soc); soc=INVALID_SOCKET; } while(0)
 #else
-#define _T_SOC_close(soc)  close(soc); soc=INVALID_SOCKET;
+#define _T_SOC_close(soc)  do { close(soc); soc=INVALID_SOCKET; } while(0)
 #endif
 #define _HALT_FTP { \
   if ( soc_ctl     != INVALID_SOCKET ) _T_SOC_close(soc_ctl); \
