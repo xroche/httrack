@@ -1,6 +1,16 @@
---- ioapi.h.orig	2012-01-17 03:51:31.000000000 +0100
-+++ ioapi.h	2014-06-08 21:54:18.326360527 +0200
-@@ -67,6 +67,24 @@
+--- ioapi.h.orig	2022-11-20 19:28:12.877767071 +0100
++++ ioapi.h	2023-01-15 11:29:37.790645280 +0100
+@@ -21,6 +21,9 @@
+ #ifndef _ZLIBIOAPI64_H
+ #define _ZLIBIOAPI64_H
+ 
++#undef OF
++#define OF(x) x
++
+ #if (!defined(_WIN32)) && (!defined(WIN32)) && (!defined(__APPLE__))
+ 
+   // Linux needs this to support file operation on files larger then 4+GB
+@@ -67,6 +70,24 @@
  #endif
  #endif
  
@@ -25,7 +35,7 @@
  /*
  #ifndef ZPOS64_T
    #ifdef _WIN32
-@@ -135,6 +153,7 @@
+@@ -135,6 +156,7 @@
  typedef voidpf   (ZCALLBACK *open_file_func)      OF((voidpf opaque, const char* filename, int mode));
  typedef uLong    (ZCALLBACK *read_file_func)      OF((voidpf opaque, voidpf stream, void* buf, uLong size));
  typedef uLong    (ZCALLBACK *write_file_func)     OF((voidpf opaque, voidpf stream, const void* buf, uLong size));
@@ -33,7 +43,7 @@
  typedef int      (ZCALLBACK *close_file_func)     OF((voidpf opaque, voidpf stream));
  typedef int      (ZCALLBACK *testerror_file_func) OF((voidpf opaque, voidpf stream));
  
-@@ -148,6 +167,7 @@
+@@ -148,6 +170,7 @@
      open_file_func      zopen_file;
      read_file_func      zread_file;
      write_file_func     zwrite_file;
@@ -41,7 +51,7 @@
      tell_file_func      ztell_file;
      seek_file_func      zseek_file;
      close_file_func     zclose_file;
-@@ -164,6 +184,7 @@
+@@ -164,6 +187,7 @@
      open64_file_func    zopen64_file;
      read_file_func      zread_file;
      write_file_func     zwrite_file;
@@ -49,7 +59,7 @@
      tell64_file_func    ztell64_file;
      seek64_file_func    zseek64_file;
      close_file_func     zclose_file;
-@@ -186,6 +207,7 @@
+@@ -186,6 +210,7 @@
  
  #define ZREAD64(filefunc,filestream,buf,size)     ((*((filefunc).zfile_func64.zread_file))   ((filefunc).zfile_func64.opaque,filestream,buf,size))
  #define ZWRITE64(filefunc,filestream,buf,size)    ((*((filefunc).zfile_func64.zwrite_file))  ((filefunc).zfile_func64.opaque,filestream,buf,size))
