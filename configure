@@ -673,6 +673,8 @@ V6_FLAG
 OPENSSL_LIBS
 HTTPS_SUPPORT
 AM_CFLAGS
+HAVE_VISIBILITY
+CFLAG_VISIBILITY
 LDFLAGS_PIE
 CFLAGS_PIE
 DEFAULT_LDFLAGS
@@ -13994,7 +13996,95 @@ fi
 
 
 ### Check for -fvisibility=hidden support
-gl_VISIBILITY
+
+
+  CFLAG_VISIBILITY=
+  HAVE_VISIBILITY=0
+  if test -n "$GCC"; then
+                { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the -Werror option is usable" >&5
+$as_echo_n "checking whether the -Werror option is usable... " >&6; }
+if ${gl_cv_cc_vis_werror+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  gl_save_CFLAGS="$CFLAGS"
+       CFLAGS="$CFLAGS -Werror"
+       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  gl_cv_cc_vis_werror=yes
+else
+  gl_cv_cc_vis_werror=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+       CFLAGS="$gl_save_CFLAGS"
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_cc_vis_werror" >&5
+$as_echo "$gl_cv_cc_vis_werror" >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for simple visibility declarations" >&5
+$as_echo_n "checking for simple visibility declarations... " >&6; }
+if ${gl_cv_cc_visibility+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  gl_save_CFLAGS="$CFLAGS"
+       CFLAGS="$CFLAGS -fvisibility=hidden"
+                                          if test $gl_cv_cc_vis_werror = yes; then
+         CFLAGS="$CFLAGS -Werror"
+       fi
+       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+extern __attribute__((__visibility__("hidden"))) int hiddenvar;
+              extern __attribute__((__visibility__("default"))) int exportedvar;
+              extern __attribute__((__visibility__("hidden"))) int hiddenfunc (void);
+              extern __attribute__((__visibility__("default"))) int exportedfunc (void);
+              void dummyfunc (void);
+              int hiddenvar;
+              int exportedvar;
+              int hiddenfunc (void) { return 51; }
+              int exportedfunc (void) { return 1225736919; }
+              void dummyfunc (void) {}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  gl_cv_cc_visibility=yes
+else
+  gl_cv_cc_visibility=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+       CFLAGS="$gl_save_CFLAGS"
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_cc_visibility" >&5
+$as_echo "$gl_cv_cc_visibility" >&6; }
+    if test $gl_cv_cc_visibility = yes; then
+      CFLAG_VISIBILITY="-fvisibility=hidden"
+      HAVE_VISIBILITY=1
+    fi
+  fi
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_VISIBILITY $HAVE_VISIBILITY
+_ACEOF
+
+
 AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
 
 
