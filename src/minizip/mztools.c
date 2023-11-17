@@ -10,6 +10,7 @@
 #include <string.h>
 #include "zlib.h"
 #include "unzip.h"
+#include "mztools.h"
 
 #define READ_8(adr)  ((unsigned char)*(adr))
 #define READ_16(adr) ( READ_8(adr) | (READ_8(adr+1) << 8) )
@@ -141,8 +142,8 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
         /* Central directory entry */
         {
           char header[46];
-          char* comment = "";
-          int comsize = (int) strlen(comment);
+          const char* comment = "";
+          const size_t comsize = strlen(comment);
           WRITE_32(header, 0x02014b50);
           WRITE_16(header + 4, version);
           WRITE_16(header + 6, version);
@@ -189,7 +190,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
             /* Comment field */
             if (comsize > 0) {
-              if ((int)fwrite(comment, 1, comsize, fpOutCD) == comsize) {
+              if (fwrite(comment, 1, comsize, fpOutCD) == comsize) {
                 offsetCD += comsize;
               } else {
                 err = Z_ERRNO;
@@ -216,8 +217,8 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     {
       int entriesZip = entries;
       char header[22];
-      char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
-      int comsize = (int) strlen(comment);
+      const char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
+      const size_t comsize = strlen(comment);
       if (entriesZip > 0xffff) {
         entriesZip = 0xffff;
       }
@@ -235,7 +236,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
         /* Comment field */
         if (comsize > 0) {
-          if ((int)fwrite(comment, 1, comsize, fpOutCD) != comsize) {
+          if (fwrite(comment, 1, comsize, fpOutCD) != comsize) {
             err = Z_ERRNO;
           }
         }
