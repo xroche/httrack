@@ -313,6 +313,11 @@ extern int ZEXPORT zipWriteInFileInZip(zipFile file,
   Write data in the zipfile
 */
 
+extern int ZEXPORT zipFlush (zipFile file);
+/*
+  Flush the zipfile output
+*/
+
 extern int ZEXPORT zipCloseFileInZip(zipFile file);
 /*
   Close the current file in the zipfile
