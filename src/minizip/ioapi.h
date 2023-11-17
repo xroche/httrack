@@ -21,6 +21,9 @@
 #ifndef _ZLIBIOAPI64_H
 #define _ZLIBIOAPI64_H
 
+#undef OF
+#define OF(x) x
+
 #if (!defined(_WIN32)) && (!defined(WIN32)) && (!defined(__APPLE__))
 
   // Linux needs this to support file operation on files larger then 4+GB
@@ -65,6 +68,24 @@
   #define fseeko64 fseek
  #endif
 #endif
+#endif
+
+/* As reported by sammyx, z_crc_t and z_const are not defined in pre-1.2.70 releases of zlib */
+/* See <https://github.com/madler/zlib/commit/6c9bd474aa08312ef2e2e9655a80e18db24a1680#diff-d466aa66f7e453e0c8a7719229cff391R391> */
+#if ZLIB_VERNUM < 0x1270
+
+#ifdef Z_U4
+   typedef Z_U4 z_crc_t;
+#else
+   typedef unsigned long z_crc_t;
+#endif
+
+#if defined(ZLIB_CONST) && !defined(z_const)
+#  define z_const const
+#else
+#  define z_const
+#endif
+
 #endif
 
 /*
@@ -137,6 +158,7 @@ extern "C" {
 typedef voidpf   (ZCALLBACK *open_file_func)      (voidpf opaque, const char* filename, int mode);
 typedef uLong    (ZCALLBACK *read_file_func)      (voidpf opaque, voidpf stream, void* buf, uLong size);
 typedef uLong    (ZCALLBACK *write_file_func)     (voidpf opaque, voidpf stream, const void* buf, uLong size);
+typedef int      (ZCALLBACK *flush_file_func)     (voidpf opaque, voidpf stream);
 typedef int      (ZCALLBACK *close_file_func)     (voidpf opaque, voidpf stream);
 typedef int      (ZCALLBACK *testerror_file_func) (voidpf opaque, voidpf stream);
 
@@ -150,6 +172,7 @@ typedef struct zlib_filefunc_def_s
     open_file_func      zopen_file;
     read_file_func      zread_file;
     write_file_func     zwrite_file;
+    flush_file_func     zflush_file;
     tell_file_func      ztell_file;
     seek_file_func      zseek_file;
     close_file_func     zclose_file;
@@ -166,6 +189,7 @@ typedef struct zlib_filefunc64_def_s
     open64_file_func    zopen64_file;
     read_file_func      zread_file;
     write_file_func     zwrite_file;
+    flush_file_func     zflush_file;
     tell64_file_func    ztell64_file;
     seek64_file_func    zseek64_file;
     close_file_func     zclose_file;
@@ -188,6 +212,7 @@ typedef struct zlib_filefunc64_32_def_s
 
 #define ZREAD64(filefunc,filestream,buf,size)     ((*((filefunc).zfile_func64.zread_file))   ((filefunc).zfile_func64.opaque,filestream,buf,size))
 #define ZWRITE64(filefunc,filestream,buf,size)    ((*((filefunc).zfile_func64.zwrite_file))  ((filefunc).zfile_func64.opaque,filestream,buf,size))
+#define ZFLUSH64(filefunc,filestream)             ((*((filefunc).zfile_func64.zflush_file))  ((filefunc).zfile_func64.opaque,filestream))
 //#define ZTELL64(filefunc,filestream)            ((*((filefunc).ztell64_file)) ((filefunc).opaque,filestream))
 //#define ZSEEK64(filefunc,filestream,pos,mode)   ((*((filefunc).zseek64_file)) ((filefunc).opaque,filestream,pos,mode))
 #define ZCLOSE64(filefunc,filestream)             ((*((filefunc).zfile_func64.zclose_file))  ((filefunc).zfile_func64.opaque,filestream))
