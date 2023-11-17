@@ -10,7 +10,6 @@
 #include <string.h>
 #include "zlib.h"
 #include "unzip.h"
-#include "mztools.h"
 
 #define READ_8(adr)  ((unsigned char)*(adr))
 #define READ_16(adr) ( READ_8(adr) | (READ_8(adr+1) << 8) )
@@ -28,10 +27,7 @@
   WRITE_16((unsigned char*)(buff) + 2, (n) >> 16); \
 } while(0)
 
-int ZEXPORT unzRepair(const char* file, const char* fileOut,
-                      const char* fileOutTmp, uLong* nRecovered,
-                      uLong* bytesRecovered)
-{
+extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* fileOutTmp, uLong* nRecovered, uLong* bytesRecovered) {
   int err = Z_OK;
   FILE* fpZip = fopen(file, "rb");
   FILE* fpOut = fopen(fileOut, "wb");
@@ -145,8 +141,8 @@ int ZEXPORT unzRepair(const char* file, const char* fileOut,
         /* Central directory entry */
         {
           char header[46];
-          const char* comment = "";
-          const size_t comsize = strlen(comment);
+          char* comment = "";
+          int comsize = (int) strlen(comment);
           WRITE_32(header, 0x02014b50);
           WRITE_16(header + 4, version);
           WRITE_16(header + 6, version);
@@ -193,7 +189,7 @@ int ZEXPORT unzRepair(const char* file, const char* fileOut,
 
             /* Comment field */
             if (comsize > 0) {
-              if (fwrite(comment, 1, comsize, fpOutCD) == comsize) {
+              if ((int)fwrite(comment, 1, comsize, fpOutCD) == comsize) {
                 offsetCD += comsize;
               } else {
                 err = Z_ERRNO;
@@ -220,8 +216,8 @@ int ZEXPORT unzRepair(const char* file, const char* fileOut,
     {
       int entriesZip = entries;
       char header[22];
-      const char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
-      const size_t comsize = strlen(comment);
+      char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
+      int comsize = (int) strlen(comment);
       if (entriesZip > 0xffff) {
         entriesZip = 0xffff;
       }
@@ -239,7 +235,7 @@ int ZEXPORT unzRepair(const char* file, const char* fileOut,
 
         /* Comment field */
         if (comsize > 0) {
-          if (fwrite(comment, 1, comsize, fpOutCD) != comsize) {
+          if ((int)fwrite(comment, 1, comsize, fpOutCD) != comsize) {
             err = Z_ERRNO;
           }
         }
