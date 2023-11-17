@@ -1401,7 +1401,7 @@ extern int ZEXPORT zipWriteInFileInZip(zipFile file, const void* buf, unsigned i
     else
 #endif
     {
-      zi->ci.stream.next_in = (Bytef*)(uintptr_t)buf;
+      zi->ci.stream.next_in = buf;
       zi->ci.stream.avail_in = len;
 
       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
@@ -1817,6 +1817,18 @@ local int Write_GlobalComment(zip64_internal* zi, const char* global_comment) {
       err = ZIP_ERRNO;
   }
   return err;
+}
+
+extern int ZEXPORT zipFlush (zipFile file)
+{
+    zip64_internal* zi;
+
+    if (file == NULL)
+        return ZIP_PARAMERROR;
+
+    zi = (zip64_internal*)file;
+
+    return ZFLUSH64(zi->z_filefunc,zi->filestream);
 }
 
 extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
