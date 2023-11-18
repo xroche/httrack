@@ -1,5 +1,5 @@
---- ioapi.h.orig	2022-11-20 19:28:12.877767071 +0100
-+++ ioapi.h	2023-01-15 11:29:37.790645280 +0100
+--- ioapi.h.orig	2023-11-17 16:21:50.359864777 +0000
++++ ioapi.h	2023-11-17 16:24:00.239861504 +0000
 @@ -21,6 +21,9 @@
  #ifndef _ZLIBIOAPI64_H
  #define _ZLIBIOAPI64_H
@@ -35,15 +35,15 @@
  /*
  #ifndef ZPOS64_T
    #ifdef _WIN32
-@@ -135,6 +156,7 @@
- typedef voidpf   (ZCALLBACK *open_file_func)      OF((voidpf opaque, const char* filename, int mode));
- typedef uLong    (ZCALLBACK *read_file_func)      OF((voidpf opaque, voidpf stream, void* buf, uLong size));
- typedef uLong    (ZCALLBACK *write_file_func)     OF((voidpf opaque, voidpf stream, const void* buf, uLong size));
-+typedef int      (ZCALLBACK *flush_file_func)     OF((voidpf opaque, voidpf stream));
- typedef int      (ZCALLBACK *close_file_func)     OF((voidpf opaque, voidpf stream));
- typedef int      (ZCALLBACK *testerror_file_func) OF((voidpf opaque, voidpf stream));
+@@ -137,6 +158,7 @@
+ typedef voidpf   (ZCALLBACK *open_file_func)      (voidpf opaque, const char* filename, int mode);
+ typedef uLong    (ZCALLBACK *read_file_func)      (voidpf opaque, voidpf stream, void* buf, uLong size);
+ typedef uLong    (ZCALLBACK *write_file_func)     (voidpf opaque, voidpf stream, const void* buf, uLong size);
++typedef int      (ZCALLBACK *flush_file_func)     (voidpf opaque, voidpf stream);
+ typedef int      (ZCALLBACK *close_file_func)     (voidpf opaque, voidpf stream);
+ typedef int      (ZCALLBACK *testerror_file_func) (voidpf opaque, voidpf stream);
  
-@@ -148,6 +170,7 @@
+@@ -150,6 +172,7 @@
      open_file_func      zopen_file;
      read_file_func      zread_file;
      write_file_func     zwrite_file;
@@ -51,7 +51,7 @@
      tell_file_func      ztell_file;
      seek_file_func      zseek_file;
      close_file_func     zclose_file;
-@@ -164,6 +187,7 @@
+@@ -166,6 +189,7 @@
      open64_file_func    zopen64_file;
      read_file_func      zread_file;
      write_file_func     zwrite_file;
@@ -59,7 +59,7 @@
      tell64_file_func    ztell64_file;
      seek64_file_func    zseek64_file;
      close_file_func     zclose_file;
-@@ -186,6 +210,7 @@
+@@ -188,6 +212,7 @@
  
  #define ZREAD64(filefunc,filestream,buf,size)     ((*((filefunc).zfile_func64.zread_file))   ((filefunc).zfile_func64.opaque,filestream,buf,size))
  #define ZWRITE64(filefunc,filestream,buf,size)    ((*((filefunc).zfile_func64.zwrite_file))  ((filefunc).zfile_func64.opaque,filestream,buf,size))
