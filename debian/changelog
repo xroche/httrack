@@ -1,3 +1,10 @@
+httrack (3.49.5-1) unstable; urgency=medium
+
+  * Updated to 3.49.5 (3.49-5)
+    Fixed CVE-2023-45853
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 27 Jan 2024 14:30:23 +0100
+
 httrack (3.49.4-1) unstable; urgency=low
 
   * Updated to 3.49.4 (3.49-4)
