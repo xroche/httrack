@@ -1,6 +1,6 @@
-AC_PREREQ(2.59)
+AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.4], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack],[3.49.4],[roche+packaging@httrack.com],[httrack],[http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -37,10 +37,18 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_STDC_HEADERS
+m4_warn([obsolete],
+[The preprocessor macro `STDC_HEADERS' is obsolete.
+  Except in unusual embedded environments, you can safely include all
+  ISO C90 headers unconditionally.])dnl
+# Autoupdate added the next two lines to ensure that your configure
+# script's behavior did not change.  They are probably safe to remove.
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
+
 LT_INIT
 AC_PROG_LN_S
-AM_PROG_LIBTOOL
+LT_INIT
 
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
@@ -142,8 +150,7 @@ CHECK_ZLIB()
 ### OpenSSL is explicitly enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
 AC_ARG_ENABLE([https],
-	[AC_HELP_STRING([--enable-https=@<:@yes/no/auto@:>@],
-		[Enable https support @<:@default=yes@:>@])],
+	[AS_HELP_STRING([--enable-https=@<:@yes/no/auto@:>@],[Enable https support @<:@default=yes@:>@])],
 	[
 	case "${enableval}" in
 	no|yes|auto)
@@ -254,8 +261,7 @@ AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
 AC_ARG_ENABLE([online-unit-tests],
-	[AC_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],
-		[Enable online-unit-tests @<:@default=yes@:>@])],
+	[AS_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],[Enable online-unit-tests @<:@default=yes@:>@])],
 	[
 	case "${enableval}" in
 	no|yes|auto)
@@ -274,7 +280,7 @@ AC_ARG_ENABLE([online-unit-tests],
 AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
 
 # Final output
-AC_OUTPUT([
+AC_CONFIG_FILES([
 Makefile
 src/Makefile
 man/Makefile
@@ -285,3 +291,4 @@ html/Makefile
 libtest/Makefile
 tests/Makefile
 ])
+AC_OUTPUT
