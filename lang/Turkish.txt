@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Sitenin yansýsý alýnýyor [%s, %s bayt]
 Site mirroring finished!
 Sitenin yansýsý alýndý!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Yansý iþlemi sýrasýnda bir hata oluþtu\n
 \nDuring:\n
 \nSüresince:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Yansý iþlemi tamamlandý.\nWinHTTrac'dan çýkmak için Çýk'a týklayýn.\nHerþeyin düzgün yapýldýðýndan emin olmak için kayýt dosyasýna bakabilirsiniz.\n\nWinHTTrack kullandýðýnýz için teþekkürler!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * YANSI ÝÞLEMÝ ÝPTAL EDÝLDÝ! * *\r\nHerhangi bir güncelleme iþlemi için þuanki geçici kayýtlar gereklidir ve bu kayýtlar indirilen dosyalarý tutarlar.\r\nBiçimlendirilmiþ kayýt daha fazla bilgi içerebilir; eðer bu bilgiyi kaybetmek istemiyorsanýz, bu kaydý yedekleyebilir ve geçici olanýný silebilirsiniz.\r\n[Not: Bu iþlemi hts-cache/new.* dosyalarýný silerek kolaylýkla yapabilirsiniz]\r\n\rBiçimlendirilmiþ kaydý geri almak istiyor musunuz?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * YANSI ÝÞLEMÝ HATASI! * *\r\nHTTrack kullanýlan yanýsnýn boþ olduðunu tespit etti. Eðer bu bir güncelleme ise, önceki yansý geri alýnabilir.\r\nNeden: baþlangýç sayfa(lar)ý bulunamadý veya bir baðlantý problemi oluþtu.\r\n=> Web sitesinin olup olmadýðýný ve vekil sunucu ayarlarýnýzý kontrol edin! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\Ýpucu: Hata ve uyarý mesajlarýný görmek için [Kayýt dosyasýný göster]'e týklayýnn
@@ -926,5 +926,5 @@ You can now close this window
 Bu pencereyi artýk kapatabilirsiniz
 Server terminated
 Sunucu sonlandýrdý
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Bu yansýlama iþlemi sýrasýnda ölümcül bir hata oluþtu

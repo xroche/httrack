@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Spiegeling is bezig... [%s, %s bytes]
 Site mirroring finished!
 Spiegeling beëindigd!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Een probleem is opgetreden tijdens de spiegeling\n
 \nDuring:\n
 \r\n\nTijdens:\n\r\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 De spiegeling is uitgevoerd.\nKlik OK om WinHTTrack te beëindigen.\nIndien nodig, zie protocolbestand(en) om zeker te gaan dat alles OK is\n\nAlvast bedankt voor het gebruik van WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * SPIEGELING AFGEBROKEN! * *\r\nDe aktuele tijdelijke cache is noodzakelijk voor gelijkwelke update operatie en bevat enkel data gedownload gedurende de zoeven afgebroken sessie.\r\nDe eerste cache kan juistere informaties bevatten; indien je deze informatie niet wenst te verliezen, dan moet je deze restoren and de aktuele cache wissen.\r\n[Opmerking: Dit is het eenvoudigst door het wissen van de hts-cache/new.* bestanden]\r\n\r\nDenk je dat de eerste cache juistere informaties bevat, en wil je deze restoren?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * FOUT MET DE SPIEGELING * *\r\nHTTrack heeft vastgesteld dat de aktuele spiegeling leeg is. Indien het een update was, is de vorige copie terug actueel.\r\nReden: de eerste pagina(s) konden ofwel niet gevonden worden, of er was een probleem met de connectie.\r\n=> Verzeker je ervan, dat de website nog steeds bestaat en/of je proxy settings correct zijn! <=
 \n\nTip: Click [View log file] to see warning or error messages
 :\r\n\n\nTip: Klik [Toon protocolbestand] voor de fouten en mededelingen\r\n
@@ -926,5 +926,5 @@ You can now close this window
 Je kunt dit verster nu sluiten
 Server terminated
 Server beeindigd
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Een fatale fout is opgetreden tijdens deze spiegeling

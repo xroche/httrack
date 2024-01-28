@@ -475,7 +475,8 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
                   strcpybuff(StatsBuffer[index].state, "search");
                   ok = 1;
                 } else if (back[i].status == STATUS_FTP_TRANSFER) {     // ohh le beau ftp
-                  sprintf(StatsBuffer[index].state, "ftp: %s", back[i].info);
+                  snprintf(StatsBuffer[index].state, sizeof(StatsBuffer[index].state),
+                           "ftp: %s", back[i].info);
                   ok = 1;
                 }
                 break;

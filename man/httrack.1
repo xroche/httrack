@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii httrack.1
 .\"
-.TH httrack 1 "20 May 2017" "httrack website copier"
+.TH httrack 1 "27 January 2024" "httrack website copier"
 .SH NAME
 httrack \- offline browser : copy websites to a local directory
 .SH SYNOPSIS
@@ -263,7 +263,7 @@ number of retries, in case of timeout or non\-fatal errors (*R1) (\-\-retries[=N
 .IP \-JN
 traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link (\-\-min\-rate[=N])
 .IP \-HN
-host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (\-\-host\-control[=N])
+host is abandoned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (\-\-host\-control[=N])
 
 .SS Links options:
 .IP \-%P
@@ -451,7 +451,7 @@ generate transfer ops. log every minutes (\-\-debug\-xfrstats)
 .IP \-#u
 wait time (\-\-advanced\-wait)
 .IP \-#Z
-generate transfer rate statictics every minutes (\-\-debug\-ratestats)
+generate transfer rate statistics every minutes (\-\-debug\-ratestats)
 
 .SS Dangerous options: (do NOT use unless you exactly know what you are doing)
 .IP \-%!
@@ -485,29 +485,29 @@ All files in web/, with random names (gadget !)
 .IP \-N100
 Site\-structure, without www.domain.xxx/
 .IP \-N101
-Identical to N1 exept that "web" is replaced by the site s name
+Identical to N1 except that "web" is replaced by the site s name
 .IP \-N102
-Identical to N2 exept that "web" is replaced by the site s name
+Identical to N2 except that "web" is replaced by the site s name
 .IP \-N103
-Identical to N3 exept that "web" is replaced by the site s name
+Identical to N3 except that "web" is replaced by the site s name
 .IP \-N104
-Identical to N4 exept that "web" is replaced by the site s name
+Identical to N4 except that "web" is replaced by the site s name
 .IP \-N105
-Identical to N5 exept that "web" is replaced by the site s name
+Identical to N5 except that "web" is replaced by the site s name
 .IP \-N199
-Identical to N99 exept that "web" is replaced by the site s name
+Identical to N99 except that "web" is replaced by the site s name
 .IP \-N1001
-Identical to N1 exept that there is no "web" directory
+Identical to N1 except that there is no "web" directory
 .IP \-N1002
-Identical to N2 exept that there is no "web" directory
+Identical to N2 except that there is no "web" directory
 .IP \-N1003
-Identical to N3 exept that there is no "web" directory (option set for g option)
+Identical to N3 except that there is no "web" directory (option set for g option)
 .IP \-N1004
-Identical to N4 exept that there is no "web" directory
+Identical to N4 except that there is no "web" directory
 .IP \-N1005
-Identical to N5 exept that there is no "web" directory
+Identical to N5 except that there is no "web" directory
 .IP \-N1099
-Identical to N99 exept that there is no "web" directory
+Identical to N99 except that there is no "web" directory
 .SS Details: User\-defined option N
    %n  Name of file without file type (ex: image)
    %N  Name of file, including file type (ex: image.gif)
@@ -610,7 +610,7 @@ Please reports bugs to
 .B <bugs@httrack.com>.
 Include a complete, self-contained example that will allow the bug to be reproduced, and say which version of httrack you are using. Do not forget to detail options used, OS version, and any other information you deem necessary.
 .SH COPYRIGHT
-Copyright (C) 1998-2017 Xavier Roche and other contributors
+Copyright (C) 1998-2024 Xavier Roche and other contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

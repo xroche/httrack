@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Створюється дзеркало [%s, %s байт]
 Site mirroring finished!
 Створення дзеркала завершене!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 У процесі завантаження відбулася помилка\n
 \nDuring:\n
 У плині:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Створення дзеркала завершене.\nдля виходу з програми натисніть кнопку OK.\nдля перевірки успішності завантаження подивитеся лог файл(и).\n\nдякуємо за використання WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * ЗАВАНТАЖЕННЯ ПЕРЕРВАНЕ! * *\r\nтимчасовий кеш, створений під час поточної сесії, містить дані, завантажені тільки під час даної сесії і буде потрібний тільки у випадку поновлення завантаження.\r\nале, може містити більш повну інформацію. Якщо ви не хочете втратити ці дані, вам потрібно видалити поточний кеш і відновити попередній.\r\n(Це можна легко зробити прямо тут, видаливши файли hts-cache/new.]\r\n\r\nВи вважаєте, що попередній кеш може містити більш повну інформацію, і чи хочете ви відновити його?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ПОМИЛКА! * *\r\nце дзеркало - порожнє. Якщо це було відновлення, версія дзеркала відновлена.\r\nпричина: перша сторінка(и) чи не знайдена, чи були проблеми з з'єднанням.\r\n=> Переконайтеся, що вебсайт ще існує, і/чи перевірте  установки проксі-сервера! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nподсказка:Для перегляду повідомлень про помилки і попереджень натисніть [Перегляд лог файлу]
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 

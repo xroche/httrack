@@ -27,13 +27,22 @@ AM_CPPFLAGS = \
 	-I"$(abs_srcdir)" \
 	-I"$(abs_srcdir)/coucal"
 
+AM_LDFLAGS = \
+	@DEFAULT_LDFLAGS@
+
 bin_PROGRAMS = proxytrack httrack htsserver
 
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
-proxytrack_CFLAGS = $(AM_CFLAGS) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
-htsserver_CFLAGS = $(AM_CFLAGS) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+
+httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
+proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+
+httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 
 lib_LTLIBRARIES = libhttrack.la libhtsjava.la
 
@@ -70,11 +79,11 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
-libhttrack_la_LDFLAGS = -version-info $(VERSION_INFO)
+libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
-libhtsjava_la_LDFLAGS = -version-info $(VERSION_INFO)
+libhtsjava_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \
 		coucal/murmurhash3.h.diff \

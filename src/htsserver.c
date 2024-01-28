@@ -347,7 +347,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       /* */
       {"connexion", 4},
       /* */
-      {"maxrate", 25000},
+      {"maxrate", 100000},
       /* */
       {"build", 1},
       /* */

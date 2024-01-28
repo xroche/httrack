@@ -1,5 +1,5 @@
-usr/lib/libhttrack.so.2.0.49
-usr/lib/libhttrack.so.2
-usr/lib/libhtsjava.so.2.0.49
-usr/lib/libhtsjava.so.2
+usr/lib/*/libhttrack.so.2.0.49
+usr/lib/*/libhttrack.so.2
+usr/lib/*/libhtsjava.so.2.0.49
+usr/lib/*/libhtsjava.so.2
 usr/share/httrack/templates

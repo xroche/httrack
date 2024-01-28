@@ -81,37 +81,26 @@ install: build
 	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
 		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
 
-	# place libraries and cleanup
-	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/
-	mv $(CURDIR)/debian/httrack/usr/bin/htsserver \
-		$(CURDIR)/debian/httrack/usr/lib/httrack/
 	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
-	rm -f $(CURDIR)/debian/httrack/usr/lib/*.la
-	rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.la
+	rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/*.la
+	rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/*.la
 	# remove *.a unless we do not have *.so files
 	# see BUG #744594
-	if ls $(CURDIR)/debian/httrack/usr/lib/*.so >/dev/null 2>/dev/null ; then \
-		rm -f $(CURDIR)/debian/httrack/usr/lib/*.a ; \
+	if ls $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/*.so >/dev/null 2>/dev/null ; then \
+		rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/*.a ; \
 	fi
-	if ls $(CURDIR)/debian/httrack/usr/lib/httrack/*.so >/dev/null 2>/dev/null ; then \
-		rm -f $(CURDIR)/debian/httrack/usr/lib/httrack/*.a ; \
+	if ls $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/*.so >/dev/null 2>/dev/null ; then \
+		rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/*.a ; \
 	fi
-	mv $(CURDIR)/debian/httrack/usr/lib/httrack/lib* \
+	mv $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/lib* \
 		$(CURDIR)/debian/httrack/usr/share/httrack/libtest/
-	mkdir -p $(CURDIR)/debian/httrack/usr/lib/httrack/libtest
+	mkdir -p $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest
 	mv $(CURDIR)/debian/httrack/usr/share/httrack/libtest/lib* \
-		$(CURDIR)/debian/httrack/usr/lib/httrack/libtest
-	ln -s ../../../share/httrack/libtest/readme.txt \
-		 $(CURDIR)/debian/httrack/usr/lib/httrack/libtest/readme.txt
+		$(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest
+	ln -s /usr/share/httrack/libtest/readme.txt \
+		 $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest/readme.txt
 
-	# Lintian overrides
-	mkdir -p $(CURDIR)/debian/httrack/usr/share/lintian/overrides
-	cp $(CURDIR)/debian/httrack.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack
-	cp $(CURDIR)/debian/libhttrack-dev.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/libhttrack-dev
-	cp $(CURDIR)/debian/httrack-doc.lintian-overrides \
-		$(CURDIR)/debian/httrack/usr/share/lintian/overrides/httrack-doc
+	dh_lintian
 
 	dh_movefiles --sourcedir=debian/httrack
 
@@ -143,10 +132,10 @@ binary-arch: build install
 	dh_strip -a
 	dh_compress -a
 	dh_fixperms -a
-	dh_makeshlibs -a -X/usr/lib/httrack/libtest --version-info
+	dh_makeshlibs -a -X/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest --version-info
 	dh_installdeb -a
 	# we depend on the current version (ABI may change)
-	dh_shlibdeps -a -ldebian/libhttrack2/usr/lib
+	dh_shlibdeps -a -ldebian/libhttrack2/usr/lib/$(DEB_HOST_MULTIARCH)
 	dh_gencontrol -a
 	dh_md5sums -a
 	dh_builddeb -a

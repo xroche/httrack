@@ -413,7 +413,7 @@ if (makeindex_fp) { \
   if (makeindex_links == 1) { \
     char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
     escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
-    sprintf(tempo,"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
+    snprintf(tempo,sizeof(tempo),"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
   } else \
     tempo[0]='\0'; \
     hts_template_format(makeindex_fp,template_footer, \

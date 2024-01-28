@@ -196,7 +196,7 @@ Site mirroring in progress [%s, %s bytes]
 Αντιγραφή τοποθεσίας σε εξέλιξη [%s, %s bytes]
 Site mirroring finished!
 Η αντιγραφή της τοποθεσίας τελείωσε!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Δημιουργήθηκε ένα πρόβλημα κατά την διαδικασία αντιγραφής\n
 \nDuring:\n
 \nΚατα τη διάρκεια:\n
@@ -206,7 +206,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Η διαδικασία αντιγραφής τέλειωσε.\nΚλικ στο Έξοδος για να εγκαταλείψετε το WinHTTrack.\nΔείτε το αρχείο γεγονότων αν είναι απαραίτητο, έτσι ώστε να επιβεβαιώσετε ότι όλα είναι εντάξει.\n\nΣας ευχαριστώ για την χρήση του WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * Η ΑΝΤΙΓΡΑΦΗ ΕΓΚΑΤΑΛΕΙΦΘΗΚΕ! * *\r\nΗ παρούσα προσωρινή cache είναι απαραίτητη για κάθε λειτουργία ανανέωσης και περιλαμβάνει μόνο δεδομένα που κατέβηκαν κατά τη διάρκεια της τωρινής εγκαταλελειμένης περιόδου.\r\nΗ προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες. Αν δεν θέλετε να χάσετε αυτές τις πληροφορίες, πρέπει να να τις ανακτήσετε και να διαγράψετε την παρούσα cache.\r\n[Σημείωση: Αυτό μπορεί να γίνει εύκολα σβήνοντας τα αρχεία hts-cache/new.*]\r\n\r\nΝομίζετε πως η προηγούμενη cache ίσως περιέχει πιο ολοκληρωμένες πληροφορίες και θέλετε να την ανακτήσετε;
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ΣΦΑΛΜΑ ΑΝΤΙΓΡΑΦΗΣ * *\r\nΤο WinHTTrack ανακάλυψε πως το παρόν αντίγραφο είναι άδειο. Αν ήταν μια ανανέωση, το προηγούμενο αντίγραφο ανακτήθηκε.\r\nΛόγος: Οι πρώτη(ες) σελίδα(ες) είτε δεν βρέθηκαν ή υπήρξε πρόβλημα κατά την σύνδεση.\r\n=> Επιβεβαιώστε ότι η τοποθεσία υπάρχει ακόμα και/ή ελέγξτε τις ρυθμίσεις του proxy σας! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nΣυμβουλή: Κλικ στο [Προβολή αρχείο γεγονότων] για να δείτε μηνύματα προειδοποιήσεων ή λαθών
@@ -928,5 +928,5 @@ You can now close this window
 Τώρα μπορείτε να κλείσετε αυτό το παράθυρο
 Server terminated
 Ακυρώθηκε από τον εξυπηρετητή
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Ένα καταστροφικό σφάλμα προκλήθηκε κατά την αντιγραφή αυτού του τόπου

@@ -1,0 +1,2 @@
+libhttrack2: no-symbols-control-file usr/lib/*
+libhttrack2: spelling-error-in-binary usr/lib/*/libhttrack.so.* updat update

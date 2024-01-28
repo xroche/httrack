@@ -320,7 +320,7 @@ void help_wizard(httrackp * opt) {
       printf("\n");
       if (strlen(stropt) == 1)
         stropt[0] = '\0';       // aucune
-      sprintf(cmd, "%s %s %s %s", urls, stropt, stropt2, strwild);
+      snprintf(cmd, sizeof(cmd), "%s %s %s %s", urls, stropt, stropt2, strwild);
       printf("---> Wizard command line: httrack %s\n\n", cmd);
       printf("Ready to launch the mirror? (Y/n) :");
       fflush(stdout);
@@ -423,7 +423,7 @@ void help_catchurl(const char *dest_path) {
       int i = 0;
 
       do {
-        sprintf(dest, "%s%s%d", dest_path, "hts-post", i);
+        snprintf(dest, sizeof(dest), "%s%s%d", dest_path, "hts-post", i);
         i++;
       } while(fexist(dest));
       {
@@ -439,7 +439,7 @@ void help_catchurl(const char *dest_path) {
         char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
 
         inplace_escape_check_url(dest, sizeof(dest));
-        sprintf(finalurl, "%s" POSTTOK "file:%s", url, dest);
+        snprintf(finalurl, sizeof(finalurl), "%s" POSTTOK "file:%s", url, dest);
         printf("\nThe URL is: \"%s\"\n", finalurl);
         printf("You can capture it through: httrack \"%s\"\n", finalurl);
       }
@@ -480,14 +480,14 @@ void help(const char *app, int more) {
   if (more)
     infomsg("1");
   if (more != 2) {
-    sprintf(info,
+    snprintf(info, sizeof(info),
             "HTTrack version " HTTRACK_VERSION "%s",
             hts_is_available());
     infomsg(info);
 #ifdef HTTRACK_AFF_WARNING
     infomsg("NOTE: " HTTRACK_AFF_WARNING);
 #endif
-    sprintf(info,
+    snprintf(info, sizeof(info),
             "\tusage: %s <URLs> [-option] [+<URL_FILTER>] [-<URL_FILTER>] [+<mime:MIME_FILTER>] [-<mime:MIME_FILTER>]",
             app);
     infomsg(info);
@@ -532,7 +532,7 @@ void help(const char *app, int more) {
   infomsg
     ("  JN traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link");
   infomsg
-    ("  HN host is abandonned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow");
+    ("  HN host is abandoned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow");
   infomsg("");
   infomsg("Links options:");
   infomsg
@@ -662,7 +662,7 @@ void help(const char *app, int more) {
   infomsg(" #R  old FTP routines (debug)");
   infomsg(" #T  generate transfer ops. log every minutes");
   infomsg(" #u  wait time");
-  infomsg(" #Z  generate transfer rate statictics every minutes");
+  infomsg(" #Z  generate transfer rate statistics every minutes");
   infomsg("");
   infomsg
     ("Dangerous options: (do NOT use unless you exactly know what you are doing)");
@@ -689,24 +689,24 @@ void help(const char *app, int more) {
   infomsg("  N99 All files in web/, with random names (gadget !)");
   infomsg("  N100 Site-structure, without www.domain.xxx/");
   infomsg
-    ("  N101 Identical to N1 exept that \"web\" is replaced by the site's name");
+    ("  N101 Identical to N1 except that \"web\" is replaced by the site's name");
   infomsg
-    ("  N102 Identical to N2 exept that \"web\" is replaced by the site's name");
+    ("  N102 Identical to N2 except that \"web\" is replaced by the site's name");
   infomsg
-    ("  N103 Identical to N3 exept that \"web\" is replaced by the site's name");
+    ("  N103 Identical to N3 except that \"web\" is replaced by the site's name");
   infomsg
-    ("  N104 Identical to N4 exept that \"web\" is replaced by the site's name");
+    ("  N104 Identical to N4 except that \"web\" is replaced by the site's name");
   infomsg
-    ("  N105 Identical to N5 exept that \"web\" is replaced by the site's name");
+    ("  N105 Identical to N5 except that \"web\" is replaced by the site's name");
   infomsg
-    ("  N199 Identical to N99 exept that \"web\" is replaced by the site's name");
-  infomsg("  N1001 Identical to N1 exept that there is no \"web\" directory");
-  infomsg("  N1002 Identical to N2 exept that there is no \"web\" directory");
+    ("  N199 Identical to N99 except that \"web\" is replaced by the site's name");
+  infomsg("  N1001 Identical to N1 except that there is no \"web\" directory");
+  infomsg("  N1002 Identical to N2 except that there is no \"web\" directory");
   infomsg
-    ("  N1003 Identical to N3 exept that there is no \"web\" directory (option set for g option)");
-  infomsg("  N1004 Identical to N4 exept that there is no \"web\" directory");
-  infomsg("  N1005 Identical to N5 exept that there is no \"web\" directory");
-  infomsg("  N1099 Identical to N99 exept that there is no \"web\" directory");
+    ("  N1003 Identical to N3 except that there is no \"web\" directory (option set for g option)");
+  infomsg("  N1004 Identical to N4 except that there is no \"web\" directory");
+  infomsg("  N1005 Identical to N5 except that there is no \"web\" directory");
+  infomsg("  N1099 Identical to N99 except that there is no \"web\" directory");
   infomsg("Details: User-defined option N");
   infomsg("  '%n' Name of file without file type (ex: image)");
   infomsg("  '%N' Name of file, including file type (ex: image.gif)");
@@ -792,7 +792,7 @@ void help(const char *app, int more) {
   infomsg("example: httrack --continue");
   infomsg("continues a mirror in the current folder");
   infomsg("");
-  sprintf(info, "HTTrack version " HTTRACK_VERSION "%s",
+  snprintf(info, sizeof(info), "HTTrack version " HTTRACK_VERSION "%s",
           hts_is_available());
   infomsg(info);
   infomsg("Copyright (C) 1998-2017 Xavier Roche and other contributors");

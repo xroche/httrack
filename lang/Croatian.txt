@@ -196,7 +196,7 @@ Site mirroring in progress [%s, %s bytes]
 Zrcaljenje sadržaja je u tijeku [%s, %s bajta]
 Site mirroring finished!
 Zrcaljenje sadržaja je završeno!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Tijekom zrcaljenja je nastao jedan problem\n
 \nDuring:\n
 \nTrajanje:\n
@@ -206,7 +206,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Zrcaljenje je dovršeno.\nKliknite na Svršetak za okonèavanje rada s WinHTTrackom.\nPogledajte po potrebi u zapisnik(e) kako bi se uvjerili da je sve u redu.\n\nHvala Vam na uporabi WinHTTracka!!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * ZRCALJENJE JE PREKINUTO! * *\r\nTekuæi privremeni meðuspremnik æe biti potreban za neku buduæu aktualizaciju i sadrži samo podatke, koji su preuzeti tijekom upravo prekinutog zasjedanja.\r\nPrethodni meðuspremnik možda sadrži potpunije podatke; ukoliko te podatke ne želite izgubiti, morate ih ponovno uspostaviti i izbrisati tekuæi meðuspremnik.\r\n[Napomena: To se jednostavno može napraviti brisanjem datoteka hts-cache/new.*]\r\n\r\nMislite li da ovom zasjedanju prethodeæi meðuspremnik može sadržavati potpunije podatke, i želite li ga ponovno uspostaviti?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * POGREŠKA PRI ZRCALJENJU! * *\r\nHTTrack je zapazio da je tekuæe zrcalo prazno. Ukoliko je to bila neka dogradnja, onda je prethodno zrcalo ponovno uspostavljeno.\r\nRazlog: ili prva stranica nije mogla biti pronaðena, ili se pak pojavio neki problem.\r\n=> Uvjerite se da dotièno mrežno mjesto još uvijek postoji, i/ili provjerite postavke Vašeg usmjerivaèa! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nPreporuka: Kliknite na [Prikazati zapisnièke datoteke], kako bi vidjeli upozorenja ili dojave pogreški
@@ -928,5 +928,5 @@ You can now close this window
 Sada možete zatvoriti ovo okno
 Server terminated
 Poslužitelj je razriješen
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 Tijekom ovog zrcaljenja je nastala fatalna pogreška

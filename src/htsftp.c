@@ -113,9 +113,9 @@ void launch_ftp(FTPDownloadStruct * params) {
 
 // pour l'arrêt du ftp
 #ifdef _WIN32
-#define _T_SOC_close(soc)  closesocket(soc); soc=INVALID_SOCKET;
+#define _T_SOC_close(soc)  do { closesocket(soc); soc=INVALID_SOCKET; } while(0)
 #else
-#define _T_SOC_close(soc)  close(soc); soc=INVALID_SOCKET;
+#define _T_SOC_close(soc)  do { close(soc); soc=INVALID_SOCKET; } while(0)
 #endif
 #define _HALT_FTP { \
   if ( soc_ctl     != INVALID_SOCKET ) _T_SOC_close(soc_ctl); \
@@ -603,7 +603,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   deletesoc(soc_dat);
                   soc_dat = INVALID_SOCKET;
                   //
-                  snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s",
+                  snprintf(back->r.msg, sizeof(back->r.msg), "RETR command error: %s",
                           linejmp(line));
                   // back->status=STATUS_FTP_READY;    // fini
                   back->r.statuscode = STATUSCODE_INVALID;
@@ -657,7 +657,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 back->r.statuscode = STATUSCODE_INVALID;
               }
             } else {
-              snprintf(back->r.msg, sizeof(back->r.msg), "RETR command errror: %s", linejmp(line));
+              snprintf(back->r.msg, sizeof(back->r.msg), "RETR command error: %s", linejmp(line));
               // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode = STATUSCODE_INVALID;
             }

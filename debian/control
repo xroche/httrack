@@ -2,14 +2,14 @@ Source: httrack
 Section: web
 Priority: optional
 Maintainer: Xavier Roche <roche@httrack.com>
-Standards-Version: 3.9.8
-Build-Depends: debhelper (>= 8.0.0), dh-autoreconf, autotools-dev, autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev
+Standards-Version: 4.6.2
+Build-Depends: debhelper (>= 12.0.0), dh-autoreconf, autotools-dev, autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev
 Homepage: http://www.httrack.com
 Vcs-Git: https://github.com/xroche/httrack.git
-Vcs-Browser: https://github.com/xroche/httrack/tree/master/src
 
 Package: httrack
 Architecture: any
+Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Suggests: webhttrack, httrack-doc
 Description: Copy websites to your computer (Offline browser)
@@ -27,7 +27,8 @@ Description: Copy websites to your computer (Offline browser)
 
 Package: webhttrack
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser | sensible-utils
 Replaces: webhttrack-common (<< 3.43.9-2)
 Breaks: webhttrack-common (<< 3.43.9-2)
 Suggests: httrack, httrack-doc
@@ -49,6 +50,7 @@ Description: Copy websites to your computer, httrack with a Web interface
 
 Package: webhttrack-common
 Architecture: all
+Multi-Arch: foreign
 Depends: ${misc:Depends}
 Description: webhttrack common files
  This package is the common files of webhttrack, website copier and
@@ -56,6 +58,7 @@ Description: webhttrack common files
 
 Package: libhttrack2
 Architecture: any
+Multi-Arch: same
 Section: libs
 Replaces: libhttrack1
 Conflicts: libhttrack1
@@ -66,6 +69,7 @@ Description: Httrack website copier library
 
 Package: libhttrack-dev
 Architecture: any
+Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends}, ${shlibs:Depends}, zlib1g-dev
 Description: Httrack website copier includes and development files
@@ -74,6 +78,7 @@ Description: Httrack website copier includes and development files
 
 Package: httrack-doc
 Architecture: all
+Multi-Arch: foreign
 Section: doc
 Depends: ${misc:Depends}
 Description: Httrack website copier additional documentation
@@ -82,6 +87,7 @@ Description: Httrack website copier additional documentation
 
 Package: proxytrack
 Architecture: any
+Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Suggests: squid, httrack
 Description: Build HTTP Caches using archived websites copied by HTTrack

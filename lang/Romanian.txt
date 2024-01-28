@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Clonare sit în desfãºurare [%s %s octeþi]
 Site mirroring finished!
 Clonare site terminatã!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 A survenit o eroare în timpul operaþiei de clonare
 \nDuring:\n
 \nDureazã:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Operaþia de clonare terminatã. \nClick Ieºire pentru a pãrãsi WinHTTrack. \nVezi fiºierele jurnal dacã este necesar, pentru a vã asigura cã totul e OK. \n\nVã mulþumim cã folosiþi WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * *CLONARE ÎNTRERUPTÃ! * * \r\nCache-ul teporar este necesar pentru orice operaþie de actualizare ºi nu conþine decât datele descãrcate în timpul sesiunii curente întrerupte.\r\nCache-ul precedent poate conþine informaþia mai completã; dacã nu doriþi sã pierdeþi aceste date, trebuie sã restauraþi ºi sã ºtergeþi cache-ul curent\r\n(Notã: Aceastã operaþie poate fi fãcutã cu uºurinþã prin ºtergerea fiºierelor hts-cache/new.*)\r\n\r\n Credeºi cã vechiul cache poate conþine mai multe informaþii ºi doriþi sã le restauraþi?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * EROARE CLONARE! * *\r\nHTTrack a detectat cã, clona curentã este goalã. Dacã a fost o actualizare, clona precedentã a fost restauratã.\r\nMotivul: Fie prima(ele) paginã(i) nu pot(ate) fi gãsitã(e), fie a intervenit o problemã de conectare.\r\n=>Asiguraþi-vã cã situl existã ºi/sau verificaþi setãrile legate de proxy!<=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nSfat:Click [Vizualizeazã fiºierul jurnal] pentru a vedea mesajele de avertizare sau eroare.
@@ -926,5 +926,5 @@ You can now close this window
 Acum puteþi închide aceastã fereastrã.
 Server terminated
 Server terminat
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 A survenit o eroare fatalã în timpul acestei clonãri.

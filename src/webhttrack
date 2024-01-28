@@ -4,7 +4,7 @@
 # Initializes the htsserver GUI frontend and launch the default browser
 
 BROWSEREXE=
-SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox icecat iceweasel abrowser firebird galeon konqueror midori opera google-chrome chrome chromium chromium-browser netscape"
+SRCHBROWSEREXE="x-www-browser www-browser iceape mozilla firefox-developer-edition firefox icecat iceweasel abrowser firebird galeon konqueror midori opera google-chrome chrome chromium chromium-browser netscape firefox-developer-edition"
 if test -n "${BROWSER}"; then
 # sensible-browser will f up if BROWSER is not set
 SRCHBROWSEREXE="xdg-open sensible-browser ${SRCHBROWSEREXE}"

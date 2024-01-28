@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
   int defaultPort = 0;
   int parentPid = 0;
 
-  printf("Initialzing the server..\n");
+  printf("Initializing the server..\n");
 
 #ifdef _WIN32
   {
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
   {
     char tmp[32];
 
-    sprintf(tmp, "%d", -1);
+    snprintf(tmp, sizeof(tmp), "%d", -1);
     smallserver_setkey("HTS_PLATFORM", tmp);
   }
   smallserver_setkey("HTTRACK_WEB", HTTRACK_WEB);
@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
     char digest[32 + 2];
 
     srand((unsigned int) time(NULL));
-    sprintf(buff, "%d-%d", (int) time(NULL), (int) rand());
+    snprintf(buff, sizeof(buff), "%d-%d", (int) time(NULL), (int) rand());
     domd5mem(buff, strlen(buff), digest, 1);
     smallserver_setkey("sid", digest);
     smallserver_setkey("_sid", digest);
@@ -673,8 +673,8 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                       strncat(proto, back[i].url_adr, count);
                     }
                   }
-                  sprintf(StatsBuffer[index].state, "%s: %s", proto,
-                          back[i].info);
+                  snprintf(StatsBuffer[index].state, sizeof(StatsBuffer[index].state),
+                          "%s: %s", proto, back[i].info);
                   ok = 1;
                 }
                 break;
@@ -771,22 +771,22 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
           tmp[0] = '\0';
           switch (hts_is_testing(opt)) {
           case 0:
-            sprintf(tmp, "parsing HTML file (%d%%)", parsing);
+            snprintf(tmp, sizeof(tmp), "parsing HTML file (%d%%)", parsing);
             break;
           case 1:
-            sprintf(tmp, "parsing HTML file: testing links (%d%%)", parsing);
+            snprintf(tmp, sizeof(tmp), "parsing HTML file: testing links (%d%%)", parsing);
             break;
           case 2:
-            sprintf(tmp, "purging files");
+            snprintf(tmp, sizeof(tmp), "purging files");
             break;
           case 3:
-            sprintf(tmp, "loading cache");
+            snprintf(tmp, sizeof(tmp), "loading cache");
             break;
           case 4:
-            sprintf(tmp, "waiting (scheduler)");
+            snprintf(tmp, sizeof(tmp), "waiting (scheduler)");
             break;
           case 5:
-            sprintf(tmp, "waiting (throttle)");
+            snprintf(tmp, sizeof(tmp), "waiting (throttle)");
             break;
           }
           smallserver_setkey("info.currentjob", tmp);

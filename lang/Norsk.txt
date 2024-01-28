@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Kopiering pågår [%s, %s bytes]
 Site mirroring finished!
 Kopieringen er fullført!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Et problem oppsto under kopieringen\n
 \nDuring:\n
 \nUnder:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Kopieringen er fullført.\nKlikk AVSLUTT for å avslutte WinHTTrack.\nVis loggfil(er) vis det er nødvendig, for å sjekke at alt er OK.\n\nTakk for at du brukte WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * KOPIERINGEN ER AVBRUTT! * *\r\nDen nåværende midlertidige cachen er obligatorisk for alle oppdateringsoperasjoner, og inneholder bare data fra den siste avbrutte kopieringsprosessen.\r\nDen tidligere cachen kan inneholde fyldigere informasjon; hvis du ønsker å beholde den informasjonen må du gjenopprette den og slette den aktuelle cachen.\r\n[OBS: Dette kan lettest gjøres ved å slette alle 'hts-cache/new.*'-filer]\r\n\r\nTror du den tidligere cache-filen kanskje inneholder fyldigere informasjon, og vil du gjenopprette den?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * KOPIERINGSFEIL! * *\r\nHttrack har oppdaget at den gjeldende websiden er tom. Hvis du var i gang med å oppdatere enn kopi, vil det gamle innholdet bli gjenopprettet.\r\nMulig årsak: Den første siden kunne enten ikke finnes, eller det oppstod et problem med forbindelsen.\r\n=> Kontroller at websiden fremdeles finnes, og/eller sjekk proxy-innstillingene dine! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nTips: Klikk på [Vis loggfil] for å se advarsler og feilmeldinger
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 

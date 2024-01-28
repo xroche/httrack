@@ -268,7 +268,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 
                   tempo[0] = '\0';
 
-                  sprintf(tempo, "%s.class", tab[tab[i].index1].name);
+                  snprintf(tempo, sizeof(tempo), "%s.class", tab[tab[i].index1].name);
 #if JAVADEBUG
                   printf("add %s\n", tempo);
 #endif
@@ -425,7 +425,7 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
         if (!feof(fp)) {
           trans.type = -1;
         } else {
-          sprintf(str->err_msg, "Internal stucture error (ASCII)");
+          sprintf(str->err_msg, "Internal structure error (ASCII)");
           *error = 1;
         }
         return (trans);

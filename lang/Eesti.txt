@@ -194,7 +194,7 @@ Site mirroring in progress [%s, %s bytes]
 Saidi kopeerimine [%s, %s baiti]
 Site mirroring finished!
 Saidikopeerimine on lõpetatud!
-A problem occured during the mirroring operation\n
+A problem occurred during the mirroring operation\n
 Saidikopeerimise käigus tekkis probleem\n
 \nDuring:\n
 \nOperatsioonil:\n
@@ -204,7 +204,7 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Kopeerimisoperatsioon on lõpetatud.\nKliki Välju, et sulgeda WinHTTrack.\nVaata logifaili veendumaks, et kõik on korras.\n\nTänan WinHTTrack'i kasutamise eest!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * KOPEERIMINE KATKESTATUD! * *\r\nPraegune ajutine cache on vajalik igasuguse uuendamise jaoks ja sisaldab ainult käesoleva katkestatud seansi jooksul tiritud andmeid.\r\nEelmine cache võib sisaldada põhjalikumat informatsiooni; kui sa ei taha seda informatsiooni kaotada, tuleb see taastada ja kustutada praegune cache.\r\n[Märkus: Seda on siin lihtne teha, kustutades hts-cache/new.* failid]\r\n\r\nKas arvad, et eelmine cache võib sisaldada põhjalikumat informatsiooni, ja kas tahad seda taastada?
-* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occured.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * KOPEERIMISE VIGA! * *\r\nHTTrack leidis, et praegune veebikoopia on tühi. Kui see on uuendus, taastatakse eelmine koopia.\r\nPõhjus: esimest lehekülge ei leitud, või on ühenduse probleemid.\r\n=> Veendu, et veebisait ikka alles on, ja/või kontrolli proxy seadistust! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nVihje: Hoiatuste ja veateadete nägemiseks kliki [Vaata logifaili]
@@ -926,5 +926,5 @@ You can now close this window
 
 Server terminated
 
-A fatal error has occured during this mirror
+A fatal error has occurred during this mirror
 
