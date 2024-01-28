@@ -673,12 +673,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               if (len > 0) {
                 if (strfield(token, "content-type")) {
-                  intag_ctype = 1;
-                  //NOPE-we do not convert the whole page actually
-                  //intag_start[1] = 'X';
                   if ((emited_footer > 0) || (emited_footer_todo > 0)) {
                     // Skip this tag that is redundant
                     please_skip_tag = 1;
+                  }
+                  else {
+                    intag_ctype = 1;
+                    //NOPE-we do not convert the whole page actually
+                    //intag_start[1] = 'X';
                   }
                 } else if (strfield(token, "refresh")) {
                   intag_ctype = 2;
