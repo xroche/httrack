@@ -386,7 +386,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       //
       int emited_footer = 0;    // emitted footer comment tag(s) count
+      int emited_footer_todo = 0; // Flag pour mise à jour différée
 
+      int skip_until_end_of_tag = 0; // Skip until the > of the end of tag ?
+      
       //
       int parent_relative = 0;  // the parent is the base path (.js, .css..)
 
@@ -661,6 +664,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           /* Meta ? */
           if (check_tag(intag_start, "meta")) {
             int pos;
+            int please_skip_tag = 0;
 
             // <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
             if ((pos = rech_tageq_all(html, "http-equiv"))) {
@@ -669,14 +673,54 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               if (len > 0) {
                 if (strfield(token, "content-type")) {
-                  intag_ctype = 1;
-                  //NOPE-we do not convert the whole page actually
-                  //intag_start[1] = 'X';
+                  if ((emited_footer > 0) || (emited_footer_todo > 0)) {
+                    // Skip this tag that is redundant
+                    please_skip_tag = 1;
+                  }
+                  else {
+                    intag_ctype = 1;
+                    //NOPE-we do not convert the whole page actually
+                    //intag_start[1] = 'X';
+                  }
                 } else if (strfield(token, "refresh")) {
                   intag_ctype = 2;
                 }
               }
             }
+            else if ((pos = rech_tageq_all(html, "charset"))) {
+              if ((emited_footer > 0) || (emited_footer_todo > 0)) {
+                // Skip this tag that is redundant
+                please_skip_tag = 1;
+              }
+            }
+
+            if (please_skip_tag == 1) {
+              if (html - r->adr < r->size) {
+                /* Not on a starting tag yet */
+                const char *adr_next = html + 1;
+
+                while(*adr_next != '<' && (adr_next - r->adr) < r->size) {
+                  adr_next++;
+                }
+                /* Jump to near end (index hack) */
+                if (!adr_next || *adr_next != '<') {
+                  if (html - r->adr < r->size - 4
+                      && r->size > 4
+                    ) {
+                    html = r->adr + r->size - 2;
+                  }
+                } else {
+                  html = adr_next;
+                }
+              }
+              lastsaved = html;
+            }
+          }
+
+          if (check_tag(intag_start, "base")) {
+            // Base tag will be empty so don't write it
+            html += 5;
+            lastsaved = html;
           }
 
           if (opt->getmode & 1) {       // sauver html
@@ -685,15 +729,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             case 0:
               // We are looking for the first head so that we can declare the HTTP-headers charset early
               // Emit as soon as we see the first <head>, <meta>, or <body> tag.
-              // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
-              if ((p = strfield(html, "<head>")) != 0
-                  || ((p = strfield(html, "<head")) != 0 && isspace(html[p]))
-                  || (p = strfield(html, "<body>")) != 0
+              if ((p = strfield(html, "<body>")) != 0
                   || ((p = strfield(html, "<body")) != 0 && isspace(html[p]))
                   || ((p = strfield(html, "<meta")) != 0 && isspace(html[p]))
+                  || (emited_footer_todo == 2)
                 ) {
                 emited_footer++;
+                p = 1; // fake value, but not 0
               } else {
+                if ((p = strfield(html, "<head>")) != 0
+                  || ((p = strfield(html, "<head")) != 0 && isspace(html[p]))) {
+                  // mémorise qu'à la fermeture du tag, il faudra sortir le code 
+                  emited_footer_todo = 1;
+                }
                 p = 0;
               }
               break;
@@ -765,6 +813,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
           } else if (!incomment) {
             intag = 0;          //inquote=0;
+            if (emited_footer_todo) {
+              emited_footer_todo = 2; // A afficher au prochain
+            }
 
             // entrée dans du javascript?
             // on parse ICI car il se peut qu'on ait eu a parser les src=.. dedans
@@ -790,6 +841,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
               }
             }
+
+            if (skip_until_end_of_tag == 1) {
+              html++;
+              lastsaved = html;
+              skip_until_end_of_tag = 0;
+            }
+
           } else {              /* end of comment? */
             // vérifier fermeture correcte
             if ((*(html - 1) == '-') && (*(html - 2) == '-')) {
@@ -2536,6 +2594,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // écrire lien
                     if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
                       lastsaved = eadr - 1 + 1; // sauter "
+                      if (check_tag(intag_start, "base")) {
+                        // Skip until the end of the tag
+                        skip_until_end_of_tag = 1;
+                      }
                     }
                     /* */
                     else if (opt->urlmode == 0) {       // URL absolue dans tous les cas
