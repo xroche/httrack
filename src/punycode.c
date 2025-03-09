@@ -31,9 +31,9 @@ enum { base = 36, tmin = 1, tmax = 26, skew = 38, damp = 700,
 /* point (for use in representing integers) in the range 0 to */
 /* base-1, or base if cp is does not represent a value.       */
 
-static punycode_uint decode_digit(punycode_uint cp) {
-  return cp - 48 < 10 ? cp - 22 : cp - 65 < 26 ? cp - 65 : cp - 97 <
-    26 ? cp - 97 : base;
+static unsigned decode_digit(int cp) {
+  return (unsigned) (cp - 48 < 10 ? cp - 22 : cp - 65 < 26 ? cp - 65 : cp - 97 <
+    26 ? cp - 97 : base);
 }
 
 /* encode_digit(d,flag) returns the basic code point whose value      */
