@@ -4,6 +4,9 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-6
++ Fixed: puny_decode CVE-2017-14062
+
 3.49-5
 + Fixed: MiniZip CVE-2023-45853
 + Lintian fixes, multiple build fixes

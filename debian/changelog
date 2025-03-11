@@ -1,3 +1,10 @@
+httrack (3.49.6-1) unstable; urgency=medium
+
+  * Updated to 3.49.6 (3.49-6)
+    Fixed CVE-2017-14062
+
+ -- Xavier Roche <roche@proliant.localnet>  Tue, 11 Mar 2025 19:43:39 +0100
+
 httrack (3.49.5-1) unstable; urgency=medium
 
   * Updated to 3.49.5 (3.49-5)
