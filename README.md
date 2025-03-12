@@ -22,5 +22,5 @@ http://www.httrack.com/
 ```sh
 git clone https://github.com/xroche/httrack.git --recurse
 cd httrack
-./configure --prefix=$HOME/usr && make -j8 && make install
+./configure --prefix=$HOME/usr && make -j$(nproc) && make install
 ```
