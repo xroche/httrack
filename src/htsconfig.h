@@ -127,6 +127,9 @@ Please visit our Website: http://www.httrack.com
 // à partir de combien de secondes doit-on étudier le taux de transfert?
 #define HTS_WATCHRATE 15
 
+// default directory name for storing websites
+#define HTS_WEBSITES_HOME "websites"
+
 // ------------------------------------------------------------
 //
 

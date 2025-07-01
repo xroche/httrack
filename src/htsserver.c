@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #undef HTS_INTERNAL_BYTECODE
 
+#include "htsconfig.h"
 #include "htsnet.h"
 #include "htslib.h"
 #include <stdio.h>
@@ -379,7 +380,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     (intptr_t) strdup(initStr[i].value));
     }
     strcpybuff(pth, gethomedir());
-    strcatbuff(pth, "/websites");
+    strcatbuff(pth, "/"HTS_WEBSITES_HOME);
     coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
   }
 

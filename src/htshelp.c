@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsconfig.h"
 #include "htscoremain.h"
 #include "htscatchurl.h"
 #include "htslib.h"
@@ -211,13 +212,13 @@ void help_wizard(httrackp * opt) {
   //
   // Path
   if (strnotempty(hts_gethome()))
-    printf("\nBase path (return=%s/websites/) :", hts_gethome());
+    printf("\nBase path (return=%s/"HTS_WEBSITES_HOME"/) :", hts_gethome());
   else
     printf("\nBase path (return=current directory) :");
   linput(stdin, str, 250);
   if (!strnotempty(str)) {
     strcatbuff(str, hts_gethome());
-    strcatbuff(str, "/websites/");
+    strcatbuff(str, "/"HTS_WEBSITES_HOME"/");
   }
   if (strnotempty(str))
     if ((str[strlen(str) - 1] != '/') && (str[strlen(str) - 1] != '\\'))
