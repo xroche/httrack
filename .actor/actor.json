@@ -1,7 +1,7 @@
 {
     "actorSpecification": 1,
     "name": "httrack-website-scraper",
-    "title": "HTTrack Website Scraper",
+    "title": "Website Scraper",
     "description": "Download complete websites using HTTrack and get them as ZIP archives. Perfect for creating offline backups, archiving websites, or downloading entire sites with all assets.",
     "version": "1.0",
     "buildTag": "latest",
