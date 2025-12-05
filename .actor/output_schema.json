@@ -1,0 +1,18 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "HTTrack Website Scraper Output",
+  "properties": {
+    "zipFile": {
+      "type": "string",
+      "title": "ZIP Archive",
+      "description": "Download the scraped website as a ZIP file",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/keys/{{zipFile}}"
+    },
+    "dataset": {
+      "type": "string",
+      "title": "Dataset",
+      "description": "View scraping statistics and metadata",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}

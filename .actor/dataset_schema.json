@@ -1,0 +1,125 @@
+{
+  "actorSpecification": 1,
+  "fields": {},
+  "views": {
+    "overview": {
+      "title": "Scraping Results",
+      "transformation": {
+        "fields": [
+          "url",
+          "outputName",
+          "zipFile",
+          "fileCount",
+          "totalSize",
+          "zipSize",
+          "compressionRatio",
+          "timestamp",
+          "status"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "Website URL",
+            "format": "link"
+          },
+          "outputName": {
+            "label": "Output Name",
+            "format": "text"
+          },
+          "zipFile": {
+            "label": "ZIP File",
+            "format": "text"
+          },
+          "fileCount": {
+            "label": "Files Count",
+            "format": "number"
+          },
+          "totalSize": {
+            "label": "Total Size (bytes)",
+            "format": "number"
+          },
+          "zipSize": {
+            "label": "ZIP Size (bytes)",
+            "format": "number"
+          },
+          "compressionRatio": {
+            "label": "Compression %",
+            "format": "number"
+          },
+          "timestamp": {
+            "label": "Scraped At",
+            "format": "date"
+          },
+          "status": {
+            "label": "Status",
+            "format": "text"
+          }
+        }
+      }
+    },
+    "details": {
+      "title": "Detailed Results",
+      "transformation": {
+        "fields": [
+          "url",
+          "outputName",
+          "zipFile",
+          "fileCount",
+          "totalSize",
+          "zipSize",
+          "compressionRatio",
+          "timestamp",
+          "config",
+          "status"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "Website URL",
+            "format": "link"
+          },
+          "outputName": {
+            "label": "Output Name",
+            "format": "text"
+          },
+          "zipFile": {
+            "label": "ZIP File",
+            "format": "text"
+          },
+          "fileCount": {
+            "label": "Files Count",
+            "format": "number"
+          },
+          "totalSize": {
+            "label": "Total Size (bytes)",
+            "format": "number"
+          },
+          "zipSize": {
+            "label": "ZIP Size (bytes)",
+            "format": "number"
+          },
+          "compressionRatio": {
+            "label": "Compression %",
+            "format": "number"
+          },
+          "timestamp": {
+            "label": "Scraped At",
+            "format": "date"
+          },
+          "config": {
+            "label": "Configuration",
+            "format": "object"
+          },
+          "status": {
+            "label": "Status",
+            "format": "text"
+          }
+        }
+      }
+    }
+  }
+}

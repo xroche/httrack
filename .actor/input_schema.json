@@ -1,0 +1,119 @@
+{
+  "title": "HTTrack Website Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "url": {
+      "title": "Website URL",
+      "type": "string",
+      "description": "The URL of the website to scrape (must include http:// or https://)",
+      "editor": "textfield",
+      "example": "https://example.com",
+      "prefill": "https://example.com"
+    },
+    "depth": {
+      "title": "Mirror Depth",
+      "type": "integer",
+      "description": "How many links deep to follow (1 = only main page, 2-3 recommended)",
+      "default": 2,
+      "minimum": 1,
+      "maximum": 10,
+      "unit": "levels"
+    },
+    "stayOnDomain": {
+      "title": "Stay on Same Domain",
+      "type": "boolean",
+      "description": "Only download content from the same domain",
+      "default": true
+    },
+    "externalDepth": {
+      "title": "External Links Depth",
+      "type": "integer",
+      "description": "How deep to follow external links (0 = don't follow external links)",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 5
+    },
+    "connections": {
+      "title": "Simultaneous Connections",
+      "type": "integer",
+      "description": "Number of parallel downloads (2-8 recommended)",
+      "default": 4,
+      "minimum": 1,
+      "maximum": 16
+    },
+    "maxRate": {
+      "title": "Max Download Rate (KB/s)",
+      "type": "integer",
+      "description": "Maximum download rate in KB/s (0 = unlimited)",
+      "default": 0,
+      "minimum": 0,
+      "unit": "KB/s"
+    },
+    "maxSize": {
+      "title": "Max Total Size (MB)",
+      "type": "integer",
+      "description": "Maximum total size to download in MB (0 = unlimited)",
+      "default": 0,
+      "minimum": 0,
+      "unit": "MB"
+    },
+    "maxTime": {
+      "title": "Max Time (seconds)",
+      "type": "integer",
+      "description": "Maximum scraping time in seconds (0 = unlimited)",
+      "default": 0,
+      "minimum": 0,
+      "unit": "seconds"
+    },
+    "retries": {
+      "title": "Retry Attempts",
+      "type": "integer",
+      "description": "Number of retry attempts on error",
+      "default": 2,
+      "minimum": 0,
+      "maximum": 10
+    },
+    "timeout": {
+      "title": "Connection Timeout (seconds)",
+      "type": "integer",
+      "description": "Connection timeout in seconds",
+      "default": 30,
+      "minimum": 5,
+      "maximum": 300,
+      "unit": "seconds"
+    },
+    "getImages": {
+      "title": "Download Images",
+      "type": "boolean",
+      "description": "Download image files (jpg, png, gif, etc.)",
+      "default": true
+    },
+    "getVideos": {
+      "title": "Download Videos",
+      "type": "boolean",
+      "description": "Download video files (mp4, avi, mov, etc.)",
+      "default": true
+    },
+    "followRobots": {
+      "title": "Follow robots.txt",
+      "type": "boolean",
+      "description": "Respect website's robots.txt file",
+      "default": true
+    },
+    "outputName": {
+      "title": "Output Name (Optional)",
+      "type": "string",
+      "description": "Custom name for output files (leave empty for auto-generated)",
+      "editor": "textfield",
+      "nullable": true
+    },
+    "cleanup": {
+      "title": "Cleanup After Zipping",
+      "type": "boolean",
+      "description": "Remove source directory after creating ZIP (saves storage)",
+      "default": true
+    }
+  },
+  "required": ["url"]
+}

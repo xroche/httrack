@@ -1,0 +1,70 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Apify
+apify_storage/
+storage/
+.actor/actor.log
+
+# Documentation
+*.md
+!README.md
+SETUP_COMPLETE.txt
+example_usage.sh
+RUN_THIS_IN_WSL.txt
+WSL_SETUP.md
+
+# Build artifacts
+configure
+config.sub
+config.guess
+Makefile.in
+ltmain.sh
+install-sh
+missing
+depcomp
+compile
+config.h.in
+aclocal.m4
+
+# Source directories not needed
+src/
+html/
+lang/
+templates/
+man/
+m4/
+tests/
+libtest/
+debian/
+
+# Other
+*.log
+*.cache
+.DS_Store

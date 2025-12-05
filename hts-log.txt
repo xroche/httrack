@@ -1,0 +1,13 @@
+HTTrack3.49-6 launched on Fri, 05 Dec 2025 12:58:29 at https://www.httrack.com/
+(httrack https://www.httrack.com/ )
+
+Information, Warnings and Errors reported for this mirror:
+note:	the hts-log.txt file, and hts-cache folder, may contain sensitive information,
+	such as username/password authentication for websites mirrored in this project
+	do not share these files/folders if you want these information to remain private
+
+12:58:59	Error: 	"Unable to get server's address: Temporary failure in name resolution" (-5) after 2 retries at link https://www.httrack.com/robots.txt (from primary/primary)
+12:58:59	Warning: 	Retry after error -5 (Unable to get server's address: unknown error) at link https://www.httrack.com/ (from primary/primary)
+12:59:09	Warning: 	Retry after error -5 (Unable to get server's address: unknown error) at link https://www.httrack.com/ (from primary/primary)
+12:59:19	Error: 	"Unable to get server's address: unknown error" (-5) after 2 retries at link https://www.httrack.com/ (from primary/primary)
+12:59:19	Warning: 	No data seems to have been transferred during this session! : restoring previous one!

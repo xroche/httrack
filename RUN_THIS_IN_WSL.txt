@@ -1,0 +1,58 @@
+═══════════════════════════════════════════════════════════════
+ COPY AND PASTE THESE COMMANDS IN YOUR WSL TERMINAL
+═══════════════════════════════════════════════════════════════
+
+The project has been copied to ~/httrack successfully!
+Now run these commands in your WSL terminal:
+
+1. Navigate to the project:
+   cd ~/httrack
+
+2. Run the setup script:
+   ./setup-wsl.sh
+
+3. Answer the prompts:
+   - Install build dependencies? → Press Enter (default: y)
+   - Show configure options? → Press Enter (default: n)
+   - Run tests? → Press Enter (default: n)
+   - Install HTTrack? → Press Enter (default: y)
+
+═══════════════════════════════════════════════════════════════
+
+WHAT THE SCRIPT WILL DO:
+-------------------------
+✓ Fix line endings in all autotools scripts (configure, missing, etc.)
+✓ Configure the build with:
+  - Installation prefix: /root/usr
+  - HTTPS support: enabled
+  - Online unit tests: enabled
+✓ Compile HTTrack using all CPU cores
+✓ Install HTTrack to /root/usr
+✓ Update your ~/.bashrc with the correct PATH
+
+═══════════════════════════════════════════════════════════════
+
+AFTER INSTALLATION:
+-------------------
+1. Reload your shell:
+   source ~/.bashrc
+
+2. Test HTTrack:
+   httrack --version
+
+3. Use HTTrack:
+   httrack --help
+
+═══════════════════════════════════════════════════════════════
+
+IF YOU ENCOUNTER ANY ERRORS:
+-----------------------------
+Check the output carefully. Common issues:
+- Missing dependencies: Re-run with sudo access
+- Configure errors: Check config.log
+- Build errors: Ensure you're in ~/httrack (not the Windows mount)
+
+The script will provide detailed error messages and suggestions.
+
+═══════════════════════════════════════════════════════════════
+

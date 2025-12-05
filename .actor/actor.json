@@ -1,0 +1,18 @@
+{
+    "actorSpecification": 1,
+    "name": "httrack-website-scraper",
+    "title": "HTTrack Website Scraper",
+    "description": "Download complete websites using HTTrack and get them as ZIP archives. Perfect for creating offline backups, archiving websites, or downloading entire sites with all assets.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "meta": {
+        "templateId": "httrack-scraper",
+        "generatedBy": "Claude Sonnet 4.5"
+    },
+    "input": "./input_schema.json",
+    "output": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile"
+}

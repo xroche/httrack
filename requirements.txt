@@ -1,0 +1,13 @@
+# Apify SDK - required for Actor development
+apify ~= 2.0.0
+
+# HTTP requests and web scraping utilities
+requests >= 2.31.0
+beautifulsoup4 >= 4.12.0
+lxml >= 4.9.0
+
+# Data handling
+python-dateutil >= 2.8.0
+
+# Type hints
+typing-extensions >= 4.5.0
