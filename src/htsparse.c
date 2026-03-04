@@ -1318,6 +1318,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (!nc && inscript_tag && inscript_tag_lastc == *(html - 1))
                         nc = strfield(html, "src");       // onXXX='src="image";'
                       if (!nc)
+                        nc = strfield(html, "srcset");    // srcset="image.jpg 1x, image2.jpg 2x"
+                      if (!nc)
                         nc = strfield(html, ".location");        // document.location="doc"
                       if (!nc)
                         nc = strfield(html, ":location");        // javascript:location="doc"

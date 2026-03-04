@@ -456,6 +456,8 @@ struct htsrequest_proxy {
   const char* name;
   int port;
   const char* bindhost;           // bind this host
+  char tunnelhost[256];           // target host for HTTPS CONNECT tunnel (fixed buffer)
+  int tunnelport;                 // target port for HTTPS CONNECT tunnel
 };
 
 #ifndef HTS_DEF_FWSTRUCT_htsrequest
