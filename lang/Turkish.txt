@@ -5,7 +5,7 @@ Turkish
 LANGUAGE_ISO
 tr
 LANGUAGE_AUTHOR
-Xavier Roche (roche at httrack.com)\r\nRobert Lagadec (rlagadec at yahoo.fr)\r\nTürkçe çeviri: DeepSeek
+Xavier Roche (roche at httrack.com)\r\nRobert Lagadec (rlagadec at yahoo.fr)\r\nTürkçe çeviri: sasutv
 LANGUAGE_CHARSET
 ISO-8859-1
 LANGUAGE_WINDOWSID
