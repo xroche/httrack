@@ -604,7 +604,7 @@ void help(const char *app, int more) {
   infomsg(" %E  from email address sent in HTTP headers");
   infomsg
     (" %F  footer string in Html code (-%F \"Mirrored [from host %s [file %s [at %s]]]\"");
-  infomsg(" %l  preffered language (-%l \"fr, en, jp, *\"");
+  infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");
   infomsg("");
