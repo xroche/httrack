@@ -14988,40 +14988,9 @@ AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
 #*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
 #esac
 
-### Check size of long and long long.
-# The cast to long int works around a bug in the HP C Compiler
-# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
-# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
-# This bug is HP SR number 8606223364.
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking size of long" >&5
-printf %s "checking size of long... " >&6; }
-if test ${ac_cv_sizeof_long+y}
-then :
-  printf %s "(cached) " >&6
-else $as_nop
-  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (long))" "ac_cv_sizeof_long"        "$ac_includes_default"
-then :
-
-else $as_nop
-  if test "$ac_cv_type_long" = yes; then
-     { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error 77 "cannot compute sizeof (long)
-See \`config.log' for more details" "$LINENO" 5; }
-   else
-     ac_cv_sizeof_long=0
-   fi
-fi
-
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_long" >&5
-printf "%s\n" "$ac_cv_sizeof_long" >&6; }
-
-
-
-printf "%s\n" "#define SIZEOF_LONG $ac_cv_sizeof_long" >>confdefs.h
-
-
+### Probe long long size for 64-bit integer support. SIZEOF_LONG is not probed:
+### it varies by architecture and would break Multi-Arch co-installation of
+### libhttrack-dev (Debian #1133728). md5.h uses <stdint.h> instead.
 # The cast to long int works around a bug in the HP C Compiler
 # version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
 # declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
