@@ -677,13 +677,42 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
   printf("..newhttp\n");
 #endif
 
+  /* Set up HTTPS tunnel target if using proxy with HTTPS */
+  if (retour && retour->req.proxy.active && strncmp(adr, "https://", 8) == 0) {
+    const char *hostStart = adr + 8;  /* skip https:// */
+    const char *portStart = strchr(hostStart, ':');
+    const char *pathStart = strchr(hostStart, '/');
+    
+    retour->req.proxy.tunnelhost[0] = '\0';
+    
+    if (portStart != NULL && (pathStart == NULL || portStart < pathStart)) {
+      /* Port specified in URL */
+      int port = 0;
+      sscanf(portStart + 1, "%d", &port);
+      retour->req.proxy.tunnelport = port;
+      {
+        size_t hostLen = portStart - hostStart;
+        if (hostLen > 255) hostLen = 255;
+        memcpy(retour->req.proxy.tunnelhost, hostStart, hostLen);
+        retour->req.proxy.tunnelhost[hostLen] = '\0';
+      }
+    } else {
+      /* Default HTTPS port */
+      retour->req.proxy.tunnelport = 443;
+      {
+        size_t hostLen = pathStart ? (size_t)(pathStart - hostStart) : strlen(hostStart);
+        if (hostLen > 255) hostLen = 255;
+        memcpy(retour->req.proxy.tunnelhost, hostStart, hostLen);
+        retour->req.proxy.tunnelhost[hostLen] = '\0';
+      }
+    }
+  }
+
   /* connexion */
   if (retour) {
-    if ((!(retour->req.proxy.active))
-        || ((strcmp(adr, "file://") == 0)
-            || (strncmp(adr, "https://", 8) == 0)
-        )
-      ) {                       /* pas de proxy, ou non utilisable ici */
+    if (!(retour->req.proxy.active)
+        || (strcmp(adr, "file://") == 0)
+       ) {                       /* pas de proxy, ou non utilisable ici */
       soc = newhttp(opt, adr, retour, -1, waitconnect);
     } else {
       soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port, waitconnect);  // ouvrir sur le proxy à la place
@@ -2320,6 +2349,82 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #if HDEBUG
     printf("connexion établie\n");
 #endif
+
+    /* Handle HTTPS CONNECT tunnel through proxy */
+    if (retour != NULL && retour->req.proxy.active && retour->req.proxy.tunnelhost != NULL) {
+      char connectReq[512];
+      int n;
+      
+      /* Send CONNECT request */
+      snprintf(connectReq, sizeof(connectReq), 
+               "CONNECT %s:%d HTTP/1.1\r\n"
+               "Host: %s:%d\r\n"
+               "Proxy-Connection: Keep-Alive\r\n"
+               "\r\n",
+               retour->req.proxy.tunnelhost, retour->req.proxy.tunnelport,
+               retour->req.proxy.tunnelhost, retour->req.proxy.tunnelport);
+      
+      if (send(soc, connectReq, (int)strlen(connectReq), 0) < 0) {
+        if (retour && retour->msg) {
+          snprintf(retour->msg, sizeof(retour->msg), "Failed to send CONNECT request to proxy");
+        }
+        deletesoc(soc);
+        return INVALID_SOCKET;
+      }
+      
+      /* Read CONNECT response with timeout */
+      {
+        char response[1024];
+        int received = 0;
+        int done = 0;
+        int timeout = 30;  /* 30 second timeout for CONNECT handshake */
+        
+        while (!done && received < (int)(sizeof(response) - 1)) {
+          int r;
+          
+          /* Use select() for timeout handling */
+          {
+            fd_set fds;
+            struct timeval tv;
+            FD_ZERO(&fds);
+            FD_SET(soc, &fds);
+            tv.tv_sec = timeout;
+            tv.tv_usec = 0;
+            r = select((int)(soc + 1), &fds, NULL, NULL, &tv);
+            if (r <= 0) {
+              /* Timeout or error */
+              if (retour && retour->msg) {
+                snprintf(retour->msg, sizeof(retour->msg), "CONNECT handshake timeout or error");
+              }
+              deletesoc(soc);
+              return INVALID_SOCKET;
+            }
+          }
+          
+          r = recv(soc, response + received, (int)(sizeof(response) - 1 - received), 0);
+          if (r <= 0) {
+            done = 1;
+          } else {
+            received += r;
+            response[received] = '\0';
+            /* Check for end of headers */
+            if (strstr(response, "\r\n\r\n") != NULL) {
+              done = 1;
+            }
+          }
+        }
+        
+        /* Check for 200 Connection established */
+        if (!(received >= 12 && strncmp(response, "HTTP/1.1 200", 12) == 0) &&
+            !(received >= 12 && strncmp(response, "HTTP/1.0 200", 12) == 0)) {
+          if (retour && retour->msg) {
+            snprintf(retour->msg, sizeof(retour->msg), "Proxy CONNECT failed: %.100s", response);
+          }
+          deletesoc(soc);
+          return INVALID_SOCKET;
+        }
+      }
+    }
 
     // A partir de maintenant, on peut envoyer et recevoir des données
     // via le flot identifié par soc (socket): write(soc,adr,taille) et
@@ -5197,6 +5302,13 @@ HTSEXT_API int hts_init(void) {
               "fatal: unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)\n");
       abortLog("unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)");
       assertf("unable to initialize TLS" == NULL);
+    }
+
+    /* Enable certificate verification to prevent MITM attacks */
+    SSL_CTX_set_verify(openssl_ctx, SSL_VERIFY_PEER, NULL);
+    if (SSL_CTX_set_default_verify_paths(openssl_ctx) == 0) {
+      fprintf(stderr,
+              "warning: unable to load default CA certificates; SSL verification may fail\n");
     }
   }
 #endif
