@@ -109,9 +109,6 @@
 /* Check for setuid */
 #undef SETUID
 
-/* The size of `long', as computed by sizeof. */
-#undef SIZEOF_LONG
-
 /* The size of `long long', as computed by sizeof. */
 #undef SIZEOF_LONG_LONG
 

@@ -1,21 +1,11 @@
 #ifndef MD5_H
 #define MD5_H
 
-#ifdef _WIN32
-#ifndef SIZEOF_LONG
-#define SIZEOF_LONG 4
-#endif
-#else
-#include "config.h"
-#endif
+#include <stdint.h>
 
-#if SIZEOF_LONG==8
-typedef unsigned int uint32;
-#elif SIZEOF_LONG==4
-typedef unsigned long uint32;
-#else
-#error undefined: SIZEOF_LONG
-#endif
+/* Exact 32-bit type for the MD5 state. uint32_t replaces a SIZEOF_LONG-derived
+   type so config.h stays architecture-independent (Debian #1133728). */
+typedef uint32_t uint32;
 
 struct MD5Context {
   union {

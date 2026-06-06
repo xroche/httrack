@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.6], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.7], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -114,8 +114,9 @@ AC_SUBST([AM_CFLAGS])
 #*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
 #esac
 
-### Check size of long and long long.
-AC_CHECK_SIZEOF(long)
+### Probe long long size for 64-bit integer support. SIZEOF_LONG is not probed:
+### it varies by architecture and would break Multi-Arch co-installation of
+### libhttrack-dev (Debian #1133728). md5.h uses <stdint.h> instead.
 AC_CHECK_SIZEOF(long long)
 
 ### check for in_addr_t
