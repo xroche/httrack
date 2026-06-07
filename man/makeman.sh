@@ -21,23 +21,23 @@
 set -eu
 
 httrack=${1:-httrack}
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-topdir=${TOPDIR:-$(CDPATH= cd -- "$script_dir/.." && pwd)}
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+topdir=${TOPDIR:-$(CDPATH='' cd -- "$script_dir/.." && pwd)}
 readme=${README:-$topdir/README}
 
 # Reproducible date when SOURCE_DATE_EPOCH is set, otherwise today.
 if [ -n "${SOURCE_DATE_EPOCH:-}" ]; then
-  date_str=$(LC_ALL=C date -u -d "@${SOURCE_DATE_EPOCH}" '+%d %B %Y' 2>/dev/null \
-           || LC_ALL=C date -u -r "${SOURCE_DATE_EPOCH}" '+%d %B %Y')
+    date_str=$(LC_ALL=C date -u -d "@${SOURCE_DATE_EPOCH}" '+%d %B %Y' 2>/dev/null ||
+        LC_ALL=C date -u -r "${SOURCE_DATE_EPOCH}" '+%d %B %Y')
 else
-  date_str=$(LC_ALL=C date '+%d %B %Y')
+    date_str=$(LC_ALL=C date '+%d %B %Y')
 fi
 year=${date_str##* }
 
 help=$("$httrack" --quiet --help 2>/dev/null)
 
-st=$(printf '%s\n' "$help" | grep -n 'General options'   | head -1 | cut -d: -f1)
-en=$(printf '%s\n' "$help" | grep -nE '^example'         | head -1 | cut -d: -f1)
+st=$(printf '%s\n' "$help" | grep -n 'General options' | head -1 | cut -d: -f1)
+en=$(printf '%s\n' "$help" | grep -nE '^example' | head -1 | cut -d: -f1)
 en2=$(printf '%s\n' "$help" | grep -nE '^HTTrack version' | tail -1 | cut -d: -f1)
 
 # SYNOPSIS: one "[ -x, --long ]" per option carrying a long name (skip "#" guru

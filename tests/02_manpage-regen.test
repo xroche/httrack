@@ -10,23 +10,30 @@ gen="$top_srcdir/man/makeman.sh"
 committed="$top_srcdir/man/httrack.1"
 
 # Need the generator and a runnable httrack.
-test -f "$gen" || { echo "makeman.sh not found; skipping" >&2; exit 77; }
-command -v httrack >/dev/null 2>&1 || { echo "httrack not in PATH; skipping" >&2; exit 77; }
+test -f "$gen" || {
+    echo "makeman.sh not found; skipping" >&2
+    exit 77
+}
+command -v httrack >/dev/null 2>&1 || {
+    echo "httrack not in PATH; skipping" >&2
+    exit 77
+}
 
 tmp=$(mktemp) || exit 1
 trap 'rm -f "$tmp"' EXIT
 
-README="$top_srcdir/README" bash "$gen" httrack > "$tmp" 2>/dev/null || {
-  echo "makeman.sh failed" >&2; exit 1
+README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || {
+    echo "makeman.sh failed" >&2
+    exit 1
 }
 
 # Ignore the two intentionally date-dependent lines (page date, copyright year).
 strip_volatile() { grep -vE '^\.TH httrack |^Copyright \(C\) 1998-'; }
 
-if diff <(strip_volatile < "$committed") <(strip_volatile < "$tmp") >/dev/null; then
-  exit 0
+if diff <(strip_volatile <"$committed") <(strip_volatile <"$tmp") >/dev/null; then
+    exit 0
 fi
 
 echo "man/httrack.1 is out of date. Regenerate with: make -C man regen-man" >&2
-diff <(strip_volatile < "$committed") <(strip_volatile < "$tmp") | head -40 >&2
+diff <(strip_volatile <"$committed") <(strip_volatile <"$tmp") | head -40 >&2
 exit 1
