@@ -160,7 +160,7 @@ am__define_uniq_tagged_files = \
 DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in AUTHORS \
 	COPYING ChangeLog INSTALL NEWS README compile config.guess \
-	config.sub depcomp install-sh ltmain.sh missing
+	config.sub install-sh ltmain.sh missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -349,8 +349,14 @@ SUBDIRS = src man m4 libtest templates lang html tests
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
-		httrack-doc.html lang.def README.md
+		httrack-doc.html lang.def README.md tools/mkdeb.sh
 
+
+# Build the signed Debian packages from a clean source export. Pass the signing
+# key and other options through DEB_FLAGS, e.g.:
+#   make deb DEB_FLAGS="--key BB71C7E6CB1AD8FAF53FE42A60C3AA7180598EFB"
+# See tools/mkdeb.sh --help for all options.
+DEB_FLAGS = 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -841,6 +847,9 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
+deb:
+	$(SHELL) $(top_srcdir)/tools/mkdeb.sh $(DEB_FLAGS)
+.PHONY: deb
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
