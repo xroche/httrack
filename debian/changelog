@@ -1,8 +1,10 @@
 httrack (3.49.7-2) unstable; urgency=medium
 
   * Bump Standards-Version to 4.7.0 (no changes needed).
+  * Switch to debhelper-compat (= 13); drop the dh-autoreconf and
+    autotools-dev build dependencies.
 
- -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 13:05:53 +0200
+ -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 14:13:39 +0200
 
 httrack (3.49.7-1) unstable; urgency=medium
 
