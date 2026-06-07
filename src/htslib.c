@@ -5177,25 +5177,34 @@ HTSEXT_API int hts_init(void) {
    */
   if (!openssl_ctx) {
     const char *version;
+    const SSL_METHOD *method;
 
+    /* OpenSSL >= 1.1.0 / LibreSSL >= 2.7.0 auto-init and provide the generic
+       methods. The legacy init and SSLv23/SSLeay calls (deprecated since 1.1.0,
+       likely gone in 4.0) are kept only for older OpenSSL. */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L \
+  || (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
     SSL_load_error_strings();
     SSL_library_init();
+    version = SSLeay_version(SSLEAY_VERSION);
+    method = SSLv23_client_method();
+#else
+    version = OpenSSL_version(OPENSSL_VERSION);
+    method = TLS_client_method();
+#endif
 
     // Check CVE-2014-0160.
-    version = SSLeay_version(SSLEAY_VERSION);
     if (ssl_vulnerable(version)) {
-      fprintf(stderr,
-              "SSLeay_version(SSLEAY_VERSION) == '%s'\n", version);
+      fprintf(stderr, "OpenSSL version == '%s'\n", version);
       abortLog("unable to initialize TLS: OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)");
       assertf("OpenSSL version seems vulnerable to heartbleed bug (CVE-2014-0160)" == NULL);
     }
 
     // OpenSSL_add_all_algorithms();
-    openssl_ctx = SSL_CTX_new(SSLv23_client_method());
+    openssl_ctx = SSL_CTX_new(method);
     if (!openssl_ctx) {
-      fprintf(stderr,
-              "fatal: unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)\n");
-      abortLog("unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)");
+      fprintf(stderr, "fatal: unable to initialize TLS: SSL_CTX_new()\n");
+      abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
     }
   }
