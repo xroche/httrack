@@ -1,3 +1,12 @@
+httrack (3.49.8-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop the OpenSSL linking exception from the license: OpenSSL 3.0+ is
+    Apache-2.0 and GPL-compatible, so it is no longer needed. httrack is now
+    plain GPL-3.0-or-later. Updated debian/copyright accordingly.
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 14:29:24 +0200
+
 httrack (3.49.7-2) unstable; urgency=medium
 
   * Bump Standards-Version to 4.7.0 (no changes needed).
