@@ -48,7 +48,10 @@ usage() {
 }
 
 need() {
-    command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"
+    local tool
+    for tool in "$@"; do
+        command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool"
+    done
 }
 
 main() {
@@ -92,10 +95,7 @@ main() {
         esac
     done
 
-    need git
-    need autoreconf
-    need debuild
-    need dpkg-parsechangelog
+    need git autoreconf debuild dcmd
     if [[ $unsigned -eq 0 ]]; then
         need gpg
         [[ -n $key ]] || die "no signing key (pass --key or set DEBSIGN_KEYID, or use --unsigned)"
@@ -168,15 +168,14 @@ main() {
         debuild "${build_opts[@]}" "${debuild_opts[@]}"
     )
 
-    # Collect artifacts.
+    # Collect every file the .changes references (orig, dsc, debs, ddebs, buildinfo).
     info "collecting artifacts into $outdir"
-    cp -- "$scratch/$orig" "$outdir/"
-    local f
-    for f in "$scratch"/httrack_"$ver"*.dsc "$scratch"/httrack_"$ver"*.debian.tar.* \
-        "$scratch"/*.deb "$scratch"/httrack_"$ver"*.changes \
-        "$scratch"/httrack_"$ver"*.buildinfo; do
-        [[ -e $f ]] && cp -- "$f" "$outdir/"
-    done
+    local -a changes
+    shopt -s nullglob
+    changes=("$scratch"/*.changes)
+    shopt -u nullglob
+    [[ ${#changes[@]} -ge 1 ]] || die "debuild produced no .changes file"
+    dcmd cp -- "${changes[@]}" "$outdir/"
 
     # Release artifacts for the upstream tarball (detached sig + checksums).
     if [[ $release_artifacts -eq 1 && $unsigned -eq 0 ]]; then
