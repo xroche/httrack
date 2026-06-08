@@ -1,5 +1,8 @@
 # HTTrack Website Copier - Development Repository
 
+[![CI](https://github.com/xroche/httrack/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/xroche/httrack/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/xroche/httrack)](COPYING)
+
 ## About
 _Copy websites to your computer (Offline browser)_
 
