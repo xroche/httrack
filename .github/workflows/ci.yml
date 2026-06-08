@@ -1,0 +1,87 @@
+# Build and test on x86-64 and arm64, and lint the shell scripts.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch or PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.arch }}, ${{ matrix.cc }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86-64, runner: ubuntu-24.04, cc: gcc }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: clang }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang }
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          # autoreconf installs the automake test-driver (not committed) and
+          # validates configure.ac, so "make check" works on a fresh checkout.
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        run: make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  lint:
+    name: lint (shellcheck, shfmt)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install linters
+        env:
+          SHFMT_VERSION: v3.8.0
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck
+          # shfmt is not packaged in apt; fetch a pinned release binary.
+          curl -fsSL -o /tmp/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)"
+          sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
+
+      # Lint the scripts we maintain; the legacy scripts are a separate cleanup.
+      - name: shellcheck
+        run: shellcheck man/makeman.sh tools/mkdeb.sh tests/*.test tests/check-network.sh
+
+      - name: shfmt
+        run: shfmt -d -i 4 man/makeman.sh tools/mkdeb.sh
