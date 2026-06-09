@@ -133,8 +133,8 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
   const size_t n = strlen(chk_dom);
   const size_t m = strlen(domain);
   const size_t l = n < m ? n : m;
-  size_t i;
-  for (i = l - 1; i >= 0; i--) {
+  int i;
+  for (i = (int) l - 1; i >= 0; i--) {
     if (chk_dom[n - i - 1] != domain[m - i - 1]) {
       return 1;
     }
