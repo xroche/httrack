@@ -3341,12 +3341,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           hts_log_print(opt, LOG_DEBUG, "engine: postprocess-html: %s%s",
                         urladr(), urlfil());
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
-            if (cAddr != TypedArrayElts(output_buffer)) {
-              hts_log_print(opt, LOG_DEBUG, 
-                "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-              TypedArraySize(output_buffer) = 0;
-              TypedArrayAppend(output_buffer, cAddr, cSize);
-            }
+            hts_log_print(opt, LOG_DEBUG,
+              "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
+            TypedArraySize(output_buffer) = 0;
+            TypedArrayAppend(output_buffer, cAddr, cSize);
           }
         }
 
