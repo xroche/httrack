@@ -4,6 +4,10 @@ httrack (3.49.8-1) unstable; urgency=medium
   * Drop the OpenSSL linking exception from the license: OpenSSL 3.0+ is
     Apache-2.0 and GPL-compatible, so it is no longer needed. httrack is now
     plain GPL-3.0-or-later. Updated debian/copyright accordingly.
+  * Fix a batch of lintian tags: depend on sensible-utils, point to
+    common-licenses/GPL-3, use a secure version=4 watch file, add
+    Rules-Requires-Root and Vcs-Browser, and override the false-positive
+    source-is-missing on the bundled HTML documentation.
 
  -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 14:29:24 +0200
 
