@@ -1,2 +1,8 @@
 httrack source: changelog-should-mention-nmu
 httrack source: source-nmu-has-incorrect-version-number
+
+# The bundled HTML pages are the genuine upstream documentation taken from
+# the httrack.com website. lintian's long-line heuristic mistakes them for
+# minified or generated content, but they are the actual source.
+httrack source: source-is-missing [html/*]
+httrack source: source-is-missing [templates/*]
