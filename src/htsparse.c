@@ -274,6 +274,28 @@ Please visit our Website: http://www.httrack.com
   } \
 } while(0)
 
+/* Percent-encode the angle brackets of a string so it is safe to embed inside
+   an HTML comment (the default footer) or any other HTML context. A URL holding
+   "-->" would otherwise close the footer comment and inject markup (issue #165).
+   Raw '<' and '>' are not valid URL characters, so encoding them is harmless. */
+static const char *html_inline_safe(const char *src, char *dst, size_t size) {
+  size_t i, j;
+
+  for(i = 0, j = 0; src[i] != '\0' && j + 4 < size; i++) {
+    const char c = src[i];
+
+    if (c == '<' || c == '>') {
+      dst[j++] = '%';
+      dst[j++] = '3';
+      dst[j++] = (c == '<') ? 'C' : 'E';
+    } else {
+      dst[j++] = c;
+    }
+  }
+  dst[j] = '\0';
+  return dst;
+}
+
 /* Main parser */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
@@ -719,13 +741,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (StringNotEmpty(opt->footer)) {
                   char BIGSTK tempo[1024 + HTS_URLMAXSIZE * 2];
                   char gmttime[256];
+                  char BIGSTK safe_adr[HTS_URLMAXSIZE * 3 + 4];
+                  char BIGSTK safe_fil[HTS_URLMAXSIZE * 3 + 4];
 
                   tempo[0] = '\0';
                   time_gmt_rfc822(gmttime);
                   strcatbuff(tempo, eol);
                   hts_template_format_str(tempo + strlen(tempo), sizeof(tempo) - strlen(tempo),
                           StringBuff(opt->footer),
-                          jump_identification_const(urladr()), urlfil(), gmttime,
+                          html_inline_safe(jump_identification_const(urladr()), safe_adr, sizeof(safe_adr)),
+                          html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil)), gmttime,
                           HTTRACK_VERSIONID, /* EOF */ NULL);
                   strcatbuff(tempo, eol);
                   //fwrite(tempo,1,strlen(tempo),fp);
