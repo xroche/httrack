@@ -934,7 +934,7 @@ httrack (3.39.6-1) unstable; urgency=low
 
 httrack (3.39.5-1) unstable; urgency=low
 
-  * Updated to 3.39.5 (3.40-alpha-5) 
+  * Updated to 3.39.5 (3.40-alpha-5)
 
  -- Xavier Roche <xavier@debian.org>  Fri, 29 Jul 2005 20:57:44 +0200
 
@@ -1616,4 +1616,3 @@ httrack (3.22-1) unstable; urgency=low
   * Initial Release.
 
  -- Xavier Roche <xavier@debian.org>  Fri, 27 Sep 2002 16:42:25 +0200
-
