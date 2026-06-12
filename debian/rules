@@ -44,7 +44,7 @@ build-indep:
 
 build-arch: build-stamp
 
-build-stamp: configure-stamp 
+build-stamp: configure-stamp
 	dh_testdir
 	dh_auto_build
 	dh_auto_test
