@@ -878,7 +878,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
                   const char *referer_adr, const char *referer_fil,
                   htsblk * retour) {
-  char BIGSTK buffer_head_request[8192];
+  char BIGSTK buffer_head_request[16384];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
   //int use_11=0;     // HTTP 1.1 utilisé

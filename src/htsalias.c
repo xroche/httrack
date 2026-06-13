@@ -271,8 +271,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
   *return_argc = 1;
   if (argv[n_arg][0] == '-')
     if (argv[n_arg][1] == '-') {
-      char command[1000];
-      char param[1000];
+      /* sized to HTS_CDLMAXSIZE: a long-form option value (--user-agent,
+         --headers, ...) is copied into param, and the value is bounded by the
+         general per-argument check in htscoremain.c (HTS_CDLMAXSIZE) */
+      char command[HTS_CDLMAXSIZE];
+      char param[HTS_CDLMAXSIZE];
       char addcommand[256];
 
       /* */
