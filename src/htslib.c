@@ -121,6 +121,7 @@ const char *hts_detect[] = {
   "lowsrc",
   "profile",                    // element META
   "src",
+  "srcset",                     // HTML5 responsive images (<img>, <source>)
   "swurl",
   "url",
   "usemap",

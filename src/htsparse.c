@@ -532,6 +532,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int valid_p = 0;        // force to take p even if == 0
         int ending_p = '\0';    // ending quote?
         int archivetag_p = 0;   // avoid multiple-archives with commas
+        int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
         int unquoted_script = 0;
         INSCRIPT inscript_state_pos_prev = inscript_state_pos;
 
@@ -1049,6 +1050,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           /* This is a temporary hack to avoid archive=foo.jar,bar.jar .. */
                           if (strcmp(hts_detect[i], "archive") == 0) {
                             archivetag_p = 1;
+                          }
+                          /* srcset: a comma-list of candidate URLs, each split
+                             out and rewritten below (#235, #236) */
+                          else if (strcmp(hts_detect[i], "srcset") == 0
+                                   || strcmp(hts_detect[i], "data-srcset") == 0) {
+                            srcset_p = 1;
                           }
                         }
                         i++;
@@ -1815,6 +1822,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 html++;          // sauter # pour usemap etc
               }
             }
+ srcset_next:
+            /* srcset: skip leading whitespace/commas before each candidate;
+               the skipped bytes flush verbatim below */
+            if (srcset_p) {
+              while(html < r->adr + r->size
+                    && (is_realspace(*html) || *html == ','))
+                INCREMENT_CURRENT_ADR(1);
+            }
             eadr = html;
 
             // ne pas flusher après code si on doit écrire le codebase avant!
@@ -1844,6 +1859,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if ((*eadr == quote && (!quoteinscript || *(eadr - 1) == '\\'))     // end quote
                         || (noquote && (*eadr == '\"' || *eadr == '\''))        // end at any quote
                         || (!noquote && quote == '\0' && is_realspace(*eadr))   // unquoted href
+                        || srcset_p     // whitespace ends a srcset candidate URL
                       )         // si pas d'attente de quote spéciale ou si quote atteinte
                       ok = 0;
                   } else if (ending_p && (*eadr == ending_p))
@@ -1872,6 +1888,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       break;    // \" ou \' point d'arrêt
                     case '?':  /*quote_adr=adr; */
                       break;    // noter position query
+                    case ',':
+                      if (srcset_p) {
+                        /* split only on a trailing comma; one inside the URL
+                           (data: URI, CDN path) is kept, per the WHATWG algo */
+                        const char *const n = eadr + 1;
+
+                        if (n >= r->adr + r->size || is_space(*n) || *n == ',')
+                          ok = 0;
+                      }
+                      break;
                     }
                   }
                   //}
@@ -3249,6 +3275,28 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               INCREMENT_CURRENT_ADR(eadr - 1 - html);
             }
             // adr=eadr-1;  // ** sauter
+
+            /* srcset candidate loop: skip the descriptor and comma, then
+               re-enter the capture for the next URL. Backward goto, not a loop:
+               the per-candidate body is this whole block. */
+            if (srcset_p && ok == 0) {
+              const char *const endp = r->adr + r->size;
+              const char *q = html;
+              while(q < endp && *q != '\0' && *q != ',' && *q != quote
+                    && *q != '<' && *q != '>' && (unsigned char) *q >= 32)
+                q++;            // skip the descriptor
+              if (q < endp && *q == ',') {
+                q++;
+                while(q < endp && (is_realspace(*q) || *q == ','))
+                  q++;          // skip whitespace and empty candidates
+                if (q < endp && *q != '\0' && *q != ',' && *q != quote
+                    && *q != '<' && *q != '>' && (unsigned char) *q >= 32) {
+                  INCREMENT_CURRENT_ADR(q - html);   // keep the automate in sync
+                  ok = 1;
+                  goto srcset_next;
+                }
+              }
+            }
 
             /* We skipped bytes and skip the " : reset state */
             /*if (inscript) {
