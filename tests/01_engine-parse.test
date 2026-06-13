@@ -1,0 +1,131 @@
+#!/bin/bash
+#
+
+# Offline HTML parser tests: each section crawls a file:// fixture (no network)
+# and checks which assets the parser captured and how it rewrote the links.
+
+set -u
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parse.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+# a minimal valid 1x1 GIF, reused for every referenced asset
+gif() {
+    printf 'GIF89a\1\0\1\0\200\0\0\0\0\0\377\377\377!\371\4\1\0\0\0\0,\0\0\0\0\1\0\1\0\0\2\2D\1\0;' >"$1"
+}
+
+# crawl <fixture-html> into <out> with link rewriting on, no extra fetching
+crawl() {
+    local html="$1" out="$2"
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack "file://$html" -O "$out" --quiet --near -n >"$out/.log" 2>&1
+}
+
+# assert a file with the given basename was saved somewhere under <out>
+found() {
+    test -n "$(find "$2" -type f -name "$1" -print -quit)" ||
+        ! echo "FAIL: expected '$1' to be downloaded under $2" || exit 1
+}
+
+# assert NO file with the given basename was saved (e.g. a descriptor token must
+# not be mistaken for a URL)
+notfound() {
+    test -z "$(find "$2" -type f -name "$1" -print -quit)" ||
+        ! echo "FAIL: '$1' should not have been downloaded under $2" || exit 1
+}
+
+# the mirrored fixture page (under "file/"), not HTTrack's own landing index
+savedhtml() {
+    find "$1" -type f -path '*/file/*' -name index.html -print -quit
+}
+
+# srcset on <img> and <source> (#235, #236): every candidate captured and
+# rewritten, descriptors preserved, following attributes left intact.
+site="$tmp/srcset"
+mkdir -p "$site"
+for f in a b c d e f g h i j v dz; do gif "$site/$f.gif"; done
+# unquoted heredoc: $site expands in the absolute-URL candidate
+cat >"$site/index.html" <<EOF
+<html><body>
+<img src="a.gif" srcset="b.gif 480w, c.gif 800w">
+<picture><source srcset="d.gif 1x, c.gif 2x"><img src="a.gif"></picture>
+<img srcset="e.gif, f.gif">
+<img srcset="g.gif 2x" alt="trailing attr after srcset">
+<img srcset="  h.gif   2x ,  i.gif  ">
+<video><source src="v.gif"></video>
+<img srcset="file://$site/j.gif 2x">
+<img srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, dz.gif 2x">
+<img srcset="">
+<a href="a.gif">plain link still works</a>
+</body></html>
+EOF
+out="$tmp/srcset-out"
+crawl "$site/index.html" "$out"
+
+# every candidate downloads, incl. unique tails (catches first-only parsing),
+# whitespace-padded (h,i), <source src> (v), absolute (j), post-data: URI (dz)
+for f in a b c d e f g h i j v dz; do found "$f.gif" "$out"; done
+
+# the width/density descriptors are not URLs and must not be fetched
+notfound "480w" "$out"
+notfound "800w" "$out"
+notfound "2x" "$out"
+
+saved=$(savedhtml "$out")
+test -n "$saved" || ! echo "FAIL: saved index.html not found" || exit 1
+
+# descriptors must survive the rewrite (no "b.gif 480w" mangled into a path)
+grep -Eq 'srcset="[^"]*480w[^"]*800w' "$saved" ||
+    ! echo "FAIL: srcset width descriptors lost/reordered in rewritten HTML" || exit 1
+grep -Eq 'srcset="[^"]*1x[^"]*2x' "$saved" ||
+    ! echo "FAIL: srcset density descriptors lost/reordered in rewritten HTML" || exit 1
+# the descriptor-less comma form keeps both candidates and the separator verbatim
+grep -Eq 'srcset="e\.gif, f\.gif"' "$saved" ||
+    ! echo "FAIL: comma-separated srcset without descriptors was altered" || exit 1
+# an attribute following srcset in the same tag must be left intact
+grep -q 'alt="trailing attr after srcset"' "$saved" ||
+    ! echo "FAIL: srcset swallowed a following attribute" || exit 1
+
+# a comma inside a URL (data: URI, CDN path) is part of the URL, not a split
+# point (WHATWG): the data: URI stays verbatim; the next candidate (dz) downloads
+grep -Fq 'data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x' "$saved" ||
+    ! echo "FAIL: a comma inside a data: URI srcset candidate was mis-split" || exit 1
+
+# real rewrite, not passthrough: the absolute file:// candidate becomes local
+# (a flat fixture can't show this; the footer comment's file:// is not in srcset)
+grep -Eq 'srcset="j\.gif 2x"' "$saved" ||
+    ! echo "FAIL: absolute file:// srcset URL was not rewritten to a local link" || exit 1
+! grep -Eq 'srcset="[^"]*file://' "$saved" ||
+    ! echo "FAIL: a file:// URL survived inside a rewritten srcset attribute" || exit 1
+
+# xlink:href (#298) and inline background-image (#237): detected and rewritten
+# to local; no-detect attributes (title, alt, ...) left untouched. Asserted by
+# rewrite (deterministic), not download. data-* (#201/#203) is omitted: its
+# detection is currently nondeterministic and can't be locked yet.
+site2="$tmp/attrs"
+mkdir -p "$site2"
+for f in xl ibg tt; do gif "$site2/$f.gif"; done
+cat >"$site2/index.html" <<EOF
+<html><body>
+<a xlink:href="file://$site2/xl.gif">xlink:href (#298)</a>
+<div style="background-image:url(file://$site2/ibg.gif)"></div>
+<span title="file://$site2/tt.gif">excluded attribute</span>
+</body></html>
+EOF
+out2="$tmp/attrs-out"
+crawl "$site2/index.html" "$out2"
+saved2=$(savedhtml "$out2")
+test -n "$saved2" || ! echo "FAIL: saved attrs page not found" || exit 1
+
+# detected attributes: the absolute URL is rewritten to a local link
+grep -Eq 'xlink:href="xl\.gif"' "$saved2" ||
+    ! echo "FAIL #298: xlink:href not detected/rewritten" || exit 1
+grep -Eq 'style="background-image:url\(ibg\.gif\)"' "$saved2" ||
+    ! echo "FAIL #237: inline background-image url() not detected/rewritten" || exit 1
+
+# excluded attribute: title is on the no-detect list, so its value is left as-is
+grep -q 'title="file://' "$saved2" ||
+    ! echo "FAIL: a no-detect attribute (title) was wrongly rewritten" || exit 1
+
+exit 0
