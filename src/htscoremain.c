@@ -2899,7 +2899,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 
   {
-    char n_lock[256];
+    /* Sized to the concat-buffer capacity so it can always hold the lock-file
+       path produced by fconcat(), even with a long log path (issue #183). */
+    char n_lock[OPT_GET_BUFF_SIZE(opt)];
 
     // on peut pas avoir un affichage ET un fichier log
     // ca sera pour la version 2
