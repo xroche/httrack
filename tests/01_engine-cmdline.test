@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+
+# Offline command-line option tests (no network). The -F user-agent and -%X
+# raw-header values used to be rejected past 126 / 256 bytes (#152); they are
+# now bounded only by the general per-argument cap (HTS_CDLMAXSIZE). A value up
+# to that cap is accepted on both the short (-F, -%X) and long (--user-agent,
+# --headers) forms, and an over-cap value is refused cleanly rather than
+# overrunning a fixed scratch buffer.
+
+set -u
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdline.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+echo '<html><body>hello</body></html>' >"$tmp/index.html"
+
+# a string of N repeated 'A' characters
+nchars() {
+    printf 'A%.0s' $(seq 1 "$1")
+}
+
+# crawl the local fixture with the given extra args; leaves the exit status in RC
+run() {
+    local out="$1"
+    shift
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack "file://$tmp/index.html" -O "$out" --quiet -n "$@" >"$out/.log" 2>&1
+    RC=$?
+}
+
+# assert the value was accepted: clean exit and the fixture was mirrored
+accepted() {
+    { test "$RC" -eq 0 && test -n "$(find "$1" -type f -path '*/index.html' -print -quit)"; } ||
+        ! echo "FAIL: $2 (exit $RC)" || exit 1
+}
+
+# assert the value was refused cleanly: a normal error exit, never a crash
+# (a SIGABRT from an overflowed scratch buffer would surface as exit 134)
+refused() {
+    { test "$RC" -ne 0 && test "$RC" -ne 134; } ||
+        ! echo "FAIL: $1 (exit $RC)" || exit 1
+}
+
+# a value past the old 126/256 caps but within the cap is accepted, on both the
+# short and long form of each option
+long=$(nchars 900)
+run "$tmp/ua-s" -F "$long"
+accepted "$tmp/ua-s" "#152: long -F user-agent rejected or crashed"
+run "$tmp/ua-l" --user-agent "$long"
+accepted "$tmp/ua-l" "#152: long --user-agent rejected or crashed"
+run "$tmp/hd-s" "-%X" "X-A: $long"
+accepted "$tmp/hd-s" "#152: long -%X header rejected or crashed"
+run "$tmp/hd-l" --headers "X-B: $long"
+accepted "$tmp/hd-l" "#152: long --headers rejected or crashed"
+
+# a value just under the cap (>1000) must not overflow the long-form alias
+# scratch buffer (the param[] copy in optalias_check)
+run "$tmp/ua-n" --user-agent "$(nchars 1010)"
+accepted "$tmp/ua-n" "#152: near-cap --user-agent overflowed the param[] buffer"
+
+# a value over the cap is refused cleanly (graceful error, not a SIGABRT), on
+# both forms
+over=$(nchars 1100)
+run "$tmp/ov-s" -F "$over"
+refused "#152: over-cap -F not refused cleanly"
+run "$tmp/ov-l" --user-agent "$over"
+refused "#152: over-cap --user-agent not refused cleanly"
+
+exit 0
