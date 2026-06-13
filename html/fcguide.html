@@ -332,7 +332,7 @@ Details: User-defined option N
   %N Name of file, including file type (ex: image.gif)
   %t File type (ex: gif)
   %p Path [without ending /] (ex: /someimages)
-  %h Host name (ex: www.someweb.com) (--http-10)
+  %h Host name (ex: www.example.com) (--http-10)
   %M URL MD5 (128 bits, 32 ascii bytes)
   %Q query string MD5 (128 bits, 32 ascii bytes)
   %q small query string MD5 (16 bits, 4 ascii bytes) (--include-query-string)
@@ -356,17 +356,17 @@ Shortcuts:
 
 --http10              force http/1.0 requests (-%h)
 
-example: httrack www.someweb.com/bob/
-means:   mirror site www.someweb.com/bob/ and only this site
+example: httrack www.example.com/bob/
+means:   mirror site www.example.com/bob/ and only this site
 
-example: httrack www.someweb.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg
+example: httrack www.example.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg
 means:   mirror the two sites together (with shared links) and accept any .jpg files on .com sites
 
-example: httrack www.someweb.com/bob/bobby.html +* -r6
+example: httrack www.example.com/bob/bobby.html +* -r6
 means get all files starting from bobby.html, with 6 link-depth, and possibility of going everywhere on the web
 
-example: httrack www.someweb.com/bob/bobby.html --spider -P proxy.myhost.com:8080
-runs the spider on www.someweb.com/bob/bobby.html using a proxy
+example: httrack www.example.com/bob/bobby.html --spider -P proxy.myhost.com:8080
+runs the spider on www.example.com/bob/bobby.html using a proxy
 
 example: httrack --update
 updates a mirror in the current folder
@@ -2054,8 +2054,8 @@ generated automatically using the interface)
         <td>This will accept all zip files in .com addresses</td>
       </tr>
       <tr>
-        <td><b>-*someweb*/*.tar*</b></td>
-        <td>This will refuse all tar (or tar.gz etc.) files in hosts containing someweb</td>
+        <td><b>-*example*/*.tar*</b></td>
+        <td>This will refuse all tar (or tar.gz etc.) files in hosts containing example</td>
       </tr>
       <tr>
         <td><b>+*/*somepage*</b></td>

@@ -109,8 +109,8 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
 
     <i>You have to know that once you have defined
     starts links, the default mode is to mirror these links - i.e. if one of your start page is
-    www.someweb.com/test/index.html, all links starting with www.someweb.com/test/ will be
-    accepted. But links directly in www.someweb.com/.. will not be accepted, however, because
+    www.example.com/test/index.html, all links starting with www.example.com/test/ will be
+    accepted. But links directly in www.example.com/.. will not be accepted, however, because
     they are in a higher strcuture. This prevent HTTrack from mirroring the whole site. (All
     files in structure levels equal or lower than the primary links will be retrieved.)<br>
     </i>
@@ -278,8 +278,8 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
         <td>This will refuse/accept all zip files in .com addresses</td>
       </tr>
       <tr>
-        <td nowrap><tt>*someweb*/*.tar*</tt></td>
-        <td>This will refuse/accept all tar (or tar.gz etc.) files in hosts containing someweb</td>
+        <td nowrap><tt>*example*/*.tar*</tt></td>
+        <td>This will refuse/accept all tar (or tar.gz etc.) files in hosts containing example</td>
       </tr>
       <tr>
         <td nowrap><tt>*/*somepage*</tt></td>
@@ -289,13 +289,13 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
         <td nowrap><tt>*.html</tt></td>
         <td>This will refuse/accept all html files. <br>
         Warning! With this filter you will accept ALL html files, even those in other addresses.
-        (causing a global (!) web mirror..) Use www.someweb.com/*.html to accept all html files from
+        (causing a global (!) web mirror..) Use www.example.com/*.html to accept all html files from
         a web.</td>
       </tr>
       <tr>
         <td nowrap><tt>*.html*[]</tt></td>
         <td>Identical to <tt>*.html</tt>, but the link must not have any supplemental characters
-        at the end (links with parameters, like <tt>www.someweb.com/index.html?page=10</tt>, will be
+        at the end (links with parameters, like <tt>www.example.com/index.html?page=10</tt>, will be
         refused)</td>
       </tr>
     </table>

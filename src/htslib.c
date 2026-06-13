@@ -895,9 +895,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
   // possibilité non documentée: >post: et >postfile:
   // si présence d'un tag >post: alors executer un POST
-  // exemple: http://www.someweb.com/test.cgi?foo>post:posteddata=10&foo=5
+  // exemple: http://www.example.com/test.cgi?foo>post:posteddata=10&foo=5
   // si présence d'un tag >postfile: alors envoyer en tête brut contenu dans le fichier en question
-  // exemple: http://www.someweb.com/test.cgi?foo>postfile:post0.txt
+  // exemple: http://www.example.com/test.cgi?foo>postfile:post0.txt
   search_tag = strstr(fil, POSTTOK ":");
   if (!search_tag) {
     search_tag = strstr(fil, POSTTOK "file:");
