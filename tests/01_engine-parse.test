@@ -99,17 +99,25 @@ grep -Eq 'srcset="j\.gif 2x"' "$saved" ||
 ! grep -Eq 'srcset="[^"]*file://' "$saved" ||
     ! echo "FAIL: a file:// URL survived inside a rewritten srcset attribute" || exit 1
 
-# xlink:href (#298) and inline background-image (#237): detected and rewritten
-# to local; no-detect attributes (title, alt, ...) left untouched. Asserted by
-# rewrite (deterministic), not download. data-* (#201/#203) is omitted: its
-# detection is currently nondeterministic and can't be locked yet.
+# xlink:href (#298) and CSS background-image (#237): detected and rewritten to
+# local. background-image is covered in both an external <style> block and an
+# inline style attribute, with the URL unquoted, double-quoted and single-quoted
+# (the quote style is preserved on rewrite). No-detect attributes (title, alt,
+# ...) are left untouched. Asserted by rewrite (deterministic), not download.
+# data-* (#201/#203) is omitted: its detection is currently nondeterministic and
+# can't be locked yet.
 site2="$tmp/attrs"
 mkdir -p "$site2"
-for f in xl ibg tt; do gif "$site2/$f.gif"; done
+for f in xl ibg ibgs cex cexd cexs tt; do gif "$site2/$f.gif"; done
 cat >"$site2/index.html" <<EOF
-<html><body>
+<html><head><style>
+.a { background-image: url(file://$site2/cex.gif); }
+.b { background-image: url("file://$site2/cexd.gif"); }
+.c { background-image: url('file://$site2/cexs.gif'); }
+</style></head><body>
 <a xlink:href="file://$site2/xl.gif">xlink:href (#298)</a>
 <div style="background-image:url(file://$site2/ibg.gif)"></div>
+<div style="background-image:url('file://$site2/ibgs.gif')"></div>
 <span title="file://$site2/tt.gif">excluded attribute</span>
 </body></html>
 EOF
@@ -121,8 +129,24 @@ test -n "$saved2" || ! echo "FAIL: saved attrs page not found" || exit 1
 # detected attributes: the absolute URL is rewritten to a local link
 grep -Eq 'xlink:href="xl\.gif"' "$saved2" ||
     ! echo "FAIL #298: xlink:href not detected/rewritten" || exit 1
+
+# #237 external <style> block, each quoting form, quote style preserved
+grep -Eq 'url\(cex\.gif\)' "$saved2" ||
+    ! echo "FAIL #237: unquoted background-image in <style> not rewritten" || exit 1
+grep -Eq 'url\("cexd\.gif"\)' "$saved2" ||
+    ! echo "FAIL #237: double-quoted background-image in <style> not rewritten" || exit 1
+grep -Eq "url\('cexs\.gif'\)" "$saved2" ||
+    ! echo "FAIL #237: single-quoted background-image in <style> not rewritten" || exit 1
+
+# #237 inline style attribute, unquoted and single-quoted url()
 grep -Eq 'style="background-image:url\(ibg\.gif\)"' "$saved2" ||
-    ! echo "FAIL #237: inline background-image url() not detected/rewritten" || exit 1
+    ! echo "FAIL #237: inline unquoted background-image not rewritten" || exit 1
+grep -Eq "style=\"background-image:url\('ibgs\.gif'\)\"" "$saved2" ||
+    ! echo "FAIL #237: inline single-quoted background-image not rewritten" || exit 1
+
+# no file:// URL survived inside any rewritten background-image
+! grep -Eq 'background-image:[^;"]*file://' "$saved2" ||
+    ! echo "FAIL #237: a file:// URL survived inside a rewritten background-image" || exit 1
 
 # excluded attribute: title is on the no-detect list, so its value is left as-is
 grep -q 'title="file://' "$saved2" ||
