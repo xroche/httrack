@@ -193,7 +193,23 @@ HTSEXT_API void hts_mutexfree(htsmutex * mutex) {
 HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
   assertf(mutex != NULL);
   if (*mutex == HTSMUTEX_INIT) {        /* must be initialized */
-    hts_mutexinit(mutex);
+    /* Initialize exactly once, even when several threads race to lock the same
+       mutex for the first time. Build our own object, then publish it with a
+       single atomic compare-and-swap; the threads that lose the race free the
+       object they built (issue #297). No static guard is needed, which keeps
+       this safe on Windows 2000 (no statically-initializable lock there). */
+    htsmutex created = HTSMUTEX_INIT;
+
+    hts_mutexinit(&created);
+#ifdef _WIN32
+    if (InterlockedCompareExchangePointer((PVOID volatile *) mutex, created,
+                                          HTSMUTEX_INIT) != HTSMUTEX_INIT)
+#else
+    if (!__sync_bool_compare_and_swap(mutex, HTSMUTEX_INIT, created))
+#endif
+    {
+      hts_mutexfree(&created);
+    }
   }
   assertf(*mutex != NULL);
 #ifdef _WIN32
