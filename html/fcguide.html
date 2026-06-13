@@ -181,17 +181,17 @@ used for some time.
 
 <p align=justify> The rest of this manual is dedicated to detailing what
 you find in the help message and providing examples - lots and lots of
-examples...  Here is what you get (page by page - use <enter> to move to
+examples...  Here is what you get (page by page - use &lt;enter&gt; to move to
 the next page in the real program) if you type 'httrack --help':
 
 <pre>
 >httrack --help
  HTTrack version 3.03BETAo4 (compiled Jul  1 2001)
-	usage: ./httrack <URLs [-option] [+<FILTERs>] [-<FILTERs>]
+	usage: ./httrack &lt;URLs&gt; [-option] [+&lt;FILTERs&gt;] [-&lt;FILTERs&gt;]
 	with options listed below: (* is the default value)
 
 General options:
-  O  path for mirror/logfiles+cache (-O path_mirror[,path_cache_and_logfiles]) (--path <param>)
+  O  path for mirror/logfiles+cache (-O path_mirror[,path_cache_and_logfiles]) (--path &lt;param&gt;)
  %O  top path if no path defined (-O path_mirror[,path_cache_and_logfiles])
 
 Action options:
@@ -202,7 +202,7 @@ Action options:
   Y   mirror ALL links located in the first level pages (mirror links) (--mirrorlinks)
 
 Proxy options:
-  P  proxy use (-P proxy:port or -P user:pass@proxy:port) (--proxy <param>)
+  P  proxy use (-P proxy:port or -P user:pass@proxy:port) (--proxy &lt;param&gt;)
  %f *use proxy for ftp (f0 don't use) (--httpproxy-ftp[=N])
 
 Limits options:
@@ -227,7 +227,7 @@ Links options:
  %P *extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don't use) (--extended-parsing[=N])
   n  get non-html files 'near' an html file (ex: an image located outside) (--near)
   t  test all URLs (even forbidden ones) (--test)
- %L <file add all URL located in this text file (one URL per line) (--list <param>)
+ %L &lt;file&gt; add all URL located in this text file (one URL per line) (--list &lt;param&gt;)
 
 Build options:
   NN structure type (0 *original structure, 1+: see below) (--structure[=N])
@@ -248,12 +248,12 @@ Spider options:
  %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (--http-10)
  %B  tolerant requests (accept bogus responses on some servers, but not standard!) (--tolerant)
  %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..) (--updatehack)
- %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3=text/html) (--assume <param>)
+ %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3=text/html) (--assume &lt;param&gt;)
 
 Browser ID:
-  F  user-agent field (-F "user-agent name") (--user-agent <param>)
- %F  footer string in Html code (-%F "Mirrored [from host %s [file %s [at %s]]]" (--footer <param>)
- %l  preferred language (-%l "fr, en, jp, *" (--language <param>)
+  F  user-agent field (-F "user-agent name") (--user-agent &lt;param&gt;)
+ %F  footer string in Html code (-%F "Mirrored [from host %s [file %s [at %s]]]" (--footer &lt;param&gt;)
+ %l  preferred language (-%l "fr, en, jp, *" (--language &lt;param&gt;)
 
 Log, index, cache
   C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) (--cache[=N])
@@ -303,8 +303,8 @@ Guru options: (do NOT use)
  #!  Execute a shell command (-#! "echo hello")
 
 Command-line specific options:
-  V execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd <param>)
- %U run the engine with another id when called as root (-%U smith) (--user <param>)
+  V execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd &lt;param&gt;)
+ %U run the engine with another id when called as root (-%U smith) (--user &lt;param&gt;)
 
 Details: Option N
   N0 Site-structure (default)
@@ -340,14 +340,14 @@ Details: User-defined option N
   %[param] param variable in query string
 
 Shortcuts:
---mirror      <URLs *make a mirror of site(s) (default)
---get         <URLs  get the files indicated, do not seek other URLs (-qg)
---list   <text file  add all URL located in this text file (-%L)
---mirrorlinks <URLs  mirror all links in 1st level pages (-Y)
---testlinks   <URLs  test links in pages (-r1p0C0I0t)
---spider      <URLs  spider site(s), to test links: reports Errors & Warnings (-p0C0I0t)
---testsite    <URLs  identical to --spider
---skeleton    <URLs  make a mirror, but gets only html files (-p1)
+--mirror      &lt;URLs&gt; *make a mirror of site(s) (default)
+--get         &lt;URLs&gt;  get the files indicated, do not seek other URLs (-qg)
+--list   &lt;text file&gt;  add all URL located in this text file (-%L)
+--mirrorlinks &lt;URLs&gt;  mirror all links in 1st level pages (-Y)
+--testlinks   &lt;URLs&gt;  test links in pages (-r1p0C0I0t)
+--spider      &lt;URLs&gt;  spider site(s), to test links: reports Errors & Warnings (-p0C0I0t)
+--testsite    &lt;URLs&gt;  identical to --spider
+--skeleton    &lt;URLs&gt;  make a mirror, but gets only html files (-p1)
 --update              update a mirror, without confirmation (-iC2)
 --continue            continue a mirror, without confirmation (-iC1)
 
@@ -387,13 +387,13 @@ with examples... I will be here a while...
 <hr>
 <h2> Syntax </h2>
 
-<pre><b><i>httrack <URLs> [-option] [+<FILTERs>] [-<FILTERs>] </i></b></pre>
+<pre><b><i>httrack &lt;URLs&gt; [-option] [+&lt;FILTERs&gt;] [-&lt;FILTERs&gt;] </i></b></pre>
 
 <p align=justify> The syntax of httrack is quite simple.  You specify
-the URLs you wish to start the process from (<URLS>), any options you
+the URLs you wish to start the process from (&lt;URLS&gt;), any options you
 might want to add ([-option], any filters specifying places you should
-([+<FILTERs>]) and should not ([-<FILTERs>]) go, and end the command
-line by pressing <enter>.  Httrack then goes off and does your bidding.
+([+&lt;FILTERs&gt;]) and should not ([-&lt;FILTERs&gt;]) go, and end the command
+line by pressing &lt;enter&gt;.  Httrack then goes off and does your bidding.
 For example:
 
 <pre><b><i>
@@ -425,7 +425,7 @@ site. Specifically, the defauls are:
   pN priority mode: (* p3)  *3 save all files
   D  *can only go down into subdirs
   a  *stay on the same address
-  --mirror      <URLs> *make a mirror of site(s) (default)
+  --mirror      &lt;URLs&gt; *make a mirror of site(s) (default)
 </pre>
 
 <p align=justify> Here's what all of that means:
@@ -542,7 +542,7 @@ subdirectories of the starting directory to be investigated.
 search started are to be collected.  Other sites they point to are not
 to be imaged. 
 
-<pre><b><i>  --mirror      <URLs> *make a mirror of site(s) (default) </i></b></pre>
+<pre><b><i>  --mirror      &lt;URLs&gt; *make a mirror of site(s) (default) </i></b></pre>
 
 <p align=justify> This indicates that the program should try to make a
 copy of the site as well as it can. 
@@ -921,7 +921,7 @@ Links options:
  %P *extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don't use)
   n   get non-html files 'near' an html file (ex: an image located outside)
   t   test all URLs (even forbidden ones)
- %L <file> add all URL located in this text file (one URL per line)
+ %L &lt;file&gt; add all URL located in this text file (one URL per line)
 </i></b></pre>
 
 <p align=justify> The links options allow you to control what links are
@@ -1183,7 +1183,7 @@ Spider options:
  %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies)
  %B  tolerant requests (accept bogus responses on some servers, but not standard!)
  %s  update hacks: various hacks to limit re-transfers when updating
- %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3=text/html) (--assume <param>)
+ %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3=text/html) (--assume &lt;param&gt;)
 </i></b></pre>
 
 <p align=justify> By default, cookies are universally accepted and
@@ -1387,7 +1387,7 @@ web servers leave footprints in the browser.
 Browser ID:
   F  user-agent field (-F "user-agent name")
  %F  footer string in Html code (-%F "Mirrored [from host %s [file %s [at %s]]]"
- %l  preferred language (-%l "fr, en, jp, *" (--language <param>)
+ %l  preferred language (-%l "fr, en, jp, *" (--language &lt;param&gt;)
 </i></b></pre>
 
 <p align=justify> The user-agent field is used by browsers to determine
@@ -1799,7 +1799,7 @@ based authentication)
 
 <pre><b><i>
 Command-line specific options:
-  V execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd <param>)
+  V execute system command after each files ($0 is the filename: -V "rm \$0") (--userdef-cmd &lt;param&gt;)
 </i></b></pre>
 
 <p align=justify> This option is very nice for a wide array of actions
@@ -1811,7 +1811,7 @@ httrack http://www.shoesizes.com/bob/ -O /tmp/shoesizes -V "/bin/echo \$0"
 </i></b></pre>
 
 <pre>
- %U run the engine with another id when called as root (-%U smith) (--user <param>)
+ %U run the engine with another id when called as root (-%U smith) (--user &lt;param&gt;)
 </pre>
 
 <p align=justify> Change the UID of the owner when running as r00t
@@ -1856,14 +1856,14 @@ of other options that are commonly used.
 
 <pre><b><i>
 Shortcuts:
---mirror      <URLs> *make a mirror of site(s) (default)
---get         <URLs>  get the files indicated, do not seek other URLs (-qg)
---list   <text file>  add all URL located in this text file (-%L)
---mirrorlinks <URLs>  mirror all links in 1st level pages (-Y)
---testlinks   <URLs>  test links in pages (-r1p0C0I0t)
---spider      <URLs>  spider site(s), to test links: reports Errors & Warnings (-p0C0I0t)
---testsite    <URLs>  identical to --spider
---skeleton    <URLs>  make a mirror, but gets only html files (-p1)
+--mirror      &lt;URLs&gt; *make a mirror of site(s) (default)
+--get         &lt;URLs&gt;  get the files indicated, do not seek other URLs (-qg)
+--list   &lt;text file&gt;  add all URL located in this text file (-%L)
+--mirrorlinks &lt;URLs&gt;  mirror all links in 1st level pages (-Y)
+--testlinks   &lt;URLs&gt;  test links in pages (-r1p0C0I0t)
+--spider      &lt;URLs&gt;  spider site(s), to test links: reports Errors & Warnings (-p0C0I0t)
+--testsite    &lt;URLs&gt;  identical to --spider
+--skeleton    &lt;URLs&gt;  make a mirror, but gets only html files (-p1)
 --update              update a mirror, without confirmation (-iC2)
 --continue            continue a mirror, without confirmation (-iC1)
 --catchurl            create a temporary proxy to capture an URL or a form post URL
@@ -2019,15 +2019,15 @@ are in reverse priority order.  Here's an example:
         <td>no characters must be present after</a></td>
       </tr>
 	<tr>
-		<td> <b> <filter>*[&lt NN]</b></td>
+		<td> <b> &lt;filter&gt;*[&lt NN]</b></td>
 		<td> size less than NN Kbytes</td>
 	</tr>
 	<tr>
-		<td> <b> <filter>*[&gt PP]</b></td>
+		<td> <b> &lt;filter&gt;*[&gt PP]</b></td>
 		<td> size more than PP Kbytes</td>
 	</tr>
 	<tr>
-		<td> <b> <filter>*[&lt NN &gt PP]</b></td>
+		<td> <b> &lt;filter&gt;*[&lt NN &gt PP]</b></td>
 		<td> size less than NN Kbytes and more than PP Kbytes</td>
 	</tr>
     </table>

@@ -7,7 +7,7 @@ uk
 LANGUAGE_AUTHOR
 Andrij Shevchuk (http://programy.com.ua, http://vic-info.com.ua) \r\n
 LANGUAGE_CHARSET
-ISO-8859-5
+windows-1251
 LANGUAGE_WINDOWSID
 Ukrainian
 OK
