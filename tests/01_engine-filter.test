@@ -47,3 +47,25 @@ match '*foo*bar' 'foozbar'
 
 # '?' is the query-string marker, not a single-char wildcard
 nomatch 'a?c' 'abc'
+
+# backslash escapes a metacharacter inside a class so it is matched literally.
+# Quirk: the decoder also adds the backslash itself to the set, so '\X' matches
+# both X and '\'. These assertions pin that behavior.
+match '*[\*]' '*'
+match '*[\*]' "\\"
+nomatch '*[\*]' 'a'
+match '*[\\]' "\\"
+nomatch '*[\\]' 'a'
+match '*[\[]' '['
+match '*[\[]' "\\"
+nomatch '*[\[]' 'a'
+
+# A literal ']' cannot be a class member: the class parser stops at the first
+# ']', escaped or not. So '*[\[\]]' does NOT mean "the [ or ] character" as the
+# filter guide claims (GitHub #148); it parses as the class {'[','\'} followed
+# by a trailing literal ']'. These assertions document the current (buggy)
+# behavior so any future matcher fix is a deliberate, visible change.
+nomatch '*[\[\]]' '['   # not matched, despite the docs
+match '*[\[\]]' ']'     # only via the empty class-match + trailing ']'
+match '*[\[\]]' '[]'    # one of {'[','\'} then the trailing ']'
+nomatch '*[\[\]]' '[]x'
