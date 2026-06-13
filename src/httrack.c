@@ -298,6 +298,9 @@ static int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
   return htsshow_start(carg, opt);
 }
 static int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
+  if (opt->verbosedisplay == 1) {
+    hts_print_progress_bar(opt->lien_tot, opt->lien_tot, (int)(time(NULL) - HTS_STAT.stat_timestart), &HTS_STAT);
+  }
   return 1;
 }
 static int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg,
@@ -352,8 +355,12 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
     stat_bytes_recv = stats->HTS_TOTAL_RECV;
   }
 
-  if (!use_show)
+  if (!use_show) {
+    if (opt->verbosedisplay == 1) {
+      hts_print_progress_bar(lien_n, lien_tot, stat_time, stats);
+    }
     return 1;
+  }
 
   mytime = mtime_local();
   if ((stat_time > 0) && (stat_bytes_recv > 0))

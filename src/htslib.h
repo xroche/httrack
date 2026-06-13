@@ -154,6 +154,8 @@ struct t_dnscache {
   char host_addr[HTS_MAXADDRLEN];
 };
 
+HTSEXT_API int hts_print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_struct * stats);
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
