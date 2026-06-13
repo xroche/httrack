@@ -13,3 +13,9 @@ regen-man: makeman.sh $(top_builddir)/src/httrack$(EXEEXT)
 	README='$(top_srcdir)/README' $(SHELL) $(srcdir)/makeman.sh \
 		'$(top_builddir)/src/httrack$(EXEEXT)' > $(srcdir)/httrack.1
 .PHONY: regen-man
+
+# Render html/httrack.man.html from httrack.1. Needs the groff html device
+# (Debian: full "groff" package, not "groff-base"). Run by hand: make -C man regen-man-html
+regen-man-html: httrack.1
+	groff -t -man -Thtml $(srcdir)/httrack.1 > $(top_srcdir)/html/httrack.man.html
+.PHONY: regen-man-html
