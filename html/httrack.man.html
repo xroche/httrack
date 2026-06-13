@@ -123,12 +123,12 @@ mirrored site, and resume interrupted downloads.</p>
 
 
 <p style="margin-left:11%; margin-top: 1em"><b>httrack
-www.someweb.com/bob/</b></p>
+www.example.com/bob/</b></p>
 
 <p style="margin-left:22%;">mirror site
-www.someweb.com/bob/ and only this site</p>
+www.example.com/bob/ and only this site</p>
 
-<p style="margin-left:11%;"><b>httrack www.someweb.com/bob/
+<p style="margin-left:11%;"><b>httrack www.example.com/bob/
 www.anothertest.com/mike/ +*.com/*.jpg <br>
 -mime:application/*</b></p>
 
@@ -137,18 +137,18 @@ www.anothertest.com/mike/ +*.com/*.jpg <br>
 sites</p>
 
 <p style="margin-left:11%;"><b>httrack
-www.someweb.com/bob/bobby.html +* -r6</b></p>
+www.example.com/bob/bobby.html +* -r6</b></p>
 
 <p style="margin-left:22%;">means get all files starting
 from bobby.html, with 6 link-depth, and possibility of going
 everywhere on the web</p>
 
 <p style="margin-left:11%;"><b>httrack
-www.someweb.com/bob/bobby.html --spider -P <br>
+www.example.com/bob/bobby.html --spider -P <br>
 proxy.myhost.com:8080</b></p>
 
 <p style="margin-left:22%;">runs the spider on
-www.someweb.com/bob/bobby.html using a proxy</p>
+www.example.com/bob/bobby.html using a proxy</p>
 
 <p style="margin-left:11%;"><b>httrack --update</b></p>
 
@@ -1877,7 +1877,7 @@ User-defined option N</b> <br>
 %N Name of file, including file type (ex: image.gif) <br>
 %t File type (ex: gif) <br>
 %p Path [without ending /] (ex: /someimages) <br>
-%h Host name (ex: www.someweb.com) <br>
+%h Host name (ex: www.example.com) <br>
 %M URL MD5 (128 bits, 32 ascii bytes) <br>
 %Q query string MD5 (128 bits, 32 ascii bytes) <br>
 %k full query string <br>

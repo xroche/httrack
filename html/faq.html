@@ -303,43 +303,43 @@ Okay, let me explain how to precisely control the capture process.<br>
 Let's take an example:<br>
 <br>
 Imagine you want to capture the following site:<br>
-<tt>www.someweb.com/gallery/flowers/</tt><br>
+<tt>www.example.com/gallery/flowers/</tt><br>
 <br>
-HTTrack, by default, will capture all links encountered in <tt>www.someweb.com/gallery/flowers/</tt> or in lower directories, like
-<tt>www.someweb.com/gallery/flowers/roses/</tt>.<br>
+HTTrack, by default, will capture all links encountered in <tt>www.example.com/gallery/flowers/</tt> or in lower directories, like
+<tt>www.example.com/gallery/flowers/roses/</tt>.<br>
 It will not follow links to other websites, because this behaviour might cause to capture the Web entirely!<br>
-It will not follow links located in higher directories, too (for example, <tt>www.someweb.com/gallery/flowers/</tt> itself) because this 
+It will not follow links located in higher directories, too (for example, <tt>www.example.com/gallery/flowers/</tt> itself) because this 
 might cause to capture too much data.<br>
 <br>
 This is the <b><u>default behaviour</b></u> of HTTrack, BUT, of course, if you want, you can tell HTTrack to capture other directorie(s), website(s)!..
 <br>
-In our example, we might want also to capture all links in <tt>www.someweb.com/gallery/trees/</tt>, and in <tt>www.someweb.com/photos/</tt><br>
+In our example, we might want also to capture all links in <tt>www.example.com/gallery/trees/</tt>, and in <tt>www.example.com/photos/</tt><br>
 <br>
 This can easily done by using filters: go to the Option panel, select the 'Scan rules' tab, and enter this line:
 (you can leave a blank space between each rules, instead of entering a carriage return)<br>
-<tt>+www.someweb.com/gallery/trees/*<br>
-+www.someweb.com/photos/*</tt><br>
+<tt>+www.example.com/gallery/trees/*<br>
++www.example.com/photos/*</tt><br>
 <br>
-This means "accept all links begining with <tt>www.someweb.com/gallery/trees/</tt> and <tt>www.someweb.com/photos/</tt>" 
+This means "accept all links begining with <tt>www.example.com/gallery/trees/</tt> and <tt>www.example.com/photos/</tt>" 
 - the <tt>+</tt> means "accept" and the final <tt>*</tt> means "any character will match after the previous ones".
 Remember the <tt>*.doc</tt> or <tt>*.zip</tt> encountered when you want to select all files from a certain type on your computer: 
 it is almost the same here, except the begining "+"<br>
 <br>
-Now, we might want to exclude all links in <tt>www.someweb.com/gallery/trees/hugetrees/</tt>, because with the previous filter,
+Now, we might want to exclude all links in <tt>www.example.com/gallery/trees/hugetrees/</tt>, because with the previous filter,
 we accepted too many files. Here again, you can add a filter rule to refuse these links. Modify the previous filters to:<br>
-<tt>+www.someweb.com/gallery/trees/*<br>
-+www.someweb.com/photos/*<br>
--www.someweb.com/gallery/trees/hugetrees/*</tt><br>
+<tt>+www.example.com/gallery/trees/*<br>
++www.example.com/photos/*<br>
+-www.example.com/gallery/trees/hugetrees/*</tt><br>
 <br>
 You have noticed the <tt>-</tt> in the begining of the third rule: this means "refuse links matching the rule" 
-; and the rule is "any files begining with <tt>www.someweb.com/gallery/trees/hugetrees/</tt><br>
+; and the rule is "any files begining with <tt>www.example.com/gallery/trees/hugetrees/</tt><br>
 
 Voila! With these three rules, you have precisely defined what you wanted to capture.<br>
 <br>
 A more complex example?<br>
 <br>
-Imagine that you want to accept all jpg files (files with .jpg type) that have "blue" in the name and located in www.someweb.com<br>
-<tt>+www.someweb.com/*blue*.jpg</tt><br>
+Imagine that you want to accept all jpg files (files with .jpg type) that have "blue" in the name and located in www.example.com<br>
+<tt>+www.example.com/*blue*.jpg</tt><br>
 <br>
 More detailed information can be found <a href="filters.html">here</a>!<br>
 <br>
@@ -440,7 +440,7 @@ This will cause a performance loss, but will increase the compatibility with som
 
 <a NAME="QT1">Q: <strong>Only the first page is caught. What's wrong?</a></strong></br>
 A: <em>First, check the <tt>hts-log.txt</tt> file (and/or <tt>hts-err.txt</tt> error log file) - this can give you precious information.<br>
-The problem can be a website that redirects you to another site (for example, <tt>www.someweb.com</tt> to <tt>public.someweb.com</tt>) : 
+The problem can be a website that redirects you to another site (for example, <tt>www.example.com</tt> to <tt>public.example.com</tt>) : 
 in this case, use filters to accept this site<br>
 This can be, also, a problem in the HTTrack options (link depth too low, for example)</em>
 
@@ -485,10 +485,10 @@ You may also want to capture files that are forbidden by default by the <a href=
 In these cases, HTTrack does not capture these links automatically, you have to tell it to do so. 
 <br><br>
 <ul><li>Either use the <a href="filters.html">filters</a>.<br>
-Example: You are downloading <tt>http://www.someweb.com/foo/</tt> and can not get .jpg images located
-in <tt>http://www.someweb.com/bar/</tt> (for example, http://www.someweb.com/bar/blue.jpg)<br>
-Then, add the filter rule <tt>+www.someweb.com/bar/*.jpg</tt> to accept all .jpg files from this location<br>
-You can, also, accept all files from the /bar folder with <tt>+www.someweb.com/bar/*</tt>, or only html files with <tt>+www.someweb.com/bar/*.html</tt> and so on..<br><br>
+Example: You are downloading <tt>http://www.example.com/foo/</tt> and can not get .jpg images located
+in <tt>http://www.example.com/bar/</tt> (for example, http://www.example.com/bar/blue.jpg)<br>
+Then, add the filter rule <tt>+www.example.com/bar/*.jpg</tt> to accept all .jpg files from this location<br>
+You can, also, accept all files from the /bar folder with <tt>+www.example.com/bar/*</tt>, or only html files with <tt>+www.example.com/bar/*.html</tt> and so on..<br><br>
 </li><li>
 If the problems are related to robots.txt rules, that do not let you access some folders (check in the logs if you are not sure),
 you may want to disable the default robots.txt rules in the options. (but only disable this option with great care, 
@@ -509,8 +509,8 @@ and rescan the website as described before. HTTrack will be obliged to recatch t
 <a NAME="Q1bb">Q: <strong>FTP links are not caught! What's happening?</strong><br>
 A: <em>FTP files might be seen as external links, especially if they are located in outside domain. You have either to accept all external links (See the links options, -n option) or
 only specific files (see <a href="filters.html">filters</a> section). <br>
-Example: You are downloading <tt>http://www.someweb.com/foo/</tt> and can not get ftp://ftp.someweb.com files<br>
-Then, add the filter rule <tt>+ftp.someweb.com/*</tt> to accept all files from this (ftp) location<br>
+Example: You are downloading <tt>http://www.example.com/foo/</tt> and can not get ftp://ftp.example.com files<br>
+Then, add the filter rule <tt>+ftp.example.com/*</tt> to accept all files from this (ftp) location<br>
 </em>
 <br>
 
@@ -551,10 +551,10 @@ Note: In some rare cases, duplicate data files can be found when the website red
 
 <a NAME="Q1b2">Q: <strong>I'm downloading too many files! What can I do?</strong><br>
 A: <em>This is often the case when you use too large a filter, for example <tt>+*.html</tt>, which asks the
-engine to catch all .html pages (even ones on other sites!). In this case, try to use more specific filters, like <tt>+www.someweb.com/specificfolder/*.html</tt><br>
-If you still have too many files, use filters to avoid somes files. For example, if you have too many files from www.someweb.com/big/, 
-use <tt>-www.someweb.com/big/*</tt> to avoid all files from this folder. Remember that the default behaviour of the engine, when
-mirroring http://www.someweb.com/big/index.html, is to catch everything in http://www.someweb.com/big/. Filters are your friends,
+engine to catch all .html pages (even ones on other sites!). In this case, try to use more specific filters, like <tt>+www.example.com/specificfolder/*.html</tt><br>
+If you still have too many files, use filters to avoid somes files. For example, if you have too many files from www.example.com/big/, 
+use <tt>-www.example.com/big/*</tt> to avoid all files from this folder. Remember that the default behaviour of the engine, when
+mirroring http://www.example.com/big/index.html, is to catch everything in http://www.example.com/big/. Filters are your friends,
 use them!
 </em>
 <br>
@@ -562,7 +562,7 @@ use them!
 
 <a NAME="Q1b22">Q: <strong>The engine turns crazy, getting thousands of files! What's going on?</strong><br>
 A: <em>This can happen if a loop occurs in some bogus website. For example, a page that refers to itself, with a timestamp
-in the query string (e.g. <tt>http://www.someweb.com/foo.asp?ts=2000/10/10,09:45:17:147</tt>). 
+in the query string (e.g. <tt>http://www.example.com/foo.asp?ts=2000/10/10,09:45:17:147</tt>). 
 These are really annoying, as it is VERY difficult to detect the loop (the timestamp might be a page number).
 To limit the problem: set a recurse level (for example to 6), or avoid the bogus pages (use the filters)
 </em>
@@ -571,7 +571,7 @@ To limit the problem: set a recurse level (for example to 6), or avoid the bogus
 
 <a NAME="Q1b3">Q: <strong>File are sometimes renamed (the type is changed)! Why?</strong><br>
 A: <em>By default, HTTrack tries to know the type of remote files. This is useful when links like
-<tt>http://www.someweb.com/foo.cgi?id=1</tt> can be either HTML pages, images or anything else. 
+<tt>http://www.example.com/foo.cgi?id=1</tt> can be either HTML pages, images or anything else. 
 Locally, foo.cgi will not be recognized as an html page, or as an image, by your browser. HTTrack has to rename the file
 as foo.html or foo.gif so that it can be viewed.<br>
 </em>
@@ -730,8 +730,8 @@ but this is a smart bug..
 the domain, too. How to retrieve them?</strong><br>
 A: <em>If you just want to retrieve files that can be reached through links, just activate
 the 'get file near links' option. But if you want to retrieve html pages too, you can both
-use wildcards or explicit addresses ; e.g. add <tt>www.someweb.com/*</tt> to accept all
-files and pages from www.someweb.com.<br>
+use wildcards or explicit addresses ; e.g. add <tt>www.example.com/*</tt> to accept all
+files and pages from www.example.com.<br>
 <br>
 </em></a><a NAME="Q6">Q: <strong>I have forgotten some URLs of files during a long
 mirror.. Should I redo all?</strong><br>
@@ -744,7 +744,7 @@ A: <em>You can use different methods. You can use the 'get files near a link' op
 files are in a foreign domain. You can use, too, a filter adress: adding <tt>+*.zip</tt>
 in the URL list (or in the filter list) will accept all ZIP files, even if these files are
 outside the address. <br>
-Example : <tt>httrack www.someweb.com/someaddress.html +*.zip</tt> will allow
+Example : <tt>httrack www.example.com/someaddress.html +*.zip</tt> will allow
 you to retrieve all zip files that are linked on the site.</em><br>
 <br>
 </a><a NAME="Q8">Q: <strong>There are ZIP files in a page, but I don't want to transfer
@@ -771,7 +771,7 @@ them on filters!</strong><br>
 A: <em>By default, HTTrack retrieves all types of files on authorized links. To avoid
 that, define filters like </a><a NAME="Q7"><tt>-* +&lt;website&gt;/*.html
 +&lt;website&gt;/*.htm +&lt;website&gt;/ +*.&lt;type wanted&gt;</tt></a><a NAME="Q10"><br>
-Example: <tt>httrack www.someweb.com/index.html -* +www.someweb.com/*.htm* +www.someweb.com/*.gif +www.someweb.com/*.jpg</tt><br>
+Example: <tt>httrack www.example.com/index.html -* +www.example.com/*.htm* +www.example.com/*.gif +www.example.com/*.jpg</tt><br>
 <br>
 </em><a NAME="Q10">Q: <strong>When I use filters, I get too many files!</strong><br>
 A: <em>You might use too large a filter, for example <tt>*.html</tt> will get ALL html
@@ -779,13 +779,13 @@ files identified. If you want to get all files on an address, use <tt>www.&lt;ad
 If you want to get ONLY files defined by your filters, use something like <tt>-* +www.foo.com/*</tt>, because 
 <tt>+www.foo.com/*</tt> will only accept selected links without forbidding other ones!<br>
 There are lots of possibilities using filters.<br>
-Example:<tt>httrack www.someweb.com +*.someweb.com/*.htm*</tt><br>
+Example:<tt>httrack www.example.com +*.example.com/*.htm*</tt><br>
 <br>
 </em></a><a NAME="Q11">Q: <strong>When I use filters, I can't access another domain, but I
 have filtered it!</strong><br>
-A: <em>You may have done a mistake declaring filters, for example <tt>+www.someweb.com/*
--*someweb* </tt></em>will not work, because -*someweb* has an upper priority (because it has
-been declared after +www.someweb.com)<br>
+A: <em>You may have done a mistake declaring filters, for example <tt>+www.example.com/*
+-*example* </tt></em>will not work, because -*example* has an upper priority (because it has
+been declared after +www.example.com)<br>
 <br>
 </a><a NAME="Q12">Q: <strong>Must I add a&nbsp; '+' or '-' in the filter list when I want
 to use filters?</strong><br>
@@ -800,7 +800,7 @@ filter list) and accept only html files and the file(s) you want to retrieve (BU
 forget to add <tt>+&lt;website&gt;*.html</tt> in the filter list, or pages will not be
 scanned! Add the name of files you want with a <tt>*/</tt> before ; i.e. if you want to
 retrieve file.zip, add <tt>*/file.zip</tt>)<br>
-Example:<tt>httrack www.someweb.com +www.someweb.com/*.htm* +thefileiwant.zip</tt><br>
+Example:<tt>httrack www.example.com +www.example.com/*.htm* +thefileiwant.zip</tt><br>
 <br>
 </em>
 
@@ -828,7 +828,7 @@ A: <em>Yes. See the URL capture abilities (--catchurl for command-line release, 
 A: <em>Yes. See the shell system command option (-V option for command-line release)</em>
 
 <br><br><a NAME="QM6">Q: <strong>Can I use username/password authentication on a site?</strong></a><br>
-A: <em>Yes. Use user:password@your_url (example: <tt>http://foo:bar@www.someweb.com/private/mybox.html</tt>)</em>
+A: <em>Yes. Use user:password@your_url (example: <tt>http://foo:bar@www.example.com/private/mybox.html</tt>)</em>
 
 <br><br><a NAME="QM7">Q: <strong>Can I use username/password authentication for a proxy?</strong></a><br>
 A: <em>Yes. Use user:password@your_proxy_name as your proxy name (example: <tt>smith:foo@proxy.mycorp.com</tt>)</em>
