@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+
+# MIME type guessing from extension (get_httptype / give_mimext).
+# -#2 <path> prints "<path> is '<mime>'" then "and its local type is '.<ext>'".
+
+mime() {
+	test "$(httrack -O /dev/null -#2 "$1" | head -1)" == "$1 is '$2'" || exit 1
+}
+unknown() {
+	test "$(httrack -O /dev/null -#2 "$1" | head -1)" == "$1 is of an unknown MIME type" || exit 1
+}
+
+mime '/a/b.html' 'text/html'
+mime '/a/b.htm' 'text/html'
+mime '/x.css' 'text/css'
+mime '/x.js' 'application/x-javascript'
+mime '/x.png' 'image/png'
+mime '/x.jpg' 'image/jpeg'
+mime '/x.gif' 'image/gif'
+mime '/x.txt' 'text/plain'
+mime '/x.xml' 'application/xml'
+mime '/x.pdf' 'application/pdf'
+
+# no extension, or one not in the table
+unknown '/noext'
+unknown '/x.unknownext'

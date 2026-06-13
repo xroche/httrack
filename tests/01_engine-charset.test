@@ -1,5 +1,36 @@
 #!/bin/bash
 #
 
-# minimalistic charset test
-test "$(httrack -O /dev/null -#3 "iso-8859-1" "café")" == "cafÃ©"	|| exit 1
+# charset -> UTF-8 conversion (hts_convertStringToUTF8).
+# -#3 <charset> <string> prints the string re-decoded from <charset> as UTF-8.
+conv() {
+	test "$(httrack -O /dev/null -#3 "$1" "$2")" == "$3" || exit 1
+}
+# crash probe: malformed input must exit cleanly, not abort.
+runs() {
+	httrack -O /dev/null -#3 "$1" "$2" >/dev/null 2>&1 || exit 1
+}
+
+# the source bytes below are UTF-8 (this file is UTF-8); "café" is 0x63 61 66 C3 A9.
+
+# already UTF-8: identity
+conv 'utf-8' 'café' 'café'
+
+# bytes reinterpreted as latin-1: each input byte becomes one codepoint
+conv 'iso-8859-1' 'café' 'cafÃ©'
+
+# windows-1252 is NOT latin-1: 0x80 is the euro sign, not U+0080. This is the
+# case that actually exercises the cp1252 table (the 0x80-0x9F range).
+conv 'windows-1252' $'\x80' '€'
+
+# pure ASCII is charset-invariant
+conv 'us-ascii' 'hello' 'hello'
+
+# unknown charset: ASCII passes through unchanged, but non-ASCII input cannot be
+# decoded and yields empty output (an error is printed to stderr).
+conv 'no-such-charset-xyz' 'abc' 'abc'
+test "$(httrack -O /dev/null -#3 'no-such-charset-xyz' 'café' 2>/dev/null)" == "" || exit 1
+
+# malformed UTF-8 (lone continuation byte, truncated lead byte) must not crash
+runs 'utf-8' $'\x80'
+runs 'utf-8' $'\xc3'
