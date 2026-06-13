@@ -1,5 +1,49 @@
 #!/bin/bash
 #
 
-# basic entities handling (with boggy entities handling)
-test "$(httrack -O /dev/null -#6 "&foo;&nbsp;th&eacute;&amp;caf&#xe9;&#e9;&#x3082;&#12398;&#x306e;&#x3051;&#x59eb;")" == "&foo; thé&café&#e9;もののけ姫"	|| exit 1
+# HTML entity unescaping (hts_unescapeEntitiesWithCharset).
+# -#6 <string> prints the string with entities decoded (UTF-8 output).
+ent() {
+	test "$(httrack -O /dev/null -#6 "$1")" == "$2" || exit 1
+}
+# crash probe: malformed input must exit cleanly, not abort.
+runs() {
+	httrack -O /dev/null -#6 "$1" >/dev/null 2>&1 || exit 1
+}
+
+# named entities
+ent '&amp;' '&'
+ent '&lt;&gt;' '<>'
+ent '&eacute;' 'é'
+
+# numeric: decimal and hex
+ent '&#65;&#66;' 'AB'
+ent '&#x41;' 'A'
+ent '&#xe9;' 'é'
+
+# malformed numeric reference (decimal 'e9' has no digits) is left verbatim
+ent '&#e9;' '&#e9;'
+
+# U+0000 is not emitted; the reference is left verbatim
+ent '&#0;' '&#0;'
+
+# unknown entity is left verbatim
+ent '&unknownentity;' '&unknownentity;'
+
+# no entities: pass-through
+ent 'plain text' 'plain text'
+
+# decoding is a single pass: &amp;amp; -> &amp; (not &)
+ent '&amp;amp;' '&amp;'
+
+# KNOWN BUG: &nbsp; (U+00A0) decodes to a plain space (0x20), not C2 A0. The
+# engine forces 160 -> 32 in htsencoding.c (FIXME hack). Locked here; if that
+# hack is ever removed, update this to expect the C2 A0 byte.
+ent '&nbsp;' ' '
+
+# overflowing numeric reference must not crash (value far above U+10FFFF)
+runs '&#9999999999;'
+
+# original compound case. NOTE: the space after '&foo;' is the &nbsp; known bug
+# above (U+00A0 -> 0x20), not a real space in the source.
+ent '&foo;&nbsp;th&eacute;&amp;caf&#xe9;&#e9;&#x3082;&#12398;&#x306e;&#x3051;&#x59eb;' '&foo; thé&café&#e9;もののけ姫'

@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+
+# wildcard filter engine (strjoker), the core of +/- include/exclude rules.
+# -#0 <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
+
+match() {
+	test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does match $1" || exit 1
+}
+nomatch() {
+	test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does NOT match $1" || exit 1
+}
+
+# bare star matches everything
+match '*' 'anything/at/all'
+
+# prefix / suffix
+match 'foo*' 'foobar'
+nomatch 'foo*' 'xfoobar'
+match '*.gif' 'a/b/c.gif'
+
+# extension match is case-insensitive
+match '*.GIF' 'a.gif'
+
+# character classes
+match '*[A-Z].txt' 'B.txt'
+nomatch '*[A-Z].txt' 'b.txt'
+match '*[0-9]' '5'
+nomatch '*[0-9]' 'x'
+
+# comma-separated class: both ranges are active, the comma is not matched
+# literally and a char in neither range fails
+match '*[A-Z,0-9]' 'Q'
+match '*[A-Z,0-9]' '3'
+nomatch '*[A-Z,0-9]' 'a'
+
+# named groups: [file] stops at '/', [path] spans it
+match '*[file].html' 'foo.html'
+nomatch '*[file].html' 'foo/bar.html'
+match '*[path]x' 'a/b/x'
+
+# *[] means "nothing more after the star"
+nomatch '*[]' 'abc'
+
+# multiple stars
+match '*foo*bar' 'foozbar'
+
+# '?' is the query-string marker, not a single-char wildcard
+nomatch 'a?c' 'abc'

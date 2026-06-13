@@ -1,10 +1,36 @@
 #!/bin/bash
 #
 
-# IDNA routine
-test "$(httrack -O /dev/null -#4 "www.café.com")" == "www.xn--caf-dma.com"	|| exit 1
-test "$(httrack -O /dev/null -#4 "www.もののけ姫-the-movie.com")" == "www.xn---the-movie-g63irla2z8297c.com"	|| exit 1
+# IDNA / punycode encode (-#4) and decode (-#5). This code has a CVE history,
+# so the edge cases below cover passthrough, round-trips, and malformed input.
 
-# reverse IDNA
-test "$(httrack -O /dev/null -#5 "www.xn--caf-dma.com")" == "www.café.com"	|| exit 1
-test "$(httrack -O /dev/null -#5 "www.xn---the-movie-g63irla2z8297c.com")" == "www.もののけ姫-the-movie.com"	|| exit 1
+enc() { test "$(httrack -O /dev/null -#4 "$1")" == "$2" || exit 1; }
+dec() { test "$(httrack -O /dev/null -#5 "$1")" == "$2" || exit 1; }
+# crash probe: malformed ACE input must exit cleanly, not abort.
+runs() { httrack -O /dev/null -#5 "$1" >/dev/null 2>&1 || exit 1; }
+
+# encode
+enc 'www.café.com' 'www.xn--caf-dma.com'
+enc 'www.もののけ姫-the-movie.com' 'www.xn---the-movie-g63irla2z8297c.com'
+enc 'münchen.de' 'xn--mnchen-3ya.de'
+
+# decode (reverse of the above)
+dec 'www.xn--caf-dma.com' 'www.café.com'
+dec 'www.xn---the-movie-g63irla2z8297c.com' 'www.もののけ姫-the-movie.com'
+dec 'xn--mnchen-3ya.de' 'münchen.de'
+
+# pure-ASCII hostnames are unchanged either way
+enc 'plain.example.com' 'plain.example.com'
+dec 'plain.example.com' 'plain.example.com'
+enc 'a.b.c.example.org' 'a.b.c.example.org'
+
+# an all-ASCII label (even one starting with the xn-- prefix) is passed through
+# by the encoder untouched, since there is nothing to encode
+enc 'xn--already-encoded.com' 'xn--already-encoded.com'
+
+# an empty punycode payload decodes back to the bare xn-- label
+dec 'xn--' 'xn--'
+
+# malformed ACE payloads (invalid base-36, garbage) must not crash
+runs 'xn--!!!'
+runs 'xn--already-encoded.com'
