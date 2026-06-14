@@ -43,17 +43,23 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 // libérer filters[0] pour insérer un élément dans filters[0]
-#define HT_INSERT_FILTERS0 do {\
-  int i;\
-  if (*opt->filters.filptr > 0) {\
-    for(i = (*opt->filters.filptr)-1 ; i>=0 ; i--) {\
-      strcpybuff((*opt->filters.filters)[i+1],(*opt->filters.filters)[i]);\
-    }\
-  }\
-  (*opt->filters.filters)[0][0]='\0';\
-  (*opt->filters.filptr)++;\
-  assertf((*opt->filters.filptr) < opt->maxfilter); \
-} while(0)
+/* Per-slot capacity of the filters array, matching the slot stride allocated by
+   filters_init() in htscore.c (HTS_URLMAXSIZE * 2). */
+#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
+
+#define HT_INSERT_FILTERS0                                                     \
+  do {                                                                         \
+    int i;                                                                     \
+    if (*opt->filters.filptr > 0) {                                            \
+      for (i = (*opt->filters.filptr) - 1; i >= 0; i--) {                      \
+        strlcpybuff((*opt->filters.filters)[i + 1],                            \
+                    (*opt->filters.filters)[i], HTS_FILTER_SLOT_SIZE);         \
+      }                                                                        \
+    }                                                                          \
+    (*opt->filters.filters)[0][0] = '\0';                                      \
+    (*opt->filters.filptr)++;                                                  \
+    assertf((*opt->filters.filptr) < opt->maxfilter);                          \
+  } while (0)
 
 typedef struct htspair_t {
   const char *tag;
@@ -707,17 +713,21 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         forbidden_url = 1;
         opt->wizard = 2;        // sauter tout le reste
         break;
-      case 0:                  // interdire les mêmes liens: adr/fil
+      case 0: // forbid the same link: adr/fil
         forbidden_url = 1;
-        HT_INSERT_FILTERS0;     // insérer en 0
-        strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
-        if (*fil != '/')
-          strcatbuff(_FILTERS[0], "/");
-        strcatbuff(_FILTERS[0], fil);
+        HT_INSERT_FILTERS0; // insert at slot 0
+        {
+          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+          htsbuff_cpy(&f, "-");
+          htsbuff_cat(&f, jump_identification_const(adr));
+          if (*fil != '/')
+            htsbuff_cat(&f, "/");
+          htsbuff_cat(&f, fil);
+        }
         break;
 
-      case 1:                  // éliminer répertoire entier et sous rép: adr/path/ *
+      case 1: // forbid the whole directory and subdirs: adr/path/*
         forbidden_url = 1;
         {
           size_t i = strlen(fil) - 1;
@@ -725,27 +735,34 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           while((fil[i] != '/') && (i > 0))
             i--;
           if (fil[i] == '/') {
-            HT_INSERT_FILTERS0; // insérer en 0
-            strcpybuff(_FILTERS[0], "-");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
+            htsbuff f;
+
+            HT_INSERT_FILTERS0; // insert at slot 0
+            f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+            htsbuff_cpy(&f, "-");
+            htsbuff_cat(&f, jump_identification_const(adr));
             if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i);
-            if (_FILTERS[0][strlen(_FILTERS[0]) - 1] != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strcatbuff(_FILTERS[0], "*");
+              htsbuff_cat(&f, "/");
+            htsbuff_catn(&f, fil, i);
+            if (f.len > 0 && f.buf[f.len - 1] != '/')
+              htsbuff_cat(&f, "/");
+            htsbuff_cat(&f, "*");
           }
         }
 
         // ** ...
         break;
 
-      case 2:                  // adresse adr*
+      case 2: // the whole address: adr*
         forbidden_url = 1;
-        HT_INSERT_FILTERS0;     // insérer en 0                                
-        strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
-        strcatbuff(_FILTERS[0], "*");
+        HT_INSERT_FILTERS0; // insert at slot 0
+        {
+          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+          htsbuff_cpy(&f, "-");
+          htsbuff_cat(&f, jump_identification_const(adr));
+          htsbuff_cat(&f, "*");
+        }
         break;
 
       case 3:                  // ** A FAIRE
@@ -777,54 +794,70 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
         break;
 
-      case 5:                  // autoriser répertoire entier et fils
-        if ((opt->seeker & 2) == 0) {   // interdiction de monter
+      case 5: // allow the whole directory and its children
+        if ((opt->seeker & 2) == 0) { // not allowed to go up
           size_t i = strlen(fil) - 1;
 
           while((fil[i] != '/') && (i > 0))
             i--;
           if (fil[i] == '/') {
-            HT_INSERT_FILTERS0; // insérer en 0                                
-            strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
-            if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i + 1);
-            strcatbuff(_FILTERS[0], "*");
+            HT_INSERT_FILTERS0; // insert at slot 0
+            {
+              htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+              htsbuff_cpy(&f, "+");
+              htsbuff_cat(&f, jump_identification_const(adr));
+              if (*fil != '/')
+                htsbuff_cat(&f, "/");
+              htsbuff_catn(&f, fil, i + 1);
+              htsbuff_cat(&f, "*");
+            }
           }
-        } else {                // autoriser domaine alors!!
-          HT_INSERT_FILTERS0;   // insérer en 0                                strcpybuff(filters[filptr],"+");
-          strcpybuff(_FILTERS[0], "+");
-          strcatbuff(_FILTERS[0], jump_identification_const(adr));
-          strcatbuff(_FILTERS[0], "*");
+        } else {              // then allow the domain
+          HT_INSERT_FILTERS0; // insert at slot 0
+          {
+            htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+            htsbuff_cpy(&f, "+");
+            htsbuff_cat(&f, jump_identification_const(adr));
+            htsbuff_cat(&f, "*");
+          }
         }
         break;
 
       case 6:                  // same domain
-        HT_INSERT_FILTERS0;     // insérer en 0                                strcpybuff(filters[filptr],"+");
-        strcpybuff(_FILTERS[0], "+");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
-        strcatbuff(_FILTERS[0], "*");
+        HT_INSERT_FILTERS0;    // insert at slot 0
+        {
+          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+          htsbuff_cpy(&f, "+");
+          htsbuff_cat(&f, jump_identification_const(adr));
+          htsbuff_cat(&f, "*");
+        }
         break;
         //
-      case 7:                  // autoriser ce répertoire
-        {
-          size_t i = strlen(fil) - 1;
+      case 7: // allow this directory
+      {
+        size_t i = strlen(fil) - 1;
 
-          while((fil[i] != '/') && (i > 0))
-            i--;
-          if (fil[i] == '/') {
-            HT_INSERT_FILTERS0; // insérer en 0                                
-            strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
+        while ((fil[i] != '/') && (i > 0))
+          i--;
+        if (fil[i] == '/') {
+          HT_INSERT_FILTERS0; // insert at slot 0
+          {
+            htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
+
+            htsbuff_cpy(&f, "+");
+            htsbuff_cat(&f, jump_identification_const(adr));
             if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i + 1);
-            strcatbuff(_FILTERS[0], "*[file]");
+              htsbuff_cat(&f, "/");
+            htsbuff_catn(&f, fil, i + 1);
+            htsbuff_cat(&f, "*[file]");
           }
         }
+      }
 
-        break;
+      break;
 
       case 50:                 // on fait rien
         break;
