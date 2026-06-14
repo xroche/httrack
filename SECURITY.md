@@ -4,7 +4,7 @@
 
 Report privately, not in a public issue or PR: use GitHub
 [private advisories](https://github.com/xroche/httrack/security/advisories/new)
-or email <roche@httrack.com>.
+or email <roche@httrack.com> (alternate: `xroche at gmail dot com`).
 
 Include the HTTrack version and platform, a concrete reproduction (command line,
 a sample page or server response, or a small proof of concept), and what an
