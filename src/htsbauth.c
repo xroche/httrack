@@ -102,7 +102,8 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   strcatbuff(cook, "\n");
   if (!((strlen(cookie->data) + strlen(cook)) < cookie->max_len))
     return -1;                  // impossible d'ajouter
-  cookie_insert(insert, cook);
+  cookie_insert(insert, cookie->max_len - (size_t) (insert - cookie->data),
+                cook);
 #if DEBUG_COOK
   printf("add_new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
          cook_name, cook_value, domain, path);
@@ -118,7 +119,7 @@ int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, con
   b = cookie_find(cookie->data, cook_name, domain, path);
   if (b) {
     a = cookie_nextfield(b);
-    cookie_delete(b, a - b);
+    cookie_delete(b, cookie->max_len - (size_t) (b - cookie->data), a - b);
 #if DEBUG_COOK
     printf("deleted old cookie: %s %s %s\n", cook_name, domain, path);
 #endif
@@ -336,41 +337,44 @@ int cookie_save(t_cookie * cookie, const char *name) {
   return -1;
 }
 
-// insertion chaine ins avant s
-void cookie_insert(char *s, const char *ins) {
+// Insert string ins before s. s_size is the capacity of the buffer at s.
+void cookie_insert(char *s, size_t s_size, const char *ins) {
   char *buff;
 
-  if (strnotempty(s) == 0) {    // rien à faire, juste concat
-    strcatbuff(s, ins);
+  if (strnotempty(s) == 0) { // nothing there yet: just concatenate
+    strlcatbuff(s, ins, s_size);
   } else {
     buff = (char *) malloct(strlen(s) + 1);
     if (buff) {
-      strcpybuff(buff, s);      // copie temporaire
-      strcpybuff(s, ins);       // insérer
-      strcatbuff(s, buff);      // copier
+      strlcpybuff(buff, s, strlen(s) + 1); // temporary copy of s
+      strlcpybuff(s, ins, s_size);         // write ins
+      strlcatbuff(s, buff, s_size);        // then the saved content
       freet(buff);
     }
   }
 }
 
-// destruction chaine dans s position pos
-void cookie_delete(char *s, size_t pos) {
+// Delete the substring of s at position pos. s_size is the capacity at s.
+void cookie_delete(char *s, size_t s_size, size_t pos) {
   char *buff;
 
-  if (strnotempty(s + pos) == 0) {      // rien à faire, effacer
+  if (strnotempty(s + pos) == 0) { // nothing after pos: truncate
     s[0] = '\0';
   } else {
     buff = (char *) malloct(strlen(s + pos) + 1);
     if (buff) {
-      strcpybuff(buff, s + pos);        // copie temporaire
-      strcpybuff(s, buff);      // copier
+      strlcpybuff(buff, s + pos, strlen(s + pos) + 1); // temporary copy
+      strlcpybuff(s, buff, s_size);                    // overwrite from start
       freet(buff);
     }
   }
 }
 
-// renvoie champ param de la chaine cookie_base
-// ex: cookie_get("ceci est<tab>un<tab>exemple",1) renvoi "un"
+// Return field <param> (0-based, tab-separated) of the cookie line cookie_base,
+// into buffer. ex: cookie_get("ceci est<tab>un<tab>exemple", 1) returns "un".
+// buffer must hold at least COOKIE_FIELD_BUFFER_SIZE bytes (all callers use
+// char[8192]).
+#define COOKIE_FIELD_BUFFER_SIZE 8192
 const char *cookie_get(char *buffer, const char *cookie_base, int param) {
   const char *limit;
 
@@ -394,11 +398,11 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
     if (cookie_base) {
       if (cookie_base < limit) {
         const char *a = cookie_base;
+        htsbuff b = htsbuff_ptr(buffer, COOKIE_FIELD_BUFFER_SIZE);
 
         while((*a) && (*a != '\t') && (*a != '\n'))
           a++;
-        buffer[0] = '\0';
-        strncatbuff(buffer, cookie_base, (int) (a - cookie_base));
+        htsbuff_catn(&b, cookie_base, (size_t) (a - cookie_base));
         return buffer;
       } else
         return "";
@@ -458,11 +462,13 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   return NULL;
 }
 
+/* Build the auth prefix (host + path, query stripped) into prefix.
+   Callers pass a buffer of HTS_URLMAXSIZE * 2 bytes. */
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   char *a;
 
-  strcpybuff(prefix, jump_identification_const(adr));
-  strcatbuff(prefix, fil);
+  strlcpybuff(prefix, jump_identification_const(adr), HTS_URLMAXSIZE * 2);
+  strlcatbuff(prefix, fil, HTS_URLMAXSIZE * 2);
   a = strchr(prefix, '?');
   if (a)
     *a = '\0';
