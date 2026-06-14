@@ -85,3 +85,61 @@ jobs:
 
       - name: shfmt
         run: shfmt -d -i 4 man/makeman.sh tools/mkdeb.sh
+
+  # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
+  # (it was shaped by an old Visual Studio formatter) and does not round-trip,
+  # so we never reformat the whole tree -- only the lines a PR touches.
+  format:
+    name: format (clang-format-19, changed lines)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format 19 (pinned, from apt.llvm.org)
+        run: |
+          set -euo pipefail
+          # ubuntu-24.04's native clang-format is 18; pin 19 to match local dev.
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-19
+          # git-clang-format driver, pinned to an immutable release tag (not a
+          # moving branch) since we curl and then execute it.
+          sudo curl -fsSL -o /usr/local/bin/git-clang-format \
+            https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/clang/tools/clang-format/git-clang-format
+          sudo chmod 0755 /usr/local/bin/git-clang-format
+          clang-format-19 --version
+
+      - name: Check formatting of changed lines
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          base="origin/${{ github.base_ref }}"
+          set +e
+          diff="$(git clang-format --binary clang-format-19 --style=file \
+                    --diff --extensions c,h "$base")"
+          rc=$?
+          set -e
+          # Classify by output first: a non-empty diff means "not clean",
+          # regardless of the driver's exit convention (the release-tag driver
+          # exits 0 and signals via stdout; some packaged drivers exit 1 on a
+          # diff). A nonzero exit with clean output is a real checker error.
+          case "$diff" in
+            "" | "no modified files to format" | *"did not modify any files"*)
+              if [ "$rc" -ne 0 ]; then
+                echo "::error::git clang-format failed (exit $rc): checker error."
+                exit 1
+              fi
+              echo "Formatting OK: changed C lines are clang-format-clean." ;;
+            *)
+              echo "$diff"
+              echo "::error::Changed C lines are not clang-format-clean."
+              echo "Fix locally with: git clang-format --binary clang-format-19 $base"
+              exit 1 ;;
+          esac
