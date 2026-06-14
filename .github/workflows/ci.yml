@@ -61,6 +61,32 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Validate the Debian packaging via the same script maintainers release with.
+  # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
+  # source build) is arch- and compiler-independent, and the build matrix above
+  # already covers compile portability. lintian runs with --fail-on=error.
+  deb:
+    name: deb package (lintian)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install packaging toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev \
+            debhelper devscripts lintian fakeroot
+
+      # --unsigned: CI has no GPG key (also skips the release sig/checksums).
+      # debuild builds every package, then lintian gates on errors.
+      - name: Build Debian packages
+        run: bash tools/mkdeb.sh --unsigned --no-release-artifacts
+
   dco:
     name: DCO sign-off
     # Only checkable on a PR, where we have the base..head commit range.

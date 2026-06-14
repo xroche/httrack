@@ -153,8 +153,9 @@ main() {
         cp -a "$export_dir/debian" "httrack-$ver/debian"
     )
 
-    # Build (debuild also runs lintian and signs).
-    local -a debuild_opts=(--lintian-opts -I -i)
+    # Build (debuild also runs lintian and signs). --fail-on aborts on a lintian
+    # error or warning, so neither a release nor CI produces an unclean package.
+    local -a debuild_opts=(--lintian-opts -I -i "--fail-on=error,warning")
     local -a build_opts=()
     [[ $source_only -eq 1 ]] && build_opts+=(-S)
     if [[ $unsigned -eq 1 ]]; then
