@@ -61,6 +61,37 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  dco:
+    name: DCO sign-off
+    # Only checkable on a PR, where we have the base..head commit range.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Every commit must be signed off
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          fail=0
+          # --no-merges: merge commits are GitHub-generated and carry no sign-off.
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            if [ -z "$(git log -1 --format='%(trailers:key=Signed-off-by)' "$sha")" ]; then
+              echo "Missing Signed-off-by: $(git log -1 --format='%h %s' "$sha")"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "Sign commits with 'git commit -s'; fix a branch with 'git rebase --signoff $BASE'."
+            echo "See CONTRIBUTING.md (Developer Certificate of Origin)."
+            exit 1
+          fi
+
   lint:
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
