@@ -40,6 +40,9 @@ Please visit our Website: http://www.httrack.com
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+// Capacity contract for the catch_url() 'data' buffer (32 Kb).
+#define CATCH_URL_DATA_SIZE 32768
+
 // Fonctions
 void socinput(T_SOC soc, char *s, int max);
 
