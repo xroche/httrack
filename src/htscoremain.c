@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htscache_selftest.h"
 #include "htsmd5.h"
 
 #include <ctype.h>
@@ -2113,6 +2114,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case '#':{           // non documenté
               com++;
               switch (*com) {
+              case 'A': // cache self-test: httrack -#A <dir>
+                if (na + 1 < argc) {
+                  const int err = cache_selftests(opt, argv[na + 1]);
+
+                  printf("cache-selftest: %s\n", err ? "FAIL" : "OK");
+                  htsmain_free();
+                  return err;
+                } else {
+                  fprintf(stderr, "Option #A requires a directory argument\n");
+                  htsmain_free();
+                  return 1;
+                }
+                break;
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
                 {
                   int hasFilter = 0;
