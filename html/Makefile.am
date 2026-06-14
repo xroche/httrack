@@ -12,6 +12,7 @@ WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
 WebIcon48x48dir = $(datadir)/icons/hicolor/48x48/apps
 VFolderEntrydir = $(prefix)/share/applications
+MetaInfodir = $(datadir)/metainfo
 
 # Wildcards are globbed against $(srcdir): a bare "*.html" is resolved against
 # the build dir and stays unexpanded (breaking "make") in an out-of-tree build.
@@ -33,11 +34,12 @@ WebIcon16x16_DATA = $(srcdir)/server/div/16x16/*.png
 WebIcon32x32_DATA = $(srcdir)/server/div/32x32/*.png
 WebIcon48x48_DATA = $(srcdir)/server/div/48x48/*.png
 VFolderEntry_DATA = $(srcdir)/server/div/*.desktop
+MetaInfo_DATA = $(srcdir)/server/div/*.metainfo.xml
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
-	$(VFolderEntry_DATA) \
+	$(VFolderEntry_DATA) $(MetaInfo_DATA) \
 	httrack.css
 
 install-data-hook:

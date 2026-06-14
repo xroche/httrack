@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Xavier Roche <roche@httrack.com> -->
+<component type="desktop-application">
+  <id>com.httrack.WebHTTrack</id>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>WebHTTrack Website Copier</name>
+  <summary>Copy websites to your computer for offline browsing</summary>
+  <description>
+    <p>
+      WebHTTrack is the web interface to HTTrack, an offline browser utility.
+      It downloads a website from the Internet to a local directory, fetching
+      the HTML, images, and other files and rebuilding the site's link
+      structure so you can browse it offline.
+    </p>
+    <p>
+      A step-by-step web interface guides you through choosing the addresses
+      to mirror and the options to apply. Mirrors can be updated in place and
+      interrupted downloads resumed.
+    </p>
+    <p>Typical uses include:</p>
+    <ul>
+      <li>Keeping an offline copy of a website for reading without a connection</li>
+      <li>Archiving or preserving sites and capturing them for later reference</li>
+      <li>Updating an existing local mirror without downloading it again</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">WebHTTrack.desktop</launchable>
+  <icon type="stock">httrack</icon>
+  <categories>
+    <category>Network</category>
+  </categories>
+  <keywords>
+    <keyword>offline browser</keyword>
+    <keyword>website copier</keyword>
+    <keyword>mirror</keyword>
+    <keyword>crawl</keyword>
+    <keyword>archiving</keyword>
+  </keywords>
+  <url type="homepage">https://www.httrack.com/</url>
+  <url type="bugtracker">https://github.com/xroche/httrack/issues</url>
+  <developer id="com.httrack">
+    <name>Xavier Roche</name>
+  </developer>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Choosing the addresses and options for a new mirror</caption>
+      <image>https://www.httrack.com/html/images/screenshot_01b.jpg</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="3.49.8" date="2026-06-07"/>
+  </releases>
+</component>
