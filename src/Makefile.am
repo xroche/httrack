@@ -86,8 +86,9 @@ libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 # This thin JNI wrapper reaches libc only through libhttrack, so the direct
 # libc edge is dropped from DT_NEEDED (library-not-linked-against-libc). Force
-# libc to be recorded as a dependency.
-libhtsjava_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO) -Wl,--push-state,--no-as-needed,-lc,--pop-state
+# libc back as a dependency; configure gates the flag since only a GNU-style
+# linker accepts it (LIBC_FORCE_LINK is empty on e.g. macOS).
+libhtsjava_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO) $(LIBC_FORCE_LINK)
 
 EXTRA_DIST = httrack.h webhttrack \
 		coucal/murmurhash3.h.diff \

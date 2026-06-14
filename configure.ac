@@ -91,6 +91,13 @@ AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,
 AX_CHECK_LINK_FLAG([-Wl,-z,relro,-z,now], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro,-z,now"])
 AX_CHECK_LINK_FLAG([-Wl,-z,noexecstack], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,noexecstack"])
 
+# Force libc back into DT_NEEDED for libraries that reach it only through
+# libhttrack (libhtsjava, the libtest callbacks), but only with a GNU-style
+# linker; Apple ld rejects these flags and links libSystem unconditionally.
+AX_CHECK_LINK_FLAG([-Wl,--push-state,--no-as-needed,-lc,--pop-state],
+	[LIBC_FORCE_LINK="-Wl,--push-state,--no-as-needed,-lc,--pop-state"])
+AC_SUBST([LIBC_FORCE_LINK])
+
 ### PIE
 CFLAGS_PIE=""
 LDFLAGS_PIE=""

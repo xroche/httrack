@@ -1,5 +1,8 @@
 #!/bin/bash
 #
+# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
+# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
+# tool flags despite the #!/bin/bash above.
 
 # Cache create/read/update logic (driven by 'httrack -#A <dir>').
 #
@@ -38,9 +41,12 @@ test -e "$dir/hts-cache/new.zip" || {
 # Sanity-check the cache footprint: the few-thousand-entry pass is expected to
 # weigh ~1-2 MB. Fail if it balloons well past that (e.g. a per-entry overhead
 # regression or runaway growth), so the cache size stays bounded.
-ceiling=$((4 * 1024 * 1024))
-bytes=$(du -sb "$dir/hts-cache" | cut -f1)
-test "$bytes" -le "$ceiling" || {
-    echo "cache footprint $bytes bytes exceeds ${ceiling} ceiling" >&2
+# du -sk (1024-byte units) is portable; GNU's -b (apparent bytes) is rejected
+# by BSD/macOS du. Block-allocated size is an upper bound on apparent size,
+# which is all a ceiling check needs.
+ceiling=$((4 * 1024)) # KiB
+kbytes=$(du -sk "$dir/hts-cache" | cut -f1)
+test "$kbytes" -le "$ceiling" || {
+    echo "cache footprint ${kbytes} KiB exceeds ${ceiling} KiB ceiling" >&2
     exit 1
 }

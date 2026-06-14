@@ -61,6 +61,78 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Portability: build and test on macOS (Darwin/clang) on a native runner --
+  # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
+  # generic-Unix path on a second libc and kernel. brew's openssl@3 is keg-only,
+  # so point configure at it; everything else is in the SDK or default paths.
+  macos:
+    name: build (macOS arm64, clang)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          ssl="$(brew --prefix openssl@3)"
+          autoreconf -fi
+          ./configure CPPFLAGS="-I${ssl}/include" LDFLAGS="-L${ssl}/lib"
+
+      - name: Build
+        run: make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Test
+        run: make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
+  # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
+  # and bounds math can truncate or wrap in ways 64-bit never reveals (the axis
+  # the overflow-safe bounds work targets). --build (not --host) keeps configure
+  # out of cross mode, so the i386 binary still runs the test suite here.
+  linux-i386:
+    name: build (linux i386, gcc -m32)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies (multilib + 32-bit libs)
+        run: |
+          set -euo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc-multilib autoconf automake libtool \
+            autoconf-archive zlib1g-dev:i386 libssl-dev:i386
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --build=i686-pc-linux-gnu CC="gcc -m32"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        run: make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Validate the Debian packaging via the same script maintainers release with.
   # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
   # source build) is arch- and compiler-independent, and the build matrix above

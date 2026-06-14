@@ -695,6 +695,7 @@ HAVE_VISIBILITY
 CFLAG_VISIBILITY
 LDFLAGS_PIE
 CFLAGS_PIE
+LIBC_FORCE_LINK
 DEFAULT_LDFLAGS
 DEFAULT_CFLAGS
 VERSION_INFO
@@ -15869,6 +15870,53 @@ else case e in #(
   e) : ;;
 esac
 fi
+
+
+# Force libc back into DT_NEEDED for libraries that reach it only through
+# libhttrack (libhtsjava, the libtest callbacks), but only with a GNU-style
+# linker; Apple ld rejects these flags and links libSystem unconditionally.
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts -Wl,--push-state,--no-as-needed,-lc,--pop-state" >&5
+printf %s "checking whether the linker accepts -Wl,--push-state,--no-as-needed,-lc,--pop-state... " >&6; }
+if test ${ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e)
+  ax_check_save_flags=$LDFLAGS
+  LDFLAGS="$LDFLAGS  -Wl,--push-state,--no-as-needed,-lc,--pop-state"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state=yes
+else case e in #(
+  e) ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+  LDFLAGS=$ax_check_save_flags ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state" >&5
+printf "%s\n" "$ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state" >&6; }
+if test "x$ax_cv_check_ldflags___Wl___push_state___no_as_needed__lc___pop_state" = xyes
+then :
+  LIBC_FORCE_LINK="-Wl,--push-state,--no-as-needed,-lc,--pop-state"
+else case e in #(
+  e) : ;;
+esac
+fi
+
 
 
 ### PIE
