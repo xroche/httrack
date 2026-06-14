@@ -118,7 +118,10 @@ main() {
     git -C "$repo/src/coucal" archive --format=tar --prefix=src/coucal/ HEAD |
         tar -x -C "$export_dir"
 
-    # Refresh build system and man page, then build and validate the tarball.
+    # Refresh build system and man page, then build the tarball. We build here
+    # only because regen-man needs the compiled binaries; the test suite is not
+    # run in this pass. debuild (below) runs the full suite once, with the online
+    # tests enabled, so a check here would just be a slower, offline-only repeat.
     info "regenerating build system and man page"
     (
         cd "$export_dir"
@@ -126,8 +129,6 @@ main() {
         ./configure --quiet
         make -s -j"$(nproc)"
         make -s -C man regen-man
-        info "running test suite"
-        make -s check
         # Build the tarball from a clean tree so no object files leak into it.
         make -s clean
         make -s dist
