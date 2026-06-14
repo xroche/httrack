@@ -1,7 +1,9 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998-2017 Xavier Roche and other contributors
+Copyright (C) 1998 Xavier Roche and other contributors
+
+SPDX-License-Identifier: GPL-3.0-or-later
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -202,7 +204,7 @@ Please visit our Website: http://www.httrack.com
 /* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
 
-/* Copyright (C) 1998-2017 Xavier Roche and other contributors */
+/* Copyright (C) 1998 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
 #define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION " " HTTRACK_AFF_AUTHORS ", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
