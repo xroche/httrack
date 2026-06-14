@@ -20,6 +20,7 @@ TESTS = \
 	01_engine-mime.test \
 	01_engine-parse.test \
 	01_engine-simplify.test \
+	01_engine-strsafe.test \
 	02_manpage-regen.test \
 	10_crawl-simple.test \
 	11_crawl-cookies.test \

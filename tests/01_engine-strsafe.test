@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+
+# htssafe.h bounded string operations (driven by 'httrack -#8').
+
+# Success path: every bounded op (strcpybuff/strcatbuff/strncatbuff/strlcpybuff)
+# must behave correctly. Like the other -# debug modes, a trailing token is
+# required (a bare '-#8' falls through to the usage screen).
+out=$(httrack -#8 run)
+test $? -eq 0 || exit 1
+test "$out" == "strsafe: OK" || exit 1
+
+# Overflow path: an over-capacity write into a sized buffer must be caught by
+# the bounded macro and abort the process, not be silently truncated/completed.
+# Assert the htssafe abort signature specifically, so the test cannot pass for
+# an unrelated reason (e.g. the -#8 mode being gone and falling through to the
+# usage screen, which also exits non-zero).
+err=$(httrack -#8 overflow "this string is far too long for the buffer" 2>&1)
+case "$err" in
+	*"strsafe: NOT aborted"*) echo "over-capacity write was NOT caught" >&2; exit 1 ;;
+	*"overflow while copying"*) ;;
+	*) echo "expected htssafe overflow abort, got: $err" >&2; exit 1 ;;
+esac
