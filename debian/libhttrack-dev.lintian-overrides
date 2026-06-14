@@ -1,4 +1,7 @@
-libhttrack-dev: breakout-link *
-libhttrack-dev: hardening-no-fortify-functions usr/lib/x86_64-linux-gnu/httrack/libtest/*
-libhttrack-dev: package-contains-documentation-outside-usr-share-doc usr/share/httrack/libtest/readme.txt
+# The libtest example shared objects are unhardened test fixtures shipped for
+# the test harness, and their readme sits beside them under /usr/share/httrack.
+# Both are pointed hints with an empty match context, so match with '*'.
+libhttrack-dev: hardening-no-fortify-functions *
+libhttrack-dev: package-contains-documentation-outside-usr-share-doc *
+# config.h is installed as a public dev header; the package-name match is expected.
 libhttrack-dev: package-name-defined-in-config-h usr/include/httrack/config.h

@@ -1,2 +1,3 @@
+# The shared libraries ship without a versioned symbols control file (ABI is
+# tracked via the SONAME and a strict =version dependency, see debian/rules).
 libhttrack2: no-symbols-control-file usr/lib/*
-libhttrack2: spelling-error-in-binary usr/lib/*/libhttrack.so.* updat update
