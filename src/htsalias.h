@@ -38,7 +38,9 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 extern const char *hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
-                   int *return_argc, char **return_argv, char *return_error);
+                   int *return_argc, char **return_argv,
+                   size_t return_argv_size, char *return_error,
+                   size_t return_error_size);
 int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);

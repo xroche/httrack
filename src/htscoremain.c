@@ -385,10 +385,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* Vérifier argv[] non vide */
       if (strnotempty(argv[na])) {
 
-        /* Vérifier Commande (alias) */
-        result =
-          optalias_check(argc, (const char *const *) argv, na, &tmp_argc,
-                         (char **) tmp_argv, tmp_error);
+        /* Resolve an option alias, if any */
+        result = optalias_check(argc, (const char *const *) argv, na, &tmp_argc,
+                                (char **) tmp_argv, sizeof(_tmp_argv[0]),
+                                tmp_error, sizeof(tmp_error));
         if (!result) {
           HTS_PANIC_PRINTF(tmp_error);
           htsmain_free();
