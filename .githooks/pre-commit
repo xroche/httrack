@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# Auto-format the staged C lines with clang-format (touched lines only), then
+# re-stage them, so commits stay clang-format-clean and CI's format check passes.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip for one commit:    HTTRACK_NO_AUTOFORMAT=1 git commit ...
+#
+# Matches the CI gate (.clang-format, clang-format 19). It only ever touches the
+# lines a commit changes; it never reformats the whole tree.
+
+set -euo pipefail
+
+[ "${HTTRACK_NO_AUTOFORMAT:-}" = "1" ] && exit 0
+
+# Staged C/H files (added/copied/modified/renamed).
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' '*.h')
+[ "${#files[@]}" -eq 0 ] && exit 0
+
+# Locate clang-format 19 and the git driver; if absent, skip (CI is the backstop).
+cf=""
+for c in clang-format-19 clang-format; do
+    if command -v "$c" >/dev/null 2>&1; then
+        case "$("$c" --version)" in *"version 19."*)
+            cf="$c"
+            break
+            ;;
+        esac
+    fi
+done
+gcf=""
+for g in git-clang-format-19 git-clang-format; do
+    command -v "$g" >/dev/null 2>&1 && {
+        gcf="$g"
+        break
+    }
+done
+if [ -z "$cf" ] || [ -z "$gcf" ]; then
+    echo "pre-commit: clang-format 19 not found; skipping auto-format (CI still checks)." >&2
+    exit 0
+fi
+
+# Files that are staged AND also have unstaged changes: re-staging them would
+# pull in the unstaged work, so don't auto-mutate. Check instead and let the
+# author resolve it.
+partial=()
+for f in "${files[@]}"; do
+    if ! git diff --quiet -- "$f"; then partial+=("$f"); fi
+done
+
+if [ "${#partial[@]}" -ne 0 ]; then
+    d="$("$gcf" --binary "$cf" --style=file --staged --diff --extensions c,h || true)"
+    case "$d" in
+    "" | "no modified files to format" | *"did not modify any files"*)
+        exit 0
+        ;; # staged lines already clean
+    *)
+        echo "pre-commit: these files have both staged and unstaged changes, so" >&2
+        echo "auto-format was skipped to avoid committing unstaged work:" >&2
+        printf '  %s\n' "${partial[@]}" >&2
+        echo "Their staged lines need formatting. Stage the rest (or stash it)," >&2
+        echo "or run: $gcf --binary $cf --staged" >&2
+        exit 1
+        ;;
+    esac
+fi
+
+# Clean-staged files: format the staged lines in the working tree, then re-stage.
+"$gcf" --binary "$cf" --style=file --staged --extensions c,h >/dev/null || true
+git add -- "${files[@]}"
+exit 0
