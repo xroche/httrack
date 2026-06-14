@@ -193,6 +193,7 @@ HTSEXT_API int structcheck(const char *path);
 HTSEXT_API int structcheck_utf8(const char *path);
 HTSEXT_API int dir_exists(const char *path);
 HTSEXT_API void infostatuscode(char *msg, int statuscode);
+HTSEXT_API const char *infostatuscode_const(int statuscode);
 HTSEXT_API TStamp mtime_local(void);
 HTSEXT_API void qsec2str(char *st, TStamp t);
 HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n);

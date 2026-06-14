@@ -1660,138 +1660,107 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
   }
 }
 
-// transforme le message statuscode en chaîne
-HTSEXT_API void infostatuscode(char *msg, int statuscode) {
+// HTTP status code -> reason phrase (per RFC), or NULL if unknown.
+HTSEXT_API const char *infostatuscode_const(int statuscode) {
+  // O(1) dispatch (the compiler builds a jump table); the phrases are static.
   switch (statuscode) {
-    // Erreurs HTTP, selon RFC
   case 100:
-    strcpybuff(msg, "Continue");
-    break;
+    return "Continue";
   case 101:
-    strcpybuff(msg, "Switching Protocols");
-    break;
+    return "Switching Protocols";
   case 200:
-    strcpybuff(msg, "OK");
-    break;
+    return "OK";
   case 201:
-    strcpybuff(msg, "Created");
-    break;
+    return "Created";
   case 202:
-    strcpybuff(msg, "Accepted");
-    break;
+    return "Accepted";
   case 203:
-    strcpybuff(msg, "Non-Authoritative Information");
-    break;
+    return "Non-Authoritative Information";
   case 204:
-    strcpybuff(msg, "No Content");
-    break;
+    return "No Content";
   case 205:
-    strcpybuff(msg, "Reset Content");
-    break;
+    return "Reset Content";
   case 206:
-    strcpybuff(msg, "Partial Content");
-    break;
+    return "Partial Content";
   case 300:
-    strcpybuff(msg, "Multiple Choices");
-    break;
+    return "Multiple Choices";
   case 301:
-    strcpybuff(msg, "Moved Permanently");
-    break;
+    return "Moved Permanently";
   case 302:
-    strcpybuff(msg, "Moved Temporarily");
-    break;
+    return "Moved Temporarily";
   case 303:
-    strcpybuff(msg, "See Other");
-    break;
+    return "See Other";
   case 304:
-    strcpybuff(msg, "Not Modified");
-    break;
+    return "Not Modified";
   case 305:
-    strcpybuff(msg, "Use Proxy");
-    break;
+    return "Use Proxy";
   case 306:
-    strcpybuff(msg, "Undefined 306 error");
-    break;
+    return "Undefined 306 error";
   case 307:
-    strcpybuff(msg, "Temporary Redirect");
-    break;
+    return "Temporary Redirect";
   case 400:
-    strcpybuff(msg, "Bad Request");
-    break;
+    return "Bad Request";
   case 401:
-    strcpybuff(msg, "Unauthorized");
-    break;
+    return "Unauthorized";
   case 402:
-    strcpybuff(msg, "Payment Required");
-    break;
+    return "Payment Required";
   case 403:
-    strcpybuff(msg, "Forbidden");
-    break;
+    return "Forbidden";
   case 404:
-    strcpybuff(msg, "Not Found");
-    break;
+    return "Not Found";
   case 405:
-    strcpybuff(msg, "Method Not Allowed");
-    break;
+    return "Method Not Allowed";
   case 406:
-    strcpybuff(msg, "Not Acceptable");
-    break;
+    return "Not Acceptable";
   case 407:
-    strcpybuff(msg, "Proxy Authentication Required");
-    break;
+    return "Proxy Authentication Required";
   case 408:
-    strcpybuff(msg, "Request Time-out");
-    break;
+    return "Request Time-out";
   case 409:
-    strcpybuff(msg, "Conflict");
-    break;
+    return "Conflict";
   case 410:
-    strcpybuff(msg, "Gone");
-    break;
+    return "Gone";
   case 411:
-    strcpybuff(msg, "Length Required");
-    break;
+    return "Length Required";
   case 412:
-    strcpybuff(msg, "Precondition Failed");
-    break;
+    return "Precondition Failed";
   case 413:
-    strcpybuff(msg, "Request Entity Too Large");
-    break;
+    return "Request Entity Too Large";
   case 414:
-    strcpybuff(msg, "Request-URI Too Large");
-    break;
+    return "Request-URI Too Large";
   case 415:
-    strcpybuff(msg, "Unsupported Media Type");
-    break;
+    return "Unsupported Media Type";
   case 416:
-    strcpybuff(msg, "Requested Range Not Satisfiable");
-    break;
+    return "Requested Range Not Satisfiable";
   case 417:
-    strcpybuff(msg, "Expectation Failed");
-    break;
+    return "Expectation Failed";
   case 500:
-    strcpybuff(msg, "Internal Server Error");
-    break;
+    return "Internal Server Error";
   case 501:
-    strcpybuff(msg, "Not Implemented");
-    break;
+    return "Not Implemented";
   case 502:
-    strcpybuff(msg, "Bad Gateway");
-    break;
+    return "Bad Gateway";
   case 503:
-    strcpybuff(msg, "Service Unavailable");
-    break;
+    return "Service Unavailable";
   case 504:
-    strcpybuff(msg, "Gateway Time-out");
-    break;
+    return "Gateway Time-out";
   case 505:
-    strcpybuff(msg, "HTTP Version Not Supported");
-    break;
-    //
+    return "HTTP Version Not Supported";
   default:
-    if (strnotempty(msg) == 0)
-      strcpybuff(msg, "Unknown error");
-    break;
+    return NULL;
+  }
+}
+
+// Write the status code's reason phrase into msg. For an unknown code, keep any
+// caller-provided message, otherwise fall back to a default. Callers provide a
+// buffer of at least 64 bytes (the longest reason phrase is 31).
+HTSEXT_API void infostatuscode(char *msg, int statuscode) {
+  const char *const text = infostatuscode_const(statuscode);
+
+  if (text != NULL) {
+    strlcpybuff(msg, text, 64);
+  } else if (strnotempty(msg) == 0) {
+    strlcpybuff(msg, "Unknown error", 64);
   }
 }
 
