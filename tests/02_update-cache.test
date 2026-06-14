@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+
+# Update path: re-mirroring a site reads the cache (cache_readex) to decide what
+# is up to date -- a path the one-shot crawl tests never exercise. Offline
+# (file://), so it always runs.
+#
+#   1. mirror, then re-mirror unchanged -> the cache-read pass must complete clean
+#      (guards against a crash/abort/error in cache_readex).
+#   2. change a source file, re-mirror -> the update must pick up the new content
+#      (guards the update decision that reads the cached metadata).
+
+set -eu
+
+site=$(mktemp -d)
+out=$(mktemp -d)
+trap 'rm -rf "$site" "$out"' EXIT
+
+cat >"$site/index.html" <<EOF
+<a href="a.html">a</a> <a href="sub/b.html">b</a>
+EOF
+echo 'OLDCONTENT' >"$site/a.html"
+mkdir -p "$site/sub"
+echo '<p>bbb</p>' >"$site/sub/b.html"
+
+url="file://$site/index.html"
+
+# count Error: lines in the log (grep -c exits 1 on zero matches: guard it)
+errors() { grep -ciE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt" || true; }
+
+# 1. fresh mirror writes the cache
+httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
+test -e "$out/hts-cache/new.zip" || {
+    echo "no cache was written" >&2
+    exit 1
+}
+
+# 2. re-mirror unchanged: the update reads the cache and must complete cleanly
+httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
+test "$(errors)" = 0 || {
+    echo "update (unchanged) reported errors" >&2
+    exit 1
+}
+for suffix in a.html sub/b.html; do
+    find "$out" -path "*/$suffix" | grep -q . || {
+        echo "missing $suffix after update" >&2
+        exit 1
+    }
+done
+
+# 3. change a source file: the update must pick up the new content
+sleep 1
+echo 'NEWCONTENT' >"$site/a.html"
+httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
+test "$(errors)" = 0 || {
+    echo "update (changed) reported errors" >&2
+    exit 1
+}
+grep -q NEWCONTENT "$(find "$out" -path '*/a.html')" || {
+    echo "update did not pick up the changed source" >&2
+    exit 1
+}
