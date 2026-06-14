@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsdefines.h"
 #include "htsalias.h"
+#include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"
 #include "htszlib.h"
@@ -138,6 +139,19 @@ static void basic_selftests(void) {
   fil_normalized(source, buffer);
   // MD5 selftests
   md5selftest();
+  // cookie_get field extraction (tab-separated, 0-based)
+  {
+    char cbuf[8192];
+
+    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 0), "a") == 0);
+    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 1), "b") == 0);
+    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 2), "c") == 0);
+    // multi-char fields catch length/boundary bugs that 1-char fields hide
+    assertf(strcmp(cookie_get(cbuf, "host\tx\t/path/to", 0), "host") == 0);
+    assertf(strcmp(cookie_get(cbuf, "host\tx\t/path/to", 2), "/path/to") == 0);
+    assertf(strcmp(cookie_get(cbuf, "a\t\tc", 1), "") == 0);  // empty field
+    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 9), "") == 0); // beyond last
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).
