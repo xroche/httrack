@@ -351,6 +351,13 @@ static HTS_INLINE HTS_UNUSED void htsbuff_cat(htsbuff *b, const char *s) {
   htsbuff_catn(b, s, (size_t) -1);
 }
 
+/** Append a single character (including '\0' as data). Aborts on overflow. */
+static HTS_INLINE HTS_UNUSED void htsbuff_catc(htsbuff *b, char c) {
+  assertf__(1 < b->cap - b->len, "htsbuff append overflow", __FILE__, __LINE__);
+  b->buf[b->len++] = c;
+  b->buf[b->len] = '\0';
+}
+
 /** Reset content to s. Aborts on overflow. */
 static HTS_INLINE HTS_UNUSED void htsbuff_cpy(htsbuff *b, const char *s) {
   b->len = 0;
