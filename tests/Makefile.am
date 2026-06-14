@@ -22,6 +22,7 @@ TESTS = \
 	01_engine-simplify.test \
 	01_engine-strsafe.test \
 	02_manpage-regen.test \
+	02_update-cache.test \
 	10_crawl-simple.test \
 	11_crawl-cookies.test \
 	11_crawl-idna.test \
