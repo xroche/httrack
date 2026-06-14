@@ -1105,20 +1105,24 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
         //
         cache_rint(cache->olddat, &r.statuscode);
         cache_rLLint(cache->olddat, &r.size);
-        cache_rstr(cache->olddat, r.msg);
-        cache_rstr(cache->olddat, r.contenttype);
+        cache_rstr(cache->olddat, r.msg, sizeof(r.msg));
+        cache_rstr(cache->olddat, r.contenttype, sizeof(r.contenttype));
         if (cache->version >= 3)
-          cache_rstr(cache->olddat, r.charset);
-        cache_rstr(cache->olddat, r.lastmodified);
-        cache_rstr(cache->olddat, r.etag);
-        cache_rstr(cache->olddat, r.location);
+          cache_rstr(cache->olddat, r.charset, sizeof(r.charset));
+        cache_rstr(cache->olddat, r.lastmodified, sizeof(r.lastmodified));
+        cache_rstr(cache->olddat, r.etag, sizeof(r.etag));
+        // r.location points into a HTS_URLMAXSIZE*2 buffer
+        cache_rstr(cache->olddat, r.location, HTS_URLMAXSIZE * 2);
         if (cache->version >= 2)
-          cache_rstr(cache->olddat, r.cdispo);
+          cache_rstr(cache->olddat, r.cdispo, sizeof(r.cdispo));
         if (cache->version >= 4) {
-          cache_rstr(cache->olddat, previous_save);     // adr
-          cache_rstr(cache->olddat, previous_save);     // fil
+          cache_rstr(cache->olddat, previous_save,
+                     sizeof(previous_save)); // adr
+          cache_rstr(cache->olddat, previous_save,
+                     sizeof(previous_save)); // fil
           previous_save[0] = '\0';
-          cache_rstr(cache->olddat, previous_save);     // save
+          cache_rstr(cache->olddat, previous_save,
+                     sizeof(previous_save)); // save
           if (return_save != NULL) {
             strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
           }
@@ -1127,8 +1131,8 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
           r.headers = cache_rstr_addr(cache->olddat);
         }
         //
-        cache_rstr(cache->olddat, check);
-        if (strcmp(check, "HTS") == 0) {        /* intégrité OK */
+        cache_rstr(cache->olddat, check, sizeof(check));
+        if (strcmp(check, "HTS") == 0) { /* integrity OK */
           ok = 1;
         }
         cache_rLLint(cache->olddat, &size_read);        /* lire size pour être sûr de la taille déclarée (réécrire) */
@@ -1767,12 +1771,12 @@ void cache_init(cache_back * cache, httrackp * opt) {
           char firstline[256];
           char *a = cache->use;
 
-          a += cache_brstr(a, firstline);
-          if (strncmp(firstline, "CACHE-", 6) == 0) {   // Nouvelle version du cache
-            if (strncmp(firstline, "CACHE-1.", 8) == 0) {       // Version 1.1x
+          a += cache_brstr(a, firstline, sizeof(firstline));
+          if (strncmp(firstline, "CACHE-", 6) == 0) {     // new cache format
+            if (strncmp(firstline, "CACHE-1.", 8) == 0) { // version 1.1x
               cache->version = (int) (firstline[8] - '0');      // cache 1.x
               if (cache->version <= 5) {
-                a += cache_brstr(a, firstline);
+                a += cache_brstr(a, firstline, sizeof(firstline));
                 strcpybuff(cache->lastmodified, firstline);
               } else {
                 hts_log_print(opt, LOG_ERROR,
@@ -1783,7 +1787,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
                 freet(cache->use);
                 cache->use = NULL;
               }
-            } else {            // non supporté
+            } else { // non supporté
               hts_log_print(opt, LOG_ERROR,
                             "Cache: %s not supported, ignoring current cache",
                             firstline);
@@ -1793,7 +1797,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
               cache->use = NULL;
             }
             /* */
-          } else {              // Vieille version du cache
+          } else { // Vieille version du cache
             /* */
             hts_log_print(opt, LOG_WARNING,
                           "Cache: importing old cache format");
@@ -2118,7 +2122,7 @@ int cache_wstr(FILE * fp, const char *s) {
     return -1;
   return 0;
 }
-void cache_rstr(FILE * fp, char *s) {
+void cache_rstr(FILE *fp, char *s, size_t s_size) {
   INTsys i;
   char buff[256 + 4];
 
@@ -2127,13 +2131,26 @@ void cache_rstr(FILE * fp, char *s) {
   if (i < 0 || i > 32768)       /* error, something nasty happened */
     i = 0;
   if (i > 0) {
-    if ((int) fread(s, 1, i, fp) != i) {
+    /* Store at most s_size-1 bytes into s, but consume all i bytes from the
+       stream so the next field stays aligned (the field may be longer than the
+       destination in a tampered/old cache). */
+    const size_t want = (size_t) i;
+    const size_t store = want < s_size ? want : s_size - 1;
+
+    if (fread(s, 1, store, fp) != store) {
       int fread_cache_failed = 0;
 
       assertf(fread_cache_failed);
     }
+    if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0) {
+      int fseek_cache_failed = 0;
+
+      assertf(fseek_cache_failed);
+    }
+    s[store] = '\0';
+  } else {
+    s[0] = '\0';
   }
-  *(s + i) = '\0';
 }
 char *cache_rstr_addr(FILE * fp) {
   INTsys i;
@@ -2157,7 +2174,7 @@ char *cache_rstr_addr(FILE * fp) {
   }
   return addr;
 }
-int cache_brstr(char *adr, char *s) {
+int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
   char buff[256 + 4];
@@ -2165,23 +2182,17 @@ int cache_brstr(char *adr, char *s) {
   off = binput(adr, buff, 256);
   adr += off;
   sscanf(buff, "%d", &i);
-  if (i > 0)
-    strncpy(s, adr, i);
-  *(s + i) = '\0';
-  off += i;
-  return off;
-}
-int cache_quickbrstr(char *adr, char *s) {
-  int i;
-  int off;
-  char buff[256 + 4];
+  if (i < 0 || i > 32768) /* guard a corrupt length */
+    i = 0;
+  if (i > 0) {
+    /* copy at most s_size-1 bytes; advance past the full field regardless */
+    const size_t store = (size_t) i < s_size ? (size_t) i : s_size - 1;
 
-  off = binput(adr, buff, 256);
-  adr += off;
-  sscanf(buff, "%d", &i);
-  if (i > 0)
-    strncpy(s, adr, i);
-  *(s + i) = '\0';
+    strncpy(s, adr, store);
+    s[store] = '\0';
+  } else {
+    s[0] = '\0';
+  }
   off += i;
   return off;
 }
@@ -2189,7 +2200,7 @@ int cache_quickbrstr(char *adr, char *s) {
 /* idem, mais en int */
 int cache_brint(char *adr, int *i) {
   char s[256];
-  int r = cache_brstr(adr, s);
+  int r = cache_brstr(adr, s, sizeof(s));
 
   if (r != -1)
     sscanf(s, "%d", i);
@@ -2198,7 +2209,7 @@ int cache_brint(char *adr, int *i) {
 void cache_rint(FILE * fp, int *i) {
   char s[256];
 
-  cache_rstr(fp, s);
+  cache_rstr(fp, s, sizeof(s));
   sscanf(s, "%d", i);
 }
 int cache_wint(FILE * fp, int i) {
@@ -2210,7 +2221,7 @@ int cache_wint(FILE * fp, int i) {
 void cache_rLLint(FILE * fp, LLint * i) {
   char s[256];
 
-  cache_rstr(fp, s);
+  cache_rstr(fp, s, sizeof(s));
   sscanf(s, LLintP, i);
 }
 int cache_wLLint(FILE * fp, LLint i) {
