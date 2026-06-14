@@ -211,6 +211,10 @@ static int string_safety_selftests(void) {
     htsbuff_cpy(&b, "xyz");             /* reset */
     if (strcmp(htsbuff_str(&b), "xyz") != 0 || b.len != 3)
       return 1;
+
+    htsbuff_catc(&b, '!'); /* single character */
+    if (strcmp(htsbuff_str(&b), "xyz!") != 0 || b.len != 4)
+      return 1;
   }
 
   /* boundary: filling to exactly cap-1 must succeed (one more aborts, which the

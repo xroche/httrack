@@ -767,7 +767,7 @@ int url_savename(lien_adrfilsave *const afs,
   // ajouter nom du site éventuellement en premier
   if (opt->savename_type == -1) {       // utiliser savename_userdef! (%h%p/%n%q.%t)
     const char *a = StringBuff(opt->savename_userdef);
-    char *b = afs->save;
+    htsbuff sb = htsbuff_array(afs->save);
 
     /*char *nom_pos=NULL,*dot_pos=NULL;  // Position nom et point */
     char tok;
@@ -787,17 +787,16 @@ int url_savename(lien_adrfilsave *const afs,
        }
      */
 
-    // Construire nom
-    while((*a) && (((int) (b - afs->save)) < HTS_URLMAXSIZE)) {      // parser, et pas trop long..
+    // build the name
+    while ((*a) && (sb.len < HTS_URLMAXSIZE)) { // parse, but not too long
       if (*a == '%') {
         int short_ver = 0;
 
         a++;
-        if (*a == 's') {
+        if (*a == 's') { // '%s...' selects the short (8.3) form
           short_ver = 1;
           a++;
         }
-        *b = '\0';
         switch (tok = *a++) {
         case '[':              // %[param:prefix_if_not_empty:suffix_if_not_empty:empty_replacement:notfound_replacement]
           if (strchr(a, ']')) {
@@ -834,8 +833,7 @@ int url_savename(lien_adrfilsave *const afs,
               }
               if (cp) {
                 c = cp + strlen(name[0]);       /* jumps "param=" */
-                strcpybuff(b, name[1]); /* prefix */
-                b += strlen(b);
+                htsbuff_cat(&sb, name[1]);      /* prefix */
                 if (*c != '\0' && *c != '&') {
                   char *d = name[0];
 
@@ -846,110 +844,90 @@ int url_savename(lien_adrfilsave *const afs,
                   *d = '\0';
                   d = unescape_http(catbuff, sizeof(catbuff), name[0]);
                   if (d && *d) {
-                    strcpybuff(b, d);   /* value */
-                    b += strlen(b);
+                    htsbuff_cat(&sb, d); /* value */
                   } else {
-                    strcpybuff(b, name[3]);     /* empty replacement if any */
-                    b += strlen(b);
+                    htsbuff_cat(&sb, name[3]); /* empty replacement if any */
                   }
                 } else {
-                  strcpybuff(b, name[3]);       /* empty replacement if any */
-                  b += strlen(b);
+                  htsbuff_cat(&sb, name[3]); /* empty replacement if any */
                 }
-                strcpybuff(b, name[2]); /* suffix */
-                b += strlen(b);
+                htsbuff_cat(&sb, name[2]); /* suffix */
               } else {
-                strcpybuff(b, name[4]); /* not found replacement if any */
-                b += strlen(b);
+                htsbuff_cat(&sb, name[4]); /* not found replacement if any */
               }
             } else {
-              strcpybuff(b, name[4]);   /* not found replacement if any */
-              b += strlen(b);
+              htsbuff_cat(&sb, name[4]); /* not found replacement if any */
             }
           }
           break;
         case '%':
-          *b++ = '%';
+          htsbuff_catc(&sb, '%');
           break;
-        case 'n':              // nom sans ext
-          *b = '\0';
+        case 'n': // name without extension
           if (dot_pos) {
-            if (!short_ver)     // Noms longs
-              strncatbuff(b, nom_pos, (int) (dot_pos - nom_pos));
+            if (!short_ver)
+              htsbuff_catn(&sb, nom_pos, (int) (dot_pos - nom_pos));
             else
-              strncatbuff(b, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              htsbuff_catn(&sb, nom_pos, min((int) (dot_pos - nom_pos), 8));
           } else {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, nom_pos);
+            if (!short_ver)
+              htsbuff_cat(&sb, nom_pos);
             else
-              strncatbuff(b, nom_pos, 8);
+              htsbuff_catn(&sb, nom_pos, 8);
           }
-          b += strlen(b);       // pointer à la fin
           break;
-        case 'N':              // nom avec ext
-          // RECOPIE NOM + EXT
-          *b = '\0';
+        case 'N': // name with extension
           if (dot_pos) {
-            if (!short_ver)     // Noms longs
-              strncatbuff(b, nom_pos, (int) (dot_pos - nom_pos));
+            if (!short_ver)
+              htsbuff_catn(&sb, nom_pos, (int) (dot_pos - nom_pos));
             else
-              strncatbuff(b, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              htsbuff_catn(&sb, nom_pos, min((int) (dot_pos - nom_pos), 8));
           } else {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, nom_pos);
+            if (!short_ver)
+              htsbuff_cat(&sb, nom_pos);
             else
-              strncatbuff(b, nom_pos, 8);
+              htsbuff_catn(&sb, nom_pos, 8);
           }
-          b += strlen(b);       // pointer à la fin
-          *b = '.';
-          ++b;
-          // RECOPIE NOM + EXT
-          *b = '\0';
+          htsbuff_catc(&sb, '.');
           if (dot_pos) {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, dot_pos + 1);
+            if (!short_ver)
+              htsbuff_cat(&sb, dot_pos + 1);
             else
-              strncatbuff(b, dot_pos + 1, 3);
+              htsbuff_catn(&sb, dot_pos + 1, 3);
           } else {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, DEFAULT_EXT + 1);   // pas de..
+            if (!short_ver)
+              htsbuff_cat(&sb, DEFAULT_EXT + 1); // skip the leading dot
             else
-              strcpybuff(b, DEFAULT_EXT_SHORT + 1);     // pas de..
+              htsbuff_cat(&sb, DEFAULT_EXT_SHORT + 1); // skip the leading dot
           }
-          b += strlen(b);       // pointer à la fin
-          //
           break;
-        case 't':              // ext
-          *b = '\0';
+        case 't': // extension
           if (dot_pos) {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, dot_pos + 1);
+            if (!short_ver)
+              htsbuff_cat(&sb, dot_pos + 1);
             else
-              strncatbuff(b, dot_pos + 1, 3);
+              htsbuff_catn(&sb, dot_pos + 1, 3);
           } else {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, DEFAULT_EXT + 1);   // pas de..
+            if (!short_ver)
+              htsbuff_cat(&sb, DEFAULT_EXT + 1); // skip the leading dot
             else
-              strcpybuff(b, DEFAULT_EXT_SHORT + 1);     // pas de..
+              htsbuff_cat(&sb, DEFAULT_EXT_SHORT + 1); // skip the leading dot
           }
-          b += strlen(b);       // pointer à la fin
           break;
-        case 'p':              // path sans dernier /
-          *b = '\0';
-          if (nom_pos != fil + 1) {     // pas: /index.html (chemin nul)
-            if (!short_ver) {   // Noms longs
-              strncatbuff(b, fil, (int) (nom_pos - fil) - 1);
+        case 'p': // path without trailing /
+          if (nom_pos !=
+              fil + 1) { // skip when the path is empty (e.g. /index.html)
+            if (!short_ver) {
+              htsbuff_catn(&sb, fil, (int) (nom_pos - fil) - 1);
             } else {
               char BIGSTK pth[HTS_URLMAXSIZE * 2], n83[HTS_URLMAXSIZE * 2];
 
               pth[0] = n83[0] = '\0';
-              //
               strncatbuff(pth, fil, (int) (nom_pos - fil) - 1);
               long_to_83(opt->savename_83, n83, pth);
-              strcpybuff(b, n83);
+              htsbuff_cat(&sb, n83);
             }
           }
-          b += strlen(b);       // pointer à la fin
           break;
         case 'h':              // host (IDNA decoded if suitable)
           // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
@@ -957,62 +935,50 @@ int url_savename(lien_adrfilsave *const afs,
             DECLARE_ADR(final_adr);
 
             /* Copy address */
-            *b = '\0';
             if (!short_ver)
-              strcpybuff(b, final_adr);
+              htsbuff_cat(&sb, final_adr);
             else
-              strcpybuff(b, final_adr);
+              htsbuff_cat(&sb, final_adr);
 
             /* release */
             RELEASE_ADR();
           }
-          b += strlen(b);       // pointer à la fin
           break;
-        case 'H':              // host, raw (old mode)
-          *b = '\0';
+        case 'H': // host, raw (old mode)
           if (protocol == PROTOCOL_FILE) {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, "localhost");
+            if (!short_ver)
+              htsbuff_cat(&sb, "localhost");
             else
-              strcpybuff(b, "local");
+              htsbuff_cat(&sb, "local");
           } else {
-            if (!short_ver)     // Noms longs
-              strcpybuff(b, print_adr);
+            if (!short_ver)
+              htsbuff_cat(&sb, print_adr);
             else
-              strncatbuff(b, print_adr, 8);
+              htsbuff_catn(&sb, print_adr, 8);
           }
-          b += strlen(b);       // pointer à la fin
           break;
-        case 'M':              /* host/address?query MD5 (128-bits) */
-          *b = '\0';
-          {
-            char digest[32 + 2];
-            char BIGSTK buff[HTS_URLMAXSIZE * 2];
+        case 'M': /* host/address?query MD5 (128-bits) */
+        {
+          char digest[32 + 2];
+          char BIGSTK buff[HTS_URLMAXSIZE * 2];
 
-            digest[0] = buff[0] = '\0';
-            strcpybuff(buff, adr);
-            strcatbuff(buff, fil_complete);
-            domd5mem(buff, strlen(buff), digest, 1);
-            strcpybuff(b, digest);
-          }
-          b += strlen(b);       // pointer à la fin
-          break;
+          digest[0] = buff[0] = '\0';
+          strcpybuff(buff, adr);
+          strcatbuff(buff, fil_complete);
+          domd5mem(buff, strlen(buff), digest, 1);
+          htsbuff_cat(&sb, digest);
+        } break;
         case 'Q':
-        case 'q':              /* query MD5 (128-bits/16-bits) 
-                                   GENERATED ONLY IF query string exists! */
-          {
-            char md5[32 + 2];
+        case 'q': /* query MD5 (128-bits/16-bits)
+                      GENERATED ONLY IF query string exists! */
+        {
+          char md5[32 + 2];
 
-            *b = '\0';
-            strncatbuff(b, url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
-            b += strlen(b);     // pointer à la fin
-          }
-          break;
+          htsbuff_catn(&sb, url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
+        } break;
         case 'r':
         case 'R':              // protocol
-          *b = '\0';
-          strcatbuff(b, protocol_str[protocol]);
-          b += strlen(b);       // pointer à la fin
+          htsbuff_cat(&sb, protocol_str[protocol]);
           break;
 
           /* Patch by Juan Fco Rodriguez to get the full query string */
@@ -1021,19 +987,17 @@ int url_savename(lien_adrfilsave *const afs,
             char *d = strchr(fil_complete, '?');
 
             if (d != NULL) {
-              strcatbuff(b, d);
-              b += strlen(b);
+              htsbuff_cat(&sb, d);
             }
           }
           break;
 
         }
       } else
-        *b++ = *a++;
+        htsbuff_catc(&sb, *a++);
     }
-    *b++ = '\0';
     //
-    // Types prédéfinis
+    // predefined types
     //
 
   }
