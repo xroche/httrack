@@ -1,6 +1,8 @@
 
 exemplesdir = $(datadir)/httrack/libtest
-exemples_DATA = *.c *.h *.txt
+# Glob against $(srcdir), not the build dir: a bare "*.c" is resolved relative to
+# the build dir and stays unexpanded (breaking "make") in an out-of-tree build.
+exemples_DATA = $(srcdir)/*.c $(srcdir)/*.h $(srcdir)/*.txt
 EXTRA_DIST = $(exemples_DATA) libtest.mak libtest.vcproj
 
 AM_CPPFLAGS = \
@@ -12,7 +14,9 @@ AM_CPPFLAGS = \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DDATADIR=\""$(datadir)"\" \
 	-DLIBDIR=\""$(libdir)"\"
-AM_CPPFLAGS += -I../src
+# Use $(top_srcdir)/src, not ../src: the latter is relative to the build dir and
+# misses the source headers (e.g. httrack-library.h) in an out-of-tree build.
+AM_CPPFLAGS += -I$(top_srcdir)/src
 
 # The callback examples reference libc only through libhttrack, so the direct
 # libc edge gets dropped from DT_NEEDED (library-not-linked-against-libc).

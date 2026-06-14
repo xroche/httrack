@@ -50,6 +50,9 @@ LT_INIT
 AC_PROG_LN_S
 LT_INIT
 
+# bash, used to run the test scripts (see tests/Makefile.am TEST_LOG_COMPILER)
+AC_PATH_PROGS([BASH], [bash], [/bin/bash])
+
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
 
