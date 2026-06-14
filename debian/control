@@ -30,7 +30,7 @@ Description: Copy websites to your computer (Offline browser)
 Package: webhttrack
 Architecture: any
 Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, sensible-utils, iceape-browser | iceweasel | icecat | mozilla | firefox | mozilla-firefox | www-browser
+Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, sensible-utils, firefox-esr | chromium | www-browser
 Replaces: webhttrack-common (<< 3.43.9-2)
 Breaks: webhttrack-common (<< 3.43.9-2)
 Suggests: httrack, httrack-doc
