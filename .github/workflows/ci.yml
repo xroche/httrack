@@ -133,6 +133,89 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Memory safety: build and run the suite under AddressSanitizer +
+  # UndefinedBehaviorSanitizer. The offline engine self-tests drive the parsers
+  # that chew on untrusted crawled input (charset, mime, HTML, entities, IDNA,
+  # filters, cache) straight through the sanitizers, so a buffer overrun,
+  # use-after-free, or signed overflow there fails the build instead of slipping
+  # past a plain -O2 build. gcc's runtimes; one job is enough (the bug class is
+  # arch-independent and the matrix already covers compile portability).
+  sanitize:
+    name: sanitize (ASan+UBSan, gcc)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Configure (sanitized)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=gcc \
+            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test (sanitized)
+        # Leaks at exit are out of scope (the CLI frees little on the way out);
+        # we want memory-safety errors, so turn leak detection off and make every
+        # other finding abort the run.
+        env:
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
+  # the configuration users on minimal systems build, and one libssl is not even
+  # installed here so configure cannot silently re-enable it. The matrix above
+  # always has libssl, so the #if HTS_USEOPENSSL branches would otherwise never
+  # be compiled and could rot unnoticed.
+  no-ssl:
+    name: build (no openssl, --disable-https)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies (no libssl)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive zlib1g-dev
+
+      - name: Configure (https disabled)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --disable-https
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        run: make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Validate the Debian packaging via the same script maintainers release with.
   # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
   # source build) is arch- and compiler-independent, and the build matrix above
@@ -166,6 +249,34 @@ jobs:
         run: |
           export DEB_BUILD_OPTIONS="noautodbgsym parallel=$(nproc)"
           bash tools/mkdeb.sh --unsigned --no-release-artifacts
+
+  # Release-tarball integrity: `make distcheck` rolls the dist tarball, then
+  # configures, builds and tests it out-of-tree from a read-only source tree and
+  # checks nothing is left behind. Catches a file referenced in *_SOURCES or
+  # EXTRA_DIST but missing from the tarball -- the same "ships broken to users"
+  # class as a stale committed Makefile.in.
+  distcheck:
+    name: distcheck (release tarball)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: distcheck
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          make -j"$(nproc)" distcheck
 
   dco:
     name: DCO sign-off
