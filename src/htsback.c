@@ -1518,9 +1518,11 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
 
           if (sscanf(text, "%d", &code) == 1) { // got code
             back[p].r.statuscode = code;
-            back[p].status = STATUS_READY;      // terminé
+            back[p].status = STATUS_READY;      // done
             if (lf != NULL && *lf != '\0') {    // got location ?
-              strcpybuff(back[p].r.location, lf + 1);
+              // r.location aliases location_buffer (set above); write the array
+              // so the bounded macro picks up its capacity.
+              strcpybuff(back[p].location_buffer, lf + 1);
             }
             return 0;
           }
@@ -3998,26 +4000,30 @@ LLint back_transferred(LLint nb, struct_back * sback) {
   return nb;
 }
 
-// infos backing
-// j: 1 afficher sockets 2 afficher autres 3 tout afficher
+// backing info
+// j: 1=show sockets 2=show others 3=show all
 void back_info(struct_back * sback, int i, int j, FILE * fp) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
   assertf(i >= 0 && i < back_max);
   if (back[i].status >= 0) {
-    char BIGSTK s[HTS_URLMAXSIZE * 2 + 1024];
+    // Holds the status tag plus the full URL: url_adr and url_fil are each
+    // HTS_URLMAXSIZE*2, so reserve room for both (*4) plus framing/trailer.
+    // Undersizing would make back_infostr's bounded appends abort on a long
+    // URL.
+    char BIGSTK s[HTS_URLMAXSIZE * 4 + 1024];
 
     s[0] = '\0';
-    back_infostr(sback, i, j, s);
+    back_infostr(sback, i, j, s, sizeof(s));
     strcatbuff(s, LF);
     fprintf(fp, "%s", s);
   }
 }
 
-// infos backing
-// j: 1 afficher sockets 2 afficher autres 3 tout afficher
-void back_infostr(struct_back * sback, int i, int j, char *s) {
+// backing info
+// j: 1=show sockets 2=show others 3=show all
+void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -4027,16 +4033,16 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
 
     if (j & 1) {
       if (back[i].status == STATUS_CONNECTING) {
-        strcatbuff(s, "CONNECT ");
+        strlcatbuff(s, "CONNECT ", size);
       } else if (back[i].status == STATUS_WAIT_HEADERS) {
-        strcatbuff(s, "INFOS ");
+        strlcatbuff(s, "INFOS ", size);
         aff = 1;
       } else if (back[i].status == STATUS_CHUNK_WAIT
                  || back[i].status == STATUS_CHUNK_CR) {
-        strcatbuff(s, "INFOSC");        // infos chunk
+        strlcatbuff(s, "INFOSC", size); // chunk info
         aff = 1;
       } else if (back[i].status > 0) {
-        strcatbuff(s, "RECEIVE ");
+        strlcatbuff(s, "RECEIVE ", size);
         aff = 1;
       }
     }
@@ -4044,44 +4050,44 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
       if (back[i].status == STATUS_READY) {
         switch (back[i].r.statuscode) {
         case 200:
-          strcatbuff(s, "READY ");
+          strlcatbuff(s, "READY ", size);
           aff = 1;
           break;
         case -1:
-          strcatbuff(s, "ERROR ");
+          strlcatbuff(s, "ERROR ", size);
           aff = 1;
           break;
         case -2:
-          strcatbuff(s, "TIMEOUT ");
+          strlcatbuff(s, "TIMEOUT ", size);
           aff = 1;
           break;
         case -3:
-          strcatbuff(s, "TOOSLOW ");
+          strlcatbuff(s, "TOOSLOW ", size);
           aff = 1;
           break;
         case 400:
-          strcatbuff(s, "BADREQUEST ");
+          strlcatbuff(s, "BADREQUEST ", size);
           aff = 1;
           break;
         case 401:
         case 403:
-          strcatbuff(s, "FORBIDDEN ");
+          strlcatbuff(s, "FORBIDDEN ", size);
           aff = 1;
           break;
         case 404:
-          strcatbuff(s, "NOT FOUND ");
+          strlcatbuff(s, "NOT FOUND ", size);
           aff = 1;
           break;
         case 500:
-          strcatbuff(s, "SERVERROR ");
+          strlcatbuff(s, "SERVERROR ", size);
           aff = 1;
           break;
         default:
           {
             char s2[256];
 
-            sprintf(s2, "ERROR(%d)", back[i].r.statuscode);
-            strcatbuff(s, s2);
+            snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
+            strlcatbuff(s, s2, size);
           }
           aff = 1;
         }
@@ -4092,16 +4098,18 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
       {
         char BIGSTK s2[HTS_URLMAXSIZE * 2 + 1024];
 
-        sprintf(s2, "\"%s", back[i].url_adr);
-        strcatbuff(s, s2);
+        snprintf(s2, sizeof(s2), "\"%s", back[i].url_adr);
+        strlcatbuff(s, s2, size);
 
         if (back[i].url_fil[0] != '/')
-          strcatbuff(s, "/");
-        sprintf(s2, "%s\" ", back[i].url_fil);
-        strcatbuff(s, s2);
-        sprintf(s, LLintP " " LLintP " ", (LLint) back[i].r.size,
-                (LLint) back[i].r.totalsize);
-        strcatbuff(s, s2);
+          strlcatbuff(s, "/", size);
+        snprintf(s2, sizeof(s2), "%s\" ", back[i].url_fil);
+        strlcatbuff(s, s2, size);
+        // size/totalsize trailer: build in s2, then append (the old code wrote
+        // straight into s here, clobbering the URL it had just assembled).
+        snprintf(s2, sizeof(s2), LLintP " " LLintP " ", (LLint) back[i].r.size,
+                 (LLint) back[i].r.totalsize);
+        strlcatbuff(s, s2, size);
       }
     }
   }
