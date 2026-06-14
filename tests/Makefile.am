@@ -9,6 +9,11 @@ TESTS_ENVIRONMENT += HTTPS_SUPPORT=$(HTTPS_SUPPORT)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 
 TEST_EXTENSIONS = .test
+# Run each .test through bash instead of execve()ing it. This lets "make check"
+# work when the source tree sits on a noexec filesystem (the driver would
+# otherwise fail with "Permission denied"), and removes any reliance on the
+# scripts' executable bit. The scripts are #!/bin/bash and use bash features.
+TEST_LOG_COMPILER = $(BASH)
 TESTS = \
 	00_runnable.test \
 	01_engine-cache.test \
