@@ -1,0 +1,27 @@
+# clang-format 19 config for the HTTrack C engine.
+#
+# IMPORTANT: this is applied to TOUCHED LINES ONLY (via git-clang-format / the
+# CI format check). The engine was originally formatted by GNU indent / by hand
+# and does NOT round-trip through clang-format, so a whole-tree reformat is
+# intentionally never done. Format the lines you change; leave the rest.
+#
+# Reverse-engineered from src/*.c: 2-space indent, no tabs, 80 columns, pointers
+# bound to the name (char *x), attached braces, un-indented case labels, and a
+# space after C-style casts ((int) x). Most of that is LLVM's defaults; the
+# lines below are the deliberate deviations.
+
+BasedOnStyle: LLVM
+
+# Engine specifics / deviations from LLVM:
+SpaceAfterCStyleCast: true   # "(int) x", overwhelmingly dominant (542 vs 7)
+SortIncludes: false          # C include order can be significant; never reorder
+IncludeBlocks: Preserve      # do not merge/reflow include groups
+
+# Stated explicitly for robustness against base-style drift (these match LLVM):
+IndentWidth: 2
+UseTab: Never
+ColumnLimit: 80
+PointerAlignment: Right
+IndentCaseLabels: false
+SpaceBeforeParens: ControlStatements
+AllowShortIfStatementsOnASingleLine: Never
