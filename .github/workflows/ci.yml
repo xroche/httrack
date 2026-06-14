@@ -84,8 +84,16 @@ jobs:
 
       # --unsigned: CI has no GPG key (also skips the release sig/checksums).
       # debuild builds every package, then lintian gates on errors.
+      #
+      # DEB_BUILD_OPTIONS trims work CI does not need (release builds via
+      # mkdeb.sh are untouched): nocheck skips debuild's make check, redundant
+      # here since the build matrix and mkdeb's own pre-build already run the
+      # suite; noautodbgsym drops the -dbgsym packages whose LTO payloads are
+      # slow to compress and that CI never ships; parallel uses every core.
       - name: Build Debian packages
-        run: bash tools/mkdeb.sh --unsigned --no-release-artifacts
+        run: |
+          export DEB_BUILD_OPTIONS="nocheck noautodbgsym parallel=$(nproc)"
+          bash tools/mkdeb.sh --unsigned --no-release-artifacts
 
   dco:
     name: DCO sign-off
