@@ -196,12 +196,13 @@ struct cache_back_zip_entry {
   int compressionMethod;
 };
 
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpybuff(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      strlcpybuff(refvalue, value, refvalue_size);                             \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -643,7 +644,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   } else {
     r.location = location_default;
   }
-  strcpybuff(r.location, "");
+  r.location[0] = '\0';
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
   hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
@@ -706,17 +707,25 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                 value++;
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg);      // msg
+              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
+                                   sizeof(r.msg));
               ZIP_READFIELD_LLINT(line, value, "X-Size", r.size);       // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype); // contenttype
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset);        // contenttype
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified);       // last-modified
-              ZIP_READFIELD_STRING(line, value, "Etag", r.etag);        // Etag
-              ZIP_READFIELD_STRING(line, value, "Location", r.location);        // 'location' pour moved
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo);       // Content-disposition
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
+                                   sizeof(r.contenttype));
+              ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset,
+                                   sizeof(r.charset));
+              ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified,
+                                   sizeof(r.lastmodified));
+              ZIP_READFIELD_STRING(line, value, "Etag", r.etag, sizeof(r.etag));
+              // r.location is a char* pointing into a HTS_URLMAXSIZE*2 buffer
+              ZIP_READFIELD_STRING(line, value, "Location", r.location,
+                                   HTS_URLMAXSIZE * 2);
+              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo,
+                                   sizeof(r.cdispo));
               //ZIP_READFIELD_STRING(line, value, "X-Addr", ..);            // Original address
               //ZIP_READFIELD_STRING(line, value, "X-Fil", ..);            // Original URI filename
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);      // Original save filename
+              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                   sizeof(previous_save_));
             }
           } while(offset < readSizeHeader && !lineEof);
           //totalHeader = offset;
@@ -733,7 +742,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             }
           }
           if (return_save != NULL) {
-            strcpybuff(return_save, previous_save);
+            strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
           }
 
           /* Complete fields */
@@ -1025,7 +1034,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
   } else {
     r.location = location_default;
   }
-  strcpybuff(r.location, "");
+  r.location[0] = '\0';
 #if HTS_FAST_CACHE
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
@@ -1111,7 +1120,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
           previous_save[0] = '\0';
           cache_rstr(cache->olddat, previous_save);     // save
           if (return_save != NULL) {
-            strcpybuff(return_save, previous_save);
+            strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
           }
         }
         if (cache->version >= 5) {
@@ -2088,7 +2097,7 @@ char *readfile_or(const char *fil, const char *defaultdata) {
     char *adr = malloct(strlen(defaultdata) + 1);
 
     if (adr) {
-      strcpybuff(adr, defaultdata);
+      strlcpybuff(adr, defaultdata, strlen(defaultdata) + 1);
       return adr;
     }
   }
