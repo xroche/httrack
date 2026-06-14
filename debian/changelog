@@ -8,6 +8,11 @@ httrack (3.49.8-1) unstable; urgency=medium
     common-licenses/GPL-3, use a secure version=4 watch file, add
     Rules-Requires-Root and Vcs-Browser, and override the false-positive
     source-is-missing on the bundled HTML documentation.
+  * Refresh the webhttrack browser dependency: drop the removed alternatives
+    (iceape-browser, iceweasel, icecat, mozilla, firefox, mozilla-firefox)
+    that no longer exist in Debian and triggered half-broken relationships on
+    the QA debcheck page. Depend on firefox-esr | chromium | www-browser
+    instead.
 
  -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 14:29:24 +0200
 
