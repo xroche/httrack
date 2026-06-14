@@ -20,11 +20,12 @@ AM_CPPFLAGS += -I$(top_srcdir)/src
 
 # The callback examples reference libc only through libhttrack, so the direct
 # libc edge gets dropped from DT_NEEDED (library-not-linked-against-libc).
-# Force libc to be recorded as a dependency.
+# Force libc back; configure gates the flag since only a GNU-style linker
+# accepts it (LIBC_FORCE_LINK is empty on e.g. macOS).
 AM_LDFLAGS = \
 	@DEFAULT_LDFLAGS@ \
 	-L../src \
-	-Wl,--push-state,--no-as-needed,-lc,--pop-state
+	@LIBC_FORCE_LINK@
 
 # Examples
 libbaselinks_la_SOURCES =  callbacks-example-baselinks.c
