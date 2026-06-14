@@ -114,5 +114,12 @@ EXTRA_DIST = httrack.h webhttrack \
 		proxy/proxytrack.h \
 		proxy/store.h \
 		proxy/proxytrack.vcproj \
-		coucal/* \
-		*.dsw *.dsp *.vcproj
+		coucal/LICENSE \
+		coucal/Makefile \
+		coucal/README.md \
+		coucal/sample.c \
+		coucal/tests.c \
+		htsjava.vcproj \
+		httrack.dsp httrack.dsw httrack.vcproj \
+		libhttrack.dsp libhttrack.dsw libhttrack.vcproj \
+		webhttrack.dsp webhttrack.dsw webhttrack.vcproj
