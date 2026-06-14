@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+
+# Cache create/read/update logic (driven by 'httrack -#A <dir>').
+#
+# The in-process self-test stores several hand-crafted edge entries (normal
+# HTML, an empty redirect with a near-limit location, a non-HTML body kept via
+# all-in-cache, a binary body with embedded NUL/high bytes), a few thousand
+# small entries (index/lookup scale), and a few large compressible and
+# incompressible bodies (zlib deflate/inflate). It reads everything back
+# asserting every header field and the body round-trip byte for byte, then
+# updates one entry and confirms the new value is read back. It exits non-zero
+# on the first mismatch.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# Like the other -# debug modes, a trailing token (the working directory) is
+# required; a bare '-#A' falls through to the usage screen.
+out=$(httrack -#A "$dir")
+
+# Match the exact success line, so the test cannot pass for an unrelated reason
+# (e.g. the -#A mode being gone and falling through to the usage screen, which
+# also exits non-zero but never prints this).
+test "$out" = "cache-selftest: OK" || {
+    echo "expected 'cache-selftest: OK', got: $out" >&2
+    exit 1
+}
+
+# The self-test must have actually produced a ZIP cache on disk.
+test -e "$dir/hts-cache/new.zip" || {
+    echo "no ZIP cache was written by the self-test" >&2
+    exit 1
+}
+
+# Sanity-check the cache footprint: the few-thousand-entry pass is expected to
+# weigh ~1-2 MB. Fail if it balloons well past that (e.g. a per-entry overhead
+# regression or runaway growth), so the cache size stays bounded.
+ceiling=$((4 * 1024 * 1024))
+bytes=$(du -sb "$dir/hts-cache" | cut -f1)
+test "$bytes" -le "$ceiling" || {
+    echo "cache footprint $bytes bytes exceeds ${ceiling} ceiling" >&2
+    exit 1
+}

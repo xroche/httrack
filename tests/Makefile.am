@@ -11,6 +11,7 @@ TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 TEST_EXTENSIONS = .test
 TESTS = \
 	00_runnable.test \
+	01_engine-cache.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
 	01_engine-entities.test \
