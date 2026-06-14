@@ -2155,8 +2155,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       char firstline[256];
                       char *a = cacheNdx;
 
-                      a += cache_brstr(a, firstline);
-                      a += cache_brstr(a, firstline);
+                      a += cache_brstr(a, firstline, sizeof(firstline));
+                      a += cache_brstr(a, firstline, sizeof(firstline));
                       while(a != NULL) {
                         a = strchr(a + 1, '\n');        /* start of line */
                         if (a) {

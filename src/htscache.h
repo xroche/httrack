@@ -80,10 +80,9 @@ int cache_writedata(FILE * cache_ndx, FILE * cache_dat, const char *str1,
 int cache_readdata(cache_back * cache, const char *str1, const char *str2,
                    char **inbuff, int *len);
 
-void cache_rstr(FILE * fp, char *s);
+void cache_rstr(FILE *fp, char *s, size_t s_size);
 char *cache_rstr_addr(FILE * fp);
-int cache_brstr(char *adr, char *s);
-int cache_quickbrstr(char *adr, char *s);
+int cache_brstr(char *adr, char *s, size_t s_size);
 int cache_brint(char *adr, int *i);
 void cache_rint(FILE * fp, int *i);
 void cache_rLLint(FILE * fp, LLint * i);
