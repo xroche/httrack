@@ -153,6 +153,89 @@ static void basic_selftests(void) {
     assertf(strcmp(cookie_get(cbuf, "a\t\tc", 1), "") == 0);  // empty field
     assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 9), "") == 0); // beyond last
   }
+  // back_infostr() status-line formatting (no sockets: pure formatting over
+  // in-memory slots). Stresses a few thousand entries across every status-code
+  // arm. Regression for a clobber bug where the size/totalsize trailer was
+  // written straight into the destination, wiping the URL it had just built.
+  {
+    static const struct {
+      int code;
+      const char *tag;
+    } cases[] = {
+        {200, "READY "},     {-1, "ERROR "},       {-2, "TIMEOUT "},
+        {-3, "TOOSLOW "},    {400, "BADREQUEST "}, {403, "FORBIDDEN "},
+        {404, "NOT FOUND "}, {500, "SERVERROR "},  {999, "ERROR(999)"},
+    };
+    const int ncases = (int) (sizeof(cases) / sizeof(cases[0]));
+    const int n = 2000;
+    lien_back *slots = calloct(n, sizeof(lien_back));
+    char line[HTS_URLMAXSIZE * 4 + 1024];
+    char expect[HTS_URLMAXSIZE * 4 + 1024];
+    struct_back sb;
+    int idx;
+
+    sb.lnk = slots;
+    sb.count = n;
+    sb.ready = NULL;
+    sb.ready_size_bytes = 0;
+    for (idx = 0; idx < n; idx++) {
+      lien_back *const slot = &slots[idx];
+
+      slot->r.location = slot->location_buffer;
+      slot->status = STATUS_READY;
+      slot->r.statuscode = cases[idx % ncases].code;
+      slot->r.size = idx;
+      slot->r.totalsize = idx + 1;
+      snprintf(slot->url_adr, sizeof(slot->url_adr), "http://h%d.example", idx);
+      snprintf(slot->url_fil, sizeof(slot->url_fil), "/p/%d.html", idx);
+    }
+    for (idx = 0; idx < n; idx++) {
+      line[0] = '\0';
+      back_infostr(&sb, idx, 3, line, sizeof(line));
+      // Exact match (not substring): pins tag/URL/trailer order and rejects a
+      // partial clobber, duplication, or truncation that a presence check would
+      // let through. The expected format is stated here independently.
+      snprintf(expect, sizeof(expect),
+               "%s\"http://h%d.example/p/%d.html\" " LLintP " " LLintP " ",
+               cases[idx % ncases].tag, idx, idx, (LLint) idx,
+               (LLint) (idx + 1));
+      assertf(strcmp(line, expect) == 0);
+    }
+    // Near-maximal URL, driven through back_info() (which owns the status
+    // buffer internally and prints to a FILE*). url_adr + url_fil together
+    // overrun the old HTS_URLMAXSIZE*2+1024 buffer, so the bounded appends
+    // would abort unless that buffer is sized to hold both fields. Regression
+    // for that sizing -- exercising back_infostr() directly would miss it,
+    // since the caller's buffer is what matters.
+    {
+      lien_back *const slot = &slots[0];
+      const size_t adrlen = sizeof(slot->url_adr) - 8;
+      const size_t fillen = sizeof(slot->url_fil) - 8;
+      FILE *const fp = tmpfile();
+      size_t got;
+
+      assertf(fp != NULL);
+      slot->status = STATUS_READY;
+      slot->r.statuscode = 200;
+      slot->r.size = 1;
+      slot->r.totalsize = 2;
+      memset(slot->url_adr, 'a', adrlen);
+      slot->url_adr[adrlen] = '\0';
+      slot->url_fil[0] = '/';
+      memset(slot->url_fil + 1, 'b', fillen - 1);
+      slot->url_fil[fillen] = '\0';
+      back_info(&sb, 0, 3, fp);
+      rewind(fp);
+      got = fread(line, 1, sizeof(line) - 1, fp);
+      line[got] = '\0';
+      fclose(fp);
+      snprintf(expect, sizeof(expect),
+               "READY \"%s%s\" " LLintP " " LLintP " " LF, slot->url_adr,
+               slot->url_fil, (LLint) 1, (LLint) 2);
+      assertf(strcmp(line, expect) == 0);
+    }
+    freet(slots);
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).

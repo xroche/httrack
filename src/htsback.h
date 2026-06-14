@@ -127,7 +127,7 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
 int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const int p);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
-void back_infostr(struct_back * sback, int i, int j, char *s);
+void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
 
 // hostback
