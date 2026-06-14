@@ -201,8 +201,8 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
             while(strnotempty(line)) {
               socinput(soc, line, 1000);
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
-              strcatbuff(data, line);
-              strcatbuff(data, "\r\n");
+              strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
+              strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
             }
             // CR/LF final de l'en tête inutile car déja placé via la ligne vide juste au dessus
             //strcatbuff(data,"\r\n");

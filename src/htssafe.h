@@ -123,41 +123,111 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
   (void) check_pointer;
 }
 
+/*
+ * Pointer-destination diagnostics for the buff() macros (GCC/Clang, C only).
+ *
+ * strcpybuff()/strcatbuff()/strncatbuff() bounds-check only when the
+ * destination is a sized char[] array (HTS_IS_CHAR_BUFFER). For a bare char*
+ * the capacity is unknown, so the macro silently falls back to plain
+ * strcpy()/strcat()/strncat() while still looking like a checked call.
+ *
+ * These stubs route that pointer case through __builtin_choose_expr() so the
+ * 'warning' attribute fires only at pointer-destination sites; array sites use
+ * the bounded *_safe_ helpers and stay quiet. The warning names the
+ * explicit-size replacement (strlcpybuff/strlcatbuff). Diagnostic only: no
+ * runtime or ABI change, built only on GCC/Clang in C mode. Other compilers
+ * (MSVC, ...) keep the previous behavior via the #else branches.
+ */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#if defined(__has_attribute)
+#if __has_attribute(warning)
+#define HTS_BUFF_PTR_ATTR(msg) __attribute__((unused, noinline, warning(msg)))
+#endif
+#endif
+#ifndef HTS_BUFF_PTR_ATTR
+/* 'warning' attribute unavailable: keep noinline so the migration can still
+   grep for these symbols, but no compile-time diagnostic is emitted. */
+#define HTS_BUFF_PTR_ATTR(msg) __attribute__((unused, noinline))
+#endif
+
+HTS_BUFF_PTR_ATTR("strcpybuff() destination is a pointer (capacity unknown): "
+                  "NOT bounds-checked; use strlcpybuff(dst, src, size)")
+static char *strcpybuff_ptr_(char *dest, const char *src) {
+  return strcpy(dest, src);
+}
+
+HTS_BUFF_PTR_ATTR("strcatbuff() destination is a pointer (capacity unknown): "
+                  "NOT bounds-checked; use strlcatbuff(dst, src, size)")
+static char *strcatbuff_ptr_(char *dest, const char *src) {
+  return strcat(dest, src);
+}
+
+HTS_BUFF_PTR_ATTR("strncatbuff() destination is a pointer (capacity unknown): "
+                  "NOT bounds-checked; use strlcatbuff(dst, src, size)")
+static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
+  return strncat(dest, src, n);
+}
+#endif
+
 /**
  * Append at most N characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define strncatbuff(A, B, N) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
+  strncat_safe_(A, sizeof(A), B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__), \
+  strncatbuff_ptr_((A), (B), (N)) )
+#else
 #define strncatbuff(A, B, N) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
   ? strncat(A, B, N) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#endif
 
 /**
  * Append characters of "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define strcatbuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
+  strncat_safe_(A, sizeof(A), B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__), \
+  strcatbuff_ptr_((A), (B)) )
+#else
 #define strcatbuff(A, B) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
   ? strcat(A, B) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#endif
 
 /**
  * Copy characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define strcpybuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
+  strcpy_safe_(A, sizeof(A), B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
+  "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__), \
+  strcpybuff_ptr_((A), (B)) )
+#else
 #define strcpybuff(A, B) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
   ? strcpy(A, B) \
   : strcpy_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#endif
 
 /**
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
