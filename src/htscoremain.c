@@ -193,6 +193,37 @@ static int string_safety_selftests(void) {
 #pragma GCC diagnostic pop
 #endif
 
+  /* htsbuff: bounded builder over a fixed array (append, truncating append,
+     reset, and length tracking) */
+  {
+    char dst[8];
+    htsbuff b = htsbuff_array(dst);
+
+    htsbuff_cat(&b, "ab");
+    htsbuff_cat(&b, "cd");
+    if (strcmp(htsbuff_str(&b), "abcd") != 0 || b.len != 4)
+      return 1;
+
+    htsbuff_catn(&b, "efghij", 2);      /* append at most 2 */
+    if (strcmp(htsbuff_str(&b), "abcdef") != 0)
+      return 1;
+
+    htsbuff_cpy(&b, "xyz");             /* reset */
+    if (strcmp(htsbuff_str(&b), "xyz") != 0 || b.len != 3)
+      return 1;
+  }
+
+  /* boundary: filling to exactly cap-1 must succeed (one more aborts, which the
+     -#8 overflow-buff mode checks) */
+  {
+    char d2[4];
+    htsbuff c = htsbuff_array(d2);
+
+    htsbuff_cat(&c, "abc");
+    if (strcmp(htsbuff_str(&c), "abc") != 0 || c.len != 3)
+      return 1;
+  }
+
   return 0;
 }
 
@@ -2494,16 +2525,23 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '8':        /* string-safety selftest: httrack -#8 [overflow <bigstr>] */
-                if (na + 1 < argc && strcmp(argv[na + 1], "overflow") == 0) {
-                  /* Deliberately exceed a sized buffer: the bounded macro must
+                if (na + 1 < argc
+                    && strncmp(argv[na + 1], "overflow", 8) == 0) {
+                  /* Deliberately exceed a sized buffer: the bounded op must
                      abort. The source comes from argv so its length is opaque
                      to the compiler (no static -Wstringop-overflow, genuine
-                     runtime check). */
+                     runtime check). "overflow-buff" exercises htsbuff. */
                   char small[4];
                   const char *const src =
                     (na + 2 < argc) ? argv[na + 2] : "overflowing";
 
-                  strcpybuff(small, src);
+                  if (strcmp(argv[na + 1], "overflow-buff") == 0) {
+                    htsbuff b = htsbuff_array(small);
+
+                    htsbuff_cat(&b, src);
+                  } else {
+                    strcpybuff(small, src);
+                  }
                   printf("strsafe: NOT aborted\n");     /* must be unreachable */
                   htsmain_free();
                   return 1;
