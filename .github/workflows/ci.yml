@@ -46,8 +46,8 @@ jobs:
       - name: Configure
         run: |
           set -euo pipefail
-          # autoreconf installs the automake test-driver (not committed) and
-          # validates configure.ac, so "make check" works on a fresh checkout.
+          # Regenerate from configure.ac/Makefile.am to validate them; the
+          # committed generated files already let a plain checkout build.
           autoreconf -fi
           ./configure
 
