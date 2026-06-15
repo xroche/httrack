@@ -3,6 +3,8 @@
 # silently drop it from the dist tarball and break "make distcheck".
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py \
+	local-crawl.sh local-server.py server.crt server.key \
+	server-root/simple/basic.html server-root/simple/link.html \
 	fixtures/cache-golden/hts-cache/new.zip
 
 TESTS_ENVIRONMENT =
@@ -47,6 +49,8 @@ TESTS = \
 	11_crawl-longurl.test \
 	11_crawl-parsing.test \
 	12_crawl_https.test \
-	13_crawl_proxy_https.test
+	13_crawl_proxy_https.test \
+	13_local-cookies.test \
+	14_local-https.test
 
 CLEANFILES = check-network_sh.cache

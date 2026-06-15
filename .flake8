@@ -1,0 +1,5 @@
+[flake8]
+# Match black's formatting so the two tools don't fight.
+max-line-length = 88
+# E203/W503 conflict with black's slice and line-break style.
+extend-ignore = E203, W503
