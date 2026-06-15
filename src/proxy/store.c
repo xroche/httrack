@@ -1162,7 +1162,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                     FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
                     if (fp != NULL) {
-                      r->adr = (char *) malloc(r->size + 4);
+                      r->adr = (char *) malloc(r->size + 1);
                       if (r->adr != NULL) {
                         if (r->size > 0
                             && fread(r->adr, 1, r->size, fp) != r->size) {
@@ -1172,6 +1172,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                           sprintf(r->msg, "Read error in cache disk data: %s",
                                   strerror(last_errno));
                         }
+                        r->adr[r->size] = '\0';
                       } else {
                         r->statuscode = STATUSCODE_INVALID;
                         strcpy(r->msg,
