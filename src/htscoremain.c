@@ -236,6 +236,55 @@ static void basic_selftests(void) {
     }
     freet(slots);
   }
+  // next_token(): in-place token scanner. Strips surrounding quotes, unescapes
+  // \" and \\ when flag is set, and returns the token terminator (the space, or
+  // NULL at end of string). The unquote/unescape rewrites the string in place
+  // by shifting left, so the result is always shorter -- regression for that
+  // compaction.
+  {
+    char tok[64];
+
+    // plain token: unchanged, returns a pointer AT the separating space (exact
+    // position, not just any space -- a strchr-style impl would land elsewhere
+    // once quotes shift the content)
+    strcpybuff(tok, "abc def");
+    {
+      char *const end = next_token(tok, 0);
+      assertf(end == tok + 3 && *end == ' ' && strcmp(tok, "abc def") == 0);
+    }
+    // surrounding quotes stripped, returns the (post-shift) trailing space
+    strcpybuff(tok, "\"ab\" cd");
+    {
+      char *const end = next_token(tok, 1);
+      assertf(end == tok + 2 && *end == ' ' && strcmp(tok, "ab cd") == 0);
+    }
+    // a space inside quotes does not end the token; end of string returns NULL
+    strcpybuff(tok, "\"a b\"c");
+    {
+      char *const end = next_token(tok, 1);
+      assertf(end == NULL && strcmp(tok, "a bc") == 0);
+    }
+    // \" and \\ are unescaped to literal " and \ in place
+    strcpybuff(tok, "\"a\\\"b\\\\c\"");
+    {
+      char *const end = next_token(tok, 1);
+      assertf(end == NULL && strcmp(tok, "a\"b\\c") == 0);
+    }
+    // unterminated quote: the opening quote is dropped, the rest survives, and
+    // the scan runs to the NUL (returns NULL)
+    strcpybuff(tok, "\"ab");
+    {
+      char *const end = next_token(tok, 1);
+      assertf(end == NULL && strcmp(tok, "ab") == 0);
+    }
+    // trailing lone backslash in a quote: *(p+1) is the NUL, not an escape, so
+    // the backslash is kept intact (and there is no over-read past the NUL)
+    strcpybuff(tok, "\"a\\");
+    {
+      char *const end = next_token(tok, 1);
+      assertf(end == NULL && strcmp(tok, "a\\") == 0);
+    }
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).
