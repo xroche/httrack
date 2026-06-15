@@ -282,7 +282,9 @@ int main(int argc, char **argv) {
 static int print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_struct *stats) {
   static TStamp last_update = 0;
   static int finished = 0;
+  static int last_lien_n = -1;
   TStamp now = mtime_local();
+  int force_update;
 
   if (lien_n < lien_tot) {
     finished = 0;
@@ -291,17 +293,25 @@ static int print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_
     return 1;
   }
 
-  /* Throttling: update the screen only every 200ms to reduce CPU overhead. */
-  /* Force update when the mirror finishes (when lien_n == lien_tot). */
-  if (last_update == 0 || (now - last_update) >= 200 || (lien_n == lien_tot && lien_tot > 0)) {
-    last_update = now;
+  /* Force update if a new file has finished downloading (lien_n changed) */
+  force_update = (lien_n != last_lien_n);
+  last_lien_n = lien_n;
 
+  /* Throttling: update the screen only every 200ms to reduce CPU overhead. */
+  /* Force update when the mirror finishes (when lien_n == lien_tot) or a file finishes. */
+  if (last_update == 0 || (now - last_update) >= 200 || (lien_n == lien_tot && lien_tot > 0) || force_update) {
     double percent = 0.0;
     int bar_width = 20;
     int filled = 0;
+    int i;
+    char bar_str[24]; /* 20 + '>' + intermediate stages + \0 */
+    double speed_kbs = 0.0;
+    char eta_str[32];
+
+    last_update = now;
+    strcpybuff(eta_str, "unknown");
 
     /* Visual progress bar calculation */
-    char bar_str[24]; /* 20 + '>' + intermediate stages + \0 */
     memset(bar_str, ' ', bar_width);
     bar_str[bar_width] = '\0';
 
@@ -311,7 +321,6 @@ static int print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_
         percent = 100.0; /* Fail-safe if lien_tot fluctuates downwards */
 
       filled = (int)((percent / 100.0) * bar_width);
-      int i;
       for (i = 0; i < filled; i++) {
         bar_str[i] = '=';
       }
@@ -321,13 +330,11 @@ static int print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_
     }
 
     /* Calculate download speed (KB/s) */
-    double speed_kbs = 0.0;
     if (stat_time > 0 && stats != NULL) {
       speed_kbs = (double)(stats->HTS_TOTAL_RECV / 1024.0) / stat_time;
     }
 
     /* Calculate ETA (Estimated Time of Arrival) */
-    char eta_str[32] = "unknown";
     if (lien_n > 0 && lien_tot > lien_n && stat_time > 0) {
       /* Simple linear calculation: avg_time_per_link * remaining_links */
       double time_per_link = (double)stat_time / lien_n;
