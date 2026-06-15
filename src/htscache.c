@@ -939,7 +939,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), previous_save), "rb");
 
                   if (fp != NULL) {
-                    r.adr = (char *) malloct((int) r.size + 4);
+                    r.adr = (char *) malloct((int) r.size + 1);
                     if (r.adr != NULL) {
                       if (r.size > 0
                           && fread(r.adr, 1, (int) r.size, fp) != r.size) {
@@ -966,7 +966,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
               // Data in cache.
               else {
                 // lire fichier (d'un coup)
-                r.adr = (char *) malloct((int) r.size + 4);
+                r.adr = (char *) malloct((int) r.size + 1);
                 if (r.adr != NULL) {
                   if (unzReadCurrentFile((unzFile) cache->zipInput, r.adr, (int) r.size) != r.size) {   // erreur
                     freet(r.adr);
@@ -1246,7 +1246,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
                     FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), return_save), "rb");
 
                     if (fp != NULL) {
-                      r.adr = (char *) malloct((size_t) r.size + 4);
+                      r.adr = (char *) malloct((size_t) r.size + 1);
                       if (r.adr != NULL) {
                         if (r.size > 0
                             && fread(r.adr, 1, (size_t) r.size, fp) != r.size) {
@@ -1268,7 +1268,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
                 }
               } else {
                 // lire fichier (d'un coup)
-                r.adr = (char *) malloct((size_t) r.size + 4);
+                r.adr = (char *) malloct((size_t) r.size + 1);
                 if (r.adr != NULL) {
                   if (fread(r.adr, 1, (size_t) r.size, cache->olddat) != r.size) {      // erreur
                     freet(r.adr);
@@ -1371,7 +1371,7 @@ int cache_readdata(cache_back * cache, const char *str1, const char *str2,
 
         cache_rint(cache->olddat, &len);
         if (len > 0) {
-          char *mem_buff = (char *) malloct(len + 4);   /* Plus byte 0 */
+          char *mem_buff = (char *) malloct(len + 1); /* trailing \0 */
 
           if (mem_buff) {
             if (fread(mem_buff, 1, len, cache->olddat) == len) {        // lire tout (y compris statuscode etc)*/

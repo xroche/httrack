@@ -334,7 +334,7 @@ void index_finish(const char *indexpath, int mode) {
     if (fp_tmpproject) {
       tab = (char **) malloct(sizeof(char *) * (hts_primindex_size + 2));
       if (tab) {
-        blk = malloct(size + 4);
+        blk = malloct(size + 1);
         if (blk) {
           fseek(fp_tmpproject, 0, SEEK_SET);
           if ((INTsys) fread(blk, 1, size, fp_tmpproject) == size) {
