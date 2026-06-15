@@ -2193,16 +2193,19 @@ int httpmirror(char *url1, httrackp * opt) {
                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                  "hts-cache/new.lst"), "rb");
         if (new_lst != NULL && sz != (size_t) -1) {
-          char *adr = (char *) malloct(sz);
+          /* +1 for the NUL below: new.lst is read raw, and the strstr()
+             that follows needs a terminated C string. */
+          char *adr = (char *) malloct(sz + 1);
 
           if (adr) {
             if (fread(adr, 1, sz, new_lst) == sz) {
+              adr[sz] = '\0';
               char line[1100];
               int purge = 0;
 
               while(!feof(old_lst)) {
                 linput(old_lst, line, 1000);
-                if (!strstr(adr, line)) {       // fichier non trouvé dans le nouveau?
+                if (!strstr(adr, line)) { // not found in the new list?
                   char BIGSTK file[HTS_URLMAXSIZE * 2];
 
                   strcpybuff(file, StringBuff(opt->path_html));

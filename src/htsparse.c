@@ -3416,8 +3416,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
             hts_log_print(opt, LOG_DEBUG,
               "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-            TypedArraySize(output_buffer) = 0;
-            TypedArrayAppend(output_buffer, cAddr, cSize);
+            /* The callback either edits output_buffer in place (cAddr
+               unchanged) or hands back its own buffer (cAddr changed). Only
+               the latter needs a copy: re-appending output_buffer onto itself
+               would read freed memory, as the append's realloc can relocate
+               the block out from under cAddr. */
+            if (cAddr != TypedArrayElts(output_buffer)) {
+              TypedArraySize(output_buffer) = 0;
+              TypedArrayAppend(output_buffer, cAddr, cSize);
+            } else {
+              TypedArraySize(output_buffer) = (size_t) cSize;
+            }
           }
         }
 

@@ -145,8 +145,13 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
         if (!hex) {
           if (src[i] >= '0' && src[i] <= '9') {
             const int h = src[i] - '0';
-            uc *= 10;
-            uc += h;
+            /* Guard before multiplying: a codepoint past the Unicode max
+               (0x10FFFF) is invalid anyway, so stop rather than overflow uc. */
+            if (uc > (0x10FFFF - h) / 10) {
+              ampStart = (size_t) -1;
+            } else {
+              uc = uc * 10 + h;
+            }
           } else {
             /* abandon */
             ampStart = (size_t) -1;
@@ -156,8 +161,11 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
         else {
           const int h = get_hex_value(src[i]);
           if (h != -1) {
-            uc *= 16;
-            uc += h;
+            if (uc > (0x10FFFF - h) / 16) {
+              ampStart = (size_t) -1;
+            } else {
+              uc = uc * 16 + h;
+            }
           } else {
             /* abandon */
             ampStart = (size_t) -1;
