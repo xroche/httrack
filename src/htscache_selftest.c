@@ -182,6 +182,16 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
     fail++;
   }
 
+  /* The loaded body must be NUL-terminated at [size]: cache_readex's strlen()
+     consumers (htscore.c:1046, htscache.c) rely on it, and a missing
+     terminator is a heap over-read. The buffer is malloc(size + slack), so
+     reading [size] is in bounds. */
+  if (r.adr != NULL && r.adr[r.size] != '\0') {
+    fprintf(stderr, "cache-selftest: %s%s: body not NUL-terminated at [size]\n",
+            adr, fil);
+    fail++;
+  }
+
 #undef CHECK_STR
 
   if (r.adr != NULL) {
@@ -206,6 +216,107 @@ static void gen_body(char *buf, size_t len, int kind) {
       buf[j] = (char) (seed >> 16);
     }
   }
+}
+
+/* Exercise the disk-fallback read path: a record stored with X-In-Cache: 0
+   keeps its body on disk (not in the ZIP), and cache_readex must load it from
+   there. The one-shot crawl tests never re-read such a body into memory, so
+   this path otherwise has no runtime coverage. We store the header with
+   all_in_cache=0 and a non-hypertext content-type (-> X-In-Cache: 0), create
+   the body at the exact fconv()-resolved path the reader uses, then read it
+   back and assert it round-trips and is NUL-terminated. */
+static int disk_fallback_selftest(httrackp *opt) {
+  int fail = 0;
+  cache_back cache;
+  htsblk r;
+  char catbuff[HTS_URLMAXSIZE * 2];
+  char *path;
+  char *locbuf;
+  FILE *fp;
+  const char *const adr = "example.com";
+  const char *const fil = "/blob.bin";
+  char save[HTS_URLMAXSIZE * 2];
+  /* no embedded NUL: were the read to leave this un-terminated, a later
+     strlen() would run off the end (the bug this guards) */
+  static const char body[] = "BINARY-on-disk-body-0123456789-no-trailing-nul";
+  const size_t body_len = sizeof(body) - 1;
+
+  /* X-Save must start with path_html_utf8 so the reader resolves it verbatim
+     (otherwise it re-roots it as a pre-3.40 relative path); then the body we
+     create at fconv(save) is exactly where cache_readex looks for it. */
+  fconcat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+          "example.com/blob.bin");
+
+  /* write only the header (X-In-Cache: 0); the body stays on disk */
+  selftest_open_for_write(&cache, opt);
+  {
+    htsblk w;
+    char locw[4];
+    char *bodycopy = malloct(body_len);
+
+    hts_init_htsblk(&w);
+    w.statuscode = 200;
+    w.size = (LLint) body_len;
+    strcpybuff(w.msg, "OK");
+    strcpybuff(w.contenttype, "application/octet-stream");
+    locw[0] = '\0';
+    w.location = locw;
+    w.is_write = 0;
+    memcpy(bodycopy, body, body_len);
+    w.adr = bodycopy;
+    cache_add(opt, &cache, &w, adr, fil, save, 0 /* all_in_cache */, NULL);
+    freet(bodycopy);
+  }
+  selftest_close(&cache);
+
+  /* create the on-disk body where the reader will look for it */
+  path = fconv(catbuff, sizeof(catbuff), save);
+  (void) structcheck(path);
+  fp = FOPEN(path, "wb");
+  if (fp == NULL) {
+    fprintf(stderr, "cache-selftest: disk-fallback: cannot create '%s'\n",
+            path);
+    return 1;
+  }
+  if (fwrite(body, 1, body_len, fp) != body_len) {
+    fprintf(stderr, "cache-selftest: disk-fallback: short write to '%s'\n",
+            path);
+    fail++;
+  }
+  fclose(fp);
+
+  /* read it back: takes the X-In-Cache: 0 disk-fallback branch */
+  selftest_open_for_read(&cache, opt);
+  locbuf = malloct(HTS_URLMAXSIZE * 2);
+  locbuf[0] = '\0';
+  r = cache_readex(opt, &cache, adr, fil, "", locbuf, NULL, 1);
+  if (r.statuscode != 200) {
+    fprintf(stderr,
+            "cache-selftest: disk-fallback: statuscode %d, expected 200"
+            " (path not taken or read failed)\n",
+            r.statuscode);
+    fail++;
+  }
+  if (r.size != (LLint) body_len) {
+    fprintf(stderr,
+            "cache-selftest: disk-fallback: size " LLintP ", expected %d\n",
+            (LLint) r.size, (int) body_len);
+    fail++;
+  } else if (r.adr == NULL || memcmp(r.adr, body, body_len) != 0) {
+    fprintf(stderr, "cache-selftest: disk-fallback: body mismatch\n");
+    fail++;
+  }
+  /* the loaded body must be NUL-terminated at [size] */
+  if (r.adr != NULL && r.adr[r.size] != '\0') {
+    fprintf(stderr, "cache-selftest: disk-fallback: body not NUL-terminated\n");
+    fail++;
+  }
+  if (r.adr != NULL) {
+    freet(r.adr);
+  }
+  freet(locbuf);
+  selftest_close(&cache);
+  return fail;
 }
 
 int cache_selftests(httrackp *opt, const char *dir) {
@@ -257,6 +368,10 @@ int cache_selftests(httrackp *opt, const char *dir) {
       strcatbuff(base, "/");
     }
     StringCopy(opt->path_log, base);
+    /* the disk-fallback pass resolves on-disk body paths through fconv(), which
+       is rooted at path_html; keep it inside the test directory too */
+    StringCopy(opt->path_html, base);
+    StringCopy(opt->path_html_utf8, base);
   }
   opt->cache = 1;
 
@@ -365,6 +480,9 @@ int cache_selftests(httrackp *opt, const char *dir) {
                   "iso-8859-1", "Wed, 03 Jan 2024 09:30:00 GMT", "etag-updated",
                   "", body_updated, strlen(body_updated));
   selftest_close(&cache);
+
+  /* pass 5: the disk-fallback read path (X-In-Cache: 0, body on disk) */
+  failures += disk_fallback_selftest(opt);
 
   for (i = 0; i < large_count; i++) {
     freet(large_body[i]);
