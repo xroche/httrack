@@ -3840,10 +3840,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (opt->verbosedisplay == 1) {
           if (back[i].status == STATUS_READY) {
             if (back[i].r.statuscode == HTTP_OK)
-              printf("* %s%s (" LLintP " bytes) - OK" VT_CLREOL "\r",
+              printf("\r* %s%s (" LLintP " bytes) - OK" VT_CLREOL "\n",
                      back[i].url_adr, back[i].url_fil, (LLint) back[i].r.size);
             else
-              printf("* %s%s (" LLintP " bytes) - %d" VT_CLREOL "\r",
+              printf("\r* %s%s (" LLintP " bytes) - %d" VT_CLREOL "\n",
                      back[i].url_adr, back[i].url_fil, (LLint) back[i].r.size,
                      back[i].r.statuscode);
             fflush(stdout);

@@ -279,6 +279,92 @@ int main(int argc, char **argv) {
   return ret;
 }
 
+static int print_progress_bar(int lien_n, int lien_tot, int stat_time, hts_stat_struct *stats) {
+  static TStamp last_update = 0;
+  static int finished = 0;
+  TStamp now = mtime_local();
+
+  if (lien_n < lien_tot) {
+    finished = 0;
+  }
+  if (finished) {
+    return 1;
+  }
+
+  /* Throttling: update the screen only every 200ms to reduce CPU overhead. */
+  /* Force update when the mirror finishes (when lien_n == lien_tot). */
+  if (last_update == 0 || (now - last_update) >= 200 || (lien_n == lien_tot && lien_tot > 0)) {
+    last_update = now;
+
+    double percent = 0.0;
+    int bar_width = 20;
+    int filled = 0;
+
+    /* Visual progress bar calculation */
+    char bar_str[24]; /* 20 + '>' + intermediate stages + \0 */
+    memset(bar_str, ' ', bar_width);
+    bar_str[bar_width] = '\0';
+
+    if (lien_tot > 0) {
+      percent = ((double)lien_n / lien_tot) * 100.0;
+      if (percent > 100.0)
+        percent = 100.0; /* Fail-safe if lien_tot fluctuates downwards */
+
+      filled = (int)((percent / 100.0) * bar_width);
+      int i;
+      for (i = 0; i < filled; i++) {
+        bar_str[i] = '=';
+      }
+      if (filled < bar_width) {
+        bar_str[filled] = '>';
+      }
+    }
+
+    /* Calculate download speed (KB/s) */
+    double speed_kbs = 0.0;
+    if (stat_time > 0 && stats != NULL) {
+      speed_kbs = (double)(stats->HTS_TOTAL_RECV / 1024.0) / stat_time;
+    }
+
+    /* Calculate ETA (Estimated Time of Arrival) */
+    char eta_str[32] = "unknown";
+    if (lien_n > 0 && lien_tot > lien_n && stat_time > 0) {
+      /* Simple linear calculation: avg_time_per_link * remaining_links */
+      double time_per_link = (double)stat_time / lien_n;
+      int links_remaining = lien_tot - lien_n;
+      TStamp eta_seconds = (TStamp)(time_per_link * links_remaining);
+
+      if (eta_seconds > 0) {
+        int eta_m = (int)(eta_seconds / 60);
+        int eta_s = (int)(eta_seconds % 60);
+        if (eta_m > 0) {
+          snprintf(eta_str, sizeof(eta_str), "%dm %ds", eta_m, eta_s);
+        } else {
+          snprintf(eta_str, sizeof(eta_str), "%ds", eta_s);
+        }
+      }
+    } else if (lien_tot == 0) {
+      strcpybuff(eta_str, "calculating...");
+    } else if (lien_n == lien_tot) {
+      strcpybuff(eta_str, "0s");
+    }
+
+    /* Print on the same line using \r, and clear to end of line to prevent trailing chars */
+    printf("\r[%s] %.1f%% | %d/%d links | DL: %.1f KB/s | ETA: %s   ", bar_str,
+           percent, lien_n, lien_tot, speed_kbs, eta_str);
+
+    if (lien_n == lien_tot && lien_tot > 0) {
+      finished = 1;
+      printf("\n");
+    }
+
+    /* Flush output explicitly since we don't write a newline character */
+    fflush(stdout);
+  }
+
+  return 1;
+}
+
 /* CALLBACK FUNCTIONS */
 
 /* Initialize the Winsock */
@@ -298,6 +384,9 @@ static int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
   return htsshow_start(carg, opt);
 }
 static int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
+  if (opt->verbosedisplay == 1) {
+    print_progress_bar(opt->lien_tot, opt->lien_tot, (int)(time(NULL) - HTS_STAT.stat_timestart), &HTS_STAT);
+  }
   return 1;
 }
 static int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg,
@@ -352,8 +441,12 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
     stat_bytes_recv = stats->HTS_TOTAL_RECV;
   }
 
-  if (!use_show)
+  if (!use_show) {
+    if (opt->verbosedisplay == 1) {
+      print_progress_bar(lien_n, lien_tot, stat_time, stats);
+    }
     return 1;
+  }
 
   mytime = mtime_local();
   if ((stat_time > 0) && (stat_bytes_recv > 0))
