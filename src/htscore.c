@@ -633,13 +633,12 @@ int httpmirror(char *url1, httrackp * opt) {
     // c'est plus propre et plus logique que d'entrer à la main les liens dans la pile
     // on bénéficie ainsi des vérifications et des tests du robot pour les liens "primaires"
     primary = (char *) malloct(primary_len);
-    if (primary) {
-      primary[0] = '\0';
-    } else {
+    if (!primary) {
       printf("PANIC! : Not enough memory [%d]\n", __LINE__);
       XH_extuninit;
       return 0;
     }
+    htsbuff primarybuff = htsbuff_ptr(primary, primary_len);
 
     while(*a) {
       int i;
@@ -687,11 +686,11 @@ int httpmirror(char *url1, httrackp * opt) {
               strcatbuff(tempo, "*");   // ajouter un *
             }
           }
-          if (type)
-            strcpybuff(filters[filptr], "+");
-          else
-            strcpybuff(filters[filptr], "-");
-          strcatbuff(filters[filptr], tempo);
+          {
+            htsbuff fb = htsbuff_ptr(filters[filptr], HTS_URLMAXSIZE * 2);
+            htsbuff_cpy(&fb, type ? "+" : "-");
+            htsbuff_cat(&fb, tempo);
+          }
           filptr++;
 
           /* sanity check */
@@ -726,12 +725,10 @@ int httpmirror(char *url1, httrackp * opt) {
         }
         url[i++] = '\0';
 
-        //strcatbuff(primary,"<PRIMARY=\"");
         if (strstr(url, ":/") == NULL)
-          strcatbuff(primary, "http://");
-        strcatbuff(primary, url);
-        //strcatbuff(primary,"\">");
-        strcatbuff(primary, "\n");
+          htsbuff_cat(&primarybuff, "http://");
+        htsbuff_cat(&primarybuff, url);
+        htsbuff_cat(&primarybuff, "\n");
       }
     }                           // while
 
@@ -762,7 +759,6 @@ int httpmirror(char *url1, httrackp * opt) {
         int filelist_ptr = 0;
         int n = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
-        char *primary_ptr = primary + strlen(primary);
 
         while(filelist_ptr < filelist_sz) {
           int count =
@@ -771,13 +767,10 @@ int httpmirror(char *url1, httrackp * opt) {
           if (count && line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
-              strcpybuff(primary_ptr, "http://");
-              primary_ptr += strlen(primary_ptr);
+              htsbuff_cat(&primarybuff, "http://");
             }
-            strcpybuff(primary_ptr, line);
-            primary_ptr += strlen(primary_ptr);
-            strcpybuff(primary_ptr, "\n");
-            primary_ptr += 1;
+            htsbuff_cat(&primarybuff, line);
+            htsbuff_cat(&primarybuff, "\n");
           }
         }
         // fclose(fp);
@@ -2453,9 +2446,10 @@ void host_ban(httrackp * opt, int ptr,
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
-    strcpybuff(_FILTERS[*_FILTERS_PTR], "-");
-    strcatbuff(_FILTERS[*_FILTERS_PTR], host);
-    strcatbuff(_FILTERS[*_FILTERS_PTR], "/*");  // host/ * interdit
+    htsbuff fb = htsbuff_ptr(_FILTERS[*_FILTERS_PTR], HTS_URLMAXSIZE * 2);
+    htsbuff_cpy(&fb, "-");
+    htsbuff_cat(&fb, host);
+    htsbuff_cat(&fb, "/*"); // forbid host/*
     (*_FILTERS_PTR)++;
   }
   // oups
@@ -3518,7 +3512,7 @@ char *next_token(char *p, int flag) {
   p--;
   do {
     p++;
-    if (flag && (*p == '\\')) { // sauter \x ou \"
+    if (flag && (*p == '\\')) { // skip \x or \"
       if (quote) {
         char c = '\0';
 
@@ -3527,20 +3521,14 @@ char *next_token(char *p, int flag) {
         else if (*(p + 1) == '"')
           c = '"';
         if (c) {
-          char BIGSTK tempo[8192];
-
-          tempo[0] = c;
-          tempo[1] = '\0';
-          strcatbuff(tempo, p + 2);
-          strcpybuff(p, tempo);
+          /* unescape the 2 chars to one, shifting left in place */
+          *p = c;
+          memmove(p + 1, p + 2, strlen(p + 2) + 1);
         }
       }
-    } else if (*p == 34) {      // guillemets (de fin)
-      char BIGSTK tempo[8192];
-
-      tempo[0] = '\0';
-      strcatbuff(tempo, p + 1);
-      strcpybuff(p, tempo);     /* wipe "" */
+    } else if (*p == 34) { // closing quote
+      /* drop the quote, shifting the rest left in place */
+      memmove(p, p + 1, strlen(p + 1) + 1);
       p--;
       /* */
       quote = !quote;
@@ -3880,7 +3868,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
                                 afs.af.adr, afs.save, savename(), tempo);
                   if (str->localLink
                       && str->localLinkSize > (int) strlen(tempo) + 1) {
-                    strcpybuff(str->localLink, tempo);
+                    strlcpybuff(str->localLink, tempo, str->localLinkSize);
                   }
                 }
               }
@@ -3892,11 +3880,11 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
                           lien);
             if (str->localLink
                 && str->localLinkSize > (int) (strlen(afs.af.adr) + strlen(afs.af.fil) + 8)) {
-              str->localLink[0] = '\0';
+              htsbuff lb = htsbuff_ptr(str->localLink, str->localLinkSize);
               if (!link_has_authority(afs.af.adr))
-                strcpybuff(str->localLink, "http://");
-              strcatbuff(str->localLink, afs.af.adr);
-              strcatbuff(str->localLink, afs.af.fil);
+                htsbuff_cat(&lb, "http://");
+              htsbuff_cat(&lb, afs.af.adr);
+              htsbuff_cat(&lb, afs.af.fil);
             }
             r = -1;
           }
