@@ -948,7 +948,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                         r.statuscode = STATUSCODE_INVALID;
                         sprintf(r.msg, "Read error in cache disk data: %s",
                                 strerror(last_errno));
-                      }
+                      } else if (r.size >= 0)
+                        *(r.adr + r.size) = '\0';
                     } else {
                       r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(r.msg,
@@ -1251,7 +1252,8 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
                             && fread(r.adr, 1, (size_t) r.size, fp) != r.size) {
                           r.statuscode = STATUSCODE_INVALID;
                           strcpybuff(r.msg, "Read error in cache disk data");
-                        }
+                        } else if (r.size >= 0)
+                          *(r.adr + r.size) = '\0';
                       } else {
                         r.statuscode = STATUSCODE_INVALID;
                         strcpybuff(r.msg,
@@ -1373,6 +1375,7 @@ int cache_readdata(cache_back * cache, const char *str1, const char *str2,
 
           if (mem_buff) {
             if (fread(mem_buff, 1, len, cache->olddat) == len) {        // lire tout (y compris statuscode etc)*/
+              mem_buff[len] = '\0';
               *inbuff = mem_buff;
               *inlen = len;
               return 1;
