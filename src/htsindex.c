@@ -343,6 +343,7 @@ void index_finish(const char *indexpath, int mode) {
             int i;
             FILE *fp;
 
+            blk[size] = '\0';
             while((b = strchr(a, '\n')) && (index < hts_primindex_size)) {
               tab[index++] = a;
               *b = '\0';
