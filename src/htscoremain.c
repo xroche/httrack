@@ -929,18 +929,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
               StringBuff(opt->path_log),
                "hts-cache/doit.log"))) || (argv_url > 0)) {
-          if (!optinclude_file
-              (fconcat
-               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-               StringBuff(opt->path_log), HTS_HTTRACKRC),
-               &argc, argv, x_argvblk, &x_ptr))
-            if (!optinclude_file(HTS_HTTRACKRC, &argc, argv, x_argvblk, &x_ptr)) {
-              if (!optinclude_file
-                  (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                  hts_gethome(), "/" HTS_HTTRACKRC),
-                   &argc, argv, x_argvblk, &x_ptr)) {
+          if (!optinclude_file(
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), HTS_HTTRACKRC),
+                  &argc, argv, x_argvblk, x_argvblk_size, &x_ptr))
+            if (!optinclude_file(HTS_HTTRACKRC, &argc, argv, x_argvblk,
+                                 x_argvblk_size, &x_ptr)) {
+              if (!optinclude_file(
+                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              hts_gethome(), "/" HTS_HTTRACKRC),
+                      &argc, argv, x_argvblk, x_argvblk_size, &x_ptr)) {
 #ifdef HTS_HTTRACKCNF
-                optinclude_file(HTS_HTTRACKCNF, &argc, argv, x_argvblk, &x_ptr);
+                optinclude_file(HTS_HTTRACKCNF, &argc, argv, x_argvblk,
+                                x_argvblk_size, &x_ptr);
 #endif
               }
             }

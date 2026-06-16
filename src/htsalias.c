@@ -41,19 +41,24 @@ Please visit our Website: http://www.httrack.com
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 
-// COPY OF cmdl_ins in htsmain.c
-// Insert a command in the argc/argv
-#define cmdl_ins(token,argc,argv,buff,ptr) \
-  { \
-  int i; \
-  for(i=argc;i>0;i--)\
-  argv[i]=argv[i-1];\
-  } \
-  argv[0]=(buff+ptr); \
-  strcpybuff(argv[0],token); \
-  ptr += (int) (strlen(argv[0])+1); \
+// COPY OF cmdl_ins in htscoremain.c
+/* Bytes left in x_argvblk from offset ptr. The offset can in principle outrun
+   the block (alias/doit.log expansion), so the copy aborts cleanly instead of
+   the subtraction wrapping to a huge unbounded size. */
+#define cmdl_room(bufsize, ptr)                                                \
+  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
+// Insert a command in the argc/argv (buff has total capacity bufsize)
+#define cmdl_ins(token, argc, argv, buff, bufsize, ptr)                        \
+  {                                                                            \
+    int i;                                                                     \
+    for (i = argc; i > 0; i--)                                                 \
+      argv[i] = argv[i - 1];                                                   \
+  }                                                                            \
+  argv[0] = (buff + ptr);                                                      \
+  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
+  ptr += (int) (strlen(argv[0]) + 1);                                          \
   argc++
-// END OF COPY OF cmdl_ins in htsmain.c
+// END OF COPY OF cmdl_ins in htscoremain.c
 
 /*
   Aliases for command-line and config file definitions
@@ -468,7 +473,7 @@ const char *optalias_help(const char *token) {
 */
 /* Note: NOT utf-8 */
 int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    int *x_ptr) {
+                    size_t x_argvblk_size, int *x_ptr) {
   FILE *fp;
 
   fp = fopen(name, "rb");
@@ -542,14 +547,15 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
               /* temporary argc: Number of parameters after minus insert_after_argc */
               insert_after_argc = (*argc) - insert_after;
               cmdl_ins((tmp_argv[2]), insert_after_argc, (argv + insert_after),
-                       x_argvblk, (*x_ptr));
+                       x_argvblk, x_argvblk_size, (*x_ptr));
               *argc = insert_after_argc + insert_after;
               insert_after++;
               /* Second one */
               if (return_argc > 1) {
                 insert_after_argc = (*argc) - insert_after;
                 cmdl_ins((tmp_argv[3]), insert_after_argc,
-                         (argv + insert_after), x_argvblk, (*x_ptr));
+                         (argv + insert_after), x_argvblk, x_argvblk_size,
+                         (*x_ptr));
                 *argc = insert_after_argc + insert_after;
                 insert_after++;
               }

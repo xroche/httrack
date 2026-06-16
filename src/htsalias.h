@@ -45,7 +45,7 @@ int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
 int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    int *x_ptr);
+                    size_t x_argvblk_size, int *x_ptr);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);
