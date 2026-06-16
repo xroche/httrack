@@ -320,20 +320,34 @@ jobs:
   lint:
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
+    env:
+      SHFMT_VERSION: v3.8.0
     steps:
       - uses: actions/checkout@v6
 
+      # shfmt is a pinned release binary, so it never changes: cache it keyed on
+      # the version. Same rationale as the git-clang-format driver below -- avoid
+      # re-downloading an unchanging file from github.com on every run.
+      - name: Cache shfmt binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/shfmt/shfmt
+          key: shfmt-${{ env.SHFMT_VERSION }}-${{ runner.arch }}
+
       - name: Install linters
-        env:
-          SHFMT_VERSION: v3.8.0
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends shellcheck
-          # shfmt is not packaged in apt; fetch a pinned release binary.
-          curl -fsSL -o /tmp/shfmt \
-            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)"
-          sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
+          # shfmt is not packaged in apt; fetch a pinned release binary (cold
+          # cache only), retrying through transient errors.
+          shfmt="$HOME/.cache/shfmt/shfmt"
+          if [ ! -s "$shfmt" ]; then
+            mkdir -p "$(dirname "$shfmt")"
+            curl --retry 5 --retry-all-errors -fsSL -o "$shfmt" \
+              "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)"
+          fi
+          sudo install -m 0755 "$shfmt" /usr/local/bin/shfmt
 
       # Lint the scripts we maintain; the legacy scripts are a separate cleanup.
       - name: shellcheck
