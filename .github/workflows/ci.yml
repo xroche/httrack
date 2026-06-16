@@ -354,6 +354,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The git-clang-format driver is pinned to an immutable release tag, so the
+      # fetched file never changes: cache it keyed on the tag. raw.githubusercontent.com
+      # 429-rate-limits the shared runner egress IPs, and re-downloading an unchanging
+      # file every run was the only thing that could (and did) hit that limit.
+      - name: Cache git-clang-format driver
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/git-clang-format/git-clang-format
+          key: git-clang-format-llvmorg-19.1.7
+
       - name: Install clang-format 19 (pinned, from apt.llvm.org)
         run: |
           set -euo pipefail
@@ -364,11 +374,14 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang-format-19
-          # git-clang-format driver, pinned to an immutable release tag (not a
-          # moving branch) since we curl and then execute it.
-          sudo curl -fsSL -o /usr/local/bin/git-clang-format \
-            https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/clang/tools/clang-format/git-clang-format
-          sudo chmod 0755 /usr/local/bin/git-clang-format
+          # Cold cache only: fetch the driver, retrying through transient 429s.
+          driver="$HOME/.cache/git-clang-format/git-clang-format"
+          if [ ! -s "$driver" ]; then
+            mkdir -p "$(dirname "$driver")"
+            curl --retry 5 --retry-all-errors -fsSL -o "$driver" \
+              https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/clang/tools/clang-format/git-clang-format
+          fi
+          sudo install -m 0755 "$driver" /usr/local/bin/git-clang-format
           clang-format-19 --version
 
       - name: Check formatting of changed lines
