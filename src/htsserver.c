@@ -129,7 +129,8 @@ HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
 /* Language files */
-HTS_UNUSED static int htslang_load(char *limit_to, const char *apppath);
+HTS_UNUSED static int htslang_load(char *limit_to, size_t limit_size,
+                                   const char *apppath);
 HTS_UNUSED static void conv_printf(const char *from, char *to);
 HTS_UNUSED static void LANG_DELETE(void);
 HTS_UNUSED static void LANG_INIT(const char *path);
@@ -325,7 +326,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
   /* Load strings */
   htslang_init();
-  if (!htslang_load(NULL, path)) {
+  if (!htslang_load(NULL, 0, path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
     return 0;
@@ -511,7 +512,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         char *s = buffer;
         char *e, *f;
 
-        strcatbuff(buffer, "&");
+        strlcatbuff(buffer, "&", buffer_size);
         while(s && (e = strchr(s, '=')) && (f = strchr(s, '&'))) {
           const char *ua;
           String sua = STRING_EMPTY;
@@ -935,7 +936,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int listDefault = 0;
 
                     name[0] = '\0';
-                    strncatbuff(name, str, n);
+                    strlncatbuff(name, str, sizeof(name_), n);
 
                     if (strncmp(name, "/*", 2) == 0) {
                       /* comments */
@@ -1490,7 +1491,7 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
   return coucal_write(NewLangList, tmp, (intptr_t) strdup(value));
 }
 
-static int htslang_load(char *limit_to, const char *path) {
+static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
 
@@ -1545,7 +1546,7 @@ static int htslang_load(char *limit_to, const char *path) {
             char *const buff = (char *) malloc(len + 1);
 
             if (buff) {
-              strcpybuff(buff, intkey);
+              strlcpybuff(buff, intkey, len + 1);
               coucal_add(NewLangStrKeys, key, (intptr_t) buff);
             }
           }
@@ -1568,9 +1569,9 @@ static int htslang_load(char *limit_to, const char *path) {
   /* Get only language name */
   if (limit_to) {
     if (hashname)
-      strcpybuff(limit_to, hashname);
+      strlcpybuff(limit_to, hashname, limit_size);
     else
-      strcpybuff(limit_to, "???");
+      strlcpybuff(limit_to, "???", limit_size);
     return 0;
   }
 
@@ -1750,7 +1751,7 @@ static void LANG_INIT(const char *path) {
 static int LANG_T(const char *path, int l) {
   if (l >= 0) {
     QLANG_T(l);
-    htslang_load(NULL, path);
+    htslang_load(NULL, 0, path);
   }
   return QLANG_T(-1);           // 0=default (english)
 }
@@ -1764,7 +1765,7 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   do {
     QLANG_T(i);
     strcpybuff(lang_str, "LANGUAGE_ISO");
-    htslang_load(lang_str, path);
+    htslang_load(lang_str, sizeof(lang_str), path);
     if (strfield(iso, lang_str)) {
       found = i;
     }
@@ -1783,10 +1784,10 @@ static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
   do {
     QLANG_T(i);
     strlcpybuff(lang_str, "LANGUAGE_NAME", buffer_size);
-    htslang_load(lang_str, path);
+    htslang_load(lang_str, sizeof(lang_str), path);
     if (strlen(lang_str) > 0) {
       if (buffer[0])
-        strcatbuff(buffer, "\n");
+        strlcatbuff(buffer, "\n", buffer_size);
       strlcatbuff(buffer, lang_str, buffer_size);
     }
     i++;
