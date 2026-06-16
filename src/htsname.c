@@ -51,12 +51,13 @@ Please visit our Website: http://www.httrack.com
       url_savename_addstr(afs->save, buff);\
     }
 
-#define ADD_STANDARD_NAME(shortname) \
-    {  /* ajout nom */\
-      char BIGSTK buff[HTS_URLMAXSIZE*2];\
-      standard_name(buff,dot_pos,nom_pos,fil_complete,(shortname));\
-      url_savename_addstr(afs->save, buff);\
-    }
+#define ADD_STANDARD_NAME(shortname)                                           \
+  { /* add name */                                                             \
+    char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
+    standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
+                  (shortname));                                                \
+    url_savename_addstr(afs->save, buff);                                      \
+  }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
 /* Based on linux/fs/umsdos/mangle.c */
@@ -1377,7 +1378,9 @@ int url_savename(lien_adrfilsave *const afs,
     if (lastDot == NULL) {
       strcatbuff(afs->save, "." DELAYED_EXT);
     } else if (!IS_DELAYED_EXT(afs->save)) {
-      strcatbuff(lastDot, "." DELAYED_EXT);
+      /* lastDot points within afs->save; bound by the remaining capacity */
+      strlcatbuff(lastDot, "." DELAYED_EXT,
+                  sizeof(afs->save) - (size_t) (lastDot - afs->save));
     }
   }
   // enforce 260-character path limit before inserting destination path
@@ -1582,41 +1585,41 @@ int url_savename(lien_adrfilsave *const afs,
   return 0;
 }
 
-/* nom avec md5 urilisé partout */
-void standard_name(char *b, const char *dot_pos, const char *nom_pos, const char *fil,
-                   int short_ver) {
+/* md5-based name used everywhere; builds into b (capacity bsize) */
+void standard_name(char *b, size_t bsize, const char *dot_pos,
+                   const char *nom_pos, const char *fil, int short_ver) {
   char md5[32 + 2];
+  htsbuff bb = htsbuff_ptr(b, bsize);
 
-  b[0] = '\0';
-  /* Nom */
+  /* Name */
   if (dot_pos) {
-    if (!short_ver)             // Noms longs
-      strncatbuff(b, nom_pos, (dot_pos - nom_pos));
+    if (!short_ver) // long names
+      htsbuff_catn(&bb, nom_pos, (size_t) (dot_pos - nom_pos));
     else
-      strncatbuff(b, nom_pos, min(dot_pos - nom_pos, 8));
+      htsbuff_catn(&bb, nom_pos, (size_t) min(dot_pos - nom_pos, 8));
   } else {
-    if (!short_ver)             // Noms longs
-      strcatbuff(b, nom_pos);
+    if (!short_ver) // long names
+      htsbuff_cat(&bb, nom_pos);
     else
-      strncatbuff(b, nom_pos, 8);
+      htsbuff_catn(&bb, nom_pos, 8);
   }
   /* MD5 - 16 bits */
-  strncatbuff(b, url_md5(md5, fil), 4);
+  htsbuff_catn(&bb, url_md5(md5, fil), 4);
   /* Ext */
   if (dot_pos) {
-    strcatbuff(b, ".");
-    if (!short_ver)             // Noms longs
-      strcatbuff(b, dot_pos + 1);
+    htsbuff_catc(&bb, '.');
+    if (!short_ver) // long names
+      htsbuff_cat(&bb, dot_pos + 1);
     else
-      strncatbuff(b, dot_pos + 1, 3);
+      htsbuff_catn(&bb, dot_pos + 1, 3);
   }
   // Allow extensionless
 #ifdef DO_NOT_ALLOW_EXTENSIONLESS
   else {
-    if (!short_ver)             // Noms longs
-      strcatbuff(b, DEFAULT_EXT);
+    if (!short_ver) // long names
+      htsbuff_cat(&bb, DEFAULT_EXT);
     else
-      strcatbuff(b, DEFAULT_EXT_SHORT);
+      htsbuff_cat(&bb, DEFAULT_EXT_SHORT);
   }
 #endif
 }

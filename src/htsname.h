@@ -96,8 +96,8 @@ int url_savename(lien_adrfilsave *const afs,
                  httrackp * opt, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers);
-void standard_name(char *b, const char *dot_pos, const char *nom_pos,
-                   const char *fil_complete,
+void standard_name(char *b, size_t bsize, const char *dot_pos,
+                   const char *nom_pos, const char *fil_complete,
                    int short_ver);
 void url_savename_addstr(char *d, const char *s);
 char *url_md5(char *digest_buffer, const char *fil_complete);
