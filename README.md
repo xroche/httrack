@@ -22,8 +22,22 @@ HTTrack can also update an existing mirrored site, and resume interrupted downlo
 http://www.httrack.com/
 
 ## Compile trunk release
+
+A git checkout ships only the autotools sources, so `./bootstrap` (which runs
+`autoreconf`) regenerates `configure` first; this needs autoconf, automake and
+libtool. Released tarballs already include `configure`, so building from a
+tarball skips `./bootstrap`.
+
 ```sh
 git clone https://github.com/xroche/httrack.git --recurse-submodules
 cd httrack
+./bootstrap
 ./configure --prefix=$HOME/usr && make -j8 && make install
+```
+
+Or use the one-shot wrapper (bootstrap + configure + make), which forwards its
+arguments to `configure`:
+
+```sh
+./build.sh --prefix=$HOME/usr
 ```

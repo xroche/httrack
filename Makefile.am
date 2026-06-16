@@ -5,7 +5,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
-		httrack-doc.html lang.def README.md tools/mkdeb.sh
+		httrack-doc.html lang.def README.md tools/mkdeb.sh \
+		bootstrap build.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:

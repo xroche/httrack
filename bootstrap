@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Regenerate the autotools build system (configure, Makefile.in, config.h.in,
+# libtool, the aux scripts) from configure.ac and the Makefile.am files.
+#
+# Run this once after a fresh git clone, before ./configure. Release tarballs
+# (made with "make dist") already ship these files, so people building from a
+# tarball do not need autotools and do not run this.
+#
+# Requires: autoconf, automake, libtool (the autoreconf toolchain).
+
+set -e
+
+# shellcheck disable=SC1007  # "CDPATH= cd" is a deliberate empty-CDPATH prefix.
+srcdir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$srcdir"
+
+if ! command -v autoreconf >/dev/null 2>&1; then
+    echo "bootstrap: autoreconf not found; install autoconf, automake and libtool" >&2
+    echo "           (or build from a release tarball, which ships ./configure)" >&2
+    exit 1
+fi
+
+exec autoreconf -fi "$@"
