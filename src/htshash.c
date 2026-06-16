@@ -76,7 +76,7 @@ static coucal_key key_duphandler(void *arg, coucal_key_const name) {
 /* Key sav hashes are using case-insensitive version */
 static coucal_hashkeys key_sav_hashes(void *arg, coucal_key_const key) {
   hash_struct *const hash = (hash_struct*) arg;
-  convtolower(hash->catbuff, (const char*) key);
+  convtolower(hash->catbuff, sizeof(hash->catbuff), (const char *) key);
   return coucal_hash_string(hash->catbuff);
 }
 

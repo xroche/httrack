@@ -238,6 +238,15 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 /**
+ * Append at most "N" characters of "B" to "A", "A" having a maximum capacity
+ * of "S".
+ */
+#define strlncatbuff(A, B, S, N)                                               \
+  strncat_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),  \
+                N, "overflow while appending '" #B "' to '" #A "'", __FILE__,  \
+                __LINE__)
+
+/**
  * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
  */
 #define strlcpybuff(A, B, S) \
