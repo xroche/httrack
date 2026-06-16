@@ -393,6 +393,44 @@ static void basic_selftests(void) {
     assertf(strcmp(adr_normalized_sized("example.com", n, sizeof(n)),
                    "example.com") == 0);
   }
+  // standard_name(): builds "<name><md5?>.<ext>" into a bounded buffer. The md5
+  // is appended (4 chars) only when the URL has a query string (see url_md5),
+  // so test both; pin the structure (name + ext, lengths), not the md5 chars.
+  {
+    char b[HTS_URLMAXSIZE * 2];
+    const char *nom = "index.html"; // name part
+    const char *dot = nom + 5;      // points at ".html"
+    size_t len;
+
+    // no query -> no md5: "index" + ".html"
+    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html", 0);
+    assertf(strcmp(b, "index.html") == 0);
+    // query -> 4 md5 chars between name and ext: "index" + md5(4) + ".html"
+    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html?v=1",
+                  0);
+    len = strlen(b);
+    assertf(len == 5 + 4 + 5);
+    assertf(strncmp(b, "index", 5) == 0);
+    assertf(strcmp(b + len - 5, ".html") == 0);
+    // short names: name kept (<=8), the extension is clamped to 3 -> ".htm"
+    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html?v=1",
+                  1);
+    len = strlen(b);
+    assertf(len == 5 + 4 + 4);
+    assertf(strcmp(b + len - 4, ".htm") == 0);
+    // short names with a >8-char name: the name is clamped to 8 ("indexpag")
+    {
+      const char *lnom = "indexpage.html";
+      const char *ldot = lnom + 9; // points at ".html"
+
+      standard_name(b, sizeof(b), ldot, lnom,
+                    "http://example.com/indexpage.html?v=1", 1);
+      len = strlen(b);
+      assertf(len == 8 + 4 + 4);
+      assertf(strncmp(b, "indexpag", 8) == 0);
+      assertf(strcmp(b + len - 4, ".htm") == 0);
+    }
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).
