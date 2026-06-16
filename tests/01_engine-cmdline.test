@@ -30,6 +30,17 @@ run() {
     RC=$?
 }
 
+# crawl using exactly the given args as the only URL(s), no implicit primary URL;
+# leaves the exit status in RC
+run_only() {
+    local out="$1"
+    shift
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack -O "$out" --quiet -n "$@" >"$out/.log" 2>&1
+    RC=$?
+}
+
 # assert the value was accepted: clean exit and the fixture was mirrored
 accepted() {
     { test "$RC" -eq 0 && test -n "$(find "$1" -type f -path '*/index.html' -print -quit)"; } ||
@@ -68,12 +79,15 @@ refused "#152: over-cap -F not refused cleanly"
 run "$tmp/ov-l" --user-agent "$over"
 refused "#152: over-cap --user-agent not refused cleanly"
 
-# a fully "-quoted argument has its surrounding quotes stripped in place (the
-# parser's quote handling), so a quoted URL is mirrored; a dangling opening quote
-# is refused cleanly, never a crash. Exercises the in-place argv quote-strip.
-run "$tmp/q-ok" "\"file://$tmp/index.html\""
-accepted "$tmp/q-ok" "quoted URL: surrounding quotes not stripped in place"
-run "$tmp/q-bad" '"foo'
-refused "quoted argument with a missing closing quote not refused cleanly"
+# Quote handling on the sole URL (run_only, so the quoted arg is the only URL and
+# can't be masked by an implicit one). A fully "-quoted URL has its surrounding
+# quotes stripped in place and is mirrored; a dangling opening quote, and a lone
+# quote (empty after the opening "), are refused cleanly and never crash.
+run_only "$tmp/q-ok" "\"file://$tmp/index.html\""
+accepted "$tmp/q-ok" "quoted URL not stripped/mirrored"
+run_only "$tmp/q-bad" '"foo'
+refused "dangling-quote argument not refused cleanly"
+run_only "$tmp/q-lone" '"'
+refused "lone-quote argument not refused cleanly"
 
 exit 0

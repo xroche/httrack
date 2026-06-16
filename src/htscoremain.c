@@ -69,10 +69,16 @@ Please visit our Website: http://www.httrack.com
 /* Resolver */
 extern int IPV6_resolver;
 
+/* Remaining room in the argv block; 0 once it is exhausted (alias expansion or
+   doit.log insertion can outrun the +32768 slack), so the copy aborts cleanly
+   instead of the subtraction wrapping to a huge unbounded size. */
+#define cmdl_room(bufsize, ptr)                                                \
+  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
+
 // Add a command in the argc/argv (buff has total capacity bufsize)
 #define cmdl_add(token, argc, argv, buff, bufsize, ptr)                        \
   argv[argc] = (buff + ptr);                                                   \
-  strlcpybuff(argv[argc], token, (bufsize) - (ptr));                           \
+  strlcpybuff(argv[argc], token, cmdl_room(bufsize, ptr));                     \
   ptr += (int) (strlen(argv[argc]) + 2);                                       \
   argc++
 
@@ -84,7 +90,7 @@ extern int IPV6_resolver;
       argv[i] = argv[i - 1];                                                   \
   }                                                                            \
   argv[0] = (buff + ptr);                                                      \
-  strlcpybuff(argv[0], token, (bufsize) - (ptr));                              \
+  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
   ptr += (int) (strlen(argv[0]) + 2);                                          \
   argc++
 
@@ -811,7 +817,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           char BIGSTK tempo[HTS_CDLMAXSIZE];
 
           strcpybuff(tempo, argv[na] + 1);
-          if (tempo[strlen(tempo) - 1] != '"') {
+          if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
             char BIGSTK s[HTS_CDLMAXSIZE];
 
             sprintf(s, "Missing quote in %s", argv[na]);
@@ -1545,7 +1551,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
 
         strcpybuff(tempo, argv[na] + 1);
-        if (tempo[strlen(tempo) - 1] != '"') {
+        if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
           char s[HTS_CDLMAXSIZE + 256];
 
           sprintf(s, "Missing quote in %s", argv[na]);
