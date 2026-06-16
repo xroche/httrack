@@ -366,6 +366,9 @@ jobs:
     name: format (clang-format-19, changed lines)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    env:
+      # Single-source the tag so the cache key and the fetch URL can never drift.
+      LLVM_TAG: llvmorg-19.1.7
     steps:
       - uses: actions/checkout@v6
         with:
@@ -379,7 +382,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/git-clang-format/git-clang-format
-          key: git-clang-format-llvmorg-19.1.7
+          key: git-clang-format-${{ env.LLVM_TAG }}
 
       - name: Install clang-format 19 (pinned, from apt.llvm.org)
         run: |
@@ -394,12 +397,12 @@ jobs:
           # Cold cache only: fetch the driver, retrying through transient 429s.
           driver="$HOME/.cache/git-clang-format/git-clang-format"
           if [ ! -s "$driver" ]; then
-            echo "git-clang-format cache MISS: fetching llvmorg-19.1.7 from raw.githubusercontent.com"
+            echo "git-clang-format cache MISS: fetching ${LLVM_TAG} from raw.githubusercontent.com"
             mkdir -p "$(dirname "$driver")"
             curl --retry 5 --retry-all-errors -fsSL -o "$driver" \
-              https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/clang/tools/clang-format/git-clang-format
+              "https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_TAG}/clang/tools/clang-format/git-clang-format"
           else
-            echo "git-clang-format cache HIT: using cached llvmorg-19.1.7"
+            echo "git-clang-format cache HIT: using cached ${LLVM_TAG}"
           fi
           sudo install -m 0755 "$driver" /usr/local/bin/git-clang-format
           clang-format-19 --version
