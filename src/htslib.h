@@ -252,7 +252,7 @@ int ishtml_ext(const char *a);
 int ishttperror(int err);
 
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
-void give_mimext(char *s, const char *st);
+void give_mimext(char *s, size_t ssize, const char *st);
 
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
@@ -264,7 +264,7 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)
 
-char *convtolower(char *catbuff, const char *a);
+char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
 void hts_lowcase(char *s);
 void hts_replace(char *s, char from, char to);
 int multipleStringMatch(const char *s, const char *match);
@@ -276,7 +276,8 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 int sig_ignore_flag(int setflag);  // flag ignore
 #endif
 
-void cut_path(char *fullpath, char *path, char *pname);
+void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
+              size_t pname_size);
 int fexist(const char *s);
 int fexist_utf8(const char *s);
 

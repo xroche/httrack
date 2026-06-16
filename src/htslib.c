@@ -1530,8 +1530,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       if (retour->location) {
         while(is_realspace(*(rcvd + p)))
           p++;                  // sauter espaces
-        if ((int) strlen(rcvd + p) < HTS_URLMAXSIZE)    // pas trop long?
-          strcpybuff(retour->location, rcvd + p);
+        if ((int) strlen(rcvd + p) < HTS_URLMAXSIZE) // not too long?
+          /* location aliases location_buffer[HTS_URLMAXSIZE * 2] */
+          strlcpybuff(retour->location, rcvd + p, HTS_URLMAXSIZE * 2);
         else                    // erreur.. ignorer
           retour->location[0] = '\0';
       }
@@ -3444,16 +3445,17 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
     /* Replace query by sorted query */
     copyBuff = malloct(qLen + 1);
     assertf(copyBuff != NULL);
-    copyBuff[0] = '\0';
-    for(i = 0; i < ampargs; i++) {
-      if (i == 0)
-        strcatbuff(copyBuff, "?");
-      else
-        strcatbuff(copyBuff, "&");
-      strcatbuff(copyBuff, amps[i] + 1);
+    {
+      htsbuff cb = htsbuff_ptr(copyBuff, qLen + 1);
+
+      for (i = 0; i < ampargs; i++) {
+        htsbuff_cat(&cb, i == 0 ? "?" : "&");
+        htsbuff_cat(&cb, amps[i] + 1);
+      }
+      assertf(cb.len == qLen);
     }
-    assertf(strlen(copyBuff) == qLen);
-    strcpybuff(query, copyBuff);
+    /* query points into dest where the original qLen-byte query was */
+    strlcpybuff(query, copyBuff, qLen + 1);
 
     /* Cleanup */
     freet(amps);
@@ -3894,9 +3896,9 @@ HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const de
 
 #undef ADD_CHAR
 
-// conversion minuscules, avec buffer
-char *convtolower(char *catbuff, const char *a) {
-  strcpybuff(catbuff, a);
+// lower-case conversion into caller buffer (capacity catbuffsize)
+char *convtolower(char *catbuff, size_t catbuffsize, const char *a) {
+  strlcpybuff(catbuff, a, catbuffsize);
   hts_lowcase(catbuff);         // lower case
   return catbuff;
 }
@@ -4073,15 +4075,15 @@ int get_userhttptype(httrackp * opt, char *s, const char *fil) {
 
 // renvoyer extesion d'un type mime..
 // ex: "image/gif" -> gif
-void give_mimext(char *s, const char *st) {
+void give_mimext(char *s, size_t ssize, const char *st) {
   int ok = 0;
   int j = 0;
 
   s[0] = '\0';
   while((!ok) && (strnotempty(hts_mime[j][1]))) {
     if (strfield2(hts_mime[j][0], st)) {
-      if (hts_mime[j][1][0] != '*') {   // Une correspondance existe
-        strcpybuff(s, hts_mime[j][1]);
+      if (hts_mime[j][1][0] != '*') { // a match exists
+        strlcpybuff(s, hts_mime[j][1], ssize);
         ok = 1;
       }
     }
@@ -4102,7 +4104,7 @@ void give_mimext(char *s, const char *st) {
     if (a) {
       if ((int) strlen(a) >= 1) {
         if ((int) strlen(a) <= 4) {
-          strcpybuff(s, a);
+          strlcpybuff(s, a, ssize);
           ok = 1;
         }
       }
@@ -4206,7 +4208,7 @@ int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename) {
       char ext[64];
 
       ext[0] = '\0';
-      give_mimext(ext, mime);
+      give_mimext(ext, sizeof(ext), mime);
       if (ext[0] != 0) {        /* we have an extension for that */
         const size_t ext_size = strlen(ext);
         const char *file = strrchr(filename, '/');      /* fetch terminal filename */
@@ -4930,7 +4932,8 @@ void hts_freeall(void) {
 
 // cut path and project name
 // patch also initial path
-void cut_path(char *fullpath, char *path, char *pname) {
+void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
+              size_t pname_size) {
   path[0] = pname[0] = '\0';
   if (strnotempty(fullpath)) {
     if ((fullpath[strlen(fullpath) - 1] == '/')
@@ -4946,8 +4949,8 @@ void cut_path(char *fullpath, char *path, char *pname) {
         a--;
       if (*a == '/')
         a++;
-      strcpybuff(pname, a);
-      strncatbuff(path, fullpath, (int) (a - fullpath));
+      strlcpybuff(pname, a, pname_size);
+      strlncatbuff(path, fullpath, path_size, (size_t) (a - fullpath));
     }
   }
 }

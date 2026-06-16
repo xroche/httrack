@@ -285,6 +285,46 @@ static void basic_selftests(void) {
       assertf(end == NULL && strcmp(tok, "a\\") == 0);
     }
   }
+  // fil_normalized(): canonicalizes a URL path. Query arguments are sorted
+  // alphabetically (by the text after each '?'/'&') and the query is rebuilt
+  // through a bounded builder; outside the query, "//" collapses to "/".
+  // Regression for that builder.
+  {
+    char norm[256];
+
+    assertf(strcmp(fil_normalized("/p?b=2&a=1&c=3", norm), "/p?a=1&b=2&c=3") ==
+            0);
+    assertf(strcmp(fil_normalized("/a//b", norm), "/a/b") == 0);
+  }
+  // give_mimext(): mime type -> file extension, bounded into the caller buffer.
+  {
+    char ext[16];
+
+    give_mimext(ext, sizeof(ext), "image/gif");
+    assertf(strcmp(ext, "gif") == 0);
+    give_mimext(ext, sizeof(ext), "text/html");
+    assertf(strcmp(ext, "html") == 0);
+    give_mimext(ext, sizeof(ext), "no/such-mime-type");
+    assertf(ext[0] == '\0');
+  }
+  // convtolower(): lower-cases into the caller buffer (bounded by its size).
+  {
+    char low[64];
+
+    assertf(strcmp(convtolower(low, sizeof(low), "ABC/Def.HTML"),
+                   "abc/def.html") == 0);
+  }
+  // cut_path(): splits a path into directory (with trailing '/') and basename,
+  // each bounded by its buffer size.
+  {
+    char full[] = "/dir/sub/file.html";
+    char path[256];
+    char pname[256];
+
+    cut_path(full, path, sizeof(path), pname, sizeof(pname));
+    assertf(strcmp(path, "/dir/sub/") == 0);
+    assertf(strcmp(pname, "file.html") == 0);
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).
@@ -2605,7 +2645,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
                     printf("%s is '%s'\n", argv[na + 1], mime);
                     ext[0] = '\0';
-                    give_mimext(ext, mime);
+                    give_mimext(ext, sizeof(ext), mime);
                     if (ext[0]) {
                       printf("and its local type is '.%s'\n", ext);
                     }
