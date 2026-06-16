@@ -754,7 +754,8 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
       if (soc != INVALID_SOCKET) {
         retour->statuscode = HTTP_OK;   // OK
         strcpybuff(retour->msg, "OK");
-        guess_httptype(opt, retour->contenttype, fil);
+        guess_httptype_sized(opt, retour->contenttype,
+                             sizeof(retour->contenttype), fil);
       } else if (strnotempty(retour->msg) == 0)
         strcpybuff(retour->msg, "Unable to open local file");
       return soc;               // renvoyer
@@ -3466,10 +3467,17 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
 }
 
 #define endwith(a) ( (len >= (sizeof(a)-1)) ? ( strncmp(dest, a+len-(sizeof(a)-1), sizeof(a)-1) == 0 ) : 0 );
-HTSEXT_API char *adr_normalized(const char *source, char *dest) {
+HTSEXT_API char *adr_normalized_sized(const char *source, char *dest,
+                                      size_t destsize) {
   /* not yet too aggressive (no com<->net<->org checkings) */
-  strcpybuff(dest, jump_normalized_const(source));
+  strlcpybuff(dest, jump_normalized_const(source), destsize);
   return dest;
+}
+
+// deprecated variant; kept for ABI compatibility. Bounds to the implicit
+// contract the old callers relied on (an HTS_URLMAXSIZE*2 URL buffer).
+HTSEXT_API char *adr_normalized(const char *source, char *dest) {
+  return adr_normalized_sized(source, dest, HTS_URLMAXSIZE * 2);
 }
 
 #undef endwith
@@ -3921,22 +3929,34 @@ void hts_replace(char *s, char from, char to) {
   }
 }
 
-// deviner type d'un fichier local..
-// ex: fil="toto.gif" -> s="image/gif"
-void guess_httptype(httrackp * opt, char *s, const char *fil) {
-  get_httptype(opt, s, fil, 1);
+// guess a local file's mime type (e.g. fil="toto.gif" -> s="image/gif")
+// returns 1 if a type was written to s, 0 otherwise
+int guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                         const char *fil) {
+  return get_httptype_sized(opt, s, ssize, fil, 1);
 }
 
-// idem
-// flag: 1 si toujours renvoyer un type
-HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag) {
-  // userdef overrides get_httptype
+// deprecated variant; kept for ABI compatibility. Bounds to the implicit
+// contract the old callers relied on (a contenttype-sized buffer).
+void guess_httptype(httrackp * opt, char *s, const char *fil) {
+  (void) get_httptype_sized(opt, s, HTS_MIMETYPE_SIZE, fil, 1);
+}
+
+// write the mime type for fil into s (capacity ssize)
+// flag: 1 to always return a type (the "application/..." / octet-stream
+// fallback) returns 1 if a type was written to s, 0 otherwise
+HTSEXT_API int get_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                  const char *fil, int flag) {
+  // userdef overrides get_httptype (a rule with an empty value, e.g. "--assume
+  // cgi=", matches but writes nothing: report it as "no type" like the old
+  // code, whose callers tested strnotempty(s))
   if (get_userhttptype(opt, s, fil)) {
-    return;
+    return s[0] != '\0';
   }
   // regular tests
   if (ishtml(opt, fil) == 1) {
-    strcpybuff(s, "text/html");
+    strlcpybuff(s, "text/html", ssize);
+    return 1;
   } else {
     /* Check html -> text/html */
     const char *a = fil + strlen(fil) - 1;
@@ -3949,21 +3969,33 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag)
       a++;
       while(strnotempty(hts_mime[j][1])) {
         if (strfield2(hts_mime[j][1], a)) {
-          if (hts_mime[j][0][0] != '*') {       // Une correspondance existe
-            strcpybuff(s, hts_mime[j][0]);
-            return;
+          if (hts_mime[j][0][0] != '*') { // a match exists
+            strlcpybuff(s, hts_mime[j][0], ssize);
+            return 1;
           }
         }
         j++;
       }
 
-      if (flag)
-        sprintf(s, "application/%s", a);
+      if (flag) {
+        snprintf(s, ssize, "application/%s", a);
+        return 1;
+      }
     } else {
-      if (flag)
-        strcpybuff(s, "application/octet-stream");
+      if (flag) {
+        strlcpybuff(s, "application/octet-stream", ssize);
+        return 1;
+      }
     }
   }
+  return 0;
+}
+
+// deprecated variant; kept for ABI compatibility. Bounds to the implicit
+// contract the old callers relied on (a contenttype-sized buffer).
+HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
+                             int flag) {
+  (void) get_httptype_sized(opt, s, HTS_MIMETYPE_SIZE, fil, flag);
 }
 
 // get type of fil (php)
@@ -4073,9 +4105,9 @@ int get_userhttptype(httrackp * opt, char *s, const char *fil) {
   return 0;
 }
 
-// renvoyer extesion d'un type mime..
-// ex: "image/gif" -> gif
-void give_mimext(char *s, size_t ssize, const char *st) {
+// give the file extension for a mime type (e.g. "image/gif" -> "gif")
+// returns 1 if an extension was found (and written to s), 0 otherwise
+int give_mimext(char *s, size_t ssize, const char *st) {
   int ok = 0;
   int j = 0;
 
@@ -4110,6 +4142,7 @@ void give_mimext(char *s, size_t ssize, const char *st) {
       }
     }
   }
+  return ok;
 }
 
 // extension connue?..
@@ -4207,9 +4240,8 @@ int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename) {
     if (strfield2(hts_mime_bogus_multiple[j], mime)) {  /* found mime type in suspicious list */
       char ext[64];
 
-      ext[0] = '\0';
-      give_mimext(ext, sizeof(ext), mime);
-      if (ext[0] != 0) {        /* we have an extension for that */
+      if (give_mimext(ext, sizeof(ext),
+                      mime)) { /* we have an extension for that */
         const size_t ext_size = strlen(ext);
         const char *file = strrchr(filename, '/');      /* fetch terminal filename */
 

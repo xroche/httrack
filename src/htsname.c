@@ -200,7 +200,7 @@ int url_savename(lien_adrfilsave *const afs,
   // foo.com/bar//foobar -> foo.com/bar/foobar
   if (opt->urlhack) {
     // copy of adr (without protocol), used for lookups (see urlhack)
-    normadr = adr_normalized(adr, normadr_);
+    normadr = adr_normalized_sized(adr, normadr_, sizeof(normadr_));
     normfil = fil_normalized(fil_complete, normfil_);
   } else {
     if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
@@ -344,8 +344,7 @@ int url_savename(lien_adrfilsave *const afs,
         mime[0] = ext[0] = '\0';
         get_userhttptype(opt, mime, fil);
         if (strnotempty(mime)) {
-          give_mimext(ext, sizeof(ext), mime);
-          if (strnotempty(ext)) {
+          if (give_mimext(ext, sizeof(ext), mime)) {
             ext_chg = 1;
           }
         }
@@ -378,8 +377,8 @@ int url_savename(lien_adrfilsave *const afs,
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, r.cdispo);
               } else if (!may_unknown2(opt, r.contenttype, fil)) {        // on peut patcher à priori?
-                give_mimext(s, sizeof(s), r.contenttype); // get extension
-                if (strnotempty(s) > 0) { // on a reconnu l'extension
+                if (give_mimext(s, sizeof(s),
+                                r.contenttype)) { // recognized extension
                   ext_chg = 1;
                   strcpybuff(ext, s);
                 }
@@ -403,8 +402,7 @@ int url_savename(lien_adrfilsave *const afs,
             mime[0] = ext[0] = '\0';
             get_userhttptype(opt, mime, fil);
             if (strnotempty(mime)) {
-              give_mimext(ext, sizeof(ext), mime);
-              if (strnotempty(ext)) {
+              if (give_mimext(ext, sizeof(ext), mime)) {
                 ext_chg = 1;
               }
             }
@@ -420,10 +418,9 @@ int url_savename(lien_adrfilsave *const afs,
                 strcpybuff(ext, headers->r.cdispo);
               } else if (!may_unknown2(opt, headers->r.contenttype, headers->url_fil)) {    // on peut patcher à priori? (pas interdit ou pas de type)
                 char s[16];
-                s[0] = '\0';
-                give_mimext(s, sizeof(s),
-                            headers->r.contenttype); // get extension
-                if (strnotempty(s) > 0) { // on a reconnu l'extension
+                if (give_mimext(
+                        s, sizeof(s),
+                        headers->r.contenttype)) { // recognized extension
                   ext_chg = 1;
                   strcpybuff(ext, s);
                 }
@@ -438,7 +435,8 @@ int url_savename(lien_adrfilsave *const afs,
                 char mime_from_file[128];
 
                 mime_from_file[0] = 0;
-                get_httptype(opt, mime_from_file, fil, 1);
+                get_httptype_sized(opt, mime_from_file, sizeof(mime_from_file),
+                                   fil, 1);
                 if (!strnotempty(mime_from_file) || strcasecmp(mime_type, mime_from_file) != 0) {       /* different mime for this type */
                   /* type change not forbidden (or no extension at all) */
                   if (!may_unknown2(opt, mime_type, fil)) {
@@ -647,9 +645,9 @@ int url_savename(lien_adrfilsave *const afs,
                       ext_chg = 2;      /* change filename */
                       strcpybuff(ext, back[b].r.cdispo);
                     } else if (!may_unknown2(opt, back[b].r.contenttype, back[b].url_fil)) {    // on peut patcher à priori? (pas interdit ou pas de type)
-                      give_mimext(s, sizeof(s),
-                                  back[b].r.contenttype); // get extension
-                      if (strnotempty(s) > 0) { // on a reconnu l'extension
+                      if (give_mimext(
+                              s, sizeof(s),
+                              back[b].r.contenttype)) { // recognized extension
                         ext_chg = 1;
                         strcpybuff(ext, s);
                       }

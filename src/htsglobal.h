@@ -197,10 +197,13 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-/* Taille max d'une URL */
+/* Max URL length */
 #define HTS_URLMAXSIZE 1024
-/* Taille max ligne de commande (>=HTS_URLMAXSIZE*2) */
+/* Max command-line length (>=HTS_URLMAXSIZE*2) */
 #define HTS_CDLMAXSIZE 1024
+/* MIME-type buffer contract (htsblk.contenttype/charset/contentencoding); holds
+   the longest registered MIME type, the Office OOXML ones reaching 73 chars */
+#define HTS_MIMETYPE_SIZE 128
 
 /* Copyright (C) 1998 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
@@ -248,6 +251,22 @@ Please visit our Website: http://www.httrack.com
 #else
 #define HTSEXT_API
 #endif
+#endif
+
+/**
+ * Mark a function deprecated, with a message pointing at the replacement.
+ * Placed before the declaration so both the GCC/Clang attribute and the MSVC
+ * __declspec sit in a position both accept. Degrades to nothing elsewhere.
+ */
+#if defined(__GNUC__) &&                                                       \
+    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+#define HTS_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#elif defined(__GNUC__)
+#define HTS_DEPRECATED(msg) __attribute__((deprecated))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
+#define HTS_DEPRECATED(msg) __declspec(deprecated(msg))
+#else
+#define HTS_DEPRECATED(msg)
 #endif
 
 #ifndef HTS_LONGLONG

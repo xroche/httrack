@@ -499,9 +499,9 @@ struct htsblk {
   FILE *out;                    // écriture directe sur disque (si is_write=1)
   LLint size;                   // taille fichier
   char msg[80];                 // message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // content-type ("text/html" par exemple)
-  char charset[64];             // charset ("iso-8859-1" par exemple)
-  char contentencoding[64];     // content-encoding ("gzip" par exemple)
+  char contenttype[HTS_MIMETYPE_SIZE];     // content-type (e.g. "text/html")
+  char charset[HTS_MIMETYPE_SIZE];         // charset (e.g. "iso-8859-1")
+  char contentencoding[HTS_MIMETYPE_SIZE]; // content-encoding (e.g. "gzip")
   char *location;               // on copie dedans éventuellement la véritable 'location'
   LLint totalsize;              // taille totale à télécharger (-1=inconnue)
   short int is_file;            // ce n'est pas une socket mais un descripteur de fichier si 1

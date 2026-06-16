@@ -3685,7 +3685,9 @@ fi
 
 
 
-VERSION_INFO="2:49:0"
+# 3:0:0: htsblk layout changed (contenttype/charset/contentencoding widened to
+# 128), an incompatible ABI break, so bump current and reset revision/age.
+VERSION_INFO="3:0:0"
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to enable maintainer-specific portions of Makefiles" >&5
 printf %s "checking whether to enable maintainer-specific portions of Makefiles... " >&6; }
