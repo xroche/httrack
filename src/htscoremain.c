@@ -295,16 +295,19 @@ static void basic_selftests(void) {
     assertf(strcmp(fil_normalized("/p?b=2&a=1&c=3", norm), "/p?a=1&b=2&c=3") ==
             0);
     assertf(strcmp(fil_normalized("/a//b", norm), "/a/b") == 0);
+    // "//" is collapsed only before the query; inside the query it is kept
+    assertf(strcmp(fil_normalized("/a//b?x=c//d", norm), "/a/b?x=c//d") == 0);
   }
   // give_mimext(): mime type -> file extension, bounded into the caller buffer.
+  // Returns 1 when an extension was written, 0 otherwise.
   {
     char ext[16];
 
-    give_mimext(ext, sizeof(ext), "image/gif");
+    assertf(give_mimext(ext, sizeof(ext), "image/gif") == 1);
     assertf(strcmp(ext, "gif") == 0);
-    give_mimext(ext, sizeof(ext), "text/html");
+    assertf(give_mimext(ext, sizeof(ext), "text/html") == 1);
     assertf(strcmp(ext, "html") == 0);
-    give_mimext(ext, sizeof(ext), "no/such-mime-type");
+    assertf(give_mimext(ext, sizeof(ext), "no/such-mime-type") == 0);
     assertf(ext[0] == '\0');
   }
   // convtolower(): lower-cases into the caller buffer (bounded by its size).
@@ -317,13 +320,78 @@ static void basic_selftests(void) {
   // cut_path(): splits a path into directory (with trailing '/') and basename,
   // each bounded by its buffer size.
   {
-    char full[] = "/dir/sub/file.html";
     char path[256];
     char pname[256];
 
-    cut_path(full, path, sizeof(path), pname, sizeof(pname));
-    assertf(strcmp(path, "/dir/sub/") == 0);
-    assertf(strcmp(pname, "file.html") == 0);
+    {
+      char full[] = "/dir/sub/file.html";
+
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      assertf(strcmp(path, "/dir/sub/") == 0);
+      assertf(strcmp(pname, "file.html") == 0);
+    }
+    { // a trailing slash is trimmed before the split
+      char full[] = "/dir/sub/";
+
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      assertf(strcmp(path, "/dir/") == 0);
+      assertf(strcmp(pname, "sub") == 0);
+    }
+    { // a path of length <= 1 yields empty results
+      char full[] = "/";
+
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      assertf(path[0] == '\0' && pname[0] == '\0');
+    }
+  }
+  // get_httptype_sized(): a long MIME type (Office OOXML reaches 73 chars) is
+  // written whole into a contenttype-sized buffer; returns 1 on a match, 0 when
+  // flag==0 and nothing matched. Regression for the old contenttype[64]
+  // overflow.
+  {
+    httrackp *opt = hts_create_opt();
+    htsblk r; // write into the real struct field, not a stand-in
+
+    assertf(opt != NULL);
+    // a long MIME (Office OOXML reaches 73 chars) must fit htsblk.contenttype
+    // whole: a [64] field would make this bounded copy abort.
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "deck.pptx", 0) == 1);
+    assertf(strcmp(r.contenttype,
+                   "application/vnd.openxmlformats-officedocument."
+                   "presentationml.presentation") == 0);
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "x.gif", 0) == 1);
+    assertf(strcmp(r.contenttype, "image/gif") == 0);
+    // no extension and flag==0: nothing written, returns 0
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "noextfile", 0) == 0);
+    assertf(r.contenttype[0] == '\0');
+    // no extension and flag==1: octet-stream fallback, returns 1
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "noextfile", 1) == 1);
+    assertf(strcmp(r.contenttype, "application/octet-stream") == 0);
+    // a user --assume rule with an empty value matches but writes nothing:
+    // get_userhttptype returns 1 with the buffer empty, so get_httptype_sized
+    // must still report 0 (callers test the return like the old
+    // strnotempty(s)).
+    StringCopy(opt->mimedefs, "\ncgi=\n");
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "/x.cgi", 0) == 0);
+    assertf(r.contenttype[0] == '\0');
+    StringCopy(opt->mimedefs, "\ncgi=text/html\n");
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "/x.cgi", 0) == 1);
+    assertf(strcmp(r.contenttype, "text/html") == 0);
+    hts_free_opt(opt);
+  }
+  // adr_normalized_sized(): bounded host normalization (passthrough when
+  // already normal).
+  {
+    char n[HTS_URLMAXSIZE];
+
+    assertf(strcmp(adr_normalized_sized("example.com", n, sizeof(n)),
+                   "example.com") == 0);
   }
 }
 
@@ -2638,15 +2706,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   // initialiser mimedefs
                   //get_userhttptype(opt,1,opt->mimedefs,NULL);
                   // check
-                  mime[0] = '\0';
-                  get_httptype(opt, mime, argv[na + 1], 0);
-                  if (mime[0] != '\0') {
+                  if (get_httptype_sized(opt, mime, sizeof(mime), argv[na + 1],
+                                         0)) {
                     char ext[256];
 
                     printf("%s is '%s'\n", argv[na + 1], mime);
-                    ext[0] = '\0';
-                    give_mimext(ext, sizeof(ext), mime);
-                    if (ext[0]) {
+                    if (give_mimext(ext, sizeof(ext), mime)) {
                       printf("and its local type is '.%s'\n", ext);
                     }
                   } else {

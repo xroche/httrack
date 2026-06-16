@@ -252,7 +252,7 @@ int ishtml_ext(const char *a);
 int ishttperror(int err);
 
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
-void give_mimext(char *s, size_t ssize, const char *st);
+int give_mimext(char *s, size_t ssize, const char *st);
 
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
@@ -500,7 +500,8 @@ HTS_STATIC int is_hypertext_mime(httrackp * opt, const char *mime,
     char guessed[256];
 
     guessed[0] = '\0';
-    guess_httptype(opt, guessed, file);
+    if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
+      return 0;
     return is_hypertext_mime__(guessed);
   }
   return 0;
@@ -515,7 +516,8 @@ HTS_STATIC int may_be_hypertext_mime(httrackp * opt, const char *mime,
     char guessed[256];
 
     guessed[0] = '\0';
-    guess_httptype(opt, guessed, file);
+    if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
+      return 0;
     return may_be_hypertext_mime__(guessed);
   }
   return 0;
@@ -530,7 +532,8 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
     char guessed[256];
 
     guessed[0] = '\0';
-    guess_httptype(opt, guessed, file);
+    if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
+      return 0;
     return strfield2(guessed, reference);
   }
   return 0;

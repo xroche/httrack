@@ -472,9 +472,8 @@ static int tris(httrackp * opt, char *buffer) {
   {
     char type[256];
 
-    type[0] = '\0';
-    get_httptype(opt, type, buffer, 0);
-    if (strnotempty(type))      // type reconnu!
+    if (get_httptype_sized(opt, type, sizeof(type), buffer,
+                           0)) // recognized type
       return 1;
     // ajout RX 05/2001
     else if (is_dyntype(get_ext(catbuff, sizeof(catbuff), buffer)))      // asp,cgi...

@@ -207,6 +207,9 @@ HTSEXT_API const char *jump_normalized_const(const char *);
 HTSEXT_API char *jump_toport(char *);
 HTSEXT_API const char *jump_toport_const(const char *);
 HTSEXT_API char *fil_normalized(const char *source, char *dest);
+HTSEXT_API char *adr_normalized_sized(const char *source, char *dest,
+                                      size_t destsize);
+HTS_DEPRECATED("use adr_normalized_sized(source, dest, destsize)")
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
 HTSEXT_API const char *hts_rootdir(char *file);
 
@@ -244,6 +247,9 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, co
 HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
 
 HTSEXT_API void escape_remove_control(char *s);
+HTSEXT_API int get_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                  const char *fil, int flag);
+HTS_DEPRECATED("use get_httptype_sized(opt, s, ssize, fil, flag)")
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
                              int flag);
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
@@ -251,6 +257,9 @@ HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 HTSEXT_API int is_dyntype(const char *fil);
 HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
 HTSEXT_API int may_unknown(httrackp * opt, const char *st);
+HTSEXT_API int guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                    const char *fil);
+HTS_DEPRECATED("use guess_httptype_sized(opt, s, ssize, fil)")
 HTSEXT_API void guess_httptype(httrackp * opt, char *s, const char *fil);
 
 /* Ugly string tools */

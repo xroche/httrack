@@ -1649,8 +1649,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 }
                                 // Prendre si extension reconnue
                                 if (!url_ok) {
-                                  get_httptype(opt, type, tempo, 0);
-                                  if (strnotempty(type))        // type reconnu!
+                                  if (get_httptype_sized(opt, type,
+                                                         sizeof(type), tempo,
+                                                         0)) // recognized type
                                     url_ok = 1;
                                   else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo)))       // reconnu php,cgi,asp..
                                     url_ok = 1;
@@ -3507,9 +3508,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             char BIGSTK pn_adr[HTS_URLMAXSIZE * 2], pn_fil[HTS_URLMAXSIZE * 2];
 
             n_adr[0] = n_fil[0] = '\0';
-            (void) adr_normalized(moved->adr, n_adr);
+            (void) adr_normalized_sized(moved->adr, n_adr, sizeof(n_adr));
             (void) fil_normalized(moved->fil, n_fil);
-            (void) adr_normalized(urladr(), pn_adr);
+            (void) adr_normalized_sized(urladr(), pn_adr, sizeof(pn_adr));
             (void) fil_normalized(urlfil(), pn_fil);
             if (strcasecmp(n_adr, pn_adr) == 0
                 && strcasecmp(n_fil, pn_fil) == 0) {

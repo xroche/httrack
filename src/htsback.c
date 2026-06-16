@@ -3584,8 +3584,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         back[i].r.is_file = 1;
                         back[i].r.totalsize = back[i].r.size =
                           fsize_utf8(back[i].url_sav);
-                        get_httptype(opt, back[i].r.contenttype,
-                                     back[i].url_sav, 1);
+                        get_httptype_sized(opt, back[i].r.contenttype,
+                                           sizeof(back[i].r.contenttype),
+                                           back[i].url_sav, 1);
                         hts_log_print(opt, LOG_DEBUG,
                                       "Not-modified status without cache guessed: %s%s",
                                       back[i].url_adr, back[i].url_fil);

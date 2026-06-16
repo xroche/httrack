@@ -1734,7 +1734,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 {
                   char buff[256];
 
-                  guess_httptype(opt, buff, urlfil());
+                  guess_httptype_sized(opt, buff, sizeof(buff), urlfil());
                   if (strcmp(buff, "image/gif") == 0)
                     create_gif_warning = 1;
                 }
@@ -3150,7 +3150,7 @@ static void postprocess_file(httrackp * opt, const char *save, const char *adr,
           /* CID */
           make_content_id(adr, fil, cid, sizeof(cid));
 
-          guess_httptype(opt, mimebuff, save);
+          guess_httptype_sized(opt, mimebuff, sizeof(mimebuff), save);
           fprintf(opt->state.mimefp, "--%s\r\n",
                   StringBuff(opt->state.mimemid));
           /*if (first)
