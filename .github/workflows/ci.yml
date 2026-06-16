@@ -343,9 +343,12 @@ jobs:
           # cache only), retrying through transient errors.
           shfmt="$HOME/.cache/shfmt/shfmt"
           if [ ! -s "$shfmt" ]; then
+            echo "shfmt cache MISS: fetching ${SHFMT_VERSION} from github.com"
             mkdir -p "$(dirname "$shfmt")"
             curl --retry 5 --retry-all-errors -fsSL -o "$shfmt" \
               "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)"
+          else
+            echo "shfmt cache HIT: using cached ${SHFMT_VERSION}"
           fi
           sudo install -m 0755 "$shfmt" /usr/local/bin/shfmt
 
@@ -391,9 +394,12 @@ jobs:
           # Cold cache only: fetch the driver, retrying through transient 429s.
           driver="$HOME/.cache/git-clang-format/git-clang-format"
           if [ ! -s "$driver" ]; then
+            echo "git-clang-format cache MISS: fetching llvmorg-19.1.7 from raw.githubusercontent.com"
             mkdir -p "$(dirname "$driver")"
             curl --retry 5 --retry-all-errors -fsSL -o "$driver" \
               https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-19.1.7/clang/tools/clang-format/git-clang-format
+          else
+            echo "git-clang-format cache HIT: using cached llvmorg-19.1.7"
           fi
           sudo install -m 0755 "$driver" /usr/local/bin/git-clang-format
           clang-format-19 --version
