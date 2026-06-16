@@ -610,11 +610,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           b = strchr(a, '<');   // prochain tag
                         }
                       }
-                      if (lienrelatif
-                          (tempo, heap(ptr)->sav,
-                           concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_html_utf8),
-                                  "index.html")) == 0) {
+                      if (lienrelatif(tempo, sizeof(tempo), heap(ptr)->sav,
+                                      concat(OPT_GET_BUFF(opt),
+                                             OPT_GET_BUFF_SIZE(opt),
+                                             StringBuff(opt->path_html_utf8),
+                                             "index.html")) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
                         makeindex_links++;      // un de plus
                         strcpybuff(makeindex_firstlink, tempo);
@@ -2720,7 +2720,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                               strcpybuff(save, StringBuff(opt->path_html_utf8));
                               strcatbuff(save, cat_name);
-                              if (lienrelatif(tempo, save, relativesavename()) == 0) {
+                              if (lienrelatif(tempo, sizeof(tempo), save,
+                                              relativesavename()) == 0) {
                                 /* Never escape high-chars (we don't know the encoding!!) */
                                 inplace_escape_uri_utf(tempo, sizeof(tempo));  // escape with %xx
                                 //if (!no_esc_utf)
@@ -2950,7 +2951,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       tempo[0] = '\0';
                       // calculer le lien relatif
 
-                      if (lienrelatif(tempo, afs.save, relativesavename()) == 0) {
+                      if (lienrelatif(tempo, sizeof(tempo), afs.save,
+                                      relativesavename()) == 0) {
                         if (!in_media) {        // In media (such as real audio): don't patch
                           /* Never escape high-chars (we don't know the encoding!!) */
                           inplace_escape_uri_utf(tempo, sizeof(tempo));

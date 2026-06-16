@@ -3862,7 +3862,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             opt->savename_83 = b;
             if (r != -1 && !forbidden_url) {
               if (savename()) {
-                if (lienrelatif(tempo, afs.save, savename()) == 0) {
+                if (lienrelatif(tempo, sizeof(tempo), afs.save, savename()) ==
+                    0) {
                   hts_log_print(opt, LOG_DEBUG,
                                 "(module): relative link at %s build with %s and %s: %s",
                                 afs.af.adr, afs.save, savename(), tempo);

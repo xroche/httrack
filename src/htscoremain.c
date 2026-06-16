@@ -431,6 +431,50 @@ static void basic_selftests(void) {
       assertf(strcmp(b + len - 4, ".htm") == 0);
     }
   }
+  // longfile_to_83(): single-name 8-3 (mode 1) / ISO9660 (mode 2) conversion;
+  // uppercases, clamps the name (8 / 31) and the extension (3). It rewrites
+  // 'save' in place, so pass a mutable array.
+  {
+    char n83[256];
+
+    {
+      char save[] = "longfilename.html";
+
+      longfile_to_83(1, n83, sizeof(n83), save); // 8-3: name->8, ext->3
+      assertf(strcmp(n83, "LONGFILE.HTM") == 0);
+    }
+    {
+      char save[] = "longfilename.html";
+
+      longfile_to_83(2, n83, sizeof(n83), save); // ISO9660: name->31, ext->3
+      assertf(strcmp(n83, "LONGFILENAME.HTM") == 0);
+    }
+    { // sanitization: leading '.'->'_', interior dots
+      char save[] = ".a b.c.d e"; // collapse to '_', spaces/specials -> '_'
+                                  // (only the last dot stays as the separator)
+      longfile_to_83(1, n83, sizeof(n83), save);
+      assertf(strcmp(n83, "_A_B_C.D_E") == 0);
+    }
+  }
+  // long_to_83(): per-segment 8-3 conversion of a whole path.
+  {
+    char n83[HTS_URLMAXSIZE * 2];
+    char save[] = "dir/longfilename.html";
+
+    long_to_83(1, n83, sizeof(n83), save);
+    assertf(strcmp(n83, "DIR/LONGFILE.HTM") == 0);
+  }
+  // lienrelatif(): relative path from the directory of curr_fil to link.
+  {
+    char s[HTS_URLMAXSIZE * 2];
+
+    // same directory -> just the basename
+    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "dir/index.html") == 0);
+    assertf(strcmp(s, "page.html") == 0);
+    // link one level up -> a "../" prefix
+    assertf(lienrelatif(s, sizeof(s), "a.html", "dir/index.html") == 0);
+    assertf(strcmp(s, "../a.html") == 0);
+  }
 }
 
 /* Self-tests for the htssafe.h bounded string ops (driven by httrack -#8).
