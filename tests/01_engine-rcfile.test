@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+
+# Config-file alias loading (no network). A .httrackrc in the working directory
+# is read by optinclude_file(), whose cmdl_ins macro inserts each alias-expanded
+# token into the x_argvblk block. That macro used to copy with an unbounded
+# strcpy on a bare char*; it is now bounded (strlcpybuff + cmdl_room over the
+# block capacity). Two properties are checked:
+#   1. The bound does not truncate: a long user-agent alias reaches doit.log
+#      intact. user-agent expands to two tokens (-F <value>), so it exercises
+#      both cmdl_ins insertions.
+#   2. The bound holds under exhaustion: a pathological .httrackrc whose alias
+#      expansions overflow the block aborts cleanly through the htssafe bounds
+#      check (a message naming htsalias.c) instead of overrunning the heap. The
+#      unbounded version segfaulted here.
+
+# set -e with the intentional-nonzero httrack runs guarded explicitly (the
+# crawls below are expected to fail/abort and their status is inspected by hand).
+set -euo pipefail
+
+# Resolve httrack to an absolute path before we cd: PATH may hold a build-relative
+# entry that would not resolve from the temp directory.
+bin=$(command -v httrack) || {
+    echo "FAIL: httrack not found on PATH"
+    exit 1
+}
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rcfile.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+# --- 1. alias token survives the bound intact -------------------------------
+d1="$tmp/intact"
+mkdir -p "$d1"
+echo '<html><body>hello</body></html>' >"$d1/index.html"
+
+# optinclude_file() lowercases each config line, so the marker is lowercase to
+# survive the comparison verbatim.
+marker='zzz_rcfile_marker_0123456789_abcdefghijklmnopqrstuvwxyz_intact'
+printf 'user-agent=%s\n' "$marker" >"$d1/.httrackrc"
+
+# Run with no -O so the working-directory .httrackrc is loaded (an -O path makes
+# the engine skip the rc files). Output lands in the temp dir. Guard the run so a
+# nonzero exit is captured for the assertion instead of tripping set -e.
+rc=0
+(cd "$d1" && "$bin" "file://$d1/index.html" --quiet -n >.log 2>&1) || rc=$?
+
+test "$rc" -eq 0 || {
+    echo "FAIL: rc-file crawl exited $rc"
+    exit 1
+}
+test -f "$d1/hts-cache/doit.log" || {
+    echo "FAIL: doit.log not written (rc file not processed)"
+    exit 1
+}
+# A truncated copy would cut the token; require the full -F value.
+grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
+    echo "FAIL: user-agent alias missing or truncated in doit.log"
+    head -1 "$d1/hts-cache/doit.log"
+    exit 1
+}
+
+# --- 2. block exhaustion aborts through the bound, not the heap -------------
+d2="$tmp/exhaust"
+mkdir -p "$d2"
+echo '<html><body>hi</body></html>' >"$d2/index.html"
+
+# Each line inserts ~two tokens of ~200 bytes; 400 lines overflow the block's
+# fixed slack (current_size + 32768) many times over, deterministically.
+val=$(printf 'a%.0s' $(seq 1 200))
+for _ in $(seq 1 400); do
+    printf 'user-agent=%s\n' "$val"
+done >"$d2/.httrackrc"
+
+# The process aborts (httrack turns the fatal signal into exit 134 either way),
+# so the exit code does not distinguish the bounded abort from a heap overflow;
+# the stderr diagnostic does. The htssafe bounds check names the offending file.
+# Expected to fail, so the nonzero exit is swallowed; only the log is inspected.
+(cd "$d2" && "$bin" "file://$d2/index.html" --quiet -n >.log 2>&1) || true
+
+grep -Eq "overflow while copying.*htsalias\.c" "$d2/.log" || {
+    echo "FAIL: exhausted rc file did not abort through the htsalias.c bound"
+    echo "(an unbounded copy would overrun the heap here)"
+    tail -3 "$d2/.log"
+    exit 1
+}
+
+exit 0

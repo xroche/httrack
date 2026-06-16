@@ -25,6 +25,7 @@ TESTS = \
 	01_engine-idna.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
+	01_engine-rcfile.test \
 	01_engine-simplify.test \
 	01_engine-strsafe.test \
 	02_manpage-regen.test \
