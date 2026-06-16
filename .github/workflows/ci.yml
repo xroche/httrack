@@ -320,37 +320,17 @@ jobs:
   lint:
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
-    env:
-      SHFMT_VERSION: v3.8.0
     steps:
       - uses: actions/checkout@v6
-
-      # shfmt is a pinned release binary, so it never changes: cache it keyed on
-      # the version. Same rationale as the git-clang-format driver below -- avoid
-      # re-downloading an unchanging file from github.com on every run.
-      - name: Cache shfmt binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/shfmt/shfmt
-          key: shfmt-${{ env.SHFMT_VERSION }}-${{ runner.arch }}
 
       - name: Install linters
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends shellcheck
-          # shfmt is not packaged in apt; fetch a pinned release binary (cold
-          # cache only), retrying through transient errors.
-          shfmt="$HOME/.cache/shfmt/shfmt"
-          if [ ! -s "$shfmt" ]; then
-            echo "shfmt cache MISS: fetching ${SHFMT_VERSION} from github.com"
-            mkdir -p "$(dirname "$shfmt")"
-            curl --retry 5 --retry-all-errors -fsSL -o "$shfmt" \
-              "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)"
-          else
-            echo "shfmt cache HIT: using cached ${SHFMT_VERSION}"
-          fi
-          sudo install -m 0755 "$shfmt" /usr/local/bin/shfmt
+          # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
+          # version; use it rather than fetching a release binary from github.com.
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt
+          shfmt --version
 
       # Lint the scripts we maintain; the legacy scripts are a separate cleanup.
       - name: shellcheck
@@ -366,23 +346,10 @@ jobs:
     name: format (clang-format-19, changed lines)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
-    env:
-      # Single-source the tag so the cache key and the fetch URL can never drift.
-      LLVM_TAG: llvmorg-19.1.7
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      # The git-clang-format driver is pinned to an immutable release tag, so the
-      # fetched file never changes: cache it keyed on the tag. raw.githubusercontent.com
-      # 429-rate-limits the shared runner egress IPs, and re-downloading an unchanging
-      # file every run was the only thing that could (and did) hit that limit.
-      - name: Cache git-clang-format driver
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/git-clang-format/git-clang-format
-          key: git-clang-format-${{ env.LLVM_TAG }}
 
       - name: Install clang-format 19 (pinned, from apt.llvm.org)
         run: |
@@ -394,17 +361,9 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang-format-19
-          # Cold cache only: fetch the driver, retrying through transient 429s.
-          driver="$HOME/.cache/git-clang-format/git-clang-format"
-          if [ ! -s "$driver" ]; then
-            echo "git-clang-format cache MISS: fetching ${LLVM_TAG} from raw.githubusercontent.com"
-            mkdir -p "$(dirname "$driver")"
-            curl --retry 5 --retry-all-errors -fsSL -o "$driver" \
-              "https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_TAG}/clang/tools/clang-format/git-clang-format"
-          else
-            echo "git-clang-format cache HIT: using cached ${LLVM_TAG}"
-          fi
-          sudo install -m 0755 "$driver" /usr/local/bin/git-clang-format
+          # The clang-format-19 package ships the git-clang-format driver;
+          # expose it unsuffixed so "git clang-format" finds it.
+          sudo ln -sf /usr/bin/git-clang-format-19 /usr/local/bin/git-clang-format
           clang-format-19 --version
 
       - name: Check formatting of changed lines
@@ -418,10 +377,9 @@ jobs:
                     --diff --extensions c,h "$base")"
           rc=$?
           set -e
-          # Classify by output first: a non-empty diff means "not clean",
-          # regardless of the driver's exit convention (the release-tag driver
-          # exits 0 and signals via stdout; some packaged drivers exit 1 on a
-          # diff). A nonzero exit with clean output is a real checker error.
+          # Classify by output, not exit code: a non-empty diff means "not
+          # clean" (git-clang-format may exit 0 or 1 on a diff). A nonzero exit
+          # with clean output is a real checker error.
           case "$diff" in
             "" | "no modified files to format" | *"did not modify any files"*)
               if [ "$rc" -ne 0 ]; then
