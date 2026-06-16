@@ -68,4 +68,12 @@ refused "#152: over-cap -F not refused cleanly"
 run "$tmp/ov-l" --user-agent "$over"
 refused "#152: over-cap --user-agent not refused cleanly"
 
+# a fully "-quoted argument has its surrounding quotes stripped in place (the
+# parser's quote handling), so a quoted URL is mirrored; a dangling opening quote
+# is refused cleanly, never a crash. Exercises the in-place argv quote-strip.
+run "$tmp/q-ok" "\"file://$tmp/index.html\""
+accepted "$tmp/q-ok" "quoted URL: surrounding quotes not stripped in place"
+run "$tmp/q-bad" '"foo'
+refused "quoted argument with a missing closing quote not refused cleanly"
+
 exit 0
