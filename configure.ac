@@ -84,6 +84,11 @@ AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -W
 AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"])
 AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"])
 AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"])
+# Make htssafe.h's pointer-dest 'warning' attribute a hard error in our build
+# (migration is at zero; a new char* dest is a regression). gcc/clang each take
+# only their own spelling; downstream keeps the plain warning, not a build break.
+AX_CHECK_COMPILE_FLAG([-Werror=attribute-warning], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=attribute-warning"])
+AX_CHECK_COMPILE_FLAG([-Werror=user-defined-warnings], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=user-defined-warnings"])
 AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"])
 AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"])
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"])
