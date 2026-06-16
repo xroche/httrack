@@ -925,7 +925,7 @@ int url_savename(lien_adrfilsave *const afs,
 
               pth[0] = n83[0] = '\0';
               strncatbuff(pth, fil, (int) (nom_pos - fil) - 1);
-              long_to_83(opt->savename_83, n83, pth);
+              long_to_83(opt->savename_83, n83, sizeof(n83), pth);
               htsbuff_cat(&sb, n83);
             }
           }
@@ -1307,7 +1307,7 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_83) {
     char BIGSTK n83[HTS_URLMAXSIZE * 2];
 
-    long_to_83(opt->savename_83, n83, afs->save);
+    long_to_83(opt->savename_83, n83, sizeof(n83), afs->save);
     strcpybuff(afs->save, n83);
   }
   // enforce stricter ISO9660 compliance (bug reported by Steffo Carlsson)

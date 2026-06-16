@@ -61,11 +61,11 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 int ident_url_relatif(const char *lien, const char *origin_adr,
                       const char *origin_fil,
                       lien_adrfil* const adrfil);
-int lienrelatif(char *s, const char *link, const char *curr);
+int lienrelatif(char *s, size_t ssize, const char *link, const char *curr);
 int link_has_authority(const char *lien);
 int link_has_authorization(const char *lien);
-void long_to_83(int mode, char *n83, char *save);
-void longfile_to_83(int mode, char *n83, char *save);
+void long_to_83(int mode, char *n83, size_t n83size, char *save);
+void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);

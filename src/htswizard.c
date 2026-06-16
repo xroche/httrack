@@ -223,8 +223,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       // note (up/down): on calcule à partir du lien primaire, ET du lien précédent.
       // ex: si on descend 2 fois on peut remonter 1 fois
 
-      if (lienrelatif(tempo, fil, heap(heap(ptr)->premier)->fil) == 0) {
-        if (lienrelatif(tempo2, fil, heap(ptr)->fil) == 0) {
+      if (lienrelatif(tempo, sizeof(tempo), fil,
+                      heap(heap(ptr)->premier)->fil) == 0) {
+        if (lienrelatif(tempo2, sizeof(tempo2), fil, heap(ptr)->fil) == 0) {
           hts_log_print(opt, LOG_DEBUG,
                         "build relative links to test: %s %s (with %s and %s)",
                         tempo, tempo2, heap(heap(ptr)->premier)->fil,
@@ -326,8 +327,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
       char BIGSTK tempo2[HTS_URLMAXSIZE * 2];
 
-      if (lienrelatif(tempo, fil, heap(heap(ptr)->premier)->fil) == 0) {
-        if (lienrelatif(tempo2, fil, heap(ptr)->fil) == 0) {
+      if (lienrelatif(tempo, sizeof(tempo), fil,
+                      heap(heap(ptr)->premier)->fil) == 0) {
+        if (lienrelatif(tempo2, sizeof(tempo2), fil, heap(ptr)->fil) == 0) {
         } else {
           hts_log_print(opt, LOG_ERROR,
                         "Error building relative link %s and %s", fil,
@@ -336,7 +338,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       } else {
         hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",
                       fil, heap(heap(ptr)->premier)->fil);
-
       }
     }                           // fin tester interdiction de monter
 
