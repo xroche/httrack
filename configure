@@ -15541,6 +15541,91 @@ else case e in #(
 esac
 fi
 
+# Make htssafe.h's pointer-dest 'warning' attribute a hard error in our build
+# (migration is at zero; a new char* dest is a regression). gcc/clang each take
+# only their own spelling; downstream keeps the plain warning, not a build break.
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Werror=attribute-warning" >&5
+printf %s "checking whether C compiler accepts -Werror=attribute-warning... " >&6; }
+if test ${ax_cv_check_cflags___Werror_attribute_warning+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e)
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Werror=attribute-warning"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  ax_cv_check_cflags___Werror_attribute_warning=yes
+else case e in #(
+  e) ax_cv_check_cflags___Werror_attribute_warning=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Werror_attribute_warning" >&5
+printf "%s\n" "$ax_cv_check_cflags___Werror_attribute_warning" >&6; }
+if test "x$ax_cv_check_cflags___Werror_attribute_warning" = xyes
+then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=attribute-warning"
+else case e in #(
+  e) : ;;
+esac
+fi
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Werror=user-defined-warnings" >&5
+printf %s "checking whether C compiler accepts -Werror=user-defined-warnings... " >&6; }
+if test ${ax_cv_check_cflags___Werror_user_defined_warnings+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e)
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Werror=user-defined-warnings"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  ax_cv_check_cflags___Werror_user_defined_warnings=yes
+else case e in #(
+  e) ax_cv_check_cflags___Werror_user_defined_warnings=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Werror_user_defined_warnings" >&5
+printf "%s\n" "$ax_cv_check_cflags___Werror_user_defined_warnings" >&6; }
+if test "x$ax_cv_check_cflags___Werror_user_defined_warnings" = xyes
+then :
+  DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=user-defined-warnings"
+else case e in #(
+  e) : ;;
+esac
+fi
+
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing" >&5
 printf %s "checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing... " >&6; }
 if test ${ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing+y}
