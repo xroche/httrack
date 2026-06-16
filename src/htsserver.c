@@ -1783,7 +1783,7 @@ static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
   buffer[0] = '\0';
   do {
     QLANG_T(i);
-    strlcpybuff(lang_str, "LANGUAGE_NAME", buffer_size);
+    strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
     htslang_load(lang_str, sizeof(lang_str), path);
     if (strlen(lang_str) > 0) {
       if (buffer[0])
