@@ -7,4 +7,15 @@ On most systems (including GNU/Linux), installing can be easily achieved using t
 -or- (if not compiling as root)
 ./configure --prefix=$HOME && make && make install
 
+Building from a git checkout (not a release tarball) first needs the build
+system regenerated, which requires autoconf, automake and libtool:
+
+./bootstrap
+./configure && make && make install
+
+You can also use the one-shot wrapper, which runs bootstrap, configure and make
+(extra arguments are passed to configure):
+
+./build.sh --prefix=$HOME
+
 See also the INSTALL generic help file.
