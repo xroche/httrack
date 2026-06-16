@@ -617,13 +617,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                              "index.html")) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
                         makeindex_links++;      // un de plus
-                        strcpybuff(makeindex_firstlink, tempo);
+                        strlcpybuff(makeindex_firstlink, tempo,
+                                    HTS_URLMAXSIZE * 2);
                         //
 
                         /* Hack */
                         if (opt->mimehtml) {
-                          strcpybuff(makeindex_firstlink,
-                                     "cid:primary/primary");
+                          strlcpybuff(makeindex_firstlink,
+                                      "cid:primary/primary",
+                                      HTS_URLMAXSIZE * 2);
                         }
 
                         if ((b == a) || (a == NULL) || (b == NULL)) {   // pas de titre
@@ -2319,12 +2321,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       switch (p_type) {
                       case 2:{
                           //if (*lien!='/') strcatbuff(base,"/");
-                          strcpybuff(base, lien);
+                          strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
                         }
                         break;  // base
                       case -2:{
                           //if (*lien!='/') strcatbuff(codebase,"/");
-                          strcpybuff(codebase, lien);
+                          strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);
                         }
                         break;  // base
                       }
@@ -4397,7 +4399,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       memcpy(r, &(back[b].r), sizeof(htsblk));
       r->location = stre->loc_; // ne PAS copier location!! adresse, pas de buffer
       if (back[b].r.location)
-        strcpybuff(r->location, back[b].r.location);
+        strlcpybuff(r->location, back[b].r.location, HTS_URLMAXSIZE * 2);
       back[b].r.adr = NULL;     // ne pas faire de desalloc ensuite
 
       // libérer emplacement backing
