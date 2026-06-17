@@ -2580,8 +2580,8 @@ HTSEXT_API TStamp mtime_local(void) {
     assert(! "gettimeofday");
   }
 
-  return (TStamp) (((TStamp) tv.tv_sec * (TStamp) 1000)
-                   + ((TStamp) tv.tv_usec / (TStamp) 1000000));
+  return (TStamp) (((TStamp) tv.tv_sec * (TStamp) 1000) +
+                   ((TStamp) tv.tv_usec / (TStamp) 1000));
 #else
   struct timeb B;
   ftime(&B);
