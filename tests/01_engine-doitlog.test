@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+
+# doit.log reprise (no network). Re-running httrack in a mirror directory with
+# NO url makes the engine read hts-cache/doit.log and re-insert every recorded
+# argument into the command line through htscoremain.c's cmdl_ins macro (the
+# x_argvblk builder). That path is distinct from the rc-file one in
+# 01_engine-rcfile.test (htsalias.c) and from the url-on-command-line update in
+# 02_update-cache.test, and nothing else exercises it. Two properties:
+#   1. A multi-token reprise re-mirrors cleanly: every token (the url and each
+#      option) survives the back-to-back packing, so the no-url run reproduces
+#      the file set with no errors. A packing/bound bug corrupts a later token
+#      and surfaces as an error or a missing file.
+#   2. The reprise actually re-crawls through the inserted url: changing a source
+#      file and re-running with no url picks up the new content.
+
+set -euo pipefail
+
+# Resolve httrack to an absolute path before we cd: PATH may hold a
+# build-relative entry that would not resolve from the temp directory.
+bin=$(command -v httrack) || {
+    echo "FAIL: httrack not found on PATH"
+    exit 1
+}
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_doitlog.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+site="$tmp/site"
+out="$tmp/out"
+mkdir -p "$site/sub"
+printf '<a href="a.html">a</a> <a href="sub/b.html">b</a>' >"$site/index.html"
+echo 'OLDCONTENT' >"$site/a.html"
+echo '<p>bbb</p>' >"$site/sub/b.html"
+url="file://$site/index.html"
+
+# count Error: lines in the log (grep -c exits 1 on zero matches: guard it)
+errors() { grep -ciE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt" || true; }
+
+# initial mirror with the url and a handful of options, so doit.log records a
+# multi-token command line for cmdl_ins to re-insert one token at a time.
+rc=0
+"$bin" "$url" -O "$out" --quiet -n -%v0 -r3 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: initial mirror exited $rc"
+    exit 1
+}
+test -f "$out/hts-cache/doit.log" || {
+    echo "FAIL: doit.log not written by the initial mirror"
+    exit 1
+}
+
+# --- 1. no-url reprise re-mirrors cleanly -----------------------------------
+# No url on the command line, so the engine loads doit.log and re-inserts the
+# recorded arguments (cmdl_ins). -O selects the mirror; argv carries no url.
+rc=0
+"$bin" -O "$out" --quiet >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: doit.log reprise exited $rc"
+    exit 1
+}
+test "$(errors)" = 0 || {
+    echo "FAIL: doit.log reprise reported errors (a token may have been corrupted)"
+    grep -iE 'Error:' "$out/hts-log.txt" | head -3
+    exit 1
+}
+for suffix in a.html sub/b.html; do
+    test -n "$(find "$out" -path "*/$suffix" -print -quit)" || {
+        echo "FAIL: $suffix missing after the no-url reprise"
+        exit 1
+    }
+done
+
+# --- 2. the reprise re-crawls through the inserted url -----------------------
+sleep 1
+echo 'NEWCONTENT' >"$site/a.html"
+rc=0
+"$bin" -O "$out" --quiet >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: second reprise exited $rc"
+    exit 1
+}
+grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || {
+    echo "FAIL: reprise did not pick up the changed source (inserted url not re-crawled)"
+    exit 1
+}
+
+exit 0
