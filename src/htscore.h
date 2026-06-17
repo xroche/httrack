@@ -369,10 +369,6 @@ char *readfile_or(const char *fil, const char *defaultdata);
 void check_rate(TStamp stat_timestart, int maxrate);
 #endif
 
-// links
-int liens_record(char *adr, char *fil, char *save, char *former_adr,
-                 char *former_fil, char *codebase);
-
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
 
