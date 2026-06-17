@@ -30,6 +30,12 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/** @file htsarrays.h
+ *  Header-only generic dynamic array (a typed growable vector). All operations
+ *  are macros parameterized by the array lvalue A; the element type T is fixed
+ *  by the struct TypedArray(T) declares. Counts and capacities are in
+ *  elements, not bytes. The array owns its backing store: grow it via the Add/
+ *  Append/EnsureRoom macros and release it with TypedArrayFree. */
 #ifndef HTS_ARRAYS_DEFSTATIC
 #define HTS_ARRAYS_DEFSTATIC
 
@@ -39,7 +45,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 
-/* Memory allocation assertion failure */
+/* Abort (with the failed byte count) when a growth allocation fails. The
+   array macros never return an out-of-memory error; they assert and abort. */
 static void hts_record_assert_memory_failed(const size_t size) {
   fprintf(stderr, "memory allocation failed (%lu bytes)", \
           (long int) size); \
@@ -61,6 +68,8 @@ static void hts_record_assert_memory_failed(const size_t size) {
     /** Capacity. **/ \
     size_t capa;      \
   }
+
+/** Initializer for an empty array (no backing store, size and capacity 0). **/
 #define EMPTY_TYPED_ARRAY { { NULL }, 0, 0 }
 
 /** Array size, in elements. **/
@@ -84,7 +93,8 @@ static void hts_record_assert_memory_failed(const size_t size) {
 /** Size of T. **/
 #define TypedArrayWidth(A)  (sizeof(*TypedArrayElts(A)))
 
-/** Nth element of the array. **/
+/** Nth element of the array, as an lvalue. No bounds check; N must be
+    < TypedArraySize(A). **/
 #define TypedArrayNth(A, N) (TypedArrayElts(A)[N])
 
 /**

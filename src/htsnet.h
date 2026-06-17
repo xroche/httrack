@@ -32,6 +32,11 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/** @file htsnet.h
+    Socket/connection layer. Provides SOCaddr, an opaque IPv4/IPv6
+   socket-address wrapper, plus accessor macros so callers never branch on
+   address family. Builds on htsbasenet.h. */
+
 #ifndef HTS_DEFNETH
 #define HTS_DEFNETH
 
@@ -43,32 +48,32 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <ctype.h>
 #ifdef _WIN32
- // pour read
+// for read
 #include <io.h>
- // pour FindFirstFile
+// for FindFirstFile
 #include <winbase.h>
 typedef USHORT in_port_t;
+
 typedef ADDRESS_FAMILY sa_family_t;
 #else
- //typedef int T_SOC;
 #define INVALID_SOCKET -1
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/time.h>
- /* Force for sun env. */
+/* Force BSD_COMP for Sun environments. */
 #ifndef BSD_COMP
 #define BSD_COMP
 #endif
 #include <sys/ioctl.h>
- /* gethostname & co */
+/* gethostname & co */
 #ifndef _WIN32
 #include <unistd.h>
 #endif
- /* inet_addr */
+/* inet_addr */
 #include <arpa/inet.h>
- // pas la peine normalement..
+/* normally not needed; provide in_addr_t where the platform lacks it */
 #ifndef HTS_DO_NOT_REDEFINE_in_addr_t
 typedef unsigned long in_addr_t;
 #endif
@@ -78,14 +83,16 @@ typedef unsigned long in_addr_t;
 extern "C" {
 #endif
 
-/* Ipv4 structures */
+/** Raw IP address type: in6_addr when IPv6 is enabled, else in_addr. */
 #if HTS_INET6 != 0
 typedef struct in6_addr INaddr;
 #else
 typedef struct in_addr INaddr;
 #endif
 
-/* This should handle all cases */
+/** Opaque socket address holding either an IPv4 or IPv6 endpoint. Use the
+    SOCaddr_* accessors rather than touching m_addr; sa_family selects the
+    active union member. */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
 typedef struct SOCaddr SOCaddr;
@@ -103,6 +110,8 @@ struct SOCaddr {
   } m_addr;
 };
 
+/** Pointer to the port field (network byte order) for the active family.
+    Asserts on NULL or an unset/unknown family. */
 static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
                                                          const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -122,6 +131,8 @@ static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
   }
 }
 
+/** Length of the active sockaddr (sockaddr_in or sockaddr_in6), or 0 if the
+    family is unset/unknown. The 0 case doubles as the "not valid" test. */
 static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
                                                      const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -140,33 +151,52 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
   }
 }
 
+/** Reset to the unset state (family AF_UNSPEC), making the address invalid. */
 static HTS_INLINE HTS_UNUSED void SOCaddr_clear_(SOCaddr*const addr,
                                                  const char *file, const int line) {
   assertf_(addr != NULL, file, line);
   addr->m_addr.sa.sa_family = AF_UNSPEC;
 }
 
-/* Ipv4/6 structure members */
-#define SOCaddr_sinfamily(server)   ((server).m_addr.sa.sa_family)
-#define SOCaddr_sinport(server)     (*SOCaddr_sinport_(&(server), __FILE__, __LINE__))
-#define SOCaddr_size(server)        (SOCaddr_size_(&(server), __FILE__, __LINE__))
-#define SOCaddr_is_valid(server)    (SOCaddr_size_(&(server), __FILE__, __LINE__) != 0 )
-#define SOCaddr_clear(server)       SOCaddr_clear_(&(server), __FILE__, __LINE__)
-#define SOCaddr_sockaddr(server)    ((server).m_addr.sa)
-#define SOCaddr_capacity(server)    sizeof((server).m_addr)
+/* SOCaddr accessors; server is an lvalue SOCaddr, not a pointer. */
+#define SOCaddr_sinfamily(server)                                              \
+  ((server).m_addr.sa.sa_family) /* AF_INET / AF_INET6 */
 
-/* AF_xx */
+#define SOCaddr_sinport(server)                                                \
+  (*SOCaddr_sinport_(&(server), __FILE__,                                      \
+                     __LINE__)) /* port lvalue (network order) */
+
+#define SOCaddr_size(server)                                                   \
+  (SOCaddr_size_(&(server), __FILE__, __LINE__)) /* active sockaddr length */
+
+#define SOCaddr_is_valid(server)                                               \
+  (SOCaddr_size_(&(server), __FILE__, __LINE__) !=                             \
+   0) /* nonzero if family is set */
+
+#define SOCaddr_clear(server) SOCaddr_clear_(&(server), __FILE__, __LINE__)
+
+#define SOCaddr_sockaddr(server)                                               \
+  ((server).m_addr.sa) /* generic struct sockaddr view */
+
+#define SOCaddr_capacity(server)                                               \
+  sizeof((server).m_addr) /* full union size, for recvfrom() etc. */
+
+/** Address family to bind/listen with: AF_INET6 when IPv6 is enabled (dual
+    stack), else AF_INET. */
 #if HTS_INET6 != 0
 #define AFinet AF_INET6
 #else
 #define AFinet AF_INET
 #endif
 
-/* Set port to sockaddr structure */
+/** Set the port (host-order argument, stored network-order) on the active
+ * family. */
 #define SOCaddr_initport(server, port) do { \
   SOCaddr_sinport(server) = htons((in_port_t) (port)); \
 } while(0)
 
+/** Initialize as an all-zero IPv4 wildcard (INADDR_ANY) address; returns its
+    sockaddr length. */
 static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
                                                         const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -175,13 +205,15 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
   return SOCaddr_size_(addr, file, line);
 }
 
+/** Initialize server as an IPv4 wildcard (INADDR_ANY) address. */
 #define SOCaddr_initany(server) do { \
   SOCaddr_initany_(&(server), __FILE__, __LINE__); \
 } while(0)
 
-/*
-  Copy sockaddr_in/sockaddr_in6/raw IPv4/raw IPv6 to our opaque SOCaddr
-*/
+/** Populate server from data. data_size selects the source form: a full
+    sockaddr_in / sockaddr_in6, or a raw 4-byte (IPv4) / 16-byte (IPv6) address
+    with port zeroed. Any other size leaves an AF_INET shell. Returns the
+    resulting sockaddr length. */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server, 
                                               const void *data, const size_t data_size,
                                               const char *file, const int line) {
@@ -214,20 +246,24 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server,
   return SOCaddr_size_(server, file, line);
 }
 
+/** Copy hpaddr (length hpsize) into server, writing the result length into the
+    lvalue server_len (int). See SOCaddr_copyaddr_ for accepted forms. */
 #define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize) do { \
   server_len = (int) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
 } while(0)
 
+/** Like SOCaddr_copyaddr but discards the result length. */
 #define SOCaddr_copyaddr2(server, hpaddr, hpsize) do { \
   (void) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
 } while(0)
 
+/** Copy one SOCaddr (src) into another (dest), preserving family and port. */
 #define SOCaddr_copy_SOCaddr(dest, src) do { \
   SOCaddr_copyaddr_(&(dest), &(src).m_addr.sa, SOCaddr_size(src), __FILE__, __LINE__); \
 } while(0)
 
-/* Get dotted address */
-
+/** Write the numeric (dotted/colon) host of ss into namebuf (capacity
+    namebuflen), scope id stripped. On failure namebuf becomes "". */
 static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen, 
                                          SOCaddr *const ss,
                                          const char *file, const int line) {
@@ -248,13 +284,14 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
   }
 }
 
+/** Numeric host of ss into namebuf (capacity namebuflen); "" on failure. */
 #define SOCaddr_inetntoa(namebuf, namebuflen, ss) \
   SOCaddr_inetntoa_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
-/* Get protocol ID */
+/** Single-char family tag: '1' for IPv4, '2' otherwise (used in the cache). */
 #define SOCaddr_getproto(ss) ( SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')
 
-/* Socket length type */
+/** Length type for socket APIs (getsockname, accept, ...). */
 typedef socklen_t SOClen;
 
 #ifdef __cplusplus

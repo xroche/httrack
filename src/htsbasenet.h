@@ -31,6 +31,11 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/** @file htsbasenet.h
+    Base networking definitions: platform socket headers, the optional global
+    OpenSSL context, and the status-code/connection-state enumerations stored in
+    htsblk and lien_back. Pulled in by htsnet.h. */
+
 #ifndef HTS_DEFBASENETH
 #define HTS_DEFBASENETH
 
@@ -80,7 +85,8 @@ extern "C" {
 /* OpenSSL structure */
 #include <openssl/bio.h>
 
-/* Global SSL context */
+/** Process-wide OpenSSL client context, created lazily on first TLS use;
+    shared by all connections. NULL until initialized. */
 extern SSL_CTX *openssl_ctx;
 
 #endif

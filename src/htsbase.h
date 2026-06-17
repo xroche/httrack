@@ -63,12 +63,15 @@ extern "C" {
 #endif
 #include <assert.h>
 
-/* GCC extension */
+/* Compiler-portability attribute macros (no-ops on non-GCC). */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
+
 #define HTS_STATIC static __attribute__ ((unused))
+
 #define HTS_INLINE __inline__
+/* printf-style format check; fmt/arg are 1-based argument positions. */
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
@@ -78,29 +81,37 @@ extern "C" {
 #endif
 #endif
 
+/* min/max evaluate their arguments twice; pass side-effect-free expressions. */
 #undef min
 #undef max
 #define min(a,b) ((a)>(b)?(b):(a))
+
 #define max(a,b) ((a)>(b)?(a):(b))
 
 #ifndef _WIN32
 #undef Sleep
 #define min(a,b) ((a)>(b)?(b):(a))
+
 #define max(a,b) ((a)>(b)?(a):(b))
+
+/* Win32 Sleep() shim for POSIX; argument is milliseconds. */
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
 
-// teste égalité de 2 chars, case insensitive
+/* hichar: ASCII uppercasing of one char. streql: case-insensitive equality of
+   two chars. ASCII only; not locale-aware. */
 #define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
+
 #define streql(a,b) (hichar(a)==hichar(b))
 
-// caractère maj
+/* True if c is an ASCII uppercase letter. */
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
 
-/* Library internal definictions */
+/* Library-internal only (engine translation units that define
+   HTS_INTERNAL_BYTECODE); not part of the consumer surface. */
 #ifdef HTS_INTERNAL_BYTECODE
 
-// functions
+/* Resolve a symbol in an already-loaded dynamic module. */
 #ifdef _WIN32
 #define DynamicGet(handle, sym) GetProcAddress(handle, sym)
 #else

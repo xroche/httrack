@@ -30,12 +30,19 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-// Fichier réunissant l'ensemble des defines
+/** @file htsglobal.h
+ *  Foundational portability layer included by every other public header:
+ *  version strings, platform/feature switches, the HTSEXT_API export marker,
+ *  the integer/time/socket typedefs (LLint, TStamp, INTsys, T_SOC), printf
+ *  format helpers, and the file-access mode constants. */
 
 #ifndef HTTRACK_GLOBAL_DEFH
 #define HTTRACK_GLOBAL_DEFH
 
-// Version (also check external version information)
+/* Package version strings (the library ABI version is VERSION_INFO in
+   configure.ac, decoupled from these). VERSION is the display form, VERSIONID
+   the dotted numeric form, AFF_VERSION the short form shown in footers,
+   LIB_VERSION the data/cache format generation. */
 #define HTTRACK_VERSION      "3.49-8"
 #define HTTRACK_VERSIONID    "3.49.8"
 #define HTTRACK_AFF_VERSION  "3.x"
@@ -46,7 +53,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #endif
 
-// Définition plate-forme
+// Platform detection (sizes, feature macros)
 #include "htsconfig.h"
 
 // WIN32 types
@@ -57,11 +64,17 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* GCC extension */
+/* Compiler-attribute helpers, no-ops where unsupported.
+   HTS_UNUSED: suppress unused-symbol warnings. HTS_STATIC: an unused-safe
+   static. HTS_PRINTF_FUN(fmt, arg): mark a printf-like function so the
+   compiler type-checks the format string at argument index fmt against the
+   varargs starting at arg. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
+
 #define HTS_STATIC static __attribute__ ((unused))
+
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
@@ -86,6 +99,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
+
 #define S_ISDIR(m) ((m) & _S_IFDIR)
 #endif
 
@@ -132,7 +146,7 @@ Please visit our Website: http://www.httrack.com
 #define BIGSTK
 #endif
 
-// compatibilité DOS
+// DOS-style 8.3 filenames? 1 on Windows, 0 elsewhere
 #ifdef _WIN32
 #define HTS_DOSNAME 1
 #else
@@ -168,7 +182,10 @@ Please visit our Website: http://www.httrack.com
 #define __cdecl
 #endif
 
-/* rc file */
+/* Install paths and config-file names. HTTRACKRC is the per-user rc filename,
+   HTTRACKCNF the system-wide config, HTTRACKDIR the shared data directory; the
+   ETC/BIN/LIB/PREFIX paths are the defaults these derive from when not set by
+   the build. */
 #ifdef _WIN32
 #define HTS_HTTRACKRC "httrackrc"
 #else
@@ -197,9 +214,11 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-/* Max URL length */
+/* Maximum URL length, in bytes. Callers size URL/path string buffers to this;
+   anything longer is rejected. */
 #define HTS_URLMAXSIZE 1024
-/* Max command-line length (>=HTS_URLMAXSIZE*2) */
+/* Maximum command-line argument length, in bytes (kept >= HTS_URLMAXSIZE*2 so
+   an addr+path pair always fits). */
 #define HTS_CDLMAXSIZE 1024
 /* MIME-type buffer contract (htsblk.contenttype/charset/contentencoding); holds
    the longest registered MIME type, the Office OOXML ones reaching 73 chars */
@@ -219,24 +238,30 @@ Please visit our Website: http://www.httrack.com
 #define LF "\x0a"
 #endif
 
-/* équivaut à "paramètre vide", par exemple -F (none) */
+/* Sentinel meaning "empty parameter", e.g. -F (none) */
 #define HTS_NOPARAM "(none)"
 #define HTS_NOPARAM2 "\"(none)\""
 
-/* maximum et minimum */
+/* Larger/smaller of two values. Macros: arguments are evaluated twice. */
 #define maximum(A,B) ( (A) > (B) ? (A) : (B) )
+
 #define minimum(A,B) ( (A) < (B) ? (A) : (B) )
 
-/* chaine no empty ? (and not null) */
+/* True when A is a non-NULL, non-empty string. */
 #define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
 
-/* optimisation inline si possible */
+/* 'inline' where the dialect supports it (C++), nothing in plain C. */
 #ifdef __cplusplus
 #define HTS_INLINE inline
 #else
 #define HTS_INLINE
 #endif
 
+/* Marks a symbol as part of the library's public ABI: exported from
+   libhttrack and visible to callers. Symbols without it stay internal (hidden
+   under -fvisibility=hidden). Expands to dllexport when building the library,
+   dllimport when consuming it, and the visibility("default") attribute on
+   ELF. */
 #ifdef _WIN32
 #ifdef LIBHTTRACK_EXPORTS
 #define HTSEXT_API __declspec(dllexport)
@@ -247,6 +272,7 @@ Please visit our Website: http://www.httrack.com
 /* See <http://gcc.gnu.org/wiki/Visibility> */
 #if ( ( defined(__GNUC__) && ( __GNUC__ >= 4 ) ) \
       || ( defined(HAVE_VISIBILITY) && HAVE_VISIBILITY ) )
+
 #define HTSEXT_API __attribute__ ((visibility ("default")))
 #else
 #define HTSEXT_API
@@ -260,10 +286,13 @@ Please visit our Website: http://www.httrack.com
  */
 #if defined(__GNUC__) &&                                                       \
     (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+
 #define HTS_DEPRECATED(msg) __attribute__((deprecated(msg)))
 #elif defined(__GNUC__)
+
 #define HTS_DEPRECATED(msg) __attribute__((deprecated))
 #elif defined(_MSC_VER) && (_MSC_VER >= 1400)
+
 #define HTS_DEPRECATED(msg) __declspec(deprecated(msg))
 #else
 #define HTS_DEPRECATED(msg)
@@ -277,12 +306,16 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-// long long int? (or int)
-// (and int cast for system functions like malloc() )
-
+/* Wide integer types, chosen per platform.
+   LLint:  signed 64-bit counter for byte counts and large sizes (falls back to
+           plain int where 64-bit is unavailable).
+   TStamp: timestamp/duration in the same width (a double in the no-64-bit
+           fallback).
+   LLintP: the printf conversion for an LLint. */
 #if HTS_LONGLONG
 #ifdef LLINT_FORMAT
 typedef LLINT_TYPE LLint;
+
 typedef LLINT_TYPE TStamp;
 
 #define LLintP LLINT_FORMAT
@@ -290,17 +323,21 @@ typedef LLINT_TYPE TStamp;
 
 #ifdef _WIN32
 typedef __int64 LLint;
+
 typedef __int64 TStamp;
 
 #define LLintP "%I64d"
 #elif (defined(_LP64) || defined(__x86_64__) \
        || defined(__powerpc64__) || defined(__64BIT__))
+
 typedef long int LLint;
+
 typedef long int TStamp;
 
 #define LLintP "%ld"
 #else
 typedef long long int LLint;
+
 typedef long long int TStamp;
 
 #define LLintP "%lld"
@@ -315,6 +352,9 @@ typedef int LLint;
 typedef double TStamp;
 #endif
 
+/* Integer type for file offsets/sizes passed to the C library. Widens to
+   LLint (with HTS_FSEEKO for fseeko/ftello) under large-file support, plain
+   int otherwise; INTsysP is its printf conversion. */
 #ifdef LFS_FLAG
 typedef LLint INTsys;
 
@@ -328,8 +368,11 @@ typedef int INTsys;
 #define INTsysP "%d"
 #endif
 
+/* Socket-handle type. An unsigned integer wide enough for a Windows SOCKET;
+   a plain int file descriptor on POSIX. */
 #ifdef _WIN32
 #if defined(_WIN64)
+
 typedef unsigned __int64 T_SOC;
 #else
 typedef unsigned __int32 T_SOC;
@@ -338,7 +381,7 @@ typedef unsigned __int32 T_SOC;
 typedef int T_SOC;
 #endif
 
-/* IPV4, IPV6 and various unified structures */
+/* Buffer size for a printed network address (IPv4 or IPv6, NUL included). */
 #define HTS_MAXADDRLEN 64
 
 #ifdef _WIN32
@@ -346,17 +389,22 @@ typedef int T_SOC;
 #define __cdecl
 #endif
 
-/* mode pour mkdir ET chmod (accès aux fichiers) */
+/* Permission bits for created folders and files (mkdir and chmod).
+   PROTECT_FOLDER is owner-only. With HTS_ACCESS set (the default) the ACCESS_
+   modes also grant group/other read; otherwise they stay owner-only. */
 #define HTS_PROTECT_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
+
 #if HTS_ACCESS
 #define HTS_ACCESS_FILE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+
 #define HTS_ACCESS_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 #else
 #define HTS_ACCESS_FILE (S_IRUSR|S_IWUSR)
+
 #define HTS_ACCESS_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
 #endif
 
-/* vérifier la déclaration des variables préprocesseur */
+/* Sanity-check that the required preprocessor switches are defined */
 #ifndef HTS_DOSNAME
 #error | HTS_DOSNAME Has not been defined.
 #error | Set it to 1 if you are under DOS, 0 under Unix.
@@ -366,7 +414,7 @@ typedef int T_SOC;
 #error
 #endif
 #ifndef HTS_ACCESS
-/* Par défaut, accès à tous les utilisateurs */
+/* Default: files readable by all users */
 #define HTS_ACCESS 1
 #endif
 
@@ -375,13 +423,13 @@ typedef int T_SOC;
 
 /* HTSLib */
 
-// Cache DNS, accélère les résolution d'adresses
+// Enable the DNS cache (speeds up address resolution)
 #define HTS_DNSCACHE 1
 
-// ID d'une pseudo-socket locale pour les file://
+// Pseudo-socket id standing in for a local file:// transfer
 #define LOCAL_SOCKET_ID -2
 
-// taille de chaque buffer (10 sockets 650 ko)
+// Per-connection transfer buffer size, in bytes
 #define TAILLE_BUFFER 65536
 
 #ifdef HTS_DO_NOT_USE_PTHREAD
@@ -405,6 +453,7 @@ struct mlink {
   int id;
   struct mlink *next;
 };
+
 static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
 #endif
@@ -418,7 +467,7 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 /* Debugging                                                    */
 /* ------------------------------------------------------------ */
 
-// débuggage types
+// type-detection debug
 #define DEBUG_SHOWTYPES 0
 // backing debug
 #define BDEBUG 0
@@ -436,28 +485,28 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #define DEBUG_ROBOTS 0
 // debug hash
 #define DEBUG_HASH 0
-// Vérification d'intégrité
+// integrity-check debug
 #define DEBUG_CHECKINT 0
 // nbr sockets debug
 #define NSDEBUG 0
 
-// débuggage HTSLib
+// HTSLib debug
 #define HDEBUG 0
 // surveillance de la connexion
 #define CNXDEBUG 0
 // debuggage cookies
 #define DEBUG_COOK 0
-// débuggage hard..
+// heavy/low-level debug
 #define HTS_WIDE_DEBUG 0
 // debuggage deletehttp et cie
 #define HTS_DEBUG_CLOSESOCK 0
-// debug tracage mémoire
+// memory-tracing debug
 #define MEMDEBUG 0
 
 // htsmain
 #define DEBUG_STEPS 0
 
-// Débuggage de contrôle
+// Derived debug control switches
 #if HTS_DEBUG_CLOSESOCK
 #define _HTS_WIDE 1
 #endif

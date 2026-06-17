@@ -42,7 +42,9 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
+
 #define HTS_STATIC static __attribute__ ((unused))
+
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
 #else
 #define HTS_UNUSED
@@ -58,6 +60,23 @@ typedef struct String String;
 #endif
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
+/**
+ * Growable owned string.
+ *
+ * Ownership/lifetime: the String owns buffer_ and frees it (StringFree).
+ * buffer_ is allocated lazily, so a freshly STRING_EMPTY/StringInit'd String,
+ * or one just StringFree'd/StringAcquire'd, has buffer_ == NULL and
+ * length_ == capacity_ == 0. Any growing operation may realloc, so a pointer
+ * obtained from StringBuff/StringBuffRW is invalidated by the next append,
+ * copy, or room request; do not cache it across such calls.
+ *
+ * Invariants when buffer_ != NULL: length_ < capacity_, and buffer_[length_]
+ * is a NUL (the content is always NUL-terminated). length_ excludes that NUL;
+ * capacity_ counts it. The empty state (buffer_ == NULL) has no readable NUL,
+ * so callers must not treat StringBuff() of an untouched String as "".
+ *
+ * Direct field access is internal (trailing underscore); use the macros below.
+ */
 struct String {
   char *buffer_;
   size_t length_;
@@ -68,6 +87,7 @@ struct String {
 /** Allocator **/
 #ifndef STRING_REALLOC
 #define STRING_REALLOC(BUFF, SIZE) ( (char*) realloc(BUFF, SIZE) )
+
 #define STRING_FREE(BUFF) free(BUFF)
 #endif
 #ifndef STRING_ASSERT
@@ -75,45 +95,49 @@ struct String {
 #define STRING_ASSERT(EXP) assert(EXP)
 #endif
 
-/** An empty string **/
+/** Initializer for an empty String (NULL buffer). Use to declare or reset. **/
 #define STRING_EMPTY { (char*) NULL, 0, 0 }
 
-/** String buffer **/
+/** Read-only buffer pointer. NULL until the String has been written to.
+    Invalidated by any subsequent growing operation. **/
 #define StringBuff(BLK) ( (const char*) ((BLK).buffer_) )
 
-/** String buffer (read/write) **/
+/** Read/write buffer pointer. Same NULL/invalidation rules as StringBuff. **/
 #define StringBuffRW(BLK) ((BLK).buffer_)
 
-/** String length **/
+/** Current length in bytes, excluding the terminating NUL. **/
 #define StringLength(BLK) ((BLK).length_)
 
-/** String not empty ? **/
+/** Non-zero if the String holds at least one byte. **/
 #define StringNotEmpty(BLK) ( StringLength(BLK) > 0 )
 
-/** String capacity **/
+/** Allocated capacity in bytes, including room for the terminating NUL. **/
 #define StringCapacity(BLK) ((BLK).capacity_)
 
-/** Subcharacter **/
+/** Byte at POS (read). No bounds check; POS must be < StringLength. **/
 #define StringSub(BLK, POS) ( StringBuff(BLK)[POS] )
 
-/** Subcharacter (read/write) **/
+/** Byte at POS (read/write). No bounds check; POS must be < StringLength. **/
 #define StringSubRW(BLK, POS) ( StringBuffRW(BLK)[POS] )
 
 /** Subcharacter (read/write) **/
 #define StringSubRW(BLK, POS) ( StringBuffRW(BLK)[POS] )
 
-/** Right subcharacter **/
+/** Byte POS positions from the end (read). POS==1 is the last byte. **/
 #define StringRight(BLK, POS) ( StringBuff(BLK)[StringLength(BLK) - POS] )
 
-/** Right subcharacter (read/write) **/
+/** Byte POS positions from the end (read/write). POS==1 is the last byte. **/
 #define StringRightRW(BLK, POS) ( StringBuffRW(BLK)[StringLength(BLK) - POS] )
 
-/** Remove the utter right character from the string. **/
+/** Drop the last byte and re-terminate. Undefined if the String is empty
+    (no length check; would underflow). **/
 #define StringPopRight(BLK) do { \
   StringBuffRW(BLK)[--StringLength(BLK)] = '\0'; \
 } while(0)
 
-/** Ensure the string is large enough for exactly CAPACITY bytes overall (including \0). **/
+/** Grow so capacity_ >= CAPACITY (total bytes, including the NUL). May realloc
+    (invalidating prior buffer pointers); aborts via STRING_ASSERT on OOM.
+    Never shrinks. **/
 #define StringRoomTotal(BLK, CAPACITY) do { \
   const size_t capacity_ = (size_t) (CAPACITY); \
   while ((BLK).capacity_ < capacity_) { \
@@ -127,31 +151,37 @@ struct String {
   } \
 } while(0)
 
-/** Ensure the string is large enough for exactly SIZE more characters (not including \0). **/
+/** Reserve room for SIZE more bytes beyond the current length (plus the NUL).
+    May realloc, invalidating prior buffer pointers. **/
 #define StringRoom(BLK, SIZE) StringRoomTotal(BLK, StringLength(BLK) + (SIZE) + 1)
 
-/** Return the RW buffer for a strcat() operation of at most SIZE characters. **/
+/** Reserve room for SIZE more bytes and return the (post-realloc) RW buffer,
+    for appending in place. Does not update length_; the caller must. **/
 #define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE)
 HTS_STATIC char *StringBuffN_(String * blk, int size) {
   StringRoom(*blk, size);
   return StringBuffRW(*blk);
 }
 
-/** Initialize a string. **/
+/** Zero the fields (NULL buffer, no allocation). Use on an uninitialized
+    String only; does NOT free an existing buffer (use StringFree to reset
+    an owned one), so calling it on a live String leaks. **/
 #define StringInit(BLK) do { \
   (BLK).buffer_ = NULL; \
   (BLK).capacity_ = 0; \
   (BLK).length_ = 0; \
 } while(0)
 
-/** Clear a string (set its length to 0) **/
+/** Truncate to length 0, keeping the allocation. Forces a non-NULL buffer
+    (allocates if empty) and writes the leading NUL, so StringBuff is "". **/
 #define StringClear(BLK) do { \
   (BLK).length_ = 0; \
   StringRoom(BLK, 0); \
   (BLK).buffer_[0] = '\0'; \
 } while(0)
 
-/** Set the length of a string to 'SIZE'. If SIZE is negative, check the size using strlen(). **/
+/** Set length_ to SIZE, or to strlen(buffer_) if SIZE is negative. Caller
+    asserts SIZE fits the existing content; does not (re)allocate. **/
 #define StringSetLength(BLK, SIZE) do { \
   if (SIZE >= 0) { \
     (BLK).length_ = SIZE; \
@@ -160,7 +190,8 @@ HTS_STATIC char *StringBuffN_(String * blk, int size) {
   } \
 } while(0)
 
-/** Free a string (release memory) **/
+/** Release the owned buffer and reset to the empty state (NULL buffer).
+    Idempotent; safe on an already-empty String. **/
 #define StringFree(BLK) do { \
   if ((BLK).buffer_ != NULL) { \
     STRING_FREE((BLK).buffer_); \
@@ -170,8 +201,12 @@ HTS_STATIC char *StringBuffN_(String * blk, int size) {
   (BLK).length_ = 0; \
 } while(0)
 
-/** Assign an allocated pointer to a a string.
-The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
+/** Take ownership of a NUL-terminated heap string STR (the String will free
+    it). Frees any current buffer first. STR MUST have been allocated by an
+    allocator compatible with STRING_REALLOC()/STRING_FREE(), and must not be
+    freed or used by the caller afterwards. length_/capacity_ are set to
+    strlen(STR) (capacity_ here excludes the NUL, so the next append reallocs).
+   **/
 #define StringSetBuffer(BLK, STR) do { \
   size_t len__ = strlen( STR ); \
   StringFree(BLK); \
@@ -180,7 +215,9 @@ The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
   (BLK).length_ = len__; \
 } while(0)
 
-/** Append a memory block to a string **/
+/** Append SIZE raw bytes from STR (NULs allowed as data). Grows as needed and
+    re-terminates with a NUL after the appended bytes. STR must not alias
+    BLK's buffer (a realloc would invalidate it). **/
 #define StringMemcat(BLK, STR, SIZE) do { \
   const char* str_mc_ = (STR); \
   const size_t size_mc_ = (size_t) (SIZE); \
@@ -192,13 +229,14 @@ The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
   *((BLK).buffer_ + (BLK).length_) = '\0'; \
 } while(0)
 
-/** Copy a memory block to a string **/
+/** Replace content with SIZE raw bytes from STR (NULs allowed as data).
+    Same non-aliasing requirement as StringMemcat. **/
 #define StringMemcpy(BLK, STR, SIZE) do { \
   (BLK).length_ = 0; \
   StringMemcat(BLK, STR, SIZE); \
 } while(0)
 
-/** Add a character **/
+/** Append one byte and re-terminate. Grows as needed. **/
 #define StringAddchar(BLK, c) do { \
   String * const s__ = &(BLK); \
   char c__ = (c); \
@@ -207,7 +245,9 @@ The pointer _MUST_ be compatible with STRING_REALLOC() and STRING_FREE() **/
   StringBuffRW(*s__)[StringLength(*s__)  ] = 0; \
 } while(0)
 
-/** Acquire a string ; it's the client's responsability to free() it **/
+/** Hand the buffer to the caller and reset the String to empty (NULL buffer).
+    The returned pointer is now owned by the caller, who must STRING_FREE() it.
+    Returns NULL if the String was empty. **/
 HTS_STATIC char *StringAcquire(String * blk) {
   char *buff = StringBuffRW(*blk);
 
@@ -217,7 +257,8 @@ HTS_STATIC char *StringAcquire(String * blk) {
   return buff;
 }
 
-/** Clone a string. **/
+/** Return an independent deep copy of *src (its own allocation). The caller
+    owns the result and must StringFree it. **/
 HTS_STATIC String StringDup(const String * src) {
   String s = STRING_EMPTY;
 
@@ -225,7 +266,10 @@ HTS_STATIC String StringDup(const String * src) {
   return s;
 }
 
-/** Attach a string using a pointer. **/
+/** Take ownership of *str (a NUL-terminated heap string) and NULL it out, so
+    ownership transfers and the caller keeps no dangling alias. Frees any
+    current buffer first. *str MUST be allocator-compatible (see
+    StringSetBuffer). No-op if str or *str is NULL. **/
 HTS_STATIC void StringAttach(String * blk, char **str) {
   StringFree(*blk);
   if (str != NULL && *str != NULL) {
@@ -235,7 +279,8 @@ HTS_STATIC void StringAttach(String * blk, char **str) {
   }
 }
 
-/** Append a string to another one. **/
+/** Append the C string STR (up to its NUL). No-op if STR is NULL. STR must not
+    alias BLK's buffer. **/
 #define StringCat(BLK, STR) do { \
   const char *const str__ = ( STR ); \
   if (str__ != NULL) { \
@@ -244,6 +289,8 @@ HTS_STATIC void StringAttach(String * blk, char **str) {
   } \
 } while(0)
 
+/** Append at most SIZE leading bytes of the C string STR. No-op if STR is
+    NULL. STR must not alias BLK's buffer. **/
 #define StringCatN(BLK, STR, SIZE) do { \
   const char *str__ = ( STR ); \
   if (str__ != NULL) { \
@@ -255,6 +302,8 @@ HTS_STATIC void StringAttach(String * blk, char **str) {
   } \
 } while(0)
 
+/** Replace content with at most SIZE leading bytes of the C string STR.
+    If STR is NULL, clears to "". STR must not alias BLK's buffer. **/
 #define StringCopyN(BLK, STR, SIZE) do { \
   const char *str__ = ( STR ); \
   const size_t usize__ = (SIZE); \
@@ -270,9 +319,13 @@ HTS_STATIC void StringAttach(String * blk, char **str) {
   } \
 } while(0)
 
+/** Replace blk's content with a copy of String blk2. blk and blk2 must be
+    distinct Strings (use StringCopyOverlapped if they may be the same). **/
 #define StringCopyS(blk, blk2) StringCopyN(blk, (blk2).buffer_, (blk2).length_)
 
-/** Copy a string to another one. **/
+/** Replace content with a copy of the C string STR. If STR is NULL, clears to
+    "". STR must not alias BLK's buffer (use StringCopyOverlapped if it might).
+   **/
 #define StringCopy(BLK, STR) do { \
   const char *str__ = ( STR ); \
   if (str__ != NULL) { \
@@ -283,7 +336,8 @@ HTS_STATIC void StringAttach(String * blk, char **str) {
   } \
 } while(0)
 
-/** Copy a (potentially overlapping) string to another one. **/
+/** Like StringCopy but safe when STR aliases BLK's own buffer: copies via a
+    temporary, so a self-copy or overlap is well-defined. **/
 #define StringCopyOverlapped(BLK, STR) do { \
   String s__ = STRING_EMPTY; \
   StringCopy(s__, STR); \
