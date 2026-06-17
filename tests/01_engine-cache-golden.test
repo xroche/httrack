@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
+# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
+# tool flags despite the #!/bin/bash above.
+
+# Golden cache-format regression test (driven by 'httrack -#B <dir>').
+#
+# 01_engine-cache.test writes the cache with the same build it reads back (a
+# round-trip), so it cannot catch a read-path or ZIP-format regression where
+# writer and reader drift together. This reads a *committed* cache frozen by an
+# earlier build and asserts a fixed set of entries still decodes field- and
+# byte-exact.
+#
+# Regenerate the fixture after a deliberate format change with
+# 'httrack -#B <dir> regen', then copy <dir>/hts-cache/new.zip over the
+# committed file.
+
+set -eu
+
+: "${top_srcdir:=..}"
+fixture="$top_srcdir/tests/fixtures/cache-golden"
+
+test -e "$fixture/hts-cache/new.zip" || {
+    echo "missing committed cache fixture: $fixture/hts-cache/new.zip" >&2
+    exit 1
+}
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# Read against a private copy so the source tree is never touched (a read
+# session does not write, but copying keeps the test hermetic). Create the dir
+# with mkdir so it is writable for the cleanup trap: under "make distcheck" the
+# srcdir is read-only, and "cp -r" of that directory would carry its read-only
+# mode over and defeat the rm -rf.
+mkdir -p "$dir/hts-cache"
+cp "$fixture/hts-cache/new.zip" "$dir/hts-cache/new.zip"
+
+out=$(httrack -#B "$dir")
+
+# Match the exact success line: the read must have found and verified every
+# entry, not merely failed to enter the mode (a bad -#B falls through to the
+# usage screen, which also exits non-zero but never prints this).
+test "$out" = "cache-golden: OK" || {
+    echo "expected 'cache-golden: OK', got: $out" >&2
+    exit 1
+}

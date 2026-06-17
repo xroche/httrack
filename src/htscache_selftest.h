@@ -44,6 +44,14 @@ typedef struct httrackp httrackp;
    Returns the number of failed checks (0 == success). */
 int cache_selftests(httrackp *opt, const char *dir);
 
+/* Read a committed (frozen) cache fixture under <dir>/hts-cache/new.zip and
+   assert a fixed set of entries decodes field- and byte-exact. Unlike
+   cache_selftests (write-then-read with the same build, a round-trip), this
+   reads bytes an earlier build froze, so it catches read-path / format drift.
+   regen!=0 first rewrites the fixture from the same table (to regenerate the
+   committed file, never by the test). Returns the failed-check count. */
+int cache_golden_selftest(httrackp *opt, const char *dir, int regen);
+
 #endif
 
 #endif
