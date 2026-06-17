@@ -349,7 +349,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 #endif
 
     // Now, parsing
-    if ((opt->getmode & 1) && (ptr > 0)) {      // récupérer les html sur disque       
+    if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
       // créer le fichier html local
       HT_ADD_FOP;               // écrire peu à peu le fichier
     }
@@ -553,7 +553,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (opt->depth == heap(ptr)->depth) {      // on note toujours les premiers liens
               if (!in_media) {
                 if (opt->makeindex && (ptr > 0)) {
-                  if (opt->getmode & 1) {       // autorisation d'écrire
+                  if (opt->getmode & HTS_GETMODE_HTML) {
                     p = strfield(html, "title");
                     if (p) {
                       if (*(html - 1) == '/')
@@ -704,7 +704,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
           }
 
-          if (opt->getmode & 1) {       // sauver html
+          if (opt->getmode & HTS_GETMODE_HTML) { // sauver html
             p = 0;
             switch (emited_footer) {
             case 0:
@@ -740,7 +740,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               if (strchr(r->adr, '\r'))
                 eol = "\r\n";
-              if (StringNotEmpty(opt->footer) || opt->urlmode != 4) {   /* != preserve */
+              if (StringNotEmpty(opt->footer) ||
+                  opt->urlmode != HTS_URLMODE_KEEP_ORIGINAL) {
                 if (StringNotEmpty(opt->footer)) {
                   char BIGSTK tempo[1024 + HTS_URLMAXSIZE * 2];
                   char gmttime[256];
@@ -1746,7 +1747,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             // écrire codebase avant, flusher avant code
             if ((p_type == -1) || (p_type == -2)) {
-              if ((opt->getmode & 1) && (ptr > 0)) {
+              if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                 HT_add_adr;     // refresh
               }
               lastsaved = html;  // dernier écrit+1
@@ -1837,7 +1838,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             // ne pas flusher après code si on doit écrire le codebase avant!
             if ((p_type != -1) && (p_type != 2) && (p_type != -2)) {
-              if ((opt->getmode & 1) && (ptr > 0)) {
+              if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                 HT_add_adr;     // refresh
               }
               lastsaved = html;  // dernier écrit+1
@@ -1914,7 +1915,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (*html != '#') {      // Not empty+unique #
                   if (eadr - html == 1) {    // 1=link empty with delim (end_adr-start_adr)
                     if (quote) {
-                      if ((opt->getmode & 1) && (ptr > 0)) {
+                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                         HT_ADD("#");    // We add this for a <href="">
                       }
                     }
@@ -2569,7 +2570,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((p_type == 2) || (p_type == -2)) {  // base href ou codebase, pas un lien
                           hts_log_print(opt, LOG_DEBUG, "Code/Codebase: %s%s",
                                         afs.af.adr, afs.af.fil);
-                        } else if ((opt->getmode & 4) == 0) {
+                        } else if ((opt->getmode & HTS_GETMODE_HTML_FIRST) ==
+                                   0) {
                           hts_log_print(opt, LOG_DEBUG, "Record: %s%s -> %s",
                                         afs.af.adr, afs.af.fil, afs.save);
                         } else {
@@ -2592,8 +2594,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       lastsaved = eadr - 1 + 1; // sauter "
                     }
                     /* */
-                    else if (opt->urlmode == 0) {       // URL absolue dans tous les cas
-                      if ((opt->getmode & 1) && (ptr > 0)) {    // ecrire les html
+                    else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
+                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
                         } else {
@@ -2620,12 +2622,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                       /* */
-                    } else if (opt->urlmode == 4) {     // ne rien faire!
+                    } else if (opt->urlmode == HTS_URLMODE_KEEP_ORIGINAL) {
                       /* */
                       /* leave the link 'as is' */
                       /* Sinon, dépend de interne/externe */
-                    } else if (forbidden_url == 1) {    // le lien ne sera pas chargé, référence externe!
-                      if ((opt->getmode & 1) && (ptr > 0)) {
+                    } else if (forbidden_url ==
+                               1) { // le lien ne sera pas chargé, référence
+                                    // externe!
+                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                         if (p_type != -1) {     // pas que le nom de fichier (pas classe java)
                           if (!opt->external) {
                             if (!link_has_authority(afs.af.adr)) {
@@ -2674,7 +2678,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                         '/') ? 1 : (ishtml(opt, afs.af.fil)))) {
                             case 1:
                             case -2:   // html ou répertoire
-                              if (opt->getmode & 1) {   // sauver html
+                              if (opt->getmode & HTS_GETMODE_HTML) {
                                 patch_it = 1;   // redirect
                                 add_url = 1;    // avec link?
                                 cat_name = "external.html";
@@ -2847,7 +2851,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             }
 
                             // érire codebase="chemin"
-                            if ((opt->getmode & 1) && (ptr > 0)) {
+                            if ((opt->getmode & HTS_GETMODE_HTML) &&
+                                (ptr > 0)) {
                               char BIGSTK tempo4[HTS_URLMAXSIZE * 2];
 
                               tempo4[0] = '\0';
@@ -2875,9 +2880,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       lastsaved = eadr - 1;
                     }
                     /*
-                       else if (opt->urlmode==1) {    // ABSOLU, c'est le cas le moins courant
+                       else if (opt->urlmode==1) {    // ABSOLU, c'est le cas le
+                       moins courant
                        //  NE FONCTIONNE PAS!!  (et est inutile)
-                       if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les html
+                       if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les
+                       html
                        // écrire le lien modifié, absolu
                        HT_ADD("file:");
                        if (*save=='/')
@@ -2885,7 +2892,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                        else
                        HT_ADD(save)
                        }
-                       lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                       lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres
+                       on fait un ++ alors hein)
                        }
                      */
                     else if (opt->mimehtml) {
@@ -2895,18 +2903,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       make_content_id(afs.af.adr, afs.af.fil, cid, sizeof(cid));
                       HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
-                    } else if (opt->urlmode == 3) {     // URI absolue /
-                      if ((opt->getmode & 1) && (ptr > 0)) {    // ecrire les html
+                    } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
+                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                         HT_ADD_HTMLESCAPED(afs.af.fil);
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
-                    } else if (opt->urlmode == 5) {     // transparent proxy URL
+                    } else if (opt->urlmode == HTS_URLMODE_TRANSPARENT_PROXY) {
                       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
                       const char *uri;
                       int i;
                       char *pos;
 
-                      if ((opt->getmode & 1) && (ptr > 0)) {    // ecrire les html
+                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
                         } else {
@@ -2947,7 +2955,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         HT_ADD_HTMLESCAPED(tempo);
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
-                    } else if (opt->urlmode == 2) {     // RELATIF
+                    } else if (opt->urlmode == HTS_URLMODE_RELATIVE) {
                       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
                       tempo[0] = '\0';
@@ -3009,7 +3017,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             }
 
                             // érire codebase="chemin"
-                            if ((opt->getmode & 1) && (ptr > 0)) {
+                            if ((opt->getmode & HTS_GETMODE_HTML) &&
+                                (ptr > 0)) {
                               char BIGSTK tempo4[HTS_URLMAXSIZE * 2];
 
                               tempo4[0] = '\0';
@@ -3027,7 +3036,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           //lastsaved=adr;    // dernier écrit+1
                         }
 
-                        if ((opt->getmode & 1) && (ptr > 0)) {
+                        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                           // convert to local codepage - NOT, already converted into %NN, and passed to the remote server so we do not have anything to do
                           //if (str->page_charset_ != NULL && *str->page_charset_ != '\0') {
                           //  char *const local_save = hts_convertStringFromUTF8(tempo, strlen(tempo), str->page_charset_);
@@ -3061,7 +3070,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       "Error building relative link %s and %s",
                                       afs.save, relativesavename());
                       }
-                    }           // sinon le lien sera écrit normalement
+                    } // sinon le lien sera écrit normalement
 
 #if 0
                     if (fexist(save)) { // le fichier existe..
@@ -3089,7 +3098,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       opt->maxlink);
                         hts_log_print(opt, LOG_INFO,
                                       "To avoid that: use #L option for more links (example: -#L1000000)");
-                        if ((opt->getmode & 1) && (ptr > 0)) {
+                        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                           if (fp) {
                             fclose(fp);
                             fp = NULL;
@@ -3101,9 +3110,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         int pass_fix, dejafait = 0;
 
                         // Calculer la priorité de ce lien
-                        if ((opt->getmode & 4) == 0) {  // traiter html après
+                        if ((opt->getmode & HTS_GETMODE_HTML_FIRST) == 0) {
                           pass_fix = 0;
-                        } else {        // vérifier que ce n'est pas un !html
+                        } else { // vérifier que ce n'est pas un !html
                           if (!ishtml(opt, afs.af.fil))
                             pass_fix = 1;       // priorité inférieure (traiter après)
                           else
@@ -3167,7 +3176,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     if (checkrobots(_ROBOTS, afs.af.adr, "") == -1) {  // robots.txt ?
                                       // enregistrer robots.txt (MACRO)
                                       if (!hts_record_link(opt, afs.af.adr, "/robots.txt", "", "", "", NULL)) {
-                                        if ((opt->getmode & 1) && (ptr > 0)) {
+                                        if ((opt->getmode & HTS_GETMODE_HTML) &&
+                                            (ptr > 0)) {
                                           if (fp) {
                                             fclose(fp);
                                             fp = NULL;
@@ -3206,7 +3216,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // enregistrer
                           if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, 
                                                former.adr, former.fil, codebase)) {
-                            if ((opt->getmode & 1) && (ptr > 0)) {
+                            if ((opt->getmode & HTS_GETMODE_HTML) &&
+                                (ptr > 0)) {
                               if (fp) {
                                 fclose(fp);
                                 fp = NULL;
@@ -3351,7 +3362,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         }
         // ----------
         // écrire peu à peu
-        if ((opt->getmode & 1) && (ptr > 0))
+        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0))
           HT_add_adr;
         lastsaved = html;        // dernier écrit+1
         // ----------
@@ -3411,7 +3422,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       opt->state._hts_in_html_parsing = 0;      // flag
       opt->state._hts_cancel = 0;       // pas de cancel
 
-      if ((opt->getmode & 1) && (ptr > 0)) {
+      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
         {
           char *cAddr = TypedArrayElts(output_buffer);
           int cSize = (int) TypedArraySize(output_buffer);
@@ -3443,7 +3454,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
     }                           // if !error
 
-    if (opt->getmode & 1) {
+    if (opt->getmode & HTS_GETMODE_HTML) {
       if (fp) {
         fclose(fp);
         fp = NULL;

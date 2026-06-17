@@ -370,7 +370,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
     StringCopy(opt->path_html, base);
     StringCopy(opt->path_html_utf8, base);
   }
-  opt->cache = 1;
+  opt->cache = HTS_CACHE_PRIORITY;
 
   /* pass 1: create everything in a single write session */
   selftest_open_for_write(&cache, opt);
@@ -547,7 +547,7 @@ static void golden_setup(httrackp *opt, const char *dir) {
   StringCopy(opt->path_log, base);
   StringCopy(opt->path_html, base);
   StringCopy(opt->path_html_utf8, base);
-  opt->cache = 1;
+  opt->cache = HTS_CACHE_PRIORITY;
 }
 
 int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
