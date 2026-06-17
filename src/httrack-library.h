@@ -254,15 +254,6 @@ HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
    or 0 if none or unknown. */
 HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
 
-/** @warning No implementation is linked into the library; calling this fails to
-    link. For per-callback user data use the CHAIN_FUNCTION() ARGUMENT and
-    CALLBACKARG_USERDEF() instead. */
-HTSEXT_API int htswrap_set_userdef(httrackp * opt, void *userdef);
-
-/** @warning No implementation is linked into the library; calling this fails to
-    link. Read per-callback user data with CALLBACKARG_USERDEF() instead. */
-HTSEXT_API void *htswrap_get_userdef(httrackp * opt);
-
 /* Internal library allocators, if a different libc is being used by the client */
 /** strdup() through the library allocator. Returns a heap copy freed with
     hts_free(), or NULL on failure. */
@@ -583,12 +574,6 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
    1 also decodes high (>= 128) bytes; @p no_high & 2 also decodes an escaped
     space. Returns @p catbuff. */
 HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, const char *s, const int no_high);
-
-/** @warning No implementation is linked into the library; calling this fails to
-    link. */
-HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
-
-HTSEXT_API void escape_remove_control(char *s);
 
 /** Determine the MIME type of local file name @p fil into @p s (capacity
     @p ssize): user --assume rules, then ".html", then the built-in extension
