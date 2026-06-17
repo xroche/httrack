@@ -2440,6 +2440,22 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 1;
                 }
                 break;
+              case 'B': // golden cache fixture read: httrack -#B <dir> [regen]
+                if (na + 1 < argc) {
+                  const int regen =
+                      (na + 2 < argc && strcmp(argv[na + 2], "regen") == 0);
+                  const int err =
+                      cache_golden_selftest(opt, argv[na + 1], regen);
+
+                  printf("cache-golden: %s\n", err ? "FAIL" : "OK");
+                  htsmain_free();
+                  return err;
+                } else {
+                  fprintf(stderr, "Option #B requires a directory argument\n");
+                  htsmain_free();
+                  return 1;
+                }
+                break;
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
                 {
                   int hasFilter = 0;

@@ -52,6 +52,9 @@ Please visit our Website: http://www.httrack.com
 
 #define SELFTEST_VOLUME 3000 /* number of small entries in the scale pass */
 
+/* prefix on assertion failures; set per entry point (-#A vs -#B) */
+static const char *selftest_tag = "cache-selftest";
+
 /* Open a cache session. A write session (ro=0) rotates new.zip -> old.zip and
    opens a fresh new.zip; a read session (ro=1) opens new.zip in place. */
 static void selftest_open(cache_back *cache, httrackp *opt, int ro) {
@@ -95,15 +98,13 @@ static void selftest_close(cache_back *cache) {
      that exits right after (same choice as the other -# cache subcommands) */
 }
 
-/* Store one entry. The body is copied into a private buffer (any size), so
-   callers may pass const data and cache_add never sees a cast-away qualifier;
-   it consumes everything synchronously, so the copy is freed on return. */
+/* Store one entry; the body is copied so callers may pass const data. */
 static void store_entry(httrackp *opt, cache_back *cache, const char *adr,
                         const char *fil, const char *save, int statuscode,
                         const char *msg, const char *contenttype,
                         const char *charset, const char *lastmodified,
                         const char *etag, const char *location,
-                        const char *body, size_t body_len) {
+                        const char *cdispo, const char *body, size_t body_len) {
   htsblk r;
   char locbuf[HTS_URLMAXSIZE * 2];
   char *bodycopy = NULL;
@@ -116,32 +117,30 @@ static void store_entry(httrackp *opt, cache_back *cache, const char *adr,
   strcpybuff(r.charset, charset);
   strcpybuff(r.lastmodified, lastmodified);
   strcpybuff(r.etag, etag);
+  strcpybuff(r.cdispo, cdispo);
   strcpybuff(locbuf, location);
   r.location = locbuf;
   r.is_write = 0;
-  /* an empty body must be a NULL pointer: cache_add rejects a non-NULL
-     pointer with size 0 */
+  /* an empty body must be NULL: cache_add rejects non-NULL with size 0 */
   if (body_len != 0) {
     bodycopy = malloct(body_len);
     memcpy(bodycopy, body, body_len);
     r.adr = bodycopy;
   }
-  /* all_in_cache=1: keep the body in the ZIP whatever the content-type,
-     so the read path never depends on a file on disk */
+  /* all_in_cache=1: body stays in the ZIP, so reads never need a disk file */
   cache_add(opt, cache, &r, adr, fil, save, 1, NULL);
   if (bodycopy != NULL) {
     freet(bodycopy);
   }
 }
 
-/* Read one entry back and check every field. Returns the number of
-   mismatches (0 == success). */
+/* Read one entry back and check every field. Returns the mismatch count. */
 static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
                        const char *fil, int statuscode, const char *msg,
                        const char *contenttype, const char *charset,
                        const char *lastmodified, const char *etag,
-                       const char *location, const char *body,
-                       size_t body_len) {
+                       const char *location, const char *cdispo,
+                       const char *body, size_t body_len) {
   int fail = 0;
   char *locbuf = malloct(HTS_URLMAXSIZE * 2);
   htsblk r;
@@ -153,15 +152,14 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
 #define CHECK_STR(field, want)                                                 \
   do {                                                                         \
     if (strcmp((field), (want)) != 0) {                                        \
-      fprintf(stderr,                                                          \
-              "cache-selftest: %s%s: " #field " is '%s', expected '%s'\n",     \
-              adr, fil, (field), (want));                                      \
+      fprintf(stderr, "%s: %s%s: " #field " is '%s', expected '%s'\n",         \
+              selftest_tag, adr, fil, (field), (want));                        \
       fail++;                                                                  \
     }                                                                          \
   } while (0)
 
   if (r.statuscode != statuscode) {
-    fprintf(stderr, "cache-selftest: %s%s: statuscode is %d, expected %d\n",
+    fprintf(stderr, "%s: %s%s: statuscode is %d, expected %d\n", selftest_tag,
             adr, fil, r.statuscode, statuscode);
     fail++;
   }
@@ -171,24 +169,23 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
   CHECK_STR(r.lastmodified, lastmodified);
   CHECK_STR(r.etag, etag);
   CHECK_STR(locbuf, location);
+  CHECK_STR(r.cdispo, cdispo);
 
   if (r.size != (LLint) body_len) {
-    fprintf(stderr, "cache-selftest: %s%s: size is " LLintP ", expected %d\n",
+    fprintf(stderr, "%s: %s%s: size is " LLintP ", expected %d\n", selftest_tag,
             adr, fil, (LLint) r.size, (int) body_len);
     fail++;
   } else if (body_len != 0 &&
              (r.adr == NULL || memcmp(r.adr, body, body_len) != 0)) {
-    fprintf(stderr, "cache-selftest: %s%s: body mismatch\n", adr, fil);
+    fprintf(stderr, "%s: %s%s: body mismatch\n", selftest_tag, adr, fil);
     fail++;
   }
 
-  /* The loaded body must be NUL-terminated at [size]: cache_readex's strlen()
-     consumers (htscore.c:1046, htscache.c) rely on it, and a missing
-     terminator is a heap over-read. The buffer is malloc(size + slack), so
-     reading [size] is in bounds. */
+  /* loaded body must be NUL-terminated at [size] for cache_readex's strlen()
+     consumers; buffer is malloc(size + slack) so [size] is in bounds */
   if (r.adr != NULL && r.adr[r.size] != '\0') {
-    fprintf(stderr, "cache-selftest: %s%s: body not NUL-terminated at [size]\n",
-            adr, fil);
+    fprintf(stderr, "%s: %s%s: body not NUL-terminated at [size]\n",
+            selftest_tag, adr, fil);
     fail++;
   }
 
@@ -378,27 +375,29 @@ int cache_selftests(httrackp *opt, const char *dir) {
   /* pass 1: create everything in a single write session */
   selftest_open_for_write(&cache, opt);
 
-  /* edge cases: normal HTML page */
+  /* edge cases (cdispo "" except where noted): normal HTML page */
   store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
               "OK", "text/html", "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT",
-              "etag-normal", "", body_index, strlen(body_index));
+              "etag-normal", "", "", body_index, strlen(body_index));
   /* redirect: empty body, empty optional fields, near-limit location */
   store_entry(opt, &cache, "example.com", "/moved", "example.com/moved.html",
               301, "Moved Permanently", "text/html", "", "", "", location_long,
-              NULL, 0);
-  /* non-HTML content-type kept in cache via all_in_cache, near-limit etag */
+              "", NULL, 0);
+  /* non-HTML content-type, near-limit etag */
   store_entry(opt, &cache, "example.com", "/api", "example.com/api.json", 200,
               "OK", "application/json", "utf-8",
-              "Tue, 02 Jan 2024 12:00:00 GMT", etag_long, "", body_api,
+              "Tue, 02 Jan 2024 12:00:00 GMT", etag_long, "", "", body_api,
               strlen(body_api));
-  /* binary body */
+  /* binary body, with a Content-Disposition */
   store_entry(opt, &cache, "example.com", "/logo", "example.com/logo.png", 200,
-              "OK", "image/png", "", "", "etag-bin", "", binary_body,
+              "OK", "image/png", "", "", "etag-bin", "",
+              "attachment; filename=\"logo.png\"", binary_body,
               sizeof(binary_body));
-  /* error status with a body and a location (non-2xx codes are cached too) */
+  /* error status with a body and a location */
   store_entry(opt, &cache, "example.com", "/gone", "example.com/gone.html", 404,
               "Not Found", "text/html", "utf-8", "", "etag-404",
-              "https://example.com/where-it-went", body_404, strlen(body_404));
+              "https://example.com/where-it-went", "", body_404,
+              strlen(body_404));
 
   /* scale: a few thousand small entries */
   for (i = 0; i < SELFTEST_VOLUME; i++) {
@@ -408,7 +407,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(save, "example.com/v/%05d.html", i);
     sprintf(body, "<html>volume entry %d</html>", i);
     store_entry(opt, &cache, "example.com", fil, save, 200, "OK", "text/html",
-                "utf-8", "", "", "", body, strlen(body));
+                "utf-8", "", "", "", "", body, strlen(body));
   }
 
   /* compression: a few large bodies */
@@ -418,7 +417,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(fil, "/big/%d.bin", i);
     sprintf(save, "example.com/big/%d.bin", i);
     store_entry(opt, &cache, "example.com", fil, save, 200, "OK",
-                "application/octet-stream", "", "", "", "", large_body[i],
+                "application/octet-stream", "", "", "", "", "", large_body[i],
                 large_size[i]);
   }
 
@@ -427,22 +426,24 @@ int cache_selftests(httrackp *opt, const char *dir) {
   /* pass 2: read back and verify everything round-tripped */
   selftest_open_for_read(&cache, opt);
 
-  failures += check_entry(opt, &cache, "example.com", "/", 200, "OK",
-                          "text/html", "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT",
-                          "etag-normal", "", body_index, strlen(body_index));
+  failures +=
+      check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
+                  "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT", "etag-normal", "",
+                  "", body_index, strlen(body_index));
   failures += check_entry(opt, &cache, "example.com", "/moved", 301,
                           "Moved Permanently", "text/html", "", "", "",
-                          location_long, NULL, 0);
+                          location_long, "", NULL, 0);
   failures +=
       check_entry(opt, &cache, "example.com", "/api", 200, "OK",
                   "application/json", "utf-8", "Tue, 02 Jan 2024 12:00:00 GMT",
-                  etag_long, "", body_api, strlen(body_api));
+                  etag_long, "", "", body_api, strlen(body_api));
   failures +=
       check_entry(opt, &cache, "example.com", "/logo", 200, "OK", "image/png",
-                  "", "", "etag-bin", "", binary_body, sizeof(binary_body));
+                  "", "", "etag-bin", "", "attachment; filename=\"logo.png\"",
+                  binary_body, sizeof(binary_body));
   failures += check_entry(opt, &cache, "example.com", "/gone", 404, "Not Found",
                           "text/html", "utf-8", "", "etag-404",
-                          "https://example.com/where-it-went", body_404,
+                          "https://example.com/where-it-went", "", body_404,
                           strlen(body_404));
 
   for (i = 0; i < SELFTEST_VOLUME; i++) {
@@ -452,7 +453,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(body, "<html>volume entry %d</html>", i);
     failures +=
         check_entry(opt, &cache, "example.com", fil, 200, "OK", "text/html",
-                    "utf-8", "", "", "", body, strlen(body));
+                    "utf-8", "", "", "", "", body, strlen(body));
   }
 
   for (i = 0; i < large_count; i++) {
@@ -460,7 +461,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
 
     sprintf(fil, "/big/%d.bin", i);
     failures += check_entry(opt, &cache, "example.com", fil, 200, "OK",
-                            "application/octet-stream", "", "", "", "",
+                            "application/octet-stream", "", "", "", "", "",
                             large_body[i], large_size[i]);
   }
 
@@ -470,7 +471,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
               "OK", "text/html", "iso-8859-1", "Wed, 03 Jan 2024 09:30:00 GMT",
-              "etag-updated", "", body_updated, strlen(body_updated));
+              "etag-updated", "", "", body_updated, strlen(body_updated));
   selftest_close(&cache);
 
   /* pass 4: re-read and confirm the updated value, not the old one */
@@ -478,7 +479,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
   failures +=
       check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
                   "iso-8859-1", "Wed, 03 Jan 2024 09:30:00 GMT", "etag-updated",
-                  "", body_updated, strlen(body_updated));
+                  "", "", body_updated, strlen(body_updated));
   selftest_close(&cache);
 
   /* pass 5: the disk-fallback read path (X-In-Cache: 0, body on disk) */
@@ -487,6 +488,100 @@ int cache_selftests(httrackp *opt, const char *dir) {
   for (i = 0; i < large_count; i++) {
     freet(large_body[i]);
   }
+
+  return failures;
+}
+
+/* Golden fixture: a small frozen cache read back to guard the read path and ZIP
+   format. The table is the contract; tests/fixtures/cache-golden/.../new.zip is
+   a witness written once via `httrack -#B <dir> regen`. Bodies stay in the ZIP
+   (all_in_cache=1), so a read needs only new.zip -- fully portable. */
+
+/* embedded NUL + high bytes: the binary-safe read path */
+static const char golden_binary[] = {
+    'P',  'N',  'G', '\0', '\r', '\n',        (char) 0xFF, (char) 0x80,
+    '\0', '\0', 'e', 'n',  'd',  (char) 0xCA, (char) 0xFE, '\n'};
+
+typedef struct {
+  const char *adr, *fil, *save, *msg, *contenttype, *charset, *lastmodified,
+      *etag, *location, *cdispo, *body;
+  size_t body_len;
+  int statuscode;
+} golden_entry;
+
+/* string-literal body + length (drops the terminator); the binary array passes
+   its length explicitly, every byte counts */
+#define GBODY(s) (s), (sizeof(s) - 1)
+
+static const golden_entry golden_entries[] = {
+    /* normal HTML page */
+    {"example.com", "/", "example.com/index.html", "OK", "text/html", "utf-8",
+     "Mon, 01 Jan 2024 00:00:00 GMT", "etag-normal", "", "",
+     GBODY("<html><body>hello</body></html>"), 200},
+    /* redirect: empty body and optionals, a Location */
+    {"example.com", "/moved", "example.com/moved.html", "Moved Permanently",
+     "text/html", "", "", "", "https://example.com/new-home", "", NULL, 0, 301},
+    /* non-HTML content */
+    {"example.com", "/api", "example.com/api.json", "OK", "application/json",
+     "utf-8", "Tue, 02 Jan 2024 12:00:00 GMT", "etag-api", "", "",
+     GBODY("{\"k\":\"v\"}"), 200},
+    /* binary body with a Content-Disposition */
+    {"example.com", "/logo", "example.com/logo.png", "OK", "image/png", "", "",
+     "etag-bin", "", "attachment; filename=\"logo.png\"", golden_binary,
+     sizeof(golden_binary), 200},
+    /* error status with a body and a Location */
+    {"example.com", "/gone", "example.com/gone.html", "Not Found", "text/html",
+     "utf-8", "", "etag-404", "https://example.com/where-it-went", "",
+     GBODY("<html><body>404 Not Found</body></html>"), 404},
+};
+
+#define GOLDEN_COUNT (sizeof(golden_entries) / sizeof(golden_entries[0]))
+
+static void golden_setup(httrackp *opt, const char *dir) {
+  char base[HTS_URLMAXSIZE];
+
+  strcpybuff(base, dir);
+  if (base[0] != '\0' && base[strlen(base) - 1] != '/') {
+    strcatbuff(base, "/");
+  }
+  StringCopy(opt->path_log, base);
+  StringCopy(opt->path_html, base);
+  StringCopy(opt->path_html_utf8, base);
+  opt->cache = 1;
+}
+
+int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
+  int failures = 0;
+  size_t k;
+  cache_back cache;
+
+  selftest_tag = "cache-golden";
+  golden_setup(opt, dir);
+
+  /* regen rewrites the fixture from the table; the test never passes it, so the
+     read pass verifies bytes a previous build froze */
+  if (regen) {
+    selftest_open_for_write(&cache, opt);
+    for (k = 0; k < GOLDEN_COUNT; k++) {
+      const golden_entry *e = &golden_entries[k];
+
+      store_entry(opt, &cache, e->adr, e->fil, e->save, e->statuscode, e->msg,
+                  e->contenttype, e->charset, e->lastmodified, e->etag,
+                  e->location, e->cdispo, e->body, e->body_len);
+    }
+    selftest_close(&cache);
+  }
+
+  selftest_open_for_read(&cache, opt);
+  for (k = 0; k < GOLDEN_COUNT; k++) {
+    const golden_entry *e = &golden_entries[k];
+
+    failures +=
+        check_entry(opt, &cache, e->adr, e->fil, e->statuscode, e->msg,
+                    e->contenttype, e->charset, e->lastmodified, e->etag,
+                    e->location, e->cdispo, e->body, e->body_len);
+  }
+  selftest_close(&cache);
 
   return failures;
 }

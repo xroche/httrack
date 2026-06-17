@@ -1,4 +1,8 @@
-EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh
+# Committed binary fixture read by 01_engine-cache-golden.test. List it
+# explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
+# silently drop it from the dist tarball and break "make distcheck".
+EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
+	fixtures/cache-golden/hts-cache/new.zip
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
@@ -17,6 +21,7 @@ TEST_LOG_COMPILER = $(BASH)
 TESTS = \
 	00_runnable.test \
 	01_engine-cache.test \
+	01_engine-cache-golden.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
 	01_engine-doitlog.test \
