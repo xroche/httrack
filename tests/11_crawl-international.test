@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
 
 # unicode tests

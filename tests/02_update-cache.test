@@ -10,7 +10,7 @@
 #   2. change a source file, re-mirror -> the update must pick up the new content
 #      (guards the update decision that reads the cached metadata).
 
-set -eu
+set -euo pipefail
 
 site=$(mktemp -d)
 out=$(mktemp -d)
@@ -42,7 +42,7 @@ test "$(errors)" = 0 || {
     exit 1
 }
 for suffix in a.html sub/b.html; do
-    find "$out" -path "*/$suffix" | grep -q . || {
+    test -n "$(find "$out" -path "*/$suffix" -print -quit)" || {
         echo "missing $suffix after update" >&2
         exit 1
     }

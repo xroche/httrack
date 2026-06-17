@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # MIME type guessing from extension (get_httptype / give_mimext).
 # -#2 <path> prints "<path> is '<mime>'" then "and its local type is '.<ext>'".
 

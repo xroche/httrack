@@ -8,7 +8,7 @@
 # --headers) forms, and an over-cap value is refused cleanly rather than
 # overrunning a fixed scratch buffer.
 
-set -u
+set -euo pipefail
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdline.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
@@ -26,8 +26,8 @@ run() {
     shift
     rm -rf "$out"
     mkdir -p "$out"
-    httrack "file://$tmp/index.html" -O "$out" --quiet -n "$@" >"$out/.log" 2>&1
-    RC=$?
+    RC=0
+    httrack "file://$tmp/index.html" -O "$out" --quiet -n "$@" >"$out/.log" 2>&1 || RC=$?
 }
 
 # crawl using exactly the given args as the only URL(s), no implicit primary URL;
@@ -37,8 +37,8 @@ run_only() {
     shift
     rm -rf "$out"
     mkdir -p "$out"
-    httrack -O "$out" --quiet -n "$@" >"$out/.log" 2>&1
-    RC=$?
+    RC=0
+    httrack -O "$out" --quiet -n "$@" >"$out/.log" 2>&1 || RC=$?
 }
 
 # assert the value was accepted: clean exit and the fixture was mirrored

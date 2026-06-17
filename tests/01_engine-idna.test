@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # IDNA / punycode encode (-#4) and decode (-#5). This code has a CVE history,
 # so the edge cases below cover passthrough, round-trips, and malformed input.
 

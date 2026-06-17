@@ -4,7 +4,7 @@
 # Offline HTML parser tests: each section crawls a file:// fixture (no network)
 # and checks which assets the parser captured and how it rewrote the links.
 
-set -u
+set -euo pipefail
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parse.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
@@ -19,7 +19,9 @@ crawl() {
     local html="$1" out="$2"
     rm -rf "$out"
     mkdir -p "$out"
-    httrack "file://$html" -O "$out" --quiet --near -n >"$out/.log" 2>&1
+    # the crawl's own exit status is irrelevant here; the assertions below check
+    # the mirrored files, so don't let set -e trip on a non-zero httrack exit
+    httrack "file://$html" -O "$out" --quiet --near -n >"$out/.log" 2>&1 || true
 }
 
 # assert a file with the given basename was saved somewhere under <out>

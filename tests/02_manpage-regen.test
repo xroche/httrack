@@ -8,6 +8,9 @@
 # POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms (such as
 # process substitution) despite the #!/bin/bash above.
 
+# pipefail is a bashism; keep to POSIX set flags ($(BASH) may be /bin/sh here).
+set -eu
+
 : "${top_srcdir:=..}"
 
 gen="$top_srcdir/man/makeman.sh"

@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # charset -> UTF-8 conversion (hts_convertStringToUTF8).
 # -#3 <charset> <string> prints the string re-decoded from <charset> as UTF-8.
 conv() {
