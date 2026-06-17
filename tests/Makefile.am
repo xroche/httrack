@@ -19,6 +19,7 @@ TESTS = \
 	01_engine-cache.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
+	01_engine-doitlog.test \
 	01_engine-entities.test \
 	01_engine-filter.test \
 	01_engine-hashtable.test \

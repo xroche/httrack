@@ -41,25 +41,6 @@ Please visit our Website: http://www.httrack.com
 
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 
-// COPY OF cmdl_ins in htscoremain.c
-/* Bytes left in x_argvblk from offset ptr. The offset can in principle outrun
-   the block (alias/doit.log expansion), so the copy aborts cleanly instead of
-   the subtraction wrapping to a huge unbounded size. */
-#define cmdl_room(bufsize, ptr)                                                \
-  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
-// Insert a command in the argc/argv (buff has total capacity bufsize)
-#define cmdl_ins(token, argc, argv, buff, bufsize, ptr)                        \
-  {                                                                            \
-    int i;                                                                     \
-    for (i = argc; i > 0; i--)                                                 \
-      argv[i] = argv[i - 1];                                                   \
-  }                                                                            \
-  argv[0] = (buff + ptr);                                                      \
-  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
-  ptr += (int) (strlen(argv[0]) + 1);                                          \
-  argc++
-// END OF COPY OF cmdl_ins in htscoremain.c
-
 /*
   Aliases for command-line and config file definitions
   These definitions can be used:

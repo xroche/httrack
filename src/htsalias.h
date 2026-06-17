@@ -52,6 +52,34 @@ const char *opttype_value(int p);
 const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
+
+/* Command-line argv-block builders, shared by htscoremain.c (the CLI parser)
+   and htsalias.c (config-file alias expansion). Tokens are packed back-to-back
+   into x_argvblk (total capacity bufsize); each argv[] entry points into the
+   block. cmdl_room bounds every copy: the running offset ptr can outrun the
+   block (alias / doit.log expansion outpacing the +32768 slack), so it yields
+   0 rather than a wrapped size_t and the bounded copy aborts cleanly. */
+#define cmdl_room(bufsize, ptr)                                                \
+  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
+
+/* Append a token as a new argv[argc]. */
+#define cmdl_add(token, argc, argv, buff, bufsize, ptr)                        \
+  argv[argc] = (buff + ptr);                                                   \
+  strlcpybuff(argv[argc], token, cmdl_room(bufsize, ptr));                     \
+  ptr += (int) (strlen(argv[argc]) + 1);                                       \
+  argc++
+
+/* Insert a token at argv[0], shifting the existing argc entries up by one. */
+#define cmdl_ins(token, argc, argv, buff, bufsize, ptr)                        \
+  {                                                                            \
+    int i;                                                                     \
+    for (i = argc; i > 0; i--)                                                 \
+      argv[i] = argv[i - 1];                                                   \
+  }                                                                            \
+  argv[0] = (buff + ptr);                                                      \
+  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
+  ptr += (int) (strlen(argv[0]) + 1);                                          \
+  argc++
 #endif
 
 #endif
