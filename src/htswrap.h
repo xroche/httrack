@@ -31,6 +31,12 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/** @file htswrap.h
+    Legacy entry points of the callback-wrapper subsystem. The live callback
+    registration API now lives on the httrackp options block (hts_set_callback);
+    only the no-op init/free stubs remain exported here for ABI compatibility.
+ */
+
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH
 
@@ -50,7 +56,10 @@ typedef struct httrackp httrackp;
 extern "C" {
 #endif
 
+/** Legacy no-op retained for ABI compatibility; always returns 1. */
 HTSEXT_API int htswrap_init(void);      // LEGACY
+
+/** Legacy no-op retained for ABI compatibility; always returns 1. */
 HTSEXT_API int htswrap_free(void);      // LEGACY
 
 #ifdef __cplusplus

@@ -31,10 +31,15 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/** @file htsmodules.h
+    Loadable-parser (external module) interface. The engine hands a downloaded
+    object to a module via htsmoduleStruct; the module reports discovered links
+    back through the addLink callback. */
+
 #ifndef HTS_MODULES
 #define HTS_MODULES
 
-/* Forware definitions */
+/* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_lien_url
 #define HTS_DEF_FWSTRUCT_lien_url
 typedef struct lien_url lien_url;
@@ -56,18 +61,18 @@ typedef struct cache_back cache_back;
 typedef struct hash_struct hash_struct;
 #endif
 
-/* Function type to add links inside the module 
-  link : link to add (absolute or relative)
-  str : structure defined below
-  Returns 1 if the link was added, 0 if not
-*/
+/** Callback a module invokes to report a discovered link.
+    str: the per-object context the module was called with.
+    link: link to add (absolute or relative); the engine copies it.
+    Returns 1 if the engine accepted/queued the link, 0 if it was rejected. */
 #ifndef HTS_DEF_FWSTRUCT_htsmoduleStruct
 #define HTS_DEF_FWSTRUCT_htsmoduleStruct
 typedef struct htsmoduleStruct htsmoduleStruct;
 #endif
 typedef int (*t_htsAddLink) (htsmoduleStruct * str, char *link);
 
-/* Structure passed to the module */
+/** Per-object context passed to a parser module for one downloaded file.
+    Field access classes are noted; engine owns all pointers unless stated. */
 struct htsmoduleStruct {
   /* Read-only elements */
   const char *filename;         /* filename (C:\My Web Sites\...) */
@@ -119,21 +124,39 @@ struct htsmoduleStruct {
 extern "C" {
 #endif
 
-/* Used to wrap module initialization */
-/* return 1 if init was ok */
+/** Module lifecycle hooks. Init/PlugInit return 1 on success, 0 on failure;
+    Exit returns its own status (ignored by the engine). */
 typedef int (*t_htsWrapperInit) (char *fn, char *args);
+
 typedef int (*t_htsWrapperExit) (void);
+
 typedef int (*t_htsWrapperPlugInit) (char *args);
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+/** Capabilities string ("-noV6", "-nossl", ...) followed by "+name" for each
+    loaded module. Returned pointer aliases opt->state.HTbuff; do not free, and
+    it is overwritten by the next call. */
 HTSEXT_API const char *hts_get_version_info(httrackp * opt);
+
+/** Static capabilities string set by htspe_init(); valid for the process
+    lifetime, do not free. */
 HTSEXT_API const char *hts_is_available(void);
+
+/** Initialize the module subsystem (idempotent): builds the capabilities
+    string and, on Windows, hardens the DLL search path. */
 extern void htspe_init(void);
+
+/** Tear-down counterpart of htspe_init(); currently a no-op. */
 extern void htspe_uninit(void);
+
+/** Run the external-parser callbacks for the object described by str.
+    Returns the parse callback result (>=0) on a handled object, or -1 if no
+    module claimed it or its wrapper_name is blacklisted. */
 extern int hts_parse_externals(htsmoduleStruct * str);
 
-/*extern int swf_is_available;*/
+/** Nonzero if IPv6 support was compiled in (== HTS_INET6). */
 extern int V6_is_available;
 #endif
 

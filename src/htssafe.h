@@ -104,6 +104,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
  * Check whether 'VAR' is of type char[].
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 /* Note: char[] and const char[] are compatible */
 #define HTS_IS_CHAR_BUFFER(VAR) ( __builtin_types_compatible_p ( typeof (VAR), char[] ) )
 #else
@@ -139,8 +140,11 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
  * (MSVC, ...) keep the previous behavior via the #else branches.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 #if defined(__has_attribute)
+
 #if __has_attribute(warning)
+
 #define HTS_BUFF_PTR_ATTR(msg) __attribute__((unused, noinline, warning(msg)))
 #endif
 #endif
@@ -152,29 +156,51 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 
 HTS_BUFF_PTR_ATTR("strcpybuff() destination is a pointer (capacity unknown): "
                   "NOT bounds-checked; use strlcpybuff(dst, src, size)")
+
 static char *strcpybuff_ptr_(char *dest, const char *src) {
   return strcpy(dest, src);
 }
 
 HTS_BUFF_PTR_ATTR("strcatbuff() destination is a pointer (capacity unknown): "
                   "NOT bounds-checked; use strlcatbuff(dst, src, size)")
+
 static char *strcatbuff_ptr_(char *dest, const char *src) {
   return strcat(dest, src);
 }
 
 HTS_BUFF_PTR_ATTR("strncatbuff() destination is a pointer (capacity unknown): "
                   "NOT bounds-checked; use strlcatbuff(dst, src, size)")
+
 static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
   return strncat(dest, src, n);
 }
 #endif
 
+/*
+ * SIZE CONTRACT shared by strcpybuff/strcatbuff/strncatbuff (the "buff"
+ * family): the destination bound is taken from sizeof(A), so A MUST be a real
+ * char[] array in scope. The bound is the full array size in bytes, INCLUDING
+ * the terminating NUL. On overflow the *_safe_ helpers do NOT truncate: they
+ * abort() (assertf). On success the result is always NUL-terminated.
+ *
+ * CRITICAL CAVEAT: if A is a bare char* pointer (not an array), sizeof(A) is
+ * the pointer size, not the buffer capacity. There is no way to recover the
+ * real capacity, so these macros SILENTLY DEGRADE to the unbounded raw
+ * strcpy()/strcat()/strncat() while still looking like a checked call. The
+ * bound is lost. On GCC/Clang (C) the pointer case routes through the
+ * *_ptr_ stubs above, which carry a 'warning' attribute to flag the site at
+ * compile time; on other compilers it is silent. When the destination is a
+ * pointer of known capacity, call the explicit-size strlcpybuff/strlcatbuff
+ * (passing the capacity, NUL included) instead.
+ */
+
 /**
  * Append at most N characters from "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
+ * If "A" is a char[] variable whose size is not sizeof(char*), then the size
  * is assumed to be the capacity of this array.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 #define strncatbuff(A, B, N) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
   strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
@@ -195,6 +221,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * is assumed to be the capacity of this array.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 #define strcatbuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
   strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
@@ -215,6 +242,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * is assumed to be the capacity of this array.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 #define strcpybuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
   strcpy_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
@@ -228,6 +256,14 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
 #endif
+
+/*
+ * Explicit-size variants (strlcatbuff/strlncatbuff/strlcpybuff): the
+ * destination capacity is the caller-supplied S (total bytes, NUL included),
+ * NOT derived from sizeof(A). Use these when A is a pointer or its capacity is
+ * not its sizeof. Same abort-on-overflow, always-NUL-terminated contract; no
+ * silent pointer degradation since the bound is passed in.
+ */
 
 /**
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
@@ -256,6 +292,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 
 /** strnlen replacement (autotools). **/
 #if ( ! defined(_WIN32) && ! defined(HAVE_STRNLEN) )
+
 static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
   size_t i;
   for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
@@ -263,6 +300,10 @@ static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
 }
 #endif
 
+/* strlen of source, but bounded by sizeof_source (its capacity, NUL included).
+   Aborts if source is NULL or has no NUL within that capacity. The sentinel
+   sizeof_source == (size_t)-1 means "capacity unknown", and falls back to the
+   unbounded strlen (used when the source is a pointer rather than an array). */
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
                                                  const char *file, int line) {
   size_t size;
@@ -273,6 +314,11 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_
   return size;
 }
 
+/* Core bounded append. Appends min(strlen(source), n) bytes of source onto
+   dest. sizeof_dest is dest's total capacity (NUL included); sizeof_source is
+   source's capacity or (size_t)-1 if unknown. Aborts if the result (existing
+   dest length + appended bytes + NUL) would not fit sizeof_dest: this NEVER
+   truncates. Always NUL-terminates on success. */
 static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t sizeof_dest,
                                                  const char *const source, const size_t sizeof_source, 
                                                  const size_t n,
@@ -288,6 +334,9 @@ static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t 
   return dest;
 }
 
+/* Core bounded copy: empties dest then appends all of source via
+   strncat_safe_. sizeof_dest is dest's total capacity (NUL included). Aborts
+   (no truncation) if source plus its NUL would not fit. */
 static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t sizeof_dest,
                                                 const char *const source, const size_t sizeof_source, 
                                                 const char *exp, const char *file, int line) {
@@ -333,9 +382,11 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
  * On other compilers there is no such guard, so pass only true arrays there.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
+
 /* 0 for an array, a -1 array-size compile error for a pointer. */
 #define htsbuff_must_be_array_(A) \
   (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(typeof(A), typeof(&(A)[0]))]) - 1)
+
 #define htsbuff_array(ARR) htsbuff_ptr_((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR))
 #else
 #define htsbuff_array(ARR) htsbuff_ptr_((ARR), sizeof(ARR))
@@ -378,11 +429,20 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
   return b->buf;
 }
 
+/* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
+   added bounds checking. freet() also NULLs the freed pointer and tolerates
+   NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the
+   bounds. */
 #define malloct(A)          malloc(A)
+
 #define calloct(A,B)        calloc((A), (B))
+
 #define freet(A)            do { if ((A) != NULL) { free(A); (A) = NULL; } } while(0)
+
 #define strdupt(A)          strdup(A)
+
 #define realloct(A,B)       realloc(A, B)
+
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
 
 #endif
