@@ -1,9 +1,11 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 bash check-network.sh ||  ! echo "skipping online unit tests" || exit 77
 
-if test "$HTTPS_SUPPORT" == "no"; then
+if test "${HTTPS_SUPPORT:-}" == "no"; then
 	echo "no https support compiled, skipping"
 	exit 77
 fi

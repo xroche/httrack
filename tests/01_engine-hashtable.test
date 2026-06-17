@@ -1,5 +1,7 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # httrack internal hashtable autotest on 100K keys
 httrack -#7 100000

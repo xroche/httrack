@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # HTML entity unescaping (hts_unescapeEntitiesWithCharset).
 # -#6 <string> prints the string with entities decoded (UTF-8 output).
 ent() {

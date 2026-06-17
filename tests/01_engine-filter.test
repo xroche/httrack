@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+set -euo pipefail
+
 # wildcard filter engine (strjoker), the core of +/- include/exclude rules.
 # -#0 <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
 
