@@ -3702,7 +3702,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->maxsoc > 0)
     to->maxsoc = from->maxsoc;
 
-  if (from->nearlink > -1)
+  /* hts_boolean/enum fields are unsigned (GCC), so a bare `> -1` unset-guard
+     is always false; cast to int to keep the -1 "unset" sentinel test. */
+  if ((int) from->nearlink > -1)
     to->nearlink = from->nearlink;
 
   if (from->timeout > -1)
@@ -3729,10 +3731,10 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->hostcontrol > -1)
     to->hostcontrol = from->hostcontrol;
 
-  if (from->errpage > -1)
+  if ((int) from->errpage > -1)
     to->errpage = from->errpage;
 
-  if (from->parseall > -1)
+  if ((int) from->parseall > -1)
     to->parseall = from->parseall;
 
   // test all: bit 8 de travel

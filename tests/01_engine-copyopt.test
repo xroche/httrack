@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Regression guard for the unsigned-enum sentinel trap: copy_htsopt's
+# `if (from->X > -1)` guard is always false for unsigned hts_boolean fields, so
+# they silently stop being copied. Driven by the in-process 'httrack -#9' test.
+# Keep POSIX-portable (harness runs it via $(BASH), a plain /bin/sh on macOS).
+
+set -eu
+
+# A trailing token is required; a bare '-#9' falls through to the usage screen.
+out=$(httrack -#9 run)
+
+# Exact-match the success line so a fall-through to usage can't pass the test.
+test "$out" = "copy-htsopt: OK" || {
+    echo "expected 'copy-htsopt: OK', got: $out" >&2
+    exit 1
+}
