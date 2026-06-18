@@ -3129,6 +3129,43 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return err;
               } break;
+              case 'Q': { // cookie request-header selftest: httrack -#Q
+                static t_cookie cookie;
+                char hdr[1024];
+                /* RFC 6265: bare name=value pairs, no $Version/$Path (#151). */
+                const char *expected = "Cookie: name=value; has_js=1" H_CRLF;
+                int err = 0;
+
+                const char *dom = "www.example.com";
+                int added;
+
+                cookie.max_len = (int) sizeof(cookie.data);
+                cookie.data[0] = '\0';
+                added = cookie_add(&cookie, "name", "value", dom, "/");
+                added |= cookie_add(&cookie, "has_js", "1", dom, "/");
+                /* different domain: must be filtered out */
+                added |= cookie_add(&cookie, "junk", "x", "other.org", "/");
+                if (added) {
+                  printf("cookie-header: FAIL (cookie_add setup)\n");
+                  htsmain_free();
+                  return 1;
+                }
+
+                http_cookie_header_selftest(&cookie, dom, "/", hdr,
+                                            sizeof(hdr));
+                if (strcmp(hdr, expected) != 0)
+                  err = 1;
+                if (strstr(hdr, "$Version") != NULL ||
+                    strstr(hdr, "$Path") != NULL)
+                  err = 1;
+                if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
+                  err = 1;
+                printf("cookie-header: %s\n", err ? "FAIL" : "OK");
+                if (err)
+                  printf("  got: %s\n", hdr);
+                htsmain_free();
+                return err;
+              } break;
               case '!':
                 HTS_PANIC_PRINTF
                   ("Option #! is disabled for security reasons");

@@ -874,6 +874,50 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str->pos < str->capacity);
 }
 
+/* Append the request "Cookie:" header line for every stored cookie matching
+   domain/path. RFC 6265 form: bare "name=value" pairs joined by "; ", no
+   $Version/$Path attributes (those are RFC 2965 syntax that modern servers
+   reject, issue #151). Returns the number of cookies emitted. */
+static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
+                                const char *domain, const char *path) {
+  char buffer[8192];
+  char *b;
+  int cook = 0;
+  int max_cookies = 8;
+
+  if (cookie == NULL)
+    return 0;
+  b = cookie->data;
+  do {
+    b = cookie_find(b, "", domain, path); // next matching cookie
+    if (b != NULL) {
+      max_cookies--;
+      if (!cook) {
+        print_buffer(bstr, "Cookie: ");
+        cook = 1;
+      } else
+        print_buffer(bstr, "; ");
+      print_buffer(bstr, "%s", cookie_get(buffer, b, 5));
+      print_buffer(bstr, "=%s", cookie_get(buffer, b, 6));
+      b = cookie_nextfield(b);
+    }
+  } while (b != NULL && max_cookies > 0);
+  if (cook)
+    print_buffer(bstr, H_CRLF);
+  return cook;
+}
+
+/* Self-test entry for append_cookie_header(): build the request Cookie line
+   into dst (always NUL-terminated). Returns the number of cookies emitted. */
+int http_cookie_header_selftest(t_cookie *cookie, const char *domain,
+                                const char *path, char *dst, size_t dst_size) {
+  buff_struct bstr = {dst, dst_size, 0};
+
+  assertf(dst != NULL && dst_size > 0);
+  dst[0] = '\0';
+  return append_cookie_header(&bstr, cookie, domain, path);
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1048,34 +1092,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                          search_tag + strlen(POSTTOK) + 1))));
       }
     }
-    // gestion cookies?
+    // send stored cookies matching this host/path
     if (cookie) {
-      char buffer[8192];
-      char *b = cookie->data;
-      int cook = 0;
-      int max_cookies = 8;
-
-      do {
-        b = cookie_find(b, "", jump_identification_const(adr), fil);  // prochain cookie satisfaisant aux conditions
-        if (b != NULL) {
-          max_cookies--;
-          if (!cook) {
-            print_buffer(&bstr, "Cookie: $Version=1; ");
-            cook = 1;
-          } else
-            print_buffer(&bstr, "; ");
-          print_buffer(&bstr, "%s", cookie_get(buffer, b, 5));
-          print_buffer(&bstr, "=%s", cookie_get(buffer, b, 6));
-          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, b, 2));
-          b = cookie_nextfield(b);
-        }
-      } while(b != NULL && max_cookies > 0);
-      if (cook) {               // on a envoyé un (ou plusieurs) cookie?
-        print_buffer(&bstr, H_CRLF);
-#if DEBUG_COOK
-        printf("Header:\n%s\n", bstr.buffer);
-#endif
-      }
+      append_cookie_header(&bstr, cookie, jump_identification_const(adr), fil);
     }
     // gérer le keep-alive (garder socket)
     if (retour->req.http11 && !retour->req.nokeepalive) {

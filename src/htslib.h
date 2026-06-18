@@ -182,6 +182,11 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
                   const char *adr, const char *fil,
                   const char *referer_adr, const char *referer_fil,
                   htsblk * retour);
+/* Build the request "Cookie:" header line for stored cookies matching
+   domain/path into dst (NUL-terminated). Exposed for the -#Q self-test;
+   wraps the same logic http_sendhead() uses. Returns cookies emitted. */
+int http_cookie_header_selftest(t_cookie *cookie, const char *domain,
+                                const char *path, char *dst, size_t dst_size);
 
 //int newhttp(char* iadr,char* err=NULL);
 T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
