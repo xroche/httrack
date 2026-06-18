@@ -1783,7 +1783,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'b':
-            sscanf(com + 1, "%d", &opt->accept_cookie);
+            sscanf(com + 1, "%d", (int *) &opt->accept_cookie);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
@@ -1845,12 +1845,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
             break;
           case 'o':
-            sscanf(com + 1, "%d", &opt->errpage);
+            sscanf(com + 1, "%d", (int *) &opt->errpage);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
           case 'u':
-            sscanf(com + 1, "%d", &opt->check_type);
+            sscanf(com + 1, "%d", (int *) &opt->check_type);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
@@ -1917,7 +1917,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'I':
                 opt->kindex = 1;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", &opt->kindex);
+                  sscanf(com + 1, "%d", (int *) &opt->kindex);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }

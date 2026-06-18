@@ -5435,14 +5435,14 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   /* default settings */
 
   opt->wizard = HTS_WIZARD_AUTO; // wizard automatique
-  opt->quiet = 0;               // questions
+  opt->quiet = HTS_FALSE;
   //
   opt->travel = HTS_TRAVEL_SAME_ADDRESS; // même adresse
   opt->depth = 9999;            // mirror total par défaut
   opt->extdepth = 0;            // mais pas à l'extérieur
   opt->seeker = HTS_SEEKER_DOWN;       // down
   opt->urlmode = HTS_URLMODE_RELATIVE; // relatif par défaut
-  opt->no_type_change = 0;      // change file types
+  opt->no_type_change = HTS_FALSE;
   opt->debug = LOG_NOTICE;      // small log
   opt->getmode = HTS_GETMODE_HTML | HTS_GETMODE_NONHTML;
   opt->maxsite = -1;            // taille max site (aucune)
@@ -5450,18 +5450,18 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->maxfile_html = -1;       // idem pour html
   opt->maxsoc = 4;              // nbre socket max
   opt->fragment = -1;           // pas de fragmentation
-  opt->nearlink = 0;            // ne pas prendre les liens non-html "adjacents"
-  opt->makeindex = 1;           // faire un index
-  opt->kindex = 0;              // index 'keyword'
-  opt->delete_old = 1;          // effacer anciens fichiers
-  opt->background_on_suspend = 1;       // Background the process if Control Z calls signal suspend.
-  opt->makestat = 0;            // pas de fichier de stats
-  opt->maketrack = 0;           // ni de tracking
+  opt->nearlink = HTS_FALSE;
+  opt->makeindex = HTS_TRUE;
+  opt->kindex = HTS_FALSE;
+  opt->delete_old = HTS_TRUE;
+  opt->background_on_suspend = HTS_TRUE;
+  opt->makestat = HTS_FALSE;
+  opt->maketrack = HTS_FALSE;
   opt->timeout = 120;           // timeout par défaut (2 minutes)
   opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
-  opt->shell = 0;               // pas de shell par defaut
+  opt->shell = HTS_FALSE;
   opt->proxy.active = 0;        // pas de proxy
-  opt->user_agent_send = 1;     // envoyer un user-agent
+  opt->user_agent_send = HTS_TRUE;
   StringCopy(opt->user_agent,
              "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
   StringCopy(opt->referer, "");
@@ -5469,34 +5469,36 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->savename_83 = 0;         // noms longs par défaut
   opt->savename_type = 0;       // avec structure originale
   opt->savename_delayed = 2;    // hard delayed type (default)
-  opt->delayed_cached = 1;      // cached delayed type (default)
-  opt->mimehtml = 0;            // pas MIME-html
+  opt->delayed_cached = HTS_TRUE;
+  opt->mimehtml = HTS_FALSE;
   opt->parsejava = HTSPARSE_DEFAULT;    // parser classes
   opt->hostcontrol = 0;         // PAS de control host pour timeout et traffic jammer
   opt->retry = 2;               // 2 retry par défaut
-  opt->errpage = 1;             // copier ou générer une page d'erreur en cas d'erreur (404 etc.)
-  opt->check_type = 1;          // vérifier type si inconnu (cgi,asp..) SAUF / considéré comme html
-  opt->all_in_cache = 0;        // ne pas tout stocker en cache
+  opt->errpage = HTS_TRUE;
+  // d'erreur (404 etc.)
+  opt->check_type = HTS_TRUE;
+  // considéré comme html
+  opt->all_in_cache = HTS_FALSE;
   opt->robots = HTS_ROBOTS_ALWAYS; // traiter les robots.txt
-  opt->external = 0;            // liens externes normaux
-  opt->passprivacy = 0;         // mots de passe dans les fichiers
-  opt->includequery = 1;        // include query-string par défaut
-  opt->mirror_first_page = 0;   // pas mode mirror links
-  opt->accept_cookie = 1;       // gérer les cookies
+  opt->external = HTS_FALSE;
+  opt->passprivacy = HTS_FALSE;
+  opt->includequery = HTS_TRUE;
+  opt->mirror_first_page = HTS_FALSE;
+  opt->accept_cookie = HTS_TRUE;
   opt->cookie = NULL;
-  opt->http10 = 0;              // laisser http/1.1
-  opt->nokeepalive = 0;         // pas keep-alive
-  opt->nocompression = 0;       // pas de compression
-  opt->tolerant = 0;            // ne pas accepter content-length incorrect
-  opt->parseall = 1;            // tout parser (tags inconnus, par exemple)
-  opt->parsedebug = 0;          // pas de mode débuggage
-  opt->norecatch = 0;           // ne pas reprendre les fichiers effacés par l'utilisateur
+  opt->http10 = HTS_FALSE;
+  opt->nokeepalive = HTS_FALSE;
+  opt->nocompression = HTS_FALSE;
+  opt->tolerant = HTS_FALSE;
+  opt->parseall = HTS_TRUE;
+  opt->parsedebug = HTS_FALSE;
+  opt->norecatch = HTS_FALSE;
   opt->verbosedisplay = 0;      // pas d'animation texte
-  opt->sizehack = 0;            // size hack
-  opt->urlhack = 1;             // url hack (normalizer)
+  opt->sizehack = HTS_FALSE;
+  opt->urlhack = HTS_TRUE;
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
-  opt->ftp_proxy = 1;           // proxy http pour ftp
-  opt->convert_utf8 = 1;        // convert html to UTF-8
+  opt->ftp_proxy = HTS_TRUE;
+  opt->convert_utf8 = HTS_TRUE;
   StringCopy(opt->filelist, "");
   StringCopy(opt->lang_iso, "en, *");
   StringCopy(opt->accept,
@@ -5507,9 +5509,9 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   //
   opt->log = stdout;
   opt->errlog = stderr;
-  opt->flush = 1;               // flush sur les fichiers log
-  //opt->aff_progress=0;
-  opt->keyboard = 0;
+  opt->flush = HTS_TRUE;
+  // opt->aff_progress=0;
+  opt->keyboard = HTS_FALSE;
   //
   StringCopy(opt->path_html, "");
   StringCopy(opt->path_html_utf8, "");
@@ -5526,10 +5528,10 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->waittime = -1;           // wait until.. hh*3600+mm*60+ss
   //
   opt->exec = "";
-  opt->is_update = 0;           // not an update (yet)
-  opt->dir_topindex = 0;        // do not built top index (yet)
+  opt->is_update = HTS_FALSE;
+  opt->dir_topindex = HTS_FALSE;
   //
-  opt->bypass_limits = 0;       // enforce limits by default
+  opt->bypass_limits = HTS_FALSE;
   opt->state.stop = 0;          // stopper
   opt->state.exit_xh = 0;       // abort
   //
