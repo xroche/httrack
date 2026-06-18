@@ -354,6 +354,26 @@ typedef enum hts_travel_scope {
 #define HTS_TRAVEL_SCOPE_MASK 0xff   /**< mask selecting the scope value */
 #define HTS_TRAVEL_TEST_ALL (1 << 8) /**< also test forbidden URLs (-t) */
 
+/* Text progress display detail (opt->verbosedisplay). */
+typedef enum hts_verbosedisplay {
+  HTS_VERBOSE_NONE = 0,   /**< no animated progress display (default) */
+  HTS_VERBOSE_SIMPLE = 1, /**< minimal single-line progress */
+  HTS_VERBOSE_FULL = 2    /**< full animated progress */
+} hts_verbosedisplay;
+
+/* Delayed file-type resolution policy (opt->savename_delayed). */
+typedef enum hts_savename_delayed {
+  HTS_SAVENAME_DELAYED_NONE = 0, /**< resolve the type immediately */
+  HTS_SAVENAME_DELAYED_SOFT = 1, /**< delay the type check when unknown */
+  HTS_SAVENAME_DELAYED_HARD = 2  /**< always delay the type check (default) */
+} hts_savename_delayed;
+
+/* Host-banning triggers (opt->hostcontrol bitmask). */
+typedef enum hts_hostcontrol {
+  HTS_HOSTCONTROL_BAN_TIMEOUT = 1 << 0, /**< ban a timing-out host */
+  HTS_HOSTCONTROL_BAN_SLOW = 1 << 1     /**< ban a too-slow host */
+} hts_hostcontrol;
+
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
@@ -386,7 +406,7 @@ struct httrackp {
   hts_urlmode
       urlmode; /**< saved-link rewriting style (relative, absolute, etc.) */
   hts_boolean no_type_change;   // do not change file type according to MIME
-  int debug;                    /**< debug logging level */
+  hts_log_type debug;           /**< debug logging level */
   int getmode;           /**< what to fetch (HTML, images, ...) bitmask */
   FILE *log;             /**< informational log stream; NULL mutes it */
   FILE *errlog;          /**< error log stream; NULL mutes it */
@@ -414,7 +434,7 @@ struct httrackp {
   int savename_type; /**< saved-name layout (original tree, flat, ...) */
   String
       savename_userdef; /**< user-defined name template (e.g. %h%p/%n%q.%t) */
-  int savename_delayed;         // delayed type check
+  hts_savename_delayed savename_delayed; /**< delayed type-check policy */
   hts_boolean
       delayed_cached;   // delayed type check can be cached to speedup updates
   hts_boolean mimehtml; /**< produce a single MIME/MHTML archive */
@@ -430,7 +450,7 @@ struct httrackp {
   hts_boolean makestat;  /**< maintain a transfer-statistics log */
   hts_boolean maketrack; /**< maintain an operations-statistics log */
   int parsejava;         /**< Java/JS parsing mode; see htsparsejava_flags */
-  int hostcontrol;       /**< drop hosts that are too slow, etc. */
+  int hostcontrol; /**< ban slow/timing-out hosts; see hts_hostcontrol bits */
   hts_boolean errpage;   /**< generate an error page on 404 and similar */
   hts_boolean
       check_type; /**< probe unknown-type links (cgi/asp/dir) and follow moves
@@ -455,7 +475,7 @@ struct httrackp {
       parseall; /**< parse aggressively, including unknown tags with links */
   hts_boolean parsedebug; /**< parser debug mode */
   hts_boolean norecatch;  /**< do not re-fetch files the user deleted locally */
-  int verbosedisplay; /**< animated text progress display */
+  hts_verbosedisplay verbosedisplay; /**< animated text progress display */
   String footer;      /**< footer/info line injected into pages */
   int maxcache;       /**< in-memory cache backing limit (bytes) */
   // int maxcache_anticipate; // maximum links to anticipate (upper bound)

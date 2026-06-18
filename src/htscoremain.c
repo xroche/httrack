@@ -1991,7 +1991,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'v':
                 opt->verbosedisplay = 2;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", &opt->verbosedisplay);
+                  sscanf(com + 1, "%d", (int *) &opt->verbosedisplay);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }
@@ -2006,7 +2006,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'N':
                 opt->savename_delayed = 2;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", &opt->savename_delayed);
+                  sscanf(com + 1, "%d", (int *) &opt->savename_delayed);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }
