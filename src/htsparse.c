@@ -3722,7 +3722,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         //case -1: can_retry=1; break;
       case STATUSCODE_TIMEOUT:
         if (opt->hostcontrol) { // timeout et retry épuisés
-          if ((opt->hostcontrol & 1) && (heap(ptr)->retry <= 0)) {
+          if ((opt->hostcontrol & HTS_HOSTCONTROL_BAN_TIMEOUT) &&
+              (heap(ptr)->retry <= 0)) {
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
@@ -3735,7 +3736,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         break;
       case STATUSCODE_SLOW:
         if ((opt->hostcontrol) && (heap(ptr)->retry <= 0)) {   // too slow
-          if (opt->hostcontrol & 2) {
+          if (opt->hostcontrol & HTS_HOSTCONTROL_BAN_SLOW) {
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
