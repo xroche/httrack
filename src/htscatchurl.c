@@ -135,7 +135,8 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
 // returns 0 if error
 // url: buffer where URL must be stored - or ip:port in case of failure
 // data: 32Kb
-HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
+HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
+                                 char *data) {
   int retour = 0;
 
   // connexion (accept)

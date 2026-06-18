@@ -242,6 +242,14 @@ Please visit our Website: http://www.httrack.com
 #define HTS_NOPARAM "(none)"
 #define HTS_NOPARAM2 "\"(none)\""
 
+/* Boolean flag for option fields and API yes/no returns. An enum (not C bool)
+   so it stays int-sized: option fields keep the httrackp layout/ABI, and a
+   return type stays compatible with the int it replaces. */
+#ifndef HTS_DEF_DEFSTRUCT_hts_boolean
+#define HTS_DEF_DEFSTRUCT_hts_boolean
+typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
+#endif
+
 /* Larger/smaller of two values. Macros: arguments are evaluated twice. */
 #define maximum(A,B) ( (A) > (B) ? (A) : (B) )
 

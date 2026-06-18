@@ -108,15 +108,15 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 // Portable directory find functions
 // Directory find functions
 HTSEXT_API find_handle hts_findfirst(char *path);
-HTSEXT_API int hts_findnext(find_handle find);
+HTSEXT_API hts_boolean hts_findnext(find_handle find);
 HTSEXT_API int hts_findclose(find_handle find);
 
 //
 HTSEXT_API char *hts_findgetname(find_handle find);
 HTSEXT_API int hts_findgetsize(find_handle find);
-HTSEXT_API int hts_findisdir(find_handle find);
-HTSEXT_API int hts_findisfile(find_handle find);
-HTSEXT_API int hts_findissystem(find_handle find);
+HTSEXT_API hts_boolean hts_findisdir(find_handle find);
+HTSEXT_API hts_boolean hts_findisfile(find_handle find);
+HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 
 #endif
 

@@ -206,7 +206,8 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 /* Logging */
 /** Legacy: write prefix then msg to opt->log. Returns 0 if written, 1 if
     opt->log is NULL. Prefer hts_log_print(). */
-HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg);
+HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
+                               const char *msg);
 
 /** printf-style log at level @p type (an hts_log_type, optionally |LOG_ERRNO).
     Forwards to the registered log callback, and when the level is <= opt->debug
@@ -313,7 +314,8 @@ HTSEXT_API T_SOC catch_url_init(int *port, char *adr);
     "ip:port". The buffers are caller-allocated and not bounds-checked: @p data
     must be CATCH_URL_DATA_SIZE bytes, and @p url / @p method must fit the
     captured request line. */
-HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data);
+HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
+                                 char *data);
 
 /* State */
 /** Whether the engine is parsing HTML. Returns 0 if not, otherwise the percent
@@ -334,10 +336,10 @@ HTSEXT_API int hts_is_exiting(httrackp * opt);
     caller-owned, NULL-terminated array of strings; the engine stores the
    pointer without copying, so the array and its strings must stay valid until
    the engine consumes them. @return nonzero if a list is now set. */
-HTSEXT_API int hts_addurl(httrackp * opt, char **url);
+HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 
 /** Clear any pending add-URL list set by hts_addurl(). Always returns 0. */
-HTSEXT_API int hts_resetaddurl(httrackp * opt);
+HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. Only fields set to a non-sentinel value are copied; the rest of @p
@@ -356,7 +358,7 @@ HTSEXT_API int hts_setpause(httrackp * opt, int);
    lock, so it is safe to call from another thread). @p force is currently
    ignored.
     @return 0; no-op if @p opt is NULL. */
-HTSEXT_API int hts_request_stop(httrackp * opt, int force);
+HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean force);
 
 /** Queue a single in-progress file, by URL, to be cancelled by the engine.
     @p url is copied internally. Takes the state lock, so it is thread-safe.
@@ -373,7 +375,7 @@ HTSEXT_API void hts_cancel_parsing(httrackp * opt);
 
 /** Nonzero once the mirror has fully ended. Read under the engine state lock,
    so safe to poll from another thread. Wait for this before hts_free_opt(). */
-HTSEXT_API int hts_has_stopped(httrackp * opt);
+HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt);
 
 /* Tools */
 /** Ensure the directory chain leading to @p path exists, creating missing
@@ -390,7 +392,7 @@ HTSEXT_API int structcheck_utf8(const char *path);
 /** Whether the directory containing @p path exists. The basename is stripped
     first, so passing a file path tests its parent directory. @return 1 if it is
     a directory, 0 otherwise. */
-HTSEXT_API int dir_exists(const char *path);
+HTSEXT_API hts_boolean dir_exists(const char *path);
 
 /** Write the HTTP reason phrase for @p statuscode into @p msg, a caller buffer
    of at least 64 bytes. For an unknown code a non-empty @p msg is kept,
@@ -573,14 +575,15 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
     must-avoid escapes are kept encoded, and %25 is never decoded). @p no_high &
    1 also decodes high (>= 128) bytes; @p no_high & 2 also decodes an escaped
     space. Returns @p catbuff. */
-HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, const char *s, const int no_high);
+HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
+                                      const char *s, const hts_boolean no_high);
 
 /** Determine the MIME type of local file name @p fil into @p s (capacity
     @p ssize): user --assume rules, then ".html", then the built-in extension
     table. @p flag != 0 forces a fallback type. @return 1 if a type was written,
     0 otherwise. */
-HTSEXT_API int get_httptype_sized(httrackp *opt, char *s, size_t ssize,
-                                  const char *fil, int flag);
+HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                          const char *fil, hts_boolean flag);
 
 /** @deprecated Use get_httptype_sized(). Assumes @p s has at least
     HTS_MIMETYPE_SIZE capacity. */
@@ -600,7 +603,7 @@ HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
 
 /** 1 if @p fil, an extension such as "asp" or "php" (not a full filename), is a
     known dynamic-page type, else 0. */
-HTSEXT_API int is_dyntype(const char *fil);
+HTSEXT_API hts_boolean is_dyntype(const char *fil);
 
 /** Extract the extension of @p fil (text after the last '.', stopping at '?')
     into caller scratch @p catbuff (capacity @p size) and return it. Returns ""
@@ -610,12 +613,12 @@ HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
 
 /** 1 if MIME type @p st must not be reclassified or renamed (hypertext types
    and a built-in keep-list of commonly mislabeled types), else 0. */
-HTSEXT_API int may_unknown(httrackp * opt, const char *st);
+HTSEXT_API hts_boolean may_unknown(httrackp *opt, const char *st);
 
 /** Guess the MIME type of local file @p fil into @p s (capacity @p ssize),
     always producing a type. @return 1 if a type was written. */
-HTSEXT_API int guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
-                                    const char *fil);
+HTSEXT_API hts_boolean guess_httptype_sized(httrackp *opt, char *s,
+                                            size_t ssize, const char *fil);
 
 /** @deprecated Use guess_httptype_sized(). Assumes @p s has at least
     HTS_MIMETYPE_SIZE capacity. */
@@ -677,7 +680,7 @@ HTSEXT_API find_handle hts_findfirst(char *path);
 
 /** Advance to the next directory entry. Returns 1 if an entry is available, 0
    at end of directory. */
-HTSEXT_API int hts_findnext(find_handle find);
+HTSEXT_API hts_boolean hts_findnext(find_handle find);
 
 /** Close the iteration and free @p find. Always returns 0; NULL is accepted. */
 HTSEXT_API int hts_findclose(find_handle find);
@@ -692,16 +695,16 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 
 /** 1 if the current entry is a directory, else 0 (a system/special entry, see
     hts_findissystem(), reports 0). */
-HTSEXT_API int hts_findisdir(find_handle find);
+HTSEXT_API hts_boolean hts_findisdir(find_handle find);
 
 /** 1 if the current entry is a regular file, else 0 (a system/special entry,
    see hts_findissystem(), reports 0). */
-HTSEXT_API int hts_findisfile(find_handle find);
+HTSEXT_API hts_boolean hts_findisfile(find_handle find);
 
 /** 1 if the current entry is a special/system entry to skip: "." or "..", on
     POSIX also device/fifo/socket nodes, on Windows also system, hidden or
     temporary entries. Else 0. */
-HTSEXT_API int hts_findissystem(find_handle find);
+HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows

@@ -354,13 +354,6 @@ typedef enum hts_travel_scope {
 #define HTS_TRAVEL_SCOPE_MASK 0xff   /**< mask selecting the scope value */
 #define HTS_TRAVEL_TEST_ALL (1 << 8) /**< also test forbidden URLs (-t) */
 
-/* Boolean option flag. An enum (not C bool) so the option fields stay int-sized
-   and the httrackp layout/ABI is unchanged. */
-#ifndef HTS_DEF_DEFSTRUCT_hts_boolean
-#define HTS_DEF_DEFSTRUCT_hts_boolean
-typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
-#endif
-
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
