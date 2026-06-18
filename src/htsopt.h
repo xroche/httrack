@@ -342,17 +342,17 @@ typedef enum hts_seeker {
   HTS_SEEKER_UP = 1 << 1    /**< may ascend to parent directories */
 } hts_seeker;
 
-/* Link-following scope, stored in the low byte of opt->travel. */
+/* opt->travel: link-following scope in the low byte, flags OR'd in above it. */
 typedef enum hts_travel_scope {
   HTS_TRAVEL_SAME_ADDRESS = 0, /**< stay on the same address (host) */
   HTS_TRAVEL_SAME_DOMAIN = 1,  /**< stay on the same principal domain */
   HTS_TRAVEL_SAME_TLD = 2,     /**< stay on the same TLD (e.g. .com) */
-  HTS_TRAVEL_EVERYWHERE = 7    /**< follow links anywhere on the web */
+  HTS_TRAVEL_EVERYWHERE = 7,   /**< follow links anywhere on the web */
+  HTS_TRAVEL_TEST_ALL = 1 << 8 /**< also test forbidden URLs (-t) */
 } hts_travel_scope;
 
-/* Flags OR'd into opt->travel above the scope value. */
-#define HTS_TRAVEL_SCOPE_MASK 0xff   /**< mask selecting the scope value */
-#define HTS_TRAVEL_TEST_ALL (1 << 8) /**< also test forbidden URLs (-t) */
+/* Mask selecting the scope value out of opt->travel. */
+#define HTS_TRAVEL_SCOPE_MASK 0xff
 
 /* Text progress display detail (opt->verbosedisplay). */
 typedef enum hts_verbosedisplay {
