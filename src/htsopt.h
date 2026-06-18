@@ -285,6 +285,75 @@ typedef enum htsparsejava_flags {
   HTSPARSE_NO_AGGRESSIVE = 8    // don't aggressively parse .js or .java
 } htsparsejava_flags;
 
+/* Link-rewriting style for saved pages (opt->urlmode). */
+#ifndef HTS_DEF_DEFSTRUCT_hts_urlmode
+#define HTS_DEF_DEFSTRUCT_hts_urlmode
+typedef enum hts_urlmode {
+  HTS_URLMODE_ABSOLUTE = 0, /**< absolute URL (http://host/path) everywhere */
+  HTS_URLMODE_ABSOLUTE_FILE = 1, /**< legacy file: form, unused */
+  HTS_URLMODE_RELATIVE = 2,      /**< relative link (default) */
+  HTS_URLMODE_ABSOLUTE_URI = 3,  /**< absolute URI from root (/path) */
+  HTS_URLMODE_KEEP_ORIGINAL = 4, /**< keep the original link, do not rewrite */
+  HTS_URLMODE_TRANSPARENT_PROXY = 5 /**< transparent-proxy URL */
+} hts_urlmode;
+#endif
+
+/* Cache policy for updates and retries (opt->cache). */
+#ifndef HTS_DEF_DEFSTRUCT_hts_cachemode
+#define HTS_DEF_DEFSTRUCT_hts_cachemode
+typedef enum hts_cachemode {
+  HTS_CACHE_NONE = 0,       /**< no cache */
+  HTS_CACHE_PRIORITY = 1,   /**< cache takes priority over the network */
+  HTS_CACHE_TEST_UPDATE = 2 /**< check for update before reuse (default) */
+} hts_cachemode;
+#endif
+
+/* Interactive wizard level (opt->wizard). */
+#ifndef HTS_DEF_DEFSTRUCT_hts_wizard
+#define HTS_DEF_DEFSTRUCT_hts_wizard
+typedef enum hts_wizard {
+  HTS_WIZARD_NONE = 0, /**< no wizard */
+  HTS_WIZARD_ASK = 1,  /**< wizard asks questions */
+  HTS_WIZARD_AUTO = 2  /**< wizard runs without asking */
+} hts_wizard;
+#endif
+
+/* robots.txt / meta-robots obedience level (opt->robots). */
+#ifndef HTS_DEF_DEFSTRUCT_hts_robots
+#define HTS_DEF_DEFSTRUCT_hts_robots
+typedef enum hts_robots {
+  HTS_ROBOTS_NEVER = 0,        /**< ignore robots rules */
+  HTS_ROBOTS_SOMETIMES = 1,    /**< partial obedience (default) */
+  HTS_ROBOTS_ALWAYS = 2,       /**< obey robots rules */
+  HTS_ROBOTS_ALWAYS_STRICT = 3 /**< obey even strict rules */
+} hts_robots;
+#endif
+
+/* What to fetch (opt->getmode bitmask). */
+typedef enum hts_getmode {
+  HTS_GETMODE_HTML = 1 << 0,      /**< save HTML files */
+  HTS_GETMODE_NONHTML = 1 << 1,   /**< save non-HTML files */
+  HTS_GETMODE_HTML_FIRST = 1 << 2 /**< fetch HTML first, then the other files */
+} hts_getmode;
+
+/* Allowed directions in the directory tree (opt->seeker bitmask). */
+typedef enum hts_seeker {
+  HTS_SEEKER_DOWN = 1 << 0, /**< may descend into subdirectories */
+  HTS_SEEKER_UP = 1 << 1    /**< may ascend to parent directories */
+} hts_seeker;
+
+/* Link-following scope, stored in the low byte of opt->travel. */
+typedef enum hts_travel_scope {
+  HTS_TRAVEL_SAME_ADDRESS = 0, /**< stay on the same address (host) */
+  HTS_TRAVEL_SAME_DOMAIN = 1,  /**< stay on the same principal domain */
+  HTS_TRAVEL_SAME_TLD = 2,     /**< stay on the same TLD (e.g. .com) */
+  HTS_TRAVEL_EVERYWHERE = 7    /**< follow links anywhere on the web */
+} hts_travel_scope;
+
+/* Flags OR'd into opt->travel above the scope value. */
+#define HTS_TRAVEL_SCOPE_MASK 0xff   /**< mask selecting the scope value */
+#define HTS_TRAVEL_TEST_ALL (1 << 8) /**< also test forbidden URLs (-t) */
+
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
@@ -308,13 +377,14 @@ typedef struct httrackp httrackp;
 struct httrackp {
   size_t size_httrackp; /**< size of this structure (version/ABI guard) */
   /* */
-  int wizard;   /**< interactive wizard level (none/full/light) */
+  hts_wizard wizard; /**< interactive wizard level (none/ask/auto) */
   int flush;    /**< fflush() log files after each write */
   int travel;   /**< link-following scope (same domain, etc.) */
   int seeker;   /**< allowed direction: go up and/or down the tree */
   int depth;    /**< maximum recursion depth (-rN) */
   int extdepth; /**< maximum recursion depth outside the start domain */
-  int urlmode;  /**< saved-link rewriting style (relative, absolute, etc.) */
+  hts_urlmode
+      urlmode; /**< saved-link rewriting style (relative, absolute, etc.) */
   int no_type_change;           // do not change file type according to MIME
   int debug;                    /**< debug logging level */
   int getmode;           /**< what to fetch (HTML, images, ...) bitmask */
@@ -335,7 +405,7 @@ struct httrackp {
   int maxrate;    /**< max transfer rate cap (bytes/s) */
   float maxconn;  /**< max connections per second */
   int waittime;   /**< scheduled start time (wall-clock seconds) */
-  int cache;      /**< cache generation mode */
+  hts_cachemode cache; /**< cache generation mode */
   // int aff_progress;     // progress bar
   int shell;         /**< driven by a shell over stdin/stdout pipes */
   t_proxy proxy;     /**< proxy configuration */
@@ -363,7 +433,7 @@ struct httrackp {
   int check_type;   /**< probe unknown-type links (cgi/asp/dir) and follow moves
                      */
   int all_in_cache; /**< keep all retrieved data in the cache */
-  int robots;       /**< robots.txt handling level */
+  hts_robots robots; /**< robots.txt handling level */
   int external;     /**< render external links as error pages */
   int passprivacy;  /**< strip passwords from external links */
   int includequery; /**< include the query string in saved names */

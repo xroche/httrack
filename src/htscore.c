@@ -1835,9 +1835,10 @@ int httpmirror(char *url1, httrackp * opt) {
                       a++;      // sauter espace(s)
                     if (strnotempty(a)) {
 #ifdef IGNORE_RESTRICTIVE_ROBOTS
-                      if (strcmp(a, "/") != 0 || opt->robots >= 3)
+                      if (strcmp(a, "/") != 0 ||
+                          opt->robots >= HTS_ROBOTS_ALWAYS_STRICT)
 #endif
-                      {         /* ignoring disallow: / */
+                      { /* ignoring disallow: / */
                         if ((strlen(buff) + strlen(a) + 8) < sizeof(buff)) {
                           strcatbuff(buff, a);
                           strcatbuff(buff, "\n");
@@ -1932,10 +1933,10 @@ int httpmirror(char *url1, httrackp * opt) {
                           "Warning: store %s without scan: %s", r.contenttype,
                           savename());
           } else {
-            if ((opt->getmode & 2) != 0) {      // ok autorisé
+            if ((opt->getmode & HTS_GETMODE_NONHTML) != 0) {
               hts_log_print(opt, LOG_DEBUG, "Store %s: %s", r.contenttype,
                             savename());
-            } else {            // lien non autorisé! (ex: cgi-bin en html)
+            } else { // lien non autorisé! (ex: cgi-bin en html)
               hts_log_print(opt, LOG_DEBUG,
                             "non-html file ignored after upload at %s : %s",
                             urladr(), urlfil());
@@ -2052,7 +2053,7 @@ int httpmirror(char *url1, httrackp * opt) {
     ptr++;
 
     // faut-il sauter le(s) lien(s) suivant(s)? (fichiers images à passer après les html)
-    if (opt->getmode & 4) {     // sauver les non html après
+    if (opt->getmode & HTS_GETMODE_HTML_FIRST) {
       // sauter les fichiers selon la passe
       if (!numero_passe) {
         while((ptr < opt->lien_tot) ? (heap(ptr)->pass2) : 0)
@@ -3736,10 +3737,10 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   // test all: bit 8 de travel
   if (from->travel > -1) {
-    if (from->travel & 256)
-      to->travel |= 256;
+    if (from->travel & HTS_TRAVEL_TEST_ALL)
+      to->travel |= HTS_TRAVEL_TEST_ALL;
     else
-      to->travel &= 255;
+      to->travel &= HTS_TRAVEL_SCOPE_MASK;
   }
 
   return 0;

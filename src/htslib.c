@@ -5434,17 +5434,17 @@ HTSEXT_API httrackp *hts_create_opt(void) {
 
   /* default settings */
 
-  opt->wizard = 2;              // wizard automatique
+  opt->wizard = HTS_WIZARD_AUTO; // wizard automatique
   opt->quiet = 0;               // questions
-  //  
-  opt->travel = 0;              // même adresse
+  //
+  opt->travel = HTS_TRAVEL_SAME_ADDRESS; // même adresse
   opt->depth = 9999;            // mirror total par défaut
   opt->extdepth = 0;            // mais pas à l'extérieur
-  opt->seeker = 1;              // down 
-  opt->urlmode = 2;             // relatif par défaut
+  opt->seeker = HTS_SEEKER_DOWN;       // down
+  opt->urlmode = HTS_URLMODE_RELATIVE; // relatif par défaut
   opt->no_type_change = 0;      // change file types
   opt->debug = LOG_NOTICE;      // small log
-  opt->getmode = 3;             // linear scan
+  opt->getmode = HTS_GETMODE_HTML | HTS_GETMODE_NONHTML;
   opt->maxsite = -1;            // taille max site (aucune)
   opt->maxfile_nonhtml = -1;    // taille max fichier non html
   opt->maxfile_html = -1;       // idem pour html
@@ -5458,7 +5458,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->makestat = 0;            // pas de fichier de stats
   opt->maketrack = 0;           // ni de tracking
   opt->timeout = 120;           // timeout par défaut (2 minutes)
-  opt->cache = 1;               // cache prioritaire
+  opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
   opt->shell = 0;               // pas de shell par defaut
   opt->proxy.active = 0;        // pas de proxy
   opt->user_agent_send = 1;     // envoyer un user-agent
@@ -5477,7 +5477,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->errpage = 1;             // copier ou générer une page d'erreur en cas d'erreur (404 etc.)
   opt->check_type = 1;          // vérifier type si inconnu (cgi,asp..) SAUF / considéré comme html
   opt->all_in_cache = 0;        // ne pas tout stocker en cache
-  opt->robots = 2;              // traiter les robots.txt
+  opt->robots = HTS_ROBOTS_ALWAYS; // traiter les robots.txt
   opt->external = 0;            // liens externes normaux
   opt->passprivacy = 0;         // mots de passe dans les fichiers
   opt->includequery = 1;        // include query-string par défaut

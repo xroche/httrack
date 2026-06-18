@@ -2779,7 +2779,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     if (strcmp(back[i].url_fil, "/robots.txt")) {
                       if (back[i].r.statuscode == HTTP_OK) {    // 'OK'
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil)) {  // pas HTML
-                          if (opt->getmode & 2) {       // on peut ecrire des non html
+                          if (opt->getmode & HTS_GETMODE_NONHTML) {
                             int fcheck = 0;
                             int last_errno = 0;
 
@@ -2852,7 +2852,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 }
                               }
                             }
-                          } else {      // on coupe tout!
+                          } else { // on coupe tout!
                             hts_log_print(opt, LOG_DEBUG,
                                           "File cancelled (non HTML): %s%s",
                                           back[i].url_adr, back[i].url_fil);
@@ -3661,7 +3661,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
                       if (sz >= 0) {
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_sav)) {  // pas HTML
-                          if (opt->getmode & 2) {       // on peut ecrire des non html  **sinon ben euhh sera intercepté plus loin, donc rap sur ce qui va sortir**
+                          if (opt->getmode & HTS_GETMODE_NONHTML) {
                             filenote(&opt->state.strc, back[i].url_sav, NULL);  // noter fichier comme connu
                             file_notify(opt, back[i].url_adr, back[i].url_fil,
                                         back[i].url_sav, 0, 1,

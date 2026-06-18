@@ -1431,7 +1431,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       StringBuff(opt->path_log), "hts-in_progress.lock"))) {        // fichier lock?
       //char s[32];
 
-      opt->cache = 1;           // cache prioritaire
+      opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
       if (opt->quiet == 0) {
         if ((fexist
              (fconcat
@@ -1465,7 +1465,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           (fconcat
            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html), "index.html"))) {
       //char s[32];
-      opt->cache = 2;           // cache vient après test de validité
+      opt->cache = HTS_CACHE_TEST_UPDATE;
       if (opt->quiet == 0) {
         if ((fexist
              (fconcat
@@ -1558,25 +1558,25 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             return 0;           // déja fait normalement
             //
           case 'g':            // récupérer un (ou plusieurs) fichiers isolés
-            opt->wizard = 2;    // le wizard on peut plus s'en passer..
+            opt->wizard = HTS_WIZARD_AUTO;
             //opt->wizard=0;             // pas de wizard
-            opt->cache = 0;     // ni de cache
+            opt->cache = HTS_CACHE_NONE; // ni de cache
             opt->makeindex = 0; // ni d'index
             httrack_logmode = 1;        // erreurs à l'écran
             opt->savename_type = 1003;  // mettre dans le répertoire courant
             opt->depth = 0;     // ne pas explorer la page
             opt->accept_cookie = 0;     // pas de cookies
-            opt->robots = 0;    // pas de robots
+            opt->robots = HTS_ROBOTS_NEVER; // pas de robots
             break;
           case 'w':
-            opt->wizard = 2;    // wizard 'soft' (ne pose pas de questions)
-            opt->travel = 0;
-            opt->seeker = 1;
+            opt->wizard = HTS_WIZARD_AUTO;
+            opt->travel = HTS_TRAVEL_SAME_ADDRESS;
+            opt->seeker = HTS_SEEKER_DOWN;
             break;
           case 'W':
-            opt->wizard = 1;    // Wizard-Help (pose des questions)
-            opt->travel = 0;
-            opt->seeker = 1;
+            opt->wizard = HTS_WIZARD_ASK; // Wizard-Help (pose des questions)
+            opt->travel = HTS_TRAVEL_SAME_ADDRESS;
+            opt->seeker = HTS_SEEKER_DOWN;
             break;
           case 'r':            // n'est plus le recurse get bestial mais wizard itou!
             if (isdigit((unsigned char) *(com + 1))) {
@@ -1598,19 +1598,23 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             // note: les tests opt->depth sont pour éviter de faire
             // un miroir du web (:-O) accidentelement ;-)
           case 'a':            /*if (opt->depth==9999) opt->depth=3; */
-            opt->travel = 0 + (opt->travel & 256);
+            opt->travel =
+                HTS_TRAVEL_SAME_ADDRESS + (opt->travel & HTS_TRAVEL_TEST_ALL);
             break;
           case 'd':            /*if (opt->depth==9999) opt->depth=3; */
-            opt->travel = 1 + (opt->travel & 256);
+            opt->travel =
+                HTS_TRAVEL_SAME_DOMAIN + (opt->travel & HTS_TRAVEL_TEST_ALL);
             break;
           case 'l':            /*if (opt->depth==9999) opt->depth=3; */
-            opt->travel = 2 + (opt->travel & 256);
+            opt->travel =
+                HTS_TRAVEL_SAME_TLD + (opt->travel & HTS_TRAVEL_TEST_ALL);
             break;
           case 'e':            /*if (opt->depth==9999) opt->depth=3; */
-            opt->travel = 7 + (opt->travel & 256);
+            opt->travel =
+                HTS_TRAVEL_EVERYWHERE + (opt->travel & HTS_TRAVEL_TEST_ALL);
             break;
           case 't':
-            opt->travel |= 256;
+            opt->travel |= HTS_TRAVEL_TEST_ALL;
             break;
           case 'n':
             opt->nearlink = 1;
@@ -1620,16 +1624,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'U':
-            opt->seeker = 2;
+            opt->seeker = HTS_SEEKER_UP;
             break;
           case 'D':
-            opt->seeker = 1;
+            opt->seeker = HTS_SEEKER_DOWN;
             break;
           case 'S':
             opt->seeker = 0;
             break;
           case 'B':
-            opt->seeker = 3;
+            opt->seeker = HTS_SEEKER_DOWN | HTS_SEEKER_UP;
             break;
             //
           case 'Y':
@@ -1659,12 +1663,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             //case 'A': opt->urlmode=1; break;
             //case 'R': opt->urlmode=2; break;
           case 'K':
-            opt->urlmode = 0;
+            opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->urlmode);
-              if (opt->urlmode == 0) {  // in fact K0 ==> K2
+              sscanf(com + 1, "%d", (int *) &opt->urlmode);
+              if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
-                opt->urlmode = 2;
+                opt->urlmode = HTS_URLMODE_RELATIVE;
               }
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
@@ -1831,11 +1835,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->robots);
+              sscanf(com + 1, "%d", (int *) &opt->robots);
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             } else
-              opt->robots = 1;
+              opt->robots = HTS_ROBOTS_SOMETIMES;
 #if DEBUG_ROBOTS
             printf("robots.txt mode set to %d\n", opt->robots);
 #endif
@@ -1853,11 +1857,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             //
           case 'C':
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->cache);
+              sscanf(com + 1, "%d", (int *) &opt->cache);
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             } else
-              opt->cache = 1;
+              opt->cache = HTS_CACHE_PRIORITY;
             break;
           case 'k':
             opt->all_in_cache = 1;
@@ -2045,7 +2049,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 // preserve: no footer, original links
               case 'p':
                 StringClear(opt->footer);
-                opt->urlmode = 4;
+                opt->urlmode = HTS_URLMODE_KEEP_ORIGINAL;
                 break;
               case 'L':        // URL list
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
@@ -3610,12 +3614,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         printf("Mirror launched on %s by HTTrack Website Copier/"
                HTTRACK_VERSION "%s " HTTRACK_AFF_AUTHORS "" LF, t,
                hts_get_version_info(opt));
-        if (opt->wizard == 0) {
+        if (opt->wizard == HTS_WIZARD_NONE) {
           printf
             ("mirroring %s with %d levels, %d sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",
              url, opt->depth, opt->maxsoc, opt->travel, opt->seeker,
              httrack_logmode, opt->urlmode, opt->getmode);
-        } else {                // the magic wizard
+        } else { // the magic wizard
           printf("mirroring %s with the wizard help..\n", url);
         }
       }

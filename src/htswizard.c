@@ -178,7 +178,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   // -------------------- PHASE 1 --------------------
 
   /* Doit-on traiter les non html? */
-  if ((opt->getmode & 2) == 0) {        // non on ne doit pas
+  if ((opt->getmode & HTS_GETMODE_NONHTML) == 0) { // non on ne doit pas
     if (!ishtml(opt, fil)) {    // non il ne faut pas
       //adr[0]='\0';    // ne pas traiter ce lien, pas traiter
       forbidden_url = 1;        // interdire récupération du lien
@@ -266,11 +266,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
               test2 =
                 (strchr(tempo2 + ((*tempo2 == '/') ? 1 : 0), '/') != NULL);
             if ((test1) && (test2)) {   // on ne peut que descendre
-              if ((opt->seeker & 1) == 0) {     // interdiction de descendre
+              if ((opt->seeker & HTS_SEEKER_DOWN) == 0) {
                 forbidden_url = 1;
                 hts_log_print(opt, LOG_DEBUG, "lower link canceled: %s%s", adr,
                               fil);
-              } else {          // autorisé à priori - NEW
+              } else {                         // autorisé à priori - NEW
                 if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
                   forbidden_url = 0;
                   hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
@@ -278,7 +278,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
                 }
               }
             } else if ((test1) || (test2)) {    // on peut descendre pour accéder au lien
-              if ((opt->seeker & 1) != 0) {     // on peut descendre - NEW
+              if ((opt->seeker & HTS_SEEKER_DOWN) != 0) {
                 if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
                   forbidden_url = 0;
                   hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
@@ -290,11 +290,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
           // up
           if ((!strncmp(tempo, "../", 3)) && (!strncmp(tempo2, "../", 3))) {    // impossible sans monter
-            if ((opt->seeker & 2) == 0) {       // interdiction de monter
+            if ((opt->seeker & HTS_SEEKER_UP) == 0) {
               forbidden_url = 1;
               hts_log_print(opt, LOG_DEBUG, "upper link canceled: %s%s", adr,
                             fil);
-            } else {            // autorisé à monter - NEW
+            } else {                           // autorisé à monter - NEW
               if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
                 forbidden_url = 0;
                 hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
@@ -302,13 +302,13 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
               }
             }
           } else if ((!strncmp(tempo, "../", 3)) || (!strncmp(tempo2, "../", 3))) {     // Possible en montant
-            if ((opt->seeker & 2) != 0) {       // autorisé à monter - NEW
+            if ((opt->seeker & HTS_SEEKER_UP) != 0) {
               if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
                 forbidden_url = 0;
                 hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
                               adr, fil);
               }
-            }                   // sinon autorisé en descente
+            } // sinon autorisé en descente
           }
 
         } else {
@@ -345,83 +345,81 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
     //if (!opt->wizard) {    // mode non wizard
     // doit-on traiter ce lien?.. vérifier droits de sortie
-    switch ((opt->travel & 255)) {
-    case 0:
+    switch ((opt->travel & HTS_TRAVEL_SCOPE_MASK)) {
+    case HTS_TRAVEL_SAME_ADDRESS:
       if (!opt->wizard)         // mode non wizard
         forbidden_url = 1;
       break;                    // interdicton de sortir au dela de l'adresse
-    case 1:{                   // sortie sur le même dom.xxx
-        size_t i = strlen(adr) - 1;
-        size_t j = strlen(urladr()) - 1;
+    case HTS_TRAVEL_SAME_DOMAIN: {
+      size_t i = strlen(adr) - 1;
+      size_t j = strlen(urladr()) - 1;
 
-        if ((i > 0) && (j > 0)) {
-          while((i > 0) && (adr[i] != '.'))
-            i--;
-          while((j > 0) && (urladr()[j] != '.'))
-            j--;
-          if ((i > 0) && (j > 0)) {
-            i--;
-            j--;
-            while((i > 0) && (adr[i] != '.'))
-              i--;
-            while((j > 0) && (urladr()[j] != '.'))
-              j--;
-          }
-        }
-        if ((i > 0) && (j > 0)) {
-          if (!strfield2(adr + i, urladr() + j)) {        // !=
-            if (!opt->wizard) { // mode non wizard
-              //printf("refused: %s\n",adr);
-              forbidden_url = 1;        // pas même domaine  
-              hts_log_print(opt, LOG_DEBUG,
-                            "foreign domain link canceled: %s%s", adr, fil);
-            }
-
-          } else {
-            if (opt->wizard) {  // mode wizard
-              forbidden_url = 0;        // même domaine  
-              hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
-                            adr, fil);
-            }
-          }
-
-        } else
-          forbidden_url = 1;
-      }
-      break;
-    case 2:{                   // sortie sur le même .xxx
-        size_t i = strlen(adr) - 1;
-        size_t j = strlen(urladr()) - 1;
-
-        while((i > 0) && (adr[i] != '.'))
+      if ((i > 0) && (j > 0)) {
+        while ((i > 0) && (adr[i] != '.'))
           i--;
-        while((j > 0) && (urladr()[j] != '.'))
+        while ((j > 0) && (urladr()[j] != '.'))
           j--;
         if ((i > 0) && (j > 0)) {
-          if (!strfield2(adr + i, urladr() + j)) {        // !-
-            if (!opt->wizard) { // mode non wizard
-              //printf("refused: %s\n",adr);
-              forbidden_url = 1;        // pas même .xx  
-              hts_log_print(opt, LOG_DEBUG,
-                            "foreign location link canceled: %s%s", adr, fil);
-            }
-          } else {
-            if (opt->wizard) {  // mode wizard
-              forbidden_url = 0;        // même domaine  
-              hts_log_print(opt, LOG_DEBUG,
-                            "same location link authorized: %s%s", adr, fil);
-            }
-          }
-        } else
-          forbidden_url = 1;
+          i--;
+          j--;
+          while ((i > 0) && (adr[i] != '.'))
+            i--;
+          while ((j > 0) && (urladr()[j] != '.'))
+            j--;
+        }
       }
-      break;
-    case 7:                    // everywhere!!
+      if ((i > 0) && (j > 0)) {
+        if (!strfield2(adr + i, urladr() + j)) { // !=
+          if (!opt->wizard) {                    // mode non wizard
+            // printf("refused: %s\n",adr);
+            forbidden_url = 1; // pas même domaine
+            hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
+                          adr, fil);
+          }
+
+        } else {
+          if (opt->wizard) {   // mode wizard
+            forbidden_url = 0; // même domaine
+            hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
+                          adr, fil);
+          }
+        }
+
+      } else
+        forbidden_url = 1;
+    } break;
+    case HTS_TRAVEL_SAME_TLD: {
+      size_t i = strlen(adr) - 1;
+      size_t j = strlen(urladr()) - 1;
+
+      while ((i > 0) && (adr[i] != '.'))
+        i--;
+      while ((j > 0) && (urladr()[j] != '.'))
+        j--;
+      if ((i > 0) && (j > 0)) {
+        if (!strfield2(adr + i, urladr() + j)) { // !-
+          if (!opt->wizard) {                    // mode non wizard
+            // printf("refused: %s\n",adr);
+            forbidden_url = 1; // pas même .xx
+            hts_log_print(opt, LOG_DEBUG,
+                          "foreign location link canceled: %s%s", adr, fil);
+          }
+        } else {
+          if (opt->wizard) {   // mode wizard
+            forbidden_url = 0; // même domaine
+            hts_log_print(opt, LOG_DEBUG, "same location link authorized: %s%s",
+                          adr, fil);
+          }
+        }
+      } else
+        forbidden_url = 1;
+    } break;
+    case HTS_TRAVEL_EVERYWHERE:
       if (opt->wizard) {        // mode wizard
         forbidden_url = 0;
         break;
       }
-    }                           // switch
+    } // switch
 
     // ANCIENNE POS -- récupérer les liens à côtés d'un lien (nearlink)
 
@@ -583,7 +581,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
     // on doit poser la question.. peut on la poser?
     // (oui je sais quel preuve de délicatesse, merci merci)      
     if ((question) && (ptr > 0) && (!force_mirror)) {
-      if (opt->wizard == 2) {   // éliminer tous les liens non répertoriés comme autorisés (ou inconnus)
+      if (opt->wizard == HTS_WIZARD_AUTO) {
         question = 0;
         forbidden_url = 1;
         hts_log_print(opt, LOG_DEBUG,
@@ -600,8 +598,8 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         printf("robots.txt forbidden: %s%s\n", adr, fil);
 #endif
         // question résolue, par les filtres, et mode robot non strict
-        if ((!question) && (filters_answer) && (opt->robots == 1)
-            && (forbidden_url != 1)) {
+        if ((!question) && (filters_answer) &&
+            (opt->robots == HTS_ROBOTS_SOMETIMES) && (forbidden_url != 1)) {
           r = 0;                // annuler interdiction des robots
           if (!forbidden_url) {
             hts_log_print(opt, LOG_DEBUG,
@@ -685,7 +683,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         io_flush;
       } else {                  // lien primaire: autoriser répertoire entier       
         if (!force_mirror) {
-          if ((opt->seeker & 1) == 0) { // interdiction de descendre
+          if ((opt->seeker & HTS_SEEKER_DOWN) == 0) {
             n = 7;
           } else {
             n = 5;              // autoriser miroir répertoires descendants (lien primaire)
@@ -712,7 +710,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       switch (n) {
       case -1:                 // sauter tout le reste
         forbidden_url = 1;
-        opt->wizard = 2;        // sauter tout le reste
+        opt->wizard = HTS_WIZARD_AUTO; // sauter tout le reste
         break;
       case 0: // forbid the same link: adr/fil
         forbidden_url = 1;
@@ -796,7 +794,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         break;
 
       case 5: // allow the whole directory and its children
-        if ((opt->seeker & 2) == 0) { // not allowed to go up
+        if ((opt->seeker & HTS_SEEKER_UP) == 0) { // not allowed to go up
           size_t i = strlen(fil) - 1;
 
           while((fil[i] != '/') && (i > 0))
@@ -872,7 +870,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   // lien non autorisé, peut-on juste le tester?
   if (just_test_it) {
     if (forbidden_url == 1) {
-      if (opt->travel & 256) {  // tester tout de même
+      if (opt->travel & HTS_TRAVEL_TEST_ALL) { // tester tout de même
         if (strfield(adr, "ftp://") == 0) {                   // PAS ftp!
           forbidden_url = 1;    // oui oui toujours interdit (note: sert à rien car ==1 mais c pour comprendre)
           *just_test_it = 1;    // mais on teste
