@@ -3096,6 +3096,41 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return 0;
                 break;
+              case '9': { // copy_htsopt selftest: httrack -#9
+                httrackp *from = hts_create_opt();
+                httrackp *to = hts_create_opt();
+                int err = 0;
+
+                /* from-values differ from both the to-values and the
+                   hts_create_opt() defaults (nearlink FALSE, errpage/parseall
+                   TRUE), so a copy that no-ops or just resets to defaults is
+                   caught too, not only the unsigned-guard bug. */
+                from->retry = 7; /* int field: positive control */
+                to->retry = 0;
+                from->nearlink = HTS_TRUE;
+                to->nearlink = HTS_FALSE;
+                from->errpage = HTS_FALSE;
+                to->errpage = HTS_TRUE;
+                from->parseall = HTS_FALSE;
+                to->parseall = HTS_TRUE;
+
+                copy_htsopt(from, to);
+
+                if (to->retry != 7)
+                  err = 1;
+                if (to->nearlink != HTS_TRUE)
+                  err = 1;
+                if (to->errpage != HTS_FALSE)
+                  err = 1;
+                if (to->parseall != HTS_FALSE)
+                  err = 1;
+
+                hts_free_opt(from);
+                hts_free_opt(to);
+                printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");
+                htsmain_free();
+                return err;
+              } break;
               case '!':
                 HTS_PANIC_PRINTF
                   ("Option #! is disabled for security reasons");
