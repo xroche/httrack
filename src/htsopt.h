@@ -368,6 +368,13 @@ typedef enum hts_savename_delayed {
   HTS_SAVENAME_DELAYED_HARD = 2  /**< always delay the type check (default) */
 } hts_savename_delayed;
 
+/* Saved-name length layout (opt->savename_83). */
+typedef enum hts_savename_83 {
+  HTS_SAVENAME_83_LONG = 0,   /**< long file names (default) */
+  HTS_SAVENAME_83_DOS = 1,    /**< DOS 8.3 names (ISO9660 level 1) */
+  HTS_SAVENAME_83_ISO9660 = 2 /**< ISO9660 level 2 names (up to 31 chars) */
+} hts_savename_83;
+
 /* Host-banning triggers (opt->hostcontrol bitmask). */
 typedef enum hts_hostcontrol {
   HTS_HOSTCONTROL_BAN_TIMEOUT = 1 << 0, /**< ban a timing-out host */
@@ -430,7 +437,8 @@ struct httrackp {
   // int aff_progress;     // progress bar
   hts_boolean shell; /**< driven by a shell over stdin/stdout pipes */
   t_proxy proxy;     /**< proxy configuration */
-  int savename_83;   /**< force 8.3 (DOS) file names */
+  hts_savename_83
+      savename_83;   /**< saved-name length layout (long/DOS/ISO9660) */
   int savename_type; /**< saved-name layout (original tree, flat, ...) */
   String
       savename_userdef; /**< user-defined name template (e.g. %h%p/%n%q.%t) */

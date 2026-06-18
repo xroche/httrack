@@ -184,10 +184,11 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* 8-3 ? */
   switch (opt->savename_83) {
-  case 1:                      // 8-3
+  case HTS_SAVENAME_83_DOS: // 8-3
     max_char = 8;
     break;
-  case 2:                      // Level 2 File names may be up to 31 characters.
+  case HTS_SAVENAME_83_ISO9660: // Level 2 File names may be up to 31
+                                // characters.
     max_char = 31;
     break;
   default:
@@ -324,7 +325,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   /* replace shtml to html.. */
-  if (opt->savename_delayed == 2)
+  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD)
     is_html = -1;               /* ALWAYS delay type */
   else
     is_html = ishtml(opt, fil);
@@ -363,7 +364,9 @@ int url_savename(lien_adrfilsave *const afs,
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
       if (!((opt->check_type == 1) && (fil[strlen(fil) - 1] == '/')))   // slash doit être html?
-        if (opt->savename_delayed == 2 || (ishtest = ishtml(opt, fil)) < 0) {   // on ne sait pas si c'est un html ou un fichier..
+        if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD ||
+            (ishtest = ishtml(opt, fil)) <
+                0) { // unsure whether it's html or a file
           // lire dans le cache
           htsblk r = cache_read_including_broken(opt, cache, adr, fil); // test uniquement
 
@@ -393,11 +396,12 @@ int url_savename(lien_adrfilsave *const afs,
             }
 #endif
             //
-          } else if (opt->savename_delayed != 2 && is_userknowntype(opt, fil)) {        /* PATCH BY BRIAN SCHRÖDER. 
-                                                                                           Lookup mimetype not only by extension, 
-                                                                                           but also by filename */
-            /* Note: "foo.cgi => text/html" means that foo.cgi shall have the text/html MIME file type,
-               that is, ".html" */
+          } else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD &&
+                     is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
+                              Lookup mimetype not only by extension,
+                              but also by filename */
+            /* Note: "foo.cgi => text/html" means that foo.cgi shall have the
+               text/html MIME file type, that is, ".html" */
             char BIGSTK mime[1024];
 
             mime[0] = ext[0] = '\0';
@@ -408,9 +412,13 @@ int url_savename(lien_adrfilsave *const afs,
               }
             }
           }
-          // note: if savename_delayed is enabled, the naming will be temporary (and slightly invalid!)
-          // note: if we are about to stop (opt->state.stop), back_add() will fail later
-          else if (opt->savename_delayed != 0 && !opt->state.stop) {
+          // note: if savename_delayed is enabled, the naming will be temporary
+          // (and slightly invalid!)
+          //
+          // note: if we are about to stop (opt->state.stop), back_add() will
+          // fail later
+          else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
+                   !opt->state.stop) {
             // Check if the file is ready in backing. We basically take the same logic as later.
             // FIXME: we should cleanup and factorize this unholy mess
             if (headers != NULL && headers->status >= 0 && !is_redirect) {
@@ -698,7 +706,7 @@ int url_savename(lien_adrfilsave *const afs,
             }
             // restaurer
             opt->state._hts_in_html_parsing = hihp;
-          }                     // caché?
+          } // caché?
         }
     }
   }
@@ -1190,7 +1198,8 @@ int url_savename(lien_adrfilsave *const afs,
   // Not used anymore unless non-delayed types.
   // de même en cas de manque d'extension on en place une de manière forcée..
   // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
-  if (opt->savename_type != -1 && opt->savename_delayed != 2) {
+  if (opt->savename_type != -1 &&
+      opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
     char *a = afs->save + strlen(afs->save) - 1;
 
     while((a > afs->save) && (*a != '.') && (*a != '/'))
@@ -1236,31 +1245,21 @@ int url_savename(lien_adrfilsave *const afs,
     size_t i;
     for(i = 0 ; afs->save[i] != '\0' ; i++) {
       unsigned char c = (unsigned char) afs->save[i];
-      if (c < 32      // control
-        || c == 127   // unwise
-        || c == '~'   // unix unwise
-        || c == '\\'  // windows separator
-        || c == ':'   // windows forbidden
-        || c == '*'   // windows forbidden
-        || c == '?'   // windows forbidden
-        || c == '\"'  // windows forbidden
-        || c == '<'   // windows forbidden
-        || c == '>'   // windows forbidden
-        || c == '|'   // windows forbidden
-        //|| c == '@' // ?
-        ||
-          (
-            opt->savename_83 == 2 // CDROM
-            &&
-            (
-              c == '-'
-              || c == '='
-              || c == '+'
-            )
-          )
-        )
-      {
-         afs->save[i] = '_';
+      if (c < 32       // control
+          || c == 127  // unwise
+          || c == '~'  // unix unwise
+          || c == '\\' // windows separator
+          || c == ':'  // windows forbidden
+          || c == '*'  // windows forbidden
+          || c == '?'  // windows forbidden
+          || c == '\"' // windows forbidden
+          || c == '<'  // windows forbidden
+          || c == '>'  // windows forbidden
+          || c == '|'  // windows forbidden
+          //|| c == '@' // ?
+          || (opt->savename_83 == HTS_SAVENAME_83_ISO9660 // CDROM
+              && (c == '-' || c == '=' || c == '+'))) {
+        afs->save[i] = '_';
       }
     }
   }
@@ -1521,7 +1520,8 @@ int url_savename(lien_adrfilsave *const afs,
           char *a = afs->save + strlen(afs->save) - 1;
           char *b;
           int n = 2;
-          char collisionSeparator = ((opt->savename_83 != 2) ? '-' : '_');
+          char collisionSeparator =
+              ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
 
           tempo[0] = '\0';
 

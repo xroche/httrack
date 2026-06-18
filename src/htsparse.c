@@ -4262,10 +4262,10 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             char com[256];
 
             linput(stdin, com, 200);
-            if (opt->verbosedisplay == 2)
-              opt->verbosedisplay = 1;
+            if (opt->verbosedisplay == HTS_VERBOSE_FULL)
+              opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
             else
-              opt->verbosedisplay = 2;
+              opt->verbosedisplay = HTS_VERBOSE_FULL;
             /* Info for wrappers */
             hts_log_print(opt, LOG_INFO, "engine: change-options");
             RUN_CALLBACK0(opt, chopt);
@@ -4375,7 +4375,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         printf("%c\x0d", ("/-\\|")[roll]);
         fflush(stdout);
       }
-    } else if (opt->verbosedisplay == 1) {
+    } else if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
       if (b >= 0) {
         if (back[b].r.statuscode == HTTP_OK)
           printf("%d/%d: %s%s (" LLintP " bytes) - OK\33[K\r", ptr, opt->lien_tot,
@@ -4466,8 +4466,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
   char in_error_msg[32];
 
   // resolve unresolved type
-  if (opt->savename_delayed != 0 && *forbidden_url == 0 && IS_DELAYED_EXT(afs->save)
-      && !opt->state.stop) {
+  if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
+      *forbidden_url == 0 && IS_DELAYED_EXT(afs->save) && !opt->state.stop) {
     int loops;
     int continue_loop;
 
@@ -4851,7 +4851,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       }
     }
 
-  }                             // delayed type check ?
+  } // delayed type check ?
 
   ENGINE_SAVE_CONTEXT_BASE();
 

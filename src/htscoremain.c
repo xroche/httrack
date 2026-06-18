@@ -612,12 +612,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* Terminal is a tty, may ask questions and display funny information */
   if (isatty(1)) {
     opt->quiet = 0;
-    opt->verbosedisplay = 1;
+    opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
   }
   /* Not a tty, no stdin input or funny output! */
   else {
     opt->quiet = 1;
-    opt->verbosedisplay = 0;
+    opt->verbosedisplay = HTS_VERBOSE_NONE;
   }
 #endif
 
@@ -1815,24 +1815,22 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 com++;
             }
             break;
-          case 'L':
-            {
-              sscanf(com + 1, "%d", &opt->savename_83);
-              switch (opt->savename_83) {
-              case 0:          // 8-3 (ISO9660 L1)
-                opt->savename_83 = 1;
-                break;
-              case 1:
-                opt->savename_83 = 0;
-                break;
-              default:         // 2 == ISO9660 (ISO9660 L2)
-                opt->savename_83 = 2;
-                break;
-              }
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+          case 'L': {
+            sscanf(com + 1, "%d", (int *) &opt->savename_83);
+            switch (opt->savename_83) {
+            case 0: // 8-3 (ISO9660 L1)
+              opt->savename_83 = HTS_SAVENAME_83_DOS;
+              break;
+            case 1:
+              opt->savename_83 = HTS_SAVENAME_83_LONG;
+              break;
+            default: // 2 == ISO9660 (ISO9660 L2)
+              opt->savename_83 = HTS_SAVENAME_83_ISO9660;
+              break;
             }
-            break;
+            while (isdigit((unsigned char) *(com + 1)))
+              com++;
+          } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
               sscanf(com + 1, "%d", (int *) &opt->robots);
@@ -1989,7 +1987,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;          // url hack
               case 'v':
-                opt->verbosedisplay = 2;
+                opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {
                   sscanf(com + 1, "%d", (int *) &opt->verbosedisplay);
                   while(isdigit((unsigned char) *(com + 1)))
@@ -2004,7 +2002,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'N':
-                opt->savename_delayed = 2;
+                opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
                 if (isdigit((unsigned char) *(com + 1))) {
                   sscanf(com + 1, "%d", (int *) &opt->savename_delayed);
                   while(isdigit((unsigned char) *(com + 1)))

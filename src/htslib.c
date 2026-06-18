@@ -5468,9 +5468,10 @@ HTSEXT_API httrackp *hts_create_opt(void) {
              "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
   StringCopy(opt->referer, "");
   StringCopy(opt->from, "");
-  opt->savename_83 = 0;         // noms longs par défaut
+  opt->savename_83 = HTS_SAVENAME_83_LONG; // long names by default
   opt->savename_type = 0;       // avec structure originale
-  opt->savename_delayed = 2;    // hard delayed type (default)
+  opt->savename_delayed =
+      HTS_SAVENAME_DELAYED_HARD; // always delay the type check (default)
   opt->delayed_cached = HTS_TRUE;
   opt->mimehtml = HTS_FALSE;
   opt->parsejava = HTSPARSE_DEFAULT;    // parser classes
@@ -5495,7 +5496,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->parseall = HTS_TRUE;
   opt->parsedebug = HTS_FALSE;
   opt->norecatch = HTS_FALSE;
-  opt->verbosedisplay = 0;      // pas d'animation texte
+  opt->verbosedisplay = HTS_VERBOSE_NONE; // no text animation
   opt->sizehack = HTS_FALSE;
   opt->urlhack = HTS_TRUE;
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
