@@ -354,6 +354,13 @@ typedef enum hts_travel_scope {
 #define HTS_TRAVEL_SCOPE_MASK 0xff   /**< mask selecting the scope value */
 #define HTS_TRAVEL_TEST_ALL (1 << 8) /**< also test forbidden URLs (-t) */
 
+/* Boolean option flag. An enum (not C bool) so the option fields stay int-sized
+   and the httrackp layout/ABI is unchanged. */
+#ifndef HTS_DEF_DEFSTRUCT_hts_boolean
+#define HTS_DEF_DEFSTRUCT_hts_boolean
+typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
+#endif
+
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
@@ -378,14 +385,14 @@ struct httrackp {
   size_t size_httrackp; /**< size of this structure (version/ABI guard) */
   /* */
   hts_wizard wizard; /**< interactive wizard level (none/ask/auto) */
-  int flush;    /**< fflush() log files after each write */
+  hts_boolean flush; /**< fflush() log files after each write */
   int travel;   /**< link-following scope (same domain, etc.) */
   int seeker;   /**< allowed direction: go up and/or down the tree */
   int depth;    /**< maximum recursion depth (-rN) */
   int extdepth; /**< maximum recursion depth outside the start domain */
   hts_urlmode
       urlmode; /**< saved-link rewriting style (relative, absolute, etc.) */
-  int no_type_change;           // do not change file type according to MIME
+  hts_boolean no_type_change;   // do not change file type according to MIME
   int debug;                    /**< debug logging level */
   int getmode;           /**< what to fetch (HTML, images, ...) bitmask */
   FILE *log;             /**< informational log stream; NULL mutes it */
@@ -395,10 +402,11 @@ struct httrackp {
   LLint maxfile_html;    /**< max bytes per HTML file */
   int maxsoc;            /**< max simultaneous sockets (-cN) */
   LLint fragment;        /**< split site after this many bytes */
-  int nearlink;   /**< also fetch images/data adjacent to a page but off-site */
-  int makeindex;  /**< build a top-level index.html */
-  int kindex;     /**< build a keyword index */
-  int delete_old; /**< delete locally obsolete files after update */
+  hts_boolean
+      nearlink; /**< also fetch images/data adjacent to a page but off-site */
+  hts_boolean makeindex;  /**< build a top-level index.html */
+  hts_boolean kindex;     /**< build a keyword index */
+  hts_boolean delete_old; /**< delete locally obsolete files after update */
   int timeout;    /**< connection timeout in seconds */
   int rateout;    /**< minimum transfer rate (bytes/s) before abort */
   int maxtime;    /**< max total mirror duration in seconds */
@@ -407,16 +415,17 @@ struct httrackp {
   int waittime;   /**< scheduled start time (wall-clock seconds) */
   hts_cachemode cache; /**< cache generation mode */
   // int aff_progress;     // progress bar
-  int shell;         /**< driven by a shell over stdin/stdout pipes */
+  hts_boolean shell; /**< driven by a shell over stdin/stdout pipes */
   t_proxy proxy;     /**< proxy configuration */
   int savename_83;   /**< force 8.3 (DOS) file names */
   int savename_type; /**< saved-name layout (original tree, flat, ...) */
   String
       savename_userdef; /**< user-defined name template (e.g. %h%p/%n%q.%t) */
   int savename_delayed;         // delayed type check
-  int delayed_cached;           // delayed type check can be cached to speedup updates
-  int mimehtml;                 /**< produce a single MIME/MHTML archive */
-  int user_agent_send;          /**< send a User-Agent header */
+  hts_boolean
+      delayed_cached;   // delayed type check can be cached to speedup updates
+  hts_boolean mimehtml; /**< produce a single MIME/MHTML archive */
+  hts_boolean user_agent_send;  /**< send a User-Agent header */
   String user_agent;            /**< User-Agent value (e.g. httrack/1.0) */
   String referer;               /**< Referer value to send */
   String from;                  /**< From value to send */
@@ -425,37 +434,39 @@ struct httrackp {
   String path_html_utf8; /**< output directory for the mirror, UTF-8 form */
   String path_bin;       /**< directory for HTML templates */
   int retry;             /**< extra retries on a failed transfer */
-  int makestat;          /**< maintain a transfer-statistics log */
-  int maketrack;         /**< maintain an operations-statistics log */
+  hts_boolean makestat;  /**< maintain a transfer-statistics log */
+  hts_boolean maketrack; /**< maintain an operations-statistics log */
   int parsejava;         /**< Java/JS parsing mode; see htsparsejava_flags */
   int hostcontrol;       /**< drop hosts that are too slow, etc. */
-  int errpage;           /**< generate an error page on 404 and similar */
-  int check_type;   /**< probe unknown-type links (cgi/asp/dir) and follow moves
-                     */
-  int all_in_cache; /**< keep all retrieved data in the cache */
+  hts_boolean errpage;   /**< generate an error page on 404 and similar */
+  hts_boolean
+      check_type; /**< probe unknown-type links (cgi/asp/dir) and follow moves
+                   */
+  hts_boolean all_in_cache; /**< keep all retrieved data in the cache */
   hts_robots robots; /**< robots.txt handling level */
-  int external;     /**< render external links as error pages */
-  int passprivacy;  /**< strip passwords from external links */
-  int includequery; /**< include the query string in saved names */
-  int mirror_first_page;        /**< only mirror the links of the first page */
+  hts_boolean external;          /**< render external links as error pages */
+  hts_boolean passprivacy;       /**< strip passwords from external links */
+  hts_boolean includequery;      /**< include the query string in saved names */
+  hts_boolean mirror_first_page; /**< only mirror the links of the first page */
   String sys_com;               /**< system command to run */
-  int sys_com_exec;             /**< actually execute sys_com */
-  int accept_cookie;            /**< accept and send cookies */
+  hts_boolean sys_com_exec;     /**< actually execute sys_com */
+  hts_boolean accept_cookie;    /**< accept and send cookies */
   t_cookie *cookie;             /**< cookie store */
-  int http10;                   /**< force HTTP/1.0 */
-  int nokeepalive;              /**< disable keep-alive */
-  int nocompression;            /**< disable content compression */
-  int sizehack;                 /**< treat same-size response as "updated" */
-  int urlhack;                  // force "url normalization" to avoid loops
-  int tolerant;                 /**< accept an incorrect Content-Length */
-  int parseall;   /**< parse aggressively, including unknown tags with links */
-  int parsedebug; /**< parser debug mode */
-  int norecatch;  /**< do not re-fetch files the user deleted locally */
+  hts_boolean http10;           /**< force HTTP/1.0 */
+  hts_boolean nokeepalive;      /**< disable keep-alive */
+  hts_boolean nocompression;    /**< disable content compression */
+  hts_boolean sizehack;         /**< treat same-size response as "updated" */
+  hts_boolean urlhack;          // force "url normalization" to avoid loops
+  hts_boolean tolerant;         /**< accept an incorrect Content-Length */
+  hts_boolean
+      parseall; /**< parse aggressively, including unknown tags with links */
+  hts_boolean parsedebug; /**< parser debug mode */
+  hts_boolean norecatch;  /**< do not re-fetch files the user deleted locally */
   int verbosedisplay; /**< animated text progress display */
   String footer;      /**< footer/info line injected into pages */
   int maxcache;       /**< in-memory cache backing limit (bytes) */
   // int maxcache_anticipate; // maximum links to anticipate (upper bound)
-  int ftp_proxy;                /**< use the HTTP proxy for FTP too */
+  hts_boolean ftp_proxy;        /**< use the HTTP proxy for FTP too */
   String filelist;              /**< file listing URLs to include */
   String urllist;               /**< file listing filters to include */
   htsfilters filters;           /**< filter pointers (+/-pattern rules) */
@@ -469,20 +480,20 @@ struct httrackp {
   String headers;               // Additional headers
   String mimedefs;              // ext1=mimetype1\next2=mimetype2..
   String mod_blacklist;         /**< blacklisted modules */
-  int convert_utf8;             // filenames UTF-8 conversion (3.46)
+  hts_boolean convert_utf8;     // filenames UTF-8 conversion (3.46)
   //
   int maxlink;   /**< max number of links */
   int maxfilter; /**< max number of filters */
   //
   const char *exec; /**< path of the running executable */
   //
-  int quiet;                    /**< suppress non-wizard questions */
-  int keyboard;                 /**< poll stdin for keyboard input */
-  int bypass_limits;            // bypass built-in limits
-  int background_on_suspend;    // background process on suspend signal
+  hts_boolean quiet;                 /**< suppress non-wizard questions */
+  hts_boolean keyboard;              /**< poll stdin for keyboard input */
+  hts_boolean bypass_limits;         // bypass built-in limits
+  hts_boolean background_on_suspend; // background process on suspend signal
   //
-  int is_update;    /**< this run is an update (show "File updated...") */
-  int dir_topindex; /**< rebuild the top index afterwards */
+  hts_boolean is_update; /**< this run is an update (show "File updated...") */
+  hts_boolean dir_topindex; /**< rebuild the top index afterwards */
   //
   // callbacks
   t_hts_htmlcheck_callbacks
