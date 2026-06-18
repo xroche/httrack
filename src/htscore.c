@@ -3342,7 +3342,8 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
               int ptr, int numero_passe) {
   int n = back_pluggable_sockets(sback, opt);
 
-  if (opt->savename_delayed == 2 && !opt->delayed_cached)       /* cancel (always delayed) */
+  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD &&
+      !opt->delayed_cached) /* cancel (always delayed) */
     return 0;
   if (n > 0) {
     int p;
@@ -3846,7 +3847,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             a = opt->savename_type;
             b = opt->savename_83;
             opt->savename_type = 0;
-            opt->savename_83 = 0;
+            opt->savename_83 = HTS_SAVENAME_83_LONG;
             // note: adr,fil peuvent être patchés
             r =
               url_savename(&afs, NULL, NULL, NULL, opt, sback, cache, hashptr, ptr, numero_passe,

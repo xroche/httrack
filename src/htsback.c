@@ -3838,7 +3838,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         /* funny log for commandline users */
         //if (!opt->quiet) {  
         // petite animation
-        if (opt->verbosedisplay == 1) {
+        if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
           if (back[i].status == STATUS_READY) {
             if (back[i].r.statuscode == HTTP_OK)
               printf("* %s%s (" LLintP " bytes) - OK" VT_CLREOL "\r",

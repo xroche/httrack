@@ -288,7 +288,7 @@ static void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
 }
 static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
   use_show = 0;
-  if (opt->verbosedisplay == 2) {
+  if (opt->verbosedisplay == HTS_VERBOSE_FULL) {
     use_show = 1;
     vt_clear();
   }
@@ -852,7 +852,7 @@ static void sig_doback(int blind) {     // mettre en backing
   if (global_opt != NULL) {
     // suppress logging and asking lousy questions
     global_opt->quiet = 1;
-    global_opt->verbosedisplay = 0;
+    global_opt->verbosedisplay = HTS_VERBOSE_NONE;
   }
 
   if (!blind)
