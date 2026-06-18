@@ -2585,7 +2585,7 @@ static int mkdir_compat(const char *pathname) {
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
 /* Note: preserve errno */
-HTSEXT_API int dir_exists(const char *path) {
+HTSEXT_API hts_boolean dir_exists(const char *path) {
   const int err = errno;
   STRUCT_STAT st;
   char BIGSTK file[HTS_URLMAXSIZE * 2];
@@ -3646,7 +3646,7 @@ HTSEXT_API int hts_setpause(httrackp * opt, int p) {
 }
 
 // ask for termination
-HTSEXT_API int hts_request_stop(httrackp * opt, int force) {
+HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean force) {
   if (opt != NULL) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     hts_mutexlock(&opt->state.lock);
@@ -3656,7 +3656,7 @@ HTSEXT_API int hts_request_stop(httrackp * opt, int force) {
   return 0;
 }
 
-HTSEXT_API int hts_has_stopped(httrackp * opt) {
+HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt) {
   int ended;
   hts_mutexlock(&opt->state.lock);
   ended = opt->state.is_ended;
@@ -3678,12 +3678,12 @@ HTSEXT_API int hts_has_stopped(httrackp * opt) {
 //}
 // ajout d'URL
 // -1 : erreur
-HTSEXT_API int hts_addurl(httrackp * opt, char **url) {
+HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
   if (url)
     opt->state._hts_addurl = url;
   return (opt->state._hts_addurl != NULL);
 }
-HTSEXT_API int hts_resetaddurl(httrackp * opt) {
+HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt) {
   opt->state._hts_addurl = NULL;
   return (opt->state._hts_addurl != NULL);
 }

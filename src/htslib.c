@@ -3646,8 +3646,9 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
 // DOES NOT DECODE %25 (part of CHAR_DELIM)
 // no_high & 1: decode high chars
 // no_high & 2: decode space
-HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, 
-                                      const char *s, const int no_high) {
+HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
+                                      const char *s,
+                                      const hts_boolean no_high) {
   size_t i, j;
 
   RUNTIME_TIME_CHECK_SIZE(size);
@@ -3931,8 +3932,8 @@ void hts_replace(char *s, char from, char to) {
 
 // guess a local file's mime type (e.g. fil="toto.gif" -> s="image/gif")
 // returns 1 if a type was written to s, 0 otherwise
-int guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
-                         const char *fil) {
+hts_boolean guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                 const char *fil) {
   return get_httptype_sized(opt, s, ssize, fil, 1);
 }
 
@@ -3945,8 +3946,8 @@ void guess_httptype(httrackp * opt, char *s, const char *fil) {
 // write the mime type for fil into s (capacity ssize)
 // flag: 1 to always return a type (the "application/..." / octet-stream
 // fallback) returns 1 if a type was written to s, 0 otherwise
-HTSEXT_API int get_httptype_sized(httrackp *opt, char *s, size_t ssize,
-                                  const char *fil, int flag) {
+HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
+                                          const char *fil, hts_boolean flag) {
   // userdef overrides get_httptype (a rule with an empty value, e.g. "--assume
   // cgi=", matches but writes nothing: report it as "no type" like the old
   // code, whose callers tested strnotempty(s))
@@ -4196,7 +4197,7 @@ HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil) {
 
 // page dynamique?
 // is_dyntype(get_ext("foo.asp"))
-HTSEXT_API int is_dyntype(const char *fil) {
+HTSEXT_API hts_boolean is_dyntype(const char *fil) {
   int j = 0;
 
   if (!fil)
@@ -4214,7 +4215,7 @@ HTSEXT_API int is_dyntype(const char *fil) {
 
 // types critiques qui ne doivent pas être changés car renvoyés par des serveurs qui ne
 // connaissent pas le type
-int may_unknown(httrackp * opt, const char *st) {
+hts_boolean may_unknown(httrackp *opt, const char *st) {
   int j = 0;
 
   // types média
@@ -5236,7 +5237,8 @@ HTSEXT_API int hts_uninit_module(void) {
 }
 
 // legacy. do not use
-HTSEXT_API int hts_log(httrackp * opt, const char *prefix, const char *msg) {
+HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
+                               const char *msg) {
   if (opt->log != NULL) {
     fspc(opt, opt->log, prefix);
     fprintf(opt->log, "%s" LF, msg);
