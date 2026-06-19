@@ -953,9 +953,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       p = buff;
       do {
         int insert_after_argc;
+        int quoted; /* "" unquotes to empty but is still a real token (#106) */
 
         // read next
         lastp = p;
+        quoted = (p != NULL && *p == '"');
         if (p) {
           p = next_token(p, 1);
           if (p) {
@@ -966,7 +968,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
         /* Insert parameters BUT so that they can be in the same order */
         if (lastp) {
-          if (strnotempty(lastp)) {
+          if (strnotempty(lastp) || quoted) {
             insert_after_argc = argc - insert_after;
             cmdl_ins(lastp, insert_after_argc, (argv + insert_after), x_argvblk,
                      x_argvblk_size, x_ptr);
