@@ -198,6 +198,17 @@ HTS_INLINE void deletesoc_r(htsblk * r);
 htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
+int check_writeinput_t(T_SOC soc, int timeout);
+
+/* Open an HTTP CONNECT tunnel through the active proxy for an https request:
+   `retour->soc` must already be TCP-connected to the proxy, and `adr` is the
+   origin authority (url_adr, e.g. "https://host:port"). Sends the CONNECT
+   request (with Proxy-Authorization when the proxy carries credentials) and
+   reads the proxy's status line, so the caller's TLS handshake then runs
+   end-to-end with the origin. Blocks up to `timeout` seconds. Returns 1 on a
+   2xx tunnel, 0 on failure (retour->msg/statuscode set). */
+int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
+                      int timeout);
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);

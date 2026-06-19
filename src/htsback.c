@@ -2532,8 +2532,26 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_USEOPENSSL
           /* SSL mode */
           if (back[i].r.ssl) {
+            int tunnel_ok = 1;
+
+            // https via proxy: CONNECT-tunnel before TLS (#85)
+            if (back[i].r.req.proxy.active && back[i].r.ssl_con == NULL) {
+              const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
+
+              tunnel_ok =
+                  http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout);
+              if (!tunnel_ok) {
+                if (!strnotempty(back[i].r.msg))
+                  strcpybuff(back[i].r.msg, "proxy CONNECT failed");
+                deletehttp(&back[i].r);
+                back[i].r.soc = INVALID_SOCKET;
+                back[i].r.statuscode = STATUSCODE_NON_FATAL;
+                back[i].status = STATUS_READY;
+                back_set_finished(sback, i);
+              }
+            }
             // handshake not yet launched
-            if (!back[i].r.ssl_con) {
+            if (tunnel_ok && !back[i].r.ssl_con) {
               SSL_CTX_set_options(openssl_ctx, SSL_OP_ALL);
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
@@ -2551,7 +2569,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
             }
             /* Error */
-            if (back[i].r.statuscode == STATUSCODE_SSL_HANDSHAKE) {
+            if (tunnel_ok && back[i].r.statuscode == STATUSCODE_SSL_HANDSHAKE) {
               strcpybuff(back[i].r.msg, "bad SSL/TLS handshake");
               deletehttp(&back[i].r);
               back[i].r.soc = INVALID_SOCKET;
