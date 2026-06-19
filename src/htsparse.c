@@ -296,6 +296,12 @@ static const char *html_inline_safe(const char *src, char *dst, size_t size) {
   return dst;
 }
 
+/* Byte before html, or a space sentinel at the buffer start where html[-1]
+   would underflow; space reads as the word boundary the guards want there. */
+static HTS_INLINE char html_prevc(const char *html, const char *start) {
+  return html > start ? html[-1] : ' ';
+}
+
 /* Main parser */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
@@ -556,7 +562,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (opt->getmode & HTS_GETMODE_HTML) {
                     p = strfield(html, "title");
                     if (p) {
-                      if (*(html - 1) == '/')
+                      if (html_prevc(html, r->adr) == '/')
                         p = 0;  // /title
                     } else {
                       if (strfield(html, "/html"))
@@ -1360,9 +1366,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (!nc)
                         nc = strfield(html, ":location");        // javascript:location="doc"
                       if (!nc) {        // location="doc"
-                        if ((nc = strfield(html, "location"))
-                            && !isspace(*(html - 1))
-                          )
+                        if ((nc = strfield(html, "location")) &&
+                            !isspace(html_prevc(html, r->adr)))
                           nc = 0;
                       }
                       if (!nc)
@@ -1383,7 +1388,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           expected = '(';       // parenthèse
                           expected_end = ")";   // fin: parenthèse
                         }
-                      if (!nc && (nc = strfield(html, "url")) && (!isalnum(*(html - 1))) && *(html - 1) != '_') {  // url(url)
+                      if (!nc && (nc = strfield(html, "url")) &&
+                          (!isalnum(html_prevc(html, r->adr))) &&
+                          html_prevc(html, r->adr) != '_') { // url(url)
                         expected = '('; // parenthèse
                         expected_end = ")";     // fin: parenthèse
                         can_avoid_quotes = 1;

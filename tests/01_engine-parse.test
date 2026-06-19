@@ -220,4 +220,15 @@ crawl "$site5/main.css" "$out5"
 found "good.css" "$out5"
 notfound "trunc" "$out5"
 
+# Offset-0 underflow (#396): a token at the buffer start makes the detector's
+# word-boundary guard read *(html-1) one byte early (aborts under ASan). The
+# url() target is still captured; here it just must not underflow.
+site6="$tmp/parse-off0"
+mkdir -p "$site6"
+printf 'body{}\n' >"$site6/off0.css"
+printf 'url(off0.css)\n' >"$site6/main.css"
+out6="$tmp/parse-off0-out"
+crawl "$site6/main.css" "$out6"
+found "off0.css" "$out6"
+
 exit 0
