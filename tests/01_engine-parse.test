@@ -264,4 +264,63 @@ grep -Fq 'window.open("winopen.gif")' "$saved7" ||
 ! grep -Fq 'window.open("file://' "$saved7" ||
     ! echo "FAIL #218: window.open URL left absolute (not rewritten)" || exit 1
 
+# Parens in an unquoted url(...) (#163): the source %28/%29 decode to literal
+# '(' ')' in the saved name, but a literal ')' in the rewritten url() closes the
+# token early, so they must stay encoded. Negative control: without the fix the
+# %281%29 greps fail (parens are RFC2396 "mark" chars the escaper leaves alone).
+site8="$tmp/cssparens"
+mkdir -p "$site8"
+for f in 'img (1).gif' 'a(b)c(1).gif' 'q (4).gif'; do gif "$site8/$f"; done
+cat >"$site8/style.css" <<'EOF'
+.a { background: url(img%20%281%29.gif); }
+.b { background: url(a%28b%29c%281%29.gif); }
+.c { background: url("q%20%284%29.gif"); }
+EOF
+out8="$tmp/cssparens-out"
+crawl "$site8/style.css" "$out8"
+found "img (1).gif" "$out8"
+found "a(b)c(1).gif" "$out8"
+found "q (4).gif" "$out8"
+css8=$(find "$out8" -type f -path '*/file/*' -name style.css -print -quit)
+test -n "$css8" || ! echo "FAIL: saved style.css not found" || exit 1
+grep -Fq 'url(img%20%281%29.gif)' "$css8" ||
+    ! echo "FAIL #163: parens in unquoted url() not percent-encoded on rewrite" || exit 1
+grep -Fq 'url(a%28b%29c%281%29.gif)' "$css8" ||
+    ! echo "FAIL #163: not every paren in a url() was percent-encoded" || exit 1
+grep -Fq 'url("q%20%284%29.gif")' "$css8" ||
+    ! echo "FAIL #163: quoted url() altered or parens left literal on rewrite" || exit 1
+
+# The url() detector is not CSS-specific: <script> and inline style= get the
+# same encoding, but ordinary href/src (ending_p is the quote, not ')') keep
+# literal parens -- the attribute checks guard the gate against over-firing.
+site9="$tmp/urlparens"
+mkdir -p "$site9"
+for f in 'js (1).gif' 'inl (2).gif' 'asrc (3).gif' 'ahref (4).gif'; do gif "$site9/$f"; done
+cat >"$site9/index.html" <<EOF
+<html><body>
+<script>var bg = "url(js%20%281%29.gif)";</script>
+<div style="background-image:url(inl%20%282%29.gif)"></div>
+<img src="asrc%20%283%29.gif">
+<a href="ahref%20%284%29.gif">link</a>
+</body></html>
+EOF
+out9="$tmp/urlparens-out"
+crawl "$site9/index.html" "$out9"
+saved9=$(savedhtml "$out9")
+test -n "$saved9" || ! echo "FAIL: saved urlparens page not found" || exit 1
+# rewrite-only: the JS-string asset is not queued for download
+grep -Fq 'url(js%20%281%29.gif)' "$saved9" ||
+    ! echo "FAIL #163: parens in <script> url() not percent-encoded" || exit 1
+found "inl (2).gif" "$out9"
+grep -Fq 'url(inl%20%282%29.gif)' "$saved9" ||
+    ! echo "FAIL #163: parens in inline style url() not percent-encoded" || exit 1
+found "asrc (3).gif" "$out9"
+found "ahref (4).gif" "$out9"
+grep -Fq 'src="asrc%20(3).gif"' "$saved9" ||
+    ! echo "FAIL #163: parens in a plain src attribute were wrongly encoded" || exit 1
+grep -Fq 'href="ahref%20(4).gif"' "$saved9" ||
+    ! echo "FAIL #163: parens in a plain href attribute were wrongly encoded" || exit 1
+! grep -Eq '(src|href)="[^"]*%28' "$saved9" ||
+    ! echo "FAIL #163: gate over-fired onto a non-url() attribute link" || exit 1
+
 exit 0
