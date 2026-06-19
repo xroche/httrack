@@ -1411,6 +1411,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if ((*a == 34) || (*a == '\'') || (can_avoid_quotes)) {
                             const char *b, *c;
                             int ndelim = 1;
+                            int valid_url = 0;
 
                             if ((*a == 34) || (*a == '\''))
                               a++;
@@ -1425,12 +1426,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 b++;
                             }
                             c = b--;
-                            c += ndelim;
-                            while(*c == ' ')
-                              c++;
-                            if ((strchr(expected_end, *c)) || (*c == '\n')
-                                || (*c == '\r')
-                                || (is_import && *(b + 1 + ndelim) == ' ')) {
+                            // no closing delimiter here (truncated input):
+                            // Don't scan past the buffer NUL or capture it.
+                            if (*c != '\0') {
+                              c += ndelim;
+                              while (*c == ' ')
+                                c++;
+                              valid_url =
+                                  (strchr(expected_end, *c)) || (*c == '\n') ||
+                                  (*c == '\r') ||
+                                  (is_import && *(b + 1 + ndelim) == ' ');
+                            }
+                            if (valid_url) {
                               // URL end = last char (b), not the delimiter
                               c = b;
                               if ((int) (c - a + 1)) {
@@ -1491,7 +1498,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 }
                               }
                             }
-
                           }
                         }
                       }
