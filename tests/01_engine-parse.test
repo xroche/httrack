@@ -154,4 +154,26 @@ grep -Eq "style=\"background-image:url\('ibgs\.gif'\)\"" "$saved2" ||
 grep -q 'title="file://' "$saved2" ||
     ! echo "FAIL: a no-detect attribute (title) was wrongly rewritten" || exit 1
 
+# xmlns / xmlns:prefix decls must not be crawled (#191). Local file:// targets so a
+# regression downloads them; each is the LAST attr (heuristic only scans a value before '>').
+site3="$tmp/xmlns"
+mkdir -p "$site3"
+for f in ns og rdfs real; do gif "$site3/$f.gif"; done
+cat >"$site3/index.html" <<EOF
+<html xmlns="file://$site3/ns.gif"><body>
+<svg xmlns:og="file://$site3/og.gif"></svg>
+<div class="c" xmlns:rdfs="file://$site3/rdfs.gif"></div>
+<a href="file://$site3/real.gif">real link</a>
+</body></html>
+EOF
+out3="$tmp/xmlns-out"
+crawl "$site3/index.html" "$out3"
+
+# the real link is still captured
+found "real.gif" "$out3"
+# namespace-declaration targets must not be fetched (default + prefixed forms)
+notfound "ns.gif" "$out3"
+notfound "og.gif" "$out3"
+notfound "rdfs.gif" "$out3"
+
 exit 0

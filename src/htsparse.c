@@ -1692,6 +1692,24 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                                               hts_nodetect[i -
                                                                            1]);
                                               }
+                                              // xmlns / xmlns:prefix declare
+                                              // XML namespaces, not resources
+                                              // (#191)
+                                              else {
+                                                const int xl = strfield(
+                                                    intag_startattr, "xmlns");
+                                                const char xc =
+                                                    intag_startattr[xl];
+                                                if (xl &&
+                                                    (xc == ':' || xc == '=' ||
+                                                     is_space(xc))) {
+                                                  url_ok = 0;
+                                                  hts_log_print(
+                                                      opt, LOG_DEBUG,
+                                                      "dirty parsing: xmlns "
+                                                      "namespace avoided");
+                                                }
+                                              }
                                             }
                                   }
 
