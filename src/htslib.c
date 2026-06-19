@@ -644,9 +644,8 @@ T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * reto
   return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
 }
 
-// Read one CRLF-terminated line from a non-blocking socket, waiting up to
-// timeout seconds for each chunk. Strips CR, stops at LF. Returns the line
-// length (0 for an empty line), or -1 on timeout/EOF/error.
+// Read a CRLF line from a non-blocking socket (waits up to timeout per recv).
+// Returns the line length (0 = empty), or -1 on timeout/EOF/error.
 static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
   int j = 0;
 
@@ -662,8 +661,9 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
         continue;
       if (ch == 10) // LF: end of line
         break;
-      if (j < max - 1)
-        s[j++] = (char) ch;
+      if (j >= max - 1)
+        return -1; // line too long: bound the read against a hostile proxy
+      s[j++] = (char) ch;
     } else if (n == 0) {
       return -1; // connection closed
     } else {
@@ -686,25 +686,38 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   const T_SOC soc = retour->soc;
   const char *const host = jump_identification_const(adr); // host[:port]
   const char *const portsep = jump_toport_const(adr);      // ":port" or NULL
-  char BIGSTK authority[HTS_URLMAXSIZE];
-  char BIGSTK req[HTS_URLMAXSIZE * 2 + 1100];
+  char BIGSTK authority[HTS_URLMAXSIZE * 2];
+  char BIGSTK req[HTS_URLMAXSIZE * 4 + 1100];
   char line[1024];
   int code;
 
   if (soc == INVALID_SOCKET)
     return 0;
 
-  // CONNECT needs an explicit "host:port" authority; default the https port
+  // CONNECT needs an explicit host:port; default the https port
   authority[0] = '\0';
   if (portsep != NULL)
     strlcatbuff(authority, host, sizeof(authority)); // already host:port
   else
     snprintf(authority, sizeof(authority), "%s:%d", host, 443);
 
+  // backstop: never let a stray CR/LF in the host smuggle a second line into
+  // the CONNECT request (the host is already sanitized upstream)
+  {
+    const char *c;
+
+    for (c = authority; *c != '\0'; c++) {
+      if ((unsigned char) *c < ' ') {
+        strcpybuff(retour->msg, "proxy CONNECT: invalid host");
+        return 0;
+      }
+    }
+  }
+
   snprintf(req, sizeof(req), "CONNECT %s HTTP/1.0" H_CRLF "Host: %s" H_CRLF,
            authority, authority);
 
-  // proxy credentials ride the CONNECT request, not the tunneled origin request
+  // creds go on the CONNECT, not the tunneled origin request
   if (link_has_authorization(retour->req.proxy.name)) {
     const char *a = jump_identification_const(retour->req.proxy.name);
     const char *astart = jump_protocol_const(retour->req.proxy.name);
@@ -723,10 +736,11 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 
-  // send the request (raw: retour->ssl is set, so sendc() would route to TLS)
+  // raw send: ssl is set, so sendc() would route to TLS
   {
     const char *p = req;
     size_t remain = strlen(req);
+    int stalls = 0;
 
     while (remain > 0) {
       const int n = (int) send(soc, p, (int) remain, 0);
@@ -734,6 +748,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
       if (n > 0) {
         p += n;
         remain -= (size_t) n;
+        stalls = 0;
       } else {
 #ifdef _WIN32
         const int wouldblock = (WSAGetLastError() == WSAEWOULDBLOCK);
@@ -741,8 +756,9 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
         const int wouldblock =
             (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
 #endif
-        // a fatal send error must not spin against an always-writable select
-        if (!wouldblock || !check_writeinput_t(soc, timeout)) {
+        // don't spin forever on a fatal error or an unwritable socket
+        if (!wouldblock || !check_writeinput_t(soc, timeout) ||
+            ++stalls > 100) {
           strcpybuff(retour->msg, "proxy CONNECT: write error");
           return 0;
         }
@@ -763,17 +779,25 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     return 0;
   }
 
-  // drain the proxy response headers up to the blank line, so the TLS
-  // handshake starts at the first tunneled byte
-  for (;;) {
-    const int n = proxy_getline(soc, line, sizeof(line), timeout);
+  // drain headers to the blank line; cap the count so a flooding proxy can't
+  // stall the crawl
+  {
+    int headers = 0;
 
-    if (n < 0) {
-      strcpybuff(retour->msg, "proxy CONNECT: truncated response");
-      return 0;
+    for (;;) {
+      const int n = proxy_getline(soc, line, sizeof(line), timeout);
+
+      if (n < 0) {
+        strcpybuff(retour->msg, "proxy CONNECT: truncated response");
+        return 0;
+      }
+      if (n == 0)
+        break; // blank line: tunnel ready
+      if (++headers > 64) {
+        strcpybuff(retour->msg, "proxy CONNECT: too many response headers");
+        return 0;
+      }
     }
-    if (n == 0)
-      break; // blank line: tunnel ready
   }
 
   return 1;
@@ -819,8 +843,8 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
     if ((!(retour->req.proxy.active)) || (strcmp(adr, "file://") == 0)) {
       soc = newhttp(opt, adr, retour, -1, waitconnect);
     } else {
-      // open to the proxy instead; https reaches the origin through a CONNECT
-      // tunnel set up in back_wait once this connection is up (issue #85)
+      // to the proxy; https tunnels to the origin via CONNECT in back_wait
+      // (#85)
       soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port,
                     waitconnect);
     }
@@ -1178,8 +1202,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     if (xsend)
       print_buffer(&bstr, "%s", xsend);  // éventuelles autres lignes
 
-    // proxy authentication (for https it rides the CONNECT request instead, so
-    // it is not leaked to the origin through the tunnel)
+    // for https, auth rides the CONNECT (the tunneled GET would leak it)
     if (retour->req.proxy.active && strncmp(adr, "https://", 8) != 0) {
       if (link_has_authorization(retour->req.proxy.name)) {     // et hop, authentification proxy!
         const char *a = jump_identification_const(retour->req.proxy.name);

@@ -2534,8 +2534,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           if (back[i].r.ssl) {
             int tunnel_ok = 1;
 
-            // https through a proxy: open a CONNECT tunnel before the TLS
-            // handshake so TLS runs end-to-end with the origin (issue #85)
+            // https via proxy: CONNECT-tunnel before TLS (#85)
             if (back[i].r.req.proxy.active && back[i].r.ssl_con == NULL) {
               const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
 

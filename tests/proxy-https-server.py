@@ -3,13 +3,20 @@
 
 Starts a TLS origin server and an HTTP proxy that honours CONNECT, on ephemeral
 ports. Every request line the proxy receives (and any Proxy-Authorization) is
-appended to the log file, so the test can assert that an https crawl really
-tunneled through the proxy instead of bypassing it.
+appended to the proxy log; every header the origin receives over the tunnel is
+appended to the origin log. That lets the test assert both that an https crawl
+tunneled through the proxy and that proxy credentials never leaked to the origin.
 
-Usage: proxy-https-server.py <cert.pem> <logfile>
+Proxy modes (argv[3], default "ok"):
+  ok    - honour CONNECT and tunnel to the origin
+  flood - answer 200 then stream headers forever with no blank line, to exercise
+          the client's bound on the proxy response (must not hang the crawl)
+
+Usage: proxy-https-server.py <cert.pem> <logdir> [mode]
 Prints "ORIGIN <port>", "PROXY <port>", then "ready" (one per line) on stdout.
 """
 import http.server
+import os
 import socket
 import socketserver
 import ssl
@@ -17,22 +24,30 @@ import sys
 import threading
 
 ORIGIN_BODY = b"<html><body>ORIGIN-PAGE-85</body></html>"
+PROXY_LOG = "proxy.log"
+ORIGIN_LOG = "origin-headers.log"
 
 
-class Origin(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html")
-        self.send_header("Content-Length", str(len(ORIGIN_BODY)))
-        self.end_headers()
-        self.wfile.write(ORIGIN_BODY)
+def make_origin(logdir):
+    class Origin(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            with open(os.path.join(logdir, ORIGIN_LOG), "a") as handle:
+                for key in self.headers.keys():
+                    handle.write(key + "\n")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(ORIGIN_BODY)))
+            self.end_headers()
+            self.wfile.write(ORIGIN_BODY)
 
-    def log_message(self, *args):
-        pass
+        def log_message(self, *args):
+            pass
+
+    return Origin
 
 
-def start_origin(certfile):
-    httpd = socketserver.TCPServer(("127.0.0.1", 0), Origin)
+def start_origin(certfile, logdir):
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), make_origin(logdir))
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(certfile)
     httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
@@ -58,7 +73,7 @@ def pipe(src, dst):
                 pass
 
 
-def handle_client(conn, logfile):
+def handle_client(conn, logdir, mode):
     rfile = conn.makefile("rb")
     request_line = rfile.readline().decode("latin-1").strip()
     auth = None
@@ -69,28 +84,39 @@ def handle_client(conn, logfile):
         key, _, value = line.partition(":")
         if key.strip().lower() == "proxy-authorization":
             auth = value.strip()
-    with open(logfile, "a") as handle:
+    with open(os.path.join(logdir, PROXY_LOG), "a") as handle:
         handle.write(request_line + "\n")
         if auth is not None:
             handle.write("AUTH " + auth + "\n")
     parts = request_line.split()
-    if len(parts) >= 2 and parts[0] == "CONNECT":
-        host, _, port = parts[1].partition(":")
-        try:
-            upstream = socket.create_connection((host, int(port or 443)))
-        except OSError:
-            conn.sendall(b"HTTP/1.0 502 Bad Gateway\r\n\r\n")
-            conn.close()
-            return
-        conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
-        threading.Thread(target=pipe, args=(conn, upstream), daemon=True).start()
-        pipe(upstream, conn)
-    else:
+    if not (len(parts) >= 2 and parts[0] == "CONNECT"):
         conn.sendall(b"HTTP/1.0 501 Not Implemented\r\n\r\n")
         conn.close()
+        return
+    if mode == "flood":
+        # 200, then an endless header stream with no terminating blank line: the
+        # client must bound this and give up, not hang.
+        try:
+            conn.sendall(b"HTTP/1.0 200 Connection established\r\n")
+            while True:
+                conn.sendall(b"X-Pad: 0123456789\r\n")
+        except OSError:
+            pass
+        conn.close()
+        return
+    host, _, port = parts[1].partition(":")
+    try:
+        upstream = socket.create_connection((host, int(port or 443)))
+    except OSError:
+        conn.sendall(b"HTTP/1.0 502 Bad Gateway\r\n\r\n")
+        conn.close()
+        return
+    conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
+    threading.Thread(target=pipe, args=(conn, upstream), daemon=True).start()
+    pipe(upstream, conn)
 
 
-def start_proxy(logfile):
+def start_proxy(logdir, mode):
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(("127.0.0.1", 0))
@@ -101,7 +127,7 @@ def start_proxy(logfile):
         while True:
             conn, _ = srv.accept()
             threading.Thread(
-                target=handle_client, args=(conn, logfile), daemon=True
+                target=handle_client, args=(conn, logdir, mode), daemon=True
             ).start()
 
     threading.Thread(target=serve, daemon=True).start()
@@ -109,10 +135,12 @@ def start_proxy(logfile):
 
 
 def main():
-    certfile, logfile = sys.argv[1], sys.argv[2]
-    open(logfile, "w").close()
-    origin_port = start_origin(certfile)
-    proxy_port = start_proxy(logfile)
+    certfile, logdir = sys.argv[1], sys.argv[2]
+    mode = sys.argv[3] if len(sys.argv) > 3 else "ok"
+    for name in (PROXY_LOG, ORIGIN_LOG):
+        open(os.path.join(logdir, name), "w").close()
+    origin_port = start_origin(certfile, logdir)
+    proxy_port = start_proxy(logdir, mode)
     print("ORIGIN %d" % origin_port, flush=True)
     print("PROXY %d" % proxy_port, flush=True)
     print("ready", flush=True)
