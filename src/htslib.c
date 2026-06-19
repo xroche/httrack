@@ -644,6 +644,141 @@ T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * reto
   return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
 }
 
+// Read one CRLF-terminated line from a non-blocking socket, waiting up to
+// timeout seconds for each chunk. Strips CR, stops at LF. Returns the line
+// length (0 for an empty line), or -1 on timeout/EOF/error.
+static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
+  int j = 0;
+
+  for (;;) {
+    unsigned char ch;
+    int n;
+
+    if (!check_readinput_t(soc, timeout))
+      return -1; // timed out waiting for data
+    n = (int) recv(soc, &ch, 1, 0);
+    if (n == 1) {
+      if (ch == 13) // CR
+        continue;
+      if (ch == 10) // LF: end of line
+        break;
+      if (j < max - 1)
+        s[j++] = (char) ch;
+    } else if (n == 0) {
+      return -1; // connection closed
+    } else {
+#ifdef _WIN32
+      if (WSAGetLastError() == WSAEWOULDBLOCK)
+        continue;
+#else
+      if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+        continue;
+#endif
+      return -1;
+    }
+  }
+  s[j] = '\0';
+  return j;
+}
+
+int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
+                      int timeout) {
+  const T_SOC soc = retour->soc;
+  const char *const host = jump_identification_const(adr); // host[:port]
+  const char *const portsep = jump_toport_const(adr);      // ":port" or NULL
+  char BIGSTK authority[HTS_URLMAXSIZE];
+  char BIGSTK req[HTS_URLMAXSIZE * 2 + 1100];
+  char line[1024];
+  int code;
+
+  if (soc == INVALID_SOCKET)
+    return 0;
+
+  // CONNECT needs an explicit "host:port" authority; default the https port
+  authority[0] = '\0';
+  if (portsep != NULL)
+    strlcatbuff(authority, host, sizeof(authority)); // already host:port
+  else
+    snprintf(authority, sizeof(authority), "%s:%d", host, 443);
+
+  snprintf(req, sizeof(req), "CONNECT %s HTTP/1.0" H_CRLF "Host: %s" H_CRLF,
+           authority, authority);
+
+  // proxy credentials ride the CONNECT request, not the tunneled origin request
+  if (link_has_authorization(retour->req.proxy.name)) {
+    const char *a = jump_identification_const(retour->req.proxy.name);
+    const char *astart = jump_protocol_const(retour->req.proxy.name);
+    char autorisation[1100];
+    char user_pass[256];
+
+    autorisation[0] = user_pass[0] = '\0';
+    strncatbuff(user_pass, astart, (int) (a - astart) - 1);
+    strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt),
+                                        OPT_GET_BUFF_SIZE(opt), user_pass));
+    code64((unsigned char *) user_pass, (int) strlen(user_pass),
+           (unsigned char *) autorisation, 0);
+    strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
+    strlcatbuff(req, autorisation, sizeof(req));
+    strlcatbuff(req, H_CRLF, sizeof(req));
+  }
+  strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
+
+  // send the request (raw: retour->ssl is set, so sendc() would route to TLS)
+  {
+    const char *p = req;
+    size_t remain = strlen(req);
+
+    while (remain > 0) {
+      const int n = (int) send(soc, p, (int) remain, 0);
+
+      if (n > 0) {
+        p += n;
+        remain -= (size_t) n;
+      } else {
+#ifdef _WIN32
+        const int wouldblock = (WSAGetLastError() == WSAEWOULDBLOCK);
+#else
+        const int wouldblock =
+            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
+#endif
+        // a fatal send error must not spin against an always-writable select
+        if (!wouldblock || !check_writeinput_t(soc, timeout)) {
+          strcpybuff(retour->msg, "proxy CONNECT: write error");
+          return 0;
+        }
+      }
+    }
+  }
+
+  // proxy status line: "HTTP/1.x <code> ..."
+  if (proxy_getline(soc, line, sizeof(line), timeout) < 0) {
+    strcpybuff(retour->msg, "proxy CONNECT: no response");
+    return 0;
+  }
+  if (sscanf(line, "HTTP/%*d.%*d %d", &code) < 1)
+    code = 0;
+  if (code < 200 || code >= 300) {
+    snprintf(retour->msg, sizeof(retour->msg), "proxy CONNECT refused: %s",
+             strnotempty(line) ? line : "(no status)");
+    return 0;
+  }
+
+  // drain the proxy response headers up to the blank line, so the TLS
+  // handshake starts at the first tunneled byte
+  for (;;) {
+    const int n = proxy_getline(soc, line, sizeof(line), timeout);
+
+    if (n < 0) {
+      strcpybuff(retour->msg, "proxy CONNECT: truncated response");
+      return 0;
+    }
+    if (n == 0)
+      break; // blank line: tunnel ready
+  }
+
+  return 1;
+}
+
 // ouverture d'une liaison http, envoi d'une requète
 // mode: 0 GET  1 HEAD  [2 POST]
 // treat: traiter header?
@@ -680,14 +815,14 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
 
   /* connexion */
   if (retour) {
-    if ((!(retour->req.proxy.active))
-        || ((strcmp(adr, "file://") == 0)
-            || (strncmp(adr, "https://", 8) == 0)
-        )
-      ) {                       /* pas de proxy, ou non utilisable ici */
+    /* no proxy, or proxy not usable here (local file) */
+    if ((!(retour->req.proxy.active)) || (strcmp(adr, "file://") == 0)) {
       soc = newhttp(opt, adr, retour, -1, waitconnect);
     } else {
-      soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port, waitconnect);  // ouvrir sur le proxy à la place
+      // open to the proxy instead; https reaches the origin through a CONNECT
+      // tunnel set up in back_wait once this connection is up (issue #85)
+      soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port,
+                    waitconnect);
     }
   } else {
     soc = newhttp(opt, adr, NULL, -1, waitconnect);
@@ -1043,8 +1178,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     if (xsend)
       print_buffer(&bstr, "%s", xsend);  // éventuelles autres lignes
 
-    // tester proxy authentication
-    if (retour->req.proxy.active) {
+    // proxy authentication (for https it rides the CONNECT request instead, so
+    // it is not leaked to the origin through the tunnel)
+    if (retour->req.proxy.active && strncmp(adr, "https://", 8) != 0) {
       if (link_has_authorization(retour->req.proxy.name)) {     // et hop, authentification proxy!
         const char *a = jump_identification_const(retour->req.proxy.name);
         const char *astart = jump_protocol_const(retour->req.proxy.name);
@@ -1823,6 +1959,24 @@ int check_readinput_t(T_SOC soc, int timeout) {
       return 1;
     else
       return 0;
+  } else
+    return 0;
+}
+
+// wait until the socket is writable, up to timeout seconds
+int check_writeinput_t(T_SOC soc, int timeout) {
+  if (soc != INVALID_SOCKET) {
+    fd_set fds;
+    struct timeval tv;
+    const int isoc = (int) soc;
+
+    assertf(isoc == soc);
+    FD_ZERO(&fds);
+    FD_SET(isoc, &fds);
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    select(isoc + 1, NULL, &fds, NULL, &tv);
+    return FD_ISSET(isoc, &fds) ? 1 : 0;
   } else
     return 0;
 }

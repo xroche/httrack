@@ -2,6 +2,7 @@
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
+	proxy-https-server.py \
 	fixtures/cache-golden/hts-cache/new.zip
 
 TESTS_ENVIRONMENT =
@@ -44,6 +45,7 @@ TESTS = \
 	11_crawl-international.test \
 	11_crawl-longurl.test \
 	11_crawl-parsing.test \
-	12_crawl_https.test
+	12_crawl_https.test \
+	13_crawl_proxy_https.test
 
 CLEANFILES = check-network_sh.cache
