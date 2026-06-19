@@ -1341,6 +1341,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     int can_avoid_quotes = 0;
                     char quotes_replacement = '\0';
                     int ensure_not_mime = 0;
+                    // @import: the quoted token is the URL; a trailing
+                    // media/supports/layer condition is not part of it
+                    int is_import = 0;
 
                     if (inscript_tag)
                       expected_end = ";\"\'";   // voir a href="javascript:doc.location='foo'"
@@ -1390,6 +1393,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((nc = strfield(html, "import"))) {   // import "url"
                           if (is_space(*(html + nc))) {
                             expected = 0;       // no char expected
+                            is_import = 1;
                           } else
                             nc = 0;
                         }
@@ -1425,8 +1429,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             while(*c == ' ')
                               c++;
                             if ((strchr(expected_end, *c)) || (*c == '\n')
-                                || (*c == '\r')) {
-                              c -= (ndelim + 1);
+                                || (*c == '\r')
+                                || (is_import && *(b + 1 + ndelim) == ' ')) {
+                              // URL end = last char (b), not the delimiter
+                              c = b;
                               if ((int) (c - a + 1)) {
                                 if (ensure_not_mime) {
                                   int i = 0;

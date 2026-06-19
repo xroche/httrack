@@ -176,4 +176,27 @@ notfound "ns.gif" "$out3"
 notfound "og.gif" "$out3"
 notfound "rdfs.gif" "$out3"
 
+# CSS @import (#94): every form's target is captured, crawling the .css directly.
+# The "cond"/"sup"/"spc" cases carry a trailing media/supports/layer condition (or
+# a space before ';'); they are the negative controls: without the parser fix the
+# URL is dropped, so a regression fails these found() checks.
+site4="$tmp/cssimport"
+mkdir -p "$site4"
+for f in nq dqu squ dqs sqs med cond sup lay spc; do printf 'body{}\n' >"$site4/$f.css"; done
+cat >"$site4/main.css" <<'EOF'
+@import url(nq.css);
+@import url("dqu.css");
+@import url('squ.css');
+@import "dqs.css";
+@import 'sqs.css';
+@import url(med.css) screen and (min-width: 400px);
+@import "cond.css" screen;
+@import "sup.css" supports(display: flex);
+@import url(lay.css) layer(base);
+@import "spc.css" ;
+EOF
+out4="$tmp/cssimport-out"
+crawl "$site4/main.css" "$out4"
+for f in nq dqu squ dqs sqs med cond sup lay spc; do found "$f.css" "$out4"; done
+
 exit 0
