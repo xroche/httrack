@@ -231,4 +231,37 @@ out6="$tmp/parse-off0-out"
 crawl "$site6/main.css" "$out6"
 found "off0.css" "$out6"
 
+# XMLHttpRequest.open(method, url) (#218): the first argument is an HTTP method,
+# not a URL. Without the fix "GET" is captured as a link and fetched (the offline
+# fixture saves a bare file named GET; a live server mangles it to GET.html).
+# window.open(url) detection must be unaffected.
+site7="$tmp/xhropen"
+mkdir -p "$site7"
+gif "$site7/winopen.gif"
+cat >"$site7/index.html" <<EOF
+<html><body><script>
+var x = new XMLHttpRequest();
+x.open("GET", "ajax_info.txt");
+var y = new XMLHttpRequest();
+y.open("Post", "submit.cgi");
+window.open("file://$site7/winopen.gif");
+</script></body></html>
+EOF
+out7="$tmp/xhropen-out"
+crawl "$site7/index.html" "$out7"
+# negative control: without the fix a file named exactly GET is downloaded
+notfound "GET" "$out7"
+# methods are matched case-insensitively (XHR spec normalizes them): a mixed-case
+# method is rejected too, so a file named Post must not appear either
+notfound "Post" "$out7"
+# regression guard: window.open(url) is still detected, so its absolute URL is
+# rewritten to a local link. The rewrite only happens if the parser saw it, so
+# these two assertions fail if .open detection broke (not a trivial --near save).
+saved7=$(savedhtml "$out7")
+test -n "$saved7" || ! echo "FAIL: saved xhr page not found" || exit 1
+grep -Fq 'window.open("winopen.gif")' "$saved7" ||
+    ! echo "FAIL #218: window.open(url) no longer detected/rewritten" || exit 1
+! grep -Fq 'window.open("file://' "$saved7" ||
+    ! echo "FAIL #218: window.open URL left absolute (not rewritten)" || exit 1
+
 exit 0

@@ -302,6 +302,21 @@ static HTS_INLINE char html_prevc(const char *html, const char *start) {
   return html > start ? html[-1] : ' ';
 }
 
+/* True if [s, s+len) is exactly an HTTP method token (XHR.open's first
+   argument is a method, not a URL: #218). Case-insensitive. */
+static int is_http_method(const char *s, size_t len) {
+  static const char *const methods[] = {"GET",    "POST",  "PUT",
+                                        "DELETE", "HEAD",  "OPTIONS",
+                                        "PATCH",  "TRACE", NULL};
+  int i;
+
+  for (i = 0; methods[i] != NULL; i++) {
+    if (strlen(methods[i]) == len && strfield(s, methods[i]) == (int) len)
+      return 1;
+  }
+  return 0;
+}
+
 /* Main parser */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
@@ -1347,6 +1362,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     int can_avoid_quotes = 0;
                     char quotes_replacement = '\0';
                     int ensure_not_mime = 0;
+                    // .open(method,url): reject an HTTP-method first arg (#218)
+                    int ensure_not_method = 0;
                     // @import: the quoted token is the URL; a trailing
                     // media/supports/layer condition is not part of it
                     int is_import = 0;
@@ -1377,6 +1394,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           expected = '(';       // parenthèse
                           expected_end = "),";  // fin: virgule ou parenthèse
                           ensure_not_mime = 1;  //* ensure the url is not a mime type */
+                          ensure_not_method = 1; // xhr.open: don't grab method
                         }
                       if (!nc)
                         if ((nc = strfield(html, ".replace"))) { // window.replace("url")
@@ -1461,6 +1479,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     }
                                     i++;
                                   }
+                                }
+                                // XHR.open's "GET" etc. is a method, not a URL
+                                if (a != NULL && ensure_not_method &&
+                                    is_http_method(a, (size_t) (c - a + 1))) {
+                                  a = NULL;
                                 }
                                 // Check for bogus links (Vasiliy)
                                 if (a != NULL) {
