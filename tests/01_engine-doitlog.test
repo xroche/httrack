@@ -89,4 +89,37 @@ grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || {
     exit 1
 }
 
+# --- 3. an empty quoted arg survives the doit.log round-trip (#106) ----------
+# -%F "" (empty footer) records an empty "" token in doit.log; -r2 follows it so
+# a "drop the empty token" bug shifts -r2 into -%F's slot (the reprise then sees
+# -%F -r2 and panics "%F needs to be followed by ..."), making the bug visible
+# rather than a harmless run off the end of argv.
+out2="$tmp/out2"
+rc=0
+"$bin" "$url" -O "$out2" --quiet -n -%v0 -%F "" -r2 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: initial mirror with empty footer exited $rc"
+    exit 1
+}
+# precondition: the writer put the empty token on disk for the reader to reload.
+grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
+    echo "FAIL: empty footer not recorded as -%F \"\" -r2 in doit.log"
+    grep -- '-%F' "$out2/hts-cache/doit.log" || true
+    exit 1
+}
+# no-url reprise: the reader rebuilds argv from doit.log and rewrites doit.log
+# from it. The empty token surviving in the regenerated file proves the reader
+# kept it (a drop/swallow would panic above or rewrite -%F without the "").
+rc=0
+"$bin" -O "$out2" --quiet >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: empty-footer reprise exited $rc (empty token dropped from doit.log?)"
+    exit 1
+}
+grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
+    echo "FAIL: empty footer did not survive the doit.log reload round-trip"
+    grep -- '-%F' "$out2/hts-cache/doit.log" || true
+    exit 1
+}
+
 exit 0
