@@ -18,7 +18,7 @@ function debug {
 }
 
 function info {
-    printf "[$*] ..\t" >&2
+    printf '[%s] ..\t' "$*" >&2
 }
 
 function result {
@@ -68,11 +68,11 @@ function start-crawl {
             ;;
         --no-purge | --summary | --print-files) ;;
         --errors | --files | --found | --not-found | --directory)
-            pos=$((${pos} + 1))
+            pos=$((pos + 1))
             test "$#" -ge "$pos" || warning "missing argument" || return 1
             ;;
         httrack)
-            pos=$((${pos} + 1))
+            pos=$((pos + 1))
             break
             ;;
         *)
@@ -80,16 +80,16 @@ function start-crawl {
             return 1
             ;;
         esac
-        pos=$((${pos} + 1))
+        pos=$((pos + 1))
     done
-    debug "remaining args: ${@:${pos}}"
+    debug "remaining args: ${*:pos}"
 
     # ut/ won't exceed 2 minutes
-    moreargs="--quiet --max-time=120 --timeout=30 --connection-per-second=5"
+    moreargs=(--quiet --max-time=120 --timeout=30 --connection-per-second=5)
 
     # proxy environment ?
-    if test -n "$http_proxy"; then
-        moreargs="$moreargs --proxy $http_proxy"
+    if test -n "${http_proxy:-}"; then
+        moreargs+=(--proxy "$http_proxy")
     fi
 
     test -n "$tmpdir" || ! warning "no tmpdir" || return 1
@@ -103,9 +103,9 @@ function start-crawl {
 
     # start crawl
     log="${tmp}/log"
-    debug starting httrack -O "${tmp}" ${moreargs} ${@:${pos}}
-    info "running httrack ${@:${pos}}"
-    httrack -O "${tmp}" --user-agent="httrack $ver ut ($(uname -omrs))" ${moreargs} ${@:${pos}} >"${log}" 2>&1 &
+    debug starting httrack -O "${tmp}" "${moreargs[@]}" "${@:pos}"
+    info "running httrack ${*:pos}"
+    httrack -O "${tmp}" --user-agent="httrack $ver ut ($(uname -omrs))" "${moreargs[@]}" "${@:pos}" >"${log}" 2>&1 &
     crawlpid="$!"
     debug "started cralwer on pid $crawlpid"
     wait "$crawlpid"
@@ -194,7 +194,7 @@ tmpdir=
 crawlpid=
 nopurge=
 verbose=
-trap "cleanup" 0 1 2 3 4 5 6 7 8 9 11 13 14 15 16 19 24 25
+trap cleanup EXIT HUP INT QUIT ILL TRAP ABRT BUS FPE SEGV PIPE ALRM TERM STKFLT XCPU XFSZ
 
 # working directory
 tmpdir="${tmptopdir}/httrack_ut.$$"

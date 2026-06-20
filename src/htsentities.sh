@@ -40,7 +40,7 @@ EOF
             -e 's/-->$//' \
             -e 's/\([^ ]*\) CDATA "&#\([^\"]*\);" -- \(.*\)/\1 \2 \3/' |
         (
-            read A
+            read -r A
             while test -n "$A"; do
                 ent="${A%% *}"
                 code=$(echo "$A" | cut -f2 -d' ')
@@ -52,8 +52,8 @@ EOF
                 m="$((1 << 32))"
                 while test "$i" -lt ${#ent}; do
                     d="$(echo -n "${ent:${i}:1}" | hexdump -v -e '/1 "%d"')"
-                    hash="$((((${hash} * ${a}) % (${m}) + ${d} + ${c}) % (${m})))"
-                    i=$((${i} + 1))
+                    hash="$((((hash * a) % (m) + d + c) % (m)))"
+                    i=$((i + 1))
                 done
                 echo -e "    /* $A */"
                 echo -e "  case ${hash}u:"
@@ -63,7 +63,7 @@ EOF
                 echo -e "    break;"
 
                 # next
-                read A
+                read -r A
             done
         )
     cat <<EOF

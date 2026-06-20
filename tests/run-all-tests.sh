@@ -3,11 +3,11 @@
 
 error=0
 for i in *.test; do
-    if bash $i; then
+    if bash "$i"; then
         echo "$i: passed" >&2
     else
         echo "$i: ERROR" >&2
-        error=$((${error} + 1))
+        error=$((error + 1))
     fi
 done
 
