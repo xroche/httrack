@@ -7,10 +7,10 @@ set -euo pipefail
 # -#0 <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
 
 match() {
-	test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does match $1" || exit 1
+    test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does match $1" || exit 1
 }
 nomatch() {
-	test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does NOT match $1" || exit 1
+    test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does NOT match $1" || exit 1
 }
 
 # bare star matches everything
@@ -67,7 +67,7 @@ nomatch '*[\[]' 'a'
 # filter guide claims (GitHub #148); it parses as the class {'[','\'} followed
 # by a trailing literal ']'. These assertions document the current (buggy)
 # behavior so any future matcher fix is a deliberate, visible change.
-nomatch '*[\[\]]' '['   # not matched, despite the docs
-match '*[\[\]]' ']'     # only via the empty class-match + trailing ']'
-match '*[\[\]]' '[]'    # one of {'[','\'} then the trailing ']'
+nomatch '*[\[\]]' '[' # not matched, despite the docs
+match '*[\[\]]' ']'   # only via the empty class-match + trailing ']'
+match '*[\[\]]' '[]'  # one of {'[','\'} then the trailing ']'
 nomatch '*[\[\]]' '[]x'
