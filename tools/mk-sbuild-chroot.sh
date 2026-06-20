@@ -106,9 +106,12 @@ main() {
         local me
         me=$(id -un)
         if ! grep -qs "^$me:" /etc/subuid || ! grep -qs "^$me:" /etc/subgid; then
+            # Suggest a range starting past every allocation in either file.
+            local start
+            start=$(awk -F: '{e = $2 + $3; if (e > m) m = e} END {print (m ? m : 100000)}' \
+                /etc/subuid /etc/subgid 2>/dev/null)
             die "no /etc/subuid+subgid range for $me; the unshare backend needs one:
-  echo \"$me:524288:65536\" | sudo tee -a /etc/subuid /etc/subgid
-(pick a start not already listed in /etc/subuid)"
+  sudo usermod --add-subuids $start-$((start + 65535)) --add-subgids $start-$((start + 65535)) $me"
         fi
     fi
 
