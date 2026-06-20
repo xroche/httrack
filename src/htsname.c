@@ -138,6 +138,30 @@ static void cleanEndingSpaceOrDot(char *s) {
   }
 }
 
+/* Should the wire Content-Type override the URL's own extension when naming the
+   saved file? True only when the type is patchable (may_unknown2) and doing so
+   would not clobber a URL extension that already maps to a specific, non-HTML
+   type. This is the #267 mangle guard: a .png served as text/html (or with no
+   type) stays named .png. */
+static int wire_patches_ext(httrackp *opt, const char *wiremime,
+                            const char *file) {
+  char urlmime[256];
+
+  if (may_unknown2(opt, wiremime, file))
+    return 0; /* type kept verbatim (keep-list / bogus-multiple) */
+  urlmime[0] = '\0';
+  /* type implied by the URL extension, only when confidently known (flag 0) */
+  if (!get_httptype_sized(opt, urlmime, sizeof(urlmime), file, 0))
+    return 1; /* URL ext implies no known type: trust the wire type */
+  if (strfield2(wiremime, urlmime))
+    return 0; /* wire agrees with the ext: keep it (no .htm->.html churn) */
+  /* wire disagrees: keep a specific non-HTML ext against an html/empty claim */
+  if (!is_hypertext_mime(opt, urlmime, file) &&
+      (is_html_mime_type(wiremime) || !strnotempty(wiremime)))
+    return 0;
+  return 1;
+}
+
 // forme le nom du fichier à sauver (save) à partir de fil et adr
 // système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
 int url_savename(lien_adrfilsave *const afs,
@@ -325,7 +349,10 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   /* replace shtml to html.. */
-  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD)
+  /* HARD delays every type, except one the user pinned with --assume: honor it
+     immediately (ishtml() consults the user type), no delayed name (#56) */
+  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD &&
+      !is_userknowntype(opt, fil))
     is_html = -1;               /* ALWAYS delay type */
   else
     is_html = ishtml(opt, fil);
@@ -380,7 +407,7 @@ int url_savename(lien_adrfilsave *const afs,
               if (strnotempty(r.cdispo)) {        /* filename given */
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, r.cdispo);
-              } else if (!may_unknown2(opt, r.contenttype, fil)) {        // on peut patcher à priori?
+              } else if (wire_patches_ext(opt, r.contenttype, fil)) {
                 if (give_mimext(s, sizeof(s),
                                 r.contenttype)) { // recognized extension
                   ext_chg = 1;
@@ -425,7 +452,8 @@ int url_savename(lien_adrfilsave *const afs,
               if (strnotempty(headers->r.cdispo)) {        /* filename given */
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, headers->r.cdispo);
-              } else if (!may_unknown2(opt, headers->r.contenttype, headers->url_fil)) {    // on peut patcher à priori? (pas interdit ou pas de type)
+              } else if (wire_patches_ext(opt, headers->r.contenttype,
+                                          headers->url_fil)) {
                 char s[16];
                 if (give_mimext(
                         s, sizeof(s),
@@ -653,7 +681,8 @@ int url_savename(lien_adrfilsave *const afs,
                     if (strnotempty(back[b].r.cdispo)) {        /* filename given */
                       ext_chg = 2;      /* change filename */
                       strcpybuff(ext, back[b].r.cdispo);
-                    } else if (!may_unknown2(opt, back[b].r.contenttype, back[b].url_fil)) {    // on peut patcher à priori? (pas interdit ou pas de type)
+                    } else if (wire_patches_ext(opt, back[b].r.contenttype,
+                                                back[b].url_fil)) {
                       if (give_mimext(
                               s, sizeof(s),
                               back[b].r.contenttype)) { // recognized extension
