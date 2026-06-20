@@ -6,11 +6,11 @@ set -euo pipefail
 # charset -> UTF-8 conversion (hts_convertStringToUTF8).
 # -#3 <charset> <string> prints the string re-decoded from <charset> as UTF-8.
 conv() {
-	test "$(httrack -O /dev/null -#3 "$1" "$2")" == "$3" || exit 1
+    test "$(httrack -O /dev/null -#3 "$1" "$2")" == "$3" || exit 1
 }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
-	httrack -O /dev/null -#3 "$1" "$2" >/dev/null 2>&1 || exit 1
+    httrack -O /dev/null -#3 "$1" "$2" >/dev/null 2>&1 || exit 1
 }
 
 # the source bytes below are UTF-8 (this file is UTF-8); "café" is 0x63 61 66 C3 A9.

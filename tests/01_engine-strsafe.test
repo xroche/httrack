@@ -21,9 +21,15 @@ test "$out" == "strsafe: OK" || exit 1
 # the bounded macro aborts (non-zero exit), so don't let set -e trip on it
 err=$(httrack -#8 overflow "this string is far too long for the buffer" 2>&1) || true
 case "$err" in
-	*"strsafe: NOT aborted"*) echo "over-capacity write was NOT caught" >&2; exit 1 ;;
-	*"overflow while copying"*) ;;
-	*) echo "expected htssafe overflow abort, got: $err" >&2; exit 1 ;;
+*"strsafe: NOT aborted"*)
+    echo "over-capacity write was NOT caught" >&2
+    exit 1
+    ;;
+*"overflow while copying"*) ;;
+*)
+    echo "expected htssafe overflow abort, got: $err" >&2
+    exit 1
+    ;;
 esac
 
 # Same guarantee for the htsbuff builder. The source is exactly the buffer
@@ -32,7 +38,13 @@ esac
 # aborted"). Match the specific htsbuff abort message, not just any assert.
 err=$(httrack -#8 overflow-buff "abcd" 2>&1) || true
 case "$err" in
-	*"strsafe: NOT aborted"*) echo "htsbuff over-capacity write was NOT caught" >&2; exit 1 ;;
-	*"htsbuff append overflow"*) ;;
-	*) echo "expected htsbuff overflow abort, got: $err" >&2; exit 1 ;;
+*"strsafe: NOT aborted"*)
+    echo "htsbuff over-capacity write was NOT caught" >&2
+    exit 1
+    ;;
+*"htsbuff append overflow"*) ;;
+*)
+    echo "expected htsbuff overflow abort, got: $err" >&2
+    exit 1
+    ;;
 esac

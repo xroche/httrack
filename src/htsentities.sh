@@ -33,43 +33,43 @@ EOF
         else
             GET "${url}"
         fi
-    ) \
-        | grep -E '^<!ENTITY [a-zA-Z0-9_]' \
-        | sed \
-        -e 's/<!ENTITY //' -e "s/[[:space:]][[:space:]]*/ /g" \
-        -e 's/-->$//' \
-        -e 's/\([^ ]*\) CDATA "&#\([^\"]*\);" -- \(.*\)/\1 \2 \3/'\
-| ( \
-        read A
-        while test -n "$A"; do
-            ent="${A%% *}"
-            code=$(echo "$A"|cut -f2 -d' ')
-            # compute hash
-            hash=0
-            i=0
-            a=1664525
-            c=1013904223
-            m="$[1 << 32]"
-            while test "$i" -lt ${#ent}; do
-                d="$(echo -n "${ent:${i}:1}"|hexdump -v -e '/1 "%d"')"
-                hash="$[((${hash}*${a})%(${m})+${d}+${c})%(${m})]"
-                i=$[${i}+1]
-            done
-            echo -e "    /* $A */"
-            echo -e "  case ${hash}u:"
-            echo -e "    if (len == ${#ent} /* && strncmp(ent, \"${ent}\") == 0 */) {"
-            echo -e "      return ${code};"
-            echo -e "    }"
-            echo -e "    break;"
-
-            # next
+    ) |
+        grep -E '^<!ENTITY [a-zA-Z0-9_]' |
+        sed \
+            -e 's/<!ENTITY //' -e "s/[[:space:]][[:space:]]*/ /g" \
+            -e 's/-->$//' \
+            -e 's/\([^ ]*\) CDATA "&#\([^\"]*\);" -- \(.*\)/\1 \2 \3/' |
+        (
             read A
-        done
-    )
+            while test -n "$A"; do
+                ent="${A%% *}"
+                code=$(echo "$A" | cut -f2 -d' ')
+                # compute hash
+                hash=0
+                i=0
+                a=1664525
+                c=1013904223
+                m="$((1 << 32))"
+                while test "$i" -lt ${#ent}; do
+                    d="$(echo -n "${ent:${i}:1}" | hexdump -v -e '/1 "%d"')"
+                    hash="$((((${hash} * ${a}) % (${m}) + ${d} + ${c}) % (${m})))"
+                    i=$((${i} + 1))
+                done
+                echo -e "    /* $A */"
+                echo -e "  case ${hash}u:"
+                echo -e "    if (len == ${#ent} /* && strncmp(ent, \"${ent}\") == 0 */) {"
+                echo -e "      return ${code};"
+                echo -e "    }"
+                echo -e "    break;"
+
+                # next
+                read A
+            done
+        )
     cat <<EOF
   }
   /* unknown */
   return -1;
 }
 EOF
-) > ${dest}
+) >${dest}
