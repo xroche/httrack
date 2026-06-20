@@ -349,7 +349,10 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   /* replace shtml to html.. */
-  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD)
+  /* HARD delays every type, except one the user pinned with --assume: honor it
+     immediately (ishtml() consults the user type), no delayed name (#56) */
+  if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD &&
+      !is_userknowntype(opt, fil))
     is_html = -1;               /* ALWAYS delay type */
   else
     is_html = ishtml(opt, fil);

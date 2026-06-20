@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# --assume under the default delayed type check (-%N2), issue #56. A user type
+# pinned with --assume must be honored immediately, not lost to the delayed
+# name: photo.png served as image/png but assumed text/html is saved as .html.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'types/photo.html' --not-found 'types/photo.png' \
+    httrack 'BASEURL/types/photo.png' --assume png=text/html

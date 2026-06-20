@@ -52,6 +52,7 @@ TESTS = \
 	13_crawl_proxy_https.test \
 	13_local-cookies.test \
 	14_local-https.test \
-	15_local-types.test
+	15_local-types.test \
+	16_local-assume.test
 
 CLEANFILES = check-network_sh.cache
