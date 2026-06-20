@@ -6,6 +6,8 @@ httrack (3.49.8-2) unstable; urgency=medium
     libraries fell through into the httrack package and libhttrack2 shipped no
     library. The new .files uses a .so.3* wildcard so a future SONAME bump no
     longer silently misplaces the libraries. New binary package, via NEW.
+  * Drop the stale debian/libhttrack-swf1.files: the swf module is no longer
+    built and no libhttrack-swf1 package exists.
 
  -- Xavier Roche <xavier@debian.org>  Sat, 20 Jun 2026 14:42:13 +0200
 
