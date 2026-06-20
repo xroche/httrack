@@ -15,5 +15,6 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'types/script.js' \
     --found 'types/style.css' \
     --found 'types/data.json' \
-    --found 'types/control.html' \
+    --found 'types/control.html' --not-found 'types/control.php' \
+    --found 'types/gend61c.png' --not-found 'types/gend61c.html' \
     httrack 'BASEURL/types/index.html'
