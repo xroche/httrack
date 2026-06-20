@@ -114,8 +114,9 @@ main() {
 
     local rc=$HOME/.sbuildrc
     local mode_line="\$chroot_mode = 'unshare';"
-    if grep -qs "chroot_mode.*unshare" "$rc"; then
-        : # already configured
+    # shellcheck disable=SC2016  # $chroot_mode is literal regex text, not a shell var.
+    if grep -qsE '^[[:space:]]*\$chroot_mode[[:space:]]*=.*unshare' "$rc"; then
+        : # already configured (active, non-commented line)
     elif [[ $write_sbuildrc -eq 1 ]]; then
         info "enabling the unshare backend in $rc"
         printf '%s\n' "$mode_line" >>"$rc"
