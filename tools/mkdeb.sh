@@ -23,7 +23,16 @@
 #   -s, --source-only          build only the source package
 #   -u, --unsigned             do not sign anything (implies no release sigs)
 #       --no-release-artifacts skip the orig tarball .asc/.md5/.sha1
+#       --sbuild               additionally build the .dsc in a clean sbuild
+#                              chroot as a from-scratch verification gate
 #   -h, --help                 show this help
+#
+# --sbuild reproduces the buildd environment: it builds the source package in a
+# minimal chroot holding only the declared Build-Depends, so an FTBFS or a
+# missing dependency fails here instead of on the archive's buildds (which, with
+# a source-only upload, are otherwise the first clean build). It needs an sbuild
+# chroot for the changelog's distribution; create one once, e.g. with the
+# rootless unshare backend: mmdebstrap unstable + sbuild --chroot-mode=unshare.
 #
 # SOURCE_DATE_EPOCH is honored for reproducible output.
 
@@ -60,6 +69,7 @@ main() {
     local source_only=0
     local unsigned=0
     local release_artifacts=1
+    local sbuild=0
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -85,6 +95,10 @@ main() {
             release_artifacts=0
             shift
             ;;
+        --sbuild)
+            sbuild=1
+            shift
+            ;;
         -h | --help)
             usage
             exit 0
@@ -96,6 +110,7 @@ main() {
     done
 
     need git autoreconf debuild dcmd
+    [[ $sbuild -eq 1 ]] && need sbuild dpkg-parsechangelog
     if [[ $unsigned -eq 0 ]]; then
         need gpg
         [[ -n $key ]] || die "no signing key (pass --key or set DEBSIGN_KEYID, or use --unsigned)"
@@ -178,6 +193,30 @@ main() {
     shopt -u nullglob
     [[ ${#changes[@]} -ge 1 ]] || die "debuild produced no .changes file"
     dcmd cp -- "${changes[@]}" "$outdir/"
+
+    # Clean-room build gate: rebuild the source package in a minimal chroot that
+    # holds only the declared Build-Depends, the same way the buildds will. An
+    # undeclared dependency or any FTBFS aborts the release here instead of
+    # surfacing after a source-only upload. Logs and clean-built debs land in
+    # $outdir/sbuild for inspection.
+    if [[ $sbuild -eq 1 ]]; then
+        local -a dscs
+        shopt -s nullglob
+        dscs=("$scratch"/*.dsc)
+        shopt -u nullglob
+        [[ ${#dscs[@]} -ge 1 ]] || die "no .dsc to sbuild"
+
+        local dist
+        dist=$(cd "$scratch/httrack-$ver" && dpkg-parsechangelog -S Distribution)
+        [[ $dist == UNRELEASED ]] && dist=unstable
+
+        info "clean-room build with sbuild (dist $dist)"
+        local sbdir=$outdir/sbuild
+        rm -rf -- "$sbdir"
+        mkdir -p "$sbdir"
+        (cd "$sbdir" && sbuild --dist="$dist" -- "${dscs[0]}")
+        info "sbuild clean-room build passed; logs in $sbdir"
+    fi
 
     # Release artifacts for the upstream tarball (detached sig + checksums).
     if [[ $release_artifacts -eq 1 && $unsigned -eq 0 ]]; then
