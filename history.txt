@@ -5,12 +5,31 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 3.49-8
++ New: tunnel HTTPS downloads through the configured HTTP proxy via CONNECT (#85)
++ New: parse every candidate URL in <img> and <source> srcset lists (#326)
 + Changed: dropped the obsolete OpenSSL linking exception (OpenSSL 3.0+ is Apache-2.0 and GPL-compatible); httrack is now plain GPLv3-or-later
-+ Fixed: link libhtsjava and the libtest examples directly against libc
++ Fixed: several out-of-bounds reads in the HTML/CSS parser on hostile input (#94, #396)
++ Fixed: stored XSS via an unescaped URL in the generated page footer (#165)
++ Fixed: hardened buffer copies throughout the engine against overflow
++ Fixed: capture conditional CSS @import URLs (#94)
++ Fixed: don't crawl xmlns namespace declarations as links (#191)
++ Fixed: don't mistake the method argument of XMLHttpRequest.open for a URL (#218)
++ Fixed: percent-encode parentheses when rewriting CSS url() targets (#163)
++ Fixed: collapse ../ in file:// URLs and widen relative-link handling (#137, #162)
++ Fixed: drop the obsolete $Version/$Path attributes from the request Cookie header, per RFC 6265 (#151)
++ Fixed: keep empty quoted arguments when reloading doit.log for --update/--continue (#106)
++ Fixed: raise the User-Agent and custom-header length limits (#152)
++ Fixed: abort on a long log path (lock-file buffer too small) (#183)
++ Fixed: race in lazy mutex initialization (#297)
++ Fixed: sub-second mtime precision when comparing local files on POSIX (#383)
++ Fixed: modernize OpenSSL TLS initialization for the 3.x to 4.x transition (#308)
 + Fixed: in-place changes made by the postprocess callback were not applied (Roman Sęk)
 + Fixed: "preffered" typo in the help text and man page (yosinn1-blip)
 + Fixed: corrections and updates of the Russian translation (German Aizek)
 + Fixed: corrections and updates of the Danish translation (scootergrisen)
++ Fixed: link libhtsjava and the libtest examples directly against libc
++ New: documented the public library API headers and typed the option fields as named enums
++ Fixed: numerous build, packaging, CI and test-coverage improvements (out-of-tree builds, sanitizer/distcheck CI, shell and Python linting, AppStream metainfo)
 
 3.49-7
 + Fixed: keep generated config.h architecture-independent (Debian #1133728)
