@@ -98,6 +98,20 @@ main() {
     command -v newuidmap >/dev/null 2>&1 ||
         die "newuidmap not found; install the uidmap package for the unshare backend"
 
+    # Unshare maps a whole UID range, not just the caller's: the base install
+    # creates system users, and without an /etc/subuid+subgid range the install
+    # crashes (dpkg SIGSEGV) instead of erroring cleanly. Root uses mode=root and
+    # needs no range.
+    if [[ $(id -u) -ne 0 ]]; then
+        local me
+        me=$(id -un)
+        if ! grep -qs "^$me:" /etc/subuid || ! grep -qs "^$me:" /etc/subgid; then
+            die "no /etc/subuid+subgid range for $me; the unshare backend needs one:
+  echo \"$me:524288:65536\" | sudo tee -a /etc/subuid /etc/subgid
+(pick a start not already listed in /etc/subuid)"
+        fi
+    fi
+
     : "${arch:=$(dpkg --print-architecture)}"
     local cache=$HOME/.cache/sbuild
     local tarball=$cache/${dist}-${arch}.tar.zst
