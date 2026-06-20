@@ -31,8 +31,8 @@
 # minimal chroot holding only the declared Build-Depends, so an FTBFS or a
 # missing dependency fails here instead of on the archive's buildds (which, with
 # a source-only upload, are otherwise the first clean build). It needs an sbuild
-# chroot for the changelog's distribution; create one once, e.g. with the
-# rootless unshare backend: mmdebstrap unstable + sbuild --chroot-mode=unshare.
+# chroot for the changelog's distribution; create one once with the companion
+# tools/mk-sbuild-chroot.sh (rootless unshare backend).
 #
 # SOURCE_DATE_EPOCH is honored for reproducible output.
 
