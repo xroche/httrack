@@ -206,9 +206,10 @@ main() {
         cp -a "$export_dir/debian" "httrack-$ver/debian"
     )
 
-    # Build (debuild also runs lintian and signs). --fail-on aborts on a lintian
-    # error or warning, so neither a release nor CI produces an unclean package.
-    local -a debuild_opts=(--lintian-opts -I -i "--fail-on=error,warning")
+    # Build and sign. debuild runs lintian too but does NOT propagate its exit
+    # status, so a broken package would pass unnoticed; disable it here and run
+    # lintian ourselves below as the real gate.
+    local -a debuild_opts=(--no-lintian)
     local -a build_opts=()
     [[ $source_only -eq 1 ]] && build_opts+=(-S)
     if [[ $unsigned -eq 1 ]]; then
@@ -219,7 +220,8 @@ main() {
     info "building packages with debuild"
     (
         cd "$scratch/httrack-$ver"
-        debuild "${build_opts[@]}" "${debuild_opts[@]}"
+        # debuild options (--no-lintian) must precede the dpkg-buildpackage ones
+        debuild "${debuild_opts[@]}" "${build_opts[@]}"
     )
 
     # Collect every file the .changes references (orig, dsc, debs, ddebs, buildinfo).
@@ -229,6 +231,16 @@ main() {
     changes=("$scratch"/*.changes)
     shopt -u nullglob
     [[ ${#changes[@]} -ge 1 ]] || die "debuild produced no .changes file"
+
+    # The real lintian gate (debuild only reports, it does not fail on tags).
+    # --profile debian: CI runners are Ubuntu, whose vendor data would wrongly
+    # reject the Debian "unstable" distribution. newer-standards-version only
+    # means the local lintian is older than the buildds', not a package
+    # defect, so suppress it. set -e turns any error/warning tag into a failure.
+    info "running lintian gate (--fail-on=error,warning)"
+    lintian --profile debian -I -i --fail-on=error,warning \
+        --suppress-tags newer-standards-version "${changes[@]}"
+
     dcmd cp -- "${changes[@]}" "$outdir/"
 
     # Clean-room build gate: rebuild the source package in a minimal chroot that

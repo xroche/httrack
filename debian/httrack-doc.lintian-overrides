@@ -4,3 +4,6 @@
 # so the path lives in the display pointer, not the override -- match with '*'.
 httrack-doc: extra-license-file *
 httrack-doc: package-contains-documentation-outside-usr-share-doc *
+# search.sh is a sample CGI shipped alongside the HTML manual, not meant to be
+# run from the package tree; it stays non-executable by design.
+httrack-doc: script-not-executable *
