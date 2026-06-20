@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Content-Type vs URL-extension naming (issue #267 family). Under the default
+# delayed type check (-%N2), a bogus/missing html-ish wire type must not clobber
+# a URL extension that maps to a specific non-HTML type. The .html "mangle" names
+# are asserted absent so a regression that re-introduces it fails here.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'types/notype.png' --not-found 'types/notype.html' \
+    --found 'types/lie.png' --not-found 'types/lie.html' \
+    --found 'types/page.htm' --not-found 'types/page.html' \
+    --found 'types/photo.png' \
+    --found 'types/script.js' \
+    --found 'types/style.css' \
+    --found 'types/data.json' \
+    --found 'types/control.html' \
+    httrack 'BASEURL/types/index.html'

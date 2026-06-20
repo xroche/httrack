@@ -118,11 +118,69 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # --- type/extension matrix (issue #267 family) -------------------------
+
+    def send_raw(self, body, content_type):
+        """Send a raw body with an explicit Content-Type, or none at all when
+        content_type is None (to observe httrack's typeless-file naming)."""
+        self.send_response(200)
+        if content_type is not None:
+            self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    # A fake-binary PNG-ish blob for the image/typeless cases.
+    FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+    # path -> (body, content_type); content_type None means no header at all.
+    TYPE_MATRIX = {
+        "/types/control.php": (b"<html><body>control</body></html>", "text/html"),
+        "/types/photo.png": (FAKE_PNG, "image/png"),
+        "/types/notype.png": (FAKE_PNG, None),
+        "/types/lie.png": (FAKE_PNG, "text/html"),
+        "/types/page.htm": (b"<html><body>htm page</body></html>", "text/html"),
+        "/types/script.js": (b"var x = 1;\n", "application/javascript"),
+        "/types/style.css": (b"body { color: red; }\n", "text/css"),
+        "/types/data.json": (b'{"k": "v"}\n', "application/json"),
+        "/types/gen.php": (FAKE_PNG, "image/png"),
+    }
+
+    def route_types_index(self):
+        body = (
+            '\t<a href="control.php">control</a>\n'
+            '\t<img src="photo.png" />\n'
+            '\t<img src="notype.png" />\n'
+            '\t<img src="lie.png" />\n'
+            '\t<a href="page.htm">htm</a>\n'
+            '\t<script src="script.js"></script>\n'
+            '\t<link rel="stylesheet" href="style.css" />\n'
+            '\t<a href="data.json">json</a>\n'
+            '\t<img src="gen.php?id=5" />\n'
+        )
+        self.send_html(body)
+
+    def route_types(self):
+        path = urlsplit(self.path).path
+        body, ctype = self.TYPE_MATRIX[path]
+        self.send_raw(body, ctype)
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
         "/cookies/third.php": route_third,
         "/robots.txt": route_robots,
+        "/types/index.html": route_types_index,
+        "/types/control.php": route_types,
+        "/types/photo.png": route_types,
+        "/types/notype.png": route_types,
+        "/types/lie.png": route_types,
+        "/types/page.htm": route_types,
+        "/types/script.js": route_types,
+        "/types/style.css": route_types,
+        "/types/data.json": route_types,
+        "/types/gen.php": route_types,
     }
 
     # --- dispatch ----------------------------------------------------------
