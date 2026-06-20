@@ -1,17 +1,22 @@
 #!/bin/bash
 #
-# Content-Type vs URL-extension naming (issue #267 family). Under the default
-# delayed type check (-%N2), a bogus/missing html-ish wire type must not clobber
-# a URL extension that maps to a specific non-HTML type. The .html "mangle" names
-# are asserted absent so a regression that re-introduces it fails here.
+# Content-Type vs URL-extension naming (issue #267 family) under the default
+# delayed type check (-%N2). Policy: a MISSING Content-Type must not clobber a
+# URL extension that maps to a specific non-HTML type (.png/.pdf stay as-is);
+# an explicitly DECLARED type is trusted, so a binary-looking URL that really
+# serves HTML (text/html on .pdf/.jpg) is named .html. The "wrong" names are
+# asserted absent so a regression in either direction fails here.
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
-    --found 'types/notype.png' --not-found 'types/notype.html' \
-    --found 'types/lie.png' --not-found 'types/lie.html' \
-    --found 'types/page.htm' --not-found 'types/page.html' \
+    --found 'types/notype.png' \
+    --found 'types/notype.pdf' --not-found 'types/notype.html' \
     --found 'types/photo.png' \
+    --found 'types/doc.pdf' \
+    --found 'types/lie.html' --not-found 'types/lie.png' \
+    --found 'types/report.html' --not-found 'types/report.pdf' \
+    --found 'types/page.htm' --not-found 'types/page.html' \
     --found 'types/script.js' \
     --found 'types/style.css' \
     --found 'types/data.json' \

@@ -139,12 +139,13 @@ static void cleanEndingSpaceOrDot(char *s) {
 }
 
 /* Should the wire Content-Type override the URL's own extension when naming the
-   saved file? True only when the type is patchable (may_unknown2) and doing so
-   would not clobber a URL extension that already maps to a specific, non-HTML
-   type. This is the #267 mangle guard: a .png served as text/html (or with no
-   type) stays named .png. */
+   saved file? True when the type is patchable (may_unknown2) and either the URL
+   extension implies no specific type or the server declared a disagreeing one.
+   A URL extension mapping to a specific non-HTML type is kept only when the
+   server sent NO Content-Type (the #267 mangle guard): a typeless .png stays
+   .png, but a .pdf explicitly served as text/html is named .html. */
 static int wire_patches_ext(httrackp *opt, const char *wiremime,
-                            const char *file) {
+                            const char *file, int contenttype_given) {
   char urlmime[256];
 
   if (may_unknown2(opt, wiremime, file))
@@ -155,9 +156,12 @@ static int wire_patches_ext(httrackp *opt, const char *wiremime,
     return 1; /* URL ext implies no known type: trust the wire type */
   if (strfield2(wiremime, urlmime))
     return 0; /* wire agrees with the ext: keep it (no .htm->.html churn) */
-  /* wire disagrees: keep a specific non-HTML ext against an html/empty claim */
-  if (!is_hypertext_mime(opt, urlmime, file) &&
-      (is_html_mime_type(wiremime) || !strnotempty(wiremime)))
+  /* wire disagrees with a specific non-HTML URL ext. Keep the ext only when
+     the server sent NO Content-Type: a missing type is defaulted to text/html
+     upstream and must not clobber e.g. a .png. An explicitly declared type is
+     trusted, so a binary-looking URL that really serves HTML (login/error
+     interstitial, soft-404) is named .html instead of kept as .pdf/.jpg. */
+  if (!is_hypertext_mime(opt, urlmime, file) && !contenttype_given)
     return 0;
   return 1;
 }
@@ -407,7 +411,8 @@ int url_savename(lien_adrfilsave *const afs,
               if (strnotempty(r.cdispo)) {        /* filename given */
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, r.cdispo);
-              } else if (wire_patches_ext(opt, r.contenttype, fil)) {
+              } else if (wire_patches_ext(opt, r.contenttype, fil,
+                                          r.contenttype_given)) {
                 if (give_mimext(s, sizeof(s),
                                 r.contenttype)) { // recognized extension
                   ext_chg = 1;
@@ -453,7 +458,8 @@ int url_savename(lien_adrfilsave *const afs,
                 ext_chg = 2;      /* change filename */
                 strcpybuff(ext, headers->r.cdispo);
               } else if (wire_patches_ext(opt, headers->r.contenttype,
-                                          headers->url_fil)) {
+                                          headers->url_fil,
+                                          headers->r.contenttype_given)) {
                 char s[16];
                 if (give_mimext(
                         s, sizeof(s),
@@ -682,7 +688,8 @@ int url_savename(lien_adrfilsave *const afs,
                       ext_chg = 2;      /* change filename */
                       strcpybuff(ext, back[b].r.cdispo);
                     } else if (wire_patches_ext(opt, back[b].r.contenttype,
-                                                back[b].url_fil)) {
+                                                back[b].url_fil,
+                                                back[b].r.contenttype_given)) {
                       if (give_mimext(
                               s, sizeof(s),
                               back[b].r.contenttype)) { // recognized extension

@@ -1,0 +1,3 @@
+usr/lib/*/libhttrack.so.4*
+usr/lib/*/libhtsjava.so.4*
+usr/share/httrack/templates
