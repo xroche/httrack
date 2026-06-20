@@ -317,6 +317,27 @@ static int is_http_method(const char *s, size_t len) {
   return 0;
 }
 
+/* Percent-encode '(' and ')' in a link emitted into an unquoted url(...) (CSS
+   or JS): a literal ')' closes the token early and the UA mis-parses the value
+   (#163). The UA decodes %28/%29 back to the saved-on-disk name. */
+static void escape_url_parens(char *const s, const size_t size) {
+  char BIGSTK buff[HTS_URLMAXSIZE * 2];
+  size_t i, j;
+
+  for (i = 0, j = 0; s[i] != '\0' && j + 3 < size && j + 3 < sizeof(buff);
+       i++) {
+    if (s[i] == '(' || s[i] == ')') {
+      buff[j++] = '%';
+      buff[j++] = '2';
+      buff[j++] = s[i] == '(' ? '8' : '9';
+    } else {
+      buff[j++] = s[i];
+    }
+  }
+  buff[j] = '\0';
+  strlcpybuff(s, buff, size);
+}
+
 /* Main parser */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
@@ -3026,6 +3047,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if (!in_media) {        // In media (such as real audio): don't patch
                           /* Never escape high-chars (we don't know the encoding!!) */
                           inplace_escape_uri_utf(tempo, sizeof(tempo));
+
+                          // unquoted url() (CSS/JS): keep parens escaped
+                          if (ending_p == ')')
+                            escape_url_parens(tempo, sizeof(tempo));
 
                           //if (!no_esc_utf)
                           //  escape_uri(tempo);     // escape with %xx
