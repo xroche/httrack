@@ -1,3 +1,16 @@
+httrack (3.49.8-2) unstable; urgency=medium
+
+  * Rename libhttrack2 to libhttrack3 to follow the SONAME, which the 3.49.8
+    ABI bump moved to libhttrack.so.3 (package-name-doesnt-match-sonames). In
+    3.49.8-1 the libhttrack2.files glob still matched .so.2, so the runtime
+    libraries fell through into the httrack package and libhttrack2 shipped no
+    library. The new .files uses a .so.3* wildcard so a future SONAME bump no
+    longer silently misplaces the libraries. New binary package, via NEW.
+  * Drop the stale debian/libhttrack-swf1.files: the swf module is no longer
+    built and no libhttrack-swf1 package exists.
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 20 Jun 2026 14:42:13 +0200
+
 httrack (3.49.8-1) unstable; urgency=medium
 
   * New upstream release: HTTPS-proxy CONNECT tunnelling and wider srcset
