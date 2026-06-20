@@ -1396,6 +1396,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 void treatfirstline(htsblk * retour, const char *rcvd) {
   const char *a = rcvd;
 
+  retour->contenttype_given = HTS_FALSE; /* set when a Content-Type is seen */
+
   // exemple:
   // HTTP/1.0 200 OK
   if (*a) {
@@ -1594,6 +1596,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         strcpybuff(retour->contenttype, tempo);
       else
         strcpybuff(retour->contenttype, "application/octet-stream-unknown");    // erreur
+      retour->contenttype_given =
+          HTS_TRUE; /* the server declared a Content-Type */
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
     // Content-Range: bytes 0-70870/70871
