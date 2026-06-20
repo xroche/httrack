@@ -219,8 +219,12 @@ main() {
     fi
 
     # Release artifacts for the upstream tarball (detached sig + checksums).
+    # A Debian revision >= 2 .changes omits the orig (it is already in the
+    # archive), so dcmd above won't have copied it; place it from the build tree
+    # so the website artifacts are produced regardless of the revision.
     if [[ $release_artifacts -eq 1 && $unsigned -eq 0 ]]; then
         info "signing upstream tarball"
+        cp -- "$scratch/$orig" "$outdir/$orig"
         (
             cd "$outdir"
             gpg --armor --detach-sign --yes -u "$key" -- "$orig"
