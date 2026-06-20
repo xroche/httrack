@@ -2605,6 +2605,8 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     for(i = 0; adrfil->fil[i] != '\0'; i++)
       if (adrfil->fil[i] == '\\')
         adrfil->fil[i] = '/';
+    // collapse ../ like the http branch above (path-traversal safety)
+    fil_simplifie(adrfil->fil);
   }
 
   // no hostname
