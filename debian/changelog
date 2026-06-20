@@ -1,6 +1,9 @@
 httrack (3.49.8-1) unstable; urgency=medium
 
-  * New upstream release.
+  * New upstream release: HTTPS-proxy CONNECT tunnelling and wider srcset
+    parsing, a batch of crawler and parser fixes (CSS @import, xmlns
+    namespaces, relative paths, RFC 6265 cookies), and security hardening of
+    the parser and of buffer copies throughout the engine.
   * Drop the OpenSSL linking exception from the license: OpenSSL 3.0+ is
     Apache-2.0 and GPL-compatible, so it is no longer needed. httrack is now
     plain GPL-3.0-or-later. Updated debian/copyright accordingly.
@@ -14,7 +17,7 @@ httrack (3.49.8-1) unstable; urgency=medium
     the QA debcheck page. Depend on firefox-esr | chromium | www-browser
     instead.
 
- -- Xavier Roche <xavier@debian.org>  Sun, 07 Jun 2026 14:29:24 +0200
+ -- Xavier Roche <xavier@debian.org>  Sat, 20 Jun 2026 13:02:08 +0200
 
 httrack (3.49.7-2) unstable; urgency=medium
 
