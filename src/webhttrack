@@ -20,7 +20,10 @@ fi
 BINWD=$(dirname "$0")
 SRCHPATH=("$BINWD" /usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin "${HOME}/usr/bin" "${HOME}/bin")
 IFS=':' read -ra pathdirs <<<"$PATH"
-SRCHPATH+=("${pathdirs[@]}")
+for d in "${pathdirs[@]}"; do
+    # drop empty PATH fields, matching the old echo|tr word-split
+    test -n "$d" && SRCHPATH+=("$d")
+done
 SRCHDISTPATH=("$BINWD/../share" "$BINWD/.." /usr/share /usr/local /usr /local /usr/local/share "${HOME}/usr" "${HOME}/usr/share" /opt/local/share /sw "${HOME}/usr/local" "${HOME}/usr/share")
 
 ###

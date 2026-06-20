@@ -323,7 +323,18 @@ jobs:
     # Every tracked shell script; the globs expand at run time. Kept here so the
     # shellcheck and shfmt steps below cannot drift apart.
     env:
-      SHELL_SCRIPTS: bootstrap build.sh .githooks/pre-commit html/div/search.sh man/makeman.sh src/htsbasiccharsets.sh src/htsentities.sh src/webhttrack tools/mkdeb.sh tests/*.test tests/*.sh
+      SHELL_SCRIPTS: >-
+        .githooks/pre-commit
+        bootstrap
+        build.sh
+        html/div/search.sh
+        man/makeman.sh
+        src/htsbasiccharsets.sh
+        src/htsentities.sh
+        src/webhttrack
+        tests/*.sh
+        tests/*.test
+        tools/mkdeb.sh
     steps:
       - uses: actions/checkout@v6
 
