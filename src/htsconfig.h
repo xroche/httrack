@@ -52,12 +52,12 @@ Please visit our Website: http://www.httrack.com
 #define DEFAULT_FTP "index.txt"
 
 // extension par défaut pour fichiers n'en ayant pas
-#define DEFAULT_EXT       ".html"
+#define DEFAULT_EXT ".html"
 #define DEFAULT_EXT_SHORT ".htm"
-//#define DEFAULT_BIN_EXT   ".bin"
-//#define DEFAULT_BIN_EXT_SHORT ".bin"
-//#define DEFAULT_EXT       ".txt"
-//#define DEFAULT_EXT_SHORT ".txt"
+// #define DEFAULT_BIN_EXT   ".bin"
+// #define DEFAULT_BIN_EXT_SHORT ".bin"
+// #define DEFAULT_EXT       ".txt"
+// #define DEFAULT_EXT_SHORT ".txt"
 
 // éviter les /nul, /con..
 #define HTS_OVERRIDE_DOS_FOLDERS 1
@@ -87,7 +87,8 @@ Please visit our Website: http://www.httrack.com
 // fast cache (build hash table)
 #define HTS_FAST_CACHE 1
 
-// le > peut être considéré comme un tag de fermeture de commentaire (<!-- > est valide)
+// le > peut être considéré comme un tag de fermeture de commentaire (<!-- > est
+// valide)
 #define GT_ENDS_COMMENT 1
 
 // always adds a '/' at the end if a '~' is encountered (/~smith -> /~smith/)
@@ -97,7 +98,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_STRIP_DOUBLE_SLASH 0
 
 // case-sensitive pour les dossiers et fichiers (0/1)
-// [normalement 1, mais pose des problèmes (url malformée par exemple) et n'est pas très utile..
+// [normalement 1, mais pose des problèmes (url malformée par exemple) et n'est
+// pas très utile..
 // ..et pas bcp respecté]
 // REMOVED
 // #define HTS_CASSE 0

@@ -68,14 +68,15 @@ struct t_cookie {
 #ifdef HTS_INTERNAL_BYTECODE
 
 /* cookies */
-int cookie_add(t_cookie * cookie, const  char *cook_name, const  char *cook_value,
-               const  char *domain, const  char *path);
+int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path);
 
-int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, const char *path);
+int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
+               const char *path);
 
-int cookie_load(t_cookie * cookie, const char *path, const char *name);
+int cookie_load(t_cookie *cookie, const char *path, const char *name);
 
-int cookie_save(t_cookie * cookie, const char *name);
+int cookie_save(t_cookie *cookie, const char *name);
 
 void cookie_insert(char *s, size_t s_size, const char *ins);
 
@@ -83,7 +84,8 @@ void cookie_delete(char *s, size_t s_size, size_t pos);
 
 const char *cookie_get(char *buffer, const char *cookie_base, int param);
 
-char *cookie_find(char *s, const char *cook_name, const char *domain, const char *path);
+char *cookie_find(char *s, const char *cook_name, const char *domain,
+                  const char *path);
 
 char *cookie_nextfield(char *a);
 
@@ -92,12 +94,13 @@ char *cookie_nextfield(char *a);
 /** Register credentials (auth = base-64 user:pass) for the prefix derived from
     adr (host) and fil (path). No-op returning 0 if cookie is NULL, allocation
     fails, or a matching prefix is already stored; returns 1 on insertion. */
-int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth);
+int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
+              const char *auth);
 
 /** Return the stored base-64 credentials whose prefix matches adr+fil, or NULL
     if none (or cookie is NULL). Returned pointer aliases the jar's bauth_chain;
     caller must not free it. */
-char *bauth_check(t_cookie * cookie, const char *adr, const char *fil);
+char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
 /** Build the auth lookup key (host + path, query string stripped, truncated at
     the last '/') from adr and fil into prefix; returns prefix. Caller must

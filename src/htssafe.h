@@ -48,7 +48,7 @@ Please visit our Website: http://www.httrack.com
 /** Assert error callback. **/
 #ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
 #define HTS_DEF_FWSTRUCT_htsErrorCallback
-typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
+typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,12 +58,13 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 #endif
 #endif
 
-#define HTSSAFE_ABORT_FUNCTION(A,B,C) do { \
-  htsErrorCallback callback = hts_get_error_callback(); \
-  if (callback != NULL) { \
-    callback(A,B,C); \
-  } \
-} while(0)
+#define HTSSAFE_ABORT_FUNCTION(A, B, C)                                        \
+  do {                                                                         \
+    htsErrorCallback callback = hts_get_error_callback();                      \
+    if (callback != NULL) {                                                    \
+      callback(A, B, C);                                                       \
+    }                                                                          \
+  } while (0)
 
 #endif
 
@@ -75,7 +76,8 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 /**
  * Fatal assertion check.
  */
-#define assertf__(exp, sexp, file, line) (void) ( (exp) || (abortf_(sexp, file, line), 0) )
+#define assertf__(exp, sexp, file, line)                                       \
+  (void) ((exp) || (abortf_(sexp, file, line), 0))
 
 /**
  * Fatal assertion check.
@@ -106,12 +108,13 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 /* Note: char[] and const char[] are compatible */
-#define HTS_IS_CHAR_BUFFER(VAR) ( __builtin_types_compatible_p ( typeof (VAR), char[] ) )
+#define HTS_IS_CHAR_BUFFER(VAR)                                                \
+  (__builtin_types_compatible_p(typeof(VAR), char[]))
 #else
 /* Note: a bit lame as char[8] won't be seen. */
-#define HTS_IS_CHAR_BUFFER(VAR) ( sizeof(VAR) != sizeof(char*) )
+#define HTS_IS_CHAR_BUFFER(VAR) (sizeof(VAR) != sizeof(char *))
 #endif
-#define HTS_IS_NOT_CHAR_BUFFER(VAR) ( ! HTS_IS_CHAR_BUFFER(VAR) )
+#define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))
 
 /* Compile-time checks. */
 static HTS_UNUSED void htssafe_compile_time_check_(void) {
@@ -201,60 +204,74 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
-#define strncatbuff(A, B, N) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
-  strncat_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
-  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__), \
-  strncatbuff_ptr_((A), (B), (N)) )
+#define strncatbuff(A, B, N)                                                   \
+  __builtin_choose_expr(                                                       \
+      HTS_IS_CHAR_BUFFER(A),                                                   \
+      strncat_safe_(A, sizeof(A), B,                                           \
+                    HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N,    \
+                    "overflow while appending '" #B "' to '" #A "'", __FILE__, \
+                    __LINE__),                                                 \
+      strncatbuff_ptr_((A), (B), (N)))
 #else
-#define strncatbuff(A, B, N) \
-  ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strncat(A, B, N) \
-  : strncat_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
-  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#define strncatbuff(A, B, N)                                                   \
+  (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
+       ? strncat(A, B, N)                                                      \
+       : strncat_safe_(A, sizeof(A), B,                                        \
+                       HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
+                       "overflow while appending '" #B "' to '" #A "'",        \
+                       __FILE__, __LINE__))
 #endif
 
 /**
  * Append characters of "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
+ * If "A" is a char[] variable whose size is not sizeof(char*), then the size
  * is assumed to be the capacity of this array.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
-#define strcatbuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
-  strncat_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
-  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__), \
-  strcatbuff_ptr_((A), (B)) )
+#define strcatbuff(A, B)                                                       \
+  __builtin_choose_expr(                                                       \
+      HTS_IS_CHAR_BUFFER(A),                                                   \
+      strncat_safe_(A, sizeof(A), B,                                           \
+                    HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),       \
+                    (size_t) -1,                                               \
+                    "overflow while appending '" #B "' to '" #A "'", __FILE__, \
+                    __LINE__),                                                 \
+      strcatbuff_ptr_((A), (B)))
 #else
-#define strcatbuff(A, B) \
-  ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strcat(A, B) \
-  : strncat_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
-  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#define strcatbuff(A, B)                                                       \
+  (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
+       ? strcat(A, B)                                                          \
+       : strncat_safe_(A, sizeof(A), B,                                        \
+                       HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),    \
+                       (size_t) -1,                                            \
+                       "overflow while appending '" #B "' to '" #A "'",        \
+                       __FILE__, __LINE__))
 #endif
 
 /**
  * Copy characters from "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
+ * If "A" is a char[] variable whose size is not sizeof(char*), then the size
  * is assumed to be the capacity of this array.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
-#define strcpybuff(A, B) __builtin_choose_expr( HTS_IS_CHAR_BUFFER(A), \
-  strcpy_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
-  "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__), \
-  strcpybuff_ptr_((A), (B)) )
+#define strcpybuff(A, B)                                                       \
+  __builtin_choose_expr(                                                       \
+      HTS_IS_CHAR_BUFFER(A),                                                   \
+      strcpy_safe_(A, sizeof(A), B,                                            \
+                   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),        \
+                   "overflow while copying '" #B "' to '" #A "'", __FILE__,    \
+                   __LINE__),                                                  \
+      strcpybuff_ptr_((A), (B)))
 #else
-#define strcpybuff(A, B) \
-  ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strcpy(A, B) \
-  : strcpy_safe_(A, sizeof(A), B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
-  "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
+#define strcpybuff(A, B)                                                       \
+  (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
+       ? strcpy(A, B)                                                          \
+       : strcpy_safe_(A, sizeof(A), B,                                         \
+                      HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),     \
+                      "overflow while copying '" #B "' to '" #A "'", __FILE__, \
+                      __LINE__))
 #endif
 
 /*
@@ -268,10 +285,10 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 /**
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
  */
-#define strlcatbuff(A, B, S) \
-  strncat_safe_(A, S, B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
-  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
+#define strlcatbuff(A, B, S)                                                   \
+  strncat_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),  \
+                (size_t) -1, "overflow while appending '" #B "' to '" #A "'",  \
+                __FILE__, __LINE__)
 
 /**
  * Append at most "N" characters of "B" to "A", "A" having a maximum capacity
@@ -285,17 +302,18 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 /**
  * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
  */
-#define strlcpybuff(A, B, S) \
-  strcpy_safe_(A, S, B, \
-  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
-  "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__)
+#define strlcpybuff(A, B, S)                                                   \
+  strcpy_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),   \
+               "overflow while copying '" #B "' to '" #A "'", __FILE__,        \
+               __LINE__)
 
 /** strnlen replacement (autotools). **/
-#if ( ! defined(_WIN32) && ! defined(HAVE_STRNLEN) )
+#if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
 
 static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
   size_t i;
-  for(i = 0 ; i < maxlen && s[i] != '\0' ; i++) ;
+  for (i = 0; i < maxlen && s[i] != '\0'; i++)
+    ;
   return i;
 }
 #endif
@@ -304,13 +322,14 @@ static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
    Aborts if source is NULL or has no NUL within that capacity. The sentinel
    sizeof_source == (size_t)-1 means "capacity unknown", and falls back to the
    unbounded strlen (used when the source is a pointer rather than an array). */
-static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_t sizeof_source, 
+static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source,
+                                                 const size_t sizeof_source,
                                                  const char *file, int line) {
   size_t size;
-  assertf_( source != NULL, file, line );
-  size = sizeof_source != (size_t) -1 
-    ? strnlen(source, sizeof_source) : strlen(source);
-  assertf_( size < sizeof_source, file, line );
+  assertf_(source != NULL, file, line);
+  size = sizeof_source != (size_t) -1 ? strnlen(source, sizeof_source)
+                                      : strlen(source);
+  assertf_(size < sizeof_source, file, line);
   return size;
 }
 
@@ -319,10 +338,10 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source, const size_
    source's capacity or (size_t)-1 if unknown. Aborts if the result (existing
    dest length + appended bytes + NUL) would not fit sizeof_dest: this NEVER
    truncates. Always NUL-terminates on success. */
-static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t sizeof_dest,
-                                                 const char *const source, const size_t sizeof_source, 
-                                                 const size_t n,
-                                                 const char *exp, const char *file, int line) {
+static HTS_INLINE HTS_UNUSED char *
+strncat_safe_(char *const dest, const size_t sizeof_dest,
+              const char *const source, const size_t sizeof_source,
+              const size_t n, const char *exp, const char *file, int line) {
   const size_t source_len = strlen_safe_(source, sizeof_source, file, line);
   const size_t dest_len = strlen_safe_(dest, sizeof_dest, file, line);
   /* note: "size_t is an unsigned integral type" ((size_t) -1 is positive) */
@@ -337,12 +356,14 @@ static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t 
 /* Core bounded copy: empties dest then appends all of source via
    strncat_safe_. sizeof_dest is dest's total capacity (NUL included). Aborts
    (no truncation) if source plus its NUL would not fit. */
-static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t sizeof_dest,
-                                                const char *const source, const size_t sizeof_source, 
-                                                const char *exp, const char *file, int line) {
+static HTS_INLINE HTS_UNUSED char *
+strcpy_safe_(char *const dest, const size_t sizeof_dest,
+             const char *const source, const size_t sizeof_source,
+             const char *exp, const char *file, int line) {
   assertf_(sizeof_dest != 0, file, line);
   dest[0] = '\0';
-  return strncat_safe_(dest, sizeof_dest, source, sizeof_source, (size_t) -1, exp, file, line);
+  return strncat_safe_(dest, sizeof_dest, source, sizeof_source, (size_t) -1,
+                       exp, file, line);
 }
 
 /**
@@ -360,9 +381,9 @@ static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t s
  * htsbuff_ptr(). The buffer is kept NUL-terminated; htsbuff_str() returns it.
  */
 typedef struct {
-  char *buf;        /* backing buffer (kept NUL-terminated) */
-  size_t cap;       /* total capacity of buf, including the NUL */
-  size_t len;       /* current length, excluding the NUL */
+  char *buf;  /* backing buffer (kept NUL-terminated) */
+  size_t cap; /* total capacity of buf, including the NUL */
+  size_t len; /* current length, excluding the NUL */
 } htsbuff;
 
 static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
@@ -384,23 +405,29 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 /* 0 for an array, a -1 array-size compile error for a pointer. */
-#define htsbuff_must_be_array_(A) \
-  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(typeof(A), typeof(&(A)[0]))]) - 1)
+#define htsbuff_must_be_array_(A)                                              \
+  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(typeof(A),               \
+                                                      typeof(&(A)[0]))]) -     \
+   1)
 
-#define htsbuff_array(ARR) htsbuff_ptr_((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR))
+#define htsbuff_array(ARR)                                                     \
+  htsbuff_ptr_((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR))
 #else
 #define htsbuff_array(ARR) htsbuff_ptr_((ARR), sizeof(ARR))
 #endif
 /** Builder over pointer P of known capacity N (N includes the NUL). */
-#define htsbuff_ptr(P, N)  htsbuff_ptr_((P), (N))
+#define htsbuff_ptr(P, N) htsbuff_ptr_((P), (N))
 
-/** Append at most n characters of s (stopping at its NUL). Aborts on overflow. */
-static HTS_INLINE HTS_UNUSED void htsbuff_catn(htsbuff *b, const char *s, size_t n) {
+/** Append at most n characters of s (stopping at its NUL). Aborts on overflow.
+ */
+static HTS_INLINE HTS_UNUSED void htsbuff_catn(htsbuff *b, const char *s,
+                                               size_t n) {
   const size_t add = strnlen(s, n);
   /* Overflow-safe: keep the (potentially huge) 'add' alone on one side. The
      maintained invariant len < cap makes 'cap - len' >= 1 (no underflow), so
      'add < cap - len' cannot wrap the way 'len + add < cap' could. */
-  assertf__(add < b->cap - b->len, "htsbuff append overflow", __FILE__, __LINE__);
+  assertf__(add < b->cap - b->len, "htsbuff append overflow", __FILE__,
+            __LINE__);
   memcpy(b->buf + b->len, s, add);
   b->len += add;
   b->buf[b->len] = '\0';
@@ -433,15 +460,21 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
    added bounds checking. freet() also NULLs the freed pointer and tolerates
    NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the
    bounds. */
-#define malloct(A)          malloc(A)
+#define malloct(A) malloc(A)
 
-#define calloct(A,B)        calloc((A), (B))
+#define calloct(A, B) calloc((A), (B))
 
-#define freet(A)            do { if ((A) != NULL) { free(A); (A) = NULL; } } while(0)
+#define freet(A)                                                               \
+  do {                                                                         \
+    if ((A) != NULL) {                                                         \
+      free(A);                                                                 \
+      (A) = NULL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define strdupt(A)          strdup(A)
+#define strdupt(A) strdup(A)
 
-#define realloct(A,B)       realloc(A, B)
+#define realloct(A, B) realloc(A, B)
 
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
 

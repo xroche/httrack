@@ -16,6 +16,7 @@ BasedOnStyle: LLVM
 SpaceAfterCStyleCast: true   # "(int) x", overwhelmingly dominant (542 vs 7)
 SortIncludes: false          # C include order can be significant; never reorder
 IncludeBlocks: Preserve      # do not merge/reflow include groups
+SeparateDefinitionBlocks: Always  # blank line between definitions (readability)
 
 # Stated explicitly for robustness against base-style drift (these match LLVM):
 IndentWidth: 2

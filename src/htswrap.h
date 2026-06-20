@@ -57,17 +57,17 @@ extern "C" {
 #endif
 
 /** Legacy no-op retained for ABI compatibility; always returns 1. */
-HTSEXT_API int htswrap_init(void);      // LEGACY
+HTSEXT_API int htswrap_init(void); // LEGACY
 
 /** Legacy no-op retained for ABI compatibility; always returns 1. */
-HTSEXT_API int htswrap_free(void);      // LEGACY
+HTSEXT_API int htswrap_free(void); // LEGACY
 
 #ifdef __cplusplus
 }
 #endif
 
-//HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
-//HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
+// HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
+// HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
 
 #endif
 
