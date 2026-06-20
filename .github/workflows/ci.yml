@@ -320,6 +320,10 @@ jobs:
   lint:
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
+    # Every tracked shell script; the globs expand at run time. Kept here so the
+    # shellcheck and shfmt steps below cannot drift apart.
+    env:
+      SHELL_SCRIPTS: bootstrap build.sh .githooks/pre-commit html/div/search.sh man/makeman.sh src/htsbasiccharsets.sh src/htsentities.sh src/webhttrack tools/mkdeb.sh tests/*.test tests/*.sh
     steps:
       - uses: actions/checkout@v6
 
@@ -332,12 +336,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends shellcheck shfmt
           shfmt --version
 
-      # Lint the scripts we maintain; the legacy scripts are a separate cleanup.
       - name: shellcheck
-        run: shellcheck man/makeman.sh tools/mkdeb.sh .githooks/pre-commit tests/*.test tests/check-network.sh
+        run: shellcheck $SHELL_SCRIPTS
 
       - name: shfmt
-        run: shfmt -d -i 4 man/makeman.sh tools/mkdeb.sh .githooks/pre-commit
+        run: shfmt -d -i 4 $SHELL_SCRIPTS
 
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
   # (it was shaped by an old Visual Studio formatter) and does not round-trip,
