@@ -69,41 +69,41 @@ typedef struct hash_struct hash_struct;
 #define HTS_DEF_FWSTRUCT_htsmoduleStruct
 typedef struct htsmoduleStruct htsmoduleStruct;
 #endif
-typedef int (*t_htsAddLink) (htsmoduleStruct * str, char *link);
+typedef int (*t_htsAddLink)(htsmoduleStruct *str, char *link);
 
 /** Per-object context passed to a parser module for one downloaded file.
     Field access classes are noted; engine owns all pointers unless stated. */
 struct htsmoduleStruct {
   /* Read-only elements */
-  const char *filename;         /* filename (C:\My Web Sites\...) */
-  int size;                     /* size of filename (should be > 0) */
-  const char *mime;             /* MIME type of the object */
-  const char *url_host;         /* incoming hostname (www.foo.com) */
-  const char *url_file;         /* incoming filename (/bar/bar.gny) */
+  const char *filename; /* filename (C:\My Web Sites\...) */
+  int size;             /* size of filename (should be > 0) */
+  const char *mime;     /* MIME type of the object */
+  const char *url_host; /* incoming hostname (www.foo.com) */
+  const char *url_file; /* incoming filename (/bar/bar.gny) */
 
   /* Write-only */
-  const char *wrapper_name;     /* name of wrapper (static string) */
-  char *err_msg;                /* if an error occurred, the error message (max. 1KB) */
+  const char *wrapper_name; /* name of wrapper (static string) */
+  char *err_msg; /* if an error occurred, the error message (max. 1KB) */
 
   /* Read/Write */
-  int relativeToHtmlLink;       /* set this to 1 if all urls you pass to addLink
-                                   are in fact relative to the html file where your
-                                   module was originally */
+  int relativeToHtmlLink; /* set this to 1 if all urls you pass to addLink
+                             are in fact relative to the html file where your
+                             module was originally */
 
   /* Callbacks */
-  t_htsAddLink addLink;         /* call this function when links are 
-                                   being detected. it if not your responsability to decide
-                                   if the engine will keep them, or not. */
+  t_htsAddLink addLink; /* call this function when links are
+                           being detected. it if not your responsability to
+                           decide if the engine will keep them, or not. */
 
   /* Optional */
-  char *localLink;              /* if non null, the engine will write there the local
-                                   relative filename of the link added by addLink(), or
-                                   the absolute path if the link was refused by the wizard */
-  int localLinkSize;            /* size of the optionnal buffer */
+  char *localLink;   /* if non null, the engine will write there the local
+                        relative filename of the link added by addLink(), or
+                        the absolute path if the link was refused by the wizard */
+  int localLinkSize; /* size of the optionnal buffer */
 
   /* User-defined */
-  void *userdef;                /* can be used by callback routines
-                                 */
+  void *userdef; /* can be used by callback routines
+                  */
 
   /* The parser httrackp structure (may be used) */
   httrackp *opt;
@@ -117,7 +117,6 @@ struct htsmoduleStruct {
   int *ptr_;
   const char *page_charset_;
   /* Internal use - please don't touch */
-
 };
 
 #ifdef __cplusplus
@@ -126,11 +125,11 @@ extern "C" {
 
 /** Module lifecycle hooks. Init/PlugInit return 1 on success, 0 on failure;
     Exit returns its own status (ignored by the engine). */
-typedef int (*t_htsWrapperInit) (char *fn, char *args);
+typedef int (*t_htsWrapperInit)(char *fn, char *args);
 
-typedef int (*t_htsWrapperExit) (void);
+typedef int (*t_htsWrapperExit)(void);
 
-typedef int (*t_htsWrapperPlugInit) (char *args);
+typedef int (*t_htsWrapperPlugInit)(char *args);
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -138,7 +137,7 @@ typedef int (*t_htsWrapperPlugInit) (char *args);
 /** Capabilities string ("-noV6", "-nossl", ...) followed by "+name" for each
     loaded module. Returned pointer aliases opt->state.HTbuff; do not free, and
     it is overwritten by the next call. */
-HTSEXT_API const char *hts_get_version_info(httrackp * opt);
+HTSEXT_API const char *hts_get_version_info(httrackp *opt);
 
 /** Static capabilities string set by htspe_init(); valid for the process
     lifetime, do not free. */
@@ -154,7 +153,7 @@ extern void htspe_uninit(void);
 /** Run the external-parser callbacks for the object described by str.
     Returns the parse callback result (>=0) on a handled object, or -1 if no
     module claimed it or its wrapper_name is blacklisted. */
-extern int hts_parse_externals(htsmoduleStruct * str);
+extern int hts_parse_externals(htsmoduleStruct *str);
 
 /** Nonzero if IPv6 support was compiled in (== HTS_INET6). */
 extern int V6_is_available;

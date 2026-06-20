@@ -72,6 +72,7 @@ typedef struct String String;
 #endif
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
+
 struct String {
   char *buffer_;
   size_t length_;
@@ -80,7 +81,7 @@ struct String {
 #endif
 
 /* Defines */
-#define CATBUFF_SIZE (STRING_SIZE*2*2)
+#define CATBUFF_SIZE (STRING_SIZE * 2 * 2)
 
 #define STRING_SIZE 2048
 
@@ -108,7 +109,7 @@ struct htsfilters {
 };
 
 /* User callbacks chain */
-typedef int (*htscallbacksfncptr) (void);
+typedef int (*htscallbacksfncptr)(void);
 
 typedef struct htscallbacks htscallbacks;
 
@@ -179,6 +180,7 @@ typedef struct lien_url lien_url;
 
 #ifndef HTS_DEF_DEFSTRUCT_hts_log_type
 #define HTS_DEF_DEFSTRUCT_hts_log_type
+
 typedef enum hts_log_type {
   LOG_PANIC,
   LOG_ERROR,
@@ -278,16 +280,17 @@ struct htslibhandles {
 
 /* Javascript parser flags */
 typedef enum htsparsejava_flags {
-  HTSPARSE_NONE = 0,            // don't parse
-  HTSPARSE_DEFAULT = 1,         // parse default (all)
-  HTSPARSE_NO_CLASS = 2,        // don't parse .java
-  HTSPARSE_NO_JAVASCRIPT = 4,   // don't parse .js
-  HTSPARSE_NO_AGGRESSIVE = 8    // don't aggressively parse .js or .java
+  HTSPARSE_NONE = 0,          // don't parse
+  HTSPARSE_DEFAULT = 1,       // parse default (all)
+  HTSPARSE_NO_CLASS = 2,      // don't parse .java
+  HTSPARSE_NO_JAVASCRIPT = 4, // don't parse .js
+  HTSPARSE_NO_AGGRESSIVE = 8  // don't aggressively parse .js or .java
 } htsparsejava_flags;
 
 /* Link-rewriting style for saved pages (opt->urlmode). */
 #ifndef HTS_DEF_DEFSTRUCT_hts_urlmode
 #define HTS_DEF_DEFSTRUCT_hts_urlmode
+
 typedef enum hts_urlmode {
   HTS_URLMODE_ABSOLUTE = 0, /**< absolute URL (http://host/path) everywhere */
   HTS_URLMODE_ABSOLUTE_FILE = 1, /**< legacy file: form, unused */
@@ -301,6 +304,7 @@ typedef enum hts_urlmode {
 /* Cache policy for updates and retries (opt->cache). */
 #ifndef HTS_DEF_DEFSTRUCT_hts_cachemode
 #define HTS_DEF_DEFSTRUCT_hts_cachemode
+
 typedef enum hts_cachemode {
   HTS_CACHE_NONE = 0,       /**< no cache */
   HTS_CACHE_PRIORITY = 1,   /**< cache takes priority over the network */
@@ -311,6 +315,7 @@ typedef enum hts_cachemode {
 /* Interactive wizard level (opt->wizard). */
 #ifndef HTS_DEF_DEFSTRUCT_hts_wizard
 #define HTS_DEF_DEFSTRUCT_hts_wizard
+
 typedef enum hts_wizard {
   HTS_WIZARD_NONE = 0, /**< no wizard */
   HTS_WIZARD_ASK = 1,  /**< wizard asks questions */
@@ -321,6 +326,7 @@ typedef enum hts_wizard {
 /* robots.txt / meta-robots obedience level (opt->robots). */
 #ifndef HTS_DEF_DEFSTRUCT_hts_robots
 #define HTS_DEF_DEFSTRUCT_hts_robots
+
 typedef enum hts_robots {
   HTS_ROBOTS_NEVER = 0,        /**< ignore robots rules */
   HTS_ROBOTS_SOMETIMES = 1,    /**< partial obedience (default) */
@@ -406,34 +412,34 @@ struct httrackp {
   /* */
   hts_wizard wizard; /**< interactive wizard level (none/ask/auto) */
   hts_boolean flush; /**< fflush() log files after each write */
-  int travel;   /**< link-following scope (same domain, etc.) */
-  int seeker;   /**< allowed direction: go up and/or down the tree */
-  int depth;    /**< maximum recursion depth (-rN) */
-  int extdepth; /**< maximum recursion depth outside the start domain */
+  int travel;        /**< link-following scope (same domain, etc.) */
+  int seeker;        /**< allowed direction: go up and/or down the tree */
+  int depth;         /**< maximum recursion depth (-rN) */
+  int extdepth;      /**< maximum recursion depth outside the start domain */
   hts_urlmode
       urlmode; /**< saved-link rewriting style (relative, absolute, etc.) */
-  hts_boolean no_type_change;   // do not change file type according to MIME
-  hts_log_type debug;           /**< debug logging level */
-  int getmode;           /**< what to fetch (HTML, images, ...) bitmask */
-  FILE *log;             /**< informational log stream; NULL mutes it */
-  FILE *errlog;          /**< error log stream; NULL mutes it */
-  LLint maxsite;         /**< max total bytes for the whole mirror */
-  LLint maxfile_nonhtml; /**< max bytes per non-HTML file */
-  LLint maxfile_html;    /**< max bytes per HTML file */
-  int maxsoc;            /**< max simultaneous sockets (-cN) */
-  LLint fragment;        /**< split site after this many bytes */
+  hts_boolean no_type_change; // do not change file type according to MIME
+  hts_log_type debug;         /**< debug logging level */
+  int getmode;                /**< what to fetch (HTML, images, ...) bitmask */
+  FILE *log;                  /**< informational log stream; NULL mutes it */
+  FILE *errlog;               /**< error log stream; NULL mutes it */
+  LLint maxsite;              /**< max total bytes for the whole mirror */
+  LLint maxfile_nonhtml;      /**< max bytes per non-HTML file */
+  LLint maxfile_html;         /**< max bytes per HTML file */
+  int maxsoc;                 /**< max simultaneous sockets (-cN) */
+  LLint fragment;             /**< split site after this many bytes */
   hts_boolean
       nearlink; /**< also fetch images/data adjacent to a page but off-site */
   hts_boolean makeindex;  /**< build a top-level index.html */
   hts_boolean kindex;     /**< build a keyword index */
   hts_boolean delete_old; /**< delete locally obsolete files after update */
-  int timeout;    /**< connection timeout in seconds */
-  int rateout;    /**< minimum transfer rate (bytes/s) before abort */
-  int maxtime;    /**< max total mirror duration in seconds */
-  int maxrate;    /**< max transfer rate cap (bytes/s) */
-  float maxconn;  /**< max connections per second */
-  int waittime;   /**< scheduled start time (wall-clock seconds) */
-  hts_cachemode cache; /**< cache generation mode */
+  int timeout;            /**< connection timeout in seconds */
+  int rateout;            /**< minimum transfer rate (bytes/s) before abort */
+  int maxtime;            /**< max total mirror duration in seconds */
+  int maxrate;            /**< max transfer rate cap (bytes/s) */
+  float maxconn;          /**< max connections per second */
+  int waittime;           /**< scheduled start time (wall-clock seconds) */
+  hts_cachemode cache;    /**< cache generation mode */
   // int aff_progress;     // progress bar
   hts_boolean shell; /**< driven by a shell over stdin/stdout pipes */
   t_proxy proxy;     /**< proxy configuration */
@@ -446,12 +452,12 @@ struct httrackp {
   hts_boolean
       delayed_cached;   // delayed type check can be cached to speedup updates
   hts_boolean mimehtml; /**< produce a single MIME/MHTML archive */
-  hts_boolean user_agent_send;  /**< send a User-Agent header */
-  String user_agent;            /**< User-Agent value (e.g. httrack/1.0) */
-  String referer;               /**< Referer value to send */
-  String from;                  /**< From value to send */
-  String path_log;              /**< directory for cache and logs */
-  String path_html;             /**< output directory for the mirror */
+  hts_boolean user_agent_send; /**< send a User-Agent header */
+  String user_agent;           /**< User-Agent value (e.g. httrack/1.0) */
+  String referer;              /**< Referer value to send */
+  String from;                 /**< From value to send */
+  String path_log;             /**< directory for cache and logs */
+  String path_html;            /**< output directory for the mirror */
   String path_html_utf8; /**< output directory for the mirror, UTF-8 form */
   String path_bin;       /**< directory for HTML templates */
   int retry;             /**< extra retries on a failed transfer */
@@ -459,49 +465,49 @@ struct httrackp {
   hts_boolean maketrack; /**< maintain an operations-statistics log */
   int parsejava;         /**< Java/JS parsing mode; see htsparsejava_flags */
   int hostcontrol; /**< ban slow/timing-out hosts; see hts_hostcontrol bits */
-  hts_boolean errpage;   /**< generate an error page on 404 and similar */
+  hts_boolean errpage; /**< generate an error page on 404 and similar */
   hts_boolean
       check_type; /**< probe unknown-type links (cgi/asp/dir) and follow moves
                    */
-  hts_boolean all_in_cache; /**< keep all retrieved data in the cache */
-  hts_robots robots; /**< robots.txt handling level */
+  hts_boolean all_in_cache;      /**< keep all retrieved data in the cache */
+  hts_robots robots;             /**< robots.txt handling level */
   hts_boolean external;          /**< render external links as error pages */
   hts_boolean passprivacy;       /**< strip passwords from external links */
   hts_boolean includequery;      /**< include the query string in saved names */
   hts_boolean mirror_first_page; /**< only mirror the links of the first page */
-  String sys_com;               /**< system command to run */
-  hts_boolean sys_com_exec;     /**< actually execute sys_com */
-  hts_boolean accept_cookie;    /**< accept and send cookies */
-  t_cookie *cookie;             /**< cookie store */
-  hts_boolean http10;           /**< force HTTP/1.0 */
-  hts_boolean nokeepalive;      /**< disable keep-alive */
-  hts_boolean nocompression;    /**< disable content compression */
-  hts_boolean sizehack;         /**< treat same-size response as "updated" */
-  hts_boolean urlhack;          // force "url normalization" to avoid loops
-  hts_boolean tolerant;         /**< accept an incorrect Content-Length */
+  String sys_com;                /**< system command to run */
+  hts_boolean sys_com_exec;      /**< actually execute sys_com */
+  hts_boolean accept_cookie;     /**< accept and send cookies */
+  t_cookie *cookie;              /**< cookie store */
+  hts_boolean http10;            /**< force HTTP/1.0 */
+  hts_boolean nokeepalive;       /**< disable keep-alive */
+  hts_boolean nocompression;     /**< disable content compression */
+  hts_boolean sizehack;          /**< treat same-size response as "updated" */
+  hts_boolean urlhack;           // force "url normalization" to avoid loops
+  hts_boolean tolerant;          /**< accept an incorrect Content-Length */
   hts_boolean
       parseall; /**< parse aggressively, including unknown tags with links */
   hts_boolean parsedebug; /**< parser debug mode */
   hts_boolean norecatch;  /**< do not re-fetch files the user deleted locally */
   hts_verbosedisplay verbosedisplay; /**< animated text progress display */
-  String footer;      /**< footer/info line injected into pages */
-  int maxcache;       /**< in-memory cache backing limit (bytes) */
+  String footer; /**< footer/info line injected into pages */
+  int maxcache;  /**< in-memory cache backing limit (bytes) */
   // int maxcache_anticipate; // maximum links to anticipate (upper bound)
-  hts_boolean ftp_proxy;        /**< use the HTTP proxy for FTP too */
-  String filelist;              /**< file listing URLs to include */
-  String urllist;               /**< file listing filters to include */
-  htsfilters filters;           /**< filter pointers (+/-pattern rules) */
-  hash_struct *hash;            // hash structure
-  lien_url **liens;             // links
-  int lien_tot;                 // top index of "links" heap (always out-of-range)
-  lien_buffers *liensbuf;       // links buffers
-  robots_wizard *robotsptr;     // robots ptr
-  String lang_iso;              /**< Accept-Language value (en, fr, ...) */
-  String accept;                // Accept:
-  String headers;               // Additional headers
-  String mimedefs;              // ext1=mimetype1\next2=mimetype2..
-  String mod_blacklist;         /**< blacklisted modules */
-  hts_boolean convert_utf8;     // filenames UTF-8 conversion (3.46)
+  hts_boolean ftp_proxy;    /**< use the HTTP proxy for FTP too */
+  String filelist;          /**< file listing URLs to include */
+  String urllist;           /**< file listing filters to include */
+  htsfilters filters;       /**< filter pointers (+/-pattern rules) */
+  hash_struct *hash;        // hash structure
+  lien_url **liens;         // links
+  int lien_tot;             // top index of "links" heap (always out-of-range)
+  lien_buffers *liensbuf;   // links buffers
+  robots_wizard *robotsptr; // robots ptr
+  String lang_iso;          /**< Accept-Language value (en, fr, ...) */
+  String accept;            // Accept:
+  String headers;           // Additional headers
+  String mimedefs;          // ext1=mimetype1\next2=mimetype2..
+  String mod_blacklist;     /**< blacklisted modules */
+  hts_boolean convert_utf8; // filenames UTF-8 conversion (3.46)
   //
   int maxlink;   /**< max number of links */
   int maxfilter; /**< max number of filters */
@@ -587,17 +593,17 @@ typedef struct htsrequest htsrequest;
 struct htsrequest {
   short int user_agent_send; /**< send a User-Agent header */
   short int http11; /**< sign the request as HTTP/1.1 rather than HTTP/1.0 */
-  short int nokeepalive;        /**< disable keep-alive */
-  short int range_used;         /**< a Range header is in use */
-  short int nocompression;      /**< disable compression */
-  short int flush_garbage;      // recycled
-  const char *user_agent;       /**< User-Agent value */
-  const char *referer;          /**< Referer value */
-  const char *from;             /**< From value */
-  const char *lang_iso;         /**< Accept-Language value */
-  const char *accept;           /**< Accept value */
-  const char *headers;          /**< extra request headers */
-  htsrequest_proxy proxy;       /**< proxy for this request */
+  short int nokeepalive;   /**< disable keep-alive */
+  short int range_used;    /**< a Range header is in use */
+  short int nocompression; /**< disable compression */
+  short int flush_garbage; // recycled
+  const char *user_agent;  /**< User-Agent value */
+  const char *referer;     /**< Referer value */
+  const char *from;        /**< From value */
+  const char *lang_iso;    /**< Accept-Language value */
+  const char *accept;      /**< Accept value */
+  const char *headers;     /**< extra request headers */
+  htsrequest_proxy proxy;  /**< proxy for this request */
 };
 
 /* Result of a connection / header fetch. */
@@ -629,8 +635,8 @@ struct htsblk {
   short int is_file; /**< 1 if a file descriptor rather than a socket */
   T_SOC soc;         /**< socket id */
   SOCaddr address;   /**< peer IP address */
-  int address_size;             // IP address structure length (unused internally)
-  FILE *fp;                     /**< file handle for file:// */
+  int address_size;  // IP address structure length (unused internally)
+  FILE *fp;          /**< file handle for file:// */
 #if HTS_USEOPENSSL
   short int ssl; /**< nonzero if this is an SSL connection (https) */
   // BIO* ssl_soc;          // SSL structure
@@ -712,7 +718,7 @@ struct lien_back {
   LLint chunk_blocksize; /**< data size declared by the chunk */
   LLint compressed_size; /**< compressed size (stats only) */
   //
-  //int links_index;        // to access liens[links_index]
+  // int links_index;        // to access liens[links_index]
   //
   char info[256]; /**< status text, e.g. for FTP */
   int stop_ftp;   /**< stop flag for FTP */

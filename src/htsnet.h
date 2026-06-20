@@ -112,10 +112,10 @@ struct SOCaddr {
 
 /** Pointer to the port field (network byte order) for the active family.
     Asserts on NULL or an unset/unknown family. */
-static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
-                                                         const char *file, const int line) {
+static HTS_INLINE HTS_UNUSED in_port_t *
+SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
-  switch(addr->m_addr.sa.sa_family) {
+  switch (addr->m_addr.sa.sa_family) {
   case AF_INET:
     return &addr->m_addr.in.sin_port;
     break;
@@ -125,7 +125,7 @@ static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
     break;
 #endif
   default:
-    assertf_(! "invalid structure", file, line);
+    assertf_(!"invalid structure", file, line);
     return 0;
     break;
   }
@@ -133,10 +133,11 @@ static HTS_INLINE HTS_UNUSED in_port_t* SOCaddr_sinport_(SOCaddr *const addr,
 
 /** Length of the active sockaddr (sockaddr_in or sockaddr_in6), or 0 if the
     family is unset/unknown. The 0 case doubles as the "not valid" test. */
-static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
-                                                     const char *file, const int line) {
+static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr *const addr,
+                                                     const char *file,
+                                                     const int line) {
   assertf_(addr != NULL, file, line);
-  switch(addr->m_addr.sa.sa_family) {
+  switch (addr->m_addr.sa.sa_family) {
   case AF_INET:
     return sizeof(addr->m_addr.in);
     break;
@@ -152,8 +153,8 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr*const addr,
 }
 
 /** Reset to the unset state (family AF_UNSPEC), making the address invalid. */
-static HTS_INLINE HTS_UNUSED void SOCaddr_clear_(SOCaddr*const addr,
-                                                 const char *file, const int line) {
+static HTS_INLINE HTS_UNUSED void
+SOCaddr_clear_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
   addr->m_addr.sa.sa_family = AF_UNSPEC;
 }
@@ -191,14 +192,16 @@ static HTS_INLINE HTS_UNUSED void SOCaddr_clear_(SOCaddr*const addr,
 
 /** Set the port (host-order argument, stored network-order) on the active
  * family. */
-#define SOCaddr_initport(server, port) do { \
-  SOCaddr_sinport(server) = htons((in_port_t) (port)); \
-} while(0)
+#define SOCaddr_initport(server, port)                                         \
+  do {                                                                         \
+    SOCaddr_sinport(server) = htons((in_port_t) (port));                       \
+  } while (0)
 
 /** Initialize as an all-zero IPv4 wildcard (INADDR_ANY) address; returns its
     sockaddr length. */
-static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
-                                                        const char *file, const int line) {
+static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr *const addr,
+                                                        const char *file,
+                                                        const int line) {
   assertf_(addr != NULL, file, line);
   memset(&addr->m_addr.in, 0, sizeof(addr->m_addr.in));
   addr->m_addr.in.sin_family = AF_INET;
@@ -206,17 +209,20 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
 }
 
 /** Initialize server as an IPv4 wildcard (INADDR_ANY) address. */
-#define SOCaddr_initany(server) do { \
-  SOCaddr_initany_(&(server), __FILE__, __LINE__); \
-} while(0)
+#define SOCaddr_initany(server)                                                \
+  do {                                                                         \
+    SOCaddr_initany_(&(server), __FILE__, __LINE__);                           \
+  } while (0)
 
 /** Populate server from data. data_size selects the source form: a full
     sockaddr_in / sockaddr_in6, or a raw 4-byte (IPv4) / 16-byte (IPv6) address
     with port zeroed. Any other size leaves an AF_INET shell. Returns the
     resulting sockaddr length. */
-static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server, 
-                                              const void *data, const size_t data_size,
-                                              const char *file, const int line) {
+static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
+                                              const void *data,
+                                              const size_t data_size,
+                                              const char *file,
+                                              const int line) {
   assertf_(server != NULL, file, line);
   assertf_(data != NULL, file, line);
 
@@ -248,32 +254,35 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr*const server,
 
 /** Copy hpaddr (length hpsize) into server, writing the result length into the
     lvalue server_len (int). See SOCaddr_copyaddr_ for accepted forms. */
-#define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize) do { \
-  server_len = (int) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
-} while(0)
+#define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize)                   \
+  do {                                                                         \
+    server_len = (int) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__,  \
+                                         __LINE__);                            \
+  } while (0)
 
 /** Like SOCaddr_copyaddr but discards the result length. */
-#define SOCaddr_copyaddr2(server, hpaddr, hpsize) do { \
-  (void) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__); \
-} while(0)
+#define SOCaddr_copyaddr2(server, hpaddr, hpsize)                              \
+  do {                                                                         \
+    (void) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__);   \
+  } while (0)
 
 /** Copy one SOCaddr (src) into another (dest), preserving family and port. */
-#define SOCaddr_copy_SOCaddr(dest, src) do { \
-  SOCaddr_copyaddr_(&(dest), &(src).m_addr.sa, SOCaddr_size(src), __FILE__, __LINE__); \
-} while(0)
+#define SOCaddr_copy_SOCaddr(dest, src)                                        \
+  do {                                                                         \
+    SOCaddr_copyaddr_(&(dest), &(src).m_addr.sa, SOCaddr_size(src), __FILE__,  \
+                      __LINE__);                                               \
+  } while (0)
 
 /** Write the numeric (dotted/colon) host of ss into namebuf (capacity
     namebuflen), scope id stripped. On failure namebuf becomes "". */
-static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen, 
-                                         SOCaddr *const ss,
-                                         const char *file, const int line) {
+static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
+                                         SOCaddr *const ss, const char *file,
+                                         const int line) {
   assertf_(namebuf != NULL, file, line);
   assertf_(ss != NULL, file, line);
 
-  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr),
-                  namebuf, namebuflen, 
-                  NULL, 0, 
-                  NI_NUMERICHOST) == 0) {
+  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr), namebuf, namebuflen, NULL,
+                  0, NI_NUMERICHOST) == 0) {
     /* remove scope id(s) */
     char *const pos = strchr(namebuf, '%');
     if (pos != NULL) {
@@ -285,11 +294,12 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
 }
 
 /** Numeric host of ss into namebuf (capacity namebuflen); "" on failure. */
-#define SOCaddr_inetntoa(namebuf, namebuflen, ss) \
+#define SOCaddr_inetntoa(namebuf, namebuflen, ss)                              \
   SOCaddr_inetntoa_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
 /** Single-char family tag: '1' for IPv4, '2' otherwise (used in the cache). */
-#define SOCaddr_getproto(ss) ( SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')
+#define SOCaddr_getproto(ss)                                                   \
+  (SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')
 
 /** Length type for socket APIs (getsockname, accept, ...). */
 typedef socklen_t SOClen;

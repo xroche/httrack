@@ -73,6 +73,7 @@ typedef struct strc_int2bytes2 strc_int2bytes2;
 #endif
 #ifndef HTS_DEF_DEFSTRUCT_hts_log_type
 #define HTS_DEF_DEFSTRUCT_hts_log_type
+
 /** Log severity levels, most to least severe. A message is emitted only if its
     level is <= opt->debug. LOG_ERRNO is a flag OR'd into the level to append
     ": <strerror(errno)>" to the message. */
@@ -97,7 +98,7 @@ typedef struct hts_stat_struct hts_stat_struct;
     retain them. */
 #ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
 #define HTS_DEF_FWSTRUCT_htsErrorCallback
-typedef void (*htsErrorCallback) (const char *msg, const char *file, int line);
+typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 #endif
 
 /* Helpers for plugging callbacks
@@ -111,29 +112,35 @@ requires: htsdefines.h */
  * CALLBACKARG_USERDEF(). Allocates a t_hts_callbackarg with hts_malloc (not
  * checked for OOM); it is freed by hts_free_opt().
  */
-#define CHAIN_FUNCTION(OPT, MEMBER, FUNCTION, ARGUMENT) do { \
-  t_hts_callbackarg *carg = (t_hts_callbackarg*) hts_malloc(sizeof(t_hts_callbackarg)); \
-  carg->userdef = ( ARGUMENT ); \
-  carg->prev.fun = (void*) ( OPT )->callbacks_fun-> MEMBER .fun; \
-  carg->prev.carg = ( OPT )->callbacks_fun-> MEMBER .carg; \
-  ( OPT )->callbacks_fun-> MEMBER .fun = ( FUNCTION ); \
-  ( OPT )->callbacks_fun-> MEMBER .carg = carg; \
-} while(0)
+#define CHAIN_FUNCTION(OPT, MEMBER, FUNCTION, ARGUMENT)                        \
+  do {                                                                         \
+    t_hts_callbackarg *carg =                                                  \
+        (t_hts_callbackarg *) hts_malloc(sizeof(t_hts_callbackarg));           \
+    carg->userdef = (ARGUMENT);                                                \
+    carg->prev.fun = (void *) (OPT)->callbacks_fun->MEMBER.fun;                \
+    carg->prev.carg = (OPT)->callbacks_fun->MEMBER.carg;                       \
+    (OPT)->callbacks_fun->MEMBER.fun = (FUNCTION);                             \
+    (OPT)->callbacks_fun->MEMBER.carg = carg;                                  \
+  } while (0)
 
-/* The following helpers are useful only if you know that an existing callback migh be existing before before the call to CHAIN_FUNCTION()
-If your functions were added just after hts_create_opt(), no need to make the previous function check */
+/* The following helpers are useful only if you know that an existing callback
+migh be existing before before the call to CHAIN_FUNCTION() If your functions
+were added just after hts_create_opt(), no need to make the previous function
+check */
 
 /** Inside a chained callback, return the ARGUMENT pointer originally passed to
     CHAIN_FUNCTION(), or NULL when CARG is NULL. */
-#define CALLBACKARG_USERDEF(CARG) ( ( (CARG) != NULL ) ? (CARG)->userdef : NULL )
+#define CALLBACKARG_USERDEF(CARG) (((CARG) != NULL) ? (CARG)->userdef : NULL)
 
 /** Return the callback of type NAME that this one chained over, cast to its
     function-pointer type, or NULL. Call it to forward to the prior handler. */
-#define CALLBACKARG_PREV_FUN(CARG, NAME) ( (t_hts_htmlcheck_ ##NAME) ( ( (CARG) != NULL ) ? (CARG)->prev.fun : NULL ) )
+#define CALLBACKARG_PREV_FUN(CARG, NAME)                                       \
+  ((t_hts_htmlcheck_##NAME)(((CARG) != NULL) ? (CARG)->prev.fun : NULL))
 
 /** Return the carg of the callback this one chained over (pass it when
    forwarding to the CALLBACKARG_PREV_FUN result), or NULL. */
-#define CALLBACKARG_PREV_CARG(CARG) ( ( (CARG) != NULL ) ? (CARG)->prev.carg : NULL )
+#define CALLBACKARG_PREV_CARG(CARG)                                            \
+  (((CARG) != NULL) ? (CARG)->prev.carg : NULL)
 
 /* Functions */
 
@@ -162,7 +169,7 @@ HTSEXT_API int hts_main(int argc, char **argv);
     hts_main() to set options or plug callbacks on opt first. Blocks until the
     mirror ends and returns the engine exit code. The caller keeps ownership of
     opt and must release it with hts_free_opt(). */
-HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt);
+HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
 
 /* Options handling */
 /** Allocate and default-initialize an option set, preloading the bundled parser
@@ -174,7 +181,7 @@ HTSEXT_API httrackp *hts_create_opt(void);
     modules, DNS cache, owned strings, and the structure). NULL is accepted. The
     pointer is invalid afterward. Do not call while a mirror is running on that
     opt; wait until hts_has_stopped() is true. */
-HTSEXT_API void hts_free_opt(httrackp * opt);
+HTSEXT_API void hts_free_opt(httrackp *opt);
 
 /** Return sizeof(httrackp) as the library sees it, for caller-vs-library struct
     ABI mismatch checks. */
@@ -184,16 +191,16 @@ HTSEXT_API size_t hts_sizeof_opt(void);
     Returns NULL if opt is NULL. The result aliases a single process-global
     static: it is not thread-safe and is overwritten by the next call, so copy
     out the fields you need. */
-HTSEXT_API const hts_stat_struct* hts_get_stats(httrackp * opt);
+HTSEXT_API const hts_stat_struct *hts_get_stats(httrackp *opt);
 
 /** Legacy no-op retained for API compatibility. */
-HTSEXT_API void set_wrappers(httrackp * opt);   /* LEGACY */
+HTSEXT_API void set_wrappers(httrackp *opt); /* LEGACY */
 
 /** Load a plugin shared library and run its hts_plug(opt, argv) entry point. On
     success the handle is recorded in opt and unloaded by hts_free_opt().
     @return 1 if loaded and hts_plug succeeded; 0 if loaded but hts_plug was
     missing or refused; -1 if the library could not be loaded. */
-HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
+HTSEXT_API int plug_wrapper(httrackp *opt, const char *moduleName,
                             const char *argv);
 
 /** Install the process-global assertion/error callback (NULL clears it). Not
@@ -212,12 +219,12 @@ HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
 /** printf-style log at level @p type (an hts_log_type, optionally |LOG_ERRNO).
     Forwards to the registered log callback, and when the level is <= opt->debug
     also to opt->log. @p format must be non-NULL. */
-HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format,
-                              ...) HTS_PRINTF_FUN(3, 4);
+HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...)
+    HTS_PRINTF_FUN(3, 4);
 
 /** va_list form of hts_log_print(). @p opt may be NULL (only the callback
    runs). Preserves errno. @p format must be non-NULL. */
-HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format,
+HTSEXT_API void hts_log_vprint(httrackp *opt, int type, const char *format,
                                va_list args);
 
 /** Install the process-global log callback invoked by hts_log_vprint() for
@@ -231,7 +238,7 @@ hts_set_log_vprint_callback(void (*callback)(httrackp *opt, int type,
     result is written into and aliases a 2048-byte scratch buffer inside opt: it
     is valid until that buffer is next used, and must not be freed. opt must be
     non-NULL. */
-HTSEXT_API const char *hts_get_version_info(httrackp * opt);
+HTSEXT_API const char *hts_get_version_info(httrackp *opt);
 
 /** Static build-features string (TLS, zlib, ipv6, and so on). Process-global
     storage; do not free or modify. */
@@ -241,21 +248,22 @@ HTSEXT_API const char *hts_is_available(void);
 HTSEXT_API const char *hts_version(void);
 
 /* Wrapper functions */
-HTSEXT_API int htswrap_init(void);      // DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int htswrap_init(void); // DEPRECATED - DUMMY FUNCTION
 
-HTSEXT_API int htswrap_free(void);      // DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int htswrap_free(void); // DEPRECATED - DUMMY FUNCTION
 
 /** Register callback @p fct under @p name in opt's callback table (for example
     "start", "check-html", "linkdetected"). Returns 1 on success, 0 if @p name
    is not a known slot. Prefer CHAIN_FUNCTION(), which preserves any prior
    callback. */
-HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct);
+HTSEXT_API int htswrap_add(httrackp *opt, const char *name, void *fct);
 
 /** Return the function pointer registered under @p name in opt as a uintptr_t,
    or 0 if none or unknown. */
-HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name);
+HTSEXT_API uintptr_t htswrap_read(httrackp *opt, const char *name);
 
-/* Internal library allocators, if a different libc is being used by the client */
+/* Internal library allocators, if a different libc is being used by the client
+ */
 /** strdup() through the library allocator. Returns a heap copy freed with
     hts_free(), or NULL on failure. */
 HTSEXT_API char *hts_strdup(const char *string);
@@ -272,13 +280,13 @@ HTSEXT_API void *hts_realloc(void *const data, const size_t size);
 HTSEXT_API void hts_free(void *data);
 
 /* Other functions */
-HTSEXT_API int hts_resetvar(void);      // DEPRECATED - DUMMY FUNCTION
+HTSEXT_API int hts_resetvar(void); // DEPRECATED - DUMMY FUNCTION
 
 /** (Re)build the top-level index.html aggregating every mirror project found
     under @p path. @p binpath is the data root used to locate the
     templates/topindex-*.html files, falling back to built-in templates. Writes
     <path>/index.html. @return 1 on success, 0 on failure. */
-HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
+HTSEXT_API int hts_buildtopindex(httrackp *opt, const char *path,
                                  const char *binpath);
 
 /** Scan every mirror project under @p path and return a CRLF-separated list:
@@ -321,14 +329,14 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
 /** Whether the engine is parsing HTML. Returns 0 if not, otherwise the percent
     done (at least 1). @p flag >= 0 also requests a progress refresh; pass a
     negative value to query without side effects. */
-HTSEXT_API int hts_is_parsing(httrackp * opt, int flag);
+HTSEXT_API int hts_is_parsing(httrackp *opt, int flag);
 
 /** Current background phase: 0 none, 1 testing links, 2 purge, 3, 4 scheduling,
     5 waiting for a slot. */
-HTSEXT_API int hts_is_testing(httrackp * opt);
+HTSEXT_API int hts_is_testing(httrackp *opt);
 
 /** Nonzero once the engine has begun its exit sequence. */
-HTSEXT_API int hts_is_exiting(httrackp * opt);
+HTSEXT_API int hts_is_exiting(httrackp *opt);
 
 /*HTSEXT_API int hts_setopt(httrackp* opt); DEPRECATED ; see copy_htsopt() */
 
@@ -344,15 +352,15 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. Only fields set to a non-sentinel value are copied; the rest of @p
    to is left untouched. The user-agent string is deep-copied. @return 0. */
-HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to);
+HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
 /** Return the engine's last error message, or NULL. The string is owned by
     @p opt; do not free it, and use it only while @p opt lives. */
-HTSEXT_API char *hts_errmsg(httrackp * opt);
+HTSEXT_API char *hts_errmsg(httrackp *opt);
 
 /** Get or set the transfer-pause flag. @p p >= 0 sets it (nonzero means
    paused); a negative value queries. @return the current pause flag. */
-HTSEXT_API int hts_setpause(httrackp * opt, int);
+HTSEXT_API int hts_setpause(httrackp *opt, int);
 
 /** Ask the running mirror to terminate (sets the stop flag under the state
    lock, so it is safe to call from another thread). @p force is currently
@@ -363,15 +371,15 @@ HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean force);
 /** Queue a single in-progress file, by URL, to be cancelled by the engine.
     @p url is copied internally. Takes the state lock, so it is thread-safe.
     @return the underlying push result. */
-HTSEXT_API int hts_cancel_file_push(httrackp * opt, const char *url);
+HTSEXT_API int hts_cancel_file_push(httrackp *opt, const char *url);
 
 /** Cancel the in-progress link-testing phase. Effective only while a test runs.
  */
-HTSEXT_API void hts_cancel_test(httrackp * opt);
+HTSEXT_API void hts_cancel_test(httrackp *opt);
 
 /** Cancel the in-progress HTML parsing. Effective only while parsing is active.
  */
-HTSEXT_API void hts_cancel_parsing(httrackp * opt);
+HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 
 /** Nonzero once the mirror has fully ended. Read under the engine state lock,
    so safe to poll from another thread. Wait for this before hts_free_opt(). */
@@ -416,19 +424,19 @@ HTSEXT_API void qsec2str(char *st, TStamp t);
    is reused, and a given strc is not reentrant. Use one strc per
    concurrently-live result. */
 /** Format @p n as a decimal string into @p strc and return it. */
-HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n);
+HTSEXT_API char *int2char(strc_int2bytes2 *strc, int n);
 
 /** Format byte count @p n as "<num><unit>" (B/KiB/MiB/GiB and so on) into
     @p strc and return it. */
-HTSEXT_API char *int2bytes(strc_int2bytes2 * strc, LLint n);
+HTSEXT_API char *int2bytes(strc_int2bytes2 *strc, LLint n);
 
 /** Format a transfer rate @p n as "<num><unit>/s" into @p strc and return it.
  */
-HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n);
+HTSEXT_API char *int2bytessec(strc_int2bytes2 *strc, long int n);
 
 /** Split byte count @p n into number and unit, returning a 2-element array
     {number, unit} stored inside @p strc. */
-HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n);
+HTSEXT_API char **int2bytes2(strc_int2bytes2 *strc, LLint n);
 
 /** Skip any "user[:pass]@" identification prefix in a URL, returning a pointer
     into the argument past it (or past the protocol if none). The result aliases
@@ -490,40 +498,50 @@ HTSEXT_API void unescape_amp(char *s);
 
 /** Percent-escape only spaces (' ' becomes "%20"); copy everything else
  * verbatim. */
-HTSEXT_API size_t escape_spc_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t escape_spc_url(const char *const src, char *const dest,
+                                 const size_t size);
 
 /** Aggressively percent-escape @p src for use as a single URL path segment
     (reserved, delimiter, unwise, special, avoid and mark characters). */
-HTSEXT_API size_t escape_in_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t escape_in_url(const char *const src, char *const dest,
+                                const size_t size);
 
 /** Percent-escape @p src as a URI, escaping only what is necessary and keeping
     '/' and other reserved characters. */
-HTSEXT_API size_t escape_uri(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t escape_uri(const char *const src, char *const dest,
+                             const size_t size);
 
 /** Like escape_uri() for a UTF-8 URI: also escapes reserved characters other
     than '/'. */
-HTSEXT_API size_t escape_uri_utf(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t escape_uri_utf(const char *const src, char *const dest,
+                                 const size_t size);
 
 /** Minimal "make safe" escape: percent-escapes only '"', ' ' and control
     characters, leaving an already-formed URL otherwise intact. */
-HTSEXT_API size_t escape_check_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
+                                   const size_t size);
 
 /** Append-variant of escape_spc_url(): escapes @p src after the existing
     NUL-terminated content of @p dest. Returns the bytes appended (excluding the
     NUL). */
-HTSEXT_API size_t append_escape_spc_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t append_escape_spc_url(const char *const src, char *const dest,
+                                        const size_t size);
 
 /** Append-variant of escape_in_url(). See append_escape_spc_url(). */
-HTSEXT_API size_t append_escape_in_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t append_escape_in_url(const char *const src, char *const dest,
+                                       const size_t size);
 
 /** Append-variant of escape_uri(). See append_escape_spc_url(). */
-HTSEXT_API size_t append_escape_uri(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t append_escape_uri(const char *const src, char *const dest,
+                                    const size_t size);
 
 /** Append-variant of escape_uri_utf(). See append_escape_spc_url(). */
-HTSEXT_API size_t append_escape_uri_utf(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t append_escape_uri_utf(const char *const src, char *const dest,
+                                        const size_t size);
 
 /** Append-variant of escape_check_url(). See append_escape_spc_url(). */
-HTSEXT_API size_t append_escape_check_url(const char *const src, char *const dest, const size_t size);
+HTSEXT_API size_t append_escape_check_url(const char *const src,
+                                          char *const dest, const size_t size);
 
 /** In-place variant of escape_spc_url(): escapes the NUL-terminated string in
     @p dest back into @p dest. */
@@ -543,32 +561,39 @@ HTSEXT_API size_t inplace_escape_check_url(char *const dest, const size_t size);
 
 /** Same escaping as escape_check_url() but returns @p dest instead of the byte
     count. */
-HTSEXT_API char *escape_check_url_addr(const char *const src, char *const dest, const size_t size);
+HTSEXT_API char *escape_check_url_addr(const char *const src, char *const dest,
+                                       const size_t size);
 
 /** Build a MIME/MHTML content-id token in @p dest from @p adr and @p fil:
     escape_in_url() both, then replace every '%' with 'X' so the result is one
     opaque token. */
-HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil, char *const dest, const size_t size);
+HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
+                                  char *const dest, const size_t size);
 
 /** Low-level percent-escaper backing the escape_* family. @p mode selects the
     character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
     30 uri_utf. @p max_size is the dest capacity including the NUL. */
-HTSEXT_API size_t x_escape_http(const char *const s, char *const dest, const size_t max_size, const int mode);
+HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
+                                const size_t max_size, const int mode);
 
 /** Strip all control characters (byte value < 32) from @p s in place. */
 HTSEXT_API void escape_remove_control(char *const s);
 
 /** HTML-escape for text output: rewrite '&' to "&amp;" and pass every other
    byte through unchanged. */
-HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, const size_t size);
+HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest,
+                                        const size_t size);
 
 /** Like escape_for_html_print() but also convert every high byte (>= 128) to a
     numeric entity "&#xNN;". */
-HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const dest, const size_t size);
+HTSEXT_API size_t escape_for_html_print_full(const char *const s,
+                                             char *const dest,
+                                             const size_t size);
 
 /** Percent-decode @p s into @p catbuff (capacity @p size) and return @p
    catbuff. Decodes every "%xx" hex escape. */
-HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const char *const s);
+HTSEXT_API char *unescape_http(char *const catbuff, const size_t size,
+                               const char *const s);
 
 /** Percent-decode @p s into @p catbuff, but only the escapes that are safe to
     decode while keeping a valid URI (reserved, delimiter, unwise, control and
@@ -589,17 +614,16 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     HTS_MIMETYPE_SIZE capacity. */
 HTS_DEPRECATED("use get_httptype_sized(opt, s, ssize, fil, flag)")
 
-HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
-                             int flag);
+HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil, int flag);
 
 /** Classify @p fil by its extension: 0 unknown, 1 known non-HTML, 2 known HTML.
     Consults the built-in table then user --assume rules. 0 for a NULL @p fil.
  */
-HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
+HTSEXT_API int is_knowntype(httrackp *opt, const char *fil);
 
 /** Like is_knowntype() but consults only the user --assume rules: 0 no rule,
     1 non-HTML, 2 HTML. */
-HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil);
+HTSEXT_API int is_userknowntype(httrackp *opt, const char *fil);
 
 /** 1 if @p fil, an extension such as "asp" or "php" (not a full filename), is a
     known dynamic-page type, else 0. */
@@ -624,7 +648,7 @@ HTSEXT_API hts_boolean guess_httptype_sized(httrackp *opt, char *s,
     HTS_MIMETYPE_SIZE capacity. */
 HTS_DEPRECATED("use guess_httptype_sized(opt, s, ssize, fil)")
 
-HTSEXT_API void guess_httptype(httrackp * opt, char *s, const char *fil);
+HTSEXT_API void guess_httptype(httrackp *opt, char *s, const char *fil);
 
 /* Ugly string tools */
 /* These take a caller scratch buffer catbuff of capacity size and return it. On
@@ -633,11 +657,13 @@ HTSEXT_API void guess_httptype(httrackp * opt, char *s, const char *fil);
    time), not a pointer. */
 /** Concatenate @p a and @p b into @p catbuff (NULL or empty operands are
  * skipped). */
-HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b);
+HTSEXT_API char *concat(char *catbuff, size_t size, const char *a,
+                        const char *b);
 
 /** Like concat(a, b) but convert '/' to the platform path separator (Windows).
  */
-HTSEXT_API char *fconcat(char *catbuff, size_t size, const char *a, const char *b);
+HTSEXT_API char *fconcat(char *catbuff, size_t size, const char *a,
+                         const char *b);
 
 /** Copy @p a into @p catbuff, converting '/' to the platform path separator
     (Windows). */
@@ -719,7 +745,7 @@ HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
 #define STAT hts_stat_utf8
 typedef struct _stat STRUCT_STAT;
 
-HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT * buf);
+HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
 
 #define UNLINK hts_unlink_utf8
 HTSEXT_API int hts_unlink_utf8(const char *pathname);
@@ -731,12 +757,12 @@ HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
 
 HTSEXT_API int hts_mkdir_utf8(const char *pathname);
 
-#define UTIME(A,B) hts_utime_utf8(A,B)
+#define UTIME(A, B) hts_utime_utf8(A, B)
 
 typedef struct _utimbuf STRUCT_UTIMBUF;
 
 HTSEXT_API int hts_utime_utf8(const char *filename,
-                              const STRUCT_UTIMBUF * times);
+                              const STRUCT_UTIMBUF *times);
 #else
 #define FOPEN fopen
 #define STAT stat
@@ -748,7 +774,7 @@ typedef struct stat STRUCT_STAT;
 
 typedef struct utimbuf STRUCT_UTIMBUF;
 
-#define UTIME(A,B) utime(A,B)
+#define UTIME(A, B) utime(A, B)
 #endif
 #define HTS_DEF_FILEAPI
 #endif
@@ -756,20 +782,21 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 /** Macro aimed to break at build-time if a size is not a sizeof() strictly
  *  greater than sizeof(char*). **/
 #undef COMPILE_TIME_CHECK_SIZE
-#define COMPILE_TIME_CHECK_SIZE(A) (void) ((void (*)(char[A - sizeof(char*) - 1])) NULL)
+#define COMPILE_TIME_CHECK_SIZE(A)                                             \
+  (void) ((void (*)(char[A - sizeof(char *) - 1])) NULL)
 
 /** Macro aimed to break at compile-time if a size is not a sizeof() strictly
  *  greater than sizeof(char*). **/
 #undef RUNTIME_TIME_CHECK_SIZE
-#define RUNTIME_TIME_CHECK_SIZE(A) assertf((A) != sizeof(void*))
+#define RUNTIME_TIME_CHECK_SIZE(A) assertf((A) != sizeof(void *))
 
-#define fconv(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fconv(A,B,C))
+#define fconv(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fconv(A, B, C))
 
-#define concat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), concat(A,B,C,D))
+#define concat(A, B, C, D) (COMPILE_TIME_CHECK_SIZE(B), concat(A, B, C, D))
 
-#define fconcat(A,B,C,D) (COMPILE_TIME_CHECK_SIZE(B), fconcat(A,B,C,D))
+#define fconcat(A, B, C, D) (COMPILE_TIME_CHECK_SIZE(B), fconcat(A, B, C, D))
 
-#define fslash(A,B,C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A,B,C))
+#define fslash(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A, B, C))
 
 #ifdef __cplusplus
 }

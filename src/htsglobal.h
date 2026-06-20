@@ -43,10 +43,10 @@ Please visit our Website: http://www.httrack.com
    configure.ac, decoupled from these). VERSION is the display form, VERSIONID
    the dotted numeric form, AFF_VERSION the short form shown in footers,
    LIB_VERSION the data/cache format generation. */
-#define HTTRACK_VERSION      "3.49-8"
-#define HTTRACK_VERSIONID    "3.49.8"
-#define HTTRACK_AFF_VERSION  "3.x"
-#define HTTRACK_LIB_VERSION  "2.0"
+#define HTTRACK_VERSION "3.49-8"
+#define HTTRACK_VERSIONID "3.49.8"
+#define HTTRACK_AFF_VERSION "3.x"
+#define HTTRACK_LIB_VERSION "2.0"
 
 #ifndef HTS_NOINCLUDES
 #include <stdio.h>
@@ -71,11 +71,11 @@ Please visit our Website: http://www.httrack.com
    varargs starting at arg. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
-#define HTS_UNUSED __attribute__ ((unused))
+#define HTS_UNUSED __attribute__((unused))
 
-#define HTS_STATIC static __attribute__ ((unused))
+#define HTS_STATIC static __attribute__((unused))
 
-#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
+#define HTS_PRINTF_FUN(fmt, arg) __attribute__((format(printf, fmt, arg)))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
@@ -113,7 +113,7 @@ Please visit our Website: http://www.httrack.com
 
 #ifndef HTS_LONGLONG
 #ifdef SIZEOF_LONG_LONG
-#if SIZEOF_LONG_LONG==8
+#if SIZEOF_LONG_LONG == 8
 #define HTS_LONGLONG 1
 #endif
 #endif
@@ -204,12 +204,12 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #define HTS_HTTRACKRC ".httrackrc"
-#define HTS_HTTRACKCNF HTS_ETCPATH"/httrack.conf"
+#define HTS_HTTRACKCNF HTS_ETCPATH "/httrack.conf"
 
 #ifdef DATADIR
-#define HTS_HTTRACKDIR DATADIR"/httrack/"
+#define HTS_HTTRACKDIR DATADIR "/httrack/"
 #else
-#define HTS_HTTRACKDIR HTS_PREFIX"/share/httrack/"
+#define HTS_HTTRACKDIR HTS_PREFIX "/share/httrack/"
 #endif
 
 #endif
@@ -226,12 +226,17 @@ Please visit our Website: http://www.httrack.com
 
 /* Copyright (C) 1998 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
-#define HTS_DEFAULT_FOOTER "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION " " HTTRACK_AFF_AUTHORS ", %s -->"
+#define HTS_DEFAULT_FOOTER                                                     \
+  "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION     \
+  " " HTTRACK_AFF_AUTHORS ", %s -->"
 #define HTTRACK_WEB "http://www.httrack.com"
-#define HTS_UPDATE_WEBSITE "http://www.httrack.com/update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID "&VersionStr=" HTTRACK_VERSION "&Platform=%d&Language=%s"
+#define HTS_UPDATE_WEBSITE                                                     \
+  "http://www.httrack.com/"                                                    \
+  "update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID                     \
+  "&VersionStr=" HTTRACK_VERSION "&Platform=%d&Language=%s"
 
 #define H_CRLF "\x0d\x0a"
-#define CRLF   "\x0d\x0a"
+#define CRLF "\x0d\x0a"
 #ifdef _WIN32
 #define LF "\x0d\x0a"
 #else
@@ -247,13 +252,14 @@ Please visit our Website: http://www.httrack.com
    return type stays compatible with the int it replaces. */
 #ifndef HTS_DEF_DEFSTRUCT_hts_boolean
 #define HTS_DEF_DEFSTRUCT_hts_boolean
+
 typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
 #endif
 
 /* Larger/smaller of two values. Macros: arguments are evaluated twice. */
-#define maximum(A,B) ( (A) > (B) ? (A) : (B) )
+#define maximum(A, B) ((A) > (B) ? (A) : (B))
 
-#define minimum(A,B) ( (A) < (B) ? (A) : (B) )
+#define minimum(A, B) ((A) < (B) ? (A) : (B))
 
 /* True when A is a non-NULL, non-empty string. */
 #define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
@@ -278,10 +284,10 @@ typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
 #endif
 #else
 /* See <http://gcc.gnu.org/wiki/Visibility> */
-#if ( ( defined(__GNUC__) && ( __GNUC__ >= 4 ) ) \
-      || ( defined(HAVE_VISIBILITY) && HAVE_VISIBILITY ) )
+#if ((defined(__GNUC__) && (__GNUC__ >= 4)) ||                                 \
+     (defined(HAVE_VISIBILITY) && HAVE_VISIBILITY))
 
-#define HTSEXT_API __attribute__ ((visibility ("default")))
+#define HTSEXT_API __attribute__((visibility("default")))
 #else
 #define HTSEXT_API
 #endif
@@ -335,8 +341,8 @@ typedef __int64 LLint;
 typedef __int64 TStamp;
 
 #define LLintP "%I64d"
-#elif (defined(_LP64) || defined(__x86_64__) \
-       || defined(__powerpc64__) || defined(__64BIT__))
+#elif (defined(_LP64) || defined(__x86_64__) || defined(__powerpc64__) ||      \
+       defined(__64BIT__))
 
 typedef long int LLint;
 
@@ -400,16 +406,17 @@ typedef int T_SOC;
 /* Permission bits for created folders and files (mkdir and chmod).
    PROTECT_FOLDER is owner-only. With HTS_ACCESS set (the default) the ACCESS_
    modes also grant group/other read; otherwise they stay owner-only. */
-#define HTS_PROTECT_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
+#define HTS_PROTECT_FOLDER (S_IRUSR | S_IWUSR | S_IXUSR)
 
 #if HTS_ACCESS
-#define HTS_ACCESS_FILE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+#define HTS_ACCESS_FILE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
-#define HTS_ACCESS_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
+#define HTS_ACCESS_FOLDER                                                      \
+  (S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
 #else
-#define HTS_ACCESS_FILE (S_IRUSR|S_IWUSR)
+#define HTS_ACCESS_FILE (S_IRUSR | S_IWUSR)
 
-#define HTS_ACCESS_FOLDER (S_IRUSR|S_IWUSR|S_IXUSR)
+#define HTS_ACCESS_FOLDER (S_IRUSR | S_IWUSR | S_IXUSR)
 #endif
 
 /* Sanity-check that the required preprocessor switches are defined */
@@ -427,7 +434,11 @@ typedef int T_SOC;
 #endif
 
 /* fflush sur stdout */
-#define io_flush { fflush(stdout); fflush(stdin); }
+#define io_flush                                                               \
+  {                                                                            \
+    fflush(stdout);                                                            \
+    fflush(stdin);                                                             \
+  }
 
 /* HTSLib */
 
@@ -447,7 +458,7 @@ typedef int T_SOC;
 
 #ifdef _DEBUG
 // trace mallocs
-//#define HTS_TRACE_MALLOC
+// #define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
 typedef unsigned long int t_htsboundary;
 
@@ -524,7 +535,13 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #if _HTS_WIDE
 extern FILE *DEBUG_fp;
 
-#define DEBUG_W(A)  { if (DEBUG_fp==NULL) DEBUG_fp=fopen("bug.out","wb"); fprintf(DEBUG_fp,":>"A); fflush(DEBUG_fp); }
+#define DEBUG_W(A)                                                             \
+  {                                                                            \
+    if (DEBUG_fp == NULL)                                                      \
+      DEBUG_fp = fopen("bug.out", "wb");                                       \
+    fprintf(DEBUG_fp, ":>" A);                                                 \
+    fflush(DEBUG_fp);                                                          \
+  }
 #undef _
 #define _ ,
 #endif
