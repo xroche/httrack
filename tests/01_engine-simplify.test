@@ -26,3 +26,17 @@ simp './a/../../b' 'b'
 
 # empty segments ('//') are not dot-segments and are preserved, per RFC 3986
 simp 'a//b' 'a//b'
+simp 'a//b/../c' 'a//c'
+
+# absolute paths keep the leading '/'; above-root '..' is clamped to it
+simp '/a/../b' '/b'
+simp '/a/../../b' '/b'
+simp '/../x' '/x'
+
+# collapses to nothing -> './' (relative) or '/' (absolute)
+simp '..' './'
+simp 'a/..' './'
+simp '/' '/'
+
+simp 'a/b/..' 'a/'              # trailing bare '..'
+simp 'a/../b?x=../y' 'b?x=../y' # '?' freezes simplification

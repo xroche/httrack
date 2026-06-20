@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# lienrelatif (build relative path) + ident_url_relatif (resolve a link, collapse
+# ./ and ../). Regression net for #137/#162; expected values hand-computed.
+
+set -euo pipefail
+
+# relative path from <curr>'s directory to <link>
+rel() {
+	local got
+	got=$(httrack -O /dev/null -#l "$1" "$2")
+	test "$got" == "relative=$3" ||
+		{ echo "FAIL rel($1, $2): got '$got' want 'relative=$3'"; exit 1; }
+}
+
+# resolve <link> against origin <adr>/<fil> -> adr=.. fil=..
+ident() {
+	local got
+	got=$(httrack -O /dev/null -#i "$1" "$2" "$3")
+	test "$got" == "$4" ||
+		{ echo "FAIL ident($1, $2, $3): got '$got' want '$4'"; exit 1; }
+}
+
+### lienrelatif
+
+rel 'dir/page.html'        'dir/index.html'        'page.html'
+rel 'dir/page.html'        'dir/page.html'         'page.html'   # self-link
+rel 'a.html'               'dir/index.html'        '../a.html'
+rel 'x.html'               'a/b/c/index.html'      '../../../x.html'
+rel 'h/a/x.jpg'            'h/a/sub/page.html'     '../x.jpg'
+rel 'a/b/c/x.html'         'index.html'            'a/b/c/x.html'
+rel 'h/sub/x.jpg'          'h/page.html'           'sub/x.jpg'
+rel 'h/dir2/x.jpg'         'h/dir1/page.html'      '../dir2/x.jpg'   # sibling dir
+rel 'h/bc/x.jpg'           'h/b/page.html'         '../bc/x.jpg'     # b/bc prefix trap
+rel 'h/b/x.jpg'            'h/bc/page.html'        '../b/x.jpg'
+rel 'h2/img/x.jpg'         'h1/p/page.html'        '../../h2/img/x.jpg'   # cross-host
+rel 'img.cdn/photo.jpg'    'www.site/articles/2020/post.html' '../../../img.cdn/photo.jpg'
+rel 'h/a/'                 'h/a/sub/page.html'     '../'             # link is ancestor dir
+rel 'x.html'               'page.html'             'x.html'
+rel 'dir/page.html?x=1'    'dir/index.html?y=2'    'page.html'       # ? stripped
+
+### ident_url_relatif
+
+ident 'img.gif'      'www.foo.com' '/dir/page.html'     'adr=www.foo.com fil=/dir/img.gif'
+ident 'sub/img.gif'  'www.foo.com' '/dir/page.html'     'adr=www.foo.com fil=/dir/sub/img.gif'
+ident '/img.gif'     'www.foo.com' '/dir/page.html'     'adr=www.foo.com fil=/img.gif'
+# embedded ../ collapses (#137)
+ident '../img.gif'             'www.foo.com' '/dir/sub/page.html'        'adr=www.foo.com fil=/dir/img.gif'
+ident 'sub/../logo.png'        'www.foo.com' '/articles/2020/post.html' 'adr=www.foo.com fil=/articles/2020/logo.png'
+ident '../../pix/sub/../logo.png' 'www.foo.com' '/articles/2020/post.html' 'adr=www.foo.com fil=/pix/logo.png'
+ident '../../../../x.gif'      'www.foo.com' '/a/b/page.html'           'adr=www.foo.com fil=/x.gif'   # above-root clamp
+ident '?page=2'      'www.foo.com' '/dir/index.html?old=1' 'adr=www.foo.com fil=/dir/index.html?page=2'
+ident 'http://other.com/a/b/../c/index.html' 'www.foo.com' '/p.html' 'adr=other.com fil=/a/c/index.html'
+# file:// collapses ../ like the other schemes; traversal contained, // authority kept
+ident 'file:///var/data/pix/sub/../logo.png' 'www.foo.com' '/p.html' 'adr=file:// fil=/var/data/pix/logo.png'
+ident 'file:///a/b/c/../../d/e.gif'          'www.foo.com' '/p.html' 'adr=file:// fil=/a/d/e.gif'
+ident 'file:///a/../../b'        'www.foo.com' '/p.html' 'adr=file:// fil=/b'
+ident 'file://srv/share/../x'    'www.foo.com' '/p.html' 'adr=file:// fil=//srv/x'
+ident 'mailto:foo@bar.com'   'www.foo.com' '/p.html'    'error=-1'   # unsupported scheme
+ident 'javascript:void(0)'   'www.foo.com' '/p.html'    'error=-1'
+
+echo "OK"

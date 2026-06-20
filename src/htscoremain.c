@@ -2787,6 +2787,47 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 0;
                 }
                 break;
+              case 'l': /* lienrelatif: relative link from curr_fil to link */
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF(
+                      "Option #l needs a link and a current-file path");
+                  printf(
+                      "Example: '-#l' 'host/dir/img.gif' 'host/dir/p.html'\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  char s[HTS_URLMAXSIZE * 2];
+
+                  if (lienrelatif(s, sizeof(s), argv[na + 1], argv[na + 2]) ==
+                      0)
+                    printf("relative=%s\n", s);
+                  else
+                    printf("relative=<ERROR>\n");
+                  htsmain_free();
+                  return 0;
+                }
+                break;
+              case 'i': /* ident_url_relatif: resolve a link -> adr/fil */
+                if (na + 3 >= argc) {
+                  HTS_PANIC_PRINTF(
+                      "Option #i needs a link, an origin address and file");
+                  printf("Example: '-#i' '../img.gif' 'www.foo.com' "
+                         "'/d/p.html'\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  lien_adrfil af;
+                  const int r = ident_url_relatif(argv[na + 1], argv[na + 2],
+                                                  argv[na + 3], &af);
+
+                  if (r == 0)
+                    printf("adr=%s fil=%s\n", af.adr, af.fil);
+                  else
+                    printf("error=%d\n", r);
+                  htsmain_free();
+                  return 0;
+                }
+                break;
               case '2':        // mimedefs
                 if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF("Option #2 needs to be followed by an URL");
