@@ -20,6 +20,9 @@
 # Options:
 #   -k, --key KEYID            GPG key for signing (default: $DEBSIGN_KEYID)
 #   -o, --outdir DIR           output directory (default: <repo>/dist)
+#       --orig FILE            reuse this upstream orig tarball instead of
+#                              regenerating it (required for a Debian revision
+#                              >= 2, whose orig is frozen in the archive)
 #   -s, --source-only          build only the source package
 #   -u, --unsigned             do not sign anything (implies no release sigs)
 #       --no-release-artifacts skip the orig tarball .asc/.md5/.sha1
@@ -33,6 +36,10 @@
 # a source-only upload, are otherwise the first clean build). It needs an sbuild
 # chroot for the changelog's distribution; create one once with the companion
 # tools/mk-sbuild-chroot.sh (rootless unshare backend).
+#
+# The Debian revision in debian/changelog decides the orig: revision 1 builds a
+# fresh upstream tarball; revision >= 2 must reuse the orig frozen at revision 1
+# (the .dsc references it by checksum), so pass it with --orig.
 #
 # SOURCE_DATE_EPOCH is honored for reproducible output.
 
@@ -66,6 +73,7 @@ need() {
 main() {
     local key=${DEBSIGN_KEYID:-}
     local outdir=""
+    local orig_in=""
     local source_only=0
     local unsigned=0
     local release_artifacts=1
@@ -81,6 +89,11 @@ main() {
         -o | --outdir)
             [[ $# -ge 2 ]] || die "missing argument for $1"
             outdir=$2
+            shift 2
+            ;;
+        --orig)
+            [[ $# -ge 2 ]] || die "missing argument for $1"
+            orig_in=$2
             shift 2
             ;;
         -s | --source-only)
@@ -109,8 +122,8 @@ main() {
         esac
     done
 
-    need git autoreconf debuild dcmd
-    [[ $sbuild -eq 1 ]] && need sbuild dpkg-parsechangelog
+    need git autoreconf debuild dcmd dpkg-parsechangelog
+    [[ $sbuild -eq 1 ]] && need sbuild
     if [[ $unsigned -eq 0 ]]; then
         need gpg
         [[ -n $key ]] || die "no signing key (pass --key or set DEBSIGN_KEYID, or use --unsigned)"
@@ -121,6 +134,11 @@ main() {
     : "${outdir:=$repo/dist}"
     mkdir -p "$outdir"
     outdir=$(cd "$outdir" && pwd)
+
+    if [[ -n $orig_in ]]; then
+        [[ -r $orig_in ]] || die "--orig file not readable: $orig_in"
+        orig_in=$(cd "$(dirname "$orig_in")" && pwd)/$(basename "$orig_in")
+    fi
 
     scratch=$(mktemp -d "${TMPDIR:-/tmp}/httrack-mkdeb.XXXXXX")
     trap 'rm -rf -- "$scratch"' EXIT
@@ -133,39 +151,58 @@ main() {
     git -C "$repo/src/coucal" archive --format=tar --prefix=src/coucal/ HEAD |
         tar -x -C "$export_dir"
 
-    # Refresh build system and man page, then build the tarball. We build here
-    # only because regen-man needs the compiled binaries; the test suite is not
-    # run in this pass. debuild (below) runs the full suite once, with the online
-    # tests enabled, so a check here would just be a slower, offline-only repeat.
-    info "regenerating build system and man page"
-    (
-        cd "$export_dir"
-        autoreconf -fi
-        ./configure --quiet
-        make -s -j"$(nproc)"
-        make -s -C man regen-man
-        # Build the tarball from a clean tree so no object files leak into it.
-        make -s clean
-        make -s dist
-    )
+    # Upstream version and Debian revision drive the orig: revision 1 builds a
+    # fresh tarball, revision >= 2 reuses the one frozen at -1 (the .dsc pins it
+    # by checksum, so a regenerated orig with new mtimes would be rejected).
+    local fullver ver rev
+    fullver=$(cd "$export_dir" && dpkg-parsechangelog -S Version)
+    ver=${fullver%-*}
+    rev=${fullver##*-}
+    local orig=httrack_${ver}.orig.tar.gz
+    info "version $ver (Debian revision $rev)"
 
-    local tarball ver
-    local -a tarballs
-    shopt -s nullglob
-    tarballs=("$export_dir"/httrack-*.tar.gz)
-    shopt -u nullglob
-    [[ ${#tarballs[@]} -ge 1 ]] || die "make dist produced no tarball"
-    tarball=${tarballs[0]##*/}
-    ver=${tarball#httrack-}
-    ver=${ver%.tar.gz}
-    info "version $ver"
+    # A signed build is upload-bound, so a revision >= 2 must reuse the frozen
+    # orig (--orig); an unsigned build is a throwaway (CI, local) and may
+    # regenerate it, since it can never reach the archive.
+    if [[ -z $orig_in && $rev != 1 && $unsigned -eq 0 ]]; then
+        die "Debian revision $rev needs --orig FILE (the orig is frozen from revision 1)"
+    fi
+
+    if [[ -n $orig_in ]]; then
+        info "reusing upstream tarball $orig_in"
+        cp -- "$orig_in" "$scratch/$orig"
+    else
+        # Refresh build system and man page, then build the tarball. We build
+        # here only because regen-man needs the compiled binaries; the test
+        # suite is not run in this pass. debuild (below) runs the full suite
+        # once, online tests enabled, so a check here would just repeat it.
+        info "regenerating build system and man page"
+        (
+            cd "$export_dir"
+            autoreconf -fi
+            ./configure --quiet
+            make -s -j"$(nproc)"
+            make -s -C man regen-man
+            # Build the tarball from a clean tree so no object files leak in.
+            make -s clean
+            make -s dist
+        )
+        local -a tarballs
+        shopt -s nullglob
+        tarballs=("$export_dir"/httrack-*.tar.gz)
+        shopt -u nullglob
+        [[ ${#tarballs[@]} -ge 1 ]] || die "make dist produced no tarball"
+        local tarball=${tarballs[0]##*/}
+        [[ $tarball == "httrack-$ver.tar.gz" ]] ||
+            die "changelog version $ver disagrees with built tarball $tarball (configure.ac mismatch?)"
+        cp -- "$export_dir/$tarball" "$scratch/$orig"
+    fi
 
     # 3.0 (quilt): orig tarball is upstream-only; debian/ is overlaid on top.
-    local orig=httrack_${ver}.orig.tar.gz
-    cp -- "$export_dir/$tarball" "$scratch/$orig"
     (
         cd "$scratch"
         tar -xf "$orig"
+        [[ -d httrack-$ver ]] || die "orig tarball does not unpack to httrack-$ver/"
         cp -a "$export_dir/debian" "httrack-$ver/debian"
     )
 
