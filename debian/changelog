@@ -1,3 +1,14 @@
+httrack (3.49.9-1) unstable; urgency=medium
+
+  * New upstream release: Content-Type and file-type detection fixes (trust a
+    declared Content-Type over a binary URL extension, honor --assume under the
+    delayed type check, keep a known extension against a bogus or empty
+    Content-Type, and avoid an uninitialised read on an empty Content-Type), and
+    restored C++ source-compatibility of the installed headers so reverse
+    dependencies (httraqt) build again.
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 21 Jun 2026 17:59:38 +0200
+
 httrack (3.49.8-2) unstable; urgency=medium
 
   * Rename libhttrack2 to libhttrack3 to follow the SONAME, which the 3.49.8
