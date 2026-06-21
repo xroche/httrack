@@ -3166,6 +3166,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 if (to->parseall != HTS_FALSE)
                   err = 1;
 
+                /* HTS_DEFAULT (-1) is "unspecified": copy_htsopt must skip it,
+                   leaving the target intact. Only a signed (int-backed) field
+                   can hold -1, so this also guards the type against regressing
+                   to an unsigned hts_boolean. */
+                from->parseall = HTS_DEFAULT;
+                to->parseall = HTS_TRUE;
+                copy_htsopt(from, to);
+                if (to->parseall != HTS_TRUE)
+                  err = 1;
+
                 hts_free_opt(from);
                 hts_free_opt(to);
                 printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");

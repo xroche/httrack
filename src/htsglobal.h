@@ -247,13 +247,23 @@ Please visit our Website: http://www.httrack.com
 #define HTS_NOPARAM "(none)"
 #define HTS_NOPARAM2 "\"(none)\""
 
-/* Boolean flag for option fields and API yes/no returns. An enum (not C bool)
-   so it stays int-sized: option fields keep the httrackp layout/ABI, and a
-   return type stays compatible with the int it replaces. */
+/* Boolean flag for option fields and API yes/no returns. Int-backed, not an
+   enum: an enum makes C++ reject `field = 1` / `f(0)` on the exported fields
+   and params. Int-sized, so the httrackp layout and the ABI are unchanged. */
 #ifndef HTS_DEF_DEFSTRUCT_hts_boolean
 #define HTS_DEF_DEFSTRUCT_hts_boolean
 
-typedef enum hts_boolean { HTS_FALSE = 0, HTS_TRUE = 1 } hts_boolean;
+typedef int hts_boolean;
+#define HTS_FALSE 0
+#define HTS_TRUE 1
+#endif
+
+#ifndef HTS_DEF_DEFSTRUCT_hts_tristate
+#define HTS_DEF_DEFSTRUCT_hts_tristate
+/* Tri-state hts_boolean: HTS_DEFAULT (-1) = "unspecified" (copy_htsopt leaves
+   the target untouched); HTS_FALSE/HTS_TRUE = off/on. */
+typedef int hts_tristate;
+#define HTS_DEFAULT (-1)
 #endif
 
 /* Larger/smaller of two values. Macros: arguments are evaluated twice. */
