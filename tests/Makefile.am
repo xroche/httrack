@@ -53,6 +53,7 @@ TESTS = \
 	13_local-cookies.test \
 	14_local-https.test \
 	15_local-types.test \
-	16_local-assume.test
+	16_local-assume.test \
+	17_local-empty-ct.test
 
 CLEANFILES = check-network_sh.cache

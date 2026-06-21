@@ -1591,13 +1591,17 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           }
         }
       }
-      sscanf(rcvd + p, "%s", tempo);
-      if (strlen(tempo) < sizeof(retour->contenttype) - 2)      // pas trop long!!
-        strcpybuff(retour->contenttype, tempo);
-      else
-        strcpybuff(retour->contenttype, "application/octet-stream-unknown");    // erreur
-      retour->contenttype_given =
-          HTS_TRUE; /* the server declared a Content-Type */
+      // An empty/whitespace Content-Type value yields no token; keep the
+      // default type and the "not given" flag instead of reading uninit tempo.
+      if (sscanf(rcvd + p, "%s", tempo) == 1) {
+        if (strlen(tempo) < sizeof(retour->contenttype) - 2) // pas trop long!!
+          strcpybuff(retour->contenttype, tempo);
+        else
+          strcpybuff(retour->contenttype,
+                     "application/octet-stream-unknown"); // erreur
+        retour->contenttype_given =
+            HTS_TRUE; /* server declared a usable type */
+      }
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
     // Content-Range: bytes 0-70870/70871

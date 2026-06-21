@@ -135,13 +135,15 @@ class Handler(SimpleHTTPRequestHandler):
     FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
     FAKE_PDF = b"%PDF-1.4\n" + b"\x00" * 64
 
-    # path -> (body, content_type); content_type None means no header at all.
+    # path -> (body, content_type); None sends no header, "" sends an empty
+    # Content-Type value (no usable type, must be treated like None).
     TYPE_MATRIX = {
         "/types/control.php": (b"<html><body>control</body></html>", "text/html"),
         "/types/photo.png": (FAKE_PNG, "image/png"),
         "/types/doc.pdf": (FAKE_PDF, "application/pdf"),
         "/types/notype.png": (FAKE_PNG, None),
         "/types/notype.pdf": (FAKE_PDF, None),
+        "/types/emptyct.png": (FAKE_PNG, ""),
         "/types/lie.png": (FAKE_PNG, "text/html"),
         "/types/report.pdf": (b"<html><body>real page</body></html>", "text/html"),
         "/types/page.htm": (b"<html><body>htm page</body></html>", "text/html"),
@@ -158,6 +160,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="doc.pdf">doc</a>\n'
             '\t<img src="notype.png" />\n'
             '\t<a href="notype.pdf">notypepdf</a>\n'
+            '\t<img src="emptyct.png" />\n'
             '\t<img src="lie.png" />\n'
             '\t<a href="report.pdf">report</a>\n'
             '\t<a href="page.htm">htm</a>\n'
@@ -184,6 +187,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/doc.pdf": route_types,
         "/types/notype.png": route_types,
         "/types/notype.pdf": route_types,
+        "/types/emptyct.png": route_types,
         "/types/lie.png": route_types,
         "/types/report.pdf": route_types,
         "/types/page.htm": route_types,

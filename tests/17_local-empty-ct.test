@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# An empty "Content-Type:" header value must be treated as "no usable type"
+# (keep the URL extension), not parsed from an uninitialized buffer. The crawl
+# also runs under ASan/UBSan in CI, which catches the uninitialized read this
+# guards against.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'types/emptyct.png' --not-found 'types/emptyct.html' \
+    httrack 'BASEURL/types/index.html'
