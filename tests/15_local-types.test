@@ -10,7 +10,7 @@
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
-    --found 'types/notype.png' \
+    --found 'types/notype.png' --not-found 'types/notype.html' \
     --found 'types/notype.pdf' --not-found 'types/notype.html' \
     --found 'types/photo.png' \
     --found 'types/doc.pdf' \

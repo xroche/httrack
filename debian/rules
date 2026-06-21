@@ -135,7 +135,7 @@ binary-arch: build install
 	dh_makeshlibs -a -X/usr/lib/$(DEB_HOST_MULTIARCH)/httrack/libtest --version-info
 	dh_installdeb -a
 	# we depend on the current version (ABI may change)
-	dh_shlibdeps -a -ldebian/libhttrack4/usr/lib/$(DEB_HOST_MULTIARCH)
+	dh_shlibdeps -a -ldebian/libhttrack3/usr/lib/$(DEB_HOST_MULTIARCH)
 	dh_gencontrol -a
 	dh_md5sums -a
 	dh_builddeb -a

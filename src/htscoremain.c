@@ -2579,7 +2579,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                         (r.size >= 0) ? r.size : (-r.size));
                                 if (r.contenttype >= 0) {
                                   fprintf(stdout, "Content-Type: %s\r\n",
-                                          r.contenttype);
+                                          hts_effective_mime(r.contenttype));
                                 }
                                 if (r.cdispo[0]) {
                                   fprintf(stdout, "Content-Disposition: %s\r\n",

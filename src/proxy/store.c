@@ -52,6 +52,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htsback.h"
+#include "htslib.h" /* hts_effective_mime */
 
 #include "store.h"
 #include "proxystrings.h"
@@ -2289,10 +2290,17 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   int size_headers;
 
   sprintf(st->headers,
-          "HTTP/1.0 %d %s" "\r\n" "X-Server: ProxyTrack " PROXYTRACK_VERSION
-          "\r\n" "Content-type: %s%s%s%s" "\r\n" "Last-modified: %s" "\r\n"
-          "Content-length: %d" "\r\n", element->statuscode, element->msg,
-          /**/ element->contenttype,
+          "HTTP/1.0 %d %s"
+          "\r\n"
+          "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
+          "Content-type: %s%s%s%s"
+          "\r\n"
+          "Last-modified: %s"
+          "\r\n"
+          "Content-length: %d"
+          "\r\n",
+          element->statuscode, element->msg,
+          /**/ hts_effective_mime(element->contenttype),
           (element->charset[0] ? "; charset=\"" : ""),
           (element->charset[0] ? element->charset : ""),
           (element->charset[0] ? "\"" : ""), /**/ element->lastmodified,
@@ -2328,10 +2336,10 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
           /* args */
           (link_has_authority(url) ? "" : "http://"), url, "0.0.0.0",
           tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
-          tm->tm_min, tm->tm_sec, element->contenttype, element->statuscode,
-          st->md5, (element->location ? element->location : "-"),
-          (long int) ftell(fp), st->filename,
-          (long int) (size_headers + element->size));
+          tm->tm_min, tm->tm_sec, hts_effective_mime(element->contenttype),
+          element->statuscode, st->md5,
+          (element->location ? element->location : "-"), (long int) ftell(fp),
+          st->filename, (long int) (size_headers + element->size));
   /* network_doc */
   if (fwrite(st->headers, 1, size_headers, fp) != size_headers
       || (element->size > 0

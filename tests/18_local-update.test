@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A second (update) pass must keep the names the first crawl chose. The stored
+# Content-Type rides the cache, so the update reads back the same value -- the
+# unknown/unknown sentinel for a typeless response, the declared type otherwise
+# -- and names consistently: a declared-text/html .pdf stays .html and a
+# typeless .png stays .png across the update rather than reverting.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
+    --found 'types/report.html' --not-found 'types/report.pdf' \
+    --found 'types/notype.png' --not-found 'types/notype.html' \
+    --found 'types/lie.html' \
+    httrack 'BASEURL/types/index.html'

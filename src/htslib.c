@@ -1396,8 +1396,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 void treatfirstline(htsblk * retour, const char *rcvd) {
   const char *a = rcvd;
 
-  retour->contenttype_given = HTS_FALSE; /* set when a Content-Type is seen */
-
   // exemple:
   // HTTP/1.0 200 OK
   if (*a) {
@@ -1425,7 +1423,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
           else
             infostatuscode(retour->msg, retour->statuscode);
           // type MIME par défaut2
-          strcpybuff(retour->contenttype, HTS_HYPERTEXT_DEFAULT_MIME);
+          strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
         } else {                // pas de code!
           retour->statuscode = STATUSCODE_INVALID;
           strcpybuff(retour->msg, "Unknown response structure");
@@ -1440,7 +1438,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
         retour->statuscode = HTTP_OK;
         retour->keep_alive = 0;
         strcpybuff(retour->msg, "Unknown, assuming junky server");
-        strcpybuff(retour->contenttype, HTS_HYPERTEXT_DEFAULT_MIME);
+        strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
       } else if (strnotempty(a)) {
         retour->statuscode = STATUSCODE_INVALID;
         strcpybuff(retour->msg, "Unknown (not HTTP/xx) response structure");
@@ -1449,7 +1447,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
         retour->statuscode = HTTP_OK;
         retour->keep_alive = 0;
         strcpybuff(retour->msg, "Unknown, assuming junky server");
-        strcpybuff(retour->contenttype, HTS_HYPERTEXT_DEFAULT_MIME);
+        strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
       }
     }
   } else {                      // vide!
@@ -1460,7 +1458,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
     /* This is dirty .. */
     retour->statuscode = HTTP_OK;
     strcpybuff(retour->msg, "Unknown, assuming junky server");
-    strcpybuff(retour->contenttype, HTS_HYPERTEXT_DEFAULT_MIME);
+    strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
   }
 }
 
@@ -1591,16 +1589,14 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           }
         }
       }
-      // An empty/whitespace Content-Type value yields no token; keep the
-      // default type and the "not given" flag instead of reading uninit tempo.
+      // An empty/whitespace Content-Type value yields no token: keep the
+      // sentinel default rather than reading an uninitialized tempo.
       if (sscanf(rcvd + p, "%s", tempo) == 1) {
         if (strlen(tempo) < sizeof(retour->contenttype) - 2) // pas trop long!!
           strcpybuff(retour->contenttype, tempo);
         else
           strcpybuff(retour->contenttype,
                      "application/octet-stream-unknown"); // erreur
-        retour->contenttype_given =
-            HTS_TRUE; /* server declared a usable type */
       }
     }
   } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
@@ -4318,6 +4314,7 @@ int give_mimext(char *s, size_t ssize, const char *st) {
   int ok = 0;
   int j = 0;
 
+  st = hts_effective_mime(st); /* no declared type: derive an html ext */
   s[0] = '\0';
   while((!ok) && (strnotempty(hts_mime[j][1]))) {
     if (strfield2(hts_mime[j][0], st)) {

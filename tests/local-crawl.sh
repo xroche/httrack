@@ -26,6 +26,7 @@ key="${testdir}/server.key"
 
 tls=
 verbose=
+rerun=
 tmpdir=
 serverpid=
 crawlpid=
@@ -89,6 +90,7 @@ nargs=$#
 while test "$pos" -lt "$nargs"; do
     case "${args[$pos]}" in
     --debug) verbose=1 ;;
+    --rerun) rerun=1 ;; # run httrack a second time (update pass) before auditing
     --no-purge)
         nopurge=1
         audit+=("--no-purge")
@@ -179,6 +181,22 @@ test "$crawlres" -eq 0 || ! result "httrack exited $crawlres" || {
 }
 result "OK"
 grep -iE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt" >&2
+
+# --- optional second pass: re-mirror into the same dir (cache/update path) ----
+if test -n "$rerun"; then
+    info "re-running httrack (update pass)"
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+        "${moreargs[@]}" "${hts[@]}" >"${log}.2" 2>&1 &
+    crawlpid=$!
+    wait "$crawlpid"
+    crawlres=$?
+    crawlpid=
+    test "$crawlres" -eq 0 || ! result "update pass exited $crawlres" || {
+        cat "${log}.2" >&2
+        exit 1
+    }
+    result "OK (update)"
+fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
 hostroot=
