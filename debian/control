@@ -58,13 +58,13 @@ Description: webhttrack common files
  This package is the common files of webhttrack, website copier and
  mirroring utility
 
-Package: libhttrack4
+Package: libhttrack3
 Architecture: any
 Multi-Arch: same
 Section: libs
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Replaces: libhttrack3, httrack (<< 3.49.8-3~)
-Breaks: libhttrack3, httrack (<< 3.49.8-3~)
+Replaces: libhttrack2, httrack (<< 3.49.8-2~)
+Breaks: libhttrack2, httrack (<< 3.49.8-2~)
 Description: Httrack website copier library
  This package is the library part of httrack, website copier and mirroring
  utility

@@ -481,10 +481,22 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
+/* Sentinel stored when the server declared no Content-Type. It is html-ish
+   for every type test (so a typeless response still parses/stores as today),
+   but the naming code (wire_patches_ext) treats it as "no declared type" and
+   keeps the URL extension. It rides the cache, so updates name consistently. */
+#define HTS_UNKNOWN_MIME "unknown/unknown"
+/* Map the no-declared-type sentinel back to a real type for any header or
+   record we EMIT or PERSIST, so "unknown/unknown" never reaches a consumer
+   (a served Content-Type, a ProxyTrack .arc record, ...). */
+#define hts_effective_mime(m)                                                  \
+  (strfield2((m), HTS_UNKNOWN_MIME) ? HTS_HYPERTEXT_DEFAULT_MIME : (m))
 
-#define is_html_mime_type(a) \
-  ( (strfield2((a),"text/html")!=0)\
-  || (strfield2((a),"application/xhtml+xml")!=0) \
+#define is_html_mime_type(a)                                                   \
+  ((strfield2((a), "text/html") != 0) ||                                       \
+   (strfield2((a), "application/xhtml+xml") != 0) ||                           \
+   (strfield2((a), HTS_UNKNOWN_MIME) !=                                        \
+    0) /* no declared type: treat as html */                                   \
   )
 #define is_hypertext_mime__(a) \
   ( \

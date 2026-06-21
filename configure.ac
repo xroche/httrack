@@ -29,9 +29,9 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 4:0:0: htsblk gained the contenttype_given field, an incompatible ABI break,
-# so bump current and reset revision/age.
-VERSION_INFO="4:0:0"
+# 3:0:0: htsblk layout changed (contenttype/charset/contentencoding widened to
+# 128), an incompatible ABI break, so bump current and reset revision/age.
+VERSION_INFO="3:0:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 

@@ -1176,11 +1176,15 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         if (element != NULL) {
           msgCode = element->statuscode;
           StringRoom(headers, 8192);
-          sprintf(StringBuffRW(headers), "HTTP/1.1 %d %s\r\n"
+          sprintf(StringBuffRW(headers),
+                  "HTTP/1.1 %d %s\r\n"
 #ifndef NO_WEBDAV
                   "%s"
 #endif
-                  "Content-Type: %s%s%s%s\r\n" "%s%s%s" "%s%s%s" "%s%s%s",
+                  "Content-Type: %s%s%s%s\r\n"
+                  "%s%s%s"
+                  "%s%s%s"
+                  "%s%s%s",
                   /* */
                   msgCode, element->msg,
 #ifndef NO_WEBDAV
@@ -1188,16 +1192,18 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                   StringBuff(davHeaders),
 #endif
                   /* Content-type: foo; [ charset=bar ] */
-                  element->contenttype,
+                  hts_effective_mime(element->contenttype),
                   ((element->charset[0]) ? "; charset=\"" : ""),
                   element->charset, ((element->charset[0]) ? "\"" : ""),
                   /* location */
-                  ((element->location != NULL
-                    && element->location[0]) ? "Location: " : ""),
-                  ((element->location != NULL
-                    && element->location[0]) ? element->location : ""),
-                  ((element->location != NULL
-                    && element->location[0]) ? "\r\n" : ""),
+                  ((element->location != NULL && element->location[0])
+                       ? "Location: "
+                       : ""),
+                  ((element->location != NULL && element->location[0])
+                       ? element->location
+                       : ""),
+                  ((element->location != NULL && element->location[0]) ? "\r\n"
+                                                                       : ""),
                   /* last-modified */
                   ((element->lastmodified[0]) ? "Last-Modified: " : ""),
                   ((element->lastmodified[0]) ? element->lastmodified : ""),
@@ -1205,8 +1211,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                   /* etag */
                   ((element->etag[0]) ? "ETag: " : ""),
                   ((element->etag[0]) ? element->etag : ""),
-                  ((element->etag[0]) ? "\r\n" : "")
-            );
+                  ((element->etag[0]) ? "\r\n" : ""));
           StringLength(headers) = (int) strlen(StringBuff(headers));
         } else {
           /* No query string, no ending / : check the the <url>/ page */

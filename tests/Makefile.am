@@ -54,6 +54,7 @@ TESTS = \
 	14_local-https.test \
 	15_local-types.test \
 	16_local-assume.test \
-	17_local-empty-ct.test
+	17_local-empty-ct.test \
+	18_local-update.test
 
 CLEANFILES = check-network_sh.cache
