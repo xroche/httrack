@@ -4,6 +4,12 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-9
++ Fixed: file-type detection from the Content-Type header: trust a declared type over a binary URL extension, honor --assume under the delayed type check, and keep a known extension against a bogus or empty Content-Type (#267, #29, #56)
++ Fixed: an uninitialized-buffer read when the Content-Type is empty (#411)
++ Fixed: restored C++ source-compatibility of the installed headers so reverse dependencies (httraqt) build again (#413)
++ Changed: multiple internal build, packaging and test-harness improvements
+
 3.49-8
 + New: tunnel HTTPS downloads through the configured HTTP proxy via CONNECT (#85)
 + New: parse every candidate URL in <img> and <source> srcset lists (#326)
