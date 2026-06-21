@@ -428,11 +428,11 @@ struct httrackp {
   LLint maxfile_html;         /**< max bytes per HTML file */
   int maxsoc;                 /**< max simultaneous sockets (-cN) */
   LLint fragment;             /**< split site after this many bytes */
-  hts_boolean
+  hts_tristate
       nearlink; /**< also fetch images/data adjacent to a page but off-site */
   hts_boolean makeindex;  /**< build a top-level index.html */
   hts_boolean kindex;     /**< build a keyword index */
-  hts_boolean delete_old; /**< delete locally obsolete files after update */
+  hts_tristate delete_old; /**< delete locally obsolete files after update */
   int timeout;            /**< connection timeout in seconds */
   int rateout;            /**< minimum transfer rate (bytes/s) before abort */
   int maxtime;            /**< max total mirror duration in seconds */
@@ -465,13 +465,13 @@ struct httrackp {
   hts_boolean maketrack; /**< maintain an operations-statistics log */
   int parsejava;         /**< Java/JS parsing mode; see htsparsejava_flags */
   int hostcontrol; /**< ban slow/timing-out hosts; see hts_hostcontrol bits */
-  hts_boolean errpage; /**< generate an error page on 404 and similar */
+  hts_tristate errpage; /**< generate an error page on 404 and similar */
   hts_boolean
       check_type; /**< probe unknown-type links (cgi/asp/dir) and follow moves
                    */
   hts_boolean all_in_cache;      /**< keep all retrieved data in the cache */
   hts_robots robots;             /**< robots.txt handling level */
-  hts_boolean external;          /**< render external links as error pages */
+  hts_tristate external;         /**< render external links as error pages */
   hts_boolean passprivacy;       /**< strip passwords from external links */
   hts_boolean includequery;      /**< include the query string in saved names */
   hts_boolean mirror_first_page; /**< only mirror the links of the first page */
@@ -485,7 +485,7 @@ struct httrackp {
   hts_boolean sizehack;          /**< treat same-size response as "updated" */
   hts_boolean urlhack;           // force "url normalization" to avoid loops
   hts_boolean tolerant;          /**< accept an incorrect Content-Length */
-  hts_boolean
+  hts_tristate
       parseall; /**< parse aggressively, including unknown tags with links */
   hts_boolean parsedebug; /**< parser debug mode */
   hts_boolean norecatch;  /**< do not re-fetch files the user deleted locally */
