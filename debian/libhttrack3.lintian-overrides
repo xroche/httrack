@@ -1,3 +1,8 @@
 # The shared libraries ship without a versioned symbols control file (ABI is
 # tracked via the SONAME plus a >= upstream-version dependency, see debian/rules).
 libhttrack3: no-symbols-control-file usr/lib/*
+
+# Bundled, locally patched minizip (src/minizip): it adds a zipFlush() API the
+# system libminizip lacks (htscache.c flushes the cache .zip so an interrupted
+# crawl leaves a valid archive), plus Android/old-zlib portability fixes.
+libhttrack3: embedded-library *libminizip*
