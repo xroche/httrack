@@ -147,9 +147,8 @@ struct OLD_htsblk {
 #define HTS_DEF_FWSTRUCT_t_dnscache
 typedef struct t_dnscache t_dnscache;
 #endif
+// One DNS cache record, stored as a coucal value keyed by hostname.
 struct t_dnscache {
-  struct t_dnscache *next;
-  const char *iadr;
   // resolved addresses, in resolver (RFC 6724) order; host_count==0 means the
   // name does not resolve (negative cache). host_count<=HTS_MAXADDRNUM.
   int host_count;
@@ -245,8 +244,9 @@ HTSEXT_API int check_hostname_dns(const char *const hostname);
 int ftp_available(void);
 
 #if HTS_DNSCACHE
-void hts_cache_free(t_dnscache *const cache);
-t_dnscache *hts_cache(httrackp * opt);
+/* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
+   on first use. Records are owned by the table and freed on coucal_delete. */
+coucal hts_cache(httrackp *opt);
 #endif
 
 // outils divers

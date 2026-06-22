@@ -4766,64 +4766,51 @@ int hts_read(htsblk * r, char *buff, int size) {
 // -- Gestion cache DNS --
 // 'RX98
 
-// 'capsule' contenant uniquement le cache
-t_dnscache *hts_cache(httrackp * opt) {
+// Free a DNS cache record (coucal value handler).
+static void hts_cache_value_free(coucal_opaque arg, coucal_value value) {
+  void *record = value.ptr;
+
+  (void) arg;
+  freet(record);
+}
+
+// opt's DNS cache hashtable, created on first use. Records (t_dnscache*) are
+// owned by the table and freed by hts_cache_value_free on coucal_delete.
+coucal hts_cache(httrackp *opt) {
   assertf(opt != NULL);
   if (opt->state.dns_cache == NULL) {
-    opt->state.dns_cache = (t_dnscache *) malloct(sizeof(t_dnscache));
-    memset(opt->state.dns_cache, 0, sizeof(t_dnscache));
+    coucal cache = coucal_new(0);
+
+    coucal_set_name(cache, "dns_cache");
+    coucal_value_set_value_handler(cache, hts_cache_value_free, NULL);
+    opt->state.dns_cache = cache;
   }
   assertf(opt->state.dns_cache != NULL);
-  /* first entry is NULL */
-  assertf(opt->state.dns_cache->iadr == NULL);
   return opt->state.dns_cache;
 }
 
-// Free DNS cache.
-void hts_cache_free(t_dnscache *const root) {
-  if (root != NULL) {
-    t_dnscache *cache;
-    for(cache = root; cache != NULL; ) {
-      t_dnscache *const next = cache->next;
-      cache->next = NULL;
-      freet(cache);
-      cache = next;
-    }
-  }
-}
-
-// lock le cache dns pour tout opération d'ajout
-// plus prudent quand plusieurs threads peuvent écrire dedans..
-// -1: status? 0: libérer 1:locker
-
-// MUST BE LOCKED
+// MUST BE LOCKED (coucal is not internally serialized vs FTP/web threads)
 // Look up iadr in the DNS cache, filling out[0..min(count,max)-1].
 // Returns: -1 not yet tested; 0 negative-cached (not in DNS); >0 address count.
-static int hts_ghbn_all(const t_dnscache *cache, const char *const iadr,
+static int hts_ghbn_all(coucal cache, const char *const iadr,
                         SOCaddr *const out, const int max) {
+  void *ptr;
+
   assertf(out != NULL);
   assertf(iadr != NULL);
   if (*iadr == '\0') {
     return -1;
   }
-  /* first entry is empty */
-  if (cache->iadr == NULL) {
-    cache = cache->next;
-  }
-  for(; cache != NULL; cache = cache->next) {
-    assertf(cache != NULL);
-    assertf(cache->iadr != NULL);
-    assertf(cache->iadr == (const char*) cache + sizeof(t_dnscache));
-    if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
-      int i;
+  if (coucal_read_pvoid(cache, iadr, &ptr)) { // ok trouvé
+    const t_dnscache *const record = (const t_dnscache *) ptr;
+    int i;
 
-      assertf(cache->host_count <= HTS_MAXADDRNUM);
-      for (i = 0; i < cache->host_count && i < max; i++) {
-        assertf(cache->host_length[i] <= sizeof(cache->host_addr[i]));
-        SOCaddr_copyaddr2(out[i], cache->host_addr[i], cache->host_length[i]);
-      }
-      return cache->host_count;
+    assertf(record->host_count <= HTS_MAXADDRNUM);
+    for (i = 0; i < record->host_count && i < max; i++) {
+      assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
+      SOCaddr_copyaddr2(out[i], record->host_addr[i], record->host_length[i]);
     }
+    return record->host_count;
   }
   return -1;
 }
@@ -5088,7 +5075,7 @@ static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
                                  SOCaddr *const out, const int max,
                                  const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
-  t_dnscache *cache = hts_cache(opt);  // adresse du cache
+  coucal cache = hts_cache(opt); // le cache dns
   int count;
 
   assertf(opt != NULL);
@@ -5109,12 +5096,9 @@ static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
   if (count >= 0) { // cache hit (0 == negative-cached)
     return count;
   } else { // non présent dans le cache dns, tester
-    const size_t iadr_len = strlen(iadr) + 1;
     SOCaddr resolved[HTS_MAXADDRNUM];
+    t_dnscache *record;
     int i;
-
-    // find queue
-    for(; cache->next != NULL; cache = cache->next) ;
 
 #if DEBUGDNS
     printf("resolving (not cached) %s\n", iadr);
@@ -5126,22 +5110,18 @@ static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
     DEBUG_W("gethostbyname done\n");
 #endif
 
-    /* attempt to store new entry */
-    cache->next = malloct(sizeof(t_dnscache) + iadr_len);
-    if (cache->next != NULL) {
-      t_dnscache *const next = cache->next;
-      char *const block = (char*) cache->next;
-      char *const str = block + sizeof(t_dnscache);
-      memcpy(str, iadr, iadr_len);
-      next->iadr = str;
-      next->host_count = count;
+    /* attempt to store new entry (coucal owns it and dups the host key) */
+    record = malloct(sizeof(t_dnscache));
+    if (record != NULL) {
+      memset(record, 0, sizeof(*record));
+      record->host_count = count;
       for (i = 0; i < count; i++) {
-        next->host_length[i] = SOCaddr_size(resolved[i]);
-        assertf(next->host_length[i] <= sizeof(next->host_addr[i]));
-        memcpy(next->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
-               next->host_length[i]);
+        record->host_length[i] = SOCaddr_size(resolved[i]);
+        assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
+        memcpy(record->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
+               record->host_length[i]);
       }
-      next->next = NULL;
+      coucal_add_pvoid(cache, iadr, record);
     }
 
     /* copy result to caller (cache store may have failed; result still valid)
@@ -6012,14 +5992,14 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
 
     /* Cache */
     if (opt->state.dns_cache != NULL) {
-      t_dnscache *root;
+      coucal root;
 
       hts_mutexlock(&opt->state.lock);
       root = opt->state.dns_cache;
       opt->state.dns_cache = NULL;
       hts_mutexrelease(&opt->state.lock);
 
-      hts_cache_free(root);
+      coucal_delete(&root); // frees records via hts_cache_value_free
     }
 
     /* Cancel chain */
