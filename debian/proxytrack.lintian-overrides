@@ -1,0 +1,3 @@
+# Statically linked against httrack's bundled, patched minizip (see src/minizip
+# and libhttrack3's override): the zipFlush() API is absent from the system one.
+proxytrack: embedded-library *libminizip*

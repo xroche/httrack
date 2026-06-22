@@ -232,30 +232,42 @@ jobs:
   deb:
     name: deb package (lintian)
     runs-on: ubuntu-24.04
+    # Build and gate inside Debian sid, the upload target. A Debian dpkg-deb
+    # produces archive-legal xz members (an Ubuntu host defaults to zstd, which
+    # the archive's lintian rejects), and sid's lintian carries the same
+    # data-driven checks (embedded-lib fingerprints and the like) the buildds and
+    # UDD apply -- so issues surface here instead of after upload.
+    container: debian:sid
     steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
       - name: Install packaging toolchain
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev \
             debhelper devscripts lintian fakeroot
 
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
       # --unsigned: CI has no GPG key (also skips the release sig/checksums).
-      # debuild builds every package, then lintian gates on errors.
+      # mkdeb builds every package then runs the lintian gate (--fail-on=error,
+      # warning); debuild runs the packaged test pass.
       #
       # DEB_BUILD_OPTIONS trims work CI does not need (release builds via
       # mkdeb.sh are untouched): noautodbgsym drops the -dbgsym packages whose
       # LTO payloads are slow to compress and that CI never ships; parallel uses
-      # every core. We let debuild run its test pass -- the only one now that
-      # mkdeb no longer runs its own -- so CI exercises the packaged tests.
-      - name: Build Debian packages
+      # every core.
+      - name: Build and lint Debian packages
         run: |
+          set -euo pipefail
+          # The workspace volume is owned by the host runner uid, but the
+          # container runs as root, so mkdeb's git calls (superproject and the
+          # coucal submodule) trip "dubious ownership"; mark them all safe.
+          git config --global --add safe.directory "*"
           export DEB_BUILD_OPTIONS="noautodbgsym parallel=$(nproc)"
           bash tools/mkdeb.sh --unsigned --no-release-artifacts
 
