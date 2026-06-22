@@ -62,7 +62,7 @@ typedef struct mock_host {
   const char *name;
   int gai_err; /* non-zero: getaddrinfo returns this */
   int naddr;
-  mock_addr addr[3];
+  mock_addr addr[6];
   int calls; /* times the backend resolved this host */
 } mock_host;
 
@@ -82,6 +82,17 @@ static mock_host mock_hosts[] = {
      2,
      {{AF_INET, {9, 10, 11, 12}},
       {AF_INET6, {0x20, 0x01, 0x0d, 0xb8, [15] = 3}}},
+     0},
+    /* more addresses than HTS_MAXADDRNUM: the list must clamp to the cap. */
+    {"many.test",
+     0,
+     6,
+     {{AF_INET, {10, 0, 0, 1}},
+      {AF_INET, {10, 0, 0, 2}},
+      {AF_INET, {10, 0, 0, 3}},
+      {AF_INET, {10, 0, 0, 4}},
+      {AF_INET, {10, 0, 0, 5}},
+      {AF_INET, {10, 0, 0, 6}}},
      0},
     {"nodns.test", EAI_NONAME, 0, {{0}}, 0},
 };
@@ -197,9 +208,9 @@ int dns_selftests(httrackp *opt) {
   CHECK(resolve_family_nocache("v4only.test") == AF_INET);
   CHECK(resolve_family_nocache("v6only.test") == AF_INET6);
 
-  /* Dual-stack: the current resolver keeps only the *first* address. Both
-     orderings pin that (not a family preference); PR2 (multi-address) widens
-     it. */
+  /* Dual-stack: the single-address API returns the *first* resolved address.
+     Both orderings pin selection by position, not a family preference. The
+     multi-address API (resolve_all, below) exposes the whole list. */
   CHECK(resolve_family_nocache("dual.test") == AF_INET6); /* v6 listed first */
   CHECK(resolve_family_nocache("dual4.test") == AF_INET); /* v4 listed first */
 
@@ -238,6 +249,47 @@ int dns_selftests(httrackp *opt) {
     CHECK(hts_dns_resolve2(opt, "nodns.test", &a1, &err) == NULL);
     CHECK(hts_dns_resolve2(opt, "nodns.test", &a2, &err) == NULL);
     CHECK(mock_find("nodns.test")->calls == 1); /* resolved once, then cached */
+  }
+
+  /* Multi-address resolution: count and order are the connect-fallback
+     contract. A dead first address is retried against the next, so both must be
+     exact. */
+  mock_reset_calls();
+  {
+    SOCaddr addrs[HTS_MAXADDRNUM];
+    char ip[64];
+    const char *err = NULL;
+
+    /* dual-stack, in resolver order: [0]=v6, [1]=v4 */
+    CHECK(hts_dns_resolve_all(opt, "dual.test", addrs, HTS_MAXADDRNUM, &err) ==
+          2);
+    CHECK(SOCaddr_sinfamily(addrs[0]) == AF_INET6);
+    CHECK(SOCaddr_sinfamily(addrs[1]) == AF_INET);
+    SOCaddr_inetntoa(ip, sizeof(ip), addrs[1]);
+    CHECK(strcmp(ip, "5.6.7.8") == 0);
+    CHECK(mock_find("dual.test")->calls ==
+          1); /* one backend hit for the list */
+
+    /* single-address host: count 1 */
+    CHECK(hts_dns_resolve_all(opt, "v4only.test", addrs, HTS_MAXADDRNUM,
+                              &err) == 1);
+    SOCaddr_inetntoa(ip, sizeof(ip), addrs[0]);
+    CHECK(strcmp(ip, "1.2.3.4") == 0);
+
+    /* does-not-resolve: count 0 (negative), no addresses */
+    CHECK(hts_dns_resolve_all(opt, "nodns.test", addrs, HTS_MAXADDRNUM, &err) ==
+          0);
+
+    /* more than the cap: the kept list is clamped to HTS_MAXADDRNUM */
+    CHECK(hts_dns_resolve_all(opt, "many.test", addrs, HTS_MAXADDRNUM, &err) ==
+          HTS_MAXADDRNUM);
+
+    /* family filter still applies through the list path */
+    IPV6_resolver = 1;
+    CHECK(hts_dns_resolve_all(opt, "dual4.test", addrs, HTS_MAXADDRNUM, &err) ==
+          1);
+    CHECK(SOCaddr_sinfamily(addrs[0]) == AF_INET);
+    IPV6_resolver = 0;
   }
 
   hts_dns_set_resolver_backend(NULL);
