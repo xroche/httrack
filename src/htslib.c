@@ -5305,6 +5305,11 @@ static int get_loglevel_from_coucal(coucal_loglevel level) {
 static void default_coucal_loghandler(void *arg, coucal_loglevel level, 
                                        const char* format, va_list args) {
 
+  /* informational chatter (hashtable stats on delete, etc.) only when
+     debugging; keep warnings and critical errors always visible. */
+  if (level > coucal_log_warning && hts_dgb_init <= 0) {
+    return;
+  }
   if (level <= coucal_log_warning) {
     fprintf(stderr, "** warning: ");
   }
