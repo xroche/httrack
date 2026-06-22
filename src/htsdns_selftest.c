@@ -280,9 +280,14 @@ int dns_selftests(httrackp *opt) {
     CHECK(hts_dns_resolve_all(opt, "nodns.test", addrs, HTS_MAXADDRNUM, &err) ==
           0);
 
-    /* more than the cap: the kept list is clamped to HTS_MAXADDRNUM */
+    /* more than the cap: the kept list is clamped to HTS_MAXADDRNUM, keeping
+       the FIRST addresses in resolver order (not some other window) */
     CHECK(hts_dns_resolve_all(opt, "many.test", addrs, HTS_MAXADDRNUM, &err) ==
           HTS_MAXADDRNUM);
+    SOCaddr_inetntoa(ip, sizeof(ip), addrs[0]);
+    CHECK(strcmp(ip, "10.0.0.1") == 0);
+    SOCaddr_inetntoa(ip, sizeof(ip), addrs[HTS_MAXADDRNUM - 1]);
+    CHECK(strcmp(ip, "10.0.0.4") == 0);
 
     /* family filter still applies through the list path */
     IPV6_resolver = 1;
@@ -290,6 +295,54 @@ int dns_selftests(httrackp *opt) {
           1);
     CHECK(SOCaddr_sinfamily(addrs[0]) == AF_INET);
     IPV6_resolver = 0;
+  }
+
+  /* newhttp_addr() must connect to the addr_index-th address, not always the
+     first: this is what back_connect_next relies on to reach the fallback. */
+  {
+    htsblk r;
+    int count = -1;
+    T_SOC s;
+
+    hts_init_htsblk(&r);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 0, &count);
+    CHECK(count == 2);
+    CHECK(SOCaddr_sinfamily(r.address) == AF_INET6); /* index 0 = v6 */
+    if (s != INVALID_SOCKET)
+      deletesoc(s);
+
+    hts_init_htsblk(&r);
+    count = -1;
+    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 1, &count);
+    CHECK(count == 2);
+    CHECK(SOCaddr_sinfamily(r.address) == AF_INET); /* index 1 = v4 */
+    if (s != INVALID_SOCKET)
+      deletesoc(s);
+
+    /* out-of-range index: no address selected (address stays unset) */
+    hts_init_htsblk(&r);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 2, NULL);
+    CHECK(s == INVALID_SOCKET);
+    if (s != INVALID_SOCKET)
+      deletesoc(s);
+  }
+
+  /* Connect-fallback decision (consumer of the multi-address list): when a
+     stuck connect should abandon the current address for the next one. */
+  {
+    /* no fallback for the last/only candidate, whatever the elapsed time */
+    CHECK(back_connect_fallback_due(0, 1, 9999, 120) == 0);
+    CHECK(back_connect_fallback_due(1, 2, 9999, 120) == 0);
+    CHECK(back_connect_fallback_due(3, 4, 9999, 120) == 0);
+    /* fallback available: wait the per-candidate deadline (cap 10s here) */
+    CHECK(back_connect_fallback_due(0, 2, 9, 120) == 0);
+    CHECK(back_connect_fallback_due(0, 2, 10, 120) == 1);
+    CHECK(back_connect_fallback_due(2, 4, 10, 120) == 1);
+    /* a shorter slot timeout shortens the deadline (min(timeout, cap)) */
+    CHECK(back_connect_fallback_due(0, 2, 4, 5) == 0);
+    CHECK(back_connect_fallback_due(0, 2, 5, 5) == 1);
+    /* no timeout management: never force a fallback */
+    CHECK(back_connect_fallback_due(0, 2, 9999, 0) == 0);
   }
 
   hts_dns_set_resolver_backend(NULL);

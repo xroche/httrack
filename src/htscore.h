@@ -152,6 +152,15 @@ struct lien_adrfilsave {
   char save[HTS_URLMAXSIZE * 2]; /**< local save path (with directory) */
 };
 
+/** Per-slot connect-fallback bookkeeping (parallel to struct_back.lnk).
+    Tracks which resolved address the slot is currently connecting to so a
+    stuck connect can be retried against the next one. */
+typedef struct hts_connect_fallback {
+  int addr_index;       /**< candidate being connected (0-based) */
+  int addr_count;       /**< resolved addresses; -1 = not yet probed */
+  TStamp connect_start; /**< when the current candidate's connect began */
+} hts_connect_fallback;
+
 /** The download-slot ring: the set of concurrent transfers in flight.
     Allocated/owned by the engine; consumers (status callbacks, the loop)
     read it but do not resize or free it. */
@@ -168,6 +177,7 @@ struct struct_back {
   int count;              /**< number of usable slots (back_max) */
   coucal ready;           /**< index of slots whose transfer completed */
   LLint ready_size_bytes; /**< total bytes buffered in completed slots */
+  hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
 };
 
 typedef struct cache_back_zip_entry cache_back_zip_entry;
@@ -371,6 +381,13 @@ void check_rate(TStamp stat_timestart, int maxrate);
 
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
+
+/* True if a connecting slot should give up on the current address and try the
+   next one: a fallback address remains (addr_index+1 < addr_count) and the
+   candidate has been connecting for at least its deadline, min(timeout, an
+   internal cap). elapsed/timeout in seconds. Exposed for the -#D self-test. */
+int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
+                              int timeout);
 
 /* How many new sockets may be opened now, honoring maxsoc and the maxconn rate
    limit (>=0). _strict ignores reserved-slot headroom; the plain form leaves
