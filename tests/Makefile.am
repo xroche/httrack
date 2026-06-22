@@ -13,6 +13,7 @@ TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
 ### TESTS_ENVIRONMENT += $(SHLIBPATH_VAR)="$(top_builddir)/src/$(LT_CV_OBJDIR)$${$(SHLIBPATH_VAR):+$(PATH_SEPARATOR)}$$$(SHLIBPATH_VAR)"
 TESTS_ENVIRONMENT += ONLINE_UNIT_TESTS=$(ONLINE_UNIT_TESTS)
 TESTS_ENVIRONMENT += HTTPS_SUPPORT=$(HTTPS_SUPPORT)
+TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 
 TEST_EXTENSIONS = .test
@@ -56,6 +57,7 @@ TESTS = \
 	15_local-types.test \
 	16_local-assume.test \
 	17_local-empty-ct.test \
-	18_local-update.test
+	18_local-update.test \
+	19_local-connect-fallback.test
 
 CLEANFILES = check-network_sh.cache

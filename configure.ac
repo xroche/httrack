@@ -215,9 +215,12 @@ AC_SUBST(OPENSSL_LIBS)
 fi
 
 ### Support IPv6
+V6_SUPPORT=no
 AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
+V6_SUPPORT=yes
 AC_DEFINE(HTS_INET6, 1, [Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
 AC_SUBST(V6_FLAG)
+AC_SUBST(V6_SUPPORT)
 
 ### Check for LFS
 AC_CHECK_LIB(c, fopen64, [LFS_FLAG="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE"

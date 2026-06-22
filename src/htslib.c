@@ -4839,6 +4839,146 @@ static const hts_resolver_backend *hts_resolver = &hts_resolver_libc;
 void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
   hts_resolver = (backend != NULL) ? backend : &hts_resolver_libc;
 }
+
+/* Debug/test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins the resolution
+   of `host` to the listed addresses (curl --resolve style), so the connect
+   fallback can be exercised deterministically (a dead address first, a live one
+   next). Any other host resolves normally. Below: an addrinfo backend that owns
+   its chain (its own freeaddrinfo), so a synthesized and a delegated result
+   free the same way. */
+
+/* Deep-copy a libc addrinfo chain into our own allocations. */
+static struct addrinfo *resolver_dup_chain(const struct addrinfo *src) {
+  struct addrinfo *head = NULL, *tail = NULL;
+
+  for (; src != NULL; src = src->ai_next) {
+    struct addrinfo *const ai = calloct(1, sizeof(*ai));
+
+    ai->ai_family = src->ai_family;
+    ai->ai_socktype = src->ai_socktype;
+    ai->ai_protocol = src->ai_protocol;
+    ai->ai_addrlen = src->ai_addrlen;
+    ai->ai_addr = malloct(src->ai_addrlen);
+    memcpy(ai->ai_addr, src->ai_addr, src->ai_addrlen);
+    if (head == NULL)
+      head = ai;
+    else
+      tail->ai_next = ai;
+    tail = ai;
+  }
+  return head;
+}
+
+/* Build one addrinfo node from an IPv4/IPv6 literal, or NULL if it does not
+   parse or is filtered out by want_family (AF_INET/AF_INET6/PF_UNSPEC). */
+static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
+  struct addrinfo *ai;
+
+  if (strchr(ip, ':') != NULL) { // IPv6 literal
+    struct sockaddr_in6 sa6;
+
+    if (want_family != PF_UNSPEC && want_family != AF_INET6)
+      return NULL;
+    memset(&sa6, 0, sizeof(sa6));
+    if (inet_pton(AF_INET6, ip, &sa6.sin6_addr) != 1)
+      return NULL;
+    sa6.sin6_family = AF_INET6;
+    ai = calloct(1, sizeof(*ai));
+    ai->ai_family = AF_INET6;
+    ai->ai_addrlen = sizeof(sa6);
+    ai->ai_addr = malloct(sizeof(sa6));
+    memcpy(ai->ai_addr, &sa6, sizeof(sa6));
+  } else { // IPv4 literal
+    struct sockaddr_in sa;
+
+    if (want_family != PF_UNSPEC && want_family != AF_INET)
+      return NULL;
+    memset(&sa, 0, sizeof(sa));
+    if (inet_pton(AF_INET, ip, &sa.sin_addr) != 1)
+      return NULL;
+    sa.sin_family = AF_INET;
+    ai = calloct(1, sizeof(*ai));
+    ai->ai_family = AF_INET;
+    ai->ai_addrlen = sizeof(sa);
+    ai->ai_addr = malloct(sizeof(sa));
+    memcpy(ai->ai_addr, &sa, sizeof(sa));
+  }
+  return ai;
+}
+
+static void override_freeaddrinfo(struct addrinfo *res) {
+  while (res != NULL) {
+    struct addrinfo *const next = res->ai_next;
+
+    freet(res->ai_addr);
+    freet(res);
+    res = next;
+  }
+}
+
+static int override_getaddrinfo(const char *node, const char *service,
+                                const struct addrinfo *hints,
+                                struct addrinfo **res) {
+  const char *const spec = getenv("HTTRACK_DEBUG_RESOLVE");
+  const int want = (hints != NULL) ? hints->ai_family : PF_UNSPEC;
+  const char *colon;
+
+  *res = NULL;
+  if (spec != NULL && node != NULL && (colon = strchr(spec, ':')) != NULL &&
+      (size_t) (colon - spec) == strlen(node) &&
+      strncmp(spec, node, colon - spec) == 0) {
+    struct addrinfo *head = NULL, *tail = NULL;
+    char buf[256];
+    char *p;
+
+    buf[0] = '\0';
+    strncatbuff(buf, colon + 1, sizeof(buf) - 1);
+    for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
+      struct addrinfo *const ai = resolver_make_ai(p, want);
+
+      if (ai != NULL) {
+        if (head == NULL)
+          head = ai;
+        else
+          tail->ai_next = ai;
+        tail = ai;
+      }
+    }
+    if (head == NULL)
+      return EAI_NONAME;
+    *res = head;
+    return 0;
+  }
+
+  /* not overridden: delegate to libc, copying into our owned format */
+  {
+    struct addrinfo *sys = NULL;
+    int gerr = getaddrinfo(node, service, hints, &sys);
+
+    if (gerr != 0)
+      return gerr;
+    *res = resolver_dup_chain(sys);
+    freeaddrinfo(sys);
+    return 0;
+  }
+}
+
+static const hts_resolver_backend hts_resolver_override = {
+    override_getaddrinfo, override_freeaddrinfo};
+
+/* Install the env override once, unless a backend was already set (self-test).
+ */
+static void hts_resolver_check_env(void) {
+  static int checked = 0;
+
+  if (!checked) {
+    checked = 1;
+    if (hts_resolver == &hts_resolver_libc &&
+        getenv("HTTRACK_DEBUG_RESOLVE") != NULL) {
+      hts_resolver = &hts_resolver_override;
+    }
+  }
+}
 #endif
 
 // Resolve hostname into up to max addresses (resolver/RFC 6724 order), no
@@ -4868,6 +5008,7 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
   struct addrinfo hints;
   int gerr;
 
+  hts_resolver_check_env();
   memset(&hints, 0, sizeof(hints));
   if (IPV6_resolver == 1) // V4 only (for bogus V6 entries)
     hints.ai_family = PF_INET;
