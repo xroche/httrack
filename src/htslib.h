@@ -150,8 +150,11 @@ typedef struct t_dnscache t_dnscache;
 struct t_dnscache {
   struct t_dnscache *next;
   const char *iadr;
-  size_t host_length;                   // length ; (4 or 16) ; 0 for error
-  char host_addr[HTS_MAXADDRLEN];
+  // resolved addresses, in resolver (RFC 6724) order; host_count==0 means the
+  // name does not resolve (negative cache). host_count<=HTS_MAXADDRNUM.
+  int host_count;
+  size_t host_length[HTS_MAXADDRNUM]; // sockaddr length of each (16 or 28)
+  char host_addr[HTS_MAXADDRNUM][HTS_MAXADDRLEN];
 };
 
 /* Library internal definictions */
@@ -191,6 +194,13 @@ int http_cookie_header_selftest(t_cookie *cookie, const char *domain,
 //int newhttp(char* iadr,char* err=NULL);
 T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
               int waitconnect);
+/* Like newhttp(), but connect to the addr_index-th resolved address of the host
+   (0-based) instead of always the first; *addr_count, if non-NULL, is set to
+   the total resolved addresses. newhttp() == newhttp_addr(...,0,NULL). Used by
+   the slot scheduler to try the next address when a connect fails (dead IPv6
+   etc.). */
+T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
+                   int waitconnect, int addr_index, int *addr_count);
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
@@ -215,9 +225,14 @@ void treatfirstline(htsblk * retour, const char *rcvd);
 
 // sous-fonctions
 LLint http_xfread1(htsblk * r, int bufl);
-HTS_INLINE SOCaddr* hts_dns_resolve2(httrackp * opt, const char *iadr,
-                                     SOCaddr *const addr, 
-                                     const char **error);
+/* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
+   resolver order), returning the count (0 = does not resolve, negative-cached).
+   Resolves once per host; later calls read the DNS cache. Must hold no lock
+   (brackets opt->state.lock itself). */
+int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
+                        const char **error);
+HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
+                                     SOCaddr *const addr, const char **error);
 HTS_INLINE SOCaddr* hts_dns_resolve(httrackp * opt, const char *iadr,
                                     SOCaddr *const addr);
 HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 

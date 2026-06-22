@@ -73,6 +73,8 @@ struct_back *back_new(httrackp *opt, int back_max) {
 
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
+  sback->connect_fallback = (hts_connect_fallback *) calloct(
+      (back_max + 1), sizeof(hts_connect_fallback));
   sback->ready = coucal_new(0);
   hts_set_hash_handler(sback->ready, opt);
   coucal_set_name(sback->ready, "back_new");
@@ -83,6 +85,7 @@ struct_back *back_new(httrackp *opt, int back_max) {
     sback->lnk[i].r.location = sback->lnk[i].location_buffer;
     sback->lnk[i].status = STATUS_FREE;
     sback->lnk[i].r.soc = INVALID_SOCKET;
+    sback->connect_fallback[i].addr_count = -1; // not yet probed
   }
   return sback;
 }
@@ -93,6 +96,7 @@ void back_free(struct_back ** sback) {
       freet((*sback)->lnk);
       (*sback)->lnk = NULL;
     }
+    freet((*sback)->connect_fallback);
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
       (*sback)->ready_size_bytes = 0;
@@ -100,6 +104,72 @@ void back_free(struct_back ** sback) {
     freet(*sback);
     *sback = NULL;
   }
+}
+
+/* Per-candidate connect deadline cap (seconds): a connecting slot with another
+   address to try waits at most this long before falling back, instead of the
+   full (default 120s) slot timeout. Caps the dead-IPv6 stall while staying well
+   above a normal handshake. The last candidate still gets the full timeout. */
+#define HTS_CONNECT_FALLBACK_TIMEOUT 10
+
+int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
+                              int timeout) {
+  int deadline;
+
+  if (addr_index + 1 >= addr_count) // last (or only) candidate: no fallback
+    return 0;
+  if (timeout <= 0) // no timeout management: never force it
+    return 0;
+  deadline = (timeout < HTS_CONNECT_FALLBACK_TIMEOUT)
+                 ? timeout
+                 : HTS_CONNECT_FALLBACK_TIMEOUT;
+  return elapsed >= deadline;
+}
+
+/* Pending-connect result for a non-blocking socket reported ready by select():
+   0 = connected, >0 = the connect errno (refused, unreachable, ...), -1 if the
+   probe itself failed. A failed connect is reported writable too, so this is
+   how success is told from failure without blocking. */
+static int connect_socket_error(T_SOC soc) {
+  int soerr = 0;
+  socklen_t len = (socklen_t) sizeof(soerr);
+
+  if (getsockopt(soc, SOL_SOCKET, SO_ERROR, (char *) &soerr, &len) != 0)
+    return -1;
+  return soerr;
+}
+
+/* Retry a stuck/failed connecting slot against its next resolved address.
+   Closes the current socket and starts a non-blocking connect to the next
+   candidate, leaving the slot in STATUS_CONNECTING. Returns 1 if a new connect
+   was started, 0 if no fallback address remains (caller fails the slot). */
+static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
+  hts_connect_fallback *const cf = &sback->connect_fallback[i];
+  lien_back *const back = sback->lnk;
+  const int next = cf->addr_index + 1;
+  T_SOC soc;
+
+  if (next >= cf->addr_count)
+    return 0;
+
+  if (back[i].r.soc != INVALID_SOCKET) {
+    deletehttp(&back[i].r);
+    back[i].r.soc = INVALID_SOCKET;
+  }
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, 0, next, NULL);
+  if (soc == INVALID_SOCKET)
+    return 0;
+
+  back[i].r.soc = soc;
+  cf->addr_index = next;
+  cf->connect_start = time_local();
+  if (back[i].timeout > 0)
+    back[i].timeout_refresh = cf->connect_start;
+  back[i].status = STATUS_CONNECTING;
+  hts_log_print(opt, LOG_DEBUG,
+                "connect failed, trying next address (%d/%d) for %s", next + 1,
+                cf->addr_count, back[i].url_adr);
+  return 1;
 }
 
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
@@ -1911,8 +1981,11 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
       // ouvrir liaison, envoyer requète
       // ne pas traiter ou recevoir l'en tête immédiatement
       hts_init_htsblk(&back[p].r);
-      //memset(&(back[p].r), 0, sizeof(htsblk)); 
+      // memset(&(back[p].r), 0, sizeof(htsblk));
       back[p].r.location = back[p].location_buffer;
+      // fresh connect: address list not yet probed, start at the first
+      sback->connect_fallback[p].addr_index = 0;
+      sback->connect_fallback[p].addr_count = -1;
       // recopier proxy
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
         if (StringBuff(opt->proxy.bindhost) != NULL)
@@ -2369,21 +2442,25 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       // en cas de gestion du connect préemptif
 #if HTS_XCONN
       if (back[i].status == STATUS_CONNECTING) {        // connexion
-        do_wait = 1;
+        // a connecting slot always carries a live socket; guard anyway so a
+        // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
+        if (back[i].r.soc != INVALID_SOCKET) {
+          do_wait = 1;
 
-        // noter socket write
-        FD_SET(back[i].r.soc, &fds_c);
+          // noter socket write
+          FD_SET(back[i].r.soc, &fds_c);
 
-        // noter socket erreur
-        FD_SET(back[i].r.soc, &fds_e);
+          // noter socket erreur
+          FD_SET(back[i].r.soc, &fds_e);
 
-        // calculer max
-        if (max_c) {
-          max_c = 0;
-          nfds = back[i].r.soc;
-        } else if (back[i].r.soc > nfds) {
-          // ID socket la plus élevée
-          nfds = back[i].r.soc;
+          // calculer max
+          if (max_c) {
+            max_c = 0;
+            nfds = back[i].r.soc;
+          } else if (back[i].r.soc > nfds) {
+            // ID socket la plus élevée
+            nfds = back[i].r.soc;
+          }
         }
 
       } else
@@ -2517,7 +2594,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       }
       // ---- FLAG WRITE MIS A UN?: POUR LE CONNECT
       if (back[i].status == STATUS_CONNECTING) {        // attendre connect
+        hts_connect_fallback *const cf = &sback->connect_fallback[i];
         int dispo = 0;
+
+        // probe the resolved address list once per fresh connect (cache hit:
+        // the host was resolved when this connect was opened)
+        if (cf->addr_count < 0 && back[i].r.soc != INVALID_SOCKET &&
+            !back[i].r.is_file) {
+          SOCaddr scratch[HTS_MAXADDRNUM];
+
+          cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
+                                               HTS_MAXADDRNUM, NULL);
+          cf->connect_start = time_local();
+        }
 
         // vérifier l'existance de timeout-check
         if (!gestion_timeout)
@@ -2526,7 +2615,20 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
         // connecté?
         dispo = FD_ISSET(back[i].r.soc, &fds_c);
-        if (dispo) {            // ok connected!!
+        if (dispo) { // socket ready: connect() finished (ok or failed)
+          // a refused/failed connect is reported writable too; probe SO_ERROR
+          // and, on failure, fall back to the next address (or fail the slot)
+          if (connect_socket_error(back[i].r.soc) != 0) {
+            if (!back_connect_next(opt, sback, i)) {
+              deletehttp(&back[i].r);
+              back[i].r.soc = INVALID_SOCKET;
+              back[i].r.statuscode = STATUSCODE_CONNERROR;
+              strcpybuff(back[i].r.msg, "Connect Error");
+              back[i].status = STATUS_READY;
+              back_set_finished(sback, i);
+            }
+            continue; // reconnected (stay connecting) or failed
+          }
           busy_state = 1;
 
 #if HTS_USEOPENSSL
@@ -3884,6 +3986,29 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
         if (back[i].status > 0) {       // réception/connexion/..
           if (back[i].timeout > 0) {
+            // a stuck connect with a fallback address: retry the next one well
+            // before the full timeout (dead IPv6 on a dual-stack host, ...)
+            if (back[i].status == STATUS_CONNECTING) {
+              const hts_connect_fallback *const cf =
+                  &sback->connect_fallback[i];
+
+              if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
+                                            (int) (act - cf->connect_start),
+                                            back[i].timeout)) {
+                if (back_connect_next(opt, sback, i)) {
+                  continue; // reconnected to the next candidate
+                }
+                // fallback was due but no socket could be opened
+                // (back_connect_next closed the dead one): stop now rather than
+                // spin on an invalid fd
+                back[i].r.soc = INVALID_SOCKET;
+                back[i].r.statuscode = STATUSCODE_CONNERROR;
+                strcpybuff(back[i].r.msg, "Connect Error");
+                back[i].status = STATUS_READY;
+                back_set_finished(sback, i);
+                continue;
+              }
+            }
             //printf("time check %d\n",((int) (act-back[i].timeout_refresh))-back[i].timeout);
             if (((int) (act - back[i].timeout_refresh)) >= back[i].timeout) {
               hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s", back[i].url_adr,

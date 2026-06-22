@@ -408,6 +408,10 @@ typedef int T_SOC;
 /* Buffer size for a printed network address (IPv4 or IPv6, NUL included). */
 #define HTS_MAXADDRLEN 64
 
+/* Max resolved addresses kept per host for connect fallback (dead IPv6 etc.).
+ */
+#define HTS_MAXADDRNUM 4
+
 #ifdef _WIN32
 #else
 #define __cdecl

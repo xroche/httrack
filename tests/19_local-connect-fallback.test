@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# A host that resolves to several addresses must fall back to the next one when
+# a connect fails, instead of giving up on the first (dead IPv6 on a dual-stack
+# host, ...). HTTRACK_DEBUG_RESOLVE pins "deadhost" to a refused address first
+# (127.0.0.2, nothing listening) then the live server (127.0.0.1): the crawl
+# only succeeds if httrack retries the second address. A second case pins every
+# address to a refused one, so the slot must exhaust the list and error out
+# (rather than hang or loop).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver list/override is IPv6-only), skipping"
+    exit 77
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 missing, skipping"
+    exit 77
+fi
+
+server="$top_srcdir/tests/local-server.py"
+root="$top_srcdir/tests/server-root"
+tmpdir=$(mktemp -d)
+serverpid=
+
+cleanup() {
+    if test -n "$serverpid"; then
+        kill "$serverpid" 2>/dev/null || true
+        wait "$serverpid" 2>/dev/null || true
+    fi
+    rm -rf "$tmpdir"
+    return 0
+}
+trap cleanup EXIT
+
+# bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
+python3 "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$tmpdir/srv.out" 2>/dev/null || true)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$tmpdir/srv.err")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+
+out="$tmpdir/crawl"
+HTTRACK_DEBUG_RESOLVE="deadhost:127.0.0.2,127.0.0.1" \
+    httrack "http://deadhost:$port/simple/basic.html" -O "$out" \
+    -c1 --robots=0 --timeout=30 --quiet -Z >"$tmpdir/log" 2>&1
+
+log="$out/hts-log.txt"
+
+# the dead address was tried, then the next one (proves the fallback ran)
+if ! grep -q "trying next address" "$log"; then
+    echo "FAIL: no connect fallback happened"
+    cat "$log"
+    exit 1
+fi
+
+# 0 errors and the file was actually fetched (over the live address)
+errs=$(grep -iEc "^[0-9:]*[[:space:]]Error:" "$log" || true)
+test "$errs" == "0" || {
+    echo "FAIL: $errs error(s) reported"
+    grep -iE "Error:" "$log"
+    exit 1
+}
+test -f "$out/deadhost_$port/simple/basic.html" || {
+    echo "FAIL: basic.html not downloaded via fallback"
+    find "$out" -type f
+    exit 1
+}
+
+# every address refused: the slot exhausts the list, then errors out (the
+# harness timeout would catch a hang/loop; refused connects are instant)
+out2="$tmpdir/crawl2"
+HTTRACK_DEBUG_RESOLVE="alldead:127.0.0.2,127.0.0.3" \
+    httrack "http://alldead:$port/simple/basic.html" -O "$out2" \
+    -c1 --robots=0 --timeout=30 --quiet -Z >"$tmpdir/log2" 2>&1
+log2="$out2/hts-log.txt"
+
+grep -q "trying next address" "$log2" || {
+    echo "FAIL: exhaustion path never tried the fallback address"
+    cat "$log2"
+    exit 1
+}
+grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" || {
+    echo "FAIL: all addresses failing did not report an error"
+    cat "$log2"
+    exit 1
+}
+test ! -f "$out2/alldead_$port/simple/basic.html" || {
+    echo "FAIL: file downloaded despite every address failing"
+    exit 1
+}
+
+echo "OK: connect fallback succeeds, and exhausting all addresses errors out"

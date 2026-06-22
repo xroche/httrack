@@ -2297,14 +2297,27 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
 T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
               int waitconnect) {
+  return newhttp_addr(opt, _iadr, retour, port, waitconnect, 0, NULL);
+}
+
+T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
+                   int waitconnect, int addr_index, int *addr_count) {
   T_SOC soc;                    // descipteur de la socket
+
+  if (addr_count != NULL) {
+    *addr_count = 0;
+  }
 
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
+    SOCaddr addrs[HTS_MAXADDRNUM];
+    int naddr;
     const char *error = "unknown error";
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
     const char *const iadr = jump_identification_const(_iadr);
+    const char *resolve_host = iadr;
+    char BIGSTK iadr2[HTS_URLMAXSIZE * 2];
 
     SOCaddr_clear(server);
 
@@ -2326,7 +2339,6 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 #endif
 
       if (a != NULL) {
-        char BIGSTK iadr2[HTS_URLMAXSIZE * 2];
         int i = -1;
 
         iadr2[0] = '\0';
@@ -2337,18 +2349,19 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
 
         // adresse véritable (sans :xx)
         strncatbuff(iadr2, iadr, (int) (a - iadr));
-
-        // adresse sans le :xx
-        hts_dns_resolve2(opt, iadr2, &server, &error);
-
-      } else {
-
-        // adresse normale (port par défaut par la suite)
-        hts_dns_resolve2(opt, iadr, &server, &error);
+        resolve_host = iadr2;
       }
+    }
 
-    } else {                    // port défini
-      hts_dns_resolve2(opt, iadr, &server, &error);
+    // resolve the full address list and pick the requested candidate; the
+    // scheduler retries the next index when a connect fails (dead IPv6 etc.)
+    naddr =
+        hts_dns_resolve_all(opt, resolve_host, addrs, HTS_MAXADDRNUM, &error);
+    if (addr_count != NULL) {
+      *addr_count = naddr;
+    }
+    if (addr_index >= 0 && addr_index < naddr) {
+      SOCaddr_copy_SOCaddr(server, addrs[addr_index]);
     }
 
     if (!SOCaddr_is_valid(server)) {
@@ -4784,14 +4797,14 @@ void hts_cache_free(t_dnscache *const root) {
 // -1: status? 0: libérer 1:locker
 
 // MUST BE LOCKED
-// routine pour le cache - retour optionnel à donner à chaque fois
-// NULL: nom non encore testé dans le cache
-// si h_length==0 alors le nom n'existe pas dans le dns
-static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCaddr *const addr) {
-  assertf(addr != NULL);
+// Look up iadr in the DNS cache, filling out[0..min(count,max)-1].
+// Returns: -1 not yet tested; 0 negative-cached (not in DNS); >0 address count.
+static int hts_ghbn_all(const t_dnscache *cache, const char *const iadr,
+                        SOCaddr *const out, const int max) {
+  assertf(out != NULL);
   assertf(iadr != NULL);
   if (*iadr == '\0') {
-    return NULL;
+    return -1;
   }
   /* first entry is empty */
   if (cache->iadr == NULL) {
@@ -4802,17 +4815,17 @@ static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCadd
     assertf(cache->iadr != NULL);
     assertf(cache->iadr == (const char*) cache + sizeof(t_dnscache));
     if (strcmp(cache->iadr, iadr) == 0) {       // ok trouvé
-      if (cache->host_length != 0) {     // entrée valide
-        assertf(cache->host_length <= sizeof(cache->host_addr));
-        SOCaddr_copyaddr2(*addr, cache->host_addr, cache->host_length);
-        return addr;
-      } else {                  // erreur dans le dns, déja vérifié
-        SOCaddr_clear(*addr);
-        return addr;
+      int i;
+
+      assertf(cache->host_count <= HTS_MAXADDRNUM);
+      for (i = 0; i < cache->host_count && i < max; i++) {
+        assertf(cache->host_length[i] <= sizeof(cache->host_addr[i]));
+        SOCaddr_copyaddr2(out[i], cache->host_addr[i], cache->host_length[i]);
       }
+      return cache->host_count;
     }
   }
-  return NULL;
+  return -1;
 }
 
 #if HTS_INET6 != 0
@@ -4826,82 +4839,237 @@ static const hts_resolver_backend *hts_resolver = &hts_resolver_libc;
 void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
   hts_resolver = (backend != NULL) ? backend : &hts_resolver_libc;
 }
-#endif
 
-static SOCaddr *hts_dns_resolve_nocache2_(const char *const hostname,
-                                          SOCaddr *const addr,
-                                          const char **error) {
-  {
-#if HTS_INET6==0
-    /* IPv4 resolver */
-    struct hostent *const hp = gethostbyname(hostname);
+/* Debug/test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins the resolution
+   of `host` to the listed addresses (curl --resolve style), so the connect
+   fallback can be exercised deterministically (a dead address first, a live one
+   next). Any other host resolves normally. Below: an addrinfo backend that owns
+   its chain (its own freeaddrinfo), so a synthesized and a delegated result
+   free the same way. */
 
-    if (hp != NULL) {
-      SOCaddr_copyaddr2(addr, hp->h_addr_list[0], hp->h_length);
-      return SOCaddr_is_valid(addr) ? &addr : NULL;
-    } else {
-      SOCaddr_clear(*addr);
-    }
-#else
-    /* IPv6 resolver */
-    struct addrinfo *res = NULL;
-    struct addrinfo hints;
-    int gerr;
+/* Deep-copy a libc addrinfo chain into our own allocations. */
+static struct addrinfo *resolver_dup_chain(const struct addrinfo *src) {
+  struct addrinfo *head = NULL, *tail = NULL;
 
-    SOCaddr_clear(*addr);
-    memset(&hints, 0, sizeof(hints));
-    if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
-      hints.ai_family = PF_INET;
-    else if (IPV6_resolver == 2)        // V6 only (for testing V6 only)
-      hints.ai_family = PF_INET6;
-    else                        // V4 + V6
-      hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    if ((gerr = hts_resolver->getaddrinfo(hostname, NULL, &hints, &res)) == 0) {
-      if (res != NULL) {
-        if (res->ai_addr != NULL && res->ai_addrlen != 0) {
-          SOCaddr_copyaddr2(*addr, res->ai_addr, res->ai_addrlen);
-        }
-      }
-    } else {
-      if (error != NULL) {
-        *error = gai_strerror(gerr);
-      }
-    }
-    if (res) {
-      hts_resolver->freeaddrinfo(res);
-    }
-#endif
+  for (; src != NULL; src = src->ai_next) {
+    struct addrinfo *const ai = calloct(1, sizeof(*ai));
+
+    ai->ai_family = src->ai_family;
+    ai->ai_socktype = src->ai_socktype;
+    ai->ai_protocol = src->ai_protocol;
+    ai->ai_addrlen = src->ai_addrlen;
+    ai->ai_addr = malloct(src->ai_addrlen);
+    memcpy(ai->ai_addr, src->ai_addr, src->ai_addrlen);
+    if (head == NULL)
+      head = ai;
+    else
+      tail->ai_next = ai;
+    tail = ai;
   }
-
-  return SOCaddr_is_valid(*addr) ? addr : NULL;
+  return head;
 }
 
-HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
-                                     SOCaddr *const addr, const char **error) {
-  /* Protection */
-  if (!strnotempty(hostname)) {
-    return NULL;
+/* Build one addrinfo node from an IPv4/IPv6 literal, or NULL if it does not
+   parse or is filtered out by want_family (AF_INET/AF_INET6/PF_UNSPEC). */
+static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
+  struct addrinfo *ai;
+
+  if (strchr(ip, ':') != NULL) { // IPv6 literal
+    struct sockaddr_in6 sa6;
+
+    if (want_family != PF_UNSPEC && want_family != AF_INET6)
+      return NULL;
+    memset(&sa6, 0, sizeof(sa6));
+    if (inet_pton(AF_INET6, ip, &sa6.sin6_addr) != 1)
+      return NULL;
+    sa6.sin6_family = AF_INET6;
+    ai = calloct(1, sizeof(*ai));
+    ai->ai_family = AF_INET6;
+    ai->ai_addrlen = sizeof(sa6);
+    ai->ai_addr = malloct(sizeof(sa6));
+    memcpy(ai->ai_addr, &sa6, sizeof(sa6));
+  } else { // IPv4 literal
+    struct sockaddr_in sa;
+
+    if (want_family != PF_UNSPEC && want_family != AF_INET)
+      return NULL;
+    memset(&sa, 0, sizeof(sa));
+    if (inet_pton(AF_INET, ip, &sa.sin_addr) != 1)
+      return NULL;
+    sa.sin_family = AF_INET;
+    ai = calloct(1, sizeof(*ai));
+    ai->ai_family = AF_INET;
+    ai->ai_addrlen = sizeof(sa);
+    ai->ai_addr = malloct(sizeof(sa));
+    memcpy(ai->ai_addr, &sa, sizeof(sa));
+  }
+  return ai;
+}
+
+static void override_freeaddrinfo(struct addrinfo *res) {
+  while (res != NULL) {
+    struct addrinfo *const next = res->ai_next;
+
+    freet(res->ai_addr);
+    freet(res);
+    res = next;
+  }
+}
+
+static int override_getaddrinfo(const char *node, const char *service,
+                                const struct addrinfo *hints,
+                                struct addrinfo **res) {
+  const char *const spec = getenv("HTTRACK_DEBUG_RESOLVE");
+  const int want = (hints != NULL) ? hints->ai_family : PF_UNSPEC;
+  const char *colon;
+
+  *res = NULL;
+  if (spec != NULL && node != NULL && (colon = strchr(spec, ':')) != NULL &&
+      (size_t) (colon - spec) == strlen(node) &&
+      strncmp(spec, node, colon - spec) == 0) {
+    struct addrinfo *head = NULL, *tail = NULL;
+    char buf[256];
+    char *p;
+
+    buf[0] = '\0';
+    strncatbuff(buf, colon + 1, sizeof(buf) - 1);
+    for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
+      struct addrinfo *const ai = resolver_make_ai(p, want);
+
+      if (ai != NULL) {
+        if (head == NULL)
+          head = ai;
+        else
+          tail->ai_next = ai;
+        tail = ai;
+      }
+    }
+    if (head == NULL)
+      return EAI_NONAME;
+    *res = head;
+    return 0;
   }
 
-  /*
-     Strip [] if any : [3ffe:b80:1234:1::1] 
-     The resolver doesn't seem to handle IP6 addresses in brackets
-   */
+  /* not overridden: delegate to libc, copying into our owned format */
+  {
+    struct addrinfo *sys = NULL;
+    int gerr = getaddrinfo(node, service, hints, &sys);
+
+    if (gerr != 0)
+      return gerr;
+    *res = resolver_dup_chain(sys);
+    freeaddrinfo(sys);
+    return 0;
+  }
+}
+
+static const hts_resolver_backend hts_resolver_override = {
+    override_getaddrinfo, override_freeaddrinfo};
+
+/* Install the env override once, unless a backend was already set (self-test).
+ */
+static void hts_resolver_check_env(void) {
+  static int checked = 0;
+
+  if (!checked) {
+    checked = 1;
+    if (hts_resolver == &hts_resolver_libc &&
+        getenv("HTTRACK_DEBUG_RESOLVE") != NULL) {
+      hts_resolver = &hts_resolver_override;
+    }
+  }
+}
+#endif
+
+// Resolve hostname into up to max addresses (resolver/RFC 6724 order), no
+// cache. Returns the count copied into out[0..count-1]; 0 = does not resolve.
+static int hts_dns_resolve_nocache_list_(const char *const hostname,
+                                         SOCaddr *const out, const int max,
+                                         const char **error) {
+  int count = 0;
+
+#if HTS_INET6==0
+  /* IPv4 resolver */
+  struct hostent *const hp = gethostbyname(hostname);
+
+  if (hp != NULL) {
+    char **h;
+
+    for (h = hp->h_addr_list; count < max && h != NULL && *h != NULL; h++) {
+      SOCaddr_clear(out[count]);
+      SOCaddr_copyaddr2(out[count], *h, hp->h_length);
+      if (SOCaddr_is_valid(out[count]))
+        count++;
+    }
+  }
+#else
+  /* IPv6 resolver */
+  struct addrinfo *res = NULL, *cur;
+  struct addrinfo hints;
+  int gerr;
+
+  hts_resolver_check_env();
+  memset(&hints, 0, sizeof(hints));
+  if (IPV6_resolver == 1) // V4 only (for bogus V6 entries)
+    hints.ai_family = PF_INET;
+  else if (IPV6_resolver == 2) // V6 only (for testing V6 only)
+    hints.ai_family = PF_INET6;
+  else // V4 + V6
+    hints.ai_family = PF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  if ((gerr = hts_resolver->getaddrinfo(hostname, NULL, &hints, &res)) == 0) {
+    for (cur = res; cur != NULL && count < max; cur = cur->ai_next) {
+      if (cur->ai_addr != NULL && cur->ai_addrlen != 0) {
+        SOCaddr_clear(out[count]);
+        SOCaddr_copyaddr2(out[count], cur->ai_addr, cur->ai_addrlen);
+        if (SOCaddr_is_valid(out[count]))
+          count++;
+      }
+    }
+  } else if (error != NULL) {
+    *error = gai_strerror(gerr);
+  }
+  if (res) {
+    hts_resolver->freeaddrinfo(res);
+  }
+#endif
+
+  return count;
+}
+
+// Strip [] around a literal IPv6 ([3ffe:b80:1234:1::1]) the resolver won't
+// take, then resolve into a list. Returns the count.
+static int hts_dns_resolve_nocache_list(const char *const hostname,
+                                        SOCaddr *const out, const int max,
+                                        const char **error) {
+  if (!strnotempty(hostname) || max <= 0) {
+    return 0;
+  }
   if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
-    SOCaddr *ret;
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
+    int count;
+
     assertf(copy != NULL);
     copy[0] = '\0';
     strncat(copy, hostname + 1, size - 2);
-    ret =  hts_dns_resolve_nocache2_(copy, addr, error);
+    count = hts_dns_resolve_nocache_list_(copy, out, max, error);
     freet(copy);
-    return ret;
+    return count;
   } else {
-    return hts_dns_resolve_nocache2_(hostname, addr, error);
+    return hts_dns_resolve_nocache_list_(hostname, out, max, error);
   }
+}
+
+HTSEXT_API SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
+                                             SOCaddr *const addr,
+                                             const char **error) {
+  SOCaddr_clear(*addr);
+  if (hts_dns_resolve_nocache_list(hostname, addr, 1, error) > 0) {
+    return SOCaddr_is_valid(*addr) ? addr : NULL;
+  }
+  return NULL;
 }
 
 HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, SOCaddr *const addr) {
@@ -4914,16 +5082,18 @@ HTSEXT_API int check_hostname_dns(const char *const hostname) {
 }
 
 // Needs locking
-// cache dns interne à HTS // ** FREE A FAIRE sur la chaine
-static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
-                                 SOCaddr *const addr, const char **error) {
+// Internal DNS cache. Fill out[0..count-1] with up to max addresses for _iadr,
+// resolving (and caching the full list) on a miss. Returns the count.
+static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
+                                 SOCaddr *const out, const int max,
+                                 const char **error) {
   char BIGSTK iadr[HTS_URLMAXSIZE * 2];
   t_dnscache *cache = hts_cache(opt);  // adresse du cache
-  SOCaddr *sa;
+  int count;
 
   assertf(opt != NULL);
   assertf(_iadr != NULL);
-  assertf(addr != NULL);
+  assertf(out != NULL);
 
   strcpybuff(iadr, jump_identification_const(_iadr));
   // couper éventuel :
@@ -4935,11 +5105,13 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
   }
 
   /* get IP from the dns cache */
-  sa = hts_ghbn(cache, iadr, addr);
-  if (sa != NULL) {
-    return SOCaddr_is_valid(*sa) ? sa : NULL;
-  } else {                      // non présent dans le cache dns, tester
+  count = hts_ghbn_all(cache, iadr, out, max);
+  if (count >= 0) { // cache hit (0 == negative-cached)
+    return count;
+  } else { // non présent dans le cache dns, tester
     const size_t iadr_len = strlen(iadr) + 1;
+    SOCaddr resolved[HTS_MAXADDRNUM];
+    int i;
 
     // find queue
     for(; cache->next != NULL; cache = cache->next) ;
@@ -4948,7 +5120,7 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
     printf("resolving (not cached) %s\n", iadr);
 #endif
 
-    sa = hts_dns_resolve_nocache2(iadr, addr, error);     // calculer IP host
+    count = hts_dns_resolve_nocache_list(iadr, resolved, HTS_MAXADDRNUM, error);
 
 #if HTS_WIDE_DEBUG
     DEBUG_W("gethostbyname done\n");
@@ -4962,28 +5134,45 @@ static SOCaddr* hts_dns_resolve_(httrackp * opt, const char *_iadr,
       char *const str = block + sizeof(t_dnscache);
       memcpy(str, iadr, iadr_len);
       next->iadr = str;
-      if (sa != NULL) {
-        next->host_length = SOCaddr_size(*sa);
-        assertf(next->host_length <= sizeof(next->host_addr));
-        memcpy(next->host_addr, &SOCaddr_sockaddr(*sa), next->host_length);
-      } else {
-        next->host_length = 0;      // non existant dans le dns
+      next->host_count = count;
+      for (i = 0; i < count; i++) {
+        next->host_length[i] = SOCaddr_size(resolved[i]);
+        assertf(next->host_length[i] <= sizeof(next->host_addr[i]));
+        memcpy(next->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
+               next->host_length[i]);
       }
       next->next = NULL;
-      return sa;
     }
 
-    /* return result if any */
-    return sa;
-  }                             // retour hp du cache
+    /* copy result to caller (cache store may have failed; result still valid)
+     */
+    for (i = 0; i < count && i < max; i++) {
+      SOCaddr_copy_SOCaddr(out[i], resolved[i]);
+    }
+    return count;
+  } // retour hp du cache
 }
 
-SOCaddr* hts_dns_resolve2(httrackp * opt, const char *_iadr, SOCaddr *const addr, const char **error) {
-  SOCaddr *ret;
+int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
+                        const char **error) {
+  int count;
+
+  if (!strnotempty(iadr) || max <= 0) {
+    return 0;
+  }
   hts_mutexlock(&opt->state.lock);
-  ret = hts_dns_resolve_(opt, _iadr, addr, error);
+  count = hts_dns_resolve_list_(opt, iadr, out, max, error);
   hts_mutexrelease(&opt->state.lock);
-  return ret;
+  return count;
+}
+
+SOCaddr *hts_dns_resolve2(httrackp *opt, const char *_iadr, SOCaddr *const addr,
+                          const char **error) {
+  SOCaddr_clear(*addr);
+  if (hts_dns_resolve_all(opt, _iadr, addr, 1, error) > 0) {
+    return SOCaddr_is_valid(*addr) ? addr : NULL;
+  }
+  return NULL;
 }
 
 SOCaddr* hts_dns_resolve(httrackp * opt, const char *_iadr, SOCaddr *const addr) {
