@@ -241,7 +241,7 @@ struct htsoptstate {
   char *userhttptype;
   int verif_backblue_done; /**< backblue.gif/fade.gif already emitted */
   int verif_external_status;
-  t_dnscache *dns_cache;  /**< DNS resolution cache */
+  coucal dns_cache; /**< DNS resolution cache: hostname -> t_dnscache record */
   int dns_cache_nthreads; /**< number of in-flight DNS resolver threads */
   /* HTML parsing state */
   char _hts_errmsg[HTS_CDLMAXSIZE + 256]; /**< last engine error message */
