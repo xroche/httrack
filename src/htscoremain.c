@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htscache_selftest.h"
+#include "htsdns_selftest.h"
 #include "htsmd5.h"
 
 #include <ctype.h>
@@ -2460,6 +2461,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 1;
                 }
                 break;
+              case 'D': { // DNS resolver/cache self-test (mock getaddrinfo)
+                const int err = dns_selftests(opt);
+
+                printf("dns-selftest: %s\n", err ? "FAIL" : "OK");
+                htsmain_free();
+                return err;
+              } break;
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
                 {
                   int hasFilter = 0;

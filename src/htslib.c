@@ -4815,8 +4815,21 @@ static SOCaddr* hts_ghbn(const t_dnscache *cache, const char *const iadr, SOCadd
   return NULL;
 }
 
-static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
-                                          SOCaddr *const addr, 
+#if HTS_INET6 != 0
+/* Active resolver backend; defaults to the libc resolver. The self-test
+   reroutes it to script DNS answers in-process (see
+   hts_dns_set_resolver_backend). */
+static const hts_resolver_backend hts_resolver_libc = {getaddrinfo,
+                                                       freeaddrinfo};
+static const hts_resolver_backend *hts_resolver = &hts_resolver_libc;
+
+void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
+  hts_resolver = (backend != NULL) ? backend : &hts_resolver_libc;
+}
+#endif
+
+static SOCaddr *hts_dns_resolve_nocache2_(const char *const hostname,
+                                          SOCaddr *const addr,
                                           const char **error) {
   {
 #if HTS_INET6==0
@@ -4845,7 +4858,7 @@ static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
       hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    if ( ( gerr = getaddrinfo(hostname, NULL, &hints, &res) ) == 0) {
+    if ((gerr = hts_resolver->getaddrinfo(hostname, NULL, &hints, &res)) == 0) {
       if (res != NULL) {
         if (res->ai_addr != NULL && res->ai_addrlen != 0) {
           SOCaddr_copyaddr2(*addr, res->ai_addr, res->ai_addrlen);
@@ -4857,7 +4870,7 @@ static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
       }
     }
     if (res) {
-      freeaddrinfo(res);
+      hts_resolver->freeaddrinfo(res);
     }
 #endif
   }

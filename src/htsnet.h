@@ -304,6 +304,22 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
 /** Length type for socket APIs (getsockname, accept, ...). */
 typedef socklen_t SOClen;
 
+#if HTS_INET6 != 0
+/** Resolver backend: getaddrinfo/freeaddrinfo as a swappable pair, so the
+    self-test can script DNS answers (families, multiplicity, errors)
+    in-process. The free function must match its getaddrinfo (a fake allocates
+    its own chain), hence the pair. */
+typedef struct hts_resolver_backend {
+  int (*getaddrinfo)(const char *node, const char *service,
+                     const struct addrinfo *hints, struct addrinfo **res);
+  void (*freeaddrinfo)(struct addrinfo *res);
+} hts_resolver_backend;
+
+/** Install a resolver backend for the process; NULL restores the libc default.
+    Test-only seam, not thread-safe; callers must serialize against resolves. */
+void hts_dns_set_resolver_backend(const hts_resolver_backend *backend);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
