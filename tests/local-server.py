@@ -15,6 +15,7 @@ stdlib only (http.server + ssl) -- no new build or runtime dependency.
 
 import argparse
 import os
+import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit
 
@@ -176,6 +177,43 @@ class Handler(SimpleHTTPRequestHandler):
         body, ctype = self.TYPE_MATRIX[path]
         self.send_raw(body, ctype)
 
+    # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
+    # can be interrupted (partial + temp-ref); every later request is 416.
+    RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
+    RESUME_LEN = len(RESUME_PREFIX) + 4096  # declared length never delivered
+    _resume_started = False
+
+    def route_resume_index(self):
+        self.send_html('\t<a href="blob.txt">blob</a>')
+
+    def route_resume(self):
+        counter = os.environ.get("RESUME_COUNTER")
+        if counter:
+            with open(counter, "a") as fp:
+                fp.write("x")
+        # First GET: stall mid-body so the crawl can be interrupted with a partial.
+        if not Handler._resume_started:
+            Handler._resume_started = True
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(self.RESUME_LEN))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.RESUME_PREFIX)
+                self.wfile.flush()
+                try:
+                    while True:
+                        time.sleep(3600)
+                except OSError:
+                    pass
+            return
+        self.send_response(416, "Requested Range Not Satisfiable")
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Range", "bytes */%d" % self.RESUME_LEN)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -195,6 +233,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/style.css": route_types,
         "/types/data.json": route_types,
         "/types/gen.php": route_types,
+        "/resume/index.html": route_resume_index,
+        "/resume/blob.txt": route_resume,
     }
 
     # --- dispatch ----------------------------------------------------------

@@ -3749,44 +3749,60 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
       }                         // bloc
       // erreur HTTP (ex: 404, not found)
-    } else if ((r->statuscode == HTTP_PRECONDITION_FAILED)
-               || (r->statuscode == HTTP_REQUESTED_RANGE_NOT_SATISFIABLE)
-      ) {                       // Precondition Failed, c'est à dire pour nous redemander TOUT le fichier
-      if (fexist_utf8(heap(ptr)->sav)) {
-        remove(heap(ptr)->sav);        // Eliminer
-      } else {
-        hts_log_print(opt, LOG_WARNING,
-                      "Unexpected 412/416 error (%s) for %s%s, '%s' could not be found on disk",
-                      r->msg, urladr(), urlfil(),
-                      heap(ptr)->sav != NULL ? heap(ptr)->sav : "");
+    } else if ((r->statuscode == HTTP_PRECONDITION_FAILED) ||
+               (r->statuscode == HTTP_REQUESTED_RANGE_NOT_SATISFIABLE)) {
+      // 412/416: the resume partial is stale; re-get the whole file (#206)
+      lien_back *itemback = NULL;
+      int had_partial = 0;
+      int ref_existed = 0;
+      int ref_gone;
+
+      // Drop the temp-ref, its partial, and heap->sav so the re-get carries no
+      // Range; else back_add rebuilds the same Range and loops.
+      if (back_unserialize_ref(opt, heap(ptr)->adr, heap(ptr)->fil,
+                               &itemback) == 0) {
+        had_partial = 1;
+        ref_existed = 1;
+        // best-effort: an orphaned partial cannot re-Range once the ref is gone
+        if (fexist_utf8(itemback->url_sav))
+          (void) UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              itemback->url_sav));
+        back_clear_entry(itemback);
+        freet(itemback);
       }
-      if (!fexist_utf8(heap(ptr)->sav)) {    // Bien éliminé? (sinon on boucle..)
-#if HDEBUG
-        printf("Partial content NOT up-to-date, reget all file for %s\n",
-               heap(ptr)->sav);
-#endif
+      // don't re-record if the ref survived (it would re-Range and loop)
+      ref_gone =
+          url_savename_refname_remove(opt, heap(ptr)->adr, heap(ptr)->fil) ||
+          !ref_existed;
+      if (fexist_utf8(heap(ptr)->sav)) {
+        had_partial = 1;
+        remove(heap(ptr)->sav);
+      }
+
+      // Re-get once, only if a partial existed and both Range triggers are
+      // gone; a failed removal gives up rather than looping. range_used is
+      // unreliable (it does not survive the delayed-type two-pass).
+      if (had_partial && ref_gone && !fexist_utf8(heap(ptr)->sav)) {
         hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
                       r->msg, urladr(), urlfil());
-        // enregistrer le MEME lien
         if (hts_record_link(opt, heap(ptr)->adr, heap(ptr)->fil, heap(ptr)->sav, "", "", NULL)) {
-          heap_top()->testmode = heap(ptr)->testmode;   // mode test?
-          heap_top()->link_import = 0;   // pas mode import
+          heap_top()->testmode = heap(ptr)->testmode;
+          heap_top()->link_import = 0;
           heap_top()->depth = heap(ptr)->depth;
           heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
           heap_top()->retry = heap(ptr)->retry;
           heap_top()->premier = heap(ptr)->premier;
           heap_top()->precedent = ptr;
-          //
-          // canceller lien actuel
           error = 1;
-          hts_invalidate_link(opt, ptr);  // invalidate hashtable entry
-          //
-        } else {              // oups erreur, plus de mémoire!!
-          XH_uninit;          // désallocation mémoire & buffers
+          hts_invalidate_link(opt, ptr); // invalidate hashtable entry
+        } else {                         // out of memory
+          XH_uninit;
           return 0;
         }
       } else {
-        hts_log_print(opt, LOG_ERROR, "Can not remove old file %s", urlfil());
+        hts_log_print(opt, LOG_WARNING,
+                      "Giving up on partial reget (%s) for %s%s", r->msg,
+                      urladr(), urlfil());
         error = 1;
       }
 

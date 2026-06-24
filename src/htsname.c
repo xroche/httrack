@@ -1729,10 +1729,10 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
     StringBuff(opt->path_log), digest_filename);
 }
 
-/* remove refname if any */
-void url_savename_refname_remove(httrackp * opt, const char *adr,
-                                 const char *fil) {
+/* remove refname if any; HTS_TRUE if it was removed */
+hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
+                                        const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
 
-  (void) UNLINK(filename);
+  return UNLINK(filename) == 0 ? HTS_TRUE : HTS_FALSE;
 }
