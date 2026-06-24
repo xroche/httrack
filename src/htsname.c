@@ -760,9 +760,9 @@ int url_savename(lien_adrfilsave *const afs,
         strcatbuff(fil, DEFAULT_HTML);  // nommer page par défaut (à priori ici html depuis un proxy http)
     }
   }
-  // Changer extension?
-  // par exemple, php3 sera sauvé en html, cgi en html ou gif, xbm etc.. selon les cas
-  if (ext_chg && !opt->no_type_change) {                // changer ext
+  // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
+  // depending on the resolved type.
+  if (ext_chg && !opt->no_type_change) {
     char *a = fil + strlen(fil) - 1;
 
     if ((opt->debug > 1) && (opt->log != NULL)) {
@@ -774,11 +774,19 @@ int url_savename(lien_adrfilsave *const afs,
                       adr_complete, fil_complete, ext);
     }
     if (ext_chg == 1) {
+      // Cut the old extension only when it is empty (a bare trailing dot), the
+      // new one, or a recognized one; an unknown trailing ".token" (e.g.
+      // /article-1.884291, #115) is part of the name, not an extension.
+      const char *const old_ext = get_ext(catbuff, sizeof(catbuff), fil);
+      const int known_ext = !*old_ext || strfield2(old_ext, ext) ||
+                            is_knowntype(opt, fil) || is_dyntype(old_ext) ||
+                            ishtml_ext(old_ext) != -1;
+
       while((a > fil) && (*a != '.') && (*a != '/'))
         a--;
-      if (*a == '.')
-        *a = '\0';              // couper
-      strcatbuff(fil, ".");     // recopier point
+      if (*a == '.' && known_ext)
+        *a = '\0';          // cut
+      strcatbuff(fil, "."); // re-add the dot
     } else {
       while((a > fil) && (*a != '/'))
         a--;
@@ -786,7 +794,7 @@ int url_savename(lien_adrfilsave *const afs,
         a++;
       *a = '\0';
     }
-    strcatbuff(fil, ext);       // copier ext/nom
+    strcatbuff(fil, ext); // append ext/name
   }
   // Rechercher premier / et dernier .
   {
