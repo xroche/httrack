@@ -177,6 +177,17 @@ class Handler(SimpleHTTPRequestHandler):
         body, ctype = self.TYPE_MATRIX[path]
         self.send_raw(body, ctype)
 
+    # --- special chars in URLs across an update (issue #157) ---------------
+    # A dotless, accented basename served as text/html (MediaWiki style). The
+    # name the first crawl picks (.html) must survive the update pass.
+    INTL_NAME = "Instalação_CVS_no_Ubuntu"
+
+    def route_intl_index(self):
+        self.send_html('\t<a href="%s">accented</a>\n' % self.INTL_NAME)
+
+    def route_intl_page(self):
+        self.send_raw(b"<html><body>accented page</body></html>\n", "text/html")
+
     # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
     # can be interrupted (partial + temp-ref); every later request is 416.
     RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
@@ -233,6 +244,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/style.css": route_types,
         "/types/data.json": route_types,
         "/types/gen.php": route_types,
+        "/intl/index.html": route_intl_index,
+        "/intl/" + INTL_NAME: route_intl_page,
         "/resume/index.html": route_resume_index,
         "/resume/blob.txt": route_resume,
     }
@@ -242,7 +255,8 @@ class Handler(SimpleHTTPRequestHandler):
     def dispatch(self):
         self._set_cookies = []
         path = urlsplit(self.path).path
-        handler = self.ROUTES.get(path)
+        # Match percent-encoded paths (accented #157 route) by their decoded form.
+        handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
         if handler is not None:
             handler(self)
             return True

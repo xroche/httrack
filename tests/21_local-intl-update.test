@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# #157: a dotless, accented URL named .html on the first crawl must keep .html
+# across an update -- not revert to the extensionless name.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
+    --found 'intl/Instalação_CVS_no_Ubuntu.html' \
+    --not-found 'intl/Instalação_CVS_no_Ubuntu' \
+    httrack 'BASEURL/intl/index.html'

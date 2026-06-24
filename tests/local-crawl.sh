@@ -196,6 +196,15 @@ if test -n "$rerun"; then
         exit 1
     }
     result "OK (update)"
+    # The update summary reports "files updated"; a fresh crawl never does. Assert
+    # it so a regression that bypasses the cache (re-crawls fresh) can't pass.
+    info "checking update used the cache"
+    if grep -aqE "mirror complete in .*files updated" "${out}/hts-log.txt"; then
+        result "OK"
+    else
+        result "update pass did not report cache activity"
+        exit 1
+    fi
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
