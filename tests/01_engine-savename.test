@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Local save-name extension resolution (url_savename via -#N <fil> <content-type>).
+# Asserts on the basename of "savename: <path>".
+
+name() {
+    out="$(httrack -O /dev/null -#N "$1" "$2" | sed -n 's/^savename: //p')"
+    test "${out##*/}" == "$3" || {
+        echo "FAIL: '$1' '$2' -> '$out' (want '$3')"
+        exit 1
+    }
+}
+
+# #115: an unknown trailing ".token" is part of the name, keep it and append the type.
+name '/article-1.884291' 'text/html' 'article-1.884291.html'
+name '/news/story-12345.987654' 'text/html' 'story-12345.987654.html'
+
+# Recognized extensions still collapse to the resolved type.
+name '/page.php' 'text/html' 'page.html'
+name '/page.asp' 'text/html' 'page.html'
+name '/foo' 'text/html' 'foo.html'
+
+# A bare trailing dot is not a tail to keep.
+name '/page.' 'text/html' 'page.html'
+
+# Soft-404 (#267/#408): a binary URL served as HTML is named .html.
+name '/x.pdf' 'text/html' 'x.html'
+name '/x.gif' 'text/html' 'x.html'
+
+# Type agrees with the extension: keep it, no churn, no double extension.
+name '/x.pdf' 'application/pdf' 'x.pdf'
+name '/x.jpg' 'image/jpeg' 'x.jpg'
+name '/x.html' 'text/html' 'x.html'
+name '/x.js' 'application/x-javascript' 'x.js'
+name '/types/data.json' 'application/json' 'data.json'
+
+# Agreeing type must not rewrite the extension's casing (no strip-and-reappend).
+name '/x.JPG' 'image/jpeg' 'x.JPG'

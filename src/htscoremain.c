@@ -2468,6 +2468,44 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return err;
               } break;
+              case 'N': { // url_savename name resolution: httrack -#N <fil>
+                          // <content-type>
+                if (na + 2 < argc) {
+                  lien_adrfilsave afs;
+                  cache_back cache;
+                  struct_back *sback;
+                  hash_struct hash;
+                  lien_back headers;
+
+                  memset(&afs, 0, sizeof(afs));
+                  strcpybuff(afs.af.adr, "www.example.com");
+                  strcpybuff(afs.af.fil, argv[na + 1]);
+
+                  memset(&cache, 0, sizeof(cache));
+                  cache.hashtable = (void *) coucal_new(0);
+
+                  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+                  hash_init(opt, &hash, opt->urlhack);
+
+                  memset(&headers, 0, sizeof(headers));
+                  headers.status = 0;
+                  headers.r.statuscode = HTTP_OK;
+                  strcpybuff(headers.r.contenttype, argv[na + 2]);
+                  strcpybuff(headers.url_fil, argv[na + 1]);
+
+                  url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache,
+                               &hash, 0, 0, &headers);
+                  printf("savename: %s\n", afs.save);
+                  htsmain_free();
+                  return 0;
+                } else {
+                  fprintf(
+                      stderr,
+                      "Option #N requires <fil> <content-type> arguments\n");
+                  htsmain_free();
+                  return 1;
+                }
+              } break;
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
                 {
                   int hasFilter = 0;
