@@ -353,6 +353,14 @@ static void basic_selftests(void) {
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
                                "noextfile", 1) == 1);
     assertf(strcmp(r.contenttype, "application/octet-stream") == 0);
+    // empty fil: no extension to scan; must not over-read before the string.
+    // flag==0 -> 0 (nothing written), flag==1 -> octet-stream.
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype), "",
+                               0) == 0);
+    assertf(r.contenttype[0] == '\0');
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype), "",
+                               1) == 1);
+    assertf(strcmp(r.contenttype, "application/octet-stream") == 0);
     // a user --assume rule with an empty value matches but writes nothing:
     // get_userhttptype returns 1 with the buffer empty, so get_httptype_sized
     // must still report 0 (callers test the return like the old

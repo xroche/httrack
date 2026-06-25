@@ -1,0 +1,17 @@
+#!/bin/bash
+# Issues #32/#41: a Content-Length that disagrees with the body warns "bogus
+# state (broken size)" and skips the cache; -%B (tolerant) accepts it.
+
+: "${top_srcdir:=..}"
+
+# Default: warn, but the file is still written.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'size/oversize.bin' \
+    --log-found 'bogus state \(broken size' \
+    httrack 'BASEURL/size/index.html'
+
+# -%B (tolerant): no warning, file written.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'size/oversize.bin' \
+    --log-not-found 'bogus state' \
+    httrack 'BASEURL/size/index.html' '-%B'
