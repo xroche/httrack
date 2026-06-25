@@ -225,6 +225,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # error pages / 0-byte files (#17): -o0 ("no error pages") must keep 4xx/5xx
+    # bodies off disk; a genuine 0-byte 200 is a valid file and stays.
+    def route_errpage_index(self):
+        self.send_html(
+            '\t<a href="good.html">good</a>\n'
+            '\t<a href="missing.html">missing</a>\n'
+            '\t<a href="empty.html">empty</a>\n'
+        )
+
+    def route_errpage_good(self):
+        self.send_raw(b"<html><body>good page</body></html>\n", "text/html")
+
+    def route_errpage_missing(self):
+        self.send_html("\t404 error body", status=404, extra_status="Not Found")
+
+    def route_errpage_empty(self):
+        self.send_raw(b"", "text/html")
+
     # broken Content-Length (#32/#41): declared size != bytes sent. httrack
     # warns "bogus state (broken size)" and skips the cache unless -%B.
     def route_size_index(self):
@@ -265,6 +283,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/resume/blob.txt": route_resume,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
+        "/errpage/index.html": route_errpage_index,
+        "/errpage/good.html": route_errpage_good,
+        "/errpage/missing.html": route_errpage_missing,
+        "/errpage/empty.html": route_errpage_empty,
     }
 
     # --- dispatch ----------------------------------------------------------
