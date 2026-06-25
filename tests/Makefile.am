@@ -62,6 +62,7 @@ TESTS = \
 	19_local-connect-fallback.test \
 	20_local-resume-loop.test \
 	21_local-intl-update.test \
-	22_local-broken-size.test
+	22_local-broken-size.test \
+	23_local-errpage.test
 
 CLEANFILES = check-network_sh.cache

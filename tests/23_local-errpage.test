@@ -1,0 +1,19 @@
+#!/bin/bash
+# Issue #17: with "no error pages" (-o0), 4xx/5xx bodies must not be written;
+# a genuine 0-byte 200 stays. Default (-o1) writes the error page. (#17's purge
+# half also does not reproduce; the purge path is not exercised here.)
+set -e
+
+: "${top_srcdir:=..}"
+
+# -o0: 404 suppressed, good page and the legit 0-byte 200 kept.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --found 'errpage/good.html' \
+    --found 'errpage/empty.html' \
+    --not-found 'errpage/missing.html' \
+    httrack 'BASEURL/errpage/index.html' '-o0'
+
+# Control -o1 (default): the 404 error page is written.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --found 'errpage/missing.html' \
+    httrack 'BASEURL/errpage/index.html' '-o1'
