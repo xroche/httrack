@@ -4177,9 +4177,10 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     /* Check html -> text/html */
     const char *a = fil + strlen(fil) - 1;
 
-    while((*a != '.') && (*a != '/') && (a > fil))
+    /* a < fil when fil is empty: bound before dereferencing */
+    while ((a > fil) && (*a != '.') && (*a != '/'))
       a--;
-    if (*a == '.' && strlen(a) < 32) {
+    if (a >= fil && *a == '.' && strlen(a) < 32) {
       int j = 0;
 
       a++;
