@@ -14,7 +14,9 @@
 # Usage:
 #   bash local-crawl.sh [--tls] [--root DIR] \
 #       --errors N --files N --found PATH ... --directory PATH ... \
+#       --log-found REGEX ... --log-not-found REGEX ... \
 #       httrack BASEURL/some/path [httrack-args...]
+# --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
 
 set -u
 
@@ -107,7 +109,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory)
+    --found | --not-found | --directory | --log-found | --log-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -256,6 +258,22 @@ while test "$i" -lt "${#audit[@]}"; do
             result "not found"
             exit 1
         fi
+        ;;
+    --log-found)
+        i=$((i + 1))
+        info "checking log matches ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "${out}/hts-log.txt"; then result "OK"; else
+            result "not in log"
+            exit 1
+        fi
+        ;;
+    --log-not-found)
+        i=$((i + 1))
+        info "checking log lacks ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "${out}/hts-log.txt"; then
+            result "present in log"
+            exit 1
+        else result "OK"; fi
         ;;
     esac
     i=$((i + 1))

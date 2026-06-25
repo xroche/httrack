@@ -225,6 +225,21 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # broken Content-Length (#32/#41): declared size != bytes sent. httrack
+    # warns "bogus state (broken size)" and skips the cache unless -%B.
+    def route_size_index(self):
+        self.send_html('\t<a href="oversize.bin">over</a>\n')
+
+    def route_size_oversize(self):
+        body = b"A" * 100
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body) - 2))  # lie: too short
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -248,6 +263,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/intl/" + INTL_NAME: route_intl_page,
         "/resume/index.html": route_resume_index,
         "/resume/blob.txt": route_resume,
+        "/size/index.html": route_size_index,
+        "/size/oversize.bin": route_size_oversize,
     }
 
     # --- dispatch ----------------------------------------------------------
