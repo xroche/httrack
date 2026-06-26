@@ -57,7 +57,10 @@ Please visit our Website: http://www.httrack.com
 // DOS
 #include <process.h>            /* _beginthread, _endthread */
 #endif
+#include <io.h> /* _chsize_s */
+#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
 #else
+#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
 #endif
 
 #define VT_CLREOL       "\33[K"
@@ -3774,26 +3777,44 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // xxc SI CHUNK VERIFIER QUE CA MARCHE??
                     if (back[i].r.statuscode == 206) {  // on nous envoie un morceau (la fin) coz une partie sur disque!
                       off_t sz = fsize_utf8(back[i].url_sav);
+                      /* RFC 7233: resume at the server's Content-Range start,
+                         not the offset we requested; a server may resume
+                         earlier and appending the overlap duplicates bytes
+                         (#198). */
+                      const LLint resume = back[i].r.crange_start;
+                      const hts_boolean range_ok =
+                          back[i].r.crange > 0 && resume >= 0 &&
+                          resume <= (LLint) sz &&
+                          back[i].r.crange_end + 1 == back[i].r.crange &&
+                          (back[i].r.totalsize < 0 ||
+                           back[i].r.totalsize ==
+                               back[i].r.crange_end - resume + 1);
 
 #if HDEBUG
                       printf("partial content: " LLintP " on disk..\n",
                              (LLint) sz);
 #endif
-                      if (sz >= 0) {
+                      if (sz >= 0 && range_ok) {
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_sav)) {  // pas HTML
                           if (opt->getmode & HTS_GETMODE_NONHTML) {
                             filenote(&opt->state.strc, back[i].url_sav, NULL);  // noter fichier comme connu
                             file_notify(opt, back[i].url_adr, back[i].url_fil,
                                         back[i].url_sav, 0, 1,
                                         back[i].r.notmodified);
-                            back[i].r.out = FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav), "ab");       // append
+                            back[i].r.out =
+                                FOPEN(fconv(catbuff, sizeof(catbuff),
+                                            back[i].url_sav),
+                                      "r+b"); // resume in place
                             if (back[i].r.out && opt->cache != 0) {
-                              back[i].r.is_write = 1;   // écrire
-                              back[i].r.size = sz;      // déja écrit
-                              back[i].r.statuscode = HTTP_OK;   // Forcer 'OK'
+                              back[i].r.is_write = 1;
+                              back[i].r.size = resume; // bytes already on disk
+                              back[i].r.statuscode = HTTP_OK; // force 'OK'
                               if (back[i].r.totalsize >= 0)
-                                back[i].r.totalsize += sz;      // plus en fait
-                              fseek(back[i].r.out, 0, SEEK_END);        // à la fin
+                                back[i].r.totalsize += resume; // -> full size
+                              HTS_FTRUNCATE(back[i].r.out,
+                                            (off_t) resume); // drop bytes past
+                                                             // the resume point
+                              fseeko(back[i].r.out, (off_t) resume, SEEK_SET);
                               /* create a temporary reference file in case of broken mirror */
                               if (back_serialize_ref(opt, &back[i]) != 0) {
                                 hts_log_print(opt, LOG_WARNING,
@@ -3814,17 +3835,18 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           FILE *fp =
                             FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav), "rb");
                           if (fp) {
-                            LLint alloc_mem = sz + 1;
+                            LLint alloc_mem = resume + 1;
 
                             if (back[i].r.totalsize >= 0)
                               alloc_mem += back[i].r.totalsize; // AJOUTER RESTANT!
                             if (deleteaddr(&back[i].r)
                                 && (back[i].r.adr =
                                     (char *) malloct((size_t) alloc_mem))) {
-                              back[i].r.size = sz;
+                              back[i].r.size = resume;
                               if (back[i].r.totalsize >= 0)
-                                back[i].r.totalsize += sz;      // plus en fait
-                              if ((fread(back[i].r.adr, 1, sz, fp)) != sz) {
+                                back[i].r.totalsize += resume; // -> full size
+                              if ((fread(back[i].r.adr, 1, (size_t) resume,
+                                         fp)) != (size_t) resume) {
                                 back[i].status = STATUS_READY;  // terminé (voir plus loin)
                                 back_set_finished(sback, i);
                                 strcpybuff(back[i].r.msg,
@@ -3842,14 +3864,30 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                          "No memory for partial file");
                             }
                             fclose(fp);
-                          } else {      // Argh.. 
+                          } else {                              // open failed
                             back[i].status = STATUS_READY;      // terminé (voir plus loin)
                             back_set_finished(sback, i);
                             strcpybuff(back[i].r.msg,
                                        "Can not open partial file");
                           }
                         }
-                      } else {  // Non trouvé??
+                      } else if (sz >=
+                                 0) { // unusable range -> restart whole file
+                        hts_log_print(opt, LOG_WARNING,
+                                      "Unusable partial-content range for %s%s "
+                                      "(have " LLintP " bytes, got " LLintP
+                                      "-" LLintP "/" LLintP "), restarting",
+                                      back[i].url_adr, back[i].url_fil,
+                                      (LLint) sz, back[i].r.crange_start,
+                                      back[i].r.crange_end, back[i].r.crange);
+                        url_savename_refname_remove(opt, back[i].url_adr,
+                                                    back[i].url_fil);
+                        UNLINK(back[i].url_sav);
+                        back[i].status = STATUS_READY;
+                        back_set_finished(sback, i);
+                        strcpybuff(back[i].r.msg,
+                                   "Unusable partial content, restarting");
+                      } else {                          // partial not found
                         back[i].status = STATUS_READY;  // terminé (voir plus loin)
                         back_set_finished(sback, i);
                         strcpybuff(back[i].r.msg, "Can not find partial file");
