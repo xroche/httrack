@@ -188,6 +188,51 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # MemorySanitizer catches reads of uninitialized memory (#143's stack-garbage
+  # size filter) that ASan/UBSan miss. It flags any byte an uninstrumented lib
+  # wrote, so the job stays in our own code: offline self-tests only, no openssl
+  # (--disable-https), no zlib cache tests, static (the runtime is not in .so's).
+  msan:
+    name: msan (MemorySanitizer, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev
+
+      - name: Configure (MSan, static, no https)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=clang \
+            CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=memory" \
+            --disable-https --disable-shared --enable-static
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test (offline self-tests under MSan)
+        env:
+          MSAN_OPTIONS: abort_on_error=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          # Engine self-tests only; the cache trio pulls in uninstrumented zlib.
+          tests="$(cd tests && ls 01_engine-*.test | grep -v -- '-cache' | tr '\n' ' ')"
+          make check TESTS="$tests"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even
   # installed here so configure cannot silently re-enable it. The matrix above
