@@ -524,6 +524,30 @@ static int st_filter(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Size-aware filter verdict via fa_strjoker: a negative <size> means the size
+   is still unknown (scan time), so a size rule like -*.jpg*[<10] must stay
+   neutral. */
+static int st_filtersize(httrackp *opt, int argc, char **argv) {
+  LLint sz;
+  int size_flag = 0, verdict, known;
+
+  (void) opt;
+  if (argc < 3) {
+    fprintf(stderr, "filtersize: needs <size> <string> <filter> [filter...]\n");
+    return 1;
+  }
+  known = (argv[0][0] != '-'); /* "-1"/"-" => size unknown */
+  sz = known ? (LLint) strtoll(argv[0], NULL, 10) : -1;
+  verdict = fa_strjoker(0, &argv[2], argc - 2, argv[1], known ? &sz : NULL,
+                        known ? &size_flag : NULL, NULL);
+  printf("verdict=%s size_flag=%d\n",
+         verdict > 0   ? "allowed"
+         : verdict < 0 ? "forbidden"
+                       : "unknown",
+         size_flag);
+  return 0;
+}
+
 static int st_simplify(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -1038,6 +1062,9 @@ static const struct selftest_entry {
 } selftests[] = {
     {"filter", "<pattern> <string>", "match a string against a wildcard filter",
      st_filter},
+    {"filtersize", "<size> <string> <filter>...",
+     "size-aware filter verdict (negative size = unknown/scan time)",
+     st_filtersize},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <string>",
