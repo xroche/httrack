@@ -146,7 +146,8 @@ typedef enum BackStatusCode {
   STATUSCODE_NON_FATAL = -5,
   STATUSCODE_SSL_HANDSHAKE = -6,
   STATUSCODE_TOO_BIG = -7,
-  STATUSCODE_TEST_OK = -10
+  STATUSCODE_TEST_OK = -10,
+  STATUSCODE_EXCLUDED = -11 /* aborted: MIME excluded by a -mime: filter */
 } BackStatusCode;
 
 /** HTTrack status ('status' member of of 'lien_back') **/

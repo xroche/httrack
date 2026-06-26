@@ -3766,7 +3766,27 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     }
 #endif
 /********** **************************** ********** */
-                  } else {      // il faut aller le chercher
+                  }
+                  // MIME type excluded by a -mime: filter: abort, don't fetch
+                  // the body (#58)
+                  else if (HTTP_IS_OK(back[i].r.statuscode) &&
+                           !back[i].testmode &&
+                           strnotempty(back[i].r.contenttype) &&
+                           hts_acceptmime(opt, 0, back[i].url_adr,
+                                          back[i].url_fil,
+                                          back[i].r.contenttype) == 1) {
+                    deletehttp(&back[i].r);
+                    back[i].r.soc = INVALID_SOCKET;
+                    back[i].status = STATUS_READY;
+                    back_set_finished(sback, i);
+                    back[i].r.statuscode = STATUSCODE_EXCLUDED;
+                    strcpybuff(back[i].r.msg, "Excluded by MIME type filter");
+                    hts_log_print(
+                        opt, LOG_NOTICE,
+                        "File excluded by MIME type filter (%s): %s%s",
+                        back[i].r.contenttype, back[i].url_adr,
+                        back[i].url_fil);
+                  } else { // il faut aller le chercher
 
                     // effacer buffer (requète)
                     if (!noFreebuff) {
@@ -3985,7 +4005,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       }
                     }
-
                   }
 
                   /*} */
