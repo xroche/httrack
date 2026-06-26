@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
+# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
+# tool flags despite the #!/bin/bash above.
+
+# Cache write-failure handling (httrack -#W <dir>). #174/#219.
+# A failing new.zip write (disk full) used to crash the process via assertf; it
+# must instead stop the mirror with a fatal error (exit_xh=-1), no crash. The
+# self-test asserts that; reverting the fix makes -#W abort (SIGABRT) and fail.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+out=$(httrack -#W "$dir")
+
+# Match the exact success line (error logs also go to stdout); a bad -#W falls
+# through to the usage screen, which exits non-zero but never prints this.
+printf '%s\n' "$out" | grep -qx "cache-writefail: OK" || {
+    echo "expected 'cache-writefail: OK', got: $out" >&2
+    exit 1
+}

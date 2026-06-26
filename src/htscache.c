@@ -220,6 +220,25 @@ struct cache_back_zip_entry {
 	} \
 } while(0)
 
+/* A cache (new.zip) write failed: storage is gone (disk full / dropped share),
+   so the mirror is doomed too. Abort it via exit_xh, don't crash as assertf
+   did. */
+static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
+                                   const char *what, int zErr) {
+  if (!cache->zipWriteFailed) {
+    cache->zipWriteFailed = HTS_TRUE;
+    if (check_fatal_io_errno()) {
+      hts_log_print(opt, LOG_ERROR,
+                    "Mirror aborted: disk full or filesystem problems");
+    } else {
+      hts_log_print(opt, LOG_ERROR,
+                    "Mirror aborted: cache write failed (%s): %s", what,
+                    hts_get_zerror(zErr));
+    }
+  }
+  opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
+}
+
 /* Ajout d'un fichier en cache */
 void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                const char *url_adr, const char *url_fil, const char *url_save,
@@ -235,6 +254,10 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   zip_fileinfo fi;
   const char *url_save_suffix = url_save;
   int zErr;
+
+  /* already failed and aborting; don't touch the broken stream again */
+  if (cache->zipWriteFailed)
+    return;
 
   // robots.txt hack
   if (url_save == NULL) {
@@ -346,9 +369,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                                    */
                                   headers, (uInt) strlen(headers), NULL, 0, NULL,       /* comment */
                                   Z_DEFLATED, Z_DEFAULT_COMPRESSION)) != Z_OK) {
-    int zip_zipOpenNewFileInZip_failed = 0;
-
-    assertf(zip_zipOpenNewFileInZip_failed);
+    cache_zip_write_failed(opt, cache, "opening a cache entry", zErr);
+    return;
   }
 
   /* Write data in cache */
@@ -358,9 +380,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
         if ((zErr =
              zipWriteInFileInZip((zipFile) cache->zipOutput, r->adr,
                                  (int) r->size)) != Z_OK) {
-          int zip_zipWriteInFileInZip_failed = 0;
-
-          assertf(zip_zipWriteInFileInZip_failed);
+          cache_zip_write_failed(opt, cache, "writing to the cache", zErr);
+          return;
         }
       }
     } else {
@@ -381,9 +402,10 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
               if ((zErr =
                    zipWriteInFileInZip((zipFile) cache->zipOutput, buff,
                                        (int) nl)) != Z_OK) {
-                int zip_zipWriteInFileInZip_failed = 0;
-
-                assertf(zip_zipWriteInFileInZip_failed);
+                cache_zip_write_failed(opt, cache, "writing to the cache",
+                                       zErr);
+                fclose(fp);
+                return;
               }
             }
           } while(nl > 0);
@@ -397,16 +419,14 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
 
   /* Close */
   if ((zErr = zipCloseFileInZip((zipFile) cache->zipOutput)) != Z_OK) {
-    int zip_zipCloseFileInZip_failed = 0;
-
-    assertf(zip_zipCloseFileInZip_failed);
+    cache_zip_write_failed(opt, cache, "closing a cache entry", zErr);
+    return;
   }
 
   /* Flush */
   if ((zErr = zipFlush((zipFile) cache->zipOutput)) != 0) {
-    int zip_zipFlush_failed = 0;
-
-    assertf(zip_zipFlush_failed);
+    cache_zip_write_failed(opt, cache, "flushing the cache", zErr);
+    return;
   }
 }
 

@@ -26,6 +26,7 @@ TESTS = \
 	00_runnable.test \
 	01_engine-cache.test \
 	01_engine-cache-golden.test \
+	01_engine-cache-writefail.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
 	01_engine-cookies.test \

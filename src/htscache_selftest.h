@@ -52,6 +52,10 @@ int cache_selftests(httrackp *opt, const char *dir);
    committed file, never by the test). Returns the failed-check count. */
 int cache_golden_selftest(httrackp *opt, const char *dir, int regen);
 
+/* #174/#219: assert a failing cache write aborts the mirror cleanly instead of
+   crashing. Returns the failed-check count. */
+int cache_write_failure_selftest(httrackp *opt, const char *dir);
+
 #endif
 
 #endif

@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htszlib.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -313,6 +314,136 @@ static int disk_fallback_selftest(httrackp *opt) {
   }
   freet(locbuf);
   selftest_close(&cache);
+  return fail;
+}
+
+typedef struct {
+  size_t budget;  /**< bytes allowed through before writes start failing */
+  int fail_errno; /**< errno set on the failing write (ENOSPC, EIO, ...) */
+  int writes;     /**< zwrite call count, to detect re-entry into the stream */
+} writefail_inject;
+
+/* zwrite that copies until the budget runs out, then fails with inj->fail_errno
+   (the #174/#219 condition). Counts calls so the test can prove a flagged cache
+   never re-enters the stream. */
+static uLong selftest_failing_zwrite(voidpf opaque, voidpf stream,
+                                     const void *buf, uLong size) {
+  writefail_inject *inj = (writefail_inject *) opaque;
+
+  inj->writes++;
+  if (inj->budget >= (size_t) size) {
+    inj->budget -= (size_t) size;
+    return (uLong) fwrite(buf, 1, (size_t) size, (FILE *) stream);
+  }
+  errno = inj->fail_errno;
+  return 0; /* short write -> the minizip op returns an error */
+}
+
+/* Open a ZIP whose writes fail past inj->budget, so cache_add() hits an error.
+ */
+static zipFile selftest_open_failing_zip(const char *path,
+                                         writefail_inject *inj) {
+  zlib_filefunc_def ff;
+
+  fill_fopen_filefunc(&ff); /* real fopen/read/seek/close; ignores opaque */
+  ff.zwrite_file = selftest_failing_zwrite;
+  ff.opaque = inj;
+  return zipOpen2(path, APPEND_STATUS_CREATE, NULL, &ff);
+}
+
+/* Store one octet-stream body into `cache` (all-in-cache, body in the ZIP). */
+static void writefail_store(httrackp *opt, cache_back *cache, const char *fil,
+                            const char *body, size_t body_len) {
+  htsblk r;
+  char locbuf[4];
+  char *bodycopy = malloct(body_len);
+
+  hts_init_htsblk(&r);
+  r.statuscode = 200;
+  r.size = (LLint) body_len;
+  strcpybuff(r.msg, "OK");
+  strcpybuff(r.contenttype, "application/octet-stream");
+  locbuf[0] = '\0';
+  r.location = locbuf;
+  r.is_write = 0;
+  memcpy(bodycopy, body, body_len);
+  r.adr = bodycopy;
+  cache_add(opt, cache, &r, "example.com", fil, "example.com/blob.bin", 1,
+            NULL);
+  freet(bodycopy);
+}
+
+/* #174/#219: a failing cache write used to crash via assertf(); it must instead
+   stop the mirror (exit_xh = -1) without crashing. Assert that, plus the cache
+   is flagged and a sibling write doesn't re-enter the broken stream. */
+int cache_write_failure_selftest(httrackp *opt, const char *dir) {
+  int fail = 0;
+  char path[HTS_URLMAXSIZE];
+  /* incompressible + big, so deflate flushes (and fails) mid-write, before
+   * close */
+  static const size_t body_len = 256 * 1024;
+  char *body = malloct(body_len);
+  int phase;
+
+  gen_body(body, body_len, 1 /* incompressible */);
+  fconcat(path, sizeof(path), dir, "/wfail.zip");
+
+  /* phase 0: fail on the body write, fatal errno (ENOSPC, the disk-full
+     branch). phase 1: fail on the open, non-fatal errno (EIO, dropped-share
+     branch). Both must abort the mirror. */
+  for (phase = 0; phase < 2; phase++) {
+    cache_back cache;
+    writefail_inject inj;
+    int writes_after_fail;
+
+    inj.budget = (phase == 0) ? 4096 : 0;
+    inj.fail_errno = (phase == 0) ? ENOSPC : EIO;
+    inj.writes = 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    if (cache.zipOutput == NULL) {
+      fprintf(stderr, "cache-writefail: could not open injected ZIP\n");
+      fail++;
+      continue;
+    }
+
+    opt->state.exit_xh = 0; /* clear; the failing write must set it to -1 */
+    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    if (!cache.zipWriteFailed) {
+      fprintf(stderr, "cache-writefail: phase %d: write error not caught\n",
+              phase);
+      fail++;
+    }
+    if (opt->state.exit_xh != -1) {
+      fprintf(stderr,
+              "cache-writefail: phase %d: mirror not aborted (exit_xh=%d)\n",
+              phase, opt->state.exit_xh);
+      fail++;
+    }
+
+    /* a flagged cache must no-op a sibling write: no further backend write */
+    writes_after_fail = inj.writes;
+    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    if (inj.writes != writes_after_fail) {
+      fprintf(stderr,
+              "cache-writefail: phase %d: sibling write re-entered the broken "
+              "stream (%d extra backend writes)\n",
+              phase, inj.writes - writes_after_fail);
+      fail++;
+    }
+
+    if (cache.zipOutput != NULL) {
+      zipClose(cache.zipOutput,
+               NULL); /* best-effort; may fail on the backend */
+      cache.zipOutput = NULL;
+    }
+  }
+
+  freet(body);
   return fail;
 }
 

@@ -2453,6 +2453,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 1;
                 }
                 break;
+              case 'W': // cache write-failure handling: httrack -#W <dir>
+                if (na + 1 < argc) {
+                  const int err =
+                      cache_write_failure_selftest(opt, argv[na + 1]);
+
+                  printf("cache-writefail: %s\n", err ? "FAIL" : "OK");
+                  htsmain_free();
+                  return err;
+                } else {
+                  fprintf(stderr, "Option #W requires a directory argument\n");
+                  htsmain_free();
+                  return 1;
+                }
+                break;
               case 'B': // golden cache fixture read: httrack -#B <dir> [regen]
                 if (na + 1 < argc) {
                   const int regen =
