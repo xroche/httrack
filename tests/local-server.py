@@ -273,6 +273,12 @@ class Handler(SimpleHTTPRequestHandler):
             int(rng[len("bytes=") :].split("-")[0]) if rng.startswith("bytes=") else 0
         )
         start = max(0, start - self.OVERLAP_EARLY)
+        # Signal that the resume Range -> 206 path actually fired, so the test
+        # can prove it was exercised (not a silent full re-download).
+        resumed = os.environ.get("OVERLAP_RESUMED")
+        if resumed:
+            with open(resumed, "a") as fp:
+                fp.write("x")
         part = blob[start:]
         self.send_response(206, "Partial Content")
         self.send_header("Content-Type", "application/octet-stream")

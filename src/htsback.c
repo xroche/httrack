@@ -3811,19 +3811,36 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               back[i].r.statuscode = HTTP_OK; // force 'OK'
                               if (back[i].r.totalsize >= 0)
                                 back[i].r.totalsize += resume; // -> full size
-                              HTS_FTRUNCATE(back[i].r.out,
-                                            (off_t) resume); // drop bytes past
-                                                             // the resume point
-                              fseeko(back[i].r.out, (off_t) resume, SEEK_SET);
-                              /* create a temporary reference file in case of broken mirror */
-                              if (back_serialize_ref(opt, &back[i]) != 0) {
-                                hts_log_print(opt, LOG_WARNING,
-                                              "Could not create temporary reference file for %s%s",
-                                              back[i].url_adr, back[i].url_fil);
-                              }
+                              // drop bytes past the resume point; a silent
+                              // failure could leave a stale tail, so on error
+                              // drop the partial and refetch the whole file
+                              if (HTS_FTRUNCATE(back[i].r.out,
+                                                (off_t) resume) != 0) {
+                                fclose(back[i].r.out);
+                                back[i].r.out = NULL;
+                                url_savename_refname_remove(
+                                    opt, back[i].url_adr, back[i].url_fil);
+                                UNLINK(back[i].url_sav);
+                                back[i].status = STATUS_READY;
+                                back_set_finished(sback, i);
+                                strcpybuff(back[i].r.msg,
+                                           "Can not truncate partial file, "
+                                           "restarting");
+                              } else {
+                                fseeko(back[i].r.out, (off_t) resume, SEEK_SET);
+                                /* create a temporary reference file in case of
+                                 * broken mirror */
+                                if (back_serialize_ref(opt, &back[i]) != 0) {
+                                  hts_log_print(opt, LOG_WARNING,
+                                                "Could not create temporary "
+                                                "reference file for %s%s",
+                                                back[i].url_adr,
+                                                back[i].url_fil);
+                                }
 #if HDEBUG
-                              printf("continue interrupted file\n");
+                                printf("continue interrupted file\n");
 #endif
+                              }
                             } else {    // On est dans la m**
                               back[i].status = STATUS_READY;    // terminé (voir plus loin)
                               back_set_finished(sback, i);
