@@ -42,6 +42,7 @@ TESTS = \
 	01_engine-rcfile.test \
 	01_engine-relative.test \
 	01_engine-savename.test \
+	01_engine-selftest-dispatch.test \
 	01_engine-simplify.test \
 	01_engine-strsafe.test \
 	02_manpage-regen.test \

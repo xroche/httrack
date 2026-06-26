@@ -4,7 +4,7 @@
 # POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
 # tool flags despite the #!/bin/bash above.
 
-# Cache create/read/update logic (driven by 'httrack -#A <dir>').
+# Cache create/read/update logic (driven by 'httrack -#test=cache <dir>').
 #
 # The in-process self-test stores several hand-crafted edge entries (normal
 # HTML, an empty redirect with a near-limit location, a non-HTML body kept via
@@ -20,13 +20,13 @@ set -eu
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-# Like the other -# debug modes, a trailing token (the working directory) is
-# required; a bare '-#A' falls through to the usage screen.
-out=$(httrack -#A "$dir")
+# The working directory is a required argument; without it the test prints a
+# usage line to stderr and returns non-zero.
+out=$(httrack -#test=cache "$dir")
 
 # Match the exact success line, so the test cannot pass for an unrelated reason
-# (e.g. the -#A mode being gone and falling through to the usage screen, which
-# also exits non-zero but never prints this).
+# (e.g. the cache test being gone, which prints the registry to stderr but
+# never prints this line).
 test "$out" = "cache-selftest: OK" || {
     echo "expected 'cache-selftest: OK', got: $out" >&2
     exit 1

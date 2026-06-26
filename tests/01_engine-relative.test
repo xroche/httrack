@@ -8,7 +8,7 @@ set -euo pipefail
 # relative path from <curr>'s directory to <link>
 rel() {
     local got
-    got=$(httrack -O /dev/null -#l "$1" "$2")
+    got=$(httrack -O /dev/null -#test=relative "$1" "$2")
     test "$got" == "relative=$3" ||
         {
             echo "FAIL rel($1, $2): got '$got' want 'relative=$3'"
@@ -19,7 +19,7 @@ rel() {
 # resolve <link> against origin <adr>/<fil> -> adr=.. fil=..
 ident() {
     local got
-    got=$(httrack -O /dev/null -#i "$1" "$2" "$3")
+    got=$(httrack -O /dev/null -#test=resolve "$1" "$2" "$3")
     test "$got" == "$4" ||
         {
             echo "FAIL ident($1, $2, $3): got '$got' want '$4'"

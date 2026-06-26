@@ -3,13 +3,13 @@
 
 set -euo pipefail
 
-# IDNA / punycode encode (-#4) and decode (-#5). This code has a CVE history,
+# IDNA / punycode encode (-#test=idna-encode) and decode (-#test=idna-decode). This code has a CVE history,
 # so the edge cases below cover passthrough, round-trips, and malformed input.
 
-enc() { test "$(httrack -O /dev/null -#4 "$1")" == "$2" || exit 1; }
-dec() { test "$(httrack -O /dev/null -#5 "$1")" == "$2" || exit 1; }
+enc() { test "$(httrack -O /dev/null -#test=idna-encode "$1")" == "$2" || exit 1; }
+dec() { test "$(httrack -O /dev/null -#test=idna-decode "$1")" == "$2" || exit 1; }
 # crash probe: malformed ACE input must exit cleanly, not abort.
-runs() { httrack -O /dev/null -#5 "$1" >/dev/null 2>&1 || exit 1; }
+runs() { httrack -O /dev/null -#test=idna-decode "$1" >/dev/null 2>&1 || exit 1; }
 
 # encode
 enc 'www.café.com' 'www.xn--caf-dma.com'

@@ -4,13 +4,13 @@
 set -euo pipefail
 
 # wildcard filter engine (strjoker), the core of +/- include/exclude rules.
-# -#0 <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
+# -#test=filter <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
 
 match() {
-    test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does match $1" || exit 1
+    test "$(httrack -O /dev/null -#test=filter "$1" "$2")" == "$2 does match $1" || exit 1
 }
 nomatch() {
-    test "$(httrack -O /dev/null -#0 "$1" "$2")" == "$2 does NOT match $1" || exit 1
+    test "$(httrack -O /dev/null -#test=filter "$1" "$2")" == "$2 does NOT match $1" || exit 1
 }
 
 # bare star matches everything

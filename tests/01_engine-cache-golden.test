@@ -4,7 +4,7 @@
 # POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
 # tool flags despite the #!/bin/bash above.
 
-# Golden cache-format regression test (driven by 'httrack -#B <dir>').
+# Golden cache-format regression test (driven by 'httrack -#test=cache-golden <dir>').
 #
 # 01_engine-cache.test writes the cache with the same build it reads back (a
 # round-trip), so it cannot catch a read-path or ZIP-format regression where
@@ -13,7 +13,7 @@
 # byte-exact.
 #
 # Regenerate the fixture after a deliberate format change with
-# 'httrack -#B <dir> regen', then copy <dir>/hts-cache/new.zip over the
+# 'httrack -#test=cache-golden <dir> regen', then copy <dir>/hts-cache/new.zip over the
 # committed file.
 
 set -eu
@@ -37,11 +37,11 @@ trap 'rm -rf "$dir"' EXIT
 mkdir -p "$dir/hts-cache"
 cp "$fixture/hts-cache/new.zip" "$dir/hts-cache/new.zip"
 
-out=$(httrack -#B "$dir")
+out=$(httrack -#test=cache-golden "$dir")
 
 # Match the exact success line: the read must have found and verified every
-# entry, not merely failed to enter the mode (a bad -#B falls through to the
-# usage screen, which also exits non-zero but never prints this).
+# entry, not merely failed to enter the mode (a renamed/removed test prints the
+# registry to stderr, which also exits non-zero but never prints this).
 test "$out" = "cache-golden: OK" || {
     echo "expected 'cache-golden: OK', got: $out" >&2
     exit 1
