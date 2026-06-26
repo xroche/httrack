@@ -84,6 +84,9 @@ fsize 'verdict=allowed size_flag=0' -1 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'   # sc
 fsize 'verdict=forbidden size_flag=1' 5 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'  # <10KB: cancel
 fsize 'verdict=allowed size_flag=1' 20 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'   # >=10KB: keep
 fsize 'verdict=forbidden size_flag=0' -1 foo.txt -* '+*.jpg' '-*.jpg*[<10]' # not a jpg
+# the '>' operator is just as neutral at scan time, and fires once size is known
+fsize 'verdict=allowed size_flag=0' -1 foo.jpg -* '+*.jpg' '-*.jpg*[>10]'   # scan time: keep
+fsize 'verdict=forbidden size_flag=1' 20 foo.jpg -* '+*.jpg' '-*.jpg*[>10]' # >10KB: cancel
 
 # [name]/[file]/[path] never span '?' mid-string; a trailing query is still
 # tolerated by the global '?' rule (same as plain *.aspx), not the class (#144).

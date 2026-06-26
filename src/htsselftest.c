@@ -537,7 +537,9 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   known = (argv[0][0] != '-'); /* "-1"/"-" => size unknown */
-  sz = known ? (LLint) strtoll(argv[0], NULL, 10) : -1;
+  sz = -1;
+  if (known)
+    sscanf(argv[0], LLintP, &sz);
   verdict = fa_strjoker(0, &argv[2], argc - 2, argv[1], known ? &sz : NULL,
                         known ? &size_flag : NULL, NULL);
   printf("verdict=%s size_flag=%d\n",
