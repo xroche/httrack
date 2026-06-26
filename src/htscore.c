@@ -736,26 +736,39 @@ int httpmirror(char *url1, httrackp * opt) {
     /* OPTIMIZED for fast load */
     if (StringNotEmpty(opt->filelist)) {
       char *filelist_buff = NULL;
-      const size_t filelist_sz = off_t_to_size_t(fsize(StringBuff(opt->filelist)));
+      size_t filelist_sz = 0;
+      const char *filelist_err = NULL; /* failure reason, NULL on success */
+      const off_t fs = fsize(StringBuff(opt->filelist));
 
-      if (filelist_sz != (size_t) -1) {
+      if (fs < 0) {
+        /* fsize() hides the cause; redo stat() for a precise errno (#49) */
+        struct stat st;
+        filelist_err = stat(StringBuff(opt->filelist), &st) != 0
+                           ? strerror(errno)
+                           : "not a regular file";
+      } else if ((filelist_sz = off_t_to_size_t(fs)) == (size_t) -1) {
+        filelist_err = "file too large";
+        filelist_sz = 0;
+      } else {
         FILE *fp = fopen(StringBuff(opt->filelist), "rb");
 
-        if (fp) {
+        if (fp == NULL) {
+          filelist_err = strerror(errno);
+        } else {
           filelist_buff = malloct(filelist_sz + 1);
-          if (filelist_buff) {
-            if (fread(filelist_buff, 1, filelist_sz, fp) != filelist_sz) {
-              freet(filelist_buff);
-              filelist_buff = NULL;
-            } else {
-              *(filelist_buff + filelist_sz) = '\0';
-            }
+          if (filelist_buff == NULL) {
+            filelist_err = "out of memory";
+          } else if (fread(filelist_buff, 1, filelist_sz, fp) != filelist_sz) {
+            freet(filelist_buff);
+            filelist_err = "read error";
+          } else {
+            filelist_buff[filelist_sz] = '\0';
           }
           fclose(fp);
         }
       }
 
-      if (filelist_buff) {
+      if (filelist_buff != NULL) {
         int filelist_ptr = 0;
         int n = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -780,8 +793,8 @@ int httpmirror(char *url1, httrackp * opt) {
         // Free buffer
         freet(filelist_buff);
       } else {
-        hts_log_print(opt, LOG_ERROR, "Could not include URL list: %s",
-                      StringBuff(opt->filelist));
+        hts_log_print(opt, LOG_ERROR, "Could not include URL list \"%s\": %s",
+                      StringBuff(opt->filelist), filelist_err);
       }
     }
 

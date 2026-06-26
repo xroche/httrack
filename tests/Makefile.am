@@ -34,6 +34,7 @@ TESTS = \
 	01_engine-dns.test \
 	01_engine-doitlog.test \
 	01_engine-entities.test \
+	01_engine-filelist.test \
 	01_engine-filter.test \
 	01_engine-hashtable.test \
 	01_engine-idna.test \

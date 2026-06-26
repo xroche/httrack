@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# -%L URL-list loading (#49): a readable list is honored; an unusable one fails
+# with the reason (errno / not-a-regular-file), not a bare "Could not include
+# URL list". Offline: file:// fixture, no server. Asserts on httrack's own
+# strings and the message shape, so it is locale-independent.
+
+set -euo pipefail
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_filelist.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+echo '<html><body>hi</body></html>' >"$tmp/index.html"
+
+# run httrack with the given -%L target; structured log lands in $out/hts-log.txt
+run() {
+    local out="$1" list="$2"
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack -O "$out" --quiet -n "-%L" "$list" >"$out/.stdout" 2>&1 || true
+    LOG="$out/hts-log.txt"
+}
+
+fail() {
+    echo "FAIL: $1"
+    cat "$LOG"
+    exit 1
+}
+loghas() {
+    grep -Eq "$1" "$LOG" || fail "expected /$1/ in $LOG"
+}
+lognot() {
+    if grep -Eq "$1" "$LOG"; then fail "unexpected /$1/ in $LOG"; fi
+}
+
+# readable list: its one URL is loaded and counted (count must be non-zero)
+printf 'file://%s/index.html\n' "$tmp" >"$tmp/urls.txt"
+run "$tmp/ok" "$tmp/urls.txt"
+loghas '[1-9][0-9]* links added from'
+
+# missing file: quoted name + a non-empty reason, never the old reasonless
+# "Could not include URL list: <name>". The reason is the stat() errno, not the
+# directory fallback literal (guards against dropping the errno lookup).
+run "$tmp/miss" "$tmp/nope.txt"
+loghas 'Could not include URL list "[^"]+": .+'
+lognot 'Could not include URL list: '
+lognot 'not a regular file'
+
+# a directory is rejected with our own reason (locale-independent)
+mkdir -p "$tmp/adir"
+run "$tmp/dir" "$tmp/adir"
+loghas 'Could not include URL list "[^"]+": not a regular file'
+
+# unreadable regular file: the fopen() errno arm fires, distinct from the
+# directory branch. Root bypasses mode 000, so skip it there.
+if test "$(id -u)" -ne 0; then
+    : >"$tmp/noperm.txt"
+    chmod 000 "$tmp/noperm.txt"
+    run "$tmp/perm" "$tmp/noperm.txt"
+    chmod 644 "$tmp/noperm.txt"
+    loghas 'Could not include URL list "[^"]+": .+'
+    lognot 'not a regular file'
+fi
+
+exit 0
