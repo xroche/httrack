@@ -5,7 +5,7 @@
 # bytes get duplicated and the file grows (corrupt PDFs). Pass 1 interrupts
 # flaky.bin mid-body (partial + temp-ref); pass 2 resumes against a 206 that
 # backs up 8 bytes. The result must equal the same bytes fetched whole (full.bin).
-set -u
+set -eu
 
 : "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
@@ -17,10 +17,10 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1
 serverpid=
 crawlpid=
 cleanup() {
-    test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
+    if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
     if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null
-        wait "$serverpid" 2>/dev/null
+        kill "$serverpid" 2>/dev/null || true
+        wait "$serverpid" 2>/dev/null || true
     fi
     rm -rf "$tmpdir"
 }
@@ -71,8 +71,8 @@ for _ in $(seq 1 300); do
     sleep 0.1
 done
 sleep 0.5
-kill -TERM "$crawlpid" 2>/dev/null
-wait "$crawlpid" 2>/dev/null
+kill -TERM "$crawlpid" 2>/dev/null || true
+wait "$crawlpid" 2>/dev/null || true
 crawlpid=
 test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
     echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
