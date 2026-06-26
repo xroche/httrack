@@ -3,11 +3,11 @@
 
 set -euo pipefail
 
-# Local save-name extension resolution (url_savename via -#N <fil> <content-type>).
+# Local save-name extension resolution (url_savename via -#test=savename <fil> <content-type>).
 # Asserts on the basename of "savename: <path>".
 
 name() {
-    out="$(httrack -O /dev/null -#N "$1" "$2" | sed -n 's/^savename: //p')"
+    out="$(httrack -O /dev/null -#test=savename "$1" "$2" | sed -n 's/^savename: //p')"
     test "${out##*/}" == "$3" || {
         echo "FAIL: '$1' '$2' -> '$out' (want '$3')"
         exit 1

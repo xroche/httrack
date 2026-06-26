@@ -1,14 +1,15 @@
 #!/bin/bash
 #
 # Issue #151 guard: the request Cookie header must be bare RFC 6265 name=value
-# pairs, no $Version/$Path attributes. Driven by the 'httrack -#Q' selftest.
+# pairs, no $Version/$Path attributes. Driven by the 'httrack -#test=cookies' selftest.
 
 set -eu
 
-# A trailing token is required; a bare '-#Q' falls through to the usage screen.
-out=$(httrack -#Q run)
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=cookies run)
 
-# Exact-match the success line so a fall-through to usage can't pass the test.
+# Exact-match the success line so a renamed/removed test (it prints the registry
+# to stderr) can't pass.
 test "$out" = "cookie-header: OK" || {
     echo "expected 'cookie-header: OK', got: $out" >&2
     exit 1

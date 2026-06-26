@@ -33,8 +33,9 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - Be terse. Comment the why, in English; translate French comments you touch.
 - Strip AI tells from prose (em-dash overuse, rule-of-three, filler, vague
   attributions). Ref: Wikipedia "Signs of AI writing". Claude Code: `/humanizer`.
-- Behavior change → add a test. Fast path: a hidden `httrack -#N` debug
-  subcommand (`htscoremain.c`) driven by a `tests/NN_*.test`, over a slow crawl.
+- Behavior change → add a test. Fast path: a hidden `httrack -#test=NAME` engine
+  self-test (registry in `htsselftest.c`; `-#test` lists them) driven by a
+  `tests/NN_*.test`, over a slow crawl.
 
 ## Review your change adversarially (strongly suggested)
 Before pushing, and when reviewing others, don't skim for bugs:

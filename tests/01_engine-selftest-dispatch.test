@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# The -#test dispatch itself: a bare -#test lists the registry, and an unknown
+# name errors (non-zero, diagnostic) instead of silently passing.
+
+set -eu
+
+# Bare -#test lists known tests (printed to stderr).
+list=$(httrack -#test 2>&1)
+printf '%s\n' "$list" | grep -q "filter" || exit 1
+printf '%s\n' "$list" | grep -q "cache-writefail" || exit 1
+
+# Unknown name: non-zero exit + diagnostic, and no test result line.
+rc=0
+err=$(httrack -#test=bogus 2>&1) || rc=$?
+test "$rc" -ne 0 || exit 1
+printf '%s\n' "$err" | grep -q "Unknown self-test" || exit 1

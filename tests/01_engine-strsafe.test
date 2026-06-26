@@ -3,23 +3,22 @@
 
 set -euo pipefail
 
-# htssafe.h bounded string operations (driven by 'httrack -#8').
+# htssafe.h bounded string operations (driven by 'httrack -#test=strsafe').
 
 # Success path: every bounded op (strcpybuff/strcatbuff/strncatbuff/strlcpybuff)
-# must behave correctly. Like the other -# debug modes, a trailing token is
-# required (a bare '-#8' falls through to the usage screen).
+# must behave correctly. 'run' selects the success path (vs the overflow modes).
 rc=0
-out=$(httrack -#8 run) || rc=$?
+out=$(httrack -#test=strsafe run) || rc=$?
 test "$rc" -eq 0 || exit 1
 test "$out" == "strsafe: OK" || exit 1
 
 # Overflow path: an over-capacity write into a sized buffer must be caught by
 # the bounded macro and abort the process, not be silently truncated/completed.
 # Assert the htssafe abort signature specifically, so the test cannot pass for
-# an unrelated reason (e.g. the -#8 mode being gone and falling through to the
-# usage screen, which also exits non-zero).
+# an unrelated reason (e.g. the strsafe test being gone, which prints the
+# registry to stderr and also exits non-zero).
 # the bounded macro aborts (non-zero exit), so don't let set -e trip on it
-err=$(httrack -#8 overflow "this string is far too long for the buffer" 2>&1) || true
+err=$(httrack -#test=strsafe overflow "this string is far too long for the buffer" 2>&1) || true
 case "$err" in
 *"strsafe: NOT aborted"*)
     echo "over-capacity write was NOT caught" >&2
@@ -36,7 +35,7 @@ esac
 # capacity (4 bytes into a 4-byte buffer), so this also pins the boundary: a
 # '<=' off-by-one in the capacity check would let it through (and print "NOT
 # aborted"). Match the specific htsbuff abort message, not just any assert.
-err=$(httrack -#8 overflow-buff "abcd" 2>&1) || true
+err=$(httrack -#test=strsafe overflow-buff "abcd" 2>&1) || true
 case "$err" in
 *"strsafe: NOT aborted"*)
     echo "htsbuff over-capacity write was NOT caught" >&2

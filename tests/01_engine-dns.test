@@ -5,9 +5,8 @@ set -euo pipefail
 
 # DNS resolver/cache self-test: a mock getaddrinfo (no network) checks address
 # family, single-address selection, the -@i4/-@i6 family filter, and cache reuse.
-# The trailing token is required, like the other -# selftests, so a bare command
-# line isn't treated as "no arguments" and routed to the usage screen.
-out=$(httrack -#D run)
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=dns run)
 
 test "$out" = "dns-selftest: OK" || {
     echo "expected 'dns-selftest: OK', got: $out" >&2

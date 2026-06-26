@@ -4,13 +4,13 @@
 set -euo pipefail
 
 # HTML entity unescaping (hts_unescapeEntitiesWithCharset).
-# -#6 <string> prints the string with entities decoded (UTF-8 output).
+# -#test=entities <string> prints the string with entities decoded (UTF-8 output).
 ent() {
-    test "$(httrack -O /dev/null -#6 "$1")" == "$2" || exit 1
+    test "$(httrack -O /dev/null -#test=entities "$1")" == "$2" || exit 1
 }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
-    httrack -O /dev/null -#6 "$1" >/dev/null 2>&1 || exit 1
+    httrack -O /dev/null -#test=entities "$1" >/dev/null 2>&1 || exit 1
 }
 
 # named entities
