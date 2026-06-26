@@ -71,3 +71,24 @@ nomatch '*[\[\]]' '[' # not matched, despite the docs
 match '*[\[\]]' ']'   # only via the empty class-match + trailing ']'
 match '*[\[\]]' '[]'  # one of {'[','\'} then the trailing ']'
 nomatch '*[\[\]]' '[]x'
+
+# Size-based rules (-#test=filtersize <size> <string> <filter...>): a negative size
+# means the size is still unknown (scan time). A size exclusion must stay neutral
+# then, so the file is fetched and only cancelled once its size is known (#143).
+fsize() {
+    local want="$1"
+    shift
+    test "$(httrack -O /dev/null -#test=filtersize "$@")" == "$want" || exit 1
+}
+fsize 'verdict=allowed size_flag=0' -1 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'   # scan time: keep
+fsize 'verdict=forbidden size_flag=1' 5 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'  # <10KB: cancel
+fsize 'verdict=allowed size_flag=1' 20 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'   # >=10KB: keep
+fsize 'verdict=forbidden size_flag=0' -1 foo.txt -* '+*.jpg' '-*.jpg*[<10]' # not a jpg
+
+# [name]/[file]/[path] never span '?' mid-string; a trailing query is still
+# tolerated by the global '?' rule (same as plain *.aspx), not the class (#144).
+nomatch '*[path]/end' 'a?b/end'
+nomatch '*[file]end' 'foo?xend'
+nomatch '*[name]X' 'abc?X'
+match '*[file]' 'foo?x=1' # trailing query: tolerated, as for *.aspx
+match '*.aspx' 'page.aspx?y=2'

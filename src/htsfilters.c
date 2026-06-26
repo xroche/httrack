@@ -76,7 +76,8 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
     }
     if (size)
       sz = *size;
-    if (strjoker(nom, filters[i] + filteroffs, &sz, size_flag)) {       // reconnu
+    /* size unknown (scan time): no size pointer => size tests stay neutral */
+    if (strjoker(nom, filters[i] + filteroffs, size ? &sz : NULL, size_flag)) {
       if (size)
         if (sz != *size)
           sizelimit = sz;
