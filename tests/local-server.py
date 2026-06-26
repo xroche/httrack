@@ -177,6 +177,24 @@ class Handler(SimpleHTTPRequestHandler):
         body, ctype = self.TYPE_MATRIX[path]
         self.send_raw(body, ctype)
 
+    # --- MIME-type exclusion abort (issue #58) -----------------------------
+    # A -mime:application/pdf filter must abort the transfer once the header
+    # arrives, not download the whole body and discard it.
+    def route_mimex_index(self):
+        self.send_html(
+            '\t<a href="blob.pdf">pdf</a>\n' '\t<a href="real.html">real</a>\n'
+        )
+
+    # 1 MB body: the fix aborts after the header, so httrack's "bytes received"
+    # stays tiny; without it the engine reads the body and the count jumps.
+    MIMEX_BLOB = b"%PDF-1.4\n" + b"\x00" * (1024 * 1024)
+
+    def route_mimex_blob(self):
+        self.send_raw(self.MIMEX_BLOB, "application/pdf")
+
+    def route_mimex_real(self):
+        self.send_raw(b"<html><body>real</body></html>", "text/html")
+
     # --- special chars in URLs across an update (issue #157) ---------------
     # A dotless, accented basename served as text/html (MediaWiki style). The
     # name the first crawl picks (.html) must survive the update pass.
@@ -355,6 +373,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,
         "/errpage/empty.html": route_errpage_empty,
+        "/mimex/index.html": route_mimex_index,
+        "/mimex/blob.pdf": route_mimex_blob,
+        "/mimex/real.html": route_mimex_real,
     }
 
     # --- dispatch ----------------------------------------------------------

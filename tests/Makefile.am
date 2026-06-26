@@ -66,6 +66,7 @@ TESTS = \
 	21_local-intl-update.test \
 	22_local-broken-size.test \
 	23_local-errpage.test \
-	24_local-resume-overlap.test
+	24_local-resume-overlap.test \
+	25_local-mime-exclude.test
 
 CLEANFILES = check-network_sh.cache
