@@ -225,6 +225,71 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # 206 resume must honor the server's Content-Range, not the offset we asked
+    # for (#198): a server resuming a few bytes *before* the request must not
+    # leave httrack duplicating the overlap onto the partial. flaky.bin
+    # interrupts once then resumes OVERLAP_EARLY bytes early; full.bin serves
+    # the identical bytes in one shot, so the test can compare the two.
+    OVERLAP_BLOB = b"%PDF-1.4\n" + bytes((i * 37 + 11) % 256 for i in range(8000))
+    OVERLAP_EARLY = 8
+    OVERLAP_PREFIX_LEN = 4000  # flushed before the stall
+    _overlap_started = False
+
+    def route_overlap_index(self):
+        self.send_html('\t<a href="flaky.bin">flaky</a>\n\t<a href="full.bin">full</a>')
+
+    def route_overlap_full(self):
+        self.send_raw(self.OVERLAP_BLOB, "application/octet-stream")
+
+    def route_overlap(self):
+        counter = os.environ.get("OVERLAP_COUNTER")
+        if counter:
+            with open(counter, "a") as fp:
+                fp.write("x")
+        blob = self.OVERLAP_BLOB
+        rng = self.headers.get("Range")
+        # First GET: stream a prefix then stall, so the crawl can be interrupted
+        # mid-body (partial + temp-ref on disk).
+        if rng is None and not Handler._overlap_started:
+            Handler._overlap_started = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(blob)))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(blob[: self.OVERLAP_PREFIX_LEN])
+                self.wfile.flush()
+                try:
+                    while True:
+                        time.sleep(3600)
+                except OSError:
+                    pass
+            return
+        if rng is None:  # no resume request: serve the whole file
+            return self.route_overlap_full()
+        # Resume: honor the Range, but back up OVERLAP_EARLY bytes.
+        start = (
+            int(rng[len("bytes=") :].split("-")[0]) if rng.startswith("bytes=") else 0
+        )
+        start = max(0, start - self.OVERLAP_EARLY)
+        # Signal that the resume Range -> 206 path actually fired, so the test
+        # can prove it was exercised (not a silent full re-download).
+        resumed = os.environ.get("OVERLAP_RESUMED")
+        if resumed:
+            with open(resumed, "a") as fp:
+                fp.write("x")
+        part = blob[start:]
+        self.send_response(206, "Partial Content")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(part)))
+        self.send_header(
+            "Content-Range", "bytes %d-%d/%d" % (start, len(blob) - 1, len(blob))
+        )
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(part)
+
     # error pages / 0-byte files (#17): -o0 ("no error pages") must keep 4xx/5xx
     # bodies off disk; a genuine 0-byte 200 is a valid file and stays.
     def route_errpage_index(self):
@@ -281,6 +346,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/intl/" + INTL_NAME: route_intl_page,
         "/resume/index.html": route_resume_index,
         "/resume/blob.txt": route_resume,
+        "/overlap/index.html": route_overlap_index,
+        "/overlap/flaky.bin": route_overlap,
+        "/overlap/full.bin": route_overlap_full,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
         "/errpage/index.html": route_errpage_index,

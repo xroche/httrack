@@ -1,0 +1,109 @@
+#!/bin/bash
+# Issue #198: on a resumed download the server may answer the Range with a 206
+# that starts *before* the offset we asked for (block-aligned ranges). httrack
+# must honor the returned Content-Range, not blindly append, or the overlap
+# bytes get duplicated and the file grows (corrupt PDFs). Pass 1 interrupts
+# flaky.bin mid-body (partial + temp-ref); pass 2 resumes against a 206 that
+# backs up 8 bytes. The result must equal the same bytes fetched whole (full.bin).
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+server="${testdir}/local-server.py"
+
+command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1
+serverpid=
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
+    if test -n "$serverpid"; then
+        kill "$serverpid" 2>/dev/null || true
+        wait "$serverpid" 2>/dev/null || true
+    fi
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+# OVERLAP_COUNTER gets a byte per flaky.bin request so pass 1 knows when to interrupt.
+serverlog="${tmpdir}/server.log"
+counter="${tmpdir}/hits"
+resumed="${tmpdir}/resumed" # gets a byte when the server serves a resume 206
+OVERLAP_COUNTER="$counter" OVERLAP_RESUMED="$resumed" \
+    python3 "$server" --root "${testdir}/server-root" \
+    >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+out="${tmpdir}/crawl"
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
+refdir="${out}/hts-cache/ref"
+
+# pass 1: interrupt once flaky.bin's prefix is streaming (partial + temp-ref).
+printf '[pass 1: interrupt flaky.bin] ..\t'
+httrack "${common[@]}" "${base}/overlap/index.html" >"${tmpdir}/log1" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -s "$counter" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+sleep 0.5
+kill -TERM "$crawlpid" 2>/dev/null || true
+wait "$crawlpid" 2>/dev/null || true
+crawlpid=
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
+    echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
+    exit 1
+}
+echo "OK (temp-ref present)"
+
+# pass 2: --continue -> resume Range -> 206 that starts 8 bytes early.
+printf '[pass 2: resume flaky.bin] ..\t'
+httrack "${common[@]}" --continue "${base}/overlap/index.html" >"${tmpdir}/log2" 2>&1 || true
+echo "OK"
+
+# Guard against a silent full re-download: the byte-compare below only tests the
+# fix if pass 2 actually went through the resume Range -> 206 path.
+printf '[resume path was exercised] ..\t'
+if ! test -s "$resumed"; then
+    echo "FAIL: pass 2 never triggered a resume 206; the overlap fix was not exercised"
+    exit 1
+fi
+echo "OK"
+
+printf '[resumed file is not corrupted] ..\t'
+dir=$(find "$out" -maxdepth 1 -type d -name '127.0.0.1*' | head -1)
+flaky="${dir}/overlap/flaky.bin"
+full="${dir}/overlap/full.bin"
+if ! test -f "$flaky" || ! test -f "$full"; then
+    echo "FAIL: flaky.bin or full.bin missing after pass 2"
+    exit 1
+fi
+if ! cmp -s "$flaky" "$full"; then
+    echo "FAIL: resumed flaky.bin ($(wc -c <"$flaky")) != full.bin ($(wc -c <"$full")); overlap duplicated"
+    exit 1
+fi
+echo "OK ($(wc -c <"$flaky") bytes, byte-identical)"
