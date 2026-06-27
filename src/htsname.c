@@ -237,9 +237,13 @@ int url_savename(lien_adrfilsave *const afs,
   // www-42.foo.com -> foo.com
   // foo.com/bar//foobar -> foo.com/bar/foobar
   if (opt->urlhack) {
-    // copy of adr (without protocol), used for lookups (see urlhack)
-    normadr = adr_normalized_sized(adr, normadr_, sizeof(normadr_));
-    normfil = fil_normalized_filtered(fil_complete, normfil_, strip);
+    // dedup-lookup key; honor the per-feature negatives like htshash.c so
+    // distinct URLs keep distinct savenames (else keep normadr = adr)
+    if (!opt->no_www_dedup)
+      normadr = adr_normalized_sized(adr, normadr_, sizeof(normadr_));
+    normfil =
+        fil_normalized_filtered_ex(fil_complete, normfil_, strip,
+                                   !opt->no_slash_dedup, !opt->no_query_dedup);
   } else {
     if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
       char *pos = strchr(adr_complete, ':');
@@ -252,9 +256,11 @@ int url_savename(lien_adrfilsave *const afs,
         normadr = normadr_;
       }
     }
-    // strip still applies with urlhack off (host left untouched)
+    // strip still applies with urlhack off (host left untouched); no // or
+    // query-sort here, to match the hash key (norm_slash/norm_query are 0 when
+    // urlhack is off) so a URL is looked up under the key it was stored with
     if (strip != NULL)
-      normfil = fil_normalized_filtered(fil_complete, normfil_, strip);
+      normfil = fil_normalized_filtered_ex(fil_complete, normfil_, strip, 0, 0);
   }
 
   // à afficher sans ftp://

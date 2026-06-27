@@ -16,3 +16,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
 # control: no stripping -> both query-named variants are saved
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html'
+
+# strip still applies with url-hack off (-%u0): exercises the urlhack-off
+# savename branch, which must normalize the dedup key the same way the hash does
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+    httrack 'BASEURL/stripquery/index.html' -%u0 --strip-query 'utm_source'

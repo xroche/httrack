@@ -531,6 +531,10 @@ struct httrackp {
   htsoptstate state; /**< embedded live engine state */
   String strip_query; /**< query keys to drop when deduping URLs (-strip-query);
                            appended at the tail to keep field offsets stable */
+  hts_boolean
+      no_www_dedup; /**< with urlhack, keep www.host distinct from host */
+  hts_boolean no_slash_dedup; /**< with urlhack, keep redundant // in paths */
+  hts_boolean no_query_dedup; /**< with urlhack, keep query-argument order */
 };
 
 /* Running statistics for a mirror. */

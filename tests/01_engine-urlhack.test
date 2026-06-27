@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# -%u url-hack split (#271): www / // / query-order dedup toggle independently.
+# All assertions live in the engine self-test (hash compare flag resolution).
+httrack -O /dev/null -#test=urlhack run | grep -q "urlhack self-test OK"

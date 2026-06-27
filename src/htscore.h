@@ -234,8 +234,10 @@ struct hash_struct {
   coucal adrfil;
   /* former address+path -> link index (renamed/moved entries) */
   coucal former_adrfil;
-  /* scratch buffers reused across lookups (not reentrant) */
-  int normalized;
+  /* effective urlhack sub-flags: www.==host / // collapse / query-arg sort */
+  hts_boolean norm_host;
+  hts_boolean norm_slash;
+  hts_boolean norm_query;
   /* query-strip keys (not owned); set from opt->strip_query at hash_init */
   const char *strip_query;
   char normfil[HTS_URLMAXSIZE * 2];
@@ -370,6 +372,11 @@ char *next_token(char *p, int flag);
    "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
 char *fil_normalized_filtered(const char *source, char *dest,
                               const char *strip);
+
+/* As fil_normalized_filtered(), but DO_SLASH/DO_QUERY gate the // collapse and
+   the query-argument sort independently (the urlhack sub-flags). */
+char *fil_normalized_filtered_ex(const char *source, char *dest,
+                                 const char *strip, int do_slash, int do_query);
 
 /* For URL ADR/FIL, return (in DEST) the comma keylist to strip from the
    '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via

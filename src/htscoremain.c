@@ -1570,6 +1570,30 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 }
                 break;          // url hack
+              case 'j':
+                opt->no_www_dedup =
+                    HTS_TRUE; // --keep-www-prefix: keep www.X != X
+                if (*(com + 1) == '0') {
+                  opt->no_www_dedup = HTS_FALSE;
+                  com++;
+                }
+                break;
+              case 'o':
+                opt->no_slash_dedup =
+                    HTS_TRUE; // --keep-double-slashes: keep //
+                if (*(com + 1) == '0') {
+                  opt->no_slash_dedup = HTS_FALSE;
+                  com++;
+                }
+                break;
+              case 'y':
+                opt->no_query_dedup =
+                    HTS_TRUE; // --keep-query-order: keep ?b&a order
+                if (*(com + 1) == '0') {
+                  opt->no_query_dedup = HTS_FALSE;
+                  com++;
+                }
+                break;
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {

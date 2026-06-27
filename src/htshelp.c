@@ -588,6 +588,9 @@ void help(const char *app, int more) {
     (" %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..)");
   infomsg
     (" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
+  infomsg("     opt out of one url-hack part: --keep-www-prefix "
+          "(www.foo.com<>foo.com), --keep-double-slashes (//), "
+          "--keep-query-order (?b&a)");
   infomsg
     (" %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3,cgi=text/html;dat,bin=application/x-zip)");
   infomsg("     shortcut: '--assume standard' is equivalent to -%A "

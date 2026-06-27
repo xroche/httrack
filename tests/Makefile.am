@@ -48,6 +48,7 @@ TESTS = \
 	01_engine-simplify.test \
 	01_engine-stripquery.test \
 	01_engine-strsafe.test \
+	01_engine-urlhack.test \
 	02_manpage-regen.test \
 	02_update-cache.test \
 	10_crawl-simple.test \

@@ -106,10 +106,10 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
   const lien_url*const lien = (const lien_url*) value;
   const char *const adr = !former ? lien->adr : lien->former_adr;
   const char *const fil = !former ? lien->fil : lien->former_fil;
-  const char *const adr_norm = adr != NULL ? 
-    ( hash->normalized  ? jump_normalized_const(adr)
-                        : jump_identification_const(adr) )
-    : NULL;
+  const char *const adr_norm =
+      adr != NULL ? (hash->norm_host ? jump_normalized_const(adr)
+                                     : jump_identification_const(adr))
+                  : NULL;
 
   // copy address
   assertf(adr_norm != NULL);
@@ -123,8 +123,9 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr, fil,
                                                   keybuf, sizeof(keybuf));
 
-    if (hash->normalized || keys != NULL) {
-      fil_normalized_filtered(fil, &hash->normfil[strlen(hash->normfil)], keys);
+    if (hash->norm_slash || hash->norm_query || keys != NULL) {
+      fil_normalized_filtered_ex(fil, &hash->normfil[strlen(hash->normfil)],
+                                 keys, hash->norm_slash, hash->norm_query);
     } else {
       strcpy(&hash->normfil[strlen(hash->normfil)], fil);
     }
@@ -139,8 +140,7 @@ static int key_adrfil_equals_generic(void *arg,
                                      coucal_key_const a_,
                                      coucal_key_const b_, 
                                      const int former) {
-  hash_struct *const hash = (hash_struct*) arg;
-  const int normalized = hash->normalized;
+  hash_struct *const hash = (hash_struct *) arg;
   const lien_url*const a = (const lien_url*) a_;
   const lien_url*const b = (const lien_url*) b_;
   const char *const a_adr = !former ? a->adr : a->former_adr;
@@ -157,10 +157,10 @@ static int key_adrfil_equals_generic(void *arg,
   assertf(b_fil != NULL);
 
   // skip scheme and authentication to the domain (possibly without www.)
-  ja = normalized
-    ? jump_normalized_const(a_adr) : jump_identification_const(a_adr);
-  jb = normalized
-    ? jump_normalized_const(b_adr) : jump_identification_const(b_adr);
+  ja = hash->norm_host ? jump_normalized_const(a_adr)
+                       : jump_identification_const(a_adr);
+  jb = hash->norm_host ? jump_normalized_const(b_adr)
+                       : jump_identification_const(b_adr);
   assertf(ja != NULL);
   assertf(jb != NULL);
   if (strcasecmp(ja, jb) != 0) {
@@ -175,9 +175,12 @@ static int key_adrfil_equals_generic(void *arg,
     const char *const keysb =
         hts_query_strip_keys(hash->strip_query, b_adr, b_fil, kb, sizeof(kb));
 
-    if (normalized || keysa != NULL || keysb != NULL) {
-      fil_normalized_filtered(a_fil, hash->normfil, keysa);
-      fil_normalized_filtered(b_fil, hash->normfil2, keysb);
+    if (hash->norm_slash || hash->norm_query || keysa != NULL ||
+        keysb != NULL) {
+      fil_normalized_filtered_ex(a_fil, hash->normfil, keysa, hash->norm_slash,
+                                 hash->norm_query);
+      fil_normalized_filtered_ex(b_fil, hash->normfil2, keysb, hash->norm_slash,
+                                 hash->norm_query);
       return strcmp(hash->normfil, hash->normfil2) == 0;
     } else {
       return strcmp(a_fil, b_fil) == 0;
@@ -237,11 +240,14 @@ static int key_former_adrfil_equals(void *arg,
   return key_adrfil_equals_generic(arg, a, b, 1);
 }
 
-void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
+void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   hash->sav = coucal_new(0);
   hash->adrfil = coucal_new(0);
   hash->former_adrfil = coucal_new(0);
-  hash->normalized = normalized;
+  /* urlhack is the umbrella; per-feature negatives opt out of each part */
+  hash->norm_host = normalized && !opt->no_www_dedup;
+  hash->norm_slash = normalized && !opt->no_slash_dedup;
+  hash->norm_query = normalized && !opt->no_query_dedup;
   /* snapshot the query-strip list (not owned; valid for the hash lifetime) */
   hash->strip_query =
       StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
@@ -298,6 +304,26 @@ void hash_free(hash_struct *hash) {
     coucal_delete(&hash->adrfil);
     coucal_delete(&hash->former_adrfil);
   }
+}
+
+/* Test helper: do the two URLs dedupe to the same key under opt's urlhack
+   flags? Exercises the live hash compare (norm_host/slash/query resolution). */
+hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
+                            const char *adrb, const char *filb) {
+  hash_struct hash;
+  lien_url la, lb;
+  hts_boolean eq;
+
+  memset(&la, 0, sizeof(la));
+  memset(&lb, 0, sizeof(lb));
+  la.adr = key_duphandler(NULL, adra);
+  la.fil = key_duphandler(NULL, fila);
+  lb.adr = key_duphandler(NULL, adrb);
+  lb.fil = key_duphandler(NULL, filb);
+  hash_init(opt, &hash, opt->urlhack);
+  eq = key_adrfil_equals(&hash, &la, &lb);
+  hash_free(&hash);
+  return eq;
 }
 
 // retour: position ou -1 si non trouvé
