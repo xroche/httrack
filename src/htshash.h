@@ -51,8 +51,12 @@ typedef enum hash_struct_type {
 } hash_struct_type;
 
 // tables de hachage
-void hash_init(httrackp *opt, hash_struct *hash, int normalized);
+void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized);
 void hash_free(hash_struct *hash);
+/* Test helper: HTS_TRUE if the two URLs dedupe together under opt's urlhack
+   flags. */
+hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
+                            const char *adrb, const char *filb);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);

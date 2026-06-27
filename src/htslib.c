@@ -3610,7 +3610,10 @@ static int sortNormFnc(const void *a_, const void *b_) {
   return strcmp(*a + 1, *b + 1);
 }
 
-HTSEXT_API char *fil_normalized(const char *source, char *dest) {
+/* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
+   sort query arguments (DO_QUERY) so equivalent URLs dedupe. */
+static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
+                               int do_query) {
   char lastc = 0;
   int gotquery = 0;
   int ampargs = 0;
@@ -3620,8 +3623,8 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   for(i = j = 0; source[i] != '\0'; i++) {
     if (!gotquery && source[i] == '?')
       gotquery = ampargs = 1;
-    if ((!gotquery && lastc == '/' && source[i] == '/') // foo//bar -> foo/bar
-      ) {
+    if (do_slash && !gotquery && lastc == '/' && source[i] == '/') {
+      // foo//bar -> foo/bar
     } else {
       if (gotquery && source[i] == '&') {
         ampargs++;
@@ -3633,7 +3636,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   dest[j++] = '\0';
 
   /* Sort arguments (&foo=1&bar=2 == &bar=2&foo=1) */
-  if (ampargs > 1) {
+  if (do_query && ampargs > 1) {
     char **amps = malloct(ampargs * sizeof(char *));
     char *copyBuff = NULL;
     size_t qLen = 0;
@@ -3681,6 +3684,10 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   return dest;
 }
 
+HTSEXT_API char *fil_normalized(const char *source, char *dest) {
+  return fil_normalized_ex(source, dest, 1, 1);
+}
+
 /* Is query key ARG[0..keylen) in the comma-separated STRIP list? "*" = all;
    case-sensitive, space-trimmed tokens. */
 static int hts_query_key_stripped(const char *arg, size_t keylen,
@@ -3711,8 +3718,9 @@ static int hts_query_key_stripped(const char *arg, size_t keylen,
 }
 
 /* see htscore.h */
-char *fil_normalized_filtered(const char *source, char *dest,
-                              const char *strip) {
+char *fil_normalized_filtered_ex(const char *source, char *dest,
+                                 const char *strip, int do_slash,
+                                 int do_query) {
   const char *query;
   char BIGSTK tmp[HTS_URLMAXSIZE * 2];
   htsbuff cb;
@@ -3721,7 +3729,7 @@ char *fil_normalized_filtered(const char *source, char *dest,
   /* No strip list, or no query: plain normalization. */
   if (strip == NULL || *strip == '\0' ||
       (query = strchr(source, '?')) == NULL) {
-    return fil_normalized(source, dest);
+    return fil_normalized_ex(source, dest, do_slash, do_query);
   }
 
   /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
@@ -3750,7 +3758,13 @@ char *fil_normalized_filtered(const char *source, char *dest,
       break;
     query++;
   }
-  return fil_normalized(tmp, dest);
+  return fil_normalized_ex(tmp, dest, do_slash, do_query);
+}
+
+/* see htscore.h */
+char *fil_normalized_filtered(const char *source, char *dest,
+                              const char *strip) {
+  return fil_normalized_filtered_ex(source, dest, strip, 1, 1);
 }
 
 /* see htscore.h */
@@ -6026,6 +6040,9 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->verbosedisplay = HTS_VERBOSE_NONE; // no text animation
   opt->sizehack = HTS_FALSE;
   opt->urlhack = HTS_TRUE;
+  opt->no_www_dedup = HTS_FALSE;
+  opt->no_slash_dedup = HTS_FALSE;
+  opt->no_query_dedup = HTS_FALSE;
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
   StringCopy(opt->strip_query, "");
   opt->ftp_proxy = HTS_TRUE;

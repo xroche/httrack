@@ -1172,6 +1172,53 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -%u url-hack split (#271): each sub-flag must toggle independently. */
+static int st_urlhack(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+#define EQ(aa, fa, ab, fb) hash_url_equals(opt, aa, fa, ab, fb)
+  /* urlhack on, no opt-outs: www, // and query order all collapse */
+  opt->urlhack = HTS_TRUE;
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  assertf(EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+  assertf(EQ("foo.com", "/p?b=2&a=1", "foo.com", "/p?a=1&b=2"));
+
+  /* keep-www-prefix: host off; // and query still collapse */
+  opt->no_www_dedup = HTS_TRUE;
+  assertf(!EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+  assertf(EQ("foo.com", "/p?b=2&a=1", "foo.com", "/p?a=1&b=2"));
+  opt->no_www_dedup = HTS_FALSE;
+
+  /* keep-double-slashes: // significant; www, query order still collapse */
+  opt->no_slash_dedup = HTS_TRUE;
+  assertf(!EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+  assertf(EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(EQ("foo.com", "/p?b=2&a=1", "foo.com", "/p?a=1&b=2"));
+  opt->no_slash_dedup = HTS_FALSE;
+
+  /* keep-query-order: query order significant; www and // still collapse */
+  opt->no_query_dedup = HTS_TRUE;
+  assertf(!EQ("foo.com", "/p?b=2&a=1", "foo.com", "/p?a=1&b=2"));
+  assertf(EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+  opt->no_query_dedup = HTS_FALSE;
+
+  /* all opt-outs == urlhack off entirely */
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_TRUE;
+  assertf(!EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(!EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+  assertf(!EQ("foo.com", "/p?b=2&a=1", "foo.com", "/p?a=1&b=2"));
+  opt->urlhack = HTS_FALSE;
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  assertf(!EQ("www.foo.com", "/a", "foo.com", "/a"));
+  assertf(!EQ("foo.com", "/a//b", "foo.com", "/a/b"));
+#undef EQ
+  printf("urlhack self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1190,6 +1237,8 @@ static const struct selftest_entry {
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},
+    {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
+     st_urlhack},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <string>",
      "convert a string to UTF-8 from a charset", st_charset},

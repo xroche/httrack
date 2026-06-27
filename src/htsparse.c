@@ -3602,16 +3602,28 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
              ident_url_relatif(mov_url, urladr(), urlfil(), moved)) >= 0) {
           int set_prio_to = 0;  // pas de priotité fixéd par wizard
 
-          // check whether URLHack is harmless or not
-          if (opt->urlhack) {
+          // check whether URLHack is harmless or not (per the effective
+          // sub-flags)
+          if (opt->urlhack && (!opt->no_www_dedup || !opt->no_slash_dedup ||
+                               !opt->no_query_dedup)) {
+            const int norm_host = !opt->no_www_dedup;
+            const int norm_slash = !opt->no_slash_dedup;
+            const int norm_query = !opt->no_query_dedup;
             char BIGSTK n_adr[HTS_URLMAXSIZE * 2], n_fil[HTS_URLMAXSIZE * 2];
             char BIGSTK pn_adr[HTS_URLMAXSIZE * 2], pn_fil[HTS_URLMAXSIZE * 2];
 
-            n_adr[0] = n_fil[0] = '\0';
-            (void) adr_normalized_sized(moved->adr, n_adr, sizeof(n_adr));
-            (void) fil_normalized(moved->fil, n_fil);
-            (void) adr_normalized_sized(urladr(), pn_adr, sizeof(pn_adr));
-            (void) fil_normalized(urlfil(), pn_fil);
+            strlcpybuff(n_adr,
+                        norm_host ? jump_normalized_const(moved->adr)
+                                  : jump_identification_const(moved->adr),
+                        sizeof(n_adr));
+            strlcpybuff(pn_adr,
+                        norm_host ? jump_normalized_const(urladr())
+                                  : jump_identification_const(urladr()),
+                        sizeof(pn_adr));
+            fil_normalized_filtered_ex(moved->fil, n_fil, NULL, norm_slash,
+                                       norm_query);
+            fil_normalized_filtered_ex(urlfil(), pn_fil, NULL, norm_slash,
+                                       norm_query);
             if (strcasecmp(n_adr, pn_adr) == 0
                 && strcasecmp(n_fil, pn_fil) == 0) {
               hts_log_print(opt, LOG_WARNING,
