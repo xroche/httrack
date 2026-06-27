@@ -1976,6 +1976,24 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCat(opt->strip_query, argv[na]);
                 }
                 break;
+              case 'K': // cookies-file: extra Netscape cookies.txt to preload
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF(
+                      "Option cookies-file needs a blank space and "
+                      "a cookies.txt path");
+                  printf("Example: --cookies-file \"/home/me/cookies.txt\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (strlen(argv[na]) >= 1024) {
+                    HTS_PANIC_PRINTF("Cookie file path too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCopy(opt->cookies_file, argv[na]);
+                }
+                break;
               case 't':        /* do not change type (ending) of filenames according to the MIME type */
                 opt->no_type_change = 1;
                 if (*(com+1)=='0') { opt->no_type_change = 0; com++; }

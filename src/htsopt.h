@@ -535,6 +535,8 @@ struct httrackp {
       no_www_dedup; /**< with urlhack, keep www.host distinct from host */
   hts_boolean no_slash_dedup; /**< with urlhack, keep redundant // in paths */
   hts_boolean no_query_dedup; /**< with urlhack, keep query-argument order */
+  String cookies_file;        /**< extra Netscape cookies.txt to preload
+                                 (--cookies-file) */
 };
 
 /* Running statistics for a mirror. */
