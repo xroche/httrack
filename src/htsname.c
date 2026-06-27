@@ -198,6 +198,13 @@ int url_savename(lien_adrfilsave *const afs,
   // copy of fil, used for lookups (see urlhack)
   const char *normadr = adr;
   const char *normfil = fil_complete;
+  /* query keys to strip for this URL (NULL = none); decoupled from urlhack */
+  char BIGSTK stripkeys[HTS_URLMAXSIZE];
+  const char *const strip =
+      StringNotEmpty(opt->strip_query)
+          ? hts_query_strip_keys(StringBuff(opt->strip_query), adr,
+                                 fil_complete, stripkeys, sizeof(stripkeys))
+          : NULL;
   const char *const print_adr = jump_protocol_const(adr);
   const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
 
@@ -232,7 +239,7 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->urlhack) {
     // copy of adr (without protocol), used for lookups (see urlhack)
     normadr = adr_normalized_sized(adr, normadr_, sizeof(normadr_));
-    normfil = fil_normalized(fil_complete, normfil_);
+    normfil = fil_normalized_filtered(fil_complete, normfil_, strip);
   } else {
     if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
       char *pos = strchr(adr_complete, ':');
@@ -245,6 +252,9 @@ int url_savename(lien_adrfilsave *const afs,
         normadr = normadr_;
       }
     }
+    // strip still applies with urlhack off (host left untouched)
+    if (strip != NULL)
+      normfil = fil_normalized_filtered(fil_complete, normfil_, strip);
   }
 
   // à afficher sans ftp://

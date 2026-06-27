@@ -5,6 +5,7 @@ EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py \
 	local-crawl.sh local-server.py server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
+	server-root/stripquery/index.html server-root/stripquery/a.html \
 	fixtures/cache-golden/hts-cache/new.zip
 
 TESTS_ENVIRONMENT =
@@ -45,6 +46,7 @@ TESTS = \
 	01_engine-savename.test \
 	01_engine-selftest-dispatch.test \
 	01_engine-simplify.test \
+	01_engine-stripquery.test \
 	01_engine-strsafe.test \
 	02_manpage-regen.test \
 	02_update-cache.test \
@@ -68,6 +70,7 @@ TESTS = \
 	22_local-broken-size.test \
 	23_local-errpage.test \
 	24_local-resume-overlap.test \
-	25_local-mime-exclude.test
+	25_local-mime-exclude.test \
+	26_local-strip-query.test
 
 CLEANFILES = check-network_sh.cache

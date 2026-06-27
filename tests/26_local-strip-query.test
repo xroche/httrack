@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# End-to-end --strip-query (#112): two links to one resource differing only by
+# ?utm_source dedup to a single saved file (2 files written: index + resource);
+# the control crawl without the option keeps both variants (3 files). Locks the
+# CLI->opt->hash plumbing the engine self-test can't reach.
+
+set -e
+
+: "${top_srcdir:=..}"
+
+# stripped: the two ?utm_source variants collapse to one resource
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+    httrack 'BASEURL/stripquery/index.html' --strip-query 'utm_source'
+
+# control: no stripping -> both query-named variants are saved
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    httrack 'BASEURL/stripquery/index.html'

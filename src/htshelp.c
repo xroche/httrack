@@ -563,6 +563,7 @@ void help(const char *app, int more) {
     (" %x  do not include any password for external password protected websites (%x0 include)");
   infomsg
     (" %q *include query string for local files (useless, for information purpose only) (%q0 don't include)");
+  infomsg(" %g  strip query keys for dedup ([host/pattern=]key1,key2,...)");
   infomsg
     ("  o *generate output html file in case of error (404..) (o0 don't generate)");
   infomsg("  X *purge old files after update (X0 keep delete)");

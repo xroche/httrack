@@ -3739,6 +3739,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);
 
+  if (StringNotEmpty(from->strip_query))
+    StringCopyS(to->strip_query, from->strip_query);
+
   if (from->retry > -1)
     to->retry = from->retry;
 

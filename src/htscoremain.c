@@ -1937,6 +1937,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
 
+              case 'g': // strip-query: accumulate "[pattern=]keys" entries
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF("Option strip-query needs a blank space and "
+                                   "[host/pattern=]key1,key2,...");
+                  printf("Example: --strip-query "
+                         "\"www.example.com/*=utm_source,sid\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (StringNotEmpty(opt->strip_query))
+                    StringCat(opt->strip_query, "\n");
+                  StringCat(opt->strip_query, argv[na]);
+                }
+                break;
               case 't':        /* do not change type (ending) of filenames according to the MIME type */
                 opt->no_type_change = 1;
                 if (*(com+1)=='0') { opt->no_type_change = 0; com++; }

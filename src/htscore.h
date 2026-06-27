@@ -236,6 +236,8 @@ struct hash_struct {
   coucal former_adrfil;
   /* scratch buffers reused across lookups (not reentrant) */
   int normalized;
+  /* query-strip keys (not owned); set from opt->strip_query at hash_init */
+  const char *strip_query;
   char normfil[HTS_URLMAXSIZE * 2];
   char normfil2[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
@@ -363,6 +365,17 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 int fspc(httrackp * opt, FILE * fp, const char *type);
 
 char *next_token(char *p, int flag);
+
+/* Like fil_normalized(), but first drops query keys in STRIP (comma-separated,
+   "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
+char *fil_normalized_filtered(const char *source, char *dest,
+                              const char *strip);
+
+/* For URL ADR/FIL, return (in DEST) the comma keylist to strip from the
+   '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via
+   strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
+const char *hts_query_strip_keys(const char *rules, const char *adr,
+                                 const char *fil, char *dest, size_t destsize);
 
 /* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
    owns it and must release it with freet(). Return NULL on missing/unreadable

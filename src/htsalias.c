@@ -60,6 +60,9 @@ Please visit our Website: http://www.httrack.com
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
 */
+/* clang-format off: hand-aligned table; clang-format reflows the whole
+   initializer (2->4 space) on any edit, churning every untouched row. */
+/* clang-format off */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
   {"path", "-O", "param1", "output path"},
@@ -107,6 +110,8 @@ const char *hts_optalias[][4] = {
   {"disable-passwords", "-%x", "single", ""}, {"disable-password", "-%x",
                                                "single", ""},
   {"include-query-string", "-%q", "single", ""},
+  {"strip-query", "-%g", "param1",
+   "strip [host/pattern=]key1,key2,... from URLs"},
   {"generate-errors", "-o", "single", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "param", ""},
@@ -241,6 +246,7 @@ const char *hts_optalias[][4] = {
 
   {"", "", "", ""}
 };
+/* clang-format on */
 
 /* 
   Check for alias in command-line 
