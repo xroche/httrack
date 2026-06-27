@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <fcntl.h>
 #include <ctype.h>
+#include <stdint.h> /* uint64_t for the pause mixer (already a hard dep via md5.h) */
 
 /* File defs */
 #include "htscore.h"
@@ -3314,6 +3315,21 @@ HTS_INLINE int back_fillmax(struct_back * sback, httrackp * opt,
   return -1;                    /* plus de place */
 }
 
+/* Seed-derived: stable within a gap, rerolls per launch; a per-call rand()
+   would bias the delay toward min_ms (see header). Jitter, not crypto. */
+int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms) {
+  uint64_t z = (uint64_t) seed;
+
+  if (max_ms <= min_ms)
+    return min_ms;
+  /* SplitMix64 finalizer: scrambles the low-entropy ms timestamp. */
+  z += 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  z ^= z >> 31;
+  return min_ms + (int) (z % (uint64_t) (max_ms - min_ms + 1));
+}
+
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   int n = opt->maxsoc - back_nsoc(sback);
 
@@ -3332,6 +3348,18 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
 
       n = min(n, nMax);
     }
+  }
+
+  // #185 randomized inter-file pause: non-blocking, one launch per gap
+  if (n > 0 && opt->pause_max_ms > 0 && HTS_STAT.last_connect > 0) {
+    TStamp opTime =
+        HTS_STAT.last_request ? HTS_STAT.last_request : HTS_STAT.last_connect;
+    TStamp lap = mtime_local() - opTime;
+
+    if (lap < hts_pause_target_ms(opTime, opt->pause_min_ms, opt->pause_max_ms))
+      n = 0;
+    else
+      n = 1;
   }
 
   return n;
@@ -3747,6 +3775,11 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);
+
+  if (from->pause_max_ms > 0) {
+    to->pause_min_ms = from->pause_min_ms;
+    to->pause_max_ms = from->pause_max_ms;
+  }
 
   if (from->retry > -1)
     to->retry = from->retry;

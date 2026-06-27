@@ -418,6 +418,10 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 
+/* Randomized inter-file pause target in [min_ms,max_ms] (#185), derived from a
+   timestamp seed so it is stable within one gap and rerolls per launch. */
+int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
+
 /* Schedule more links from the heap into free slots. Returns the number queued,
    or <=0 if none could be added (no free slot / paused / stopped). */
 int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,

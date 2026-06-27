@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# --pause (#185): a fixed inter-file delay must slow a multi-file crawl. Measure
+# the same crawl with and without --pause and compare: the harness overhead
+# cancels, leaving only the pause. Integer seconds keep it portable (BSD date
+# has no %N); a lower bound is not timing-flaky since a pause only adds time.
+
+set -e
+
+: "${top_srcdir:=..}"
+
+run() { # echoes the wall-clock seconds of one crawl
+    local t0 t1
+    t0=$(date +%s)
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+        httrack 'BASEURL/types/index.html' -c1 "$@" >/dev/null 2>&1
+    t1=$(date +%s)
+    echo $((t1 - t0))
+}
+
+base=$(run)
+paused=$(run --pause 0.5)
+delta=$((paused - base))
+
+echo "crawl: ${base}s, with --pause 0.5: ${paused}s (delta ${delta}s)"
+if [ "$delta" -lt 2 ]; then
+    echo "FAIL: --pause did not delay the crawl (delta ${delta}s)" >&2
+    exit 1
+fi

@@ -114,6 +114,8 @@ const char *hts_optalias[][4] = {
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
+  {"pause", "-%G", "param1",
+   "random pause of MIN[:MAX] seconds between files"},
   {"generate-errors", "-o", "single", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "param", ""},

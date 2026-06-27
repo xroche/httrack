@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# --pause (#185): the inter-file pause target must stay in [min,max] and spread
+# across it (a per-call rand() would collapse it toward min). Driven by the
+# in-process 'httrack -#test=pause' test. POSIX-portable ($(BASH) is /bin/sh on macOS).
+
+set -eu
+
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=pause run)
+
+test "$out" = "pause: OK" || {
+    echo "expected 'pause: OK', got: $out" >&2
+    exit 1
+}
