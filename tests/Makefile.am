@@ -72,6 +72,7 @@ TESTS = \
 	23_local-errpage.test \
 	24_local-resume-overlap.test \
 	25_local-mime-exclude.test \
-	26_local-strip-query.test
+	26_local-strip-query.test \
+	27_local-cookies-file.test
 
 CLEANFILES = check-network_sh.cache

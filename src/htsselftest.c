@@ -899,6 +899,19 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   if (to->parseall != HTS_TRUE)
     err = 1;
 
+  /* String field: a non-empty source deep-copies across, an empty source
+     leaves the target intact (StringNotEmpty guard). Covers the exported
+     copy_htsopt String path that no crawl test reaches. */
+  StringCopy(from->cookies_file, "/tmp/jar.txt");
+  StringCopy(to->cookies_file, "");
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
+    err = 1;
+  StringCopy(from->cookies_file, "");
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
+    err = 1;
+
   hts_free_opt(from);
   hts_free_opt(to);
   printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");

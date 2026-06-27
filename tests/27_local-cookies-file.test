@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# End-to-end --cookies-file (#215): /gated/secret.php needs a cookie no page
+# ever Set-Cookies, so it is reachable only when the option preloads it from a
+# Netscape cookies.txt. Locks the CLI->opt->cookie_load->wire plumbing.
+
+set -e
+
+: "${top_srcdir:=..}"
+
+# preloaded cookie -> secret page is served. -o0 means a 500 leaves no file, so
+# --found/--files only hold when the secret is genuinely fetched (200).
+bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
+    --errors 0 --files 2 \
+    --found 'gated/index.html' --found 'gated/secret.html' \
+    httrack 'BASEURL/gated/index.php' -o0
+
+# control: without the cookie the secret 500s; -o0 suppresses the error page so
+# its absence is real (error + missing file)
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --found 'gated/index.html' --not-found 'gated/secret.html' \
+    httrack 'BASEURL/gated/index.php' -o0

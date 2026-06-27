@@ -12,11 +12,14 @@
 # the mirror directory name.
 #
 # Usage:
-#   bash local-crawl.sh [--tls] [--root DIR] \
+#   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
 #       --errors N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       httrack BASEURL/some/path [httrack-args...]
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
+# --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
+# which the ephemeral port forces into the cookie domain) and passes it to
+# httrack via --cookies-file, to exercise preloaded cookies.
 
 set -u
 
@@ -85,6 +88,7 @@ tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create
 
 # --- parse leading control flags --------------------------------------------
 declare -a audit=()
+declare -a cookies=()
 scheme=http
 pos=0
 args=("$@")
@@ -104,6 +108,10 @@ while test "$pos" -lt "$nargs"; do
     --root)
         pos=$((pos + 1))
         root="${args[$pos]}"
+        ;;
+    --cookie)
+        pos=$((pos + 1))
+        cookies+=("${args[$pos]}")
         ;;
     --errors | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
@@ -157,6 +165,17 @@ while test "$pos" -lt "$nargs"; do
     hts+=("${args[$pos]//BASEURL/$baseurl}")
     pos=$((pos + 1))
 done
+
+# --- materialize any --cookie entries into a cookies.txt ---------------------
+if test "${#cookies[@]}" -gt 0; then
+    jar="${tmpdir}/cookies.txt"
+    : >"$jar"
+    for spec in "${cookies[@]}"; do
+        printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\t%s\t%s\n' \
+            "$port" "${spec%%=*}" "${spec#*=}" >>"$jar"
+    done
+    hts+=(--cookies-file "$jar")
+fi
 
 # --- run httrack -------------------------------------------------------------
 which httrack >/dev/null || die "could not find httrack"

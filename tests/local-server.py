@@ -110,6 +110,19 @@ class Handler(SimpleHTTPRequestHandler):
             return self.fail_cookie("badger")
         self.send_html("\tThis is a test.")
 
+    # --cookies-file (#215): the secret page needs a cookie no page ever sets,
+    # so it is reachable only when --cookies-file preloads it.
+    GATE_COOKIE = ("session", "opensesame")
+
+    def route_gated_index(self):
+        self.send_html('\tThis is a <a href="secret.php">link</a>')
+
+    def route_gated_secret(self):
+        name, value = self.GATE_COOKIE
+        if self.request_cookies().get(name) != value:
+            return self.fail_cookie(name)
+        self.send_html("\tThis is the secret.")
+
     def route_robots(self):
         body = b"User-agent: *\nDisallow:\n"
         self.send_response(200)
@@ -345,6 +358,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
         "/cookies/third.php": route_third,
+        "/gated/index.php": route_gated_index,
+        "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

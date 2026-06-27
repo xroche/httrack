@@ -572,6 +572,7 @@ void help(const char *app, int more) {
   infomsg("");
   infomsg("Spider options:");
   infomsg("  bN accept cookies in cookies.txt (0=do not accept,* 1=accept)");
+  infomsg(" %K  load extra cookies from a Netscape cookies.txt");
   infomsg
     ("  u  check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)");
   infomsg

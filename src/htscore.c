@@ -523,9 +523,12 @@ int httpmirror(char *url1, httrackp * opt) {
     opt->cookie = &cookie;
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
-    // Charger cookies.txt par défaut ou cookies.txt du miroir
+    // Load the mirror's cookies.txt, then the one in the current directory
     cookie_load(opt->cookie, StringBuff(opt->path_log), "cookies.txt");
     cookie_load(opt->cookie, "", "cookies.txt");
+    // A user-supplied cookie file is merged last so it wins on conflicts
+    if (strnotempty(StringBuff(opt->cookies_file)))
+      cookie_load(opt->cookie, "", StringBuff(opt->cookies_file));
   } else
     opt->cookie = NULL;
 
@@ -3741,6 +3744,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->strip_query))
     StringCopyS(to->strip_query, from->strip_query);
+
+  if (StringNotEmpty(from->cookies_file))
+    StringCopyS(to->cookies_file, from->cookies_file);
 
   if (from->retry > -1)
     to->retry = from->retry;
