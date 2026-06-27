@@ -1052,6 +1052,126 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* --strip-query: resolver + fil_normalized_filtered, end to end. */
+static int st_stripquery(httrackp *opt, int argc, char **argv) {
+  char dest[1024], keys[256], ref[1024];
+  const char *k;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* empty rules == plain fil_normalized */
+  assertf(hts_query_strip_keys(NULL, "h.com", "/p?a=1", keys, sizeof(keys)) ==
+          NULL);
+  assertf(hts_query_strip_keys("", "h.com", "/p?a=1", keys, sizeof(keys)) ==
+          NULL);
+  assertf(strcmp(fil_normalized_filtered("/p?b=2&a=1", dest, NULL),
+                 fil_normalized("/p?b=2&a=1", ref)) == 0);
+
+  /* bare form (*=keys): strip the key everywhere, keep+sort the rest */
+  k = hts_query_strip_keys("sid", "any.com", "/p?b=2&sid=x&a=1", keys,
+                           sizeof(keys));
+  assertf(k != NULL && strcmp(k, "sid") == 0);
+  assertf(strcmp(fil_normalized_filtered("/p?b=2&sid=x&a=1", dest, k),
+                 "/p?a=1&b=2") == 0);
+
+  /* reordered variant + an extra stripped key == the clean URL */
+  assertf(strcmp(fil_normalized_filtered("/p?sid=y&a=1&b=2", dest, "sid"),
+                 fil_normalized("/p?a=1&b=2", ref)) == 0);
+
+  /* host pattern matches only that host, incl. its www-normalized forms */
+  assertf(hts_query_strip_keys("ex.com/*=utm", "other.com", "/p?utm=1", keys,
+                               sizeof(keys)) == NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "ex.com", "/p?utm=1", keys,
+                               sizeof(keys)) != NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "www.ex.com", "/p?utm=1", keys,
+                               sizeof(keys)) != NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "http://www-3.ex.com",
+                               "/p?utm=1", keys, sizeof(keys)) != NULL);
+
+  /* last match wins, wholesale: host rule overrides global, no union */
+  k = hts_query_strip_keys("*=sid\nex.com/*=utm", "ex.com",
+                           "/p?sid=1&utm=2&a=3", keys, sizeof(keys));
+  assertf(k != NULL && strcmp(k, "utm") == 0);
+  assertf(strcmp(fil_normalized_filtered("/p?sid=1&utm=2&a=3", dest, k),
+                 "/p?a=3&sid=1") == 0);
+  k = hts_query_strip_keys("*=sid\nex.com/*=utm", "z.com", "/p?sid=1&a=3", keys,
+                           sizeof(keys));
+  assertf(k != NULL && strcmp(k, "sid") == 0);
+
+  /* whole-key match, not prefix: "utm" must not strip utm_source */
+  assertf(strcmp(fil_normalized_filtered("/p?utm_source=x&a=1", dest, "utm"),
+                 "/p?a=1&utm_source=x") == 0);
+
+  /* "*" drops every param; a fully-stripped single-arg query loses its '?' */
+  assertf(strcmp(fil_normalized_filtered("/p?a=1&b=2", dest, "*"), "/p") == 0);
+  assertf(strcmp(fil_normalized_filtered("/p?utm=1", dest, "utm"), "/p") == 0);
+
+  /* degenerate forms a=, b, c== (key 'c'); strip c keeps a= and b */
+  assertf(strcmp(fil_normalized_filtered("/p?a=&b&c==", dest, "c"),
+                 "/p?a=&b") == 0);
+  /* short key must not strip a longer one: 'c' must not touch 'cc' */
+  assertf(strcmp(fil_normalized_filtered("/p?cc=1&c=2", dest, "c"),
+                 "/p?cc=1") == 0);
+
+  /* repeated key: every occurrence is stripped, not just the first */
+  assertf(
+      strcmp(fil_normalized_filtered("/p?foo=42&bar=13&foo=43", dest, "foo"),
+             "/p?bar=13") == 0);
+  /* repeated key mixing missing/empty values */
+  assertf(
+      strcmp(fil_normalized_filtered("/p?foo&bar=13&foo=42&foo=", dest, "foo"),
+             "/p?bar=13") == 0);
+  /* repeated key kept (no match): all occurrences retained, then sorted */
+  assertf(strcmp(fil_normalized_filtered("/p?foo=42&bar=13&foo=43", dest, "z"),
+                 "/p?bar=13&foo=42&foo=43") == 0);
+
+  /* value containing '=': the key is only the part before the first '='. Strip
+     'foo' drops "foo=42=17" whole; the '=' in the value is not a delimiter. */
+  assertf(strcmp(fil_normalized_filtered("/p?foo=42=17&bar=", dest, "foo"),
+                 "/p?bar=") == 0);
+  /* keeping it preserves the embedded '=' verbatim */
+  assertf(strcmp(fil_normalized_filtered("/p?foo=42=17&bar=", dest, "bar"),
+                 "/p?foo=42=17") == 0);
+  /* a value segment is not a key: stripping "42" must not touch foo=42=17 */
+  assertf(strcmp(fil_normalized_filtered("/p?foo=42=17", dest, "42"),
+                 "/p?foo=42=17") == 0);
+
+  /* Idempotency: the read path re-normalizes an already-normalized fil, so the
+     result must be a fixpoint or dedup misses (catches a dropped empty/trailing
+     arg like "?&&", "a&"). */
+  {
+    static const char *const qs[] = {"/p?a=&b&c==",
+                                     "/p?a&&b",
+                                     "/p?&a",
+                                     "/p?a&",
+                                     "/p?",
+                                     "/p?=v",
+                                     "/p?&&",
+                                     "/p?b=2&a=1",
+                                     "/p?utm=x&",
+                                     "/p?&utm=x",
+                                     "/p?foo=42&bar=13&foo=43",
+                                     "/p?foo&bar=13&foo=42&foo=",
+                                     "/p?foo=42=17&bar="};
+    static const char *const strips[] = {NULL, "z", "utm", "*", "a", "foo"};
+    char once[1024], twice[1024];
+    size_t i, j;
+
+    for (i = 0; i < sizeof(qs) / sizeof(qs[0]); i++) {
+      for (j = 0; j < sizeof(strips) / sizeof(strips[0]); j++) {
+        fil_normalized_filtered(qs[i], once, strips[j]);
+        fil_normalized_filtered(once, twice, strips[j]);
+        assertf(strcmp(once, twice) == 0);
+      }
+    }
+  }
+
+  printf("strip-query self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1068,6 +1188,8 @@ static const struct selftest_entry {
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
+    {"stripquery", "", "--strip-query pattern/key stripping self-test",
+     st_stripquery},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <string>",
      "convert a string to UTF-8 from a charset", st_charset},

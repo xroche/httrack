@@ -117,10 +117,17 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
 
   // copy link
   assertf(fil != NULL);
-  if (hash->normalized) {
-    fil_normalized(fil, &hash->normfil[strlen(hash->normfil)]);
-  } else {
-    strcpy(&hash->normfil[strlen(hash->normfil)], fil);
+  {
+    /* resolve the per-URL strip keys; strip applies even when urlhack is off */
+    char BIGSTK keybuf[HTS_URLMAXSIZE];
+    const char *const keys = hts_query_strip_keys(hash->strip_query, adr, fil,
+                                                  keybuf, sizeof(keybuf));
+
+    if (hash->normalized || keys != NULL) {
+      fil_normalized_filtered(fil, &hash->normfil[strlen(hash->normfil)], keys);
+    } else {
+      strcpy(&hash->normfil[strlen(hash->normfil)], fil);
+    }
   }
 
   // hash
@@ -161,12 +168,20 @@ static int key_adrfil_equals_generic(void *arg,
   }
 
   // now compare pathes
-  if (normalized) {
-    fil_normalized(a_fil, hash->normfil);
-    fil_normalized(b_fil, hash->normfil2);
-    return strcmp(hash->normfil, hash->normfil2) == 0;
-  } else {
-    return strcmp(a_fil, b_fil) == 0;
+  {
+    char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
+    const char *const keysa =
+        hts_query_strip_keys(hash->strip_query, a_adr, a_fil, ka, sizeof(ka));
+    const char *const keysb =
+        hts_query_strip_keys(hash->strip_query, b_adr, b_fil, kb, sizeof(kb));
+
+    if (normalized || keysa != NULL || keysb != NULL) {
+      fil_normalized_filtered(a_fil, hash->normfil, keysa);
+      fil_normalized_filtered(b_fil, hash->normfil2, keysb);
+      return strcmp(hash->normfil, hash->normfil2) == 0;
+    } else {
+      return strcmp(a_fil, b_fil) == 0;
+    }
   }
 }
 
@@ -227,6 +242,9 @@ void hash_init(httrackp *opt, hash_struct * hash, int normalized) {
   hash->adrfil = coucal_new(0);
   hash->former_adrfil = coucal_new(0);
   hash->normalized = normalized;
+  /* snapshot the query-strip list (not owned; valid for the hash lifetime) */
+  hash->strip_query =
+      StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
 
   hts_set_hash_handler(hash->sav, opt);
   hts_set_hash_handler(hash->adrfil, opt);

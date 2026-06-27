@@ -529,6 +529,8 @@ struct httrackp {
   htslibhandles libHandles; /**< loaded external module handles */
   //
   htsoptstate state; /**< embedded live engine state */
+  String strip_query; /**< query keys to drop when deduping URLs (-strip-query);
+                           appended at the tail to keep field offsets stable */
 };
 
 /* Running statistics for a mirror. */

@@ -3681,6 +3681,142 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   return dest;
 }
 
+/* Is query key ARG[0..keylen) in the comma-separated STRIP list? "*" = all;
+   case-sensitive, space-trimmed tokens. */
+static int hts_query_key_stripped(const char *arg, size_t keylen,
+                                  const char *strip) {
+  const char *p = strip;
+
+  while (*p != '\0') {
+    const char *start = p;
+    size_t toklen;
+
+    while (*p != '\0' && *p != ',')
+      p++;
+    toklen = (size_t) (p - start);
+    while (toklen > 0 && *start == ' ') {
+      start++;
+      toklen--;
+    }
+    while (toklen > 0 && start[toklen - 1] == ' ')
+      toklen--;
+    if (toklen == 1 && start[0] == '*')
+      return 1;
+    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
+      return 1;
+    if (*p == ',')
+      p++;
+  }
+  return 0;
+}
+
+/* see htscore.h */
+char *fil_normalized_filtered(const char *source, char *dest,
+                              const char *strip) {
+  const char *query;
+  char BIGSTK tmp[HTS_URLMAXSIZE * 2];
+  htsbuff cb;
+  int wrote = 0;
+
+  /* No strip list, or no query: plain normalization. */
+  if (strip == NULL || *strip == '\0' ||
+      (query = strchr(source, '?')) == NULL) {
+    return fil_normalized(source, dest);
+  }
+
+  /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
+     every field incl. empty/trailing ("a&","?&&") so the result is a fixpoint
+     (the read re-normalizes it; a dropped empty arg would miss dedup). */
+  cb = htsbuff_ptr(tmp, sizeof(tmp));
+  htsbuff_catn(&cb, source, (size_t) (query - source));
+  for (query++;;) {
+    const char *const arg = query;
+    const char *eq = NULL;
+    size_t keylen, arglen;
+
+    while (*query != '\0' && *query != '&') {
+      if (eq == NULL && *query == '=')
+        eq = query;
+      query++;
+    }
+    arglen = (size_t) (query - arg);
+    keylen = eq != NULL ? (size_t) (eq - arg) : arglen;
+    if (!hts_query_key_stripped(arg, keylen, strip)) {
+      htsbuff_catc(&cb, wrote ? '&' : '?');
+      htsbuff_catn(&cb, arg, arglen);
+      wrote = 1;
+    }
+    if (*query == '\0')
+      break;
+    query++;
+  }
+  return fil_normalized(tmp, dest);
+}
+
+/* see htscore.h */
+const char *hts_query_strip_keys(const char *rules, const char *adr,
+                                 const char *fil, char *dest, size_t destsize) {
+  const char *p, *q;
+  const char *result = NULL;
+  char BIGSTK url[HTS_URLMAXSIZE * 2];
+
+  if (rules == NULL || *rules == '\0' || destsize == 0)
+    return NULL;
+
+  /* Match string = normalized host/path, query removed. jump_normalized_const
+     collapses www+scheme/auth so read and write (double-normalized) agree;
+     query excluded keeps the decision on host/path only. */
+  url[0] = '\0';
+  strcatbuff(url, jump_normalized_const(adr));
+  if (fil[0] != '/')
+    strcatbuff(url, "/");
+  q = strchr(fil, '?');
+  if (q != NULL)
+    strncatbuff(url, fil, (int) (q - fil));
+  else
+    strcatbuff(url, fil);
+
+  /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
+     "pattern=keys"; no '=' is the bare form, pattern "*". */
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq, *keys;
+    char BIGSTK pat[HTS_URLMAXSIZE * 2];
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    if (eol == line)
+      continue;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq != NULL) {
+      size_t patlen = (size_t) (eq - line);
+
+      if (patlen >= sizeof(pat))
+        patlen = sizeof(pat) - 1;
+      memcpy(pat, line, patlen);
+      pat[patlen] = '\0';
+      keys = eq + 1;
+    } else {
+      pat[0] = '*';
+      pat[1] = '\0';
+      keys = line;
+    }
+    if (strjoker(url, pat, NULL, NULL) != NULL) {
+      size_t klen = (size_t) (eol - keys);
+
+      if (klen >= destsize)
+        klen = destsize - 1;
+      memcpy(dest, keys, klen);
+      dest[klen] = '\0';
+      result = dest;
+    }
+  }
+  return result;
+}
+
 #define endwith(a) ( (len >= (sizeof(a)-1)) ? ( strncmp(dest, a+len-(sizeof(a)-1), sizeof(a)-1) == 0 ) : 0 );
 HTSEXT_API char *adr_normalized_sized(const char *source, char *dest,
                                       size_t destsize) {
@@ -5891,6 +6027,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->sizehack = HTS_FALSE;
   opt->urlhack = HTS_TRUE;
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
+  StringCopy(opt->strip_query, "");
   opt->ftp_proxy = HTS_TRUE;
   opt->convert_utf8 = HTS_TRUE;
   StringCopy(opt->filelist, "");
@@ -6035,6 +6172,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->urllist);
     StringFree(opt->footer);
     StringFree(opt->mod_blacklist);
+    StringFree(opt->strip_query);
 
     StringFree(opt->path_html);
     StringFree(opt->path_html_utf8);
