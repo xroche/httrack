@@ -355,7 +355,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     # 302 whose Location carries a #fragment (#204): the fragment is a UA anchor
-    # and must be dropped before the target is fetched/saved.
+    # that must be dropped before the target is fetched. A leaked '#' reaches the
+    # strict-server guard below and 400s.
     def route_redir_index(self):
         self.send_html('\t<a href="go.php">go</a>')
 
@@ -412,6 +413,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     # --- dispatch ----------------------------------------------------------
 
+    def reject_fragment(self):
+        # Strict server: a '#' in the request-target is the client failing to
+        # drop a fragment (#204). RFC 3986 forbids it on the wire; answer 400.
+        if "#" in self.path:
+            self.send_response(400, "Bad Request")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return True
+        return False
+
     def dispatch(self):
         self._set_cookies = []
         path = urlsplit(self.path).path
@@ -423,10 +434,14 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_GET(self):
+        if self.reject_fragment():
+            return
         if not self.dispatch():
             super().do_GET()
 
     def do_HEAD(self):
+        if self.reject_fragment():
+            return
         if not self.dispatch():
             super().do_HEAD()
 
