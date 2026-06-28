@@ -30,12 +30,14 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <stdint.h>
+
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htssafe.h"
 
-/* static int decode_entity(const unsigned int hash, const size_t len);
-*/
+/* static int decode_entity(const uint64_t hash, const size_t len);
+ */
 #include "htsentities.h"
 
 /* hexadecimal conversion */
@@ -50,30 +52,31 @@ static int get_hex_value(char c) {
     return -1;
 }
 
-/* Numerical Recipes,
-   see <http://en.wikipedia.org/wiki/Linear_congruential_generator> */
-#define HASH_PRIME ( 1664525 )
-#define HASH_CONST ( 1013904223 )
-#define HASH_ADD(HASH, C) do {                  \
-    (HASH) *= HASH_PRIME;                       \
-    (HASH) += HASH_CONST;                       \
-    (HASH) += (C);                              \
-  } while(0)
+/* 64-bit FNV-1a; must match htsentities.sh, which keys the entity table on it.
+ */
+#define HASH_INIT 0xcbf29ce484222325ULL
+#define HASH_PRIME 0x100000001b3ULL
+#define HASH_ADD(HASH, C)                                                      \
+  do {                                                                         \
+    (HASH) ^= (unsigned char) (C);                                             \
+    (HASH) *= HASH_PRIME;                                                      \
+  } while (0)
 
 int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
   size_t i, j, ampStart, ampStartDest;
   int uc;
   int hex;
-  unsigned int hash;
+  uint64_t hash;
 
   assertf(max != 0);
-  for(i = 0, j = 0, ampStart = (size_t) -1, ampStartDest = 0,
-        uc = -1, hex = 0, hash = 0 ; src[i] != '\0' ; i++) {
+  for (i = 0, j = 0, ampStart = (size_t) -1, ampStartDest = 0, uc = -1, hex = 0,
+      hash = HASH_INIT;
+       src[i] != '\0'; i++) {
     /* start of entity */
     if (src[i] == '&') {
       ampStart = i;
       ampStartDest = j;
-      hash = 0;
+      hash = HASH_INIT;
       uc = -1;
     }
     /* inside a potential entity */
@@ -174,14 +177,11 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
       }
       /* alphanumerical entity */
       else {
-        /* alphanum and not too far ('&thetasym;' is the longest) */
-        if (i <= ampStart + 10 &&
-            (
-             (src[i] >= '0' && src[i] <= '9')
-             || (src[i] >= 'A' && src[i] <= 'Z')
-             || (src[i] >= 'a' && src[i] <= 'z')
-             )
-            ) {
+        /* alphanum, capped at the longest name
+         * '&CounterClockwiseContourIntegral;' (31) */
+        if (i <= ampStart + 31 && ((src[i] >= '0' && src[i] <= '9') ||
+                                   (src[i] >= 'A' && src[i] <= 'Z') ||
+                                   (src[i] >= 'a' && src[i] <= 'z'))) {
           /* compute hash */
           HASH_ADD(hash, (unsigned char) src[i]);
         } else {

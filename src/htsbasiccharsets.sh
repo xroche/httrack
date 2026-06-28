@@ -3,12 +3,12 @@
 
 # Change this to download files
 if false; then
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/ISO8859/8859-*.TXT" | lftp
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/PC/CP*.TXT" | lftp
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WINDOWS/CP*.TXT" | lftp
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/EBCDIC/CP*.TXT" | lftp
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MISC/CP*.TXT" | lftp
-    echo "mget ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MISC/KOI8*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/ISO8859/8859-*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/PC/CP*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WINDOWS/CP*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/EBCDIC/CP*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/VENDORS/MISC/CP*.TXT" | lftp
+    echo "mget https://www.unicode.org/Public/MAPPINGS/VENDORS/MISC/KOI8*.TXT" | lftp
     rm -f CP932.TXT CP936.TXT CP949.TXT CP950.TXT
 fi
 
