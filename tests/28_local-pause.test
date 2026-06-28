@@ -9,6 +9,13 @@ set -e
 
 : "${top_srcdir:=..}"
 
+# python3 runs the local server (mirror local-crawl.sh); skip when absent, else
+# run() swallows its exit-77 and the serverless 0s/0s crawl looks like a fail.
+command -v python3 >/dev/null || {
+    echo "python3 not found; skipping local crawl tests"
+    exit 77
+}
+
 run() { # echoes the wall-clock seconds of one crawl
     local t0 t1
     t0=$(date +%s)

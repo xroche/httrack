@@ -61,6 +61,50 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Reproduce the Debian buildds: they build in a minimal chroot with no
+  # python3, so the local-server tests must SKIP (exit 77), not fail. GitHub
+  # runners ship python3, so every other job hides this path; here we remove it
+  # before `make check`. This is the guard that would have caught the 3.49.10-1
+  # FTBFS (28_local-pause failed instead of skipping when python3 was absent).
+  buildd-no-python3:
+    name: build (no python3, Debian buildd)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test without python3
+        run: |
+          set -euo pipefail
+          # Hide every python3* so `command -v python3` fails like it does in the
+          # buildd chroot; masking with /bin/false would still resolve.
+          sudo find /usr/bin /usr/local/bin -maxdepth 1 -name 'python3*' \
+            -exec mv {} {}.hidden \;
+          ! command -v python3
+          make check
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
   # generic-Unix path on a second libc and kernel. brew's openssl@3 is keg-only,
