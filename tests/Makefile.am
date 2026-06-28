@@ -75,6 +75,7 @@ TESTS = \
 	25_local-mime-exclude.test \
 	26_local-strip-query.test \
 	27_local-cookies-file.test \
-	28_local-pause.test
+	28_local-pause.test \
+	29_local-redirect-fragment.test
 
 CLEANFILES = check-network_sh.cache

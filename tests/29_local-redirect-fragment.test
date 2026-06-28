@@ -1,0 +1,11 @@
+#!/bin/bash
+# Issue #204: a 302 Location with a #fragment must drop the fragment before the
+# target is fetched. The server is strict (400 on a '#' in the request-target),
+# so a leaked fragment logs an error and the target is never saved.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'redir/target.html' \
+    httrack 'BASEURL/redir/index.html'
