@@ -18,6 +18,21 @@ ent '&amp;' '&'
 ent '&lt;&gt;' '<>'
 ent '&eacute;' 'é'
 
+# HTML5 names from the WHATWG set
+ent '&hellip;' '…'
+ent '&bigcup;' '⋃'
+# longest name (31 chars) exercises the name-length cap
+ent '&CounterClockwiseContourIntegral;' '∳'
+# astral codepoint -> 4-byte UTF-8
+ent '&Aopf;' '𝔸'
+# multi-codepoint refs are skipped at generation, so left verbatim
+ent '&fjlig;' '&fjlig;'
+
+# common HTML4 names still decode (regression guard against accidental drops)
+ent '&copy;&reg;&trade;' '©®™'
+ent '&mdash;&ndash;' '—–'
+ent '&alpha;&beta;' 'αβ'
+
 # numeric: decimal and hex
 ent '&#65;&#66;' 'AB'
 ent '&#x41;' 'A'
