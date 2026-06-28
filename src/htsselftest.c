@@ -1302,6 +1302,22 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
+static int st_useragent(httrackp *opt, int argc, char **argv) {
+  const char *ua = StringBuff(opt->user_agent);
+  (void) argc;
+  (void) argv;
+  assertf(ua != NULL);
+  assertf(strcmp(ua, HTS_DEFAULT_USER_AGENT) == 0);
+  /* Teeth independent of the macro: honest token + self-identifier, and no
+     legacy Mozilla/4.x fake-browser string (rejects the whole relic family). */
+  assertf(strstr(ua, "HTTrack/") != NULL);
+  assertf(strstr(ua, "+https://www.httrack.com/") != NULL);
+  assertf(strstr(ua, "Mozilla/4.") == NULL);
+  printf("useragent self-test OK: %s\n", ua);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1348,6 +1364,7 @@ static const struct selftest_entry {
      st_cache_writefail},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"cookies", "", "cookie request-header self-test", st_cookies},
+    {"useragent", "", "default User-Agent self-test", st_useragent},
 };
 
 static void list_selftests(void) {

@@ -6048,8 +6048,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->shell = HTS_FALSE;
   opt->proxy.active = 0;        // pas de proxy
   opt->user_agent_send = HTS_TRUE;
-  StringCopy(opt->user_agent,
-             "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)");
+  StringCopy(opt->user_agent, HTS_DEFAULT_USER_AGENT);
   StringCopy(opt->referer, "");
   StringCopy(opt->from, "");
   opt->savename_83 = HTS_SAVENAME_83_LONG; // long names by default

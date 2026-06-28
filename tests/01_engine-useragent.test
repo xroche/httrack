@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Default User-Agent (#449): honest HTTrack token, no Windows 98 relic.
+httrack -O /dev/null -#test=useragent run | grep -q "useragent self-test OK"

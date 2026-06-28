@@ -358,12 +358,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       {NULL, 0}
     };
     initStrElt initStr[] = {
-      {"user", "Mozilla/4.5 (compatible; HTTrack 3.0x; Windows 98)"},
-      {"footer",
-       "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x [XR&CO'2014], %s -->"},
-      {"url2", "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/*"},
-      {NULL, NULL}
-    };
+        {"user", HTS_DEFAULT_USER_AGENT},
+        {"footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x "
+                   "[XR&CO'2014], %s -->"},
+        {"url2",
+         "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/*"},
+        {NULL, NULL}};
     int i = 0;
 
     for(i = 0; initInt[i].name; i++) {
