@@ -50,27 +50,47 @@ match '*foo*bar' 'foozbar'
 # '?' is the query-string marker, not a single-char wildcard
 nomatch 'a?c' 'abc'
 
-# backslash escapes a metacharacter inside a class so it is matched literally.
-# Quirk: the decoder also adds the backslash itself to the set, so '\X' matches
-# both X and '\'. These assertions pin that behavior.
+# Inside a class, backslash escapes the next char as a literal member (#148):
+# '\X' matches X only (not '\'), and an escaped ']' is a member, not the terminator.
 match '*[\*]' '*'
-match '*[\*]' "\\"
-nomatch '*[\*]' 'a'
+nomatch '*[\*]' "\\"
 match '*[\\]' "\\"
-nomatch '*[\\]' 'a'
+nomatch '*[\\]' '*'
 match '*[\[]' '['
-match '*[\[]' "\\"
-nomatch '*[\[]' 'a'
+nomatch '*[\[]' "\\"
+match '*[\]]' ']'
+nomatch '*[\]]' "\\"
 
-# A literal ']' cannot be a class member: the class parser stops at the first
-# ']', escaped or not. So '*[\[\]]' does NOT mean "the [ or ] character" as the
-# filter guide claims (GitHub #148); it parses as the class {'[','\'} followed
-# by a trailing literal ']'. These assertions document the current (buggy)
-# behavior so any future matcher fix is a deliberate, visible change.
-nomatch '*[\[\]]' '[' # not matched, despite the docs
-match '*[\[\]]' ']'   # only via the empty class-match + trailing ']'
-match '*[\[\]]' '[]'  # one of {'[','\'} then the trailing ']'
-nomatch '*[\[\]]' '[]x'
+# '*[\[\]]' is "the [ or ] character", as the filter guide documents.
+match '*[\[\]]' '['
+match '*[\[\]]' ']'
+nomatch '*[\[\]]' 'a'
+match '*[\[,\]]' '['   # comma between members is optional
+match '*[\[,\]]' ']'
+match '*[a,\[]' 'a'    # an escaped member no longer eats the preceding one
+match '*[a,\[]' '['
+
+# Escape is decoded before the range/separator/size checks, so '\-' '\,' '\<'
+# are literal members, not operators.
+match '*[a\-z]' 'a'
+match '*[a\-z]' 'z'
+nomatch '*[a\-z]' 'b'  # not the a..z range
+match '*[\,]' ','
+match '*[\<]' '<'
+match '*[\[,\],a]' '['
+match '*[\[,\],a]' ']'
+match '*[\[,\],a]' 'a'
+
+# *(...) matches exactly one char from the class; *[...] matches a run.
+match '*(a,b)' 'a'
+nomatch '*(a,b)' 'aa'
+nomatch '*(a,b)' 'c'
+
+# documented composite filters (filters.html)
+match 'www.*[path].com/*[path].zip' 'www.foo.com/a/b.zip'
+nomatch 'www.*[path].com/*[path].zip' 'www.foo.com/a/b.tar'
+match '*.html*[]' 'page.html'
+nomatch '*.html*[]' 'page.html?x=1'  # *[] forbids the trailing query
 
 # Size-based rules (-#test=filtersize <size> <string> <filter...>): a negative size
 # means the size is still unknown (scan time). A size exclusion must stay neutral

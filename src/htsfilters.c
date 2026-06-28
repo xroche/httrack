@@ -193,7 +193,12 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
           int len = (int) strlen(joker);
 
           while((joker[i] != RIGHT) && (joker[i]) && (i < len)) {
-            if ((joker[i] == '<') || (joker[i] == '>')) {       // *[<10]
+            // '\' escapes the next char as a literal member, e.g. *[\[\]]
+            if (joker[i] == '\\' && joker[i + 1] != '\0') {
+              i++;
+              pass[(int) (unsigned char) joker[i]] = 1;
+              i++;
+            } else if ((joker[i] == '<') || (joker[i] == '>')) { // *[<10]
               int lsize = 0;
               int lverdict;
 
@@ -221,7 +226,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
                 while(isdigit((unsigned char) joker[i]))
                   i++;
               }
-            } else if (joker[i + 1] == '-') {   // 2 car, ex: *[A-Z]
+            } else if (joker[i + 1] == '-') { // 2 car, ex: *[A-Z]
               if ((int) (unsigned char) joker[i + 2] >
                   (int) (unsigned char) joker[i]) {
                 int j;
@@ -233,10 +238,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
               }
               // else err=1;
               i += 3;
-            } else {            // 1 car, ex: *[ ]
-              if (joker[i + 2] == '\\' && joker[i + 3] != 0) {  // escaped char, such as *[\[] or *[\]]
-                i++;
-              }
+            } else { // 1 car, ex: *[ ]
               pass[(int) (unsigned char) joker[i]] = 1;
               i++;
             }
