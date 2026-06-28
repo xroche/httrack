@@ -512,15 +512,21 @@ static int string_safety_selftests(void) {
 /* ------------------------------------------------------------ */
 
 static int st_filter(httrackp *opt, int argc, char **argv) {
+  char *str, *pat;
+  int matched;
+
   (void) opt;
   if (argc < 2) {
     fprintf(stderr, "filter: needs a filter pattern and a string\n");
     return 1;
   }
-  if (strjoker(argv[1], argv[0], NULL, NULL))
-    printf("%s does match %s\n", argv[1], argv[0]);
-  else
-    printf("%s does NOT match %s\n", argv[1], argv[0]);
+  /* exact-size heap copies so a sanitizer traps any over-read of the pattern */
+  str = strdupt(argv[1]);
+  pat = strdupt(argv[0]);
+  matched = strjoker(str, pat, NULL, NULL) != NULL;
+  printf("%s does %s %s\n", argv[1], matched ? "match" : "NOT match", argv[0]);
+  freet(str);
+  freet(pat);
   return 0;
 }
 
