@@ -226,7 +226,9 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
                 while(isdigit((unsigned char) joker[i]))
                   i++;
               }
-            } else if (joker[i + 1] == '-') { // 2 car, ex: *[A-Z]
+            } else if (joker[i + 1] == '-' && joker[i + 2] != '\0') {
+              // range *[A-Z]; the '\0' guard rejects a truncated *[a- (else
+              // i+=3 overshoots the NUL)
               if ((int) (unsigned char) joker[i + 2] >
                   (int) (unsigned char) joker[i]) {
                 int j;
