@@ -90,4 +90,16 @@ refused "dangling-quote argument not refused cleanly"
 run_only "$tmp/q-lone" '"'
 refused "lone-quote argument not refused cleanly"
 
+# --pause (#185): valid MIN[:MAX] accepted; malformed, reversed, over-range and
+# non-finite values refused cleanly. NaN defeats naive `<`/`>` checks (it
+# compares false to everything), so it must not slip through to the int cast.
+run "$tmp/pause-ok" --pause 0.2:0.4
+accepted "$tmp/pause-ok" "#185: valid --pause range rejected"
+run "$tmp/pause-fix" --pause 0.2
+accepted "$tmp/pause-fix" "#185: valid fixed --pause rejected"
+for bad in nan nan:5 5:nan inf 10:5 99999; do
+    run "$tmp/pause-bad" --pause "$bad"
+    refused "#185: invalid --pause '$bad' not refused cleanly"
+done
+
 exit 0

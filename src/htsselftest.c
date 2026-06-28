@@ -912,9 +912,55 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
     err = 1;
 
+  /* #185 pause pair: copied when enabled (max>0), the 0 sentinel skips */
+  from->pause_min_ms = 5000;
+  from->pause_max_ms = 10000;
+  to->pause_min_ms = to->pause_max_ms = 0;
+  copy_htsopt(from, to);
+  if (to->pause_min_ms != 5000 || to->pause_max_ms != 10000)
+    err = 1;
+  from->pause_min_ms = from->pause_max_ms = 0;
+  copy_htsopt(from, to);
+  if (to->pause_min_ms != 5000 || to->pause_max_ms != 10000)
+    err = 1;
+
   hts_free_opt(from);
   hts_free_opt(to);
   printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_pause(httrackp *opt, int argc, char **argv) {
+  int err = 0, i, seen_low = 0, seen_high = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* Consecutive-ms seeds (production shape: launch timestamps a few ms apart)
+     must stay in range and spread, not collapse to a bound -- worst case for a
+     weak low-bit mixer. */
+  for (i = 0; i < 10000; i++) {
+    int t = hts_pause_target_ms((TStamp) (1719500000000LL + i), 5000, 10000);
+
+    if (t < 5000 || t > 10000)
+      err = 1;
+    seen_low |= (t < 6000);
+    seen_high |= (t > 9000);
+  }
+  if (!seen_low || !seen_high)
+    err = 1;
+  if (hts_pause_target_ms(12345, 8000, 8000) != 8000) /* equal bounds = fixed */
+    err = 1;
+  /* deterministic: a seed yields the same target even after an intervening call
+     with another seed (no global PRNG state to perturb it) */
+  {
+    int a = hts_pause_target_ms(99, 5000, 10000);
+
+    (void) hts_pause_target_ms(54321, 5000, 10000);
+    if (hts_pause_target_ms(99, 5000, 10000) != a)
+      err = 1;
+  }
+  printf("pause: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -1264,6 +1310,7 @@ static const struct selftest_entry {
     {"strsafe", "[overflow|overflow-buff [str]]", "bounded string-op self-test",
      st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",

@@ -537,6 +537,8 @@ struct httrackp {
   hts_boolean no_query_dedup; /**< with urlhack, keep query-argument order */
   String cookies_file;        /**< extra Netscape cookies.txt to preload
                                  (--cookies-file) */
+  int pause_min_ms; /**< inter-file pause lower bound, ms (0=off, #185) */
+  int pause_max_ms; /**< inter-file pause upper bound, ms */
 };
 
 /* Running statistics for a mirror. */

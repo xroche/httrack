@@ -1994,6 +1994,33 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCopy(opt->cookies_file, argv[na]);
                 }
                 break;
+              case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF("Option pause needs a blank space and a "
+                                   "delay in seconds (MIN[:MAX])");
+                  printf("Example: --pause 5:10\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  double pmin = 0, pmax = 0;
+                  int nf;
+
+                  na++;
+                  nf = sscanf(argv[na], "%lf:%lf", &pmin, &pmax);
+                  if (nf < 2)
+                    pmax = pmin; /* a single value means a fixed delay */
+                  /* positive-form bounds: NaN fails every comparison, so this
+                     rejects it before the undefined (int)(NaN*1000) cast */
+                  if (nf < 1 || !(pmin >= 0 && pmax >= pmin && pmax <= 86400)) {
+                    HTS_PANIC_PRINTF("Invalid --pause range (expected "
+                                     "MIN[:MAX] seconds, 0<=MIN<=MAX<=86400)");
+                    htsmain_free();
+                    return -1;
+                  }
+                  opt->pause_min_ms = (int) (pmin * 1000.0);
+                  opt->pause_max_ms = (int) (pmax * 1000.0);
+                }
+                break;
               case 't':        /* do not change type (ending) of filenames according to the MIME type */
                 opt->no_type_change = 1;
                 if (*(com+1)=='0') { opt->no_type_change = 0; com++; }

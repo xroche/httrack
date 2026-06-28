@@ -521,6 +521,7 @@ void help(const char *app, int more) {
   infomsg("  EN maximum mirror time in seconds (60=1 minute, 3600=1 hour)");
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");
   infomsg(" %cN maximum number of connections/seconds (*%c10)");
+  infomsg(" %G  random pause of MIN[:MAX] seconds between files (e.g. %G5:10)");
   infomsg
     ("  GN pause transfer if N bytes reached, and wait until lock file is deleted");
   infomsg("");

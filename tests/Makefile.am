@@ -41,6 +41,7 @@ TESTS = \
 	01_engine-idna.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
+	01_engine-pause.test \
 	01_engine-rcfile.test \
 	01_engine-relative.test \
 	01_engine-savename.test \
@@ -73,6 +74,7 @@ TESTS = \
 	24_local-resume-overlap.test \
 	25_local-mime-exclude.test \
 	26_local-strip-query.test \
-	27_local-cookies-file.test
+	27_local-cookies-file.test \
+	28_local-pause.test
 
 CLEANFILES = check-network_sh.cache

@@ -6046,6 +6046,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
   StringCopy(opt->strip_query, "");
   StringCopy(opt->cookies_file, "");
+  opt->pause_min_ms = 0;
+  opt->pause_max_ms = 0;
   opt->ftp_proxy = HTS_TRUE;
   opt->convert_utf8 = HTS_TRUE;
   StringCopy(opt->filelist, "");
