@@ -229,6 +229,10 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFAULT_FOOTER                                                     \
   "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION     \
   " " HTTRACK_AFF_AUTHORS ", %s -->"
+/* Honest crawler User-Agent; no fake OS/browser to go stale. */
+#define HTS_DEFAULT_USER_AGENT                                                 \
+  "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
+  "; +https://www.httrack.com/)"
 #define HTTRACK_WEB "http://www.httrack.com"
 #define HTS_UPDATE_WEBSITE                                                     \
   "http://www.httrack.com/"                                                    \
