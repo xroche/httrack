@@ -497,6 +497,12 @@ static const char *GetHttpMessage(int statuscode) {
   case 417:
     return "Expectation Failed";
     break;
+  case 429:
+    return "Too Many Requests";
+    break;
+  case 451:
+    return "Unavailable For Legal Reasons";
+    break;
   case 500:
     return "Internal Server Error";
     break;

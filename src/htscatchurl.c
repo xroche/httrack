@@ -64,7 +64,7 @@ Please visit our Website: http://www.httrack.com
 // catch_url_init(&port,&return_host);
 HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
   T_SOC soc;
-  int try_to_listen_to[] = { 8080, 3128, 80, 81, 82, 8081, 3129, 31337, 0, -1 };
+  int try_to_listen_to[] = {8080, 3128, 80, 81, 82, 8081, 3129, 0, -1};
   int i = 0;
 
   do {
