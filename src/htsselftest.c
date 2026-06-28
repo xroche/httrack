@@ -1318,6 +1318,24 @@ static int st_useragent(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* HTTP status code -> reason phrase, including the modern 429/451. */
+static int st_status(httrackp *opt, int argc, char **argv) {
+  const char *s;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  s = infostatuscode_const(429);
+  assertf(s != NULL && strcmp(s, "Too Many Requests") == 0);
+  s = infostatuscode_const(451);
+  assertf(s != NULL && strcmp(s, "Unavailable For Legal Reasons") == 0);
+  /* A spot-check of a long-standing code, and an unknown one. */
+  s = infostatuscode_const(404);
+  assertf(s != NULL && strcmp(s, "Not Found") == 0);
+  assertf(infostatuscode_const(799) == NULL);
+  printf("status self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1365,6 +1383,7 @@ static const struct selftest_entry {
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},
+    {"status", "", "HTTP status code -> reason phrase self-test", st_status},
 };
 
 static void list_selftests(void) {

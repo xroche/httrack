@@ -1951,6 +1951,10 @@ HTSEXT_API const char *infostatuscode_const(int statuscode) {
     return "Requested Range Not Satisfiable";
   case 417:
     return "Expectation Failed";
+  case 429:
+    return "Too Many Requests";
+  case 451:
+    return "Unavailable For Legal Reasons";
   case 500:
     return "Internal Server Error";
   case 501:
@@ -5797,6 +5801,13 @@ HTSEXT_API int hts_init(void) {
       abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
     }
+    /* Pin a TLS floor (no SSLv3/TLS1.0/1.1); no cert verify, by design. */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    SSL_CTX_set_min_proto_version(openssl_ctx, TLS1_2_VERSION);
+#else
+    SSL_CTX_set_options(openssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
+                                         SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+#endif
   }
 #endif
 

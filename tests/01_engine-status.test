@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# HTTP status -> reason phrase, including the modern 429/451 (#453).
+httrack -O /dev/null -#test=status run | grep -q "status self-test OK"

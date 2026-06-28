@@ -47,6 +47,7 @@ TESTS = \
 	01_engine-savename.test \
 	01_engine-selftest-dispatch.test \
 	01_engine-simplify.test \
+	01_engine-status.test \
 	01_engine-stripquery.test \
 	01_engine-strsafe.test \
 	01_engine-urlhack.test \
