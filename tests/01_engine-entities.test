@@ -25,8 +25,13 @@ ent '&bigcup;' '⋃'
 ent '&CounterClockwiseContourIntegral;' '∳'
 # astral codepoint -> 4-byte UTF-8
 ent '&Aopf;' '𝔸'
-# multi-codepoint refs are unsupported, left verbatim
+# multi-codepoint refs are skipped at generation, so left verbatim
 ent '&fjlig;' '&fjlig;'
+
+# common HTML4 names still decode (regression guard against accidental drops)
+ent '&copy;&reg;&trade;' '©®™'
+ent '&mdash;&ndash;' '—–'
+ent '&alpha;&beta;' 'αβ'
 
 # numeric: decimal and hex
 ent '&#65;&#66;' 'AB'
