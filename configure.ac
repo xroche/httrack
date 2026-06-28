@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.9], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.10], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -29,10 +29,10 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:1:0: 3.49.9 changed code but not the exported interface vs 3.49.8 (same 164
-# symbols, no struct-layout change), so bump revision only. (3:0:0 was the htsblk
-# mime-buffer widening, an ABI break that moved the soname .so.2 -> .so.3.)
-VERSION_INFO="3:1:0"
+# 3:2:0: 3.49.10 only appends tail fields to the options struct (no existing
+# symbol or offset changed vs 3.49.9), so it stays soname .so.3; bump revision.
+# (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
+VERSION_INFO="3:2:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 

@@ -1,3 +1,16 @@
+httrack (3.49.10-1) unstable; urgency=medium
+
+  * New upstream release: new download-pacing and URL-handling options plus a
+    batch of crawl and robustness fixes (full list in history.txt).
+  * Rewrite debian/copyright in machine-readable DEP-5 format, crediting the
+    bundled minizip, md5 and coucal sources (#415).
+  * Lead the webhttrack browser dependency with chromium so httrack is not
+    dragged into the firefox-esr autoremoval cascade (#436).
+  * Override the embedded-library lint for the bundled minizip (#419).
+  * Bump Standards-Version to 4.7.4 (no changes required).
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 28 Jun 2026 14:01:53 +0200
+
 httrack (3.49.9-1) unstable; urgency=medium
 
   * New upstream release: Content-Type and file-type detection fixes (trust a
