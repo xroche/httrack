@@ -323,4 +323,33 @@ grep -Fq 'href="ahref%20(4).gif"' "$saved9" ||
 ! grep -Eq '(src|href)="[^"]*%28' "$saved9" ||
     ! echo "FAIL #163: gate over-fired onto a non-url() attribute link" || exit 1
 
+# HTML5 <source>/<track> follow as embedded near-links past the -r2 depth boundary (#451).
+# img.gif positive control; plain.gif (bare <a href>) negative control proves the gate is selective.
+site10="$tmp/html5media"
+mkdir -p "$site10"
+for f in img ss plain; do gif "$site10/$f.gif"; done
+printf 'x' >"$site10/v.webm"
+printf 'x' >"$site10/subs.vtt"
+cat >"$site10/index.html" <<EOF
+<html><body><a href="leaf.html">leaf</a></body></html>
+EOF
+cat >"$site10/leaf.html" <<EOF
+<html><body>
+<img src="img.gif">
+<picture><source srcset="ss.gif 2x"></picture>
+<video><source src="v.webm"></video>
+<video><track src="subs.vtt"></video>
+<a href="plain.gif">plain link past the boundary</a>
+</body></html>
+EOF
+out10="$tmp/html5media-out"
+rm -rf "$out10"
+mkdir -p "$out10"
+httrack "file://$site10/index.html" -O "$out10" --quiet --near -r2 >"$out10/.log" 2>&1 || true
+found "img.gif" "$out10"
+found "ss.gif" "$out10"
+found "v.webm" "$out10"
+found "subs.vtt" "$out10"
+notfound "plain.gif" "$out10"
+
 exit 0

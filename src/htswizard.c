@@ -80,6 +80,10 @@ htspair_t hts_detect_embed[] = {
   {NULL, NULL}
 };
 
+/* HTML5 media siblings of <img src>: same near-link treatment (#451) */
+static const htspair_t hts_detect_embed_html5[] = {
+    {"source", "src"}, {"source", "srcset"}, {"track", "src"}, {NULL, NULL}};
+
 /* Internal */
 static int hts_acceptlink_(httrackp * opt, int ptr, const char *adr,
                            const char *fil, const char *tag,
@@ -136,6 +140,17 @@ static int cmp_token(const char *tag, const char *cmp) {
           && !isalnum((unsigned char) tag[p]));
 }
 
+/* TRUE if (tag, attribute) matches an embedded-asset pair in the table */
+static hts_boolean is_embed_pair(const htspair_t *table, const char *tag,
+                                 const char *attribute) {
+  int i;
+  for (i = 0; table[i].tag != NULL; i++) {
+    if (cmp_token(tag, table[i].tag) && cmp_token(attribute, table[i].attr))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
@@ -163,15 +178,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
   /* Built-in known tags (<img src=..>, ..) */
   if (forbidden_url != 0 && opt->nearlink && tag != NULL && attribute != NULL) {
-    int i;
-
-    for(i = 0; hts_detect_embed[i].tag != NULL; i++) {
-      if (cmp_token(tag, hts_detect_embed[i].tag)
-          && cmp_token(attribute, hts_detect_embed[i].attr)
-        ) {
-        embedded_triggered = 1;
-        break;
-      }
+    if (is_embed_pair(hts_detect_embed, tag, attribute) ||
+        is_embed_pair(hts_detect_embed_html5, tag, attribute)) {
+      embedded_triggered = 1;
     }
   }
 
