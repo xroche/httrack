@@ -47,48 +47,89 @@ Please visit our Website: http://www.httrack.com
 */
 
 /*
-  Unpack file into a new file
+  Unpack file into a new file (gzip, zlib RFC1950 or raw deflate RFC1951).
   Return value: size of the new file, or -1 if an error occurred
 */
 /* Note: utf-8 */
 int hts_zunpack(char *filename, char *newfile) {
   int ret = -1;
 
-  if (filename != NULL && newfile != NULL) {
-    if (filename[0] && newfile[0]) {
-      char catbuff[CATBUFF_SIZE];
-      FILE *const in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
-      const int fd = in != NULL ? fileno(in) : -1;
-      const int dup_fd = fd != -1 ? dup(fd) : -1;
-      // Note: we must dup to be able to flose cleanly.
-      const gzFile gz = dup_fd != -1 ? gzdopen(dup_fd, "rb") : NULL;
+  if (filename != NULL && newfile != NULL && filename[0] && newfile[0]) {
+    char catbuff[CATBUFF_SIZE];
+    FILE *const in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
 
-      if (gz) {
-        FILE *const fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
-        int size = 0;
+    if (in != NULL) {
+      unsigned char BIGSTK inbuf[8192];
+      size_t navail = fread(inbuf, 1, sizeof(inbuf), in);
+      /* gzip/zlib headers -> +32 windowBits; else raw deflate (RFC1951) */
+      const hts_boolean wrapped =
+          (navail >= 2 &&
+           ((inbuf[0] == 0x1f && inbuf[1] == 0x8b) ||
+            ((inbuf[0] & 0x0f) == Z_DEFLATED &&
+             (((unsigned) inbuf[0] << 8 | inbuf[1]) % 31) == 0)));
+      int attempt;
 
-        if (fpout) {
-          int nr;
+      /* deflate is ambiguous; on failure retry with the other windowBits */
+      for (attempt = 0; attempt < 2 && ret < 0; attempt++) {
+        const int windowBits =
+            (attempt == 0 ? wrapped : !wrapped) ? (32 + MAX_WBITS) : -MAX_WBITS;
+        FILE *fpout;
+        z_stream strm;
 
-          do {
-            char BIGSTK buff[1024];
-
-            nr = gzread(gz, buff, sizeof(buff));
-            if (nr > 0) {
-              size += nr;
-              if (fwrite(buff, 1, nr, fpout) != nr)
-                nr = size = -1;
-            }
-          } while(nr > 0);
+        if (attempt > 0) {
+          /* rewind input; reopening fpout "wb" discards the partial output */
+          if (fseek(in, 0, SEEK_SET) != 0)
+            break;
+          navail = fread(inbuf, 1, sizeof(inbuf), in);
+        }
+        fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
+        if (fpout == NULL)
+          break;
+        memset(&strm, 0, sizeof(strm));
+        if (inflateInit2(&strm, windowBits) != Z_OK) {
           fclose(fpout);
-        } else
-          size = -1;
-        gzclose(gz);
-        ret = (int) size;
+          break;
+        }
+        {
+          hts_boolean ok = HTS_TRUE;
+          int size = 0;
+          int zerr = Z_OK;
+
+          /* chunked inflate; first chunk in inbuf, single member */
+          do {
+            strm.next_in = inbuf;
+            strm.avail_in = (uInt) navail;
+            do {
+              unsigned char BIGSTK outbuf[8192];
+              size_t produced;
+
+              strm.next_out = outbuf;
+              strm.avail_out = sizeof(outbuf);
+              zerr = inflate(&strm, Z_NO_FLUSH);
+              if (zerr == Z_NEED_DICT || zerr == Z_DATA_ERROR ||
+                  zerr == Z_MEM_ERROR || zerr == Z_STREAM_ERROR) {
+                ok = HTS_FALSE;
+                break;
+              }
+              produced = sizeof(outbuf) - strm.avail_out;
+              if (produced > 0 &&
+                  fwrite(outbuf, 1, produced, fpout) != produced) {
+                ok = HTS_FALSE;
+                break;
+              }
+              size += (int) produced;
+            } while (strm.avail_out == 0);
+            if (!ok || zerr == Z_STREAM_END)
+              break;
+            navail = fread(inbuf, 1, sizeof(inbuf), in);
+          } while (navail > 0);
+          if (ok && zerr == Z_STREAM_END)
+            ret = size;
+        }
+        inflateEnd(&strm);
+        fclose(fpout);
       }
-      if (in != NULL) {
-        fclose(in);
-      }
+      fclose(in);
     }
   }
   return ret;

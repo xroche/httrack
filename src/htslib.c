@@ -1326,16 +1326,12 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
       // Compression accepted ?
       if (retour->req.http11) {
+        hts_boolean compressible = HTS_FALSE;
 #if HTS_USEZLIB
-        if ((!retour->req.range_used)
-            && (!retour->req.nocompression))
-          print_buffer(&bstr, "Accept-Encoding: " "gzip" /* gzip if the preffered encoding */
-                     ", " "identity;q=0.9" H_CRLF);
-        else
-          print_buffer(&bstr, "Accept-Encoding: identity" H_CRLF);       /* no compression */
-#else
-        print_buffer(&bstr, "Accept-Encoding: identity" H_CRLF); /* no compression */
+        compressible = (!retour->req.range_used && !retour->req.nocompression);
 #endif
+        print_buffer(&bstr, "Accept-Encoding: %s" H_CRLF,
+                     hts_acceptencoding(compressible));
       }
 
       /* Authentification */
@@ -4412,6 +4408,11 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
 HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
                              int flag) {
   (void) get_httptype_sized(opt, s, HTS_MIMETYPE_SIZE, fil, flag);
+}
+
+/* Advertised Accept-Encoding; gzip and deflate both decode via hts_zunpack */
+const char *hts_acceptencoding(hts_boolean compressible) {
+  return compressible ? "gzip, deflate, identity;q=0.9" : "identity";
 }
 
 // get type of fil (php)

@@ -50,6 +50,9 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htsmd5.h"
+#if HTS_USEZLIB
+#include "htszlib.h"
+#endif
 #include "coucal/coucal.h"
 
 #include <ctype.h>
@@ -1336,6 +1339,158 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+#if HTS_USEZLIB
+/* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
+static int ae_write_packed(const char *path, int windowBits,
+                           const unsigned char *src, size_t len) {
+  unsigned char out[8192];
+  z_stream strm;
+  FILE *f;
+  int zerr;
+
+  memset(&strm, 0, sizeof(strm));
+  if (deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, windowBits, 8,
+                   Z_DEFAULT_STRATEGY) != Z_OK)
+    return 1;
+  if ((f = FOPEN(path, "wb")) == NULL) {
+    deflateEnd(&strm);
+    return 1;
+  }
+  strm.next_in = (Bytef *) src;
+  strm.avail_in = (uInt) len;
+  do {
+    size_t n;
+
+    strm.next_out = out;
+    strm.avail_out = sizeof(out);
+    zerr = deflate(&strm, Z_FINISH);
+    n = sizeof(out) - strm.avail_out;
+    if (n > 0 && fwrite(out, 1, n, f) != n) {
+      deflateEnd(&strm);
+      fclose(f);
+      return 1;
+    }
+  } while (zerr == Z_OK);
+  deflateEnd(&strm);
+  fclose(f);
+  return (zerr == Z_STREAM_END) ? 0 : 1;
+}
+
+/* Forged raw deflate (08 1D) that misdetects as zlib; only fallback decodes */
+static int ae_write_collision(const char *path, const unsigned char *src,
+                              size_t len) {
+  /* block-1 LEN low byte 0x1D: with 0x08, (0x081D)%31==0 */
+  const size_t n1 = 29;
+  size_t n2, p = 0;
+  unsigned char *buf;
+  FILE *f;
+  int ok;
+
+  if (len < n1 || len - n1 > 0xFFFF)
+    return 1;
+  n2 = len - n1;
+  buf = malloct(10 + len);
+  if (buf == NULL)
+    return 1;
+  buf[p++] = 0x08; /* BFINAL=0, BTYPE=00, forged padding -> zlib CMF nibble */
+  buf[p++] = (unsigned char) (n1 & 0xff);
+  buf[p++] = (unsigned char) (n1 >> 8);
+  buf[p++] = (unsigned char) (~n1 & 0xff);
+  buf[p++] = (unsigned char) ((~n1 >> 8) & 0xff);
+  memcpy(buf + p, src, n1);
+  p += n1;
+  buf[p++] = 0x01; /* BFINAL=1, BTYPE=00 */
+  buf[p++] = (unsigned char) (n2 & 0xff);
+  buf[p++] = (unsigned char) (n2 >> 8);
+  buf[p++] = (unsigned char) (~n2 & 0xff);
+  buf[p++] = (unsigned char) ((~n2 >> 8) & 0xff);
+  memcpy(buf + p, src + n1, n2);
+  p += n2;
+  f = FOPEN(path, "wb");
+  ok = (f != NULL && fwrite(buf, 1, p, f) == p);
+  if (f != NULL)
+    fclose(f);
+  freet(buf);
+  return ok ? 0 : 1;
+}
+
+/* Compare path's bytes to expect[0..len); 0 if equal. Streams (large files). */
+static int ae_check_decoded(const char *path, const unsigned char *expect,
+                            size_t len) {
+  unsigned char buf[8192];
+  FILE *f = FOPEN(path, "rb");
+  size_t off = 0, n;
+
+  if (f == NULL)
+    return 1;
+  while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    if (n > len - off || memcmp(buf, expect + off, n) != 0) {
+      fclose(f);
+      return 1;
+    }
+    off += n;
+  }
+  fclose(f);
+  return (off == len) ? 0 : 1;
+}
+#endif
+
+/* Accept-Encoding (#450): advertise gzip+deflate; both decode (hts_zunpack) */
+static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
+  const char *off = hts_acceptencoding(HTS_FALSE);
+  const char *on = hts_acceptencoding(HTS_TRUE);
+
+  (void) opt;
+  assertf(strcmp(off, "identity") == 0);
+  assertf(strstr(on, "gzip") != NULL);
+  assertf(strstr(on, "deflate") != NULL); /* fails on the old gzip-only list */
+#if HTS_USEZLIB
+  if (argc >= 1) {
+    static const int windowBits[] = {16 + MAX_WBITS, MAX_WBITS, -MAX_WBITS};
+    const unsigned char small[] =
+        "deflate round-trip: HTTrack decodes gzip and deflate alike. "
+        "deflate round-trip: HTTrack decodes gzip and deflate alike.";
+    const size_t slen = sizeof(small) - 1;
+    /* 64 KiB of varied (LCG) bytes: forces the multi-fread loop */
+    const size_t blen = 64 * 1024;
+    unsigned char *body = malloct(blen);
+    uint32_t x = 0x1234567u;
+    char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
+    size_t i;
+
+    assertf(body != NULL);
+    for (i = 0; i < blen; i++) {
+      x = x * 1103515245u + 12345u;
+      body[i] = (unsigned char) (x >> 16);
+    }
+    /* gzip, zlib (RFC1950) and raw deflate (RFC1951), both small and large. */
+    for (i = 0; i < sizeof(windowBits) / sizeof(windowBits[0]); i++) {
+      snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[i]);
+      snprintf(outpath, sizeof(outpath), "%s/ae-out-%d", argv[0],
+               windowBits[i]);
+      assertf(ae_write_packed(inpath, windowBits[i], small, slen) == 0);
+      assertf(hts_zunpack(inpath, outpath) == (int) slen);
+      assertf(ae_check_decoded(outpath, small, slen) == 0);
+      assertf(ae_write_packed(inpath, windowBits[i], body, blen) == 0);
+      assertf(hts_zunpack(inpath, outpath) == (int) blen);
+      assertf(ae_check_decoded(outpath, body, blen) == 0);
+    }
+    /* Fallback teeth: raw deflate misdetected as zlib; -1 without the retry. */
+    snprintf(inpath, sizeof(inpath), "%s/ae-collide.z", argv[0]);
+    snprintf(outpath, sizeof(outpath), "%s/ae-collide.out", argv[0]);
+    assertf(ae_write_collision(inpath, body, 64) == 0);
+    assertf(hts_zunpack(inpath, outpath) == 64);
+    assertf(ae_check_decoded(outpath, body, 64) == 0);
+    freet(body);
+  }
+#else
+  (void) argc;
+  (void) argv;
+#endif
+  printf("acceptencoding self-test OK: %s\n", on);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1384,6 +1539,8 @@ static const struct selftest_entry {
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
+    {"acceptencoding", "[dir]",
+     "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
 };
 
 static void list_selftests(void) {

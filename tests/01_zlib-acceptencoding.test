@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Accept-Encoding (#450): advertise gzip+deflate; decode gzip/zlib/raw-deflate.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=acceptencoding "$dir" run |
+    grep -q "acceptencoding self-test OK"
