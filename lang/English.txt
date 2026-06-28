@@ -295,7 +295,7 @@ Max Depth
 Maximum external depth:
 Maximum external depth:
 Filters (refuse/accept links) :
-Filters (refuse/accept links) :
+Filters (refuse/accept links):
 Paths
 Paths
 Save prefs
