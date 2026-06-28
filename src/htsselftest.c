@@ -239,6 +239,14 @@ static void basic_selftests(void) {
     assertf(strcmp(ext, "html") == 0);
     assertf(give_mimext(ext, sizeof(ext), "no/such-mime-type") == 0);
     assertf(ext[0] == '\0');
+    // modern web formats -> extension. Avoid MIME types the
+    // application/<=4-char-subtype fallback could fabricate without a row.
+    assertf(give_mimext(ext, sizeof(ext), "image/webp") == 1);
+    assertf(strcmp(ext, "webp") == 0);
+    assertf(give_mimext(ext, sizeof(ext), "application/manifest+json") == 1);
+    assertf(strcmp(ext, "webmanifest") == 0);
+    assertf(give_mimext(ext, sizeof(ext), "font/woff2") == 1);
+    assertf(strcmp(ext, "woff2") == 0);
   }
   // convtolower(): lower-cases into the caller buffer (bounded by its size).
   {
@@ -293,6 +301,16 @@ static void basic_selftests(void) {
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
                                "x.gif", 0) == 1);
     assertf(strcmp(r.contenttype, "image/gif") == 0);
+    // modern extensions map back to their MIME type
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "x.webp", 0) == 1);
+    assertf(strcmp(r.contenttype, "image/webp") == 0);
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "app.wasm", 0) == 1);
+    assertf(strcmp(r.contenttype, "application/wasm") == 0);
+    assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                               "mod.mjs", 0) == 1);
+    assertf(strcmp(r.contenttype, "text/javascript") == 0);
     // no extension and flag==0: nothing written, returns 0
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
                                "noextfile", 0) == 0);

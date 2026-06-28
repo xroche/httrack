@@ -563,6 +563,39 @@ const char *hts_mime[][2] = {
   {"", ""}
 };
 
+/* Modern web formats (post-2010), kept in their own table: appending to the
+   legacy hts_mime[] above makes clang-format reflow its whole initializer.
+   Scanned after hts_mime[], so it never shadows a legacy mapping. */
+static const char *hts_mime_modern[][2] = {
+    {"image/webp", "webp"},
+    {"image/avif", "avif"},
+    {"image/heic", "heic"},
+    {"font/woff", "woff"},
+    {"font/woff2", "woff2"},
+    {"font/ttf", "ttf"},
+    {"font/otf", "otf"},
+    {"application/json", "json"},
+    {"application/ld+json", "jsonld"},
+    {"application/manifest+json", "webmanifest"},
+    {"application/wasm", "wasm"},
+    {"text/javascript", "js"},
+    {"text/javascript", "mjs"},
+    {"text/markdown", "md"},
+    {"video/mp4", "mp4"},
+    {"video/webm", "webm"},
+    {"video/ogg", "ogv"},
+    {"video/mp2t", "ts"},
+    {"audio/mp4", "m4a"},
+    {"audio/aac", "aac"},
+    {"audio/ogg", "oga"},
+    {"audio/opus", "opus"},
+    {"audio/flac", "flac"},
+    {"audio/webm", "weba"},
+    {"application/x-7z-compressed", "7z"},
+    {"application/x-rar-compressed", "rar"},
+    {"application/zstd", "zst"},
+    {"", ""}};
+
 // Reserved (RFC2396)
 #define CIS(c,ch) ( ((unsigned char)(c)) == (ch) )
 #define CHAR_RESERVED(c)  ( CIS(c,';') \
@@ -4308,6 +4341,20 @@ void guess_httptype(httrackp * opt, char *s, const char *fil) {
   (void) get_httptype_sized(opt, s, HTS_MIMETYPE_SIZE, fil, 1);
 }
 
+// first match in a NUL-terminated {mime,ext} table. key selects the lookup
+// column (0=mime, 1=ext); returns the other column, or NULL if no row matches
+// (a "*" partner means the row carries no value).
+static const char *hts_mime_lookup(const char *(*table)[2], int key,
+                                   const char *needle) {
+  int j;
+
+  for (j = 0; strnotempty(table[j][1]); j++) {
+    if (strfield2(table[j][key], needle) && table[j][!key][0] != '*')
+      return table[j][!key];
+  }
+  return NULL;
+}
+
 // write the mime type for fil into s (capacity ssize)
 // flag: 1 to always return a type (the "application/..." / octet-stream
 // fallback) returns 1 if a type was written to s, 0 otherwise
@@ -4331,17 +4378,15 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     while ((a > fil) && (*a != '.') && (*a != '/'))
       a--;
     if (a >= fil && *a == '.' && strlen(a) < 32) {
-      int j = 0;
+      const char *mime;
 
       a++;
-      while(strnotempty(hts_mime[j][1])) {
-        if (strfield2(hts_mime[j][1], a)) {
-          if (hts_mime[j][0][0] != '*') { // a match exists
-            strlcpybuff(s, hts_mime[j][0], ssize);
-            return 1;
-          }
-        }
-        j++;
+      mime = hts_mime_lookup(hts_mime, 1, a);
+      if (mime == NULL)
+        mime = hts_mime_lookup(hts_mime_modern, 1, a);
+      if (mime != NULL) {
+        strlcpybuff(s, mime, ssize);
+        return 1;
       }
 
       if (flag) {
@@ -4476,18 +4521,16 @@ int get_userhttptype(httrackp * opt, char *s, const char *fil) {
 // returns 1 if an extension was found (and written to s), 0 otherwise
 int give_mimext(char *s, size_t ssize, const char *st) {
   int ok = 0;
-  int j = 0;
+  const char *ext;
 
   st = hts_effective_mime(st); /* no declared type: derive an html ext */
   s[0] = '\0';
-  while((!ok) && (strnotempty(hts_mime[j][1]))) {
-    if (strfield2(hts_mime[j][0], st)) {
-      if (hts_mime[j][1][0] != '*') { // a match exists
-        strlcpybuff(s, hts_mime[j][1], ssize);
-        ok = 1;
-      }
-    }
-    j++;
+  ext = hts_mime_lookup(hts_mime, 0, st);
+  if (ext == NULL)
+    ext = hts_mime_lookup(hts_mime_modern, 0, st);
+  if (ext != NULL) {
+    strlcpybuff(s, ext, ssize);
+    ok = 1;
   }
   // wrap "x" mimetypes, such as:
   // application/x-mp3
