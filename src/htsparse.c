@@ -302,6 +302,14 @@ static HTS_INLINE char html_prevc(const char *html, const char *start) {
   return html > start ? html[-1] : ' ';
 }
 
+/* Drop a redirect Location's #fragment: a UA anchor, never part of the fetched
+ * resource (#204). */
+static void url_drop_fragment(char *const url) {
+  char *const frag = strchr(url, '#');
+  if (frag != NULL)
+    *frag = '\0';
+}
+
 /* True if [s, s+len) is exactly an HTTP method token (XHR.open's first
    argument is a method, not a URL: #218). Case-insensitive. */
 static int is_http_method(const char *s, size_t len) {
@@ -3596,6 +3604,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         //
 
         strcpybuff(mov_url, r->location);
+        url_drop_fragment(mov_url);
 
         // url qque -> adresse+fichier
         if ((reponse =
@@ -4803,6 +4812,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
             mov_url[0] = '\0';
             strcpybuff(mov_url, back[b].r.location);    // copier URL
+            url_drop_fragment(mov_url);
 
             /* Remove (temporarily created) file if it was created */
             UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), back[b].url_sav));

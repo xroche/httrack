@@ -354,6 +354,20 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # 302 whose Location carries a #fragment (#204): the fragment is a UA anchor
+    # and must be dropped before the target is fetched/saved.
+    def route_redir_index(self):
+        self.send_html('\t<a href="go.php">go</a>')
+
+    def route_redir_go(self):
+        self.send_response(302, "Found")
+        self.send_header("Location", "target.html#section")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_redir_target(self):
+        self.send_raw(b"<html><body>redirect target</body></html>\n", "text/html")
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -391,6 +405,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/mimex/index.html": route_mimex_index,
         "/mimex/blob.pdf": route_mimex_blob,
         "/mimex/real.html": route_mimex_real,
+        "/redir/index.html": route_redir_index,
+        "/redir/go.php": route_redir_go,
+        "/redir/target.html": route_redir_target,
     }
 
     # --- dispatch ----------------------------------------------------------

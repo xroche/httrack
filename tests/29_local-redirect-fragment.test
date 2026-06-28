@@ -1,0 +1,12 @@
+#!/bin/bash
+# Issue #204: a 302 Location with a #fragment must drop the fragment before the
+# target is fetched; else the request-target carries '#' (strict servers 400)
+# and the mirror lands under a fragment-polluted name.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'redir/target.html' \
+    --not-found 'redir/target.html#section.html' \
+    httrack 'BASEURL/redir/index.html'
