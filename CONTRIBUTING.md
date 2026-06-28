@@ -39,6 +39,10 @@ Welcome, and nothing to disclose. Two rules:
 
 The sign-off covers AI-assisted code too.
 
+## Translations
+
+Interface strings live in [`lang/`](lang/). See [lang/README.md](lang/README.md) for the file format and how to add or update a language.
+
 ## Bugs
 
 Open an issue with the version, OS, command used, and expected vs actual result.
