@@ -1,0 +1,29 @@
+Description: skip 28_local-pause when python3 is absent (fixes FTBFS on buildds)
+ The local-server tests skip (exit 77) when python3 is missing, but
+ 28_local-pause wrapped local-crawl.sh in a command substitution that swallowed
+ that skip. On the python3-less buildd chroot the test then ran serverless, both
+ crawls finished in 0s, and the 0s delta was reported as a failure. Guard the
+ test on python3 up front, like its siblings, so it skips cleanly.
+Author: Xavier Roche <roche@httrack.com>
+Origin: upstream, https://github.com/xroche/httrack/pull/445
+Applied-Upstream: https://github.com/xroche/httrack/commit/45279d7
+Forwarded: not-needed
+Last-Update: 2026-06-28
+diff --git a/tests/28_local-pause.test b/tests/28_local-pause.test
+index 8505a75..add95d1 100755
+--- a/tests/28_local-pause.test
++++ b/tests/28_local-pause.test
+@@ -9,6 +9,13 @@ set -e
+ 
+ : "${top_srcdir:=..}"
+ 
++# python3 runs the local server (mirror local-crawl.sh); skip when absent, else
++# run() swallows its exit-77 and the serverless 0s/0s crawl looks like a fail.
++command -v python3 >/dev/null || {
++    echo "python3 not found; skipping local crawl tests"
++    exit 77
++}
++
+ run() { # echoes the wall-clock seconds of one crawl
+     local t0 t1
+     t0=$(date +%s)
