@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# hts_finish_makeindex writes the footer and gates the refresh meta on a single
+# first link (guards the macro->function extraction).
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=makeindex "$dir" run |
+    grep -q "makeindex self-test OK"

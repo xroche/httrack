@@ -1305,6 +1305,55 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// hts_finish_makeindex writes the footer, emits the refresh meta only when
+// makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir.
+static int st_makeindex(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  char buf[4096];
+  FILE *fp;
+  size_t n;
+  int done;
+
+  assertf(argc >= 1);
+  snprintf(path, sizeof(path), "%s/index.html", argv[0]);
+
+  /* single first link: footer + a refresh meta carrying the escaped URL */
+  done = 0;
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  hts_finish_makeindex(opt, &done, &fp, 1, "http://example.com/a b", "%s%s", "",
+                       "");
+  assertf(fp == NULL); /* the function closed and cleared it */
+  assertf(done != 0);
+  fp = fopen(path, "rb");
+  assertf(fp != NULL);
+  n = fread(buf, 1, sizeof(buf) - 1, fp);
+  fclose(fp);
+  buf[n] = '\0';
+  assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
+  assertf(strstr(buf, "Refresh") != NULL);
+  assertf(strstr(buf, "example.com") != NULL);
+
+  /* no single link: footer only, no refresh meta */
+  done = 0;
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  hts_finish_makeindex(opt, &done, &fp, 0, NULL, "%s%s", "", "");
+  assertf(fp == NULL);
+  assertf(done != 0);
+  fp = fopen(path, "rb");
+  assertf(fp != NULL);
+  n = fread(buf, 1, sizeof(buf) - 1, fp);
+  fclose(fp);
+  buf[n] = '\0';
+  assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
+  assertf(strstr(buf, "Refresh") == NULL);
+
+  UNLINK(path);
+  printf("makeindex self-test OK\n");
+  return 0;
+}
+
 /* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
 static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
@@ -1621,6 +1670,8 @@ static const struct selftest_entry {
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},
+    {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
+     st_makeindex},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},

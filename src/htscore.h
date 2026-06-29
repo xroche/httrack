@@ -362,6 +362,14 @@ void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
 
 void usercommand_exe(const char *cmd, const char *file);
 
+// Finish the makeindex index.html (footer + refresh meta), run usercommand.
+// Updates *makeindex_done/*makeindex_fp in place; adr/fil are the mode strings.
+void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
+                          FILE **makeindex_fp, int makeindex_links,
+                          const char *makeindex_firstlink,
+                          const char *template_footer, const char *adr,
+                          const char *fil);
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

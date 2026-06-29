@@ -167,30 +167,6 @@ Please visit our Website: http://www.httrack.com
 }
 #define HT_ADD_FOP
 
-// COPY IN HTSCORE.C
-#define HT_INDEX_END do { \
-  if (!makeindex_done) { \
-  if (makeindex_fp) { \
-  char BIGSTK tempo[1024]; \
-  if (makeindex_links == 1) { \
-  char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
-  escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
-  snprintf(tempo,sizeof(tempo),"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF,link_escaped); \
-  } else \
-  tempo[0]='\0'; \
-  hts_template_format(makeindex_fp,template_footer, \
-  "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
-  tempo, /* EOF */ NULL \
-  ); \
-  fflush(makeindex_fp); \
-  fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
-  makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_html_utf8),"index.html"),"primary","primary");  \
-  } \
-  } \
-  makeindex_done=1;    /* ok c'est fait */  \
-} while(0)
-
 #define ENGINE_DEFINE_CONTEXT() \
   ENGINE_DEFINE_CONTEXT_BASE(); \
   /* */ \
@@ -709,7 +685,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
 
             } else if (heap(ptr)->depth < opt->depth) {        // on a sauté level1+1 et level1
-              HT_INDEX_END;
+              hts_finish_makeindex(opt, &makeindex_done, &makeindex_fp,
+                                   makeindex_links, makeindex_firstlink,
+                                   template_footer, "primary", "primary");
             }
           }                     // if (opt->makeindex)
         }
