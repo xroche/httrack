@@ -49,6 +49,7 @@ TESTS = \
 	01_engine-strsafe.test \
 	01_engine-urlhack.test \
 	01_engine-useragent.test \
+	01_zlib-acceptencoding.test \
 	01_zlib-cache.test \
 	01_zlib-cache-golden.test \
 	01_zlib-cache-writefail.test \
