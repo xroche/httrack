@@ -20,6 +20,14 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo "python3 missing, skipping"
     exit 77
 fi
+# The fixture needs a second loopback IP (dead 127.0.0.2 + live 127.0.0.1) for
+# the fallback to have a target; GNU/Hurd has only 127.0.0.1, so skip there.
+case "$(uname -s)" in
+GNU | GNU/*)
+    echo "GNU/Hurd: single loopback IP, connect-fallback fixture unbuildable, skipping"
+    exit 77
+    ;;
+esac
 
 server="$top_srcdir/tests/local-server.py"
 root="$top_srcdir/tests/server-root"
