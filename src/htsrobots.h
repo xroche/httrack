@@ -39,17 +39,27 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEF_FWSTRUCT_robots_wizard
 typedef struct robots_wizard robots_wizard;
 #endif
+
+/* Per-host blob: one rule per line, first byte 'A'/'D' then path pattern. */
+#define HTS_ROBOTS_TOKEN_SIZE 4096
+
 struct robots_wizard {
   char adr[128];
-  char token[4096];
+  char token[HTS_ROBOTS_TOKEN_SIZE];
   struct robots_wizard *next;
 };
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+/* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
 int checkrobots(robots_wizard * robots, const char *adr, const char *fil);
 void checkrobots_free(robots_wizard * robots);
 int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
+/* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
+   gets a disallow summary, `keep_root_disallow` FALSE drops "Disallow: /". */
+void robots_parse(robots_wizard *robots, const char *adr, const char *body,
+                  size_t bodysize, char *info, size_t infosize,
+                  hts_boolean keep_root_disallow);
 #endif
 
 #endif

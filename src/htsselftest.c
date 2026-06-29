@@ -1491,6 +1491,89 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
+static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
+  static int n = 0;
+  char host[64];
+
+  snprintf(host, sizeof(host), "h%d.example", n++);
+  robots_parse(r, host, txt, strlen(txt), NULL, 0, HTS_TRUE);
+  return checkrobots(r, host, path);
+}
+
+static int st_robots(httrackp *opt, int argc, char **argv) {
+  robots_wizard robots;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(&robots, 0, sizeof(robots));
+
+  /* Longer Allow re-opens subtree under Disallow: / (old matcher couldn't). */
+  {
+    const char *txt = "User-agent: *\nDisallow: /\nAllow: /public/\n";
+
+    assertf(rb_decide(&robots, txt, "/public/x") == 0); /* allowed */
+    assertf(rb_decide(&robots, txt, "/private") == -1); /* denied */
+    assertf(rb_decide(&robots, txt, "/") == -1);        /* denied */
+  }
+
+  /* Equal-length match: Allow wins the tie over Disallow. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /foo\nAllow: /foo\n";
+
+    assertf(rb_decide(&robots, txt, "/foo/bar") == 0);
+  }
+
+  /* Longest match wins even when it is not the last rule. */
+  {
+    assertf(rb_decide(&robots, "User-agent: *\nDisallow: /a/b\nAllow: /a\n",
+                      "/a/b/c") == -1);
+    assertf(rb_decide(&robots, "User-agent: *\nAllow: /a/b\nDisallow: /a\n",
+                      "/a/b/c") == 0);
+  }
+
+  /* '*' matches any run of characters. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /*.php\n";
+
+    assertf(rb_decide(&robots, txt, "/a/b/index.php") == -1);
+    assertf(rb_decide(&robots, txt, "/a/b/index.html") == 0);
+  }
+
+  /* Trailing '$' anchors the end of the path. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a$\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/ab") == 0);
+    assertf(rb_decide(&robots, txt, "/a/b") == 0);
+  }
+
+  /* The httrack-specific group replaces the generic '*' group entirely. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /everyone\n"
+                      "User-agent: httrack\nDisallow: /\n";
+
+    assertf(rb_decide(&robots, txt, "/anything") == -1);
+  }
+
+  /* Replace, not merge: the generic group does not bind the httrack group. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /x\n"
+                      "User-agent: httrack\nDisallow: /y\n";
+
+    assertf(rb_decide(&robots, txt, "/x") == 0);
+    assertf(rb_decide(&robots, txt, "/y") == -1);
+  }
+
+  /* No rules: everything is allowed. */
+  assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
+
+  checkrobots_free(&robots);
+  printf("robots self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1541,6 +1624,8 @@ static const struct selftest_entry {
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
+    {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
+     st_robots},
 };
 
 static void list_selftests(void) {

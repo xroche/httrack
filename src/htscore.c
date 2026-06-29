@@ -1796,90 +1796,18 @@ int httpmirror(char *url1, httrackp * opt) {
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
             if (r.adr) {
-              int bptr = 0;
-              char BIGSTK line[1024];
-              char BIGSTK buff[8192];
               char BIGSTK infobuff[8192];
-              int record = 0;
-
-              line[0] = '\0';
-              buff[0] = '\0';
-              infobuff[0] = '\0';
-              //
-#if DEBUG_ROBOTS
-              printf("robots.txt dump:\n%s\n", r.adr);
-#endif
-              do {
-                char *comm;
-                int llen;
-
-                bptr += binput(r.adr + bptr, line, sizeof(line) - 2);
-                /* strip comment */
-                comm = strchr(line, '#');
-                if (comm != NULL) {
-                  *comm = '\0';
-                }
-                /* strip spaces */
-                llen = (int) strlen(line);
-                while(llen > 0 && is_realspace(line[llen - 1])) {
-                  line[llen - 1] = '\0';
-                  llen--;
-                }
-                if (strfield(line, "user-agent:")) {
-                  char *a;
-
-                  a = line + 11;
-                  while(is_realspace(*a))
-                    a++;        // sauter espace(s)
-                  if (*a == '*') {
-                    if (record != 2)
-                      record = 1;       // c pour nous
-                  } else if (strfield(a, "httrack") || strfield(a, "winhttrack")
-                             || strfield(a, "webhttrack")) {
-                    buff[0] = '\0';     // re-enregistrer
-                    infobuff[0] = '\0';
-                    record = 2; // locked
-#if DEBUG_ROBOTS
-                    printf("explicit disallow for httrack\n");
-#endif
-                  } else
-                    record = 0;
-                } else if (record) {
-                  if (strfield(line, "disallow:")) {
-                    char *a = line + 9;
-
-                    while(is_realspace(*a))
-                      a++;      // sauter espace(s)
-                    if (strnotempty(a)) {
 #ifdef IGNORE_RESTRICTIVE_ROBOTS
-                      if (strcmp(a, "/") != 0 ||
-                          opt->robots >= HTS_ROBOTS_ALWAYS_STRICT)
+              hts_boolean keep_root = (opt->robots >= HTS_ROBOTS_ALWAYS_STRICT)
+                                          ? HTS_TRUE
+                                          : HTS_FALSE;
+#else
+              hts_boolean keep_root = HTS_TRUE;
 #endif
-                      { /* ignoring disallow: / */
-                        if ((strlen(buff) + strlen(a) + 8) < sizeof(buff)) {
-                          strcatbuff(buff, a);
-                          strcatbuff(buff, "\n");
-                          if ((strlen(infobuff) + strlen(a) + 8) <
-                              sizeof(infobuff)) {
-                            if (strnotempty(infobuff))
-                              strcatbuff(infobuff, ", ");
-                            strcatbuff(infobuff, a);
-                          }
-                        }
-                      }
-#ifdef IGNORE_RESTRICTIVE_ROBOTS
-                      else {
-                        hts_log_print(opt, LOG_NOTICE,
-                                      "Note: %s robots.txt rules are too restrictive, ignoring /",
-                                      urladr());
-                      }
-#endif
-                    }
-                  }
-                }
-              } while((bptr < r.size) && (strlen(buff) < (sizeof(buff) - 32)));
-              if (strnotempty(buff)) {
-                checkrobots_set(&robots, urladr(), buff);
+
+              robots_parse(&robots, urladr(), r.adr, r.size, infobuff,
+                           sizeof(infobuff), keep_root);
+              if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
                               urladr(), infobuff);
