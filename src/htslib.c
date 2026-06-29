@@ -4131,24 +4131,32 @@ DECLARE_APPEND_ESCAPE_VERSION(escape_uri)
 
 #undef DECLARE_APPEND_ESCAPE_VERSION
 
-// Same as above, but in-place
-#undef DECLARE_INPLACE_ESCAPE_VERSION
-#define DECLARE_INPLACE_ESCAPE_VERSION(NAME) \
-HTSEXT_API size_t inplace_ ##NAME(char *const dest, const size_t size) { \
-  char buffer[256]; \
-  const size_t len = strnlen(dest, size); \
-  const int in_buffer = len + 1 < sizeof(buffer); \
-  char *src = in_buffer ? buffer : malloct(len + 1); \
-  size_t ret; \
-  assertf(src != NULL); \
-  assertf(len < size); \
-  memcpy(src, dest, len + 1); \
-  ret = NAME(src, dest, size); \
-  if (!in_buffer) { \
-    freet(src); \
-  } \
-  return ret; \
+// In-place escaping: copy dest aside, then escape that copy back into dest.
+typedef size_t (*escape_fn_t)(const char *src, char *dest, size_t size);
+
+static size_t inplace_escape(char *const dest, const size_t size,
+                             escape_fn_t escape) {
+  char buffer[256];
+  const size_t len = strnlen(dest, size);
+  const int in_buffer = len + 1 < sizeof(buffer);
+  char *src = in_buffer ? buffer : malloct(len + 1);
+  size_t ret;
+  assertf(src != NULL);
+  assertf(len < size);
+  memcpy(src, dest, len + 1);
+  ret = escape(src, dest, size);
+  if (!in_buffer) {
+    freet(src);
+  }
+  return ret;
 }
+
+// Thin exported wrappers binding inplace_escape() to each escaper (ABI).
+#undef DECLARE_INPLACE_ESCAPE_VERSION
+#define DECLARE_INPLACE_ESCAPE_VERSION(NAME)                                   \
+  HTSEXT_API size_t inplace_##NAME(char *const dest, const size_t size) {      \
+    return inplace_escape(dest, size, NAME);                                   \
+  }
 
 DECLARE_INPLACE_ESCAPE_VERSION(escape_in_url)
 DECLARE_INPLACE_ESCAPE_VERSION(escape_spc_url)
