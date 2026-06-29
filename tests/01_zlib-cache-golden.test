@@ -6,7 +6,7 @@
 
 # Golden cache-format regression test (driven by 'httrack -#test=cache-golden <dir>').
 #
-# 01_engine-cache.test writes the cache with the same build it reads back (a
+# 01_zlib-cache.test writes the cache with the same build it reads back (a
 # round-trip), so it cannot catch a read-path or ZIP-format regression where
 # writer and reader drift together. This reads a *committed* cache frozen by an
 # earlier build and asserts a fixed set of entries still decodes field- and

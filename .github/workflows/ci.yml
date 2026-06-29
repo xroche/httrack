@@ -269,8 +269,9 @@ jobs:
           MSAN_OPTIONS: abort_on_error=1:halt_on_error=1
         run: |
           set -euo pipefail
-          # Engine self-tests only; the cache trio pulls in uninstrumented zlib.
-          tests="$(cd tests && ls 01_engine-*.test | grep -v -- '-cache' | tr '\n' ' ')"
+          # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
+          # skipped here (uninstrumented libz floods MSan with false positives).
+          tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
           make check TESTS="$tests"
 
       - name: Print the test log on failure
