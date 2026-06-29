@@ -1,4 +1,4 @@
-# Committed binary fixture read by 01_engine-cache-golden.test. List it
+# Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
@@ -25,9 +25,6 @@ TEST_EXTENSIONS = .test
 TEST_LOG_COMPILER = $(BASH)
 TESTS = \
 	00_runnable.test \
-	01_engine-cache.test \
-	01_engine-cache-golden.test \
-	01_engine-cache-writefail.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
 	01_engine-cookies.test \
@@ -52,6 +49,9 @@ TESTS = \
 	01_engine-strsafe.test \
 	01_engine-urlhack.test \
 	01_engine-useragent.test \
+	01_zlib-cache.test \
+	01_zlib-cache-golden.test \
+	01_zlib-cache-writefail.test \
 	02_manpage-regen.test \
 	02_update-cache.test \
 	10_crawl-simple.test \
