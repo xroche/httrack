@@ -524,6 +524,41 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
+     n_eval == 2 on a double-eval macro. */
+  {
+    String s = STRING_EMPTY;
+    int n_eval = 0;
+
+    StringCat(s, "hello");
+    StringCatN(s, "world", (n_eval++, 3)); /* strlen>SIZE so the clamp runs */
+    if (n_eval != 1 || strcmp(StringBuff(s), "hellowor") != 0) {
+      StringFree(s);
+      return 1;
+    }
+
+    n_eval = 0;
+    StringSetLength(s, (n_eval++, 5));
+    if (n_eval != 1 || StringLength(s) != 5) {
+      StringFree(s);
+      return 1;
+    }
+    StringFree(s);
+  }
+
+  /* StringSubRW still reads/writes after dropping its duplicate definition. */
+  {
+    String s = STRING_EMPTY;
+
+    StringCat(s, "abc");
+    StringSubRW(s, 1) = 'X';
+    if (StringSub(s, 1) != 'X' || strcmp(StringBuff(s), "aXc") != 0) {
+      StringFree(s);
+      return 1;
+    }
+    StringFree(s);
+  }
+
   return 0;
 }
 

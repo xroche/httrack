@@ -121,9 +121,6 @@ struct String {
 /** Byte at POS (read/write). No bounds check; POS must be < StringLength. **/
 #define StringSubRW(BLK, POS) (StringBuffRW(BLK)[POS])
 
-/** Subcharacter (read/write) **/
-#define StringSubRW(BLK, POS) (StringBuffRW(BLK)[POS])
-
 /** Byte POS positions from the end (read). POS==1 is the last byte. **/
 #define StringRight(BLK, POS) (StringBuff(BLK)[StringLength(BLK) - POS])
 
@@ -191,8 +188,9 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
     asserts SIZE fits the existing content; does not (re)allocate. **/
 #define StringSetLength(BLK, SIZE)                                             \
   do {                                                                         \
-    if (SIZE >= 0) {                                                           \
-      (BLK).length_ = SIZE;                                                    \
+    const int len__ = (SIZE); /* signed: negative means strlen(buffer_) */     \
+    if (len__ >= 0) {                                                          \
+      (BLK).length_ = len__;                                                   \
     } else {                                                                   \
       (BLK).length_ = strlen((BLK).buffer_);                                   \
     }                                                                          \
@@ -308,10 +306,11 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
 #define StringCatN(BLK, STR, SIZE)                                             \
   do {                                                                         \
     const char *str__ = (STR);                                                 \
+    const size_t usize__ = (SIZE);                                             \
     if (str__ != NULL) {                                                       \
       size_t size__ = strlen(str__);                                           \
-      if (size__ > (SIZE)) {                                                   \
-        size__ = (SIZE);                                                       \
+      if (size__ > usize__) {                                                  \
+        size__ = usize__;                                                      \
       }                                                                        \
       StringMemcat(BLK, str__, size__);                                        \
     }                                                                          \
