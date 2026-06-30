@@ -406,29 +406,40 @@ void hts_invalidate_link(httrackp * opt, int lpos) {
   opt->liens[lpos]->pass2 = -1;
 }
 
-
-#define HT_INDEX_END do { \
-if (!makeindex_done) { \
-if (makeindex_fp) { \
-  char BIGSTK tempo[1024]; \
-  if (makeindex_links == 1) { \
-    char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
-    escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
-    snprintf(tempo,sizeof(tempo),"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
-  } else \
-    tempo[0]='\0'; \
-    hts_template_format(makeindex_fp,template_footer, \
-    "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
-    tempo, /* EOF */ NULL \
-    ); \
-  fflush(makeindex_fp); \
-  fclose(makeindex_fp);  /* à ne pas oublier sinon on passe une nuit blanche */  \
-  makeindex_fp=NULL; \
-  usercommand(opt,0,NULL,fconcat(OPT_GET_BUFF(opt),OPT_GET_BUFF_SIZE(opt),StringBuff(opt->path_html_utf8),"index.html"),"","");  \
-} \
-} \
-makeindex_done=1;    /* ok c'est fait */  \
-} while(0)
+// Write the makeindex footer (refresh meta when makeindex_links==1), close
+// the file, then run usercommand.
+void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
+                          FILE **makeindex_fp, int makeindex_links,
+                          const char *makeindex_firstlink,
+                          const char *template_footer, const char *adr,
+                          const char *fil) {
+  if (!*makeindex_done) {
+    if (*makeindex_fp) {
+      char BIGSTK tempo[1024];
+      if (makeindex_links == 1) {
+        char BIGSTK link_escaped[HTS_URLMAXSIZE * 2];
+        escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped));
+        snprintf(tempo, sizeof(tempo),
+                 "<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">" CRLF,
+                 link_escaped);
+      } else
+        tempo[0] = '\0';
+      hts_template_format(*makeindex_fp, template_footer,
+                          "<!-- Mirror and index made by HTTrack Website "
+                          "Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS
+                          " -->",
+                          tempo, /* EOF */ NULL);
+      fflush(*makeindex_fp);
+      fclose(*makeindex_fp);
+      *makeindex_fp = NULL;
+      usercommand(opt, 0, NULL,
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_html_utf8), "index.html"),
+                  adr, fil);
+    }
+  }
+  *makeindex_done = 1;
+}
 
 /* does it look like XML ? (SVG et al.) */
 static int look_like_xml(const char *s) {
@@ -2044,7 +2055,8 @@ int httpmirror(char *url1, httrackp * opt) {
   /*
      Ensure the index is being closed
    */
-  HT_INDEX_END;
+  hts_finish_makeindex(opt, &makeindex_done, &makeindex_fp, makeindex_links,
+                       makeindex_firstlink, template_footer, "", "");
 
   /* 
      updating-a-remotely-deteted-website hack
