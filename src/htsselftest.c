@@ -1389,6 +1389,41 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Each inplace_escape_*() must equal escape_*() on a copy. */
+static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
+  /* >255 bytes forces the helper's malloct path, not the stack buffer */
+  static char longstr[600];
+  static const char *const samples[] = {
+      "",          "abc",           "a b/c?d=e&f", "h\x8ello w\x94rld",
+      "a%b\"c<d>", "/path to/file", longstr};
+  static size_t (*const inplace[])(char *, size_t) = {
+      inplace_escape_in_url, inplace_escape_spc_url, inplace_escape_uri_utf,
+      inplace_escape_check_url, inplace_escape_uri};
+  static size_t (*const plain[])(const char *, char *, size_t) = {
+      escape_in_url, escape_spc_url, escape_uri_utf, escape_check_url,
+      escape_uri};
+  size_t i, f;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  memset(longstr, 'a', sizeof(longstr) - 1);
+  for (f = 0; f < sizeof(inplace) / sizeof(inplace[0]); f++) {
+    for (i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
+      char ref[4096], work[4096];
+      size_t rret, iret;
+      rret = plain[f](samples[i], ref, sizeof(ref));
+      strcpybuff(work, samples[i]);
+      iret = inplace[f](work, sizeof(work));
+      assertf(iret == rret);
+      assertf(strcmp(work, ref) == 0);
+    }
+  }
+  printf("inplace-escape self-test OK\n");
+  return 0;
+}
+
 /* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
 static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
@@ -1707,6 +1742,8 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
+     st_inplace_escape},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
