@@ -6,6 +6,7 @@ EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
 	local-crawl.sh local-server.py server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
+	server-root/fraglink/index.html server-root/fraglink/target.html \
 	fixtures/cache-golden/hts-cache/new.zip
 
 TESTS_ENVIRONMENT =
@@ -83,6 +84,7 @@ TESTS = \
 	26_local-strip-query.test \
 	27_local-cookies-file.test \
 	28_local-pause.test \
-	29_local-redirect-fragment.test
+	29_local-redirect-fragment.test \
+	30_local-fragment-link.test
 
 CLEANFILES = check-network_sh.cache
