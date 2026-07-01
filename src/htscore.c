@@ -441,6 +441,72 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
   *makeindex_done = 1;
 }
 
+/* Flush the parsed HTML output buffer to disk, skipping the rewrite when the
+ * on-disk MD5 is unchanged. */
+void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
+                          FILE **fp, const char *ht_buff, size_t ht_len,
+                          const char *adr, const char *fil, const char *save) {
+  char digest[32 + 2];
+  off_t fsize_old =
+      fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), save));
+  int ok = 0;
+
+  digest[0] = '\0';
+  domd5mem(ht_buff, ht_len, digest, 1);
+  if (fsize_old == (off_t) ht_len) {
+    int mlen = 0;
+    char *mbuff;
+
+    cache_readdata(cache, "//[HTML-MD5]//", save, &mbuff, &mlen);
+    if (mlen)
+      mbuff[mlen] = '\0';
+    if ((mlen == 32) && (strcmp(((mbuff != NULL) ? mbuff : ""), digest) == 0)) {
+      ok = 1;
+      hts_log_print(opt, LOG_DEBUG, "File not re-written (md5): %s", save);
+    }
+    freet(mbuff);
+  }
+  if (!ok) {
+    file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
+    *fp = filecreate(&opt->state.strc, save);
+    if (*fp) {
+      if (ht_len > 0 && fwrite(ht_buff, 1, ht_len, *fp) != ht_len) {
+        int fcheck = check_fatal_io_errno();
+
+        if (fcheck)
+          opt->state.exit_xh = -1;
+        if (opt->log) {
+          hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
+                        "Unable to write HTML file %s", save);
+          if (fcheck)
+            hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
+        }
+      }
+      fclose(*fp);
+      *fp = NULL;
+      if (strnotempty(r->lastmodified))
+        set_filetime_rfc822(save, r->lastmodified);
+    } else {
+      int fcheck = check_fatal_io_errno();
+
+      if (fcheck) {
+        hts_log_print(opt, LOG_ERROR,
+                      "Mirror aborted: disk full or filesystem problems");
+        opt->state.exit_xh = -1;
+      }
+      hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", save);
+      if (fcheck)
+        hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
+    }
+  } else {
+    file_notify(opt, adr, fil, save, 0, 0, r->notmodified);
+    filenote(&opt->state.strc, save, NULL);
+  }
+  if (cache->ndx)
+    cache_writedata(cache->ndx, cache->dat, "//[HTML-MD5]//", save, digest,
+                    (int) strlen(digest));
+}
+
 /* does it look like XML ? (SVG et al.) */
 static int look_like_xml(const char *s) {
   return strncmp(s, "<?xml", 5) == 0
