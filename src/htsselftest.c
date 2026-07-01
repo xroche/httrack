@@ -1424,6 +1424,50 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Pin HTS_HTMLESCAPE*_MAXEXP to each escaper's true max byte expansion. */
+static int st_escape_room(httrackp *opt, int argc, char **argv) {
+  /* N > 1023: where 6n outgrows the old 5n+1024 reservation */
+  enum { N = 2000 };
+
+  char *src = malloct(N + 1);
+  char *dst;
+  size_t room, got;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* _full worst case: a high byte expands to "&#xHH;" (6 bytes) */
+  memset(src, 0xE9, N);
+  src[N] = '\0';
+  room = (size_t) N * HTS_HTMLESCAPE_FULL_MAXEXP + 1024;
+  dst = malloct(room);
+  got = escape_for_html_print_full(src, dst, room);
+  assertf(got == (size_t) N * HTS_HTMLESCAPE_FULL_MAXEXP);
+  assertf(strlen(dst) == got);
+  freet(dst);
+
+  /* one factor short overflows (returns size), truncating the page: the bug */
+  room = (size_t) N * (HTS_HTMLESCAPE_FULL_MAXEXP - 1) + 1024;
+  dst = malloct(room);
+  got = escape_for_html_print_full(src, dst, room);
+  assertf(got == room);
+  freet(dst);
+
+  /* plain escaper worst case: '&' -> "&amp;" (5); high bytes stay verbatim */
+  memset(src, '&', N);
+  src[N] = '\0';
+  room = (size_t) N * HTS_HTMLESCAPE_MAXEXP + 1024;
+  dst = malloct(room);
+  got = escape_for_html_print(src, dst, room);
+  assertf(got == (size_t) N * HTS_HTMLESCAPE_MAXEXP);
+  assertf(strlen(dst) == got);
+  freet(dst);
+
+  freet(src);
+  printf("escape-room self-test OK\n");
+  return 0;
+}
+
 /* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
 static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
@@ -1744,6 +1788,8 @@ static const struct selftest_entry {
      st_makeindex},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
+    {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",
+     st_escape_room},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},

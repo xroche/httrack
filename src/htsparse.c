@@ -77,13 +77,14 @@ Please visit our Website: http://www.httrack.com
 /** Append to the output buffer the string 'A'. **/
 #define HT_ADD(A) TypedArrayAppend(output_buffer, A, strlen(A))
 
-/** Append to the output buffer the string 'A', html-escaped. **/
-#define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION) do { \
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
+/** Append 'A' to the output buffer, html-escaped; FACTOR = max byte expansion. **/
+#define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION, FACTOR) do { \
   if ((opt->getmode & 1) != 0 && ptr>0) { \
     const char *const str_ = (A); \
     size_t size_; \
-    /* &amp; is the maximum expansion */ \
-    TypedArrayEnsureRoom(output_buffer, strlen(str_) * 5 + 1024); \
+    TypedArrayEnsureRoom(output_buffer, strlen(str_) * (FACTOR) + 1024); \
     size_ = FUNCTION(str_, &TypedArrayTail(output_buffer), \
                      TypedArrayRoom(output_buffer)); \
     TypedArraySize(output_buffer) += size_; \
@@ -91,17 +92,22 @@ Please visit our Website: http://www.httrack.com
 } while(0)
 
 /** Append to the output buffer the string 'A', html-escaped for &. **/
-#define HT_ADD_HTMLESCAPED(A) HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print)
+#define HT_ADD_HTMLESCAPED(A) \
+  HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print, HTS_HTMLESCAPE_MAXEXP)
 
 /**
- * Append to the output buffer the string 'A', html-escaped for & and 
+ * Append to the output buffer the string 'A', html-escaped for & and
  * high chars.
  **/
-#define HT_ADD_HTMLESCAPED_FULL(A) HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full)
+#define HT_ADD_HTMLESCAPED_FULL(A) \
+  HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full, HTS_HTMLESCAPE_FULL_MAXEXP)
+/* clang-format on */
 
 // does nothing
 #define XH_uninit do {} while(0)
 
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
 #define HT_ADD_END { \
   int ok=0;\
   if (TypedArraySize(output_buffer) != 0) { \
@@ -123,6 +129,7 @@ Please visit our Website: http://www.httrack.com
       } else {\
         ok=0;\
       } \
+      freet(mbuff);\
     }\
     if (!ok) { \
       file_notify(opt,urladr(), urlfil(), savename(), 1, 1, r->notmodified); \
@@ -165,6 +172,7 @@ Please visit our Website: http://www.httrack.com
   } \
   TypedArrayFree(output_buffer); \
 }
+/* clang-format on */
 #define HT_ADD_FOP
 
 #define ENGINE_DEFINE_CONTEXT() \
@@ -193,6 +201,9 @@ Please visit our Website: http://www.httrack.com
   HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
   HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
 
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
+/* Load-once: re-reading resets makestat_time (mutated locally, never SAVEd). */
 #define ENGINE_SET_CONTEXT() \
   ENGINE_SET_CONTEXT_BASE(); \
   /* */ \
@@ -203,9 +214,8 @@ Please visit our Website: http://www.httrack.com
   makeindex_fp = *stre->makeindex_fp_; \
   makeindex_links = *stre->makeindex_links_; \
   /* */ \
-  stat_fragment = *stre->stat_fragment_; \
-  makestat_time = stre->makestat_time; \
-  makestat_fp = stre->makestat_fp
+  stat_fragment = *stre->stat_fragment_
+/* clang-format on */
 
 #define ENGINE_LOAD_CONTEXT() \
   ENGINE_DEFINE_CONTEXT()
