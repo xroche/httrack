@@ -201,6 +201,9 @@ Please visit our Website: http://www.httrack.com
   HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
   HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
 
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
+/* Load-once: re-reading resets makestat_time (mutated locally, never SAVEd). */
 #define ENGINE_SET_CONTEXT() \
   ENGINE_SET_CONTEXT_BASE(); \
   /* */ \
@@ -211,9 +214,8 @@ Please visit our Website: http://www.httrack.com
   makeindex_fp = *stre->makeindex_fp_; \
   makeindex_links = *stre->makeindex_links_; \
   /* */ \
-  stat_fragment = *stre->stat_fragment_; \
-  makestat_time = stre->makestat_time; \
-  makestat_fp = stre->makestat_fp
+  stat_fragment = *stre->stat_fragment_
+/* clang-format on */
 
 #define ENGINE_LOAD_CONTEXT() \
   ENGINE_DEFINE_CONTEXT()
