@@ -478,4 +478,8 @@ void voidf(void);
 /* HTML marker comment marking where the top index is spliced. */
 #define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
 
+/* Worst-case byte expansion HT_ADD_HTMLESCAPED* must reserve per escaper. */
+#define HTS_HTMLESCAPE_MAXEXP 5      /* escape_for_html_print: '&'->"&amp;" */
+#define HTS_HTMLESCAPE_FULL_MAXEXP 6 /* _full: high byte->"&#xHH;" */
+
 #endif

@@ -36,6 +36,7 @@ TESTS = \
 	01_engine-filter.test \
 	01_engine-hashtable.test \
 	01_engine-idna.test \
+	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
