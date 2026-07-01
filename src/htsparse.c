@@ -106,6 +106,8 @@ Please visit our Website: http://www.httrack.com
 // does nothing
 #define XH_uninit do {} while(0)
 
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
 #define HT_ADD_END { \
   int ok=0;\
   if (TypedArraySize(output_buffer) != 0) { \
@@ -127,6 +129,7 @@ Please visit our Website: http://www.httrack.com
       } else {\
         ok=0;\
       } \
+      freet(mbuff);\
     }\
     if (!ok) { \
       file_notify(opt,urladr(), urlfil(), savename(), 1, 1, r->notmodified); \
@@ -169,6 +172,7 @@ Please visit our Website: http://www.httrack.com
   } \
   TypedArrayFree(output_buffer); \
 }
+/* clang-format on */
 #define HT_ADD_FOP
 
 #define ENGINE_DEFINE_CONTEXT() \
