@@ -167,29 +167,53 @@ Please visit our Website: http://www.httrack.com
 
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
 
-/* Apply current *adr character for the script automate */
-#define AUTOMATE_LOOKUP_CURRENT_ADR() do { \
-  if (inscript) { \
-  int new_state_pos; \
-  new_state_pos=inscript_state[inscript_state_pos][(unsigned char)*html]; \
-  if (new_state_pos < 0) { \
-  new_state_pos=inscript_state[inscript_state_pos][INSCRIPT_DEFAULT]; \
-  } \
-  assertf(new_state_pos >= 0); \
-  assertf(new_state_pos*sizeof(inscript_state[0]) < sizeof(inscript_state)); \
-  inscript_state_pos=new_state_pos; \
-  } \
-} while(0)
+/* JS-detection automaton states; INSCRIPT_DEFAULT is the synthetic "any other
+   char" column of the transition table. */
+typedef enum {
+  INSCRIPT_START = 0,
+  INSCRIPT_ANTISLASH,
+  INSCRIPT_INQUOTE,
+  INSCRIPT_INQUOTE2,
+  INSCRIPT_SLASH,
+  INSCRIPT_SLASHSLASH,
+  INSCRIPT_COMMENT,
+  INSCRIPT_COMMENT2,
+  INSCRIPT_ANTISLASH_IN_QUOTE,
+  INSCRIPT_ANTISLASH_IN_QUOTE2,
+  INSCRIPT_DEFAULT = 256
+} INSCRIPT;
 
-/* Increment current pointer to 'steps' characters, modifying automate if necessary */
-#define INCREMENT_CURRENT_ADR(steps) do { \
-  int steps__ = (int) ( steps ); \
-  while(steps__ > 0) { \
-  html++; \
-  AUTOMATE_LOOKUP_CURRENT_ADR(); \
-  steps__ --; \
-  } \
-} while(0)
+#define INSCRIPT_NSTATES 10 /* rows in the transition table */
+
+/* Live view of the parser's automaton locals, set up once so the helpers below
+   can drive it without capturing them by lexical scope. */
+typedef struct {
+  const int *inscript;             /* nonzero while inside a script body */
+  const signed char (*table)[257]; /* [INSCRIPT_NSTATES][257] transitions */
+  INSCRIPT *pos;                   /* current state */
+  const char **html;               /* parse cursor */
+} script_automate;
+
+/* Feed the current *html byte to the automaton. No-op outside a script body. */
+static void hts_automate_lookup(const script_automate *aut) {
+  if (*aut->inscript) {
+    int next = aut->table[*aut->pos][(unsigned char) **aut->html];
+    if (next < 0) {
+      next = aut->table[*aut->pos][INSCRIPT_DEFAULT];
+    }
+    assertf(next >= 0 && next < INSCRIPT_NSTATES);
+    *aut->pos = (INSCRIPT) next;
+  }
+}
+
+/* Advance the cursor by 'steps' bytes, feeding each to the automaton. */
+static void hts_automate_increment(const script_automate *aut, int steps) {
+  while (steps > 0) {
+    (*aut->html)++;
+    hts_automate_lookup(aut);
+    steps--;
+  }
+}
 
 /* Percent-encode the angle brackets of a string so it is safe to embed inside
    an HTML comment (the default footer) or any other HTML context. A URL holding
@@ -334,20 +358,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
       int inscript_locked = 0;  // in locked script (ie. js file)
-      signed char inscript_state[10][257];
-      typedef enum {
-        INSCRIPT_START = 0,
-        INSCRIPT_ANTISLASH,
-        INSCRIPT_INQUOTE,
-        INSCRIPT_INQUOTE2,
-        INSCRIPT_SLASH,
-        INSCRIPT_SLASHSLASH,
-        INSCRIPT_COMMENT,
-        INSCRIPT_COMMENT2,
-        INSCRIPT_ANTISLASH_IN_QUOTE,
-        INSCRIPT_ANTISLASH_IN_QUOTE2,
-        INSCRIPT_DEFAULT = 256
-      } INSCRIPT;
+      signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;
       const char *inscript_name = NULL;       // script tag name
       int inscript_tag = 0;     // on est dans un <body onLoad="... terminé par >
@@ -408,6 +419,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       inscript_state[INSCRIPT_COMMENT2]['*'] = INSCRIPT_COMMENT2;
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE; /* #8: escape in '' */
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE2;       /* #9: escape in "" */
+      const script_automate saut = {&inscript, inscript_state,
+                                    &inscript_state_pos, &html};
 
       /* Primary list or URLs */
       if (ptr == 0) {
@@ -846,7 +859,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
 
             /* automate */
-            AUTOMATE_LOOKUP_CURRENT_ADR();
+            hts_automate_lookup(&saut);
 
             // Note:
             // Certaines pages ne respectent pas le html
@@ -1762,7 +1775,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
             // sauter espaces
             // adr+=p;
-            INCREMENT_CURRENT_ADR(p);
+            hts_automate_increment(&saut, p);
             while((is_space(*html)
                    || (inscriptgen && html[0] == '\\' && is_space(html[1])
                    )
@@ -1777,7 +1790,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
               // puis quitter
               // html++;    // sauter les espaces, "" et cie
-              INCREMENT_CURRENT_ADR(1);
+              hts_automate_increment(&saut, 1);
             }
 
             /* Stop at \n (LF) if primary links or link lists */
@@ -1792,7 +1805,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (*html == '\\') {
                 if ((*(html + 1) == '\'') || (*(html + 1) == '"')) {      // \" ou \'
                   // html+=2;    // sauter
-                  INCREMENT_CURRENT_ADR(2);
+                  hts_automate_increment(&saut, 2);
                 }
               }
             }
@@ -1840,7 +1853,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (srcset_p) {
               while(html < r->adr + r->size
                     && (is_realspace(*html) || *html == ','))
-                INCREMENT_CURRENT_ADR(1);
+                hts_automate_increment(&saut, 1);
             }
             eadr = html;
 
@@ -3300,7 +3313,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             assertf(eadr - html >= 0);   // Should not go back
             if (eadr > html) {
-              INCREMENT_CURRENT_ADR(eadr - 1 - html);
+              hts_automate_increment(&saut, (int) (eadr - 1 - html));
             }
             // adr=eadr-1;  // ** sauter
 
@@ -3319,7 +3332,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   q++;          // skip whitespace and empty candidates
                 if (q < endp && *q != '\0' && *q != ',' && *q != quote
                     && *q != '<' && *q != '>' && (unsigned char) *q >= 32) {
-                  INCREMENT_CURRENT_ADR(q - html);   // keep the automate in sync
+                  hts_automate_increment(
+                      &saut, (int) (q - html)); // keep the automate in sync
                   ok = 1;
                   goto srcset_next;
                 }
