@@ -1,4 +1,6 @@
-httrack source: changelog-should-mention-nmu
+# Maintainer uploads sign the changelog as xavier@debian.org while the control
+# Maintainer is roche@httrack.com; lintian reads the address mismatch as an NMU.
+httrack source: no-nmu-in-changelog
 httrack source: source-nmu-has-incorrect-version-number
 
 # The bundled HTML pages are the genuine upstream documentation taken from
