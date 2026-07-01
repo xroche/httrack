@@ -108,62 +108,47 @@ Please visit our Website: http://www.httrack.com
 
 #define HT_ADD_FOP
 
+/* Mutable extended-context fields: one source of truth so the DEFINE/SET/SAVE
+   load and store lists can't drift apart. */
+/* clang-format off */
+#define ENGINE_MUTABLE_FIELDS(X) \
+  X(int, error, stre->error_) \
+  X(int, store_errpage, stre->store_errpage_) \
+  X(int, makeindex_done, stre->makeindex_done_) \
+  X(FILE *, makeindex_fp, stre->makeindex_fp_) \
+  X(int, makeindex_links, stre->makeindex_links_) \
+  X(LLint, stat_fragment, stre->stat_fragment_)
+
+#define ENGINE_FIELD_DECLARE(type, name, src) type name = *(src);
+#define ENGINE_FIELD_LOAD(type, name, src) name = *(src);
+#define ENGINE_FIELD_STORE(type, name, src) *(src) = name;
+
 #define ENGINE_DEFINE_CONTEXT() \
   ENGINE_DEFINE_CONTEXT_BASE(); \
-  /* */ \
   htsblk* const r HTS_UNUSED = stre->r_; \
   hash_struct* const hash HTS_UNUSED = stre->hash_; \
   char* const codebase HTS_UNUSED = stre->codebase; \
   char* const base HTS_UNUSED = stre->base; \
-  /* */ \
   const char * const template_header HTS_UNUSED = stre->template_header_; \
   const char * const template_body HTS_UNUSED = stre->template_body_; \
   const char * const template_footer HTS_UNUSED = stre->template_footer_; \
-  /* */ \
   HTS_UNUSED char* const makeindex_firstlink = stre->makeindex_firstlink_; \
-  /* */ \
-  /* */ \
-  int error = * stre->error_; \
-  int store_errpage = * stre->store_errpage_; \
-  /* */ \
-  int makeindex_done = *stre->makeindex_done_; \
-  FILE* makeindex_fp = *stre->makeindex_fp_; \
-  int makeindex_links = *stre->makeindex_links_; \
-  /* */ \
-  LLint stat_fragment = *stre->stat_fragment_; \
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_DECLARE) \
+  /* load-once (kept out of SET/SAVE): re-reading would reset the throttle */ \
   HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
   HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
 
-/* clang-format off: an edit realigns all backslashes, churning the macro. */
-/* clang-format off */
-/* Load-once: re-reading resets makestat_time (mutated locally, never SAVEd). */
 #define ENGINE_SET_CONTEXT() \
   ENGINE_SET_CONTEXT_BASE(); \
-  /* */ \
-  error = * stre->error_; \
-  store_errpage = * stre->store_errpage_; \
-  /* */ \
-  makeindex_done = *stre->makeindex_done_; \
-  makeindex_fp = *stre->makeindex_fp_; \
-  makeindex_links = *stre->makeindex_links_; \
-  /* */ \
-  stat_fragment = *stre->stat_fragment_
-/* clang-format on */
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_LOAD)
 
 #define ENGINE_LOAD_CONTEXT() \
   ENGINE_DEFINE_CONTEXT()
 
 #define ENGINE_SAVE_CONTEXT() \
   ENGINE_SAVE_CONTEXT_BASE(); \
-  /* */ \
-  * stre->error_ = error; \
-  * stre->store_errpage_ = store_errpage; \
-  /* */ \
-  *stre->makeindex_done_ = makeindex_done; \
-  *stre->makeindex_fp_ = makeindex_fp; \
-  *stre->makeindex_links_ = makeindex_links; \
-  /* */ \
-  *stre->stat_fragment_ = stat_fragment
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_STORE)
+/* clang-format on */
 
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
 
