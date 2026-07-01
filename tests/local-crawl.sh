@@ -15,8 +15,11 @@
 #   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
 #       --errors N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
+#       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
 #       httrack BASEURL/some/path [httrack-args...]
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
+# --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
+# host root), to assert rewritten link/content survived the crawl.
 # --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
 # which the ephemeral port forces into the cookie domain) and passes it to
 # httrack via --cookies-file, to exercise preloaded cookies.
@@ -120,6 +123,10 @@ while test "$pos" -lt "$nargs"; do
     --found | --not-found | --directory | --log-found | --log-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
+        ;;
+    --file-matches | --file-not-matches)
+        audit+=("${args[$pos]}" "${args[$((pos + 1))]}" "${args[$((pos + 2))]}")
+        pos=$((pos + 2))
         ;;
     httrack)
         pos=$((pos + 1))
@@ -291,6 +298,24 @@ while test "$i" -lt "${#audit[@]}"; do
         info "checking log lacks ${audit[$i]}"
         if grep -aqE "${audit[$i]}" "${out}/hts-log.txt"; then
             result "present in log"
+            exit 1
+        else result "OK"; fi
+        ;;
+    --file-matches)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        info "checking ${path} matches ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "${hostroot}/${path}"; then result "OK"; else
+            result "no match"
+            exit 1
+        fi
+        ;;
+    --file-not-matches)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        info "checking ${path} lacks ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "${hostroot}/${path}"; then
+            result "matched"
             exit 1
         else result "OK"; fi
         ;;

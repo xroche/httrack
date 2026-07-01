@@ -1,0 +1,13 @@
+#!/bin/bash
+# Issue #279: an anchored link (target.html#sec, quoted or bare) fetches the
+# target with the fragment dropped (strict server 400s on a '#' in the request)
+# but keeps it in the rewritten local link so the anchor still works.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'fraglink/target.html' \
+    --file-matches 'fraglink/index.html' 'href=target\.html#sec' \
+    --file-matches 'fraglink/index.html' 'href="target\.html#sec2"' \
+    httrack 'BASEURL/fraglink/index.html'
