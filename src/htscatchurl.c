@@ -175,7 +175,9 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
       //
       socinput(soc, line, 1000);
       if (strnotempty(line)) {
-        if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
+        /* widths bound the caller buffers: method[32], url[HTS_URLMAXSIZE*2],
+           protocol[256] */
+        if (sscanf(line, "%31s %2047s %255s", method, url, protocol) == 3) {
           lien_adrfil af;
 
           // méthode en majuscule

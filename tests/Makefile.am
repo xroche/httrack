@@ -54,6 +54,7 @@ TESTS = \
 	01_engine-stripquery.test \
 	01_engine-strsafe.test \
 	01_engine-urlhack.test \
+	01_engine-unescape-bounds.test \
 	01_engine-useragent.test \
 	01_zlib-acceptencoding.test \
 	01_zlib-cache.test \
