@@ -736,6 +736,10 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeEntities("abc", dest, sizeof(dest)) == 0);
   assertf(strcmp(dest, "abc") == 0);
+  /* raw multi-byte UTF-8 flush path (bypasses the per-byte guard) */
+  assertf(hts_unescapeUrl("ab\xC3\xA9", dest, sizeof(dest)) == -1);
+  assertf(hts_unescapeUrl("a\xC3\xA9", dest, sizeof(dest)) == 0);
+  assertf(strcmp(dest, "a\xC3\xA9") == 0);
   printf("unescape-bounds self-test OK\n");
   return 0;
 }
