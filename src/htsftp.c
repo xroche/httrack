@@ -128,6 +128,31 @@ void launch_ftp(FTPDownloadStruct * params) {
   return 0; \
   }
 
+/* Bounded split of a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
+void ftp_split_userpass(const char *src, const char *end, char *user,
+                        size_t user_size, char *pass, size_t pass_size) {
+  size_t n = 0;
+
+  while (src[n] != '\0' && src[n] != ':') {
+    if (n < user_size - 1)
+      user[n] = src[n];
+    n++;
+  }
+  user[n < user_size ? n : user_size - 1] = '\0';
+  pass[0] = '\0';
+  if (src[n] == ':') { // password follows the colon
+    const size_t base = n + 1;
+    size_t k = 0;
+
+    while (&src[base + k + 1] < end && src[base + k] != '\0') {
+      if (k < pass_size - 1)
+        pass[k] = src[base + k];
+      k++;
+    }
+    pass[k < pass_size ? k : pass_size - 1] = '\0';
+  }
+}
+
 // la véritable fonction une fois lancées les routines thread/fork
 int run_launch_ftp(FTPDownloadStruct * pStruct) {
   lien_back *back = pStruct->pBack;
@@ -173,24 +198,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   while(*real_adr == '/')
     real_adr++;                 // sauter /
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
-    int i = -1;
-
-    pass[0] = '\0';
-    do {
-      i++;
-      user[i] = real_adr[i];
-    } while((real_adr[i] != ':') && (real_adr[i]));
-    user[i] = '\0';
-    if (real_adr[i] == ':') {   // pass
-      int j = -1;
-
-      i++;                      // oui on saute aussi le :
-      do {
-        j++;
-        pass[j] = real_adr[i + j];
-      } while(((&real_adr[i + j + 1]) < adr) && (real_adr[i + j]));
-      pass[j] = '\0';
-    }
+    ftp_split_userpass(real_adr, adr, user, sizeof(user), pass, sizeof(pass));
   }
   // Calculer RETR <nom>
   {
@@ -984,8 +992,8 @@ int get_ftp_line(T_SOC soc, char *ptrline, size_t line_size, int timeout) {
       //case 0: break;    // pas encore --> erreur (on attend)!
     case 1:
       HTS_STAT.HTS_TOTAL_RECV += 1;     // compter flux entrant
-      if ((b != 10) && (b != 13))
-        data[i++] = b;
+      if ((b != 10) && (b != 13) && (i < (int) sizeof(data) - 1))
+        data[i++] = b; // truncate hostile over-long reply lines
       break;
     default:
       if (ptrline)

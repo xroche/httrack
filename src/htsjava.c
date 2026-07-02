@@ -63,6 +63,9 @@ Please visit our Website: http://www.httrack.com
 /* This file */
 #include "htsjava.h"
 
+/* calloct/freet wrappers */
+#include "htssafe.h"
+
 static int reverse_endian(void) {
   int endian = 1;
 
@@ -204,7 +207,16 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
         return 0;
       }
 
-      tab = (RESP_STRUCT *) calloc(header.count, sizeof(RESP_STRUCT));
+      /* A constant-pool entry is >= 1 byte on disk; reject a count exceeding
+         the file size (hostile .class ~68 MB alloc DoS). */
+      if (!hts_count_fits(header.count, (LLint) fsize(file))) {
+        fclose(fpout);
+        sprintf(str->err_msg,
+                "Invalid constant pool count %u (file len " LLintP ")",
+                (unsigned) header.count, (LLint) fsize(file));
+        return 0;
+      }
+      tab = (RESP_STRUCT *) calloct(header.count, sizeof(RESP_STRUCT));
       if (!tab) {
         sprintf(str->err_msg, "Unable to alloc %d bytes",
                 (int) sizeof(RESP_STRUCT));
@@ -230,7 +242,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
           } else {              // ++ une erreur est survenue!
             if (strnotempty(str->err_msg) == 0)
               strcpy(str->err_msg, "Internal readtable error");
-            free(tab);
+            freet(tab);
             if (fpout) {
               fclose(fpout);
               fpout = NULL;
@@ -288,7 +300,7 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 #if JAVADEBUG
       printf("end\n");
 #endif
-      free(tab);
+      freet(tab);
       if (fpout) {
         fclose(fpout);
         fpout = NULL;

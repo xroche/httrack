@@ -35,10 +35,13 @@ TESTS = \
 	01_engine-entities.test \
 	01_engine-filelist.test \
 	01_engine-filter.test \
+	01_engine-ftp-line.test \
+	01_engine-ftp-userpass.test \
 	01_engine-hashtable.test \
 	01_engine-idna.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
+	01_engine-java.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
