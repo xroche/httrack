@@ -1846,6 +1846,17 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   ftp_split_userpass(in, in + 802, user, sizeof(user), pass, sizeof(pass));
   assertf(strlen(user) == sizeof(user) - 1);
   assertf(strlen(pass) == sizeof(pass) - 1);
+  {
+    /* tight sizes + guard byte catch an off-by-one the 256 case can't */
+    char ubuf[16], pbuf[16];
+
+    memset(ubuf, 'Z', sizeof(ubuf));
+    memset(pbuf, 'Z', sizeof(pbuf));
+    ftp_split_userpass(in, in + 802, ubuf, 8, pbuf, 8);
+    assertf(strcmp(ubuf, "uuuuuuu") == 0);
+    assertf(strcmp(pbuf, "ppppppp") == 0);
+    assertf(ubuf[8] == 'Z' && pbuf[8] == 'Z');
+  }
   printf("ftp-userpass self-test OK\n");
   return 0;
 }
