@@ -133,6 +133,8 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
                         size_t user_size, char *pass, size_t pass_size) {
   size_t n = 0;
 
+  assertf(user_size > 0 && pass_size > 0); /* the size-1 math underflows on 0 */
+
   while (src[n] != '\0' && src[n] != ':') {
     if (n < user_size - 1)
       user[n] = src[n];

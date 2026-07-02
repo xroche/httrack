@@ -71,7 +71,8 @@ int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
 int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) into
-   bounded, NUL-terminated user/pass buffers, truncating to fit. */
+   bounded, NUL-terminated user/pass buffers, truncating to fit.
+   Both sizes must be nonzero. */
 void ftp_split_userpass(const char *src, const char *end, char *user,
                         size_t user_size, char *pass, size_t pass_size);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);

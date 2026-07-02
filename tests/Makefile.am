@@ -90,6 +90,7 @@ TESTS = \
 	27_local-cookies-file.test \
 	28_local-pause.test \
 	29_local-redirect-fragment.test \
-	30_local-fragment-link.test
+	30_local-fragment-link.test \
+	31_local-javaclass.test
 
 CLEANFILES = check-network_sh.cache

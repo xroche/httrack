@@ -736,6 +736,17 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeEntities("abc", dest, sizeof(dest)) == 0);
   assertf(strcmp(dest, "abc") == 0);
+  /* raw multi-byte UTF-8 flush path (bypasses the per-byte guard) */
+  assertf(hts_unescapeUrl("ab\xC3\xA9", dest, sizeof(dest)) == -1);
+  assertf(hts_unescapeUrl("a\xC3\xA9", dest, sizeof(dest)) == 0);
+  assertf(strcmp(dest, "a\xC3\xA9") == 0);
+  {
+    /* %xx-encoded flush path (utfBufferJ = lastJ rollback) */
+    char wide[8];
+
+    assertf(hts_unescapeUrl("%C3%A9", wide, sizeof(wide)) == 0);
+    assertf(strcmp(wide, "\xC3\xA9") == 0);
+  }
   printf("unescape-bounds self-test OK\n");
   return 0;
 }
@@ -1842,6 +1853,17 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   ftp_split_userpass(in, in + 802, user, sizeof(user), pass, sizeof(pass));
   assertf(strlen(user) == sizeof(user) - 1);
   assertf(strlen(pass) == sizeof(pass) - 1);
+  {
+    /* tight sizes + guard byte catch an off-by-one the 256 case can't */
+    char ubuf[16], pbuf[16];
+
+    memset(ubuf, 'Z', sizeof(ubuf));
+    memset(pbuf, 'Z', sizeof(pbuf));
+    ftp_split_userpass(in, in + 802, ubuf, 8, pbuf, 8);
+    assertf(strcmp(ubuf, "uuuuuuu") == 0);
+    assertf(strcmp(pbuf, "ppppppp") == 0);
+    assertf(ubuf[8] == 'Z' && pbuf[8] == 'Z');
+  }
   printf("ftp-userpass self-test OK\n");
   return 0;
 }

@@ -300,6 +300,11 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
 
           /* Was the character read successfully ? */
           if (nRead == utfBufferSize) {
+            /* the 'continue' below skips the NUL-reserve guard: re-check */
+            if (utfBufferJ + utfBufferSize >= max) {
+              return -1;
+            }
+
             /* Rollback write position to sequence start write position */
             j = utfBufferJ;
 

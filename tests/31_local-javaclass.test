@@ -1,0 +1,23 @@
+#!/bin/bash
+# The java plugin must load (versioned dlopen name) and parse a .class
+# constant pool: a resource named only inside Foo.class gets crawled.
+set -e
+
+: "${top_srcdir:=..}"
+
+tmproot=$(mktemp -d)
+trap 'rm -rf "$tmproot"' EXIT
+mkdir "$tmproot/javaclass"
+
+cat >"$tmproot/javaclass/index.html" <<'EOF'
+<html><body><a href="Foo.class">applet</a></body></html>
+EOF
+printf 'GIF89a' >"$tmproot/javaclass/hello.gif"
+# magic/minor/major, count=2, one CONSTANT_Utf8 "hello.gif", class/superclass
+printf '\xCA\xFE\xBA\xBE\x00\x00\x00\x32\x00\x02\x01\x00\x09hello.gif\x00\x00\x00\x00' \
+    >"$tmproot/javaclass/Foo.class"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$tmproot" --errors 0 \
+    --found 'javaclass/Foo.class' \
+    --found 'javaclass/hello.gif' \
+    httrack 'BASEURL/javaclass/index.html'
