@@ -66,7 +66,11 @@ AC_SUBST(VERSION_INFO)
 # Versioned plugin name for dlopen() in hts_create_opt(); soname major is
 # libtool's current - age, so this tracks VERSION_INFO bumps automatically.
 HTS_SONAME_MAJOR=$((${VERSION_INFO%%:*} - ${VERSION_INFO##*:}))
-AC_DEFINE_UNQUOTED([HTS_LIBHTSJAVA_NAME], ["libhtsjava.so.$HTS_SONAME_MAJOR"],
+case "$host_os" in
+darwin*) HTS_LIBHTSJAVA_NAME="libhtsjava.$HTS_SONAME_MAJOR.dylib" ;;
+*) HTS_LIBHTSJAVA_NAME="libhtsjava.so.$HTS_SONAME_MAJOR" ;;
+esac
+AC_DEFINE_UNQUOTED([HTS_LIBHTSJAVA_NAME], ["$HTS_LIBHTSJAVA_NAME"],
   [Versioned libhtsjava runtime name, derived from VERSION_INFO])
 
 ### Default CFLAGS
