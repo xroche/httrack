@@ -6023,9 +6023,11 @@ HTSEXT_API httrackp *hts_create_opt(void) {
     "htsswf", "htsjava", "httrack-plugin", NULL
   };
 #else
-  static const char *defaultModules[] = {
-    "libhtsswf.so.1", "libhtsjava.so.2", "httrack-plugin", NULL
-  };
+#ifndef HTS_LIBHTSJAVA_NAME
+#define HTS_LIBHTSJAVA_NAME "libhtsjava.so" /* non-autoconf fallback */
+#endif
+  static const char *defaultModules[] = {"libhtsswf.so.1", HTS_LIBHTSJAVA_NAME,
+                                         "httrack-plugin", NULL};
 #endif
   httrackp *opt = malloc(sizeof(httrackp));
 

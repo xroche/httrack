@@ -69,11 +69,15 @@ typedef struct t_hts_callbackarg t_hts_callbackarg;
 typedef struct t_hts_callbackarg t_hts_callbackarg;
 #endif
 
-/* Marks a symbol an external wrapper module exports back to the engine
-   (dllexport on Windows, nothing elsewhere). */
+/* Marks a symbol an external wrapper module exports back to the engine.
+   Must override -fvisibility=hidden on ELF, or dlopen()ed plugins (htsjava)
+   hide their own hts_plug()/hts_unplug() entry points. */
 #ifndef EXTERNAL_FUNCTION
 #ifdef _WIN32
 #define EXTERNAL_FUNCTION __declspec(dllexport)
+#elif ((defined(__GNUC__) && (__GNUC__ >= 4)) ||                               \
+       (defined(HAVE_VISIBILITY) && HAVE_VISIBILITY))
+#define EXTERNAL_FUNCTION __attribute__((visibility("default")))
 #else
 #define EXTERNAL_FUNCTION
 #endif

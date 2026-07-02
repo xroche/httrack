@@ -33,15 +33,19 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSJAVA_DEFH
 #define HTSJAVA_DEFH
 
+#include <stdint.h>
+
 #ifndef HTS_DEF_FWSTRUCT_JAVA_HEADER
 #define HTS_DEF_FWSTRUCT_JAVA_HEADER
 typedef struct JAVA_HEADER JAVA_HEADER;
 #endif
+/* 10-byte on-disk .class header image, fread() directly: fields need exact
+   widths (LP64's 8-byte 'unsigned long' magic never matched 0xCAFEBABE). */
 struct JAVA_HEADER {
-  unsigned long int magic;
-  unsigned short int minor;
-  unsigned short int major;
-  unsigned short int count;
+  uint32_t magic;
+  uint16_t minor;
+  uint16_t major;
+  uint16_t count;
 };
 
 #ifndef HTS_DEF_FWSTRUCT_RESP_STRUCT

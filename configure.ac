@@ -63,6 +63,12 @@ AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 # Export version info
 AC_SUBST(VERSION_INFO)
 
+# Versioned plugin name for dlopen() in hts_create_opt(); soname major is
+# libtool's current - age, so this tracks VERSION_INFO bumps automatically.
+HTS_SONAME_MAJOR=$((${VERSION_INFO%%:*} - ${VERSION_INFO##*:}))
+AC_DEFINE_UNQUOTED([HTS_LIBHTSJAVA_NAME], ["libhtsjava.so.$HTS_SONAME_MAJOR"],
+  [Versioned libhtsjava runtime name, derived from VERSION_INFO])
+
 ### Default CFLAGS
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
 -Wmultichar -Wwrite-strings -Wcast-qual -Wcast-align \
