@@ -190,9 +190,9 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
         }
       }
     }
-    
-    /* copy */
-    if (j + 1 > max) {
+
+    /* reserve one byte for the trailing NUL written after the loop */
+    if (j + 1 >= max) {
       /* overflow */
       return -1;
     }
@@ -314,8 +314,8 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       }
     }
 
-    /* Check for overflow */
-    if (j + 1 > max) {
+    /* reserve one byte for the trailing NUL written after the loop */
+    if (j + 1 >= max) {
       return -1;
     }
 

@@ -713,12 +713,30 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   }
   s = strdupt(argv[0]);
   enc = argc >= 2 ? argv[1] : "UTF-8";
-  if (s != NULL && hts_unescapeEntitiesWithCharset(s, s, strlen(s), enc) == 0) {
+  if (s != NULL &&
+      hts_unescapeEntitiesWithCharset(s, s, strlen(s) + 1, enc) == 0) {
     printf("%s\n", s);
     freet(s);
   } else {
     fprintf(stderr, "invalid string '%s'\n", argv[0]);
   }
+  return 0;
+}
+
+/* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
+   dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
+   by ASan). Both unescapeEntities and unescapeUrl share the guard. */
+static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
+  char dest[4];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(hts_unescapeEntities("abcd", dest, sizeof(dest)) == -1);
+  assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
+  assertf(hts_unescapeEntities("abc", dest, sizeof(dest)) == 0);
+  assertf(strcmp(dest, "abc") == 0);
+  printf("unescape-bounds self-test OK\n");
   return 0;
 }
 
@@ -1873,6 +1891,8 @@ static const struct selftest_entry {
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
+    {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
+     st_unescape_bounds},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff [str]]", "bounded string-op self-test",
      st_strsafe},

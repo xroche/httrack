@@ -1149,7 +1149,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           char BIGSTK protocol[256], url[HTS_URLMAXSIZE * 2], method[256];
 
           linput(fp, line, 1000);
-          if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
+          /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
+          if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
             size_t ret;
             // selon que l'on a ou pas un proxy
             if (retour->req.proxy.active) {

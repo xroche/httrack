@@ -604,13 +604,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Decode title with encoding
-                        if (str->page_charset_ != NULL 
-                            && *str->page_charset_ != '\0') {
-                          char *const sUtf = 
-                            hts_convertStringToUTF8(s, strlen(s), str->page_charset_);
+                        if (str->page_charset_ != NULL &&
+                            *str->page_charset_ != '\0') {
+                          char *sUtf = hts_convertStringToUTF8(
+                              s, strlen(s), str->page_charset_);
                           if (sUtf != NULL) {
-                            strcpy(s, sUtf);
-                            free(sUtf);
+                            /* UTF-8 can expand past s[]; truncate to fit */
+                            snprintf(s, sizeof(s), "%s", sUtf);
+                            freet(sUtf);
                           }
                         }
 
