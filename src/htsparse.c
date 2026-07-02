@@ -3488,6 +3488,24 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   return 0;
 }
 
+/* Mirror the savename to tell whether a redirect saves to the same file (#159);
+ * contract in htsparse.h. */
+hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
+                                       const char *cur_fil,
+                                       const char *moved_adr,
+                                       const char *moved_fil) {
+  const int norm_slash = opt->urlhack && !opt->no_slash_dedup;
+  const int norm_query = opt->urlhack && !opt->no_query_dedup;
+  char BIGSTK n_fil[HTS_URLMAXSIZE * 2], pn_fil[HTS_URLMAXSIZE * 2];
+
+  if (strcasecmp(jump_identification_const(moved_adr),
+                 jump_identification_const(cur_adr)) != 0)
+    return HTS_FALSE;
+  fil_normalized_filtered_ex(moved_fil, n_fil, NULL, norm_slash, norm_query);
+  fil_normalized_filtered_ex(cur_fil, pn_fil, NULL, norm_slash, norm_query);
+  return strcasecmp(n_fil, pn_fil) == 0;
+}
+
 /*
 Check 301, 302, .. statuscodes (moved)
 */
@@ -3533,36 +3551,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         if ((reponse =
              ident_url_relatif(mov_url, urladr(), urlfil(), moved)) >= 0) {
           int set_prio_to = 0;  // pas de priotité fixéd par wizard
-
-          // check whether URLHack is harmless or not (per the effective
-          // sub-flags)
-          if (opt->urlhack && (!opt->no_www_dedup || !opt->no_slash_dedup ||
-                               !opt->no_query_dedup)) {
-            const int norm_host = !opt->no_www_dedup;
-            const int norm_slash = !opt->no_slash_dedup;
-            const int norm_query = !opt->no_query_dedup;
-            char BIGSTK n_adr[HTS_URLMAXSIZE * 2], n_fil[HTS_URLMAXSIZE * 2];
-            char BIGSTK pn_adr[HTS_URLMAXSIZE * 2], pn_fil[HTS_URLMAXSIZE * 2];
-
-            strlcpybuff(n_adr,
-                        norm_host ? jump_normalized_const(moved->adr)
-                                  : jump_identification_const(moved->adr),
-                        sizeof(n_adr));
-            strlcpybuff(pn_adr,
-                        norm_host ? jump_normalized_const(urladr())
-                                  : jump_identification_const(urladr()),
-                        sizeof(pn_adr));
-            fil_normalized_filtered_ex(moved->fil, n_fil, NULL, norm_slash,
-                                       norm_query);
-            fil_normalized_filtered_ex(urlfil(), pn_fil, NULL, norm_slash,
-                                       norm_query);
-            if (strcasecmp(n_adr, pn_adr) == 0
-                && strcasecmp(n_fil, pn_fil) == 0) {
-              hts_log_print(opt, LOG_WARNING,
-                            "Redirected link is identical because of 'URL Hack' option: %s%s and %s%s",
-                            urladr(), urlfil(), moved->adr, moved->fil);
-            }
-          }
+          // A same-file alias redirect must be followed, not stubbed (#159).
+          const hts_boolean same_savefile = hts_redirect_same_savefile(
+              opt, urladr(), urlfil(), moved->adr, moved->fil);
           //if (ident_url_absolute(mov_url,moved->adr,moved->fil)!=-1) {    // ok URL reconnue
           // c'est (en gros) la même URL..
           // si c'est un problème de casse dans le host c'est que le serveur est buggé
@@ -3590,7 +3581,17 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                 hts_log_print(opt, LOG_DEBUG, "moved link accepted: %s%s",
                               moved->adr, moved->fil);
               }
-            }                   /* sinon traité normalement */
+            } else if (same_savefile) {
+              // A stub would point at itself; follow the redirect instead.
+              if (hts_acceptlink(opt, ptr, moved->adr, moved->fil, NULL, NULL,
+                                 &set_prio_to, NULL) != 1) {
+                get_it = 1;
+                hts_log_print(opt, LOG_WARNING,
+                              "Redirect to a same-file alias, fetching real "
+                              "content: %s%s -> %s%s",
+                              urladr(), urlfil(), moved->adr, moved->fil);
+              }
+            } /* sinon traité normalement */
           }
 
           //if ((strfield2(moved->adr,urladr())!=0) && (strfield2(moved->fil,urlfil())!=0)) {  // identique à casse près
@@ -3613,7 +3614,11 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                    heap(heap(ptr)->precedent)->adr,
                    heap(heap(ptr)->precedent)->fil, opt,
                    sback, cache, hash, ptr, numero_passe, NULL) != -1) {
-                if (hash_read(hash, savedmoved.save, NULL, HASH_STRUCT_FILENAME) < 0) {   // n'existe pas déja
+                // Same-file alias: the reserved name is the invalidated source,
+                // so record anyway.
+                if (same_savefile ||
+                    hash_read(hash, savedmoved.save, NULL,
+                              HASH_STRUCT_FILENAME) < 0) { // n'existe pas déja
                   // enregistrer lien avec SAV IDENTIQUE
                   if (hts_record_link(opt, moved->adr, moved->fil, heap(ptr)->sav, "", "", NULL)) {
                     // mode test?
@@ -3637,7 +3642,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                                 "moving %s to an existing file %s",
                                 heap(ptr)->fil, urlfil());
                 }
-
               }
             }
 

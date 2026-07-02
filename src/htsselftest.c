@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsdefines.h"
 #include "htslib.h"
+#include "htsparse.h"
 #include "htscache_selftest.h"
 #include "htsdns_selftest.h"
 #include "htscharset.h"
@@ -1340,6 +1341,37 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
+ * alias. */
+static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+#define SAME(aa, fa, ab, fb) hts_redirect_same_savefile(opt, aa, fa, ab, fb)
+  /* scheme and userinfo collapse (the #159 case); a different path does not */
+  assertf(SAME("http://foo.com", "/a/b", "https://foo.com", "/a/b"));
+  assertf(SAME("http://user@foo.com", "/a", "http://foo.com", "/a"));
+  assertf(!SAME("http://foo.com", "/a", "http://foo.com", "/b"));
+  /* www stays distinct here; the crawl's dedup layer folds www, not this helper
+   */
+  opt->urlhack = HTS_TRUE;
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  assertf(!SAME("http://www.foo.com", "/a", "http://foo.com", "/a"));
+  /* slash/query fold only when the dedup flag is on */
+  assertf(SAME("https://foo.com", "/a//b", "http://foo.com", "/a/b"));
+  assertf(
+      SAME("https://foo.com", "/p?b=2&a=1", "http://foo.com", "/p?a=1&b=2"));
+  opt->no_slash_dedup = opt->no_query_dedup = HTS_TRUE;
+  assertf(!SAME("https://foo.com", "/a//b", "http://foo.com", "/a/b"));
+  assertf(
+      !SAME("https://foo.com", "/p?b=2&a=1", "http://foo.com", "/p?a=1&b=2"));
+  /* but a pure scheme alias still collapses regardless of dedup opt-outs */
+  assertf(SAME("http://foo.com", "/a/b", "https://foo.com", "/a/b"));
+  opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+#undef SAME
+  printf("redirect-samefile self-test OK\n");
+  return 0;
+}
+
 // hts_finish_makeindex writes the footer, emits the refresh meta only when
 // makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
@@ -1757,6 +1789,8 @@ static const struct selftest_entry {
      st_stripquery},
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
      st_urlhack},
+    {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
+     st_redirect_samefile},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <string>",
      "convert a string to UTF-8 from a charset", st_charset},

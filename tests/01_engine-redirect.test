@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# #159: a redirect to a same-file alias (http<->https, user@host, ..) must be
+# followed through, not turned into a self-pointing "moved" stub. The decision
+# helper is exercised by the engine self-test.
+httrack -O /dev/null -#test=redirect-samefile run | grep -q "redirect-samefile self-test OK"
