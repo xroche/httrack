@@ -117,6 +117,19 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                            htsmoduleStructExtended * stre);
 
 /*
+  Non-zero if a redirect (cur_adr,cur_fil)->(moved_adr,moved_fil) saves to the
+  same local file, so it must be followed rather than turned into a
+  self-pointing "moved" stub (#159). Mirrors the savename: scheme+userinfo
+  stripped, www kept (www dedup is the crawl layer's job), path
+  slash/query-normalized per the URL-hack flags. Not hash_url_equals: that keys
+  on the dedup hash, which folds www and never collapses http<->https.
+*/
+hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
+                                       const char *cur_fil,
+                                       const char *moved_adr,
+                                       const char *moved_fil);
+
+/*
   Process user intercations: pause, add link, delete link..
 */
 void hts_mirror_process_user_interaction(htsmoduleStruct * str,
