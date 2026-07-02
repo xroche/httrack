@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# get_ftp_line bounds a hostile CRLF-less FTP reply into its 1024-byte buffer.
+httrack -O /dev/null -#test=ftp-line run | grep -q "ftp-line self-test OK"

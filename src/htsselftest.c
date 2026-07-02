@@ -50,6 +50,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdns_selftest.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htsftp.h"
 #include "htsmd5.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
@@ -61,6 +62,10 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
@@ -1769,6 +1774,75 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* get_ftp_line must bound a hostile, CRLF-less reply into its internal
+   1024-byte buffer; ASan turns the pre-fix overflow into an abort here. */
+#ifndef _WIN32
+static int st_ftpline(httrackp *opt, int argc, char **argv) {
+  int sv[2];
+  char line[2048];
+  char flood[4096];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(flood, 'x', sizeof(flood));
+  assertf(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0);
+  assertf(write(sv[1], "220 ", 4) == 4); // valid 3-digit code
+  assertf(write(sv[1], flood, sizeof(flood)) == (ssize_t) sizeof(flood));
+  assertf(write(sv[1], "\r\n", 2) == 2); // end the line so we return
+  close(sv[1]);
+  line[0] = '\0';
+  get_ftp_line(sv[0], line, sizeof(line), 5);
+  close(sv[0]);
+  printf("ftp-line self-test OK (bounded %d-byte reply)\n",
+         (int) sizeof(flood));
+  return 0;
+}
+#endif
+
+/* ftp_split_userpass: well-formed split, plus a hostile over-long userinfo
+   that pre-fix overran user[256]/pass[256]. */
+static int st_ftpuser(httrackp *opt, int argc, char **argv) {
+  char user[256], pass[256];
+  char in[1200];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  {
+    const char ok[] = "bob:secret@host/f"; // '@' at index 10
+
+    ftp_split_userpass(ok, ok + 11, user, sizeof(user), pass, sizeof(pass));
+    assertf(strcmp(user, "bob") == 0);
+    assertf(strcmp(pass, "secret") == 0);
+  }
+  memset(in, 'u', 400);
+  in[400] = ':';
+  memset(in + 401, 'p', 400);
+  in[801] = '@';
+  in[802] = '\0';
+  ftp_split_userpass(in, in + 802, user, sizeof(user), pass, sizeof(pass));
+  assertf(strlen(user) == sizeof(user) - 1);
+  assertf(strlen(pass) == sizeof(pass) - 1);
+  printf("ftp-userpass self-test OK\n");
+  return 0;
+}
+
+/* hts_count_fits caps the .class constant-pool entry count to the file size,
+   rejecting the ~68 MB-per-file calloc DoS. */
+static int st_java(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(hts_count_fits(10, 1000) == HTS_TRUE);
+  assertf(hts_count_fits(0, 10) == HTS_TRUE);
+  assertf(hts_count_fits(65535, 10) == HTS_FALSE);
+  assertf(hts_count_fits(1, 0) == HTS_FALSE);
+  assertf(hts_count_fits(1, -1) == HTS_FALSE);
+  printf("java constant-pool cap self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -1829,6 +1903,12 @@ static const struct selftest_entry {
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
+#ifndef _WIN32
+    {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
+     st_ftpline},
+#endif
+    {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"java", "", "java .class constant-pool count cap self-test", st_java},
 };
 
 static void list_selftests(void) {
