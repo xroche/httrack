@@ -1093,33 +1093,113 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
+   no-www= no-slash= no-query= n83= type=, plus repeatable prior=adr|fil|sav
+   registering an already-crawled link (dedup/collision paths). */
+/* Parse raw response-header lines and print the naming-relevant fields. */
+static int st_header(httrackp *opt, int argc, char **argv) {
+  htsblk r;
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "header: needs at least one raw header line\n");
+    return 1;
+  }
+  memset(&r, 0, sizeof(r));
+  for (i = 0; i < argc; i++) {
+    char BIGSTK line[HTS_URLMAXSIZE * 2];
+
+    strcpybuff(line, argv[i]);
+    treathead(NULL, "www.example.com", "/", &r, line);
+  }
+  printf("contenttype=%s cdispo=%s\n", r.contenttype, r.cdispo);
+  return 0;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   lien_adrfilsave afs;
   cache_back cache;
   struct_back *sback;
   hash_struct hash;
   lien_back headers;
+  const char *adr = "www.example.com";
+  const char *cdispo = NULL;
+  int statuscode = HTTP_OK, status = 0;
+  int i;
 
   if (argc < 2) {
     fprintf(stderr, "savename: needs a fil and a content-type\n");
     return 1;
   }
+  /* knobs first: hash_init and the prior links depend on them */
+  for (i = 2; i < argc; i++) {
+    const char *const a = argv[i];
+
+    if (strncmp(a, "adr=", 4) == 0)
+      adr = a + 4;
+    else if (strncmp(a, "cdispo=", 7) == 0)
+      cdispo = a + 7;
+    else if (strncmp(a, "statuscode=", 11) == 0)
+      statuscode = atoi(a + 11);
+    else if (strncmp(a, "status=", 7) == 0)
+      status = atoi(a + 7);
+    else if (strncmp(a, "strip=", 6) == 0)
+      StringCopy(opt->strip_query, a + 6);
+    else if (strncmp(a, "urlhack=", 8) == 0)
+      opt->urlhack = atoi(a + 8) ? HTS_TRUE : HTS_FALSE;
+    else if (strncmp(a, "no-www=", 7) == 0)
+      opt->no_www_dedup = atoi(a + 7) ? HTS_TRUE : HTS_FALSE;
+    else if (strncmp(a, "no-slash=", 9) == 0)
+      opt->no_slash_dedup = atoi(a + 9) ? HTS_TRUE : HTS_FALSE;
+    else if (strncmp(a, "no-query=", 9) == 0)
+      opt->no_query_dedup = atoi(a + 9) ? HTS_TRUE : HTS_FALSE;
+    else if (strncmp(a, "n83=", 4) == 0)
+      opt->savename_83 = atoi(a + 4);
+    else if (strncmp(a, "type=", 5) == 0)
+      opt->savename_type = atoi(a + 5);
+    else if (strncmp(a, "prior=", 6) != 0) {
+      fprintf(stderr, "savename: unknown arg '%s'\n", a);
+      return 1;
+    }
+  }
   memset(&afs, 0, sizeof(afs));
-  strcpybuff(afs.af.adr, "www.example.com");
+  strcpybuff(afs.af.adr, adr);
   strcpybuff(afs.af.fil, argv[0]);
 
   memset(&cache, 0, sizeof(cache));
   cache.hashtable = (void *) coucal_new(0);
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
   hash_init(opt, &hash, opt->urlhack);
+  hash.liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = &hash;
+  hts_record_init(opt);
+
+  for (i = 2; i < argc; i++) {
+    if (strncmp(argv[i], "prior=", 6) == 0) {
+      char *dup = strdupt(argv[i] + 6);
+      char *const p1 = strchr(dup, '|');
+      char *const p2 = p1 != NULL ? strchr(p1 + 1, '|') : NULL;
+
+      if (p2 == NULL) {
+        fprintf(stderr, "savename: prior needs adr|fil|sav\n");
+        return 1;
+      }
+      *p1 = *p2 = '\0';
+      if (!hts_record_link(opt, dup, p1 + 1, p2 + 1, "", "", NULL))
+        return 1;
+      freet(dup);
+    }
+  }
 
   memset(&headers, 0, sizeof(headers));
-  headers.status = 0;
-  headers.r.statuscode = HTTP_OK;
+  headers.status = status;
+  headers.r.statuscode = statuscode;
   strcpybuff(headers.r.contenttype, argv[1]);
-  if (argc >= 3)
-    strcpybuff(headers.r.cdispo, argv[2]);
+  if (cdispo != NULL)
+    strcpybuff(headers.r.cdispo, cdispo);
   strcpybuff(headers.url_fil, argv[0]);
 
   url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
@@ -1926,8 +2006,10 @@ static const struct selftest_entry {
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
-    {"savename", "<fil> <content-type> [cdispo]", "local save-name for a URL",
-     st_savename},
+    {"header", "<raw-header-line> ...", "response header-line parsing",
+     st_header},
+    {"savename", "<fil> <content-type> [key=value ...]",
+     "local save-name for a URL", st_savename},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cache-golden", "<dir> [regen]", "frozen cache-format read self-test",
      st_cache_golden},

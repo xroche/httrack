@@ -38,6 +38,7 @@ TESTS = \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
 	01_engine-hashtable.test \
+	01_engine-header.test \
 	01_engine-idna.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
@@ -91,6 +92,7 @@ TESTS = \
 	28_local-pause.test \
 	29_local-redirect-fragment.test \
 	30_local-fragment-link.test \
-	31_local-javaclass.test
+	31_local-javaclass.test \
+	32_local-cdispo.test
 
 CLEANFILES = check-network_sh.cache
