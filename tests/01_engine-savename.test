@@ -43,3 +43,6 @@ name '/x.JPG' 'image/jpeg' 'x.JPG'
 # A Content-Disposition filename replaces the URL name outright.
 name '/x.php' 'application/pdf' 'report.pdf' 'report.pdf'
 name '/download' 'text/html' 'setup.exe' 'setup.exe'
+
+# Reserved characters in a hostile Content-Disposition name are sanitized.
+name '/x.php' 'application/pdf' 'set_up.exe' 'set:up.exe'
