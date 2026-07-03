@@ -4845,6 +4845,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* Still have a back reference */
           if (b >= 0) {
+            /* Patch destination filename for direct-to-disk mode, BEFORE any
+               finalize: it records and caches the entry under url_sav */
+            strcpybuff(back[b].url_sav, afs->save);
             /* Finalize now as we have the type */
             if (back[b].status == STATUS_READY) {
               if (!back[b].finalized) {
@@ -4852,8 +4855,6 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
                 back_finalize(opt, cache, sback, b);
               }
             }
-            /* Patch destination filename for direct-to-disk mode */
-            strcpybuff(back[b].url_sav, afs->save);
           }
 
         }                       // b >= 0
