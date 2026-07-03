@@ -1118,6 +1118,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   headers.status = 0;
   headers.r.statuscode = HTTP_OK;
   strcpybuff(headers.r.contenttype, argv[1]);
+  if (argc >= 3)
+    strcpybuff(headers.r.cdispo, argv[2]);
   strcpybuff(headers.url_fil, argv[0]);
 
   url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
@@ -1924,7 +1926,7 @@ static const struct selftest_entry {
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
-    {"savename", "<fil> <content-type>", "local save-name for a URL",
+    {"savename", "<fil> <content-type> [cdispo]", "local save-name for a URL",
      st_savename},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cache-golden", "<dir> [regen]", "frozen cache-format read self-test",
