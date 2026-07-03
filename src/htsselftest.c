@@ -1096,6 +1096,27 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
    no-www= no-slash= no-query= n83= type=, plus repeatable prior=adr|fil|sav
    registering an already-crawled link (dedup/collision paths). */
+/* Parse raw response-header lines and print the naming-relevant fields. */
+static int st_header(httrackp *opt, int argc, char **argv) {
+  htsblk r;
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "header: needs at least one raw header line\n");
+    return 1;
+  }
+  memset(&r, 0, sizeof(r));
+  for (i = 0; i < argc; i++) {
+    char BIGSTK line[HTS_URLMAXSIZE * 2];
+
+    strcpybuff(line, argv[i]);
+    treathead(NULL, "www.example.com", "/", &r, line);
+  }
+  printf("contenttype=%s cdispo=%s\n", r.contenttype, r.cdispo);
+  return 0;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   lien_adrfilsave afs;
   cache_back cache;
@@ -1150,6 +1171,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   cache.hashtable = (void *) coucal_new(0);
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
   hash_init(opt, &hash, opt->urlhack);
   hash.liens = (const lien_url *const *const *) &opt->liens;
   opt->hash = &hash;
@@ -1984,6 +2006,8 @@ static const struct selftest_entry {
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
+    {"header", "<raw-header-line> ...", "response header-line parsing",
+     st_header},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},

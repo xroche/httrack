@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Response header-line parsing (treathead via -#test=header <raw-line> ...).
+# Isolates the wire layer from url_savename, which strips traversal on its own.
+
+hdr() {
+    local want="$1"
+    shift
+    out="$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')"
+    test "$out" == "$want" || {
+        echo "FAIL: $* -> '$out' (want '$want')"
+        exit 1
+    }
+}
+
+hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'
+
+# filename= is honored quoted or bare.
+hdr 'contenttype= cdispo=report.pdf' \
+    'Content-Disposition: attachment; filename="report.pdf"'
+hdr 'contenttype= cdispo=report.pdf' \
+    'Content-Disposition: attachment; filename=report.pdf'
+
+# Path components in the filename are dropped on the wire (RFC 2616).
+hdr 'contenttype= cdispo=evil.pdf' \
+    'Content-Disposition: attachment; filename="../../evil.pdf"'

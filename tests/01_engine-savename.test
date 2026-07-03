@@ -93,6 +93,10 @@ name '/x.php' 'text/html' 'x-3.html' \
 name '/INDEX.HTML' 'text/html' 'INDEX-2.HTML' \
     'prior=www.example.com|/index.html|/dev/null/www.example.com/index.html'
 
+# Same basename in another directory is NOT a collision.
+name '/x.php' 'text/html' 'x.html' \
+    'prior=www.example.com|/sub/x.html|/dev/null/www.example.com/sub/x.html'
+
 # 8-3 modes: DOS truncates every component to 8+3, ISO9660 level 2 to 31.
 full '/directory-long/verylongfilename.html' 'text/html' \
     '/dev/null/EXAMPLE/DIRECTOR/VERYLONG.HTM' n83=1
@@ -112,6 +116,10 @@ full '/w.php' 'text/html' '/dev/null/www.example.com/W-PRIOR.html' adr=example.c
 full '/w.php' 'text/html' '/dev/null/example.com/w.html' adr=example.com no-www=1 \
     'prior=www.example.com|/w.php|/dev/null/www.example.com/W-PRIOR.html'
 
+# Distinct URLs must stay distinct under urlhack (no over-normalization).
+full '/a//b.php' 'text/html' '/dev/null/www.example.com/a/b.html' \
+    'prior=www.example.com|/a/c.php|/dev/null/www.example.com/a/C-PRIOR.html'
+
 # --strip-query (#112): stripped key dedups onto the prior sav; without the
 # option the same URLs stay distinct.
 full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/PAGE-PRIOR.html' \
@@ -119,8 +127,13 @@ full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/PAGE-PRIOR.h
 full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.html' \
     'prior=www.example.com|/page.php?id=3|/dev/null/www.example.com/PAGE-PRIOR.html'
 
+# A kept key that differs must still block the dedup (no over-stripping).
+full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.html' \
+    strip=sid 'prior=www.example.com|/page.php?id=4|/dev/null/www.example.com/PAGE-PRIOR.html'
+
 # Hostile fils stay rooted under the mirror: ../ (raw or %2e-encoded) drops out,
-# control characters become spaces, oversized names truncate to 210 (ext included).
+# control characters become spaces, oversized names cap at 210 chars (the cap
+# can chop the extension off entirely).
 full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/x.php' 'application/pdf' '/dev/null/www.example.com///evil.exe' 'cdispo=../../evil.exe'

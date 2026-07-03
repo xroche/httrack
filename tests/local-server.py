@@ -134,12 +134,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     # --- type/extension matrix (issue #267 family) -------------------------
 
-    def send_raw(self, body, content_type):
+    def send_raw(self, body, content_type, extra_headers=()):
         """Send a raw body with an explicit Content-Type, or none at all when
         content_type is None (to observe httrack's typeless-file naming)."""
         self.send_response(200)
         if content_type is not None:
             self.send_header("Content-Type", content_type)
+        for name, value in extra_headers:
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command != "HEAD":
@@ -368,14 +370,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_cdispo(self):
         filename = self.CDISPO_NAMES[urlsplit(self.path).path]
-        body = self.FAKE_PDF
-        self.send_response(200)
-        self.send_header("Content-Type", "application/pdf")
-        self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(body)
+        cdispo = 'attachment; filename="%s"' % filename
+        self.send_raw(
+            self.FAKE_PDF,
+            "application/pdf",
+            extra_headers=[("Content-Disposition", cdispo)],
+        )
 
     # 302 whose Location carries a #fragment (#204): the fragment is a UA anchor
     # that must be dropped before the target is fetched. A leaked '#' reaches the
