@@ -167,8 +167,24 @@ static int wire_patches_ext(httrackp *opt, const char *wiremime,
   return 1;
 }
 
-// forme le nom du fichier à sauver (save) à partir de fil et adr
-// système intelligent, qui renomme en cas de besoin (exemple: deux INDEX.HTML et index.html)
+/* Wire-metadata name change: a Content-Disposition filename wins (returns 2),
+   else the declared type's ext when wire_patches_ext() allows (returns 1),
+   else 0. ext receives the new extension or replacement filename. */
+static int resolve_extension(httrackp *opt, const char *cdispo,
+                             const char *contenttype, const char *fil,
+                             char *ext, size_t ext_size) {
+  if (strnotempty(cdispo)) {
+    strlcpybuff(ext, cdispo, ext_size);
+    return 2;
+  }
+  if (wire_patches_ext(opt, contenttype, fil) &&
+      give_mimext(ext, ext_size, contenttype))
+    return 1;
+  return 0;
+}
+
+// Build the local save name (save) from adr/fil; renames on collision
+// (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
                  lien_adrfil *const former,
                  const char *referer_adr, const char *referer_fil, 
@@ -405,45 +421,23 @@ int url_savename(lien_adrfilsave *const afs,
 
   // si option check_type activée
   if (is_html < 0 && opt->check_type && !ext_chg) {
-    int ishtest = 0;
-
     if (protocol != PROTOCOL_FILE
         && protocol != PROTOCOL_FTP
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
       if (!((opt->check_type == 1) && (fil[strlen(fil) - 1] == '/')))   // slash doit être html?
         if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD ||
-            (ishtest = ishtml(opt, fil)) <
-                0) { // unsure whether it's html or a file
+            ishtml(opt, fil) < 0) { // unsure whether it's html or a file
           // lire dans le cache
           htsblk r = cache_read_including_broken(opt, cache, adr, fil); // test uniquement
 
-          if (r.statuscode != -1) {     // pas d'erreur de lecture cache
-            char s[32];
-
-            s[0] = '\0';
+          if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
                           adr_complete, fil_complete);
             if (!HTTP_IS_REDIRECT(r.statuscode)) {
-              if (strnotempty(r.cdispo)) {        /* filename given */
-                ext_chg = 2;      /* change filename */
-                strcpybuff(ext, r.cdispo);
-              } else if (wire_patches_ext(opt, r.contenttype, fil)) {
-                if (give_mimext(s, sizeof(s),
-                                r.contenttype)) { // recognized extension
-                  ext_chg = 1;
-                  strcpybuff(ext, s);
-                }
-              }
+              ext_chg = resolve_extension(opt, r.cdispo, r.contenttype, fil,
+                                          ext, sizeof(ext));
             }
-#ifdef DEFAULT_BIN_EXT
-            // no extension and potentially bogus
-            else if (ishtest == -2) {
-              ext_chg = 1;
-              strcpybuff(ext, DEFAULT_BIN_EXT + 1);
-            }
-#endif
-            //
           } else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD &&
                      is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
                               Lookup mimetype not only by extension,
@@ -467,22 +461,11 @@ int url_savename(lien_adrfilsave *const afs,
           // fail later
           else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
                    !opt->state.stop) {
-            // Check if the file is ready in backing. We basically take the same logic as later.
-            // FIXME: we should cleanup and factorize this unholy mess
+            // Check if the file is ready in backing.
             if (headers != NULL && headers->status >= 0 && !is_redirect) {
-              if (strnotempty(headers->r.cdispo)) {        /* filename given */
-                ext_chg = 2;      /* change filename */
-                strcpybuff(ext, headers->r.cdispo);
-              } else if (wire_patches_ext(opt, headers->r.contenttype,
-                                          headers->url_fil)) {
-                char s[16];
-                if (give_mimext(
-                        s, sizeof(s),
-                        headers->r.contenttype)) { // recognized extension
-                  ext_chg = 1;
-                  strcpybuff(ext, s);
-                }
-              }
+              ext_chg = resolve_extension(opt, headers->r.cdispo,
+                                          headers->r.contenttype,
+                                          headers->url_fil, ext, sizeof(ext));
             }
             else if (mime_type != NULL) {
               ext[0] = '\0';
@@ -500,13 +483,6 @@ int url_savename(lien_adrfilsave *const afs,
                   if (!may_unknown2(opt, mime_type, fil)) {
                     ext_chg = 1;
                   }
-#ifdef DEFAULT_BIN_EXT
-                  // no extension and potentially bogus
-                  else if (ishtml(opt, fil) == -2) {
-                    ext_chg = 1;
-                    strcpybuff(ext, DEFAULT_BIN_EXT + 1);
-                  }
-#endif
                 } else {
                   ext_chg = 0;
                 }
@@ -696,30 +672,10 @@ int url_savename(lien_adrfilsave *const afs,
                     // libérer emplacement backing
                   }
 
-                  {             // pas d'erreur, changer type?
-                    char s[16];
-
-                    s[0] = '\0';
-                    if (strnotempty(back[b].r.cdispo)) {        /* filename given */
-                      ext_chg = 2;      /* change filename */
-                      strcpybuff(ext, back[b].r.cdispo);
-                    } else if (wire_patches_ext(opt, back[b].r.contenttype,
-                                                back[b].url_fil)) {
-                      if (give_mimext(
-                              s, sizeof(s),
-                              back[b].r.contenttype)) { // recognized extension
-                        ext_chg = 1;
-                        strcpybuff(ext, s);
-                      }
-                    }
-#ifdef DEFAULT_BIN_EXT
-                    // no extension and potentially bogus
-                    else if (ishtest == -2) {
-                      ext_chg = 1;
-                      strcpybuff(ext, DEFAULT_BIN_EXT + 1);
-                    }
-#endif
-                  }
+                  // no error: change the type?
+                  ext_chg = resolve_extension(
+                      opt, back[b].r.cdispo, back[b].r.contenttype,
+                      back[b].url_fil, ext, sizeof(ext));
                 }
                 // FIN Si non déplacé, forcer type?
 
