@@ -91,6 +91,7 @@ TESTS = \
 	28_local-pause.test \
 	29_local-redirect-fragment.test \
 	30_local-fragment-link.test \
-	31_local-javaclass.test
+	31_local-javaclass.test \
+	32_local-cdispo.test
 
 CLEANFILES = check-network_sh.cache

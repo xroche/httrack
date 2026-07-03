@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Content-Disposition names the saved file: the attachment filename replaces
+# the URL-derived name, and a traversal filename is reduced to its last
+# component, inside the mirror.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'cdispo/report.pdf' \
+    --file-matches 'cdispo/report.pdf' '%PDF' \
+    --not-found 'cdispo/fetch.pdf' \
+    --found 'cdispo/evil.pdf' \
+    --not-found 'evil.pdf' \
+    httrack 'BASEURL/cdispo/index.html'

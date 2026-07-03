@@ -354,6 +354,29 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # Content-Disposition naming: the attachment filename replaces the
+    # URL-derived name; path components in it are stripped (RFC 2616).
+    CDISPO_NAMES = {
+        "/cdispo/fetch.php": "report.pdf",
+        "/cdispo/evil.php": "../../evil.pdf",
+    }
+
+    def route_cdispo_index(self):
+        self.send_html(
+            '\t<a href="fetch.php">report</a>\n' '\t<a href="evil.php">evil</a>\n'
+        )
+
+    def route_cdispo(self):
+        filename = self.CDISPO_NAMES[urlsplit(self.path).path]
+        body = self.FAKE_PDF
+        self.send_response(200)
+        self.send_header("Content-Type", "application/pdf")
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     # 302 whose Location carries a #fragment (#204): the fragment is a UA anchor
     # that must be dropped before the target is fetched. A leaked '#' reaches the
     # strict-server guard below and 400s.
@@ -406,6 +429,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/mimex/index.html": route_mimex_index,
         "/mimex/blob.pdf": route_mimex_blob,
         "/mimex/real.html": route_mimex_real,
+        "/cdispo/index.html": route_cdispo_index,
+        "/cdispo/fetch.php": route_cdispo,
+        "/cdispo/evil.php": route_cdispo,
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,

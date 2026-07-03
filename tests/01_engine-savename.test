@@ -3,13 +3,30 @@
 
 set -euo pipefail
 
-# Local save-name extension resolution (url_savename via -#test=savename <fil> <content-type> [cdispo]).
-# Asserts on the basename of "savename: <path>".
+# Local save-name resolution (url_savename via -#test=savename <fil> <content-type> [key=value ...]).
+# name() asserts on the basename, full() on the whole path; prior= registers an
+# already-crawled link whose sav is rooted under the -O path (/dev/null here).
+
+run() {
+    httrack -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
+}
 
 name() {
-    out="$(httrack -O /dev/null -#test=savename "$1" "$2" ${4:+"$4"} | sed -n 's/^savename: //p')"
-    test "${out##*/}" == "$3" || {
-        echo "FAIL: '$1' '$2' -> '$out' (want '$3')"
+    local fil="$1" ctype="$2" want="$3"
+    shift 3
+    out="$(run "$fil" "$ctype" "$@")"
+    test "${out##*/}" == "$want" || {
+        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
+        exit 1
+    }
+}
+
+full() {
+    local fil="$1" ctype="$2" want="$3"
+    shift 3
+    out="$(run "$fil" "$ctype" "$@")"
+    test "$out" == "$want" || {
+        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
         exit 1
     }
 }
@@ -41,8 +58,71 @@ name '/types/data.json' 'application/json' 'data.json'
 name '/x.JPG' 'image/jpeg' 'x.JPG'
 
 # A Content-Disposition filename replaces the URL name outright.
-name '/x.php' 'application/pdf' 'report.pdf' 'report.pdf'
-name '/download' 'text/html' 'setup.exe' 'setup.exe'
+name '/x.php' 'application/pdf' 'report.pdf' cdispo=report.pdf
+name '/download' 'text/html' 'setup.exe' cdispo=setup.exe
 
 # Reserved characters in a hostile Content-Disposition name are sanitized.
-name '/x.php' 'application/pdf' 'set_up.exe' 'set:up.exe'
+name '/x.php' 'application/pdf' 'set_up.exe' 'cdispo=set:up.exe'
+
+# The md5-of-query suffix lands inside a Content-Disposition name too.
+name '/x.php?id=1' 'application/pdf' 'report681a.pdf' cdispo=report.pdf
+
+# Still-downloading path (status=-1): mime drives the ext, cdispo is ignored
+# there (the deliberately unfolded 4th resolve_extension variant).
+name '/x.pdf' 'text/html' 'x.html' status=-1
+name '/x.html' 'text/html' 'x.html' status=-1
+name '/x.php' 'application/pdf' 'x.pdf' status=-1 cdispo=report.pdf
+
+# A redirect answer resolves nothing: delayed placeholder name.
+name '/x.php' 'text/html' 'x.0.delayed' statuscode=301
+
+# Root and query-only URLs get index + the md5-of-query suffix.
+name '/' 'text/html' 'index.html'
+name '/?a=1' 'text/html' 'index3872.html'
+
+# Same URL crawled before: reuse its sav verbatim (case preserved).
+full '/X.PHP' 'text/html' 'www.example.com/CASE.HTML' \
+    'prior=www.example.com|/X.PHP|www.example.com/CASE.HTML'
+
+# Another URL owns the name: collision suffix -2, then -3, case-insensitively.
+name '/x.php' 'text/html' 'x-2.html' \
+    'prior=www.example.com|/other.html|/dev/null/www.example.com/x.html'
+name '/x.php' 'text/html' 'x-3.html' \
+    'prior=www.example.com|/o1.html|/dev/null/www.example.com/x.html' \
+    'prior=www.example.com|/o2.html|/dev/null/www.example.com/x-2.html'
+name '/INDEX.HTML' 'text/html' 'INDEX-2.HTML' \
+    'prior=www.example.com|/index.html|/dev/null/www.example.com/index.html'
+
+# 8-3 modes: DOS truncates every component to 8+3, ISO9660 level 2 to 31.
+full '/directory-long/verylongfilename.html' 'text/html' \
+    '/dev/null/EXAMPLE/DIRECTOR/VERYLONG.HTM' n83=1
+full '/directory-long/verylongfilename.html' 'text/html' \
+    '/dev/null/EXAMPLE_C/DIRECTORY_LONG/VERYLONGFILENAME.HTM' n83=2
+name '/verylongfilename.php' 'text/html' 'VERYLO-2.HTM' n83=1 \
+    'prior=www.example.com|/other.html|/dev/null/EXAMPLE/VERYLONG.HTM'
+
+# urlhack dedup (#271): // collapse and www-strip map to the prior link's sav;
+# the per-feature negatives opt out and take a fresh name.
+full '/a//b.php' 'text/html' '/dev/null/www.example.com/a/PRIOR.html' \
+    'prior=www.example.com|/a/b.php|/dev/null/www.example.com/a/PRIOR.html'
+full '/a//b.php' 'text/html' '/dev/null/www.example.com/a/b.html' no-slash=1 \
+    'prior=www.example.com|/a/b.php|/dev/null/www.example.com/a/PRIOR.html'
+full '/w.php' 'text/html' '/dev/null/www.example.com/W-PRIOR.html' adr=example.com \
+    'prior=www.example.com|/w.php|/dev/null/www.example.com/W-PRIOR.html'
+full '/w.php' 'text/html' '/dev/null/example.com/w.html' adr=example.com no-www=1 \
+    'prior=www.example.com|/w.php|/dev/null/www.example.com/W-PRIOR.html'
+
+# --strip-query (#112): stripped key dedups onto the prior sav; without the
+# option the same URLs stay distinct.
+full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/PAGE-PRIOR.html' \
+    strip=sid 'prior=www.example.com|/page.php?id=3|/dev/null/www.example.com/PAGE-PRIOR.html'
+full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.html' \
+    'prior=www.example.com|/page.php?id=3|/dev/null/www.example.com/PAGE-PRIOR.html'
+
+# Hostile fils stay rooted under the mirror: ../ (raw or %2e-encoded) drops out,
+# control characters become spaces, oversized names truncate to 210 (ext included).
+full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
+full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
+full '/x.php' 'application/pdf' '/dev/null/www.example.com///evil.exe' 'cdispo=../../evil.exe'
+name $'/evil\rname\t.php' 'text/html' 'evil name .html'
+name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..210})"
