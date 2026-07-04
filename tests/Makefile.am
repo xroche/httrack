@@ -97,6 +97,7 @@ TESTS = \
 	31_local-javaclass.test \
 	32_local-cdispo.test \
 	33_local-delayed.test \
-	34_local-maxtime.test
+	34_local-maxtime.test \
+	35_local-maxsize.test
 
 CLEANFILES = check-network_sh.cache

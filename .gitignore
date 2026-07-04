@@ -39,3 +39,6 @@ Makefile
 
 # Editor / autotools backup files.
 *~
+
+# Python bytecode (tests/local-server.py).
+__pycache__/

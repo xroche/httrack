@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# -M byte cap (#77): the crawl must stop with the "giving up" error and keep
+# the mirror well under the 8 x 640KB the fixture totals uncapped.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# cap = -M + the 4 in-flight files the smooth stop lets finish + one of margin
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found 'More than 400000 bytes have been transferred.. giving up' \
+    --found bigfiles/p0.bin \
+    --max-mirror-bytes 3700000 \
+    httrack 'BASEURL/bigfiles/index.html' -M400000 -c4
