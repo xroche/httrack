@@ -3399,20 +3399,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
           back_fillmax(sback, opt, cache, ptr, numero_passe);
 
-          // Transfer rate
-          engine_stats();
-
-          // Refresh various stats
-          HTS_STAT.stat_nsocket = back_nsoc(sback);
-          HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-          HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-          HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-          HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-          HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-          if (!RUN_CALLBACK7
-              (opt, loop, sback->lnk, sback->count, 0, ptr, opt->lien_tot,
-               (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {
+          if (!hts_loop_tick(sback, opt, 0, ptr)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             *stre->exit_xh_ = 1;        // exit requested
             XH_uninit;
@@ -3423,7 +3410,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             nofollow = 1;       // moins violent
             opt->state._hts_cancel = 0;
           }
-
         }
         // refresh the backing system each 2 seconds
         if (engine_stats()) {
@@ -3960,22 +3946,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         {
           back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
 
-          // Transfer rate
-          engine_stats();
-
-          // Refresh various stats
-          HTS_STAT.stat_nsocket = back_nsoc(sback);
-          HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-          HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-          HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-          HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-          HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
           b = 0;
-          if (!RUN_CALLBACK7
-              (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-               (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)
-              || !back_checkmirror(opt)) {
+          if (!hts_loop_tick(sback, opt, b, ptr) || !back_checkmirror(opt)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             *stre->exit_xh_ = 1;        // exit requested
             XH_uninit;
@@ -4081,20 +4053,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       if (!back_checkmirror(opt))
         break;
 
-      // Transfer rate
-      engine_stats();
-
-      // Refresh various stats
-      HTS_STAT.stat_nsocket = back_nsoc(sback);
-      HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-      HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-      HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-      HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-      HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-      if (!RUN_CALLBACK7
-          (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-           (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {
+      if (!hts_loop_tick(sback, opt, b, ptr)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         *stre->exit_xh_ = 1;    // exit requested
         XH_uninit;
@@ -4281,26 +4240,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
           freet(s);
         }
 
-        // Transfer rate
-        engine_stats();
-
-        // Refresh various stats
-        HTS_STAT.stat_nsocket = back_nsoc(sback);
-        HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-        HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-        HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-        HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-        HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-        if (!RUN_CALLBACK7
-            (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-             (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {
+        if (!hts_loop_tick(sback, opt, b, ptr)) {
           hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
           *stre->exit_xh_ = 1;  // exit requested
           XH_uninit;
           return 0;
         }
-
       }
 
 #if HTS_POLL
@@ -4681,29 +4626,14 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           if (ptr >= 0) {
             back_fillmax(sback, opt, cache, ptr, numero_passe);
           }
-          // on est obligé d'appeler le shell pour le refresh..
-          {
-
-            // Transfer rate
-            engine_stats();
-
-            // Refresh various stats
-            HTS_STAT.stat_nsocket = back_nsoc(sback);
-            HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-            HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-            HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-            HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-            HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-            if (!RUN_CALLBACK7
-                (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-                 (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {
-              back_set_unlocked(sback, b);
-              return -1;
-            } else if (opt->state._hts_cancel || !back_checkmirror(opt)) {      // cancel 2 ou 1 (cancel parsing)
-              back_delete(opt, cache, sback, b);        // cancel test
-              break;
-            }
+          if (!hts_loop_tick(sback, opt, b, ptr)) {
+            back_set_unlocked(sback, b);
+            return -1;
+          } else if (opt->state._hts_cancel ||
+                     !back_checkmirror(
+                         opt)) { // cancel level 2 or 1 (cancel parsing)
+            back_delete(opt, cache, sback, b); // cancel test
+            break;
           }
         } while (
             /* dns/connect/request */

@@ -660,24 +660,11 @@ int url_savename(lien_adrfilsave *const afs,
                   if (ptr >= 0) {
                     back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
-                  // on est obligé d'appeler le shell pour le refresh..
-                  // Transfer rate
-                  engine_stats();
-
-                  // Refresh various stats
-                  HTS_STAT.stat_nsocket = back_nsoc(sback);
-                  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-                  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-                  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-                  HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-                  HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-                  if (!RUN_CALLBACK7
-                      (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-                       (int) (time_local() - HTS_STAT.stat_timestart),
-                       &HTS_STAT)) {
+                  if (!hts_loop_tick(sback, opt, b, ptr)) {
                     return -1;
-                  } else if (opt->state._hts_cancel || !back_checkmirror(opt)) {        // cancel 2 ou 1 (cancel parsing)
+                  } else if (opt->state._hts_cancel ||
+                             !back_checkmirror(
+                                 opt)) { // cancel level 2 or 1 (cancel parsing)
                     back_delete(opt, cache, sback, b);  // cancel test
                     stop_looping = 1;
                   }
