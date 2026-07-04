@@ -15,6 +15,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'types/photo.png' \
     --found 'types/doc.pdf' \
     --found 'types/lie.html' --not-found 'types/lie.png' \
+    --found 'types/wrongtype.png' --not-found 'types/wrongtype.jpg' \
+    --found 'types/bigtype.png' --not-found 'types/bigtype.jpg' \
+    --found 'types/packed.png' --not-found 'types/packed.jpg' \
+    --found 'types/mutant.png' --not-found 'types/mutant.jpg' \
     --found 'types/report.html' --not-found 'types/report.pdf' \
     --found 'types/page.htm' --not-found 'types/page.html' \
     --found 'types/script.js' \

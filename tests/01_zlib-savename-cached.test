@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Update-run naming from a real cache entry (-#test=savename cached=<ctype>|<save>).
+# Named 01_zlib-*: the cache writer needs zlib, which the MSan job can't run.
+
+# resolve httrack before cd: make check puts a RELATIVE ../src on PATH
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cd "$scratch"
+
+name() {
+    local fil="$1" ctype="$2" want="$3"
+    shift 3
+    out="$("$httrack_bin" -O /dev/null -#test=savename "$fil" "$ctype" "$@" | sed -n 's/^savename: //p')"
+    test "${out##*/}" == "$want" || {
+        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
+        exit 1
+    }
+}
+
+# Names are re-derived from the stored headers on every run: neither the
+# recorded save name nor the cached body bytes change the verdict (pinned).
+name '/photo.jpg' 'image/png' 'photo.png' 'cached=image/png|www.example.com/photo.jpg'
+name '/photo.jpg' 'image/png' 'photo.png' 'cached=image/png|www.example.com/photo.png'
+name '/photo.jpg' 'image/jpeg' 'photo.jpg' 'cached=image/jpeg|www.example.com/photo.png'
+name '/style.css' 'image/png' 'style.png' 'cached=image/png|www.example.com/style.css'
+# agreement keeps the URL ext verbatim (.jpeg), never canonicalized to .jpg
+name '/photo.jpeg' 'image/jpeg' 'photo.jpeg' 'cached=image/jpeg|www.example.com/photo.jpeg'

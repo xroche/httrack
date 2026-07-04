@@ -138,32 +138,45 @@ static void cleanEndingSpaceOrDot(char *s) {
   }
 }
 
-/* Should the wire Content-Type override the URL's own extension when naming the
-   saved file? True when the type is patchable (may_unknown2) and either the URL
-   extension implies no specific type or the server declared a disagreeing one.
-   A URL extension mapping to a specific non-HTML type is kept only when the
-   server declared NO type (the HTS_UNKNOWN_MIME sentinel; the #267 mangle
-   guard): a typeless .png stays .png, but a .pdf explicitly served as text/html
-   is named .html. The sentinel rides the cache, so updates stay consistent. */
+/* Wire Content-Type vs URL extension: a patchable wire type wins over an
+   unspecific ext, the HTS_UNKNOWN_MIME sentinel keeps a specific non-HTML ext
+   (#267 guard), a declared disagreement is CONTESTED. Sentinel and verdict
+   ride the cache, so updates stay consistent. */
+typedef enum wire_verdict {
+  WIRE_KEEPS_EXT,
+  WIRE_WINS,
+  WIRE_CONTESTED
+} wire_verdict;
+
+static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
+                                     const char *file, char *urlmime,
+                                     size_t urlmime_size) {
+  if (may_unknown2(opt, wiremime, file))
+    return WIRE_KEEPS_EXT; /* type kept verbatim (keep-list / bogus-multiple) */
+  urlmime[0] = '\0';
+  /* type implied by the URL extension, only when confidently known (flag 0) */
+  if (!get_httptype_sized(opt, urlmime, urlmime_size, file, 0))
+    return WIRE_WINS; /* URL ext implies no known type */
+  if (strfield2(wiremime, urlmime))
+    return WIRE_KEEPS_EXT; /* agreement (no .htm->.html churn) */
+  if (!is_hypertext_mime(opt, urlmime, file) &&
+      strfield2(wiremime, HTS_UNKNOWN_MIME))
+    return WIRE_KEEPS_EXT; /* no declared type */
+  return WIRE_CONTESTED;
+}
+
 static int wire_patches_ext(httrackp *opt, const char *wiremime,
                             const char *file) {
   char urlmime[256];
 
-  if (may_unknown2(opt, wiremime, file))
-    return 0; /* type kept verbatim (keep-list / bogus-multiple) */
-  urlmime[0] = '\0';
-  /* type implied by the URL extension, only when confidently known (flag 0) */
-  if (!get_httptype_sized(opt, urlmime, sizeof(urlmime), file, 0))
-    return 1; /* URL ext implies no known type: trust the wire type */
-  if (strfield2(wiremime, urlmime))
-    return 0; /* wire agrees with the ext: keep it (no .htm->.html churn) */
-  /* wire disagrees with a specific non-HTML URL ext. Keep the ext only when
-     the server declared no type (the sentinel); an explicitly declared type,
-     even text/html, is trusted, so a binary-looking URL that really serves
-     HTML (login/error interstitial, soft-404) is named .html. */
-  if (!is_hypertext_mime(opt, urlmime, file) &&
-      strfield2(wiremime, HTS_UNKNOWN_MIME))
+  switch (wire_ext_verdict(opt, wiremime, file, urlmime, sizeof(urlmime))) {
+  case WIRE_KEEPS_EXT:
     return 0;
+  case WIRE_WINS:
+    return 1;
+  case WIRE_CONTESTED:
+    break; /* no content evidence is consulted today: trust the wire */
+  }
   return 1;
 }
 

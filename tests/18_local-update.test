@@ -12,4 +12,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
     --found 'types/report.html' --not-found 'types/report.pdf' \
     --found 'types/notype.png' --not-found 'types/notype.html' \
     --found 'types/lie.html' \
+    --found 'types/wrongtype.png' --not-found 'types/wrongtype.jpg' \
+    --found 'types/packed.png' --not-found 'types/packed.jpg' \
+    --found 'types/mutant.png' --not-found 'types/mutant.jpg' \
     httrack 'BASEURL/types/index.html'

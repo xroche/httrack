@@ -64,6 +64,7 @@ TESTS = \
 	01_zlib-cache.test \
 	01_zlib-cache-golden.test \
 	01_zlib-cache-writefail.test \
+	01_zlib-savename-cached.test \
 	02_manpage-regen.test \
 	02_update-cache.test \
 	10_crawl-simple.test \

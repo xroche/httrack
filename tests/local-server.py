@@ -14,6 +14,7 @@ stdlib only (http.server + ssl) -- no new build or runtime dependency.
 """
 
 import argparse
+import gzip
 import os
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -150,6 +151,8 @@ class Handler(SimpleHTTPRequestHandler):
     # Fake-binary blobs for the image/pdf/typeless cases.
     FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
     FAKE_PDF = b"%PDF-1.4\n" + b"\x00" * 64
+    FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+    BIG_JPEG = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 64  # > sniff window
 
     # path -> (body, content_type); None sends no header, "" sends an empty
     # Content-Type value (no usable type, must be treated like None).
@@ -161,6 +164,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/notype.pdf": (FAKE_PDF, None),
         "/types/emptyct.png": (FAKE_PNG, ""),
         "/types/lie.png": (FAKE_PNG, "text/html"),
+        "/types/wrongtype.jpg": (FAKE_JPEG, "image/png"),
+        "/types/bigtype.jpg": (BIG_JPEG, "image/png"),
         "/types/report.pdf": (b"<html><body>real page</body></html>", "text/html"),
         "/types/page.htm": (b"<html><body>htm page</body></html>", "text/html"),
         "/types/script.js": (b"var x = 1;\n", "application/javascript"),
@@ -178,6 +183,10 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="notype.pdf">notypepdf</a>\n'
             '\t<img src="emptyct.png" />\n'
             '\t<img src="lie.png" />\n'
+            '\t<img src="wrongtype.jpg" />\n'
+            '\t<img src="bigtype.jpg" />\n'
+            '\t<img src="mutant.jpg" />\n'
+            '\t<img src="packed.jpg" />\n'
             '\t<a href="report.pdf">report</a>\n'
             '\t<a href="page.htm">htm</a>\n'
             '\t<script src="script.js"></script>\n'
@@ -191,6 +200,25 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         body, ctype = self.TYPE_MATRIX[path]
         self.send_raw(body, ctype)
+
+    # content changes between crawls: run 1 sniffs JPEG, the update pass must
+    # keep the run-1 name (recorded verdict) even though the body is now PNG
+    MUTANT_SEEN = set()
+
+    def route_types_mutant(self):
+        path = urlsplit(self.path).path
+        body = self.FAKE_PNG if path in self.MUTANT_SEEN else self.FAKE_JPEG
+        if self.command != "HEAD":
+            self.MUTANT_SEEN.add(path)
+        self.send_raw(body, "image/png")
+
+    # gzip on the wire: the sniff must see the decoded body, not the stream
+    def route_types_packed(self):
+        self.send_raw(
+            gzip.compress(self.FAKE_JPEG),
+            "image/png",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
 
     # --- MIME-type exclusion abort (issue #58) -----------------------------
     # A -mime:application/pdf filter must abort the transfer once the header
@@ -451,6 +479,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/notype.pdf": route_types,
         "/types/emptyct.png": route_types,
         "/types/lie.png": route_types,
+        "/types/wrongtype.jpg": route_types,
+        "/types/bigtype.jpg": route_types,
+        "/types/mutant.jpg": route_types_mutant,
+        "/types/packed.jpg": route_types_packed,
         "/types/report.pdf": route_types,
         "/types/page.htm": route_types,
         "/types/script.js": route_types,
