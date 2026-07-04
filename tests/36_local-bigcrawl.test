@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Diverse seeded /big/ crawl: 12 pattern families, decoy absence, update pass
+# must 304-revalidate. 360 = 1 index + 96 pages + 192 imgs + 5 shared + 60
+# family + 6 singles; the 4 planted errors write -o1 pages, not counted.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --rerun \
+    --errors 4 --files 360 \
+    --found 'big/p/95.html' \
+    --found 'big/a/d1/d2/d3/d4/d5/d6/d7/d8/deep.png' \
+    --found 'big/a/f2-2x.png' \
+    --found 'big/a/subs.vtt' \
+    --found 'big/a/font.woff2' \
+    --found 'big/a/js-data.bin' \
+    --found 'big/d/01.pdf' \
+    --found 'big/d/named.pdf' \
+    --found 'big/a/doc.pdf' \
+    --found "big/f9/caf$(printf '\xc3\xa9').html" \
+    --found 'big/f7/fa.html' \
+    --found 'big/a/ref.png' \
+    --found 'big/f6/sub/leaf.html' \
+    --found 'big/f1/dir/index.html' \
+    --found 'big/f10/empty.html' \
+    --found 'big/indexd41d.html' \
+    --not-found 'big/x/og.png' \
+    --not-found 'big/x/tw.png' \
+    --not-found 'big/x/jsonld.png' \
+    --not-found 'big/x/never-scanned.png' \
+    --not-found 'big/x/atom-only.html' \
+    --not-found 'big/x/sitemap-only.html' \
+    --not-found 'big/x/form-target.html' \
+    --not-found 'big/x/formact.html' \
+    --not-found 'big/x/ping.html' \
+    --not-found 'big/x/aj.jar' \
+    --not-found 'big/x/bj.jar' \
+    --not-found 'big/x/is1.png' \
+    --not-found 'big/x/concat.html' \
+    --file-matches 'big/p/2.html' 'srcset="\.\./a/f2-1x\.png 1x, \.\./a/f2-2x\.png 2x"' \
+    --file-matches 'big/a/blk2.css' 'url\(blk2-bg\.png\)' \
+    --file-matches 'big/p/5.html' "document\\.write\\('<a href=\"\\.\\./f5/dw\\.html\"" \
+    --log-not-found 'bogus state|[Pp]anic|assert' \
+    --log-found ', no files updated' \
+    --max-mirror-bytes 700000 \
+    httrack 'BASEURL/big/index.html' --retries=0 -c8 -%c100 -A100000000
