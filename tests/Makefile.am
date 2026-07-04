@@ -93,6 +93,7 @@ TESTS = \
 	29_local-redirect-fragment.test \
 	30_local-fragment-link.test \
 	31_local-javaclass.test \
-	32_local-cdispo.test
+	32_local-cdispo.test \
+	33_local-delayed.test
 
 CLEANFILES = check-network_sh.cache

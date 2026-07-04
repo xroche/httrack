@@ -392,6 +392,50 @@ class Handler(SimpleHTTPRequestHandler):
     def route_redir_target(self):
         self.send_raw(b"<html><body>redirect target</body></html>\n", "text/html")
 
+    # --- delayed-type degenerate paths (issues #5/#107) --------------------
+    def route_delayed_index(self):
+        self.send_html(
+            '\t<a href="noloc.php">noloc</a>\n'
+            '\t<a href="selfloop.php">selfloop</a>\n'
+            '\t<a href="chain1.php">chain</a>\n'
+            '\t<a href="redir.php">redir</a>\n'
+            '\t<a href="notype.bin">notype</a>\n'
+            '\t<a href="empty.php">empty</a>\n'
+        )
+
+    def send_redirect(self, location):
+        self.send_response(302, "Found")
+        if location is not None:
+            self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_delayed_noloc(self):
+        self.send_redirect(None)  # 302 without Location: name never resolves
+
+    def route_delayed_selfloop(self):
+        self.send_redirect("selfloop.php")
+
+    def route_delayed_chain(self):
+        # chain1..chain9: one more hop than the type-check redirect budget
+        n = int(urlsplit(self.path).path.rsplit("chain", 1)[1].split(".")[0])
+        if n < 9:
+            self.send_redirect("chain%d.php" % (n + 1))
+        else:
+            self.send_raw(self.FAKE_PDF, "application/pdf")
+
+    def route_delayed_redir(self):
+        self.send_redirect("real.pdf")
+
+    def route_delayed_realpdf(self):
+        self.send_raw(self.FAKE_PDF, "application/pdf")
+
+    def route_delayed_notype(self):
+        self.send_raw(self.FAKE_PDF, None)
+
+    def route_delayed_empty(self):
+        self.send_raw(b"", "text/html")  # 200 + Content-Length: 0
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -432,6 +476,22 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/index.html": route_cdispo_index,
         "/cdispo/fetch.php": route_cdispo,
         "/cdispo/evil.php": route_cdispo,
+        "/delayed/index.html": route_delayed_index,
+        "/delayed/noloc.php": route_delayed_noloc,
+        "/delayed/selfloop.php": route_delayed_selfloop,
+        "/delayed/redir.php": route_delayed_redir,
+        "/delayed/real.pdf": route_delayed_realpdf,
+        "/delayed/notype.bin": route_delayed_notype,
+        "/delayed/empty.php": route_delayed_empty,
+        "/delayed/chain1.php": route_delayed_chain,
+        "/delayed/chain2.php": route_delayed_chain,
+        "/delayed/chain3.php": route_delayed_chain,
+        "/delayed/chain4.php": route_delayed_chain,
+        "/delayed/chain5.php": route_delayed_chain,
+        "/delayed/chain6.php": route_delayed_chain,
+        "/delayed/chain7.php": route_delayed_chain,
+        "/delayed/chain8.php": route_delayed_chain,
+        "/delayed/chain9.php": route_delayed_chain,
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
