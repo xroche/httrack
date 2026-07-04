@@ -246,6 +246,14 @@ done
 test -n "$hostroot" || die "could not find host root under $out"
 debug "host root: $hostroot"
 
+# A completed crawl must leave no .delayed temporaries (issue #107)
+info "checking for leftover .delayed files"
+leftovers=$(find "$out" -name '*.delayed' 2>/dev/null | head -5)
+if test -z "$leftovers"; then result "OK"; else
+    result "leftover: $leftovers"
+    exit 1
+fi
+
 # --- audit -------------------------------------------------------------------
 i=0
 while test "$i" -lt "${#audit[@]}"; do
