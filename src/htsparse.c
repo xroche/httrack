@@ -4077,6 +4077,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
     while(opt->state._hts_setpause || back_pluggable_sockets_strict(sback, opt) <= 0) { // on fait la pause..
       opt->state._hts_in_html_parsing = 6;
       back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
+      /* time limit (-E) exceeded: stop waiting for a socket (#481) */
+      if (!back_checkmirror(opt))
+        break;
 
       // Transfer rate
       engine_stats();

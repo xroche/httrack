@@ -1359,6 +1359,18 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 // effacer entrée
+/* Discard a cancelled mid-write .delayed placeholder (unusable across runs). */
+static void back_delayed_discard(httrackp *opt, lien_back *back) {
+  if (back->r.out != NULL) {
+    fclose(back->r.out);
+    back->r.out = NULL;
+  }
+  back->r.is_write = 0;
+  if (opt != NULL)
+    url_savename_refname_remove(opt, back->url_adr, back->url_fil);
+  (void) UNLINK(back->url_sav);
+}
+
 int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                 const int p) {
   lien_back *const back = sback->lnk;
@@ -1366,6 +1378,12 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
 
   assertf(p >= 0 && p < back_max);
   if (p >= 0 && p < sback->count) {     // on sait jamais..
+    /* mid-write cancel: drop a .delayed placeholder; real-named partials
+       survive for resume (--continue) */
+    if (back[p].r.is_write && IS_DELAYED_EXT(back[p].url_sav) &&
+        (back[p].status != STATUS_READY || back[p].r.statuscode <= 0)) {
+      back_delayed_discard(opt, &back[p]);
+    }
     // Vérificateur d'intégrité
 #if DEBUG_CHECKINT
     _CHECKINT(&back[p], "Appel back_delete")
@@ -2418,6 +2436,34 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   // Cleanup the stack to save space!
   back_clean(opt, cache, sback);
 #endif
+
+  /* Time limit exceeded past grace: abort in-flight transfers so no wait loop
+     starves (#481). FTP slots stay, their thread owns the socket. */
+  if (!back_checkmirror(opt)) {
+    int aborted = 0;
+    unsigned int i;
+
+    for (i = 0; i < (unsigned int) back_max; i++) {
+      if (back[i].status > 0 && back[i].status < STATUS_FTP_TRANSFER) {
+        if (back[i].r.soc != INVALID_SOCKET) {
+          deletehttp(&back[i].r);
+        }
+        back[i].r.soc = INVALID_SOCKET;
+        /* drop a .delayed placeholder; real partials survive for resume */
+        if (back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))
+          back_delayed_discard(opt, &back[i]);
+        back[i].r.statuscode = STATUSCODE_TIMEOUT;
+        strcpybuff(back[i].r.msg, "Mirror Time Out");
+        back[i].status = STATUS_READY;
+        back_set_finished(sback, i);
+        aborted++;
+      }
+    }
+    if (aborted > 0)
+      hts_log_print(opt, LOG_WARNING,
+                    "time limit reached, %d transfer(s) aborted", aborted);
+    return;
+  }
 
   // recevoir tant qu'il y a des données (avec un maximum de max_loop boucles)
   do_wait = 0;
@@ -4164,6 +4210,11 @@ int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize) 
   return 1;
 }
 
+/* Grace left to the smooth stop before in-flight transfers are aborted. */
+static int back_maxtime_grace(const int maxtime) {
+  return maximum(5, minimum(30, maxtime / 10));
+}
+
 int back_checkmirror(httrackp * opt) {
   // Check max size
   if ((opt->maxsite > 0) && (HTS_STAT.stat_bytes >= opt->maxsite)) {
@@ -4180,13 +4231,19 @@ int back_checkmirror(httrackp * opt) {
      */
   }
   // Check max time
-  if ((opt->maxtime > 0)
-      && ((time_local() - HTS_STAT.stat_timestart) >= opt->maxtime)) {
-    if (!opt->state.stop) {     /* not yet stopped */
-      hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
-                    opt->maxtime);
-      /* cancel mirror smoothly */
-      hts_request_stop(opt, 0);
+  if (opt->maxtime > 0) {
+    const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
+
+    if (elapsed >= opt->maxtime) {
+      if (!opt->state.stop) { /* not yet stopped */
+        hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
+                      opt->maxtime);
+        /* cancel mirror smoothly */
+        hts_request_stop(opt, 0);
+      }
+      /* smooth stop starved past the grace period: stop waiting (#481) */
+      if (elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
+        return 0;
     }
   }
   return 1;                     /* Ok, go on */
