@@ -400,6 +400,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="chain1.php">chain</a>\n'
             '\t<a href="redir.php">redir</a>\n'
             '\t<a href="notype.bin">notype</a>\n'
+            '\t<a href="empty.php">empty</a>\n'
         )
 
     def send_redirect(self, location):
@@ -431,6 +432,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_delayed_notype(self):
         self.send_raw(self.FAKE_PDF, None)
+
+    def route_delayed_empty(self):
+        self.send_raw(b"", "text/html")  # 200 + Content-Length: 0
 
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
@@ -478,6 +482,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/delayed/redir.php": route_delayed_redir,
         "/delayed/real.pdf": route_delayed_realpdf,
         "/delayed/notype.bin": route_delayed_notype,
+        "/delayed/empty.php": route_delayed_empty,
         "/delayed/chain1.php": route_delayed_chain,
         "/delayed/chain2.php": route_delayed_chain,
         "/delayed/chain3.php": route_delayed_chain,

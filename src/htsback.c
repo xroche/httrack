@@ -3961,8 +3961,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               && (back[i].r.adr = (char *) malloct(2))) {
                             back[i].r.adr[0] = 0;
                           }
-                          hts_log_print(opt, LOG_TRACE, "finalizing empty");
-                          back_finalize(opt, cache, sback, i);
+                          /* locked = name pending; the waiter finalizes after
+                             patching url_sav (else: cached as .delayed, #5) */
+                          if (!back[i].locked) {
+                            hts_log_print(opt, LOG_TRACE, "finalizing empty");
+                            back_finalize(opt, cache, sback, i);
+                          }
                         } else if (!back[i].r.is_chunk) {       // pas de chunk
                           //if (back[i].r.http11!=2) {    // pas de chunk
                           back[i].is_chunk = 0;

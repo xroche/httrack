@@ -12,6 +12,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun --errors 0 \
     --found 'delayed/real.pdf' \
     --file-matches 'delayed/real.pdf' '%PDF' \
     --found 'delayed/notype.bin.html' \
+    --found 'delayed/empty.html' \
     --not-found 'delayed/noloc.html' \
     --not-found 'delayed/selfloop.html' \
     --not-found 'delayed/chain9.pdf' \
