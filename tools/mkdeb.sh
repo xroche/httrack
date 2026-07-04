@@ -211,7 +211,9 @@ main() {
     # lintian ourselves below as the real gate.
     local -a debuild_opts=(--no-lintian)
     local -a build_opts=()
-    [[ $source_only -eq 1 ]] && build_opts+=(-S)
+    # -d: a source build runs no debhelper, so don't require Build-Depends
+    # locally (the buildds and the --sbuild gate enforce them).
+    [[ $source_only -eq 1 ]] && build_opts+=(-S -d)
     if [[ $unsigned -eq 1 ]]; then
         build_opts+=(-us -uc)
     else
