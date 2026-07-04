@@ -1117,6 +1117,30 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Decode a body argument ("hex:FFD8.." or literal text) into buf. */
+static size_t st_decode_body(const char *arg, char *buf, size_t size) {
+  size_t n = 0;
+
+  if (strncmp(arg, "hex:", 4) == 0) {
+    const char *s = arg + 4;
+
+    for (; s[0] != '\0' && s[1] != '\0' && n + 1 < size; s += 2) {
+      unsigned int byte;
+
+      if (sscanf(s, "%2x", &byte) != 1)
+        break;
+      buf[n++] = (char) byte;
+    }
+  } else {
+    n = strlen(arg);
+    if (n >= size)
+      n = size - 1;
+    memcpy(buf, arg, n);
+  }
+  buf[n] = '\0';
+  return n;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   lien_adrfilsave afs;
   cache_back cache;
@@ -1125,6 +1149,9 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   lien_back headers;
   const char *adr = "www.example.com";
   const char *cdispo = NULL;
+  const char *body = NULL;
+  const char *cached = NULL;
+  const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
   int i;
 
@@ -1158,6 +1185,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       opt->savename_83 = atoi(a + 4);
     else if (strncmp(a, "type=", 5) == 0)
       opt->savename_type = atoi(a + 5);
+    else if (strncmp(a, "body=", 5) == 0)
+      body = a + 5;
+    else if (strncmp(a, "cached=", 7) == 0)
+      cached = a + 7;
     else if (strncmp(a, "prior=", 6) != 0) {
       fprintf(stderr, "savename: unknown arg '%s'\n", a);
       return 1;
@@ -1168,7 +1199,47 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   strcpybuff(afs.af.fil, argv[0]);
 
   memset(&cache, 0, sizeof(cache));
-  cache.hashtable = (void *) coucal_new(0);
+  if (cached != NULL) { /* cached=<content-type>|<save name> */
+    char *dup = strdupt(cached);
+    char *const sep = strchr(dup, '|');
+    char locbuf[64] = "";
+    htsblk cr;
+
+    if (sep == NULL) {
+      fprintf(stderr, "savename: cached needs ctype|save\n");
+      return 1;
+    }
+    *sep = '\0';
+    /* one-entry cache in cwd, reopened read-only; body is PNG magic on
+       purpose: naming must not depend on stored content */
+    StringCopy(opt->path_log, "");
+    cache.type = 1;
+    cache.log = cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache_init(&cache, opt);
+    hts_init_htsblk(&cr);
+    cr.statuscode = HTTP_OK;
+    strcpybuff(cr.msg, "OK");
+    strcpybuff(cr.contenttype, dup);
+    cr.location = locbuf;
+    cr.adr = strdupt("\x89PNG\r\n\x1a\n");
+    cr.size = 8;
+    cache_add(opt, &cache, &cr, adr, argv[0], sep + 1, 1, NULL);
+    freet(cr.adr);
+    if (cache.zipOutput != NULL) {
+      zipClose(cache.zipOutput, NULL);
+      cache.zipOutput = NULL;
+    }
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.ro = 1;
+    cache_init(&cache, opt);
+    freet(dup);
+  } else {
+    cache.hashtable = (void *) coucal_new(0);
+  }
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
   /* same wiring as hts_mirror (htscore.c) */
@@ -1201,9 +1272,23 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (cdispo != NULL)
     strcpybuff(headers.r.cdispo, cdispo);
   strcpybuff(headers.url_fil, argv[0]);
+  if (body != NULL) { /* leading body bytes, exposed via url_sav */
+    char BIGSTK data[1024];
+    const size_t n = st_decode_body(body, data, sizeof(data));
+    FILE *const fp = fopen(bodyfile, "wb");
+
+    if (fp == NULL || fwrite(data, 1, n, fp) != n) {
+      fprintf(stderr, "savename: can not write %s\n", bodyfile);
+      return 1;
+    }
+    fclose(fp);
+    strcpybuff(headers.url_sav, bodyfile);
+  }
 
   url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
                &headers);
+  if (body != NULL)
+    (void) UNLINK(bodyfile);
   printf("savename: %s\n", afs.save);
   return 0;
 }

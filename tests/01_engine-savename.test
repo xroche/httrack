@@ -7,8 +7,16 @@ set -euo pipefail
 # name() asserts on the basename, full() on the whole path; prior= registers an
 # already-crawled link whose sav is rooted under the -O path (/dev/null here).
 
+# resolve httrack before cd: make check puts a RELATIVE ../src on PATH
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+# scratch dir: body= and cached= write temp files (st-savename-body.tmp, hts-cache/)
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cd "$scratch"
+
 run() {
-    httrack -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
+    "$httrack_bin" -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
 }
 
 name() {
@@ -72,6 +80,16 @@ name '/x.php?id=1' 'application/pdf' 'report681a.pdf' cdispo=report.pdf
 name '/x.pdf' 'text/html' 'x.html' status=-1
 name '/x.html' 'text/html' 'x.html' status=-1
 name '/x.php' 'application/pdf' 'x.pdf' status=-1 cdispo=report.pdf
+
+# Contested type (wire disagrees with a specific ext): the wire is trusted and
+# body bytes are not consulted; pinned so a content-based tie-break shows up
+# as an explicit flip of these rows.
+name '/photo.jpg' 'image/png' 'photo.png' body=hex:FFD8FFE000104A46
+name '/photo.jpg' 'image/png' 'photo.png' body=hex:89504E470D0A1A0A
+name '/photo.jpg' 'image/png' 'photo.png'
+name '/doc.pdf' 'text/html' 'doc.html' body=hex:255044462D312E34
+name '/doc.pdf' 'text/html' 'doc.html' 'body=<html><body>soft 404</body></html>'
+name '/style.css' 'image/png' 'style.png' 'body=body { }'
 
 # A redirect answer resolves nothing: delayed placeholder name.
 name '/x.php' 'text/html' 'x.0.delayed' statuscode=301
