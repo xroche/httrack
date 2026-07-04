@@ -175,33 +175,4 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
   /* Apply changes */ \
   * str->ptr_ = ptr
 
-#define WAIT_FOR_AVAILABLE_SOCKET()                                            \
-  do {                                                                         \
-    int prev = opt->state._hts_in_html_parsing;                                \
-    while (back_pluggable_sockets_strict(sback, opt) <= 0) {                   \
-      opt->state._hts_in_html_parsing = 6;                                     \
-      /* Wait .. */                                                            \
-      back_wait(sback, opt, cache, 0);                                         \
-      /* time limit (-E) exceeded: stop waiting for a socket (#481) */         \
-      if (!back_checkmirror(opt))                                              \
-        break;                                                                 \
-      /* Transfer rate */                                                      \
-      engine_stats();                                                          \
-      /* Refresh various stats */                                              \
-      HTS_STAT.stat_nsocket = back_nsoc(sback);                                \
-      HTS_STAT.stat_errors = fspc(opt, NULL, "error");                         \
-      HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");                     \
-      HTS_STAT.stat_infos = fspc(opt, NULL, "info");                           \
-      HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);    \
-      HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);              \
-      /* Check */                                                              \
-      if (!RUN_CALLBACK7(                                                      \
-              opt, loop, sback->lnk, sback->count, -1, ptr, opt->lien_tot,     \
-              (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {    \
-        return -1;                                                             \
-      }                                                                        \
-    }                                                                          \
-    opt->state._hts_in_html_parsing = prev;                                    \
-  } while (0)
-
 #endif

@@ -4533,10 +4533,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
         IS_DELAYED_EXT(afs->save) && continue_loop && loops < 7; loops++) {
       continue_loop = 0;
 
-      /*
-         Wait for an available slot 
-       */
-      WAIT_FOR_AVAILABLE_SOCKET();
+      /* Wait for an available slot */
+      if (!hts_wait_available_socket(sback, opt, cache, ptr))
+        return -1;
 
       /* We can lookup directly in the cache to speedup this mess */
       if (opt->delayed_cached) {
