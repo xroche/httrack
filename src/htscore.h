@@ -432,6 +432,15 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 
+/* One engine-loop tick: refresh the transfer stats and run the loop callback
+   for slot b (-1 = none). HTS_FALSE = the callback requested an abort. */
+hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr);
+
+/* Wait until a test socket can be plugged, pumping transfers, stats and the
+   loop callback; gives up past the -E deadline. HTS_FALSE = callback abort. */
+hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
+                                      cache_back *cache, int ptr);
+
 /* Randomized inter-file pause target in [min_ms,max_ms] (#185), derived from a
    timestamp seed so it is stable within one gap and rerolls per launch. */
 int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);

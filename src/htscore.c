@@ -3371,6 +3371,41 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   return n;
 }
 
+/* One engine-loop tick: refresh the transfer stats and run the loop callback
+   for slot b (-1 = none). HTS_FALSE = the callback requested an abort. */
+hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
+  engine_stats();
+  HTS_STAT.stat_nsocket = back_nsoc(sback);
+  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
+  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
+  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
+  HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
+  return RUN_CALLBACK7(
+             opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
+             (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* Single implementation of the historical WAIT_FOR_AVAILABLE_SOCKET macros. */
+hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
+                                      cache_back *cache, int ptr) {
+  const int prev = opt->state._hts_in_html_parsing;
+
+  while (back_pluggable_sockets_strict(sback, opt) <= 0) {
+    opt->state._hts_in_html_parsing = 6;
+    back_wait(sback, opt, cache, 0);
+    /* time limit (-E) exceeded: stop waiting for a socket (#481) */
+    if (!back_checkmirror(opt))
+      break;
+    if (!hts_loop_tick(sback, opt, -1, ptr))
+      return HTS_FALSE;
+  }
+  opt->state._hts_in_html_parsing = prev;
+  return HTS_TRUE;
+}
+
 int back_pluggable_sockets(struct_back * sback, httrackp * opt) {
   int n;
 

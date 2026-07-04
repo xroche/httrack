@@ -74,37 +74,6 @@ static const char *hts_tbdev[] = {
   ""
 };
 
-#define URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET()                                \
-  do {                                                                         \
-    int prev = opt->state._hts_in_html_parsing;                                \
-    while (back_pluggable_sockets_strict(sback, opt) <= 0) {                   \
-      opt->state._hts_in_html_parsing = 6;                                     \
-      /* Wait .. */                                                            \
-      back_wait(sback, opt, cache, 0);                                         \
-      /* time limit (-E) exceeded: stop waiting for a socket (#481) */         \
-      if (!back_checkmirror(opt))                                              \
-        break;                                                                 \
-      /* Transfer rate */                                                      \
-      engine_stats();                                                          \
-      /* Refresh various stats */                                              \
-      HTS_STAT.stat_nsocket = back_nsoc(sback);                                \
-      HTS_STAT.stat_errors = fspc(opt, NULL, "error");                         \
-      HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");                     \
-      HTS_STAT.stat_infos = fspc(opt, NULL, "info");                           \
-      HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);    \
-      HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);              \
-      /* Check */                                                              \
-      {                                                                        \
-        if (!RUN_CALLBACK7(                                                    \
-                opt, loop, sback->lnk, sback->count, -1, ptr, opt->lien_tot,   \
-                (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {  \
-          return -1;                                                           \
-        }                                                                      \
-      }                                                                        \
-    }                                                                          \
-    opt->state._hts_in_html_parsing = prev;                                    \
-  } while (0)
-
 /* Strip all // */
 static void cleanDoubleSlash(char *s) {
   int i, j;
@@ -658,11 +627,10 @@ int url_savename(lien_adrfilsave *const afs,
             int has_been_moved = 0;
             lien_adrfil current;
 
-            /* Ensure we don't use too many sockets by using a "testing" one
-               If we have only 1 simultaneous connection authorized, wait for pending download
-               Wait for an available slot 
+            /* Wait for an available test slot, honoring the connection limits
              */
-            URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET();
+            if (!hts_wait_available_socket(sback, opt, cache, ptr))
+              return -1;
 
             /* Rock'in */
             current.adr[0] = current.fil[0] = '\0';
@@ -692,24 +660,11 @@ int url_savename(lien_adrfilsave *const afs,
                   if (ptr >= 0) {
                     back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
-                  // on est obligé d'appeler le shell pour le refresh..
-                  // Transfer rate
-                  engine_stats();
-
-                  // Refresh various stats
-                  HTS_STAT.stat_nsocket = back_nsoc(sback);
-                  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-                  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-                  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
-                  HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
-                  HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
-
-                  if (!RUN_CALLBACK7
-                      (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
-                       (int) (time_local() - HTS_STAT.stat_timestart),
-                       &HTS_STAT)) {
+                  if (!hts_loop_tick(sback, opt, b, ptr)) {
                     return -1;
-                  } else if (opt->state._hts_cancel || !back_checkmirror(opt)) {        // cancel 2 ou 1 (cancel parsing)
+                  } else if (opt->state._hts_cancel ||
+                             !back_checkmirror(
+                                 opt)) { // cancel level 2 or 1 (cancel parsing)
                     back_delete(opt, cache, sback, b);  // cancel test
                     stop_looping = 1;
                   }
@@ -774,8 +729,9 @@ int url_savename(lien_adrfilsave *const afs,
                                                 "Loop with HEAD request (during prefetch) at %s%s",
                                                 current.adr, current.fil);
                                 }
-                                // Ajouter
-                                URLSAVENAME_WAIT_FOR_AVAILABLE_SOCKET();
+                                if (!hts_wait_available_socket(sback, opt,
+                                                               cache, ptr))
+                                  return -1;
                                 if (back_add(sback, opt, cache, moved.adr, moved.fil, methode, referer_adr, referer_fil, 1) != -1) {        // OK
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "(during prefetch) %s (%d) to link %s at %s%s",
