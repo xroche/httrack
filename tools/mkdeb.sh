@@ -236,12 +236,15 @@ main() {
 
     # The real lintian gate (debuild only reports, it does not fail on tags).
     # --profile debian: CI runners are Ubuntu, whose vendor data would wrongly
-    # reject the Debian "unstable" distribution. newer-standards-version only
-    # means the local lintian is older than the buildds', not a package
-    # defect, so suppress it. set -e turns any error/warning tag into a failure.
+    # reject the Debian "unstable" distribution. Suppressed tags are stale-local-
+    # lintian skew, not package defects: newer-standards-version, and
+    # recommended-field (old lintian still wants the Priority field the sid
+    # lintian in CI accepts dropping). set -e turns any error/warning tag into
+    # a failure.
     info "running lintian gate (--fail-on=error,warning)"
     lintian --profile debian -I -i --fail-on=error,warning \
-        --suppress-tags newer-standards-version "${changes[@]}"
+        --suppress-tags newer-standards-version,recommended-field \
+        "${changes[@]}"
 
     dcmd cp -- "${changes[@]}" "$outdir/"
 
