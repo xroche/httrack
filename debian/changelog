@@ -1,3 +1,15 @@
+httrack (3.49.11-1) unstable; urgency=medium
+
+  * New upstream release: crawl correctness and security fixes (network-facing
+    buffer overflows, file-type detection, redirect handling) and modernized
+    web defaults; full list in history.txt.
+  * Add DEP-12 upstream metadata (#466).
+  * Bump debhelper compat to 14 (#466).
+  * Drop the redundant Priority field and update the NMU lintian override to
+    the current tag names (#466).
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 05 Jul 2026 00:03:18 +0200
+
 httrack (3.49.10-1) unstable; urgency=medium
 
   * New upstream release: new download-pacing and URL-handling options plus a
