@@ -81,15 +81,14 @@ name '/x.pdf' 'text/html' 'x.html' status=-1
 name '/x.html' 'text/html' 'x.html' status=-1
 name '/x.php' 'application/pdf' 'x.pdf' status=-1 cdispo=report.pdf
 
-# Contested type (wire disagrees with a specific ext): the wire is trusted and
-# body bytes are not consulted; pinned so a content-based tie-break shows up
-# as an explicit flip of these rows.
-name '/photo.jpg' 'image/png' 'photo.png' body=hex:FFD8FFE000104A46
+# Contested type (wire disagrees with a specific ext): magic bytes proving the
+# extension right keep it, anything else trusts the wire as before.
+name '/photo.jpg' 'image/png' 'photo.jpg' body=hex:FFD8FFE000104A46
 name '/photo.jpg' 'image/png' 'photo.png' body=hex:89504E470D0A1A0A
 name '/photo.jpg' 'image/png' 'photo.png'
-name '/doc.pdf' 'text/html' 'doc.html' body=hex:255044462D312E34
+name '/doc.pdf' 'text/html' 'doc.pdf' body=hex:255044462D312E34
 name '/doc.pdf' 'text/html' 'doc.html' 'body=<html><body>soft 404</body></html>'
-name '/style.css' 'image/png' 'style.png' 'body=body { }'
+name '/style.css' 'image/png' 'style.png' 'body=body { }' # no rule for css: wire wins
 
 # A redirect answer resolves nothing: delayed placeholder name.
 name '/x.php' 'text/html' 'x.0.delayed' statuscode=301

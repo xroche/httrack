@@ -66,8 +66,11 @@ htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location);
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
-htsblk cache_read_including_broken(httrackp * opt, cache_back * cache,
-                                   const char *adr, const char *fil);
+/* Like cache_read, but also yields entries whose transfer broke; return_save
+   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name. */
+htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
+                                   const char *adr, const char *fil,
+                                   char *return_save);
 htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
                     const char *fil, const char *save, char *location,
                     char *return_save, int readonly);

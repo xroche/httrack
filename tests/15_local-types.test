@@ -1,11 +1,10 @@
 #!/bin/bash
 #
-# Content-Type vs URL-extension naming (issue #267 family) under the default
-# delayed type check (-%N2). Policy: a MISSING Content-Type must not clobber a
-# URL extension that maps to a specific non-HTML type (.png/.pdf stay as-is);
-# an explicitly DECLARED type is trusted, so a binary-looking URL that really
-# serves HTML (text/html on .pdf/.jpg) is named .html. The "wrong" names are
-# asserted absent so a regression in either direction fails here.
+# Content-Type vs URL-extension naming (#267 family, default -%N2). A MISSING
+# type keeps a specific non-HTML ext; a DECLARED disagreeing type is trusted
+# unless magic bytes prove the ext right (lie/wrongtype/packed keep theirs),
+# so a real HTML body (report.pdf) still becomes .html. Wrong names are
+# asserted absent so a regression in either direction fails.
 
 : "${top_srcdir:=..}"
 
@@ -14,11 +13,11 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'types/notype.pdf' --not-found 'types/notype.html' \
     --found 'types/photo.png' \
     --found 'types/doc.pdf' \
-    --found 'types/lie.html' --not-found 'types/lie.png' \
-    --found 'types/wrongtype.png' --not-found 'types/wrongtype.jpg' \
-    --found 'types/bigtype.png' --not-found 'types/bigtype.jpg' \
-    --found 'types/packed.png' --not-found 'types/packed.jpg' \
-    --found 'types/mutant.png' --not-found 'types/mutant.jpg' \
+    --found 'types/lie.png' --not-found 'types/lie.html' \
+    --found 'types/wrongtype.jpg' --not-found 'types/wrongtype.png' \
+    --found 'types/bigtype.jpg' --not-found 'types/bigtype.png' \
+    --found 'types/mutant.jpg' --not-found 'types/mutant.png' \
+    --found 'types/packed.jpg' --not-found 'types/packed.png' \
     --found 'types/report.html' --not-found 'types/report.pdf' \
     --found 'types/page.htm' --not-found 'types/page.html' \
     --found 'types/script.js' \
