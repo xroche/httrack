@@ -26,15 +26,16 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --found 'big/f1/dir/index.html' \
     --found 'big/f10/empty.html' \
     --found 'big/indexd41d.html' \
-    --not-found 'big/x/og.png' \
-    --not-found 'big/x/tw.png' \
+    --found 'big/a/i0a.png' \
+    --not-found 'big/x/og' \
+    --not-found 'big/x/tw' \
     --not-found 'big/x/jsonld.png' \
     --not-found 'big/x/never-scanned.png' \
     --not-found 'big/x/atom-only.html' \
     --not-found 'big/x/sitemap-only.html' \
     --not-found 'big/x/form-target.html' \
-    --not-found 'big/x/formact.html' \
-    --not-found 'big/x/ping.html' \
+    --not-found 'big/x/formact' \
+    --not-found 'big/x/ping' \
     --not-found 'big/x/aj.jar' \
     --not-found 'big/x/bj.jar' \
     --not-found 'big/x/is1.png' \
@@ -42,7 +43,13 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --file-matches 'big/p/2.html' 'srcset="\.\./a/f2-1x\.png 1x, \.\./a/f2-2x\.png 2x"' \
     --file-matches 'big/a/blk2.css' 'url\(blk2-bg\.png\)' \
     --file-matches 'big/p/5.html' "document\\.write\\('<a href=\"\\.\\./f5/dw\\.html\"" \
+    --file-not-matches 'big/p/1.html' 'href="/big/' \
     --log-not-found 'bogus state|[Pp]anic|assert' \
+    --log-found '\(404\) at link [^ ]*/big/e/404\.html' \
+    --log-found '\(410\) at link [^ ]*/big/e/410\.html' \
+    --log-found '\(500\) at link [^ ]*/big/e/500\.html' \
+    --log-found 'decompressing.*big/e/gztrunc\.html' \
     --log-found ', no files updated' \
     --max-mirror-bytes 700000 \
+    --min-mirror-bytes 500000 \
     httrack 'BASEURL/big/index.html' --retries=0 -c8 -%c100 -A100000000

@@ -19,7 +19,7 @@
 #       --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
-# --max-mirror-bytes asserts the mirrored content (host root) stays under N.
+# --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl.
 # --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
@@ -126,7 +126,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes)
+    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -324,6 +324,15 @@ while test "$i" -lt "${#audit[@]}"; do
         info "checking mirror size ${sz} <= ${audit[$i]} bytes"
         if test "$sz" -le "${audit[$i]}"; then result "OK"; else
             result "mirror too big"
+            exit 1
+        fi
+        ;;
+    --min-mirror-bytes)
+        i=$((i + 1))
+        sz=$(find "$hostroot" -type f -exec cat {} + | wc -c | tr -d '[:space:]')
+        info "checking mirror size ${sz} >= ${audit[$i]} bytes"
+        if test "$sz" -ge "${audit[$i]}"; then result "OK"; else
+            result "mirror too small"
             exit 1
         fi
         ;;

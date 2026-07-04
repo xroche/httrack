@@ -243,11 +243,13 @@ def _fam_js(port):
 
 
 def _fam_meta(port):
+    # Extensionless decoy targets stay unfetchable even if the aggressive
+    # parser fires (no known extension, no scheme: rejected in every state).
     return (
         '<meta http-equiv="refresh" content="2;URL=/big/f6/refreshed.html">'
         '<a href="/big/f6/based.html">based</a>'
-        '<meta property="og:image" content="/big/x/og.png">'
-        '<meta name="twitter:image" content="/big/x/tw.png">'
+        '<meta property="og:image" content="/big/x/og">'
+        '<meta name="twitter:image" content="/big/x/tw">'
         '<script type="application/ld+json">'
         '{"@type": "Thing", "image": "/big/x/jsonld.png"}</script>'
     )
@@ -305,8 +307,8 @@ def _fam_forms(port):
         '<a href="/big/f11/page.html">bare</a>'
         '<a href="/big/f11/page.html?utm_source=news&amp;utm_medium=mail">utm</a>'
         '<a href="/big/f11/sess.html?PHPSESSID=deadbeef123">sess</a>'
-        '<button formaction="/big/x/formact.html">go</button>'
-        '<a href="/big/f11/page.html" ping="/big/x/ping.html">ping</a>'
+        '<button formaction="/big/x/formact">go</button>'
+        '<a href="/big/f11/page.html" ping="/big/x/ping">ping</a>'
     )
 
 
