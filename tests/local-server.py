@@ -464,6 +464,30 @@ class Handler(SimpleHTTPRequestHandler):
     def route_delayed_empty(self):
         self.send_raw(b"", "text/html")  # 200 + Content-Length: 0
 
+    # -E time-limit (#481): pages that trickle far longer than any -E budget,
+    # so only an engine-side abort can end the crawl.
+    TRICKLE_SECONDS = 60
+
+    def route_trickle_index(self):
+        self.send_html(
+            "".join('\t<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
+        )
+
+    def route_trickle_page(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(2 * self.TRICKLE_SECONDS))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            for _ in range(self.TRICKLE_SECONDS):
+                self.wfile.write(b"xy")
+                self.wfile.flush()
+                time.sleep(1.0)
+        except OSError:
+            pass
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -509,6 +533,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/fetch.php": route_cdispo,
         "/cdispo/evil.php": route_cdispo,
         "/delayed/index.html": route_delayed_index,
+        "/trickle/index.html": route_trickle_index,
+        "/trickle/p0.bin": route_trickle_page,
+        "/trickle/p1.bin": route_trickle_page,
+        "/trickle/p2.bin": route_trickle_page,
+        "/trickle/p3.bin": route_trickle_page,
+        "/trickle/p4.bin": route_trickle_page,
+        "/trickle/p5.bin": route_trickle_page,
+        "/trickle/p6.bin": route_trickle_page,
+        "/trickle/p7.bin": route_trickle_page,
         "/delayed/noloc.php": route_delayed_noloc,
         "/delayed/selfloop.php": route_delayed_selfloop,
         "/delayed/redir.php": route_delayed_redir,

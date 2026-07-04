@@ -92,6 +92,7 @@ tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create
 # --- parse leading control flags --------------------------------------------
 declare -a audit=()
 declare -a cookies=()
+skip_delayed_audit=""
 scheme=http
 pos=0
 args=("$@")
@@ -115,6 +116,9 @@ while test "$pos" -lt "$nargs"; do
     --cookie)
         pos=$((pos + 1))
         cookies+=("${args[$pos]}")
+        ;;
+    --skip-delayed-audit)
+        skip_delayed_audit=1
         ;;
     --errors | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
@@ -246,12 +250,15 @@ done
 test -n "$hostroot" || die "could not find host root under $out"
 debug "host root: $hostroot"
 
-# A completed crawl must leave no .delayed temporaries (issue #107)
-info "checking for leftover .delayed files"
-leftovers=$(find "$out" -name '*.delayed' 2>/dev/null | head -5)
-if test -z "$leftovers"; then result "OK"; else
-    result "leftover: $leftovers"
-    exit 1
+# A completed crawl must leave no .delayed temporaries (issue #107).
+# --skip-delayed-audit: a cancelled crawl can orphan placeholders (issue #483)
+if test -z "$skip_delayed_audit"; then
+    info "checking for leftover .delayed files"
+    leftovers=$(find "$out" -name '*.delayed' 2>/dev/null | head -5)
+    if test -z "$leftovers"; then result "OK"; else
+        result "leftover: $leftovers"
+        exit 1
+    fi
 fi
 
 # --- audit -------------------------------------------------------------------
