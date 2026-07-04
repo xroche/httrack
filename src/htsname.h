@@ -100,6 +100,8 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
                    const char *nom_pos, const char *fil_complete,
                    int short_ver);
 void url_savename_addstr(char *d, const char *s);
+/* Contested wire-vs-ext verdict that a body sniff could settle (htssniff.h). */
+int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
 char *url_md5(char *digest_buffer, const char *fil_complete);
 void url_savename_refname(const char *adr, const char *fil, char *filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,

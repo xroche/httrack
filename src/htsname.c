@@ -41,6 +41,10 @@ Please visit our Website: http://www.httrack.com
 #include "htstools.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htssniff.h"
+#if HTS_USEZLIB
+#include "htszlib.h"
+#endif
 #include <ctype.h>
 
 #define ADD_STANDARD_PATH \
@@ -140,8 +144,7 @@ static void cleanEndingSpaceOrDot(char *s) {
 
 /* Wire Content-Type vs URL extension: a patchable wire type wins over an
    unspecific ext, the HTS_UNKNOWN_MIME sentinel keeps a specific non-HTML ext
-   (#267 guard), a declared disagreement is CONTESTED. Sentinel and verdict
-   ride the cache, so updates stay consistent. */
+   (#267 guard), a declared disagreement is CONTESTED (sniffed below). */
 typedef enum wire_verdict {
   WIRE_KEEPS_EXT,
   WIRE_WINS,
@@ -165,8 +168,105 @@ static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
   return WIRE_CONTESTED;
 }
 
-static int wire_patches_ext(httrackp *opt, const char *wiremime,
-                            const char *file) {
+/* Optional evidence for a contested wire-vs-ext verdict. */
+typedef struct sniff_src {
+  struct_back *sback;       /* live backing (looked up by adr/fil) */
+  const lien_back *headers; /* snapshot: r.adr, else the url_sav file */
+  const char *adr, *fil;
+  const char *prev_save; /* previous run's save name (cache X-Save) */
+} sniff_src;
+
+#if HTS_USEZLIB
+/* Inflate the head of a gzip/zlib stream; 0 when undecodable. */
+static size_t sniff_inflate_head(const void *in, size_t in_len, void *out,
+                                 size_t out_len) {
+  z_stream zs;
+  size_t n = 0;
+  int err;
+
+  memset(&zs, 0, sizeof(zs));
+  if (inflateInit2(&zs, 47) != Z_OK) /* 47: gzip or zlib, autodetected */
+    return 0;
+  zs.next_in = (const Bytef *) in;
+  zs.avail_in = (uInt) in_len;
+  zs.next_out = (Bytef *) out;
+  zs.avail_out = (uInt) out_len;
+  err = inflate(&zs, Z_SYNC_FLUSH);
+  if (err == Z_OK || err == Z_STREAM_END || err == Z_BUF_ERROR)
+    n = out_len - zs.avail_out;
+  inflateEnd(&zs);
+  return n;
+}
+#endif
+
+static size_t sniff_read_head(const char *path, void *buf, size_t len) {
+  char catbuff[CATBUFF_SIZE];
+  FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
+  size_t n = 0;
+
+  if (fp != NULL) {
+    n = fread(buf, 1, len, fp);
+    fclose(fp);
+  }
+  return n;
+}
+
+/* Body head of one slot: memory, else its flushed on-disk file (url_sav, or
+   tmpfile for a compressed stream); inflated so the sniff sees the final body.
+ */
+static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
+  const htsblk *const r = &slot->r;
+  size_t n = 0;
+
+  if (r->adr != NULL && r->size > 0) {
+    n = (size_t) r->size < len ? (size_t) r->size : len;
+    memcpy(buf, r->adr, n);
+  } else {
+    if (r->out != NULL)
+      fflush(r->out);
+    if (slot->url_sav[0] != '\0')
+      n = sniff_read_head(slot->url_sav, buf, len);
+    if (n == 0 && slot->tmpfile != NULL && slot->tmpfile[0] != '\0')
+      n = sniff_read_head(slot->tmpfile, buf, len);
+  }
+  if (n > 0 && r->compressed) {
+#if HTS_USEZLIB
+    unsigned char raw[HTS_SNIFF_LEN];
+
+    if (n > sizeof(raw))
+      n = sizeof(raw);
+    memcpy(raw, buf, n);
+    n = sniff_inflate_head(raw, n, buf, len);
+#else
+    n = 0;
+#endif
+  }
+  return n;
+}
+
+/* Up to len leading body bytes; 0 when unavailable, and always in
+   non-delayed mode (its HEAD-probe first run couldn't sniff either). */
+static size_t sniff_body_head(httrackp *opt, const sniff_src *src, void *buf,
+                              size_t len) {
+  size_t n = 0;
+
+  if (src == NULL || opt->savename_delayed == HTS_SAVENAME_DELAYED_NONE)
+    return 0;
+  /* live backing slot: a snapshot (back_copy_static) loses r.adr/r.out */
+  if (src->sback != NULL && src->adr != NULL && src->fil != NULL) {
+    const int b = back_index(opt, src->sback, src->adr, src->fil, NULL);
+
+    if (b >= 0)
+      n = sniff_slot_head(&src->sback->lnk[b], buf, len);
+  }
+  if (n == 0 && src->headers != NULL)
+    n = sniff_slot_head(src->headers, buf, len);
+  return n;
+}
+
+/* Contested verdicts: magic proving the URL ext keeps it, else wire wins. */
+static int wire_patches_ext(httrackp *opt, const sniff_src *src,
+                            const char *wiremime, const char *file) {
   char urlmime[256];
 
   switch (wire_ext_verdict(opt, wiremime, file, urlmime, sizeof(urlmime))) {
@@ -175,22 +275,51 @@ static int wire_patches_ext(httrackp *opt, const char *wiremime,
   case WIRE_WINS:
     return 1;
   case WIRE_CONTESTED:
-    break; /* no content evidence is consulted today: trust the wire */
+    break;
+  }
+  if (src != NULL) {
+    if (hts_sniff_mime_known(urlmime)) {
+      unsigned char head[HTS_SNIFF_LEN];
+      const size_t n = sniff_body_head(opt, src, head, sizeof(head));
+
+      if (n > 0)
+        return hts_sniff_mime_consistent(head, n, urlmime) ? 0 : 1;
+    }
+    /* no bytes: reproduce the previous run's verdict (cached X-Save name) */
+    if (src->prev_save != NULL && src->prev_save[0] != '\0') {
+      char prevmime[256];
+
+      prevmime[0] = '\0';
+      if (get_httptype_sized(opt, prevmime, sizeof(prevmime), src->prev_save,
+                             0) &&
+          strfield2(prevmime, urlmime))
+        return 0;
+    }
   }
   return 1;
+}
+
+int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime,
+                         const char *file) {
+  char urlmime[256];
+
+  return wiremime != NULL && strnotempty(wiremime) &&
+         wire_ext_verdict(opt, wiremime, file, urlmime, sizeof(urlmime)) ==
+             WIRE_CONTESTED &&
+         hts_sniff_mime_known(urlmime);
 }
 
 /* Wire-metadata name change: a Content-Disposition filename wins (returns 2),
    else the declared type's ext when wire_patches_ext() allows (returns 1),
    else 0. ext receives the new extension or replacement filename. */
-static int resolve_extension(httrackp *opt, const char *cdispo,
-                             const char *contenttype, const char *fil,
-                             char *ext, size_t ext_size) {
+static int resolve_extension(httrackp *opt, const sniff_src *src,
+                             const char *cdispo, const char *contenttype,
+                             const char *fil, char *ext, size_t ext_size) {
   if (strnotempty(cdispo)) {
     strlcpybuff(ext, cdispo, ext_size);
     return 2;
   }
-  if (wire_patches_ext(opt, contenttype, fil) &&
+  if (wire_patches_ext(opt, src, contenttype, fil) &&
       give_mimext(ext, ext_size, contenttype))
     return 1;
   return 0;
@@ -442,14 +571,21 @@ int url_savename(lien_adrfilsave *const afs,
         if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD ||
             ishtml(opt, fil) < 0) { // unsure whether it's html or a file
           // lire dans le cache
-          htsblk r = cache_read_including_broken(opt, cache, adr, fil); // test uniquement
+          char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
+          htsblk r;
+
+          previous_save[0] = '\0';
+          r = cache_read_including_broken(opt, cache, adr, fil,
+                                          previous_save); // test uniquement
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
                           adr_complete, fil_complete);
             if (!HTTP_IS_REDIRECT(r.statuscode)) {
-              ext_chg = resolve_extension(opt, r.cdispo, r.contenttype, fil,
-                                          ext, sizeof(ext));
+              const sniff_src src = {sback, NULL, adr, fil, previous_save};
+
+              ext_chg = resolve_extension(opt, &src, r.cdispo, r.contenttype,
+                                          fil, ext, sizeof(ext));
             }
           } else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD &&
                      is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
@@ -476,7 +612,9 @@ int url_savename(lien_adrfilsave *const afs,
                    !opt->state.stop) {
             // Check if the file is ready in backing.
             if (headers != NULL && headers->status >= 0 && !is_redirect) {
-              ext_chg = resolve_extension(opt, headers->r.cdispo,
+              const sniff_src src = {sback, headers, adr, fil, NULL};
+
+              ext_chg = resolve_extension(opt, &src, headers->r.cdispo,
                                           headers->r.contenttype,
                                           headers->url_fil, ext, sizeof(ext));
             }
@@ -687,7 +825,7 @@ int url_savename(lien_adrfilsave *const afs,
 
                   // no error: change the type?
                   ext_chg = resolve_extension(
-                      opt, back[b].r.cdispo, back[b].r.contenttype,
+                      opt, NULL, back[b].r.cdispo, back[b].r.contenttype,
                       back[b].url_fil, ext, sizeof(ext));
                 }
                 // FIN Si non déplacé, forcer type?

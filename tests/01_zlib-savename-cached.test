@@ -23,11 +23,11 @@ name() {
     }
 }
 
-# Names are re-derived from the stored headers on every run: neither the
-# recorded save name nor the cached body bytes change the verdict (pinned).
-name '/photo.jpg' 'image/png' 'photo.png' 'cached=image/png|www.example.com/photo.jpg'
+# No live bytes: the recorded save name (X-Save) reproduces the previous
+# verdict; cached body bytes (PNG magic) are ignored; css has no magic rule.
+name '/photo.jpg' 'image/png' 'photo.jpg' 'cached=image/png|www.example.com/photo.jpg'
 name '/photo.jpg' 'image/png' 'photo.png' 'cached=image/png|www.example.com/photo.png'
 name '/photo.jpg' 'image/jpeg' 'photo.jpg' 'cached=image/jpeg|www.example.com/photo.png'
-name '/style.css' 'image/png' 'style.png' 'cached=image/png|www.example.com/style.css'
+name '/style.css' 'image/png' 'style.css' 'cached=image/png|www.example.com/style.css'
 # agreement keeps the URL ext verbatim (.jpeg), never canonicalized to .jpg
 name '/photo.jpeg' 'image/jpeg' 'photo.jpeg' 'cached=image/jpeg|www.example.com/photo.jpeg'

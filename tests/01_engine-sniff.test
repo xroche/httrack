@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# MIME magic consistency (-#test=sniff <content-type> <hex:..|text>), the
+# tie-break behind htsname's wire-vs-extension naming.
+
+chk() {
+    local mime="$1" body="$2" want="$3"
+    out="$(httrack -#test=sniff "$mime" "$body" | sed -n 's/^sniff: //p')"
+    test "$out" == "$want" || {
+        echo "FAIL: '$mime' '$body' -> '$out' (want '$want')"
+        exit 1
+    }
+}
+
+yes='known=1 consistent=1'
+no='known=1 consistent=0'
+unk='known=0 consistent=0'
+
+# images
+chk image/jpeg hex:FFD8FFE000104A46 "$yes"
+chk image/png hex:89504E470D0A1A0A "$yes"
+chk image/png hex:FFD8FFE000104A46 "$no" # jpeg bytes are not a png
+chk image/gif 'GIF89a' "$yes"
+chk image/bmp 'BMxxxx' "$yes"
+chk image/tiff hex:49492A00 "$yes"
+chk image/tiff hex:4D4D002A "$yes" # both endians
+chk image/x-icon hex:00000100 "$yes"
+chk image/x-icon hex:00000200 "$yes" # Windows cursor, spec maps to x-icon
+chk image/webp 'RIFFxxxxWEBPVP' "$yes"
+chk image/webp 'RIFFxxxxWAVE' "$no" # riff subtype discriminates
+chk image/avif hex:0000001C6674797061766966 "$yes"
+chk image/avif hex:0000001C6674797068656963 "$no" # heic brand is not avif
+chk image/heic hex:0000001C6674797068656963 "$yes"
+chk image/svg+xml '<svg xmlns="x">' "$yes"
+chk image/svg+xml $'\xef\xbb\xbf  <?xml version="1.0"?>' "$yes" # BOM+ws skip
+
+# audio / video
+chk audio/mpeg 'ID3xxx' "$yes"
+chk audio/mpeg hex:FFFB9000 "$yes" # bare frame sync
+chk audio/aac hex:FFF15080 "$yes"
+chk audio/flac 'fLaC' "$yes"
+chk audio/ogg hex:4F67675300 "$yes"
+chk audio/x-wav 'RIFFxxxxWAVE' "$yes"
+chk video/x-msvideo 'RIFFxxxxAVI ' "$yes"
+chk video/x-msvideo 'RIFFxxxxWAVE' "$no"
+chk video/mp4 hex:000000186674797069736F6D "$yes"
+chk video/webm hex:1A45DFA3 "$yes"
+chk video/mpeg hex:000001BA "$yes"
+chk video/x-ms-wmv hex:3026B2758E66CF11 "$yes"
+
+# archives; zip magic covers the office-container families
+chk application/zip hex:504B0304 "$yes"
+chk application/vnd.openxmlformats-officedocument.wordprocessingml.document hex:504B0304 "$yes"
+chk application/vnd.oasis.opendocument.text hex:504B0304 "$yes"
+chk application/msword hex:D0CF11E0A1B11AE1 "$yes"
+chk application/msword hex:504B0304 "$no" # legacy .doc is OLE, not zip
+chk application/x-gzip hex:1F8B08 "$yes"
+chk application/x-bzip2 'BZh9' "$yes"
+chk application/x-7z-compressed hex:377ABCAF271C "$yes"
+chk application/x-rar-compressed hex:526172211A07 "$yes"
+chk application/zstd hex:28B52FFD "$yes"
+chk application/x-tar "hex:$(printf '00%.0s' {1..257})7573746172" "$yes" # ustar at 257
+chk application/x-tar hex:7573746172 "$no"
+
+# documents, fonts, misc
+chk application/pdf '%PDF-1.7' "$yes"
+chk application/pdf '<html><body>soft 404</body></html>' "$no"
+chk application/postscript '%!PS-Adobe' "$yes"
+chk application/rtf '{\rtf1' "$yes"
+chk font/woff2 'wOF2' "$yes"
+chk font/otf 'OTTO' "$yes"
+chk font/ttf hex:0001000000 "$yes"
+chk application/x-shockwave-flash 'CWSx' "$yes"
+chk application/x-java-vm hex:CAFEBABE "$yes"
+chk application/wasm hex:0061736D "$yes"
+chk text/html $'  \r\n<!DOCTYPE html><html>' "$yes"
+chk text/html '<html lang="en">' "$yes"
+chk text/html 'plain text, no markup' "$no"
+chk text/xml '<?xml version="1.0"?>' "$yes"
+
+# no magic rule at all: never confirmed, never blocks the wire type
+chk text/css 'body { }' "$unk"
+chk text/plain 'hello' "$unk"
+chk application/x-javascript 'var x;' "$unk"

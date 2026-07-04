@@ -1,18 +1,18 @@
 #!/bin/bash
 #
-# A second (update) pass must keep the names the first crawl chose. The stored
-# Content-Type rides the cache, so the update reads back the same value -- the
-# unknown/unknown sentinel for a typeless response, the declared type otherwise
-# -- and names consistently: a declared-text/html .pdf stays .html and a
-# typeless .png stays .png across the update rather than reverting.
+# An update pass keeps the names the first crawl chose: type and save name
+# ride the cache, so a declared-text/html .pdf stays .html, a typeless .png
+# stays .png, and a sniff-kept ext is reproduced from X-Save even when the
+# refetched content changed (mutant.jpg serves PNG bytes on the rerun).
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
     --found 'types/report.html' --not-found 'types/report.pdf' \
     --found 'types/notype.png' --not-found 'types/notype.html' \
-    --found 'types/lie.html' \
-    --found 'types/wrongtype.png' --not-found 'types/wrongtype.jpg' \
-    --found 'types/packed.png' --not-found 'types/packed.jpg' \
-    --found 'types/mutant.png' --not-found 'types/mutant.jpg' \
+    --found 'types/lie.png' --not-found 'types/lie.html' \
+    --found 'types/wrongtype.jpg' --not-found 'types/wrongtype.png' \
+    --found 'types/bigtype.jpg' --not-found 'types/bigtype.png' \
+    --found 'types/packed.jpg' --not-found 'types/packed.png' \
+    --found 'types/mutant.jpg' --not-found 'types/mutant.png' \
     httrack 'BASEURL/types/index.html'

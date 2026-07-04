@@ -62,7 +62,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htsmd5.c htszlib.c htswrap.c htsconcat.c \
-	htsmodules.c htscharset.c punycode.c htsencoding.c \
+	htsmodules.c htscharset.c punycode.c htsencoding.c htssniff.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
@@ -70,7 +70,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htslib.h htsmd5.h \
-	htsmodules.h htsname.h htsnet.h \
+	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htszlib.h  \
 	htsstrings.h htsarrays.h httrack-library.h \

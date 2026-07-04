@@ -49,6 +49,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsindex.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htssniff.h"
 
 /* external modules */
 #include "htsmodules.h"
@@ -4695,22 +4696,26 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             if (!RUN_CALLBACK7
                 (opt, loop, sback->lnk, sback->count, b, ptr, opt->lien_tot,
                  (int) (time_local() - HTS_STAT.stat_timestart), &HTS_STAT)) {
+              back_set_unlocked(sback, b);
               return -1;
             } else if (opt->state._hts_cancel || !back_checkmirror(opt)) {      // cancel 2 ou 1 (cancel parsing)
               back_delete(opt, cache, sback, b);        // cancel test
               break;
             }
           }
-        } while(
-                 /* dns/connect/request */
-                 (back[b].status >= 99 && back[b].status <= 101)
-                 ||
-                 /* For redirects, wait for request to be terminated */
-                 (HTTP_IS_REDIRECT(back[b].r.statuscode) && back[b].status > 0)
-                 ||
-                 /* Same for errors */
-                 (HTTP_IS_ERROR(back[b].r.statuscode) && back[b].status > 0)
-          );
+        } while (
+            /* dns/connect/request */
+            (back[b].status >= 99 && back[b].status <= 101) ||
+            /* For redirects, wait for request to be terminated */
+            (HTTP_IS_REDIRECT(back[b].r.statuscode) && back[b].status > 0) ||
+            /* Same for errors */
+            (HTTP_IS_ERROR(back[b].r.statuscode) && back[b].status > 0) ||
+            /* Contested type: wait for a sniffable body head (or EOF) */
+            (back[b].r.statuscode == HTTP_OK && back[b].status > 0 &&
+             strnotempty(back[b].r.cdispo) == 0 &&
+             back[b].r.size < HTS_SNIFF_LEN &&
+             hts_ext_sniff_wanted(opt, back[b].r.contenttype,
+                                  back[b].url_fil)));
         if (b >= 0) {
           back_set_unlocked(sback, b);  // Unlocked entry
         }
@@ -4845,8 +4850,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* Still have a back reference */
           if (b >= 0) {
-            /* Patch destination filename for direct-to-disk mode, BEFORE any
-               finalize: it records and caches the entry under url_sav */
+            /* patch url_sav BEFORE finalize: it records/caches under this name
+             */
             strcpybuff(back[b].url_sav, afs->save);
             /* Finalize now as we have the type */
             if (back[b].status == STATUS_READY) {

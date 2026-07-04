@@ -596,15 +596,18 @@ htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
   return cache_readex(opt, cache, adr, fil, save, location, NULL, 1);
 }
 
-htsblk cache_read_including_broken(httrackp * opt, cache_back * cache,
-                                   const char *adr, const char *fil) {
-  htsblk r = cache_read(opt, cache, adr, fil, NULL, NULL);
+htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
+                                   const char *adr, const char *fil,
+                                   char *return_save) {
+  htsblk r = cache_readex(opt, cache, adr, fil, NULL, NULL, return_save, 0);
 
   if (r.statuscode == -1) {
     lien_back *itemback = NULL;
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
       r = itemback->r;
+      if (return_save != NULL)
+        strlcpybuff(return_save, itemback->url_sav, HTS_URLMAXSIZE * 2);
       /* cleanup */
       back_clear_entry(itemback);       /* delete entry content */
       freet(itemback);          /* delete item */

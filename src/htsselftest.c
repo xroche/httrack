@@ -52,6 +52,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htsftp.h"
 #include "htsmd5.h"
+#include "htssniff.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
@@ -1141,6 +1142,22 @@ static size_t st_decode_body(const char *arg, char *buf, size_t size) {
   return n;
 }
 
+static int st_sniff(httrackp *opt, int argc, char **argv) {
+  char BIGSTK body[1024];
+  size_t n;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "sniff: needs a content-type and a body\n");
+    return 1;
+  }
+  n = st_decode_body(argv[1], body, sizeof(body));
+  printf("sniff: known=%d consistent=%d\n",
+         hts_sniff_mime_known(argv[0]) == HTS_TRUE,
+         hts_sniff_mime_consistent(body, n, argv[0]) == HTS_TRUE);
+  return 0;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   lien_adrfilsave afs;
   cache_back cache;
@@ -1211,7 +1228,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     }
     *sep = '\0';
     /* one-entry cache in cwd, reopened read-only; body is PNG magic on
-       purpose: naming must not depend on stored content */
+       purpose: only the recorded name (X-Save) may drive the naming */
     StringCopy(opt->path_log, "");
     cache.type = 1;
     cache.log = cache.errlog = stderr;
@@ -1272,7 +1289,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (cdispo != NULL)
     strcpybuff(headers.r.cdispo, cdispo);
   strcpybuff(headers.url_fil, argv[0]);
-  if (body != NULL) { /* leading body bytes, exposed via url_sav */
+  if (body != NULL) { /* leading body bytes, read via url_sav */
     char BIGSTK data[1024];
     const size_t n = st_decode_body(body, data, sizeof(data));
     FILE *const fp = fopen(bodyfile, "wb");
@@ -2095,6 +2112,8 @@ static const struct selftest_entry {
      st_header},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
+     st_sniff},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cache-golden", "<dir> [regen]", "frozen cache-format read self-test",
      st_cache_golden},
