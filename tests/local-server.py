@@ -468,10 +468,14 @@ class Handler(SimpleHTTPRequestHandler):
     # so only an engine-side abort can end the crawl.
     TRICKLE_SECONDS = 60
 
-    def route_trickle_index(self):
+    def send_bin_index(self):
+        """Index page linking p0.bin..p7.bin (shared by trickle and bigfiles)."""
         self.send_html(
             "".join('\t<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
         )
+
+    def route_trickle_index(self):
+        self.send_bin_index()
 
     def route_trickle_page(self):
         self.send_response(200)
@@ -487,6 +491,15 @@ class Handler(SimpleHTTPRequestHandler):
                 time.sleep(1.0)
         except OSError:
             pass
+
+    # -M byte cap (#77): large fast files so a crawl overruns -M immediately.
+    BIGFILE_BYTES = 640 * 1024
+
+    def route_bigfiles_index(self):
+        self.send_bin_index()
+
+    def route_bigfile(self):
+        self.send_raw(b"x" * self.BIGFILE_BYTES, "application/octet-stream")
 
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
@@ -542,6 +555,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/trickle/p5.bin": route_trickle_page,
         "/trickle/p6.bin": route_trickle_page,
         "/trickle/p7.bin": route_trickle_page,
+        "/bigfiles/index.html": route_bigfiles_index,
+        "/bigfiles/p0.bin": route_bigfile,
+        "/bigfiles/p1.bin": route_bigfile,
+        "/bigfiles/p2.bin": route_bigfile,
+        "/bigfiles/p3.bin": route_bigfile,
+        "/bigfiles/p4.bin": route_bigfile,
+        "/bigfiles/p5.bin": route_bigfile,
+        "/bigfiles/p6.bin": route_bigfile,
+        "/bigfiles/p7.bin": route_bigfile,
         "/delayed/noloc.php": route_delayed_noloc,
         "/delayed/selfloop.php": route_delayed_selfloop,
         "/delayed/redir.php": route_delayed_redir,
