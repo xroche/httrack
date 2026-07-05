@@ -25,6 +25,8 @@
 # --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
 # which the ephemeral port forces into the cookie domain) and passes it to
 # httrack via --cookies-file, to exercise preloaded cookies.
+# --rerun-dead re-runs with the server stopped: the no-data rollback must
+# restore the previous hts-cache generation byte-identical.
 
 set -u
 
@@ -37,6 +39,7 @@ key="${testdir}/server.key"
 tls=
 verbose=
 rerun=
+rerun_dead=
 tmpdir=
 serverpid=
 crawlpid=
@@ -102,7 +105,8 @@ nargs=$#
 while test "$pos" -lt "$nargs"; do
     case "${args[$pos]}" in
     --debug) verbose=1 ;;
-    --rerun) rerun=1 ;; # run httrack a second time (update pass) before auditing
+    --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
+    --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     --no-purge)
         nopurge=1
         audit+=("--no-purge")
@@ -239,6 +243,43 @@ if test -n "$rerun"; then
         result "update pass did not report cache activity"
         exit 1
     fi
+fi
+
+# --- optional dead pass: server stopped, the cache must survive the rollback --
+if test -n "$rerun_dead"; then
+    zip="${out}/hts-cache/new.zip"
+    test -s "$zip" || die "no cache was written by the first pass"
+    cp "$zip" "${tmpdir}/cache-before.zip"
+    cp "${out}/hts-log.txt" "${tmpdir}/log-before.txt"
+    kill "$serverpid" 2>/dev/null
+    wait "$serverpid" 2>/dev/null
+    serverpid=
+    info "re-running httrack against the stopped server"
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+        "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &
+    crawlpid=$!
+    wait "$crawlpid" || true
+    crawlpid=
+    result "OK (dead pass ran)"
+    # The dead pass must have gone through the no-data rollback, not bailed out
+    # before the mirror loop (which would leave the cache trivially untouched).
+    info "checking the dead pass hit the rollback"
+    if grep -aq "No data seems to have been transferred" "${out}/hts-log.txt"; then
+        result "OK"
+    else
+        result "rollback notice not found in hts-log.txt"
+        exit 1
+    fi
+    info "checking the previous cache generation was restored"
+    if cmp -s "$zip" "${tmpdir}/cache-before.zip" &&
+        test ! -e "${out}/hts-cache/old.zip"; then
+        result "OK"
+    else
+        result "new.zip differs from the pre-outage cache (or old.zip left behind)"
+        exit 1
+    fi
+    # Audits below describe the healthy crawl, not the dead pass.
+    cp "${tmpdir}/log-before.txt" "${out}/hts-log.txt"
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------

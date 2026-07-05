@@ -78,6 +78,17 @@ htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, htsblk * r);
 void cache_init(cache_back * cache, httrackp * opt);
 
+/* Which hts-cache/ generation (new.* vs old.*) is authoritative. */
+typedef enum {
+  CACHE_RECONCILE_PROMOTE,     /* no new cache: promote the old generation */
+  CACHE_RECONCILE_INTERRUPTED, /* aborted run: keep the larger generation */
+  CACHE_RECONCILE_ROLLBACK     /* nothing transferred: restore the old one */
+} hts_cache_reconcile_mode;
+
+/* Reconcile the on-disk cache generations according to mode; a no-op when
+   the involved files are absent. */
+void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
+
 int cache_writedata(FILE * cache_ndx, FILE * cache_dat, const char *str1,
                     const char *str2, char *outbuff, int len);
 int cache_readdata(cache_back * cache, const char *str1, const char *str2,

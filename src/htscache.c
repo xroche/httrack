@@ -1420,6 +1420,86 @@ static int hts_rename(httrackp * opt, const char *a, const char *b) {
   return rename(a, b);
 }
 
+/* Pathname of a file inside the mirror dir (rotating concat buffer). */
+static char *reconcile_path(httrackp *opt, const char *name) {
+  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                 StringBuff(opt->path_log), name);
+}
+
+/* Interrupted-run heuristic: prefer the old generation when the new cache
+   stalled below NEW_TINY while the old one grew past OLD_SOLID (historical
+   arbitrary thresholds). */
+#define CACHE_RECONCILE_NEW_TINY 32768
+#define CACHE_RECONCILE_OLD_SOLID 65536
+
+/* Replace the new-generation file by the old one, when the old one exists. */
+static void reconcile_promote(httrackp *opt, const char *oldname,
+                              const char *newname) {
+  if (fexist(reconcile_path(opt, oldname))) {
+    remove(reconcile_path(opt, newname));
+    rename(reconcile_path(opt, oldname), reconcile_path(opt, newname));
+  }
+}
+
+void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
+  switch (mode) {
+  case CACHE_RECONCILE_PROMOTE:
+    /* Previous run rotated new.* to old.* then died before writing: promote
+       the old generation back, whichever format it uses. */
+    if (!fexist(reconcile_path(opt, "hts-cache/new.zip")))
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if ((!fexist(reconcile_path(opt, "hts-cache/new.dat")) ||
+         !fexist(reconcile_path(opt, "hts-cache/new.ndx"))) &&
+        fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.ndx"))) {
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
+    }
+    break;
+  case CACHE_RECONCILE_INTERRUPTED:
+    /* Aborted run: keep the larger generation when the new cache is
+       suspiciously small next to the old one. The new file must exist: fsize()
+       is -1 for a missing file, which would spuriously pass the "< TINY" test
+       and overwrite a solid old generation that PROMOTE/ROLLBACK should keep.
+     */
+    if (!opt->cache || !fexist(reconcile_path(opt, "hts-in_progress.lock")))
+      break;
+    if (fexist(reconcile_path(opt, "hts-cache/new.zip")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.zip")) &&
+        fsize(reconcile_path(opt, "hts-cache/new.zip")) <
+            CACHE_RECONCILE_NEW_TINY &&
+        fsize(reconcile_path(opt, "hts-cache/old.zip")) >
+            CACHE_RECONCILE_OLD_SOLID &&
+        fsize(reconcile_path(opt, "hts-cache/old.zip")) >
+            fsize(reconcile_path(opt, "hts-cache/new.zip")))
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if (fexist(reconcile_path(opt, "hts-cache/new.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.ndx")) &&
+        fsize(reconcile_path(opt, "hts-cache/new.dat")) <
+            CACHE_RECONCILE_NEW_TINY &&
+        fsize(reconcile_path(opt, "hts-cache/old.dat")) >
+            CACHE_RECONCILE_OLD_SOLID &&
+        fsize(reconcile_path(opt, "hts-cache/old.dat")) >
+            fsize(reconcile_path(opt, "hts-cache/new.dat"))) {
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
+    }
+    break;
+  case CACHE_RECONCILE_ROLLBACK:
+    /* Nothing transferred: restore the previous generation and sidecars. */
+    reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if (fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.ndx"))) {
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
+    }
+    reconcile_promote(opt, "hts-cache/old.lst", "hts-cache/new.lst");
+    reconcile_promote(opt, "hts-cache/old.txt", "hts-cache/new.txt");
+    break;
+  }
+}
+
 // renvoyer uniquement en tête, ou NULL si erreur
 // return NULL upon error, and set -1 to r.statuscode
 htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,

@@ -2137,47 +2137,7 @@ int httpmirror(char *url1, httrackp * opt) {
     hts_log_print(opt, LOG_NOTICE,
                   "No data seems to have been transferred during this session! : restoring previous one!");
     XH_uninit;
-    if ((fexist
-         (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/old.dat")))
-        &&
-        (fexist
-         (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-           "hts-cache/old.ndx")))) {
-      remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/new.dat"));
-      remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/new.ndx"));
-      remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/new.lst"));
-      remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/new.txt"));
-      rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.dat"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                            StringBuff(opt->path_log),
-                                            "hts-cache/new.dat"));
-      rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.ndx"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                            StringBuff(opt->path_log),
-                                            "hts-cache/new.ndx"));
-      rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.lst"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                            StringBuff(opt->path_log),
-                                            "hts-cache/new.lst"));
-      rename(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.txt"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                            StringBuff(opt->path_log),
-                                            "hts-cache/new.txt"));
-    }
+    hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
     opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
     return 1;
   }

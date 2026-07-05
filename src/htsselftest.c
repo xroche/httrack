@@ -1347,6 +1347,18 @@ static int st_cache_writefail(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_reconcile(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "reconcile: needs a directory\n");
+    return 1;
+  }
+  err = cache_reconcile_selftest(opt, argv[0]);
+  printf("cache-reconcile: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_dns(httrackp *opt, int argc, char **argv) {
   const int err = dns_selftests(opt);
 
@@ -2119,6 +2131,8 @@ static const struct selftest_entry {
      st_cache_golden},
     {"cache-writefail", "<dir>", "cache write-failure handling self-test",
      st_cache_writefail},
+    {"reconcile", "<dir>", "cache generation reconcile policy self-test",
+     st_reconcile},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},

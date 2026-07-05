@@ -56,6 +56,10 @@ int cache_golden_selftest(httrackp *opt, const char *dir, int regen);
    crashing. Returns the failed-check count. */
 int cache_write_failure_selftest(httrackp *opt, const char *dir);
 
+/* Exercise the hts_cache_reconcile() generation policies on file fixtures
+   under <dir>. Returns the failed-check count. */
+int cache_reconcile_selftest(httrackp *opt, const char *dir);
+
 #endif
 
 #endif
