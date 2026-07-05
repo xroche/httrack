@@ -106,8 +106,6 @@ grep -Eq 'srcset="j\.gif 2x"' "$saved" ||
 # inline style attribute, with the URL unquoted, double-quoted and single-quoted
 # (the quote style is preserved on rewrite). No-detect attributes (title, alt,
 # ...) are left untouched. Asserted by rewrite (deterministic), not download.
-# data-* (#201/#203) is omitted: its detection is currently nondeterministic and
-# can't be locked yet.
 site2="$tmp/attrs"
 mkdir -p "$site2"
 for f in xl ibg ibgs cex cexd cexs tt; do gif "$site2/$f.gif"; done
@@ -351,5 +349,29 @@ found "ss.gif" "$out10"
 found "v.webm" "$out10"
 found "subs.vtt" "$out10"
 notfound "plain.gif" "$out10"
+
+# Unknown-attr (data-*) URLs (#201/#203): the script automaton state must reset at
+# </script>, or detection dies for the rest of the page after the first script.
+site11="$tmp/dataattr"
+mkdir -p "$site11"
+for f in pre post jsdecoy; do gif "$site11/$f.gif"; done
+cat >"$site11/index.html" <<EOF
+<html><body>
+<img data-pre="file://$site11/pre.gif">
+<script>var x = 1;</script>
+<img data-post="file://$site11/post.gif">
+<script>var s; s = 1; "jsdecoy.gif";</script>
+</body></html>
+EOF
+out11="$tmp/dataattr-out"
+crawl "$site11/index.html" "$out11"
+saved11=$(savedhtml "$out11")
+test -n "$saved11" || ! echo "FAIL: saved dataattr page not found" || exit 1
+grep -Fq 'data-pre="pre.gif"' "$saved11" ||
+    ! echo "FAIL #201: data-* URL before any script not detected/rewritten" || exit 1
+grep -Fq 'data-post="post.gif"' "$saved11" ||
+    ! echo "FAIL #201: data-* URL after a script not detected (state leak)" || exit 1
+# a JS string not preceded by =/(/, is still ignored after the reset
+notfound "jsdecoy.gif" "$out11"
 
 exit 0

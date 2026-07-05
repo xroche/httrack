@@ -754,6 +754,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           ) {
           if (inscript_tag) {
             inscript_tag = inscript = 0;
+            // reset the automaton on exit or its state leaks into plain HTML
+            inscript_state_pos = INSCRIPT_START;
             intag = 0;
             incomment = 0;
             intag_start_valid = 0;
@@ -837,6 +839,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (*html == inscript_tag_lastc) {
                   /* sortir */
                   inscript_tag = inscript = 0;
+                  inscript_state_pos = INSCRIPT_START;
                   incomment = 0;
                   if (opt->parsedebug) {
                     HT_ADD("<@@ /inscript @@>");
@@ -1293,6 +1296,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     a--;
                     if (*a == '<') {    // sûr que c'est un tag?
                       inscript = 0;
+                      inscript_state_pos = INSCRIPT_START;
                       if (opt->parsedebug) {
                         HT_ADD("<@@ /inscript @@>");
                       }
