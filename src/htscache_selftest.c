@@ -825,6 +825,17 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures +=
       reconcile_expect(opt, "hts-cache/new.zip", TINY, "interrupted-nolock");
 
+  /* INTERRUPTED: an absent new.zip must NOT promote old.zip (fsize(-1) would
+     spuriously pass "< TINY"); leave the solid old generation for ROLLBACK */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.zip", -1, "interrupted-nonew");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.zip", SOLID, "interrupted-nonew");
+
   /* INTERRUPTED: stalled tiny new.zip loses to a solid old.zip (was dead for
      zip caches: the arm was gated on a legacy new.dat) */
   reconcile_wipe(opt);

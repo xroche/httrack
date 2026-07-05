@@ -1458,10 +1458,14 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
     break;
   case CACHE_RECONCILE_INTERRUPTED:
     /* Aborted run: keep the larger generation when the new cache is
-       suspiciously small next to the old one. */
+       suspiciously small next to the old one. The new file must exist: fsize()
+       is -1 for a missing file, which would spuriously pass the "< TINY" test
+       and overwrite a solid old generation that PROMOTE/ROLLBACK should keep.
+     */
     if (!opt->cache || !fexist(reconcile_path(opt, "hts-in_progress.lock")))
       break;
-    if (fexist(reconcile_path(opt, "hts-cache/old.zip")) &&
+    if (fexist(reconcile_path(opt, "hts-cache/new.zip")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.zip")) &&
         fsize(reconcile_path(opt, "hts-cache/new.zip")) <
             CACHE_RECONCILE_NEW_TINY &&
         fsize(reconcile_path(opt, "hts-cache/old.zip")) >
@@ -1469,7 +1473,8 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
         fsize(reconcile_path(opt, "hts-cache/old.zip")) >
             fsize(reconcile_path(opt, "hts-cache/new.zip")))
       reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
-    if (fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+    if (fexist(reconcile_path(opt, "hts-cache/new.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
         fexist(reconcile_path(opt, "hts-cache/old.ndx")) &&
         fsize(reconcile_path(opt, "hts-cache/new.dat")) <
             CACHE_RECONCILE_NEW_TINY &&
