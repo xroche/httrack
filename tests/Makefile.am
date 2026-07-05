@@ -48,6 +48,7 @@ TESTS = \
 	01_engine-parse.test \
 	01_engine-pause.test \
 	01_engine-rcfile.test \
+	01_engine-reconcile.test \
 	01_engine-redirect.test \
 	01_engine-relative.test \
 	01_engine-robots.test \
@@ -99,6 +100,7 @@ TESTS = \
 	33_local-delayed.test \
 	34_local-maxtime.test \
 	35_local-maxsize.test \
-	36_local-bigcrawl.test
+	36_local-bigcrawl.test \
+	37_local-cache-outage.test
 
 CLEANFILES = check-network_sh.cache

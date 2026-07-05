@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# An update run against a dead server must not destroy the cache: the no-data
+# rollback restores the previous hts-cache generation (zip caches lost it).
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun-dead \
+    --found 'simple/basic.html' \
+    httrack 'BASEURL/simple/basic.html'
