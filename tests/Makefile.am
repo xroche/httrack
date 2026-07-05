@@ -101,6 +101,7 @@ TESTS = \
 	34_local-maxtime.test \
 	35_local-maxsize.test \
 	36_local-bigcrawl.test \
-	37_local-cache-outage.test
+	37_local-cache-outage.test \
+	38_local-update-304.test
 
 CLEANFILES = check-network_sh.cache

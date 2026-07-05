@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# An all-304 update of a tiny site (headers under the 32K rollback threshold)
+# is a healthy run: it must not trip the no-data rollback as a fake outage.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
+    --log-found 'no files updated' \
+    --log-not-found 'No data seems to have been transferred' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html'

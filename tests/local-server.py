@@ -831,6 +831,16 @@ class Handler(SimpleHTTPRequestHandler):
     def route_redir_target(self):
         self.send_raw(b"<html><body>redirect target</body></html>\n", "text/html")
 
+    # --- /mini304/: tiny fully-cacheable site (an update gets only 304s) ---
+    def route_mini304_index(self):
+        self.big_send(
+            b'<html><body>\n\t<a href="page.html">page</a>\n</body></html>\n',
+            "text/html",
+        )
+
+    def route_mini304_page(self):
+        self.big_send(b"<html><body>tiny cacheable page</body></html>\n", "text/html")
+
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
         self.send_html(
@@ -993,6 +1003,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/mini304/index.html": route_mini304_index,
+        "/mini304/page.html": route_mini304_page,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------
