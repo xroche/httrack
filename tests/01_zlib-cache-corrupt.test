@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Read-side cache corruption (httrack -#test=cache-corrupt <dir>): zip byte
+# surgery (bad/oversized X-Size, blanked X-In-Cache, smashed header, garbled
+# deflate) must each be rejected per-entry, never crash, never taint the sibling.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# the smashed-header case logs expected "Corrupted cache entry" warnings on
+# stdout; the verdict is the last line
+out=$(httrack -#test=cache-corrupt "$dir" 2>/dev/null | tail -n1)
+
+test "$out" = "cache-corrupt: OK" || {
+    echo "expected 'cache-corrupt: OK', got: $out" >&2
+    exit 1
+}
