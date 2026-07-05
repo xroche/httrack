@@ -464,19 +464,22 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     if (phase == 0) {
       writefail_store(opt, &cache, "/blob.bin", body, body_len);
     } else {
+      /* the abort must land exactly on the CACHE_MAX_WRITE_FAILURES'th (8th)
+         consecutive failure, not sooner */
       int i;
 
-      for (i = 0; i < 32 && !cache.zipWriteFailed; i++) {
+      for (i = 0; i < 7; i++) {
         char fil[32];
 
         snprintf(fil, sizeof(fil), "/b%d.bin", i);
         writefail_store(opt, &cache, fil, body, 16);
-        if (i == 0 && cache.zipWriteFailed) {
-          fprintf(stderr, "cache-writefail: phase 1: aborted on the first "
-                          "non-fatal failure instead of skipping\n");
-          fail++;
-        }
       }
+      if (cache.zipWriteFailed) {
+        fprintf(stderr, "cache-writefail: phase 1: aborted before the "
+                        "8th consecutive failure\n");
+        fail++;
+      }
+      writefail_store(opt, &cache, "/b7.bin", body, 16);
     }
     if (!cache.zipWriteFailed) {
       fprintf(stderr, "cache-writefail: phase %d: write error not caught\n",
@@ -506,6 +509,46 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
                NULL); /* best-effort; may fail on the backend */
       cache.zipOutput = NULL;
     }
+  }
+
+  /* scattered failures: a stored entry resets the streak, so failures with
+     successes in between never abort, however many accumulate */
+  {
+    cache_back cache;
+    writefail_inject inj;
+    int i;
+
+    inj.budget = (size_t) -1;
+    inj.fail_errno = EIO;
+    inj.writes = 0;
+    inj.fail_once = 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    opt->state.exit_xh = 0;
+
+    for (i = 0; i < 10; i++) {
+      char fil[32];
+
+      inj.budget = 0; /* this store fails */
+      snprintf(fil, sizeof(fil), "/s%d.bin", i);
+      writefail_store(opt, &cache, fil, body, 16);
+      inj.budget = (size_t) -1; /* this one succeeds and resets the streak */
+      snprintf(fil, sizeof(fil), "/ok%d.bin", i);
+      writefail_store(opt, &cache, fil, body, 16);
+    }
+    if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "cache-writefail: scattered: non-consecutive failures aborted "
+              "the mirror (flagged=%d, exit_xh=%d)\n",
+              (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
   }
 
   /* an isolated (transient) failure: only that entry is dropped, the mirror

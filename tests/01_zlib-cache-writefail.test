@@ -22,3 +22,9 @@ printf '%s\n' "$out" | grep -qx "cache-writefail: OK" || {
     echo "expected 'cache-writefail: OK', got: $out" >&2
     exit 1
 }
+
+# A skipped entry must be warned about with its URL.
+printf '%s\n' "$out" | grep -q "entry not cached: example.com/" || {
+    echo "expected a URL-bearing skip warning" >&2
+    exit 1
+}
