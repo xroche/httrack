@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -321,6 +322,7 @@ typedef struct {
   size_t budget;  /**< bytes allowed through before writes start failing */
   int fail_errno; /**< errno set on the failing write (ENOSPC, EIO, ...) */
   int writes;     /**< zwrite call count, to detect re-entry into the stream */
+  int fail_once;  /**< recover (unlimited budget) after the first failure */
 } writefail_inject;
 
 /* zwrite that copies until the budget runs out, then fails with inj->fail_errno
@@ -335,6 +337,8 @@ static uLong selftest_failing_zwrite(voidpf opaque, voidpf stream,
     inj->budget -= (size_t) size;
     return (uLong) fwrite(buf, 1, (size_t) size, (FILE *) stream);
   }
+  if (inj->fail_once)
+    inj->budget = (size_t) -1; /* the backend recovers after this failure */
   errno = inj->fail_errno;
   return 0; /* short write -> the minizip op returns an error */
 }
@@ -373,9 +377,50 @@ static void writefail_store(httrackp *opt, cache_back *cache, const char *fil,
   freet(bodycopy);
 }
 
-/* #174/#219: a failing cache write used to crash via assertf(); it must instead
-   stop the mirror (exit_xh = -1) without crashing. Assert that, plus the cache
-   is flagged and a sibling write doesn't re-enter the broken stream. */
+/* Store an entry claiming a >2GB body; the degrade path never reads data. */
+static void writefail_store_oversized(httrackp *opt, cache_back *cache,
+                                      const char *fil, int is_write) {
+  htsblk r;
+  char locbuf[4];
+
+  hts_init_htsblk(&r);
+  r.statuscode = 200;
+  r.size = (LLint) INT_MAX + 1;
+  strcpybuff(r.msg, "OK");
+  strcpybuff(r.contenttype, "application/octet-stream");
+  locbuf[0] = '\0';
+  r.location = locbuf;
+  r.is_write = (short int) is_write;
+  cache_add(opt, cache, &r, "example.com", fil, "example.com/big.bin", 1, NULL);
+}
+
+/* Read back `entryname`: extra field (cached headers) and body. Returns the
+   body length, or -1 if the entry is absent or unreadable. */
+static int writefail_read_entry(const char *path, const char *entryname,
+                                char *extra, size_t extralen, char *body,
+                                size_t bodylen) {
+  unzFile z = unzOpen(path);
+  int n = -1;
+
+  if (z == NULL)
+    return -1;
+  if (unzLocateFile(z, entryname, 1) == UNZ_OK &&
+      unzOpenCurrentFile(z) == UNZ_OK) {
+    const int elen = unzGetLocalExtrafield(z, extra, (unsigned) (extralen - 1));
+
+    if (elen >= 0) {
+      extra[elen] = '\0';
+      n = unzReadCurrentFile(z, body, (unsigned) bodylen);
+    }
+    unzCloseCurrentFile(z);
+  }
+  unzClose(z);
+  return n;
+}
+
+/* Cache write-failure policy (#174/#219): fatal errno or a failure streak
+   stops the mirror (exit_xh=-1, no crash); isolated/oversized drops the entry.
+ */
 int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
   char path[HTS_URLMAXSIZE];
@@ -388,9 +433,8 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   gen_body(body, body_len, 1 /* incompressible */);
   fconcat(path, sizeof(path), dir, "/wfail.zip");
 
-  /* phase 0: fail on the body write, fatal errno (ENOSPC, the disk-full
-     branch). phase 1: fail on the open, non-fatal errno (EIO, dropped-share
-     branch). Both must abort the mirror. */
+  /* phase 0: fatal errno (ENOSPC) aborts at once; phase 1: persistent EIO
+     drops entries until the streak caps out, then aborts. */
   for (phase = 0; phase < 2; phase++) {
     cache_back cache;
     writefail_inject inj;
@@ -399,6 +443,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     inj.budget = (phase == 0) ? 4096 : 0;
     inj.fail_errno = (phase == 0) ? ENOSPC : EIO;
     inj.writes = 0;
+    inj.fail_once = 0;
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;
     cache.log = stderr;
@@ -412,7 +457,25 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
 
     opt->state.exit_xh = 0; /* clear; the failing write must set it to -1 */
-    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    if (phase == 0) {
+      writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    } else {
+      /* the abort must land exactly on the 8th consecutive failure */
+      int i;
+
+      for (i = 0; i < 7; i++) {
+        char fil[32];
+
+        snprintf(fil, sizeof(fil), "/b%d.bin", i);
+        writefail_store(opt, &cache, fil, body, 16);
+      }
+      if (cache.zipWriteFailed) {
+        fprintf(stderr, "cache-writefail: phase 1: aborted before the "
+                        "8th consecutive failure\n");
+        fail++;
+      }
+      writefail_store(opt, &cache, "/b7.bin", body, 16);
+    }
     if (!cache.zipWriteFailed) {
       fprintf(stderr, "cache-writefail: phase %d: write error not caught\n",
               phase);
@@ -440,6 +503,136 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
       zipClose(cache.zipOutput,
                NULL); /* best-effort; may fail on the backend */
       cache.zipOutput = NULL;
+    }
+  }
+
+  /* failures with successes in between reset the streak: never aborts */
+  {
+    cache_back cache;
+    writefail_inject inj;
+    int i;
+
+    inj.budget = (size_t) -1;
+    inj.fail_errno = EIO;
+    inj.writes = 0;
+    inj.fail_once = 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    opt->state.exit_xh = 0;
+
+    for (i = 0; i < 10; i++) {
+      char fil[32];
+
+      inj.budget = 0; /* this store fails */
+      snprintf(fil, sizeof(fil), "/s%d.bin", i);
+      writefail_store(opt, &cache, fil, body, 16);
+      inj.budget = (size_t) -1; /* this one succeeds and resets the streak */
+      snprintf(fil, sizeof(fil), "/ok%d.bin", i);
+      writefail_store(opt, &cache, fil, body, 16);
+    }
+    if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "cache-writefail: scattered: non-consecutive failures aborted "
+              "the mirror (flagged=%d, exit_xh=%d)\n",
+              (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
+  }
+
+  /* isolated failure: only that entry drops; a later sibling round-trips */
+  {
+    cache_back cache;
+    writefail_inject inj;
+    char extra[8192];
+    char rbody[64];
+    int n;
+
+    inj.budget = 4096;
+    inj.fail_errno = EIO;
+    inj.writes = 0;
+    inj.fail_once = 1;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    opt->state.exit_xh = 0;
+
+    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "cache-writefail: skip: isolated failure aborted the mirror "
+              "(flagged=%d, exit_xh=%d)\n",
+              (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
+    n = writefail_read_entry(path, "http://example.com/blob2.bin", extra,
+                             sizeof(extra), rbody, sizeof(rbody));
+    if (n != 16 || memcmp(rbody, body, 16) != 0) {
+      fprintf(stderr,
+              "cache-writefail: skip: sibling entry lost after a skipped "
+              "entry (%d)\n",
+              n);
+      fail++;
+    }
+  }
+
+  /* >2GB bodies: in-memory drops the entry, on-disk degrades to headers-only */
+  {
+    cache_back cache;
+    writefail_inject inj;
+    char extra[8192];
+    char rbody[64];
+    int n;
+
+    inj.budget = (size_t) -1; /* no injected failure */
+    inj.fail_errno = 0;
+    inj.writes = 0;
+    inj.fail_once = 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    opt->state.exit_xh = 0;
+
+    writefail_store_oversized(opt, &cache, "/bigmem.bin", 0 /* in-memory */);
+    writefail_store_oversized(opt, &cache, "/bigdisk.bin", 1 /* on-disk */);
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
+
+    if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "cache-writefail: oversize: mirror aborted (flagged=%d, "
+              "exit_xh=%d)\n",
+              (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    if (writefail_read_entry(path, "http://example.com/bigmem.bin", extra,
+                             sizeof(extra), rbody, sizeof(rbody)) >= 0) {
+      fprintf(stderr,
+              "cache-writefail: oversize: in-memory entry was stored\n");
+      fail++;
+    }
+    n = writefail_read_entry(path, "http://example.com/bigdisk.bin", extra,
+                             sizeof(extra), rbody, sizeof(rbody));
+    if (n != 0 || strstr(extra, "X-In-Cache: 0") == NULL) {
+      fprintf(stderr,
+              "cache-writefail: oversize: on-disk entry not stored "
+              "headers-only (%d)\n",
+              n);
+      fail++;
     }
   }
 

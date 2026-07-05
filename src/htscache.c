@@ -221,23 +221,38 @@ struct cache_back_zip_entry {
 	} \
 } while(0)
 
-/* A cache (new.zip) write failed: storage is gone (disk full / dropped share),
-   so the mirror is doomed too. Abort it via exit_xh, don't crash as assertf
-   did. */
+/* Consecutive entry write failures before the cache stream is declared dead. */
+#define CACHE_MAX_WRITE_FAILURES 8
+
+/* Cache write failed: a fatal errno or a failure streak aborts the mirror
+   (exit_xh); an isolated failure only drops the current entry. */
 static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
-                                   const char *what, int zErr) {
-  if (!cache->zipWriteFailed) {
-    cache->zipWriteFailed = HTS_TRUE;
-    if (check_fatal_io_errno()) {
-      hts_log_print(opt, LOG_ERROR,
-                    "Mirror aborted: disk full or filesystem problems");
-    } else {
-      hts_log_print(opt, LOG_ERROR,
-                    "Mirror aborted: cache write failed (%s): %s", what,
-                    hts_get_zerror(zErr));
+                                   const char *what, int zErr,
+                                   hts_boolean entry_open, const char *url_adr,
+                                   const char *url_fil) {
+  const int fatal_errno = zErr == ZIP_ERRNO && check_fatal_io_errno();
+
+  cache->zipWriteFailures++;
+  if (fatal_errno || cache->zipWriteFailures >= CACHE_MAX_WRITE_FAILURES) {
+    if (!cache->zipWriteFailed) {
+      cache->zipWriteFailed = HTS_TRUE;
+      if (fatal_errno) {
+        hts_log_print(opt, LOG_ERROR,
+                      "Mirror aborted: disk full or filesystem problems");
+      } else {
+        hts_log_print(opt, LOG_ERROR,
+                      "Mirror aborted: cache write failed (%s): %s", what,
+                      hts_get_zerror(zErr));
+      }
     }
+    opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
+  } else {
+    if (entry_open)
+      zipCloseFileInZip((zipFile) cache->zipOutput); /* abandon, best-effort */
+    hts_log_print(opt, LOG_WARNING,
+                  "cache write failed (%s: %s), entry not cached: %s%s", what,
+                  hts_get_zerror(zErr), url_adr, url_fil);
   }
-  opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
 }
 
 /* Ajout d'un fichier en cache */
@@ -287,10 +302,19 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   if (r->size < 0)              // error
     return;
 
-  // data in cache
-  if (dataincache) {
-    assertf(((int) r->size) == r->size);
-    //entryBodySize = (int) r->size;
+  // data in cache: the body must fit the 32-bit zip write API
+  if (dataincache && (LLint) (int) r->size != r->size) {
+    if (r->is_write && url_save != NULL && strnotempty(url_save)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "file too large for the cache, storing headers only: %s%s",
+                    url_adr, url_fil);
+      dataincache = 0;
+    } else {
+      hts_log_print(opt, LOG_WARNING,
+                    "entry too large for the cache, not cached: %s%s", url_adr,
+                    url_fil);
+      return;
+    }
   }
 
   /* Fields */
@@ -370,7 +394,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                                    */
                                   headers, (uInt) strlen(headers), NULL, 0, NULL,       /* comment */
                                   Z_DEFLATED, Z_DEFAULT_COMPRESSION)) != Z_OK) {
-    cache_zip_write_failed(opt, cache, "opening a cache entry", zErr);
+    cache_zip_write_failed(opt, cache, "opening a cache entry", zErr, HTS_FALSE,
+                           url_adr, url_fil);
     return;
   }
 
@@ -381,7 +406,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
         if ((zErr =
              zipWriteInFileInZip((zipFile) cache->zipOutput, r->adr,
                                  (int) r->size)) != Z_OK) {
-          cache_zip_write_failed(opt, cache, "writing to the cache", zErr);
+          cache_zip_write_failed(opt, cache, "writing to the cache", zErr,
+                                 HTS_TRUE, url_adr, url_fil);
           return;
         }
       }
@@ -403,8 +429,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
               if ((zErr =
                    zipWriteInFileInZip((zipFile) cache->zipOutput, buff,
                                        (int) nl)) != Z_OK) {
-                cache_zip_write_failed(opt, cache, "writing to the cache",
-                                       zErr);
+                cache_zip_write_failed(opt, cache, "writing to the cache", zErr,
+                                       HTS_TRUE, url_adr, url_fil);
                 fclose(fp);
                 return;
               }
@@ -420,15 +446,19 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
 
   /* Close */
   if ((zErr = zipCloseFileInZip((zipFile) cache->zipOutput)) != Z_OK) {
-    cache_zip_write_failed(opt, cache, "closing a cache entry", zErr);
+    cache_zip_write_failed(opt, cache, "closing a cache entry", zErr, HTS_FALSE,
+                           url_adr, url_fil);
     return;
   }
 
   /* Flush */
   if ((zErr = zipFlush((zipFile) cache->zipOutput)) != 0) {
-    cache_zip_write_failed(opt, cache, "flushing the cache", zErr);
+    cache_zip_write_failed(opt, cache, "flushing the cache", zErr, HTS_FALSE,
+                           url_adr, url_fil);
     return;
   }
+
+  cache->zipWriteFailures = 0; /* entry stored: reset the failure streak */
 }
 
 #else

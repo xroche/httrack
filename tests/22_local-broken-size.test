@@ -1,17 +1,19 @@
 #!/bin/bash
-# Issues #32/#41: a Content-Length that disagrees with the body warns "bogus
-# state (broken size)" and skips the cache; -%B (tolerant) accepts it.
+# Issues #32/#41: a Content-Length that disagrees with the body warns
+# "incomplete transfer" and skips the cache; -%B (tolerant) accepts it.
+
+set -euo pipefail
 
 : "${top_srcdir:=..}"
 
 # Default: warn, but the file is still written.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'size/oversize.bin' \
-    --log-found 'bogus state \(broken size' \
+    --log-found 'incomplete transfer \(expected' \
     httrack 'BASEURL/size/index.html'
 
 # -%B (tolerant): no warning, file written.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'size/oversize.bin' \
-    --log-not-found 'bogus state' \
+    --log-not-found 'incomplete transfer|not cached' \
     httrack 'BASEURL/size/index.html' '-%B'

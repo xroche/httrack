@@ -2853,6 +2853,9 @@ int check_fatal_io_errno(void) {
 #ifdef EROFS
   case EROFS:                  /* Read-only file system */
 #endif
+#ifdef EDQUOT
+  case EDQUOT: /* Disk quota exceeded */
+#endif
     return 1;
     break;
   }

@@ -2,7 +2,7 @@
 #
 # Degenerate delayed-type paths (#5/#107 family): redirects that never resolve
 # a name must drop cleanly -- no .delayed leftovers (audited by local-crawl.sh),
-# no "bogus state" cache warnings, resolvable links still land correctly.
+# no "not cached" warnings, resolvable links still land correctly.
 
 set -euo pipefail
 
@@ -16,5 +16,5 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun --errors 0 \
     --not-found 'delayed/noloc.html' \
     --not-found 'delayed/selfloop.html' \
     --not-found 'delayed/chain9.pdf' \
-    --log-not-found 'bogus state' \
+    --log-not-found 'not cached' \
     httrack 'BASEURL/delayed/index.html'

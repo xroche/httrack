@@ -4,10 +4,9 @@
 # POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
 # tool flags despite the #!/bin/bash above.
 
-# Cache write-failure handling (httrack -#test=cache-writefail <dir>). #174/#219.
-# A failing new.zip write (disk full) used to crash the process via assertf; it
-# must instead stop the mirror with a fatal error (exit_xh=-1), no crash. The
-# self-test asserts that; reverting the fix makes -#test=cache-writefail abort (SIGABRT) and fail.
+# Cache write-failure policy (-#test=cache-writefail <dir>). #174/#219: disk
+# full or a failure streak aborts cleanly; an isolated failure or an oversized
+# entry is only dropped.
 
 set -eu
 
@@ -20,5 +19,11 @@ out=$(httrack -#test=cache-writefail "$dir")
 # test prints the registry to stderr, which exits non-zero but never prints this.
 printf '%s\n' "$out" | grep -qx "cache-writefail: OK" || {
     echo "expected 'cache-writefail: OK', got: $out" >&2
+    exit 1
+}
+
+# A skipped entry must be warned about with its URL.
+printf '%s\n' "$out" | grep -q "entry not cached: example.com/" || {
+    echo "expected a URL-bearing skip warning" >&2
     exit 1
 }
