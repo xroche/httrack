@@ -10,6 +10,15 @@ httrack (3.49.11-1) unstable; urgency=medium
 
  -- Xavier Roche <xavier@debian.org>  Sun, 05 Jul 2026 00:03:18 +0200
 
+httrack (3.49.10-2) unstable; urgency=medium
+
+  * Fix FTBFS: tests/28_local-pause failed instead of skipping when python3 is
+    absent (the local-server tests need python3, which the buildds lack). Add
+    patches/skip-local-pause-test-without-python3.patch to guard the test on
+    python3 up front, like its siblings, so it skips cleanly.
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 28 Jun 2026 20:18:46 +0200
+
 httrack (3.49.10-1) unstable; urgency=medium
 
   * New upstream release: new download-pacing and URL-handling options plus a
