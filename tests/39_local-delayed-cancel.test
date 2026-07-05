@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# Cancelling mid delayed-type-check must not orphan .delayed placeholders
+# (#483): timing-dependent (~1 in 6 crawls on a buggy tree, hence two tries),
+# never false-fails. -A keeps reads throttled so the window stays reachable.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+for _ in 1 2; do
+    bash "$top_srcdir/tests/local-crawl.sh" \
+        httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000
+done

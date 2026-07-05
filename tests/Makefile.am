@@ -103,6 +103,7 @@ TESTS = \
 	35_local-maxsize.test \
 	36_local-bigcrawl.test \
 	37_local-cache-outage.test \
-	38_local-update-304.test
+	38_local-update-304.test \
+	39_local-delayed-cancel.test
 
 CLEANFILES = check-network_sh.cache

@@ -4566,6 +4566,12 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           back_maydelete(opt, cache, sback, b);    // cancel
           b = -1;
 
+          /* Nothing references the on-disk placeholder anymore; if the
+             cancel left it behind (is_write already cleared), drop it (#483) */
+          if (fexist_utf8(delayed_back.url_sav)) {
+            back_delayed_discard(opt, &delayed_back);
+          }
+
           /* Recompute filename with MIME type */
           afs->save[0] = '\0';
           url_savename(afs, former, heap(ptr)->adr,
@@ -4782,6 +4788,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* Still have a back reference */
           if (b >= 0) {
+            /* a direct-to-disk transfer still writes to the placeholder path:
+               once url_sav is patched no cleanup can see that file (#483) */
+            back_delayed_rename(opt, &back[b], afs->save);
             /* patch url_sav BEFORE finalize: it records/caches under this name
              */
             strcpybuff(back[b].url_sav, afs->save);

@@ -113,6 +113,14 @@ void back_set_locked(struct_back * sback, const int p);
 void back_set_unlocked(struct_back * sback, const int p);
 int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                 const int p);
+/* Discard back's on-disk .delayed placeholder and its refname; closes any
+   open output stream. Safe on a back_copy_static() copy. */
+void back_delayed_discard(httrackp *opt, lien_back *back);
+/* Move back's on-disk .delayed placeholder to newname before url_sav is
+   patched; reopens a mid-transfer stream on the new name. HTS_FALSE = the
+   file was lost and the slot flagged in error. */
+hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
+                                const char *newname);
 void back_index_unlock(struct_back * sback, const int p);
 int back_clear_entry(lien_back * back);
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,

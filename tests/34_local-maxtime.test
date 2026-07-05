@@ -7,10 +7,8 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-# cancelled crawls can orphan .delayed placeholders (#483): skip that audit
 start=$(date +%s)
 bash "$top_srcdir/tests/local-crawl.sh" \
-    --skip-delayed-audit \
     --log-found 'More than 2 seconds passed' \
     httrack 'BASEURL/trickle/index.html' -E2 -c4
 wall=$(($(date +%s) - start))
