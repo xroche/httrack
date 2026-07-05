@@ -1158,6 +1158,46 @@ static void corrupt_build_etag(httrackp *opt) {
   selftest_close(&cache);
 }
 
+/* Like corrupt_build_etag, but the victim is headers-only (X-In-Cache: 0,
+   body on disk): the shape every non-html file is stored with. */
+static void corrupt_build_disk(httrackp *opt) {
+  cache_back cache;
+  htsblk w;
+  char locw[4];
+  char BIGSTK save[HTS_URLMAXSIZE * 2];
+  char BIGSTK catbuff[HTS_URLMAXSIZE * 2];
+  char *path;
+  FILE *fp;
+
+  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
+  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
+  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
+  fconcat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+          CORRUPT_ADR "/victim.bin");
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
+              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
+              strlen(corrupt_body_a));
+  hts_init_htsblk(&w);
+  w.statuscode = 200;
+  w.size = (LLint) sizeof(corrupt_body_b) - 1;
+  strcpybuff(w.msg, "OK");
+  strcpybuff(w.contenttype, "application/octet-stream");
+  strcpybuff(w.etag, "AAAAAAAAAAAAAAAAAAAA");
+  locw[0] = '\0';
+  w.location = locw;
+  w.is_write = 0;
+  cache_add(opt, &cache, &w, CORRUPT_ADR, "/victim.bin", save,
+            0 /* all_in_cache */, NULL);
+  selftest_close(&cache);
+  /* the reader only checks this file exists; it never reads it here */
+  path = fconv(catbuff, sizeof(catbuff), save);
+  (void) structcheck(path);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+}
+
 /* Patch the nth of total occurrences of pat (same-length rep) in new.zip. */
 static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
                           const char *rep, size_t nth, size_t total) {
@@ -1217,8 +1257,8 @@ static void corrupt_victim_body(httrackp *opt) {
    /canary.html: the victim must be rejected (wantmsg pins which path) and the
    canary must still decode byte-exact, proving one bad entry never taints a
    sibling read. */
-static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
-                                 const char *what) {
+static int corrupt_expect_victim_fil(httrackp *opt, const char *fil,
+                                     const char *wantmsg, const char *what) {
   cache_back cache;
   htsblk v, c;
   char BIGSTK lv[HTS_URLMAXSIZE * 2];
@@ -1227,7 +1267,7 @@ static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
 
   selftest_open_for_read(&cache, opt);
   lv[0] = lc[0] = '\0';
-  v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.html", "", lv, NULL, 1);
+  v = cache_readex(opt, &cache, CORRUPT_ADR, fil, "", lv, NULL, 1);
   if (v.statuscode != STATUSCODE_INVALID) {
     fprintf(stderr, "%s: %s: victim: statuscode is %d, expected %d\n",
             selftest_tag, what, v.statuscode, STATUSCODE_INVALID);
@@ -1250,6 +1290,34 @@ static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
     freet(v.adr);
   if (c.adr != NULL)
     freet(c.adr);
+  selftest_close(&cache);
+  return fail;
+}
+
+static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
+                                 const char *what) {
+  return corrupt_expect_victim_fil(opt, "/victim.html", wantmsg, what);
+}
+
+/* Headers-only probe of the disk victim: must parse OK with the size kept. */
+static int corrupt_expect_disk_header(httrackp *opt, LLint wantsize,
+                                      const char *what) {
+  cache_back cache;
+  htsblk v;
+  char BIGSTK lv[HTS_URLMAXSIZE * 2];
+  int fail = 0;
+
+  selftest_open_for_read(&cache, opt);
+  lv[0] = '\0';
+  v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.bin", NULL, lv, NULL, 1);
+  if (v.statuscode != 200 || v.size != wantsize) {
+    fprintf(stderr,
+            "%s: %s: statuscode %d size " LLintP ", expected 200/" LLintP "\n",
+            selftest_tag, what, v.statuscode, (LLint) v.size, wantsize);
+    fail++;
+  }
+  if (v.adr != NULL)
+    freet(v.adr);
   selftest_close(&cache);
   return fail;
 }
@@ -1301,6 +1369,34 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
                 "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Bad Size",
                                     "X-Size above INT_MAX");
+
+  /* A headers-only entry (X-In-Cache: 0) may carry an X-Size >= INT_MAX: that
+     is how every >2GB non-html file is stored. It must survive a header probe
+     (or every update re-fetches the file); an in-memory read still rejects. */
+  corrupt_build_disk(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: 2147483648AAAAAAAA", 1, 1);
+  failures += corrupt_expect_disk_header(opt, (LLint) 2147483648LL,
+                                         "headers-only X-Size above INT_MAX");
+  failures += corrupt_expect_victim_fil(opt, "/victim.bin",
+                                        "Cache Read Error : Bad Size",
+                                        "in-memory X-Size above INT_MAX");
+
+  /* exactly INT_MAX pins the >= boundary: (int) r.size + 1 would overflow */
+  corrupt_build_disk(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: 2147483647AAAAAAAA", 1, 1);
+  failures += corrupt_expect_victim_fil(opt, "/victim.bin",
+                                        "Cache Read Error : Bad Size",
+                                        "in-memory X-Size at INT_MAX");
+
+  /* the negative check must stay global, headers-only included */
+  corrupt_build_disk(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: -2147483648AAAAAAA", 1, 1);
+  failures += corrupt_expect_victim_fil(opt, "/victim.bin",
+                                        "Cache Read Error : Bad Size",
+                                        "headers-only negative X-Size");
 
   return failures;
 }
