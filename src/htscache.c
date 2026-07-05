@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsbasenet.h"
 #include "htsmd5.h"
+#include <limits.h>
 #include <time.h>
 
 #include "htszlib.h"
@@ -768,6 +769,15 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
           }
 
+          /* A tampered X-Size must be rejected before the size-driven malloc.
+             The alloc casts to int (malloct((int) r.size + 1)), so bound it to
+             [0, INT_MAX): a negative value, or a positive one whose (int) cast
+             truncates negative, would otherwise wrap to a huge allocation. */
+          if (r.size < 0 || r.size >= INT_MAX) {
+            r.statuscode = STATUSCODE_INVALID;
+            strcpybuff(r.msg, "Cache Read Error : Bad Size");
+          }
+
           /* Complete fields */
           r.totalsize = r.size;
           r.adr = NULL;
@@ -794,7 +804,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             }                   // otherwise, the ZIP file is supposed to be consistent with data.
           }
           /* Read data ? */
-          else {                /* ne pas lire uniquement header */
+          else if (r.statuscode !=
+                   STATUSCODE_INVALID) { /* ne pas lire uniquement header */
             int ok = 0;
 
 #if HTS_DIRECTDISK

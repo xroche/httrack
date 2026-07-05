@@ -1347,6 +1347,18 @@ static int st_cache_writefail(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_cache_corrupt(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-corrupt: needs a directory\n");
+    return 1;
+  }
+  err = cache_corruption_selftest(opt, argv[0]);
+  printf("cache-corrupt: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_reconcile(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -2133,6 +2145,8 @@ static const struct selftest_entry {
      st_cache_writefail},
     {"reconcile", "<dir>", "cache generation reconcile policy self-test",
      st_reconcile},
+    {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
+     st_cache_corrupt},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},
