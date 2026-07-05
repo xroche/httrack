@@ -1432,27 +1432,28 @@ static char *reconcile_path(httrackp *opt, const char *name) {
 #define CACHE_RECONCILE_NEW_TINY 32768
 #define CACHE_RECONCILE_OLD_SOLID 65536
 
+/* Replace the new-generation file by the old one, when the old one exists. */
+static void reconcile_promote(httrackp *opt, const char *oldname,
+                              const char *newname) {
+  if (fexist(reconcile_path(opt, oldname))) {
+    remove(reconcile_path(opt, newname));
+    rename(reconcile_path(opt, oldname), reconcile_path(opt, newname));
+  }
+}
+
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   switch (mode) {
   case CACHE_RECONCILE_PROMOTE:
     /* Previous run rotated new.* to old.* then died before writing: promote
-       the old generation back. */
-    if (!fexist(reconcile_path(opt, "hts-cache/new.zip"))) {
-      if (fexist(reconcile_path(opt, "hts-cache/old.zip"))) {
-        rename(reconcile_path(opt, "hts-cache/old.zip"),
-               reconcile_path(opt, "hts-cache/new.zip"));
-      }
-    } else if (!fexist(reconcile_path(opt, "hts-cache/new.dat")) ||
-               !fexist(reconcile_path(opt, "hts-cache/new.ndx"))) {
-      if (fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
-          fexist(reconcile_path(opt, "hts-cache/old.ndx"))) {
-        remove(reconcile_path(opt, "hts-cache/new.dat"));
-        remove(reconcile_path(opt, "hts-cache/new.ndx"));
-        rename(reconcile_path(opt, "hts-cache/old.dat"),
-               reconcile_path(opt, "hts-cache/new.dat"));
-        rename(reconcile_path(opt, "hts-cache/old.ndx"),
-               reconcile_path(opt, "hts-cache/new.ndx"));
-      }
+       the old generation back, whichever format it uses. */
+    if (!fexist(reconcile_path(opt, "hts-cache/new.zip")))
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if ((!fexist(reconcile_path(opt, "hts-cache/new.dat")) ||
+         !fexist(reconcile_path(opt, "hts-cache/new.ndx"))) &&
+        fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.ndx"))) {
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
     }
     break;
   case CACHE_RECONCILE_INTERRUPTED:
@@ -1460,37 +1461,36 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
        suspiciously small next to the old one. */
     if (!opt->cache || !fexist(reconcile_path(opt, "hts-in_progress.lock")))
       break;
-    if (fexist(reconcile_path(opt, "hts-cache/new.dat"))) {
-      if (fexist(reconcile_path(opt, "hts-cache/old.zip")) &&
-          fsize(reconcile_path(opt, "hts-cache/new.zip")) <
-              CACHE_RECONCILE_NEW_TINY &&
-          fsize(reconcile_path(opt, "hts-cache/old.zip")) >
-              CACHE_RECONCILE_OLD_SOLID &&
-          fsize(reconcile_path(opt, "hts-cache/old.zip")) >
-              fsize(reconcile_path(opt, "hts-cache/new.zip"))) {
-        remove(reconcile_path(opt, "hts-cache/new.zip"));
-        rename(reconcile_path(opt, "hts-cache/old.zip"),
-               reconcile_path(opt, "hts-cache/new.zip"));
-      }
+    if (fexist(reconcile_path(opt, "hts-cache/old.zip")) &&
+        fsize(reconcile_path(opt, "hts-cache/new.zip")) <
+            CACHE_RECONCILE_NEW_TINY &&
+        fsize(reconcile_path(opt, "hts-cache/old.zip")) >
+            CACHE_RECONCILE_OLD_SOLID &&
+        fsize(reconcile_path(opt, "hts-cache/old.zip")) >
+            fsize(reconcile_path(opt, "hts-cache/new.zip")))
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if (fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
+        fexist(reconcile_path(opt, "hts-cache/old.ndx")) &&
+        fsize(reconcile_path(opt, "hts-cache/new.dat")) <
+            CACHE_RECONCILE_NEW_TINY &&
+        fsize(reconcile_path(opt, "hts-cache/old.dat")) >
+            CACHE_RECONCILE_OLD_SOLID &&
+        fsize(reconcile_path(opt, "hts-cache/old.dat")) >
+            fsize(reconcile_path(opt, "hts-cache/new.dat"))) {
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
     }
     break;
   case CACHE_RECONCILE_ROLLBACK:
-    /* Nothing transferred: restore the previous generation. */
+    /* Nothing transferred: restore the previous generation and sidecars. */
+    reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
     if (fexist(reconcile_path(opt, "hts-cache/old.dat")) &&
         fexist(reconcile_path(opt, "hts-cache/old.ndx"))) {
-      remove(reconcile_path(opt, "hts-cache/new.dat"));
-      remove(reconcile_path(opt, "hts-cache/new.ndx"));
-      remove(reconcile_path(opt, "hts-cache/new.lst"));
-      remove(reconcile_path(opt, "hts-cache/new.txt"));
-      rename(reconcile_path(opt, "hts-cache/old.dat"),
-             reconcile_path(opt, "hts-cache/new.dat"));
-      rename(reconcile_path(opt, "hts-cache/old.ndx"),
-             reconcile_path(opt, "hts-cache/new.ndx"));
-      rename(reconcile_path(opt, "hts-cache/old.lst"),
-             reconcile_path(opt, "hts-cache/new.lst"));
-      rename(reconcile_path(opt, "hts-cache/old.txt"),
-             reconcile_path(opt, "hts-cache/new.txt"));
+      reconcile_promote(opt, "hts-cache/old.dat", "hts-cache/new.dat");
+      reconcile_promote(opt, "hts-cache/old.ndx", "hts-cache/new.ndx");
     }
+    reconcile_promote(opt, "hts-cache/old.lst", "hts-cache/new.lst");
+    reconcile_promote(opt, "hts-cache/old.txt", "hts-cache/new.txt");
     break;
   }
 }
