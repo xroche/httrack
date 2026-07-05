@@ -919,3 +919,195 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   reconcile_wipe(opt);
   return failures;
 }
+
+/* --- read-side corruption injection --------------------------------------- */
+
+/* canary read back intact after each corruption; victim gets the byte surgery
+ */
+#define CORRUPT_ADR "corrupt.example.com"
+static char corrupt_body_a[33 + 1];
+static char corrupt_body_b[44 + 1];
+
+/* Write a fresh two-entry cache: /canary.html then /victim.html. */
+static void corrupt_build(httrackp *opt) {
+  cache_back cache;
+
+  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
+  memset(corrupt_body_b, 'b', sizeof(corrupt_body_b) - 1);
+  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
+  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
+              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
+              strlen(corrupt_body_a));
+  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
+              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_b,
+              strlen(corrupt_body_b));
+  selftest_close(&cache);
+}
+
+/* Like corrupt_build, but the victim carries a 20-char Etag whose header line
+   is later overwritten with a forged oversized X-Size (same byte length). */
+static void corrupt_build_etag(httrackp *opt) {
+  cache_back cache;
+
+  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
+  memset(corrupt_body_b, 'b', sizeof(corrupt_body_b) - 1);
+  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
+  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
+              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
+              strlen(corrupt_body_a));
+  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
+              "OK", "text/html", "utf-8", "", "AAAAAAAAAAAAAAAAAAAA", "", "",
+              corrupt_body_b, strlen(corrupt_body_b));
+  selftest_close(&cache);
+}
+
+/* Patch the nth of total occurrences of pat (same-length rep) in new.zip. */
+static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
+                          const char *rep, size_t nth, size_t total) {
+  LLint fsz = 0;
+  char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
+  const size_t n = (size_t) fsz;
+  size_t k, hits = 0, at = 0;
+  FILE *fp;
+
+  assertf(data != NULL);
+  for (k = 0; k + patlen <= n; k++) {
+    if (memcmp(data + k, pat, patlen) == 0) {
+      hits++;
+      if (hits == nth)
+        at = k;
+    }
+  }
+  assertf(hits == total);
+  memcpy(data + at, rep, patlen);
+  fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
+  assertf(fp != NULL);
+  assertf(fwrite(data, 1, n, fp) == n);
+  fclose(fp);
+  freet(data);
+}
+
+/* Garbage the first bytes of the victim's deflated data (2nd local header). */
+static void corrupt_victim_body(httrackp *opt) {
+  LLint fsz = 0;
+  char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
+  const size_t n = (size_t) fsz;
+  size_t k, hits = 0, off = 0;
+  FILE *fp;
+
+  assertf(data != NULL);
+  for (k = 0; k + 4 <= n; k++) {
+    if (memcmp(data + k, "PK\x03\x04", 4) == 0 && ++hits == 2) {
+      const size_t namelen =
+          (unsigned char) data[k + 26] | ((unsigned char) data[k + 27] << 8);
+      const size_t extralen =
+          (unsigned char) data[k + 28] | ((unsigned char) data[k + 29] << 8);
+
+      off = k + 30 + namelen + extralen;
+    }
+  }
+  assertf(hits == 2);
+  assertf(off != 0 && off + 4 <= n);
+  memset(data + off, 0xFF, 4);
+  fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
+  assertf(fp != NULL);
+  assertf(fwrite(data, 1, n, fp) == n);
+  fclose(fp);
+  freet(data);
+}
+
+/* Read the corrupt /victim.html and, in the SAME read session, the intact
+   /canary.html: the victim must be rejected (wantmsg pins which path) and the
+   canary must still decode byte-exact, proving one bad entry never taints a
+   sibling read. */
+static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
+                                 const char *what) {
+  cache_back cache;
+  htsblk v, c;
+  char BIGSTK lv[HTS_URLMAXSIZE * 2];
+  char BIGSTK lc[HTS_URLMAXSIZE * 2];
+  int fail = 0;
+
+  selftest_open_for_read(&cache, opt);
+  lv[0] = lc[0] = '\0';
+  v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.html", "", lv, NULL, 1);
+  if (v.statuscode != STATUSCODE_INVALID) {
+    fprintf(stderr, "%s: %s: victim: statuscode is %d, expected %d\n",
+            selftest_tag, what, v.statuscode, STATUSCODE_INVALID);
+    fail++;
+  }
+  if (wantmsg != NULL && strcmp(v.msg, wantmsg) != 0) {
+    fprintf(stderr, "%s: %s: victim: msg is '%s', expected '%s'\n",
+            selftest_tag, what, v.msg, wantmsg);
+    fail++;
+  }
+  c = cache_readex(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc, NULL, 1);
+  if (c.statuscode != 200 || c.adr == NULL ||
+      c.size != (LLint) strlen(corrupt_body_a) ||
+      memcmp(c.adr, corrupt_body_a, strlen(corrupt_body_a)) != 0) {
+    fprintf(stderr, "%s: %s: canary tainted (status %d)\n", selftest_tag, what,
+            c.statuscode);
+    fail++;
+  }
+  if (v.adr != NULL)
+    freet(v.adr);
+  if (c.adr != NULL)
+    freet(c.adr);
+  selftest_close(&cache);
+  return fail;
+}
+
+/* One zip corruption case: build, patch, then check victim+canary in-session.
+ */
+static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
+                            size_t nth, size_t total, const char *wantmsg,
+                            const char *what) {
+  corrupt_build(opt);
+  corrupt_patch(opt, pat, strlen(pat), rep, nth, total);
+  return corrupt_expect_victim(opt, wantmsg, what);
+}
+
+int cache_corruption_selftest(httrackp *opt, const char *dir) {
+  int failures = 0;
+
+  selftest_tag = "cache-corrupt";
+  golden_setup(opt, dir);
+
+  failures +=
+      corrupt_case_zip(opt, "X-Size: 44", "X-Size: 99", 1, 1,
+                       "Cache Read Error : Read Data", "oversized X-Size");
+  failures +=
+      corrupt_case_zip(opt, "X-Size: 44", "X-Size: -4", 1, 1,
+                       "Cache Read Error : Bad Size", "negative X-Size");
+  /* both entries carry the line; the victim's is the second */
+  failures += corrupt_case_zip(opt, "X-In-Cache: 1", "X-In-Cache: 0", 2, 2,
+                               "Previous cache file not found (empty filename)",
+                               "blanked X-In-Cache");
+  /* smashed local file header: the entry is dropped at index load */
+  failures +=
+      corrupt_case_zip(opt, "PK\x03\x04", "XK\x03\x04", 2, 2,
+                       "File Cache Entry Not Found", "smashed local header");
+
+  corrupt_build(opt);
+  corrupt_victim_body(opt);
+  failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
+                                    "garbled deflate stream");
+
+  /* An X-Size above INT_MAX is positive as int64 (slips a bare sign check) but
+     truncates negative in the (int) cast the malloc uses: a wraparound alloc.
+     cache_add asserts size fits an int, so such a value only reaches the reader
+     from a corrupt/foreign cache; inject it by overwriting the victim's long
+     Etag line with a same-length forged X-Size line (the parser keeps the last
+     X-Size it sees), keeping the zip byte-length and offsets intact. */
+  corrupt_build_etag(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: 2147483648AAAAAAAA", 1, 1);
+  failures += corrupt_expect_victim(opt, "Cache Read Error : Bad Size",
+                                    "X-Size above INT_MAX");
+
+  return failures;
+}
