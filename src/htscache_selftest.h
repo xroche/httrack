@@ -60,6 +60,11 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir);
    under <dir>. Returns the failed-check count. */
 int cache_reconcile_selftest(httrackp *opt, const char *dir);
 
+/* Inject read-side corruption (zip byte surgery: bad size, header, deflate)
+   under <dir> and assert every case degrades to STATUSCODE_INVALID without
+   tainting a sibling entry. */
+int cache_corruption_selftest(httrackp *opt, const char *dir);
+
 #endif
 
 #endif
