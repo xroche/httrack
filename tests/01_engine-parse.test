@@ -354,13 +354,30 @@ notfound "plain.gif" "$out10"
 # </script>, or detection dies for the rest of the page after the first script.
 site11="$tmp/dataattr"
 mkdir -p "$site11"
-for f in pre post jsdecoy; do gif "$site11/$f.gif"; done
+for f in pre post mid spdata handler handler2 jsdecoy jsdecoy2 nodecoy \
+    spalt glalt spxml jtail1 jtail2 textdecoy tagdecoy phantom; do gif "$site11/$f.gif"; done
 cat >"$site11/index.html" <<EOF
 <html><body>
 <img data-pre="file://$site11/pre.gif">
 <script>var x = 1;</script>
 <img data-post="file://$site11/post.gif">
+<img data-mid="file://$site11/mid.gif" alt="mid-tag attr, no delimiter after">
+<img data-sp = "file://$site11/spdata.gif" q=1>
+<img alt="nodecoy.gif" src="pre.gif">
+<img alt = "spalt.gif" id=x>
+<img src="pre.gif"alt="glalt.gif" id=x>
+<p xmlns:bar = "spxml.gif" id=x></p>
+<div data-json='["jtail1.gif","jtail2.gif"]' q=1></div>
+<p>t = "textdecoy.gif" q</p>
+<img ="tagdecoy.gif" q>
+<a onclick='q = 1; "h1'>x</a>
+<img data-h1="file://$site11/handler.gif">
+<a onclick='w = 1; "h2>x</a>
+<img data-h2="file://$site11/handler2.gif">
 <script>var s; s = 1; "jsdecoy.gif";</script>
+<script>var s2 = "jsdecoy2.gif" x;</script>
+<script>var f = "</script>
+<img alt="y" "phantom.gif">
 </body></html>
 EOF
 out11="$tmp/dataattr-out"
@@ -371,7 +388,26 @@ grep -Fq 'data-pre="pre.gif"' "$saved11" ||
     ! echo "FAIL #201: data-* URL before any script not detected/rewritten" || exit 1
 grep -Fq 'data-post="post.gif"' "$saved11" ||
     ! echo "FAIL #201: data-* URL after a script not detected (state leak)" || exit 1
+grep -Fq 'data-mid="mid.gif"' "$saved11" ||
+    ! echo "FAIL #201: mid-tag data-* URL not detected" || exit 1
+grep -Fq 'data-sp = "spdata.gif"' "$saved11" ||
+    ! echo "FAIL #201: spaced-= data-* URL not detected" || exit 1
+found "handler.gif" "$out11"  # automaton reset at the handler-terminator exit
+found "handler2.gif" "$out11" # ... and at the '>' exit of an unterminated handler
 # a JS string not preceded by =/(/, is still ignored after the reset
 notfound "jsdecoy.gif" "$out11"
+# in-script, the strict follower gate still applies (intag is 1 in script bodies)
+notfound "jsdecoy2.gif" "$out11"
+# no-detect attrs stay exempt, incl. spaced-'=' and glued-attr forms
+notfound "nodecoy.gif" "$out11"
+notfound "spalt.gif" "$out11"
+notfound "glalt.gif" "$out11"
+notfound "spxml.gif" "$out11"
+# not '='-preceded: comma-list tails and out-of-tag text tokens stay ignored
+notfound "jtail2.gif" "$out11"
+notfound "textdecoy.gif" "$out11"
+notfound "tagdecoy.gif" "$out11" # a '=' glued to the tag name is not an attr
+# a </script> inside a JS string must not cause phantom fetches later
+notfound "phantom.gif" "$out11"
 
 exit 0

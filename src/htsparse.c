@@ -192,6 +192,48 @@ static void hts_automate_lookup(const script_automate *aut) {
   }
 }
 
+/* Attribute name owning the quoted value at 'quote' inside a tag, spanning
+   [name, *nend); NULL when the quote is not an attribute value. */
+static const char *dirty_attr_name(const char *quote, const char *tag_start,
+                                   const char **nend) {
+  const char *a = quote - 1;
+  while (a > tag_start && is_taborspace(*a))
+    a--;
+  if (a == tag_start || *a != '=')
+    return NULL;
+  a--;
+  while (a > tag_start && is_taborspace(*a))
+    a--;
+  *nend = a + 1;
+  while (a > tag_start && *a != '=' && *a != '\"' && *a != '\'' &&
+         !is_realspace(*a))
+    a--;
+  a++;
+  // a name starting right after '<' is the tag name, not an attribute
+  return a < *nend && a > tag_start + 1 ? a : NULL;
+}
+
+/* Accept the in-tag quoted value at 'quote' for dirty parsing? Resolves the
+   owning attribute itself (intag_startattr is unreliable mid-tag) and rejects
+   no-detect/xmlns names. */
+static hts_boolean dirty_attr_detectable(const char *quote,
+                                         const char *tag_start) {
+  const char *nend;
+  const char *name = dirty_attr_name(quote, tag_start, &nend);
+  int i;
+  if (name == NULL)
+    return HTS_FALSE;
+  for (i = 0; strnotempty(hts_nodetect[i]); i++) {
+    const int l = strfield(name, hts_nodetect[i]);
+    if (l && name + l == nend)
+      return HTS_FALSE;
+  }
+  i = strfield(name, "xmlns");
+  if (i && (name + i == nend || name[i] == ':'))
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
 /* Advance the cursor by 'steps' bytes, feeding each to the automaton. */
 static void hts_automate_increment(const script_automate *aut, int steps) {
   while (steps > 0) {
@@ -1572,8 +1614,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           while(is_taborspace(*a))
                             a++;
                           c = *a;
-                          if (strchr("),;>/+\r\n", c)) {        // exemple: ..img.gif";
-                            // le / est pour funct("img.gif" /* URL */);
+                          // in-tag, an attribute value ends at its quote: no
+                          // delimiter required after it (mid-tag attrs, #201)
+                          if (strchr("),;>/+\r\n", c) ||
+                              (intag && !inscript && intag_start_valid &&
+                               dirty_attr_detectable(html, intag_start))) {
+                            // '/' covers a value followed by a JS comment
                             char BIGSTK tempo[HTS_URLMAXSIZE * 2];
                             char type[256];
                             int url_ok = 0;     // url valide?
