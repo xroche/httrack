@@ -4,10 +4,9 @@
 # POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
 # tool flags despite the #!/bin/bash above.
 
-# Cache write-failure policy (httrack -#test=cache-writefail <dir>). #174/#219.
-# Disk full or a persistent failure streak stops the mirror cleanly (exit_xh=-1,
-# no crash); an isolated write failure or an oversized (>2GB) body only drops
-# that cache entry and the mirror keeps going.
+# Cache write-failure policy (-#test=cache-writefail <dir>). #174/#219: disk
+# full or a failure streak aborts cleanly; an isolated failure or an oversized
+# entry is only dropped.
 
 set -eu
 

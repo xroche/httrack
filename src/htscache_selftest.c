@@ -377,8 +377,7 @@ static void writefail_store(httrackp *opt, cache_back *cache, const char *fil,
   freet(bodycopy);
 }
 
-/* Store an entry claiming a > 2GB body (the oversize degrade path never reads
-   the data, so none is provided). */
+/* Store an entry claiming a >2GB body; the degrade path never reads data. */
 static void writefail_store_oversized(httrackp *opt, cache_back *cache,
                                       const char *fil, int is_write) {
   htsblk r;
@@ -395,9 +394,8 @@ static void writefail_store_oversized(httrackp *opt, cache_back *cache,
   cache_add(opt, cache, &r, "example.com", fil, "example.com/big.bin", 1, NULL);
 }
 
-/* Reopen `path`, locate `entryname`, fill its local extra field (the cached
-   headers, NUL-terminated) and body. Returns the body length, or -1 if the
-   entry is absent or unreadable. */
+/* Read back `entryname`: extra field (cached headers) and body. Returns the
+   body length, or -1 if the entry is absent or unreadable. */
 static int writefail_read_entry(const char *path, const char *entryname,
                                 char *extra, size_t extralen, char *body,
                                 size_t bodylen) {
@@ -420,10 +418,9 @@ static int writefail_read_entry(const char *path, const char *entryname,
   return n;
 }
 
-/* Cache write-failure policy (#174/#219). Fatal regime: a fatal errno (disk
-   full) or a persistent failure streak stops the mirror (exit_xh = -1), no
-   crash, and the broken stream is never re-entered. Skip regime: an isolated
-   failure or an oversized body only drops that entry. */
+/* Cache write-failure policy (#174/#219): fatal errno or a failure streak
+   stops the mirror (exit_xh=-1, no crash); isolated/oversized drops the entry.
+ */
 int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
   char path[HTS_URLMAXSIZE];
@@ -436,9 +433,8 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   gen_body(body, body_len, 1 /* incompressible */);
   fconcat(path, sizeof(path), dir, "/wfail.zip");
 
-  /* phase 0: fatal errno (ENOSPC, disk full) on the body write aborts at once.
-     phase 1: persistent non-fatal errno (EIO, dropped share) drops entries
-     until the streak caps out, then aborts. */
+  /* phase 0: fatal errno (ENOSPC) aborts at once; phase 1: persistent EIO
+     drops entries until the streak caps out, then aborts. */
   for (phase = 0; phase < 2; phase++) {
     cache_back cache;
     writefail_inject inj;
@@ -464,8 +460,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     if (phase == 0) {
       writefail_store(opt, &cache, "/blob.bin", body, body_len);
     } else {
-      /* the abort must land exactly on the CACHE_MAX_WRITE_FAILURES'th (8th)
-         consecutive failure, not sooner */
+      /* the abort must land exactly on the 8th consecutive failure */
       int i;
 
       for (i = 0; i < 7; i++) {
@@ -511,8 +506,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
   }
 
-  /* scattered failures: a stored entry resets the streak, so failures with
-     successes in between never abort, however many accumulate */
+  /* failures with successes in between reset the streak: never aborts */
   {
     cache_back cache;
     writefail_inject inj;
@@ -551,8 +545,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.zipOutput = NULL;
   }
 
-  /* an isolated (transient) failure: only that entry is dropped, the mirror
-     stays alive, and a sibling entry written afterwards still round-trips */
+  /* isolated failure: only that entry drops; a later sibling round-trips */
   {
     cache_back cache;
     writefail_inject inj;
@@ -594,8 +587,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
   }
 
-  /* oversized (> 2GB) bodies: an in-memory one drops the entry, an on-disk
-     one degrades to a headers-only entry (X-In-Cache: 0), no crash */
+  /* >2GB bodies: in-memory drops the entry, on-disk degrades to headers-only */
   {
     cache_back cache;
     writefail_inject inj;

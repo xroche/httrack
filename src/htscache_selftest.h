@@ -52,9 +52,8 @@ int cache_selftests(httrackp *opt, const char *dir);
    committed file, never by the test). Returns the failed-check count. */
 int cache_golden_selftest(httrackp *opt, const char *dir, int regen);
 
-/* Cache write-failure policy (#174/#219): a fatal errno or a failure streak
-   aborts the mirror cleanly (no crash); an isolated entry failure or an
-   oversized body only drops that entry. Returns the failed-check count. */
+/* Cache write-failure policy (#174/#219): abort on fatal errno or a streak,
+   drop just the entry otherwise. Returns the failed-check count. */
 int cache_write_failure_selftest(httrackp *opt, const char *dir);
 
 /* Exercise the hts_cache_reconcile() generation policies on file fixtures

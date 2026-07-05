@@ -216,8 +216,7 @@ struct cache_back {
   int zipEntriesCapa;
   hts_boolean
       zipWriteFailed; /**< a cache write failed; stop touching the stream */
-  int zipWriteFailures; /**< consecutive entry write failures; reset when an
-                           entry is stored */
+  int zipWriteFailures; /**< consecutive entry write failures; reset on store */
 };
 
 #ifndef HTS_DEF_FWSTRUCT_hash_struct

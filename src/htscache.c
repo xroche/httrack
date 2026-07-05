@@ -223,10 +223,8 @@ struct cache_back_zip_entry {
 /* Consecutive entry write failures before the cache stream is declared dead. */
 #define CACHE_MAX_WRITE_FAILURES 8
 
-/* A cache (new.zip) write failed. Storage-level trouble (fatal errno, every
-   entry failing) dooms the mirror: abort it via exit_xh, don't crash as
-   assertf did. An isolated failure only drops the current entry: the file
-   stays on disk and the next update re-fetches it into the cache. */
+/* Cache write failed: a fatal errno or a failure streak aborts the mirror
+   (exit_xh); an isolated failure only drops the current entry. */
 static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
                                    const char *what, int zErr,
                                    hts_boolean entry_open, const char *url_adr,
