@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
+# Timing-dependent (hence two tries); -A keeps the window reachable.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+for _ in 1 2; do
+    bash "$top_srcdir/tests/local-crawl.sh" \
+        httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000
+done

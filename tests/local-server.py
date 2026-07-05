@@ -913,6 +913,26 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # #483: trickled .bin pages so the -E stop lands in the type waiter's
+    # unlock-to-patch window with body bytes pending.
+    def route_dcancel_index(self):
+        self.send_bin_index()
+
+    def route_dcancel_page(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", "4096")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            for _ in range(32):
+                self.wfile.write(b"z" * 128)
+                self.wfile.flush()
+                time.sleep(0.05)
+        except OSError:
+            pass
+
     # -M byte cap (#77): large fast files so a crawl overruns -M immediately.
     BIGFILE_BYTES = 640 * 1024
 
@@ -976,6 +996,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/trickle/p5.bin": route_trickle_page,
         "/trickle/p6.bin": route_trickle_page,
         "/trickle/p7.bin": route_trickle_page,
+        "/dcancel/index.html": route_dcancel_index,
+        "/dcancel/p0.bin": route_dcancel_page,
+        "/dcancel/p1.bin": route_dcancel_page,
+        "/dcancel/p2.bin": route_dcancel_page,
+        "/dcancel/p3.bin": route_dcancel_page,
+        "/dcancel/p4.bin": route_dcancel_page,
+        "/dcancel/p5.bin": route_dcancel_page,
+        "/dcancel/p6.bin": route_dcancel_page,
+        "/dcancel/p7.bin": route_dcancel_page,
         "/bigfiles/index.html": route_bigfiles_index,
         "/bigfiles/p0.bin": route_bigfile,
         "/bigfiles/p1.bin": route_bigfile,

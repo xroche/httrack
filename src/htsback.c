@@ -1362,9 +1362,39 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
   return 0;
 }
 
+/* Move a still-writing .delayed placeholder to its final name (#483). */
+hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
+                                const char *newname) {
+  hts_boolean renamed;
+
+  if (!back->r.is_write || back->tmpfile != NULL ||
+      !IS_DELAYED_EXT(back->url_sav) || strcmp(back->url_sav, newname) == 0)
+    return HTS_TRUE; /* nothing bound to the placeholder name */
+  if (back->r.out != NULL) {
+    fclose(back->r.out);
+    back->r.out = NULL;
+  }
+  renamed = RENAME(back->url_sav, newname) == 0 ? HTS_TRUE : HTS_FALSE;
+  if (renamed && (back->status == STATUS_READY ||
+                  (back->r.out = FOPEN(newname, "ab")) != NULL)) {
+    filenote(&opt->state.strc, newname, NULL);
+    hts_log_print(opt, LOG_DEBUG, "moved placeholder %s to %s", back->url_sav,
+                  newname);
+    return HTS_TRUE;
+  }
+  /* partial lost: drop only what we own (Windows rename won't overwrite) */
+  hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "unable to move %s to %s",
+                back->url_sav, newname);
+  back->r.statuscode = STATUSCODE_INVALID;
+  strcpybuff(back->r.msg, "Write error on disk");
+  back->r.is_write = 0;
+  (void) UNLINK(renamed ? newname : back->url_sav);
+  return HTS_FALSE;
+}
+
 // effacer entrée
 /* Discard a cancelled mid-write .delayed placeholder (unusable across runs). */
-static void back_delayed_discard(httrackp *opt, lien_back *back) {
+void back_delayed_discard(httrackp *opt, lien_back *back) {
   if (back->r.out != NULL) {
     fclose(back->r.out);
     back->r.out = NULL;
