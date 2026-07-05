@@ -799,11 +799,11 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
           }
 
-          /* A tampered X-Size must be rejected before the size-driven malloc.
-             The alloc casts to int (malloct((int) r.size + 1)), so bound it to
-             [0, INT_MAX): a negative value, or a positive one whose (int) cast
-             truncates negative, would otherwise wrap to a huge allocation. */
-          if (r.size < 0 || r.size >= INT_MAX) {
+          /* A negative X-Size is corrupt; so is one >= INT_MAX when the data
+             is in the zip (the write path asserts int-sized). Headers-only
+             entries legitimately exceed INT_MAX (>2GB body on disk): keep
+             them, or every update would re-fetch the file. */
+          if (r.size < 0 || (dataincache && r.size >= INT_MAX)) {
             r.statuscode = STATUSCODE_INVALID;
             strcpybuff(r.msg, "Cache Read Error : Bad Size");
           }
@@ -999,7 +999,10 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                     strcpybuff(r.msg,
                                "Previous cache file not found (empty filename)");
                   }
-                } else {        /* Read in memory from disk */
+                } else if (r.size >= INT_MAX) { /* too big to read in memory */
+                  r.statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r.msg, "Cache Read Error : Bad Size");
+                } else { /* Read in memory from disk */
                   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), previous_save), "rb");
 
                   if (fp != NULL) {
