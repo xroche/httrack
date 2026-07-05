@@ -913,8 +913,8 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
-    # Cancel mid delayed-type-check (#483): trickled .bin pages so the -E stop
-    # lands in the type waiter's unlock-to-patch window with body bytes pending.
+    # #483: trickled .bin pages so the -E stop lands in the type waiter's
+    # unlock-to-patch window with body bytes pending.
     def route_dcancel_index(self):
         self.send_bin_index()
 

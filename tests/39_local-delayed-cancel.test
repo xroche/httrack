@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Cancelling mid delayed-type-check must not orphan .delayed placeholders
-# (#483): timing-dependent (~1 in 6 crawls on a buggy tree, hence two tries),
-# never false-fails. -A keeps reads throttled so the window stays reachable.
+# Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
+# Timing-dependent (hence two tries); -A keeps the window reachable.
 
 set -euo pipefail
 

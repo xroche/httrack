@@ -1362,8 +1362,7 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
   return 0;
 }
 
-/* The final type was resolved while the transfer still writes to the .delayed
-   placeholder: move the on-disk file to newname, following with the stream. */
+/* Move a still-writing .delayed placeholder to its final name (#483). */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname) {
   hts_boolean renamed;
@@ -1383,8 +1382,7 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                   newname);
     return HTS_TRUE;
   }
-  /* the partial is lost: flag the slot and drop only what we own, never a
-     pre-existing newname (Windows rename does not overwrite) */
+  /* partial lost: drop only what we own (Windows rename won't overwrite) */
   hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "unable to move %s to %s",
                 back->url_sav, newname);
   back->r.statuscode = STATUSCODE_INVALID;
