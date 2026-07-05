@@ -572,9 +572,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         && back[p].r.size != back[p].r.totalsize && !opt->tolerant) {
       if (back[p].status == STATUS_READY) {
         hts_log_print(opt, LOG_WARNING,
-                      "file not stored in cache due to bogus state (broken size, expected "
-                      LLintP " got " LLintP "): %s%s", back[p].r.totalsize,
-                      back[p].r.size, back[p].url_adr, back[p].url_fil);
+                      "incomplete transfer (expected " LLintP
+                      " bytes, got " LLintP
+                      "): file not cached, will be retried on the next update"
+                      " (use -%%B to cache anyway): %s%s",
+                      back[p].r.totalsize, back[p].r.size, back[p].url_adr,
+                      back[p].url_fil);
       } else {
         hts_log_print(opt, LOG_INFO,
                       "incomplete file not yet stored in cache (expected "
@@ -879,11 +882,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                          back[p].url_fil, NULL);
           } else {
             /* Partial file, but marked as "ok" ? */
-            hts_log_print(opt, LOG_WARNING,
-                          "file not stored in cache due to bogus state (incomplete type with %s (%d), size "
-                          LLintP "): %s%s", back[p].r.msg, back[p].r.statuscode,
-                          (LLint) back[p].r.size, back[p].url_adr,
-                          back[p].url_fil);
+            hts_log_print(
+                opt, LOG_WARNING,
+                "file with unresolved type not cached (%s (%d), size " LLintP
+                "): %s%s",
+                back[p].r.msg, back[p].r.statuscode, (LLint) back[p].r.size,
+                back[p].url_adr, back[p].url_fil);
           }
         }
 

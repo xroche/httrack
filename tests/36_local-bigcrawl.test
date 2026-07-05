@@ -44,7 +44,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --file-matches 'big/a/blk2.css' 'url\(blk2-bg\.png\)' \
     --file-matches 'big/p/5.html' "document\\.write\\('<a href=\"\\.\\./f5/dw\\.html\"" \
     --file-not-matches 'big/p/1.html' 'href="/big/' \
-    --log-not-found 'bogus state|[Pp]anic|assert' \
+    --log-not-found 'not cached|[Pp]anic|assert' \
     --log-found '\(404\) at link [^ ]*/big/e/404\.html' \
     --log-found '\(410\) at link [^ ]*/big/e/410\.html' \
     --log-found '\(500\) at link [^ ]*/big/e/500\.html' \

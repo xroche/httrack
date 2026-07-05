@@ -781,7 +781,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"", "text/html")
 
     # broken Content-Length (#32/#41): declared size != bytes sent. httrack
-    # warns "bogus state (broken size)" and skips the cache unless -%B.
+    # warns "incomplete transfer" and skips the cache unless -%B.
     def route_size_index(self):
         self.send_html('\t<a href="oversize.bin">over</a>\n')
 
