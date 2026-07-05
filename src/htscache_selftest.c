@@ -1382,5 +1382,21 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
                                         "Cache Read Error : Bad Size",
                                         "in-memory X-Size above INT_MAX");
 
+  /* exactly INT_MAX pins the >= boundary: (int) r.size + 1 would overflow */
+  corrupt_build_disk(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: 2147483647AAAAAAAA", 1, 1);
+  failures += corrupt_expect_victim_fil(opt, "/victim.bin",
+                                        "Cache Read Error : Bad Size",
+                                        "in-memory X-Size at INT_MAX");
+
+  /* the negative check must stay global, headers-only included */
+  corrupt_build_disk(opt);
+  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+                "X-Size: -2147483648AAAAAAA", 1, 1);
+  failures += corrupt_expect_victim_fil(opt, "/victim.bin",
+                                        "Cache Read Error : Bad Size",
+                                        "headers-only negative X-Size");
+
   return failures;
 }
