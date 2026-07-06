@@ -250,13 +250,6 @@ static int gethost(const char *hostname, SOCaddr * server) {
     struct addrinfo hints;
 
     memset(&hints, 0, sizeof(hints));
-#if 0
-    if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
-      hints.ai_family = PF_INET;
-    else if (IPV6_resolver == 2)        // V6 only (for testing V6 only)
-      hints.ai_family = PF_INET6;
-    else
-#endif
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;

@@ -4882,32 +4882,6 @@ LLint check_downloadable_bytes(int rate) {
     return TAILLE_BUFFER;
 }
 
-//
-// 0 : OK
-// 1 : slow down
-#if 0
-int HTS_TOTAL_RECV_CHECK(int var) {
-  if (HTS_STAT.HTS_TOTAL_RECV_STATE)
-    return 1;
-  /*
-     {
-     if (HTS_STAT.HTS_TOTAL_RECV_STATE==3) { 
-     var = min(var,32); 
-     Sleep(250); 
-     } else if (HTS_STAT.HTS_TOTAL_RECV_STATE==2) { 
-     var = min(var,256); 
-     Sleep(100); 
-     } else { 
-     var/=2; 
-     if (var<=0) var=1; 
-     Sleep(50); 
-     } 
-     }
-   */
-  return 0;
-}
-#endif
-
 // Lecture dans buff de size octets au maximum en utilisant la socket r (structure htsblk)
 // returns: 
 // >0 : data received
@@ -4934,7 +4908,6 @@ int hts_read(htsblk * r, char *buff, int size) {
     if (r->soc == INVALID_SOCKET)
       printf("!!WIDE_DEBUG ERROR, soc==INVALID hts_read\n");
 #endif
-    //HTS_TOTAL_RECV_CHECK(size);         // Diminuer au besoin si trop de données reçues
 #if HTS_USEOPENSSL
     if (r->ssl) {
       retour = SSL_read(r->ssl_con, buff, size);

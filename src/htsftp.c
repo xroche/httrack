@@ -206,20 +206,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   {
     char *a;
 
-#if 0
-    a = back->url_fil + strlen(back->url_fil) - 1;
-    while((a > back->url_fil) && (*a != '/'))
-      a--;
-    if (*a != '/') {
-      a = NULL;
-    }
-#else
     a = back->url_fil;
-#endif
     if (a != NULL && *a != '\0') {
-#if 0
-      a++;                      // sauter /
-#endif
       ftp_filename = a;
       if (strnotempty(a)) {
         char catbuff[CATBUFF_SIZE];
@@ -348,47 +336,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               // back->status=STATUS_FTP_READY;    // fini
               back->r.statuscode = STATUSCODE_INVALID;
             }
-#if 0
-            // --CWD--
-            char *a;
-
-            a = back->url_fil + strlen(back->url_fil) - 1;
-            while((a > back->url_fil) && (*a != '/'))
-              a--;
-            if (*a == '/') {    // ok repéré
-              char BIGSTK target[1024];
-
-              target[0] = '\0';
-              strncatbuff(target, back->url_fil, (int) (a - back->url_fil));
-              if (strnotempty(target) == 0)
-                strcatbuff(target, "/");
-              strcpybuff(back->info, "cwd");
-              snprintf(line, sizeof(line), "CWD %s", target);
-              send_line(soc_ctl, line);
-              get_ftp_line(soc_ctl, line, sizeof(line), timeout);
-              _CHECK_HALT_FTP;
-              if (line[0] == '2') {
-                send_line(soc_ctl, "TYPE I");
-                get_ftp_line(soc_ctl, line, sizeof(line), timeout);
-                _CHECK_HALT_FTP;
-                if (line[0] == '2') {
-                  // ok..
-                } else {
-                  strcpybuff(back->r.msg, "TYPE I error");
-                  // back->status=STATUS_FTP_READY;    // fini
-                  back->r.statuscode = STATUSCODE_INVALID;
-                }
-              } else {
-                snprintf(back->r.msg, sizeof(back->r.msg), "CWD error: %s", linejmp(line));
-                // back->status=STATUS_FTP_READY;    // fini
-                back->r.statuscode = STATUSCODE_INVALID;
-              }                 // sinon on est prêts
-            } else {
-              strcpybuff(back->r.msg, "Unexpected ftp error");
-              // back->status=STATUS_FTP_READY;    // fini
-              back->r.statuscode = STATUSCODE_INVALID;
-            }
-#endif
 
           } else {
             snprintf(back->r.msg, sizeof(back->r.msg), "Bad password: %s", linejmp(line));
@@ -707,8 +654,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             int len = 1;
             int read_len = 1024;
 
-            //HTS_TOTAL_RECV_CHECK(read_len);         // Diminuer au besoin si trop de données reçues
-
             while((len > 0) && (!stop_ftp(back))) {
               // attendre les données
               len = 1;          // pas d'erreur pour le moment
@@ -762,7 +707,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   }
                 }
                 read_len = 1024;
-                //HTS_TOTAL_RECV_CHECK(read_len);         // Diminuer au besoin si trop de données reçues
               }
             }
             if (back->r.fp) {
@@ -989,7 +933,6 @@ int get_ftp_line(T_SOC soc, char *ptrline, size_t line_size, int timeout) {
       break;
     }
 
-    //HTS_TOTAL_RECV_CHECK(dummy);     // Diminuer au besoin si trop de données reçues
     switch (recv(soc, &b, 1, 0)) {
       //case 0: break;    // pas encore --> erreur (on attend)!
     case 1:

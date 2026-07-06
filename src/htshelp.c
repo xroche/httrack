@@ -227,8 +227,6 @@ void help_wizard(httrackp * opt) {
   strcatbuff(stropt2, str);
   strcatbuff(stropt2, projname);
   strcatbuff(stropt2, "\" ");
-  // Créer si ce n'est fait un index.html 1er niveau
-  make_empty_index(str);
   //
   printf("\n");
   printf("Enter URLs (separated by commas or blank spaces) :");
@@ -453,23 +451,6 @@ void help_catchurl(const char *dest_path) {
 #endif
   } else
     printf("Unable to create a temporary proxy (no remaining port)\n");
-}
-
-// Créer un index.html vide
-void make_empty_index(const char *str) {
-#if 0
-  if (!fexist(fconcat(str, "index.html"))) {
-    FILE *fp = fopen(fconcat(str, "index.html"), "wb");
-
-    if (fp) {
-      fprintf(fp, "<!-- " HTS_TOPINDEX " -->" CRLF);
-      fprintf(fp,
-              "<HTML><BODY>Index is empty!<BR>(File used to index all HTTrack projects)</BODY></HTML>"
-              CRLF);
-      fclose(fp);
-    }
-  }
-#endif
 }
 
 // mini-aide  (h: help)

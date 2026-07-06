@@ -171,7 +171,6 @@ HTSEXT_API const char* hts_version(void);
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
-//int HTS_TOTAL_RECV_CHECK(int var);
 LLint check_downloadable_bytes(int rate);
 
 HTSEXT_API int hts_uninit_module(void);

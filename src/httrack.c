@@ -773,28 +773,7 @@ static void sig_finish(int code) {      // finir et quitter
   fprintf(stderr, "\nExit requested to engine (signal %d)\n", code);
 }
 
-#ifdef _WIN32
-#if 0
-static void sig_ask(int code) { // demander
-  char s[256];
-
-  signal(code, sig_term);       // quitter si encore
-  printf("\nQuit program/Interrupt/Cancel? (Q/I/C) ");
-  fflush(stdout);
-  scanf("%s", s);
-  if ((s[0] == 'y') || (s[0] == 'Y') || (s[0] == 'o') || (s[0] == 'O')
-      || (s[0] == 'q') || (s[0] == 'Q'))
-    exit(0);                    // quitter
-  else if ((s[0] == 'i') || (s[0] == 'I')) {
-    if (global_opt != NULL) {
-      // ask for stop
-      global_opt->state.stop = 1;
-    }
-  }
-  signal(code, sig_ask);        // remettre signal
-}
-#endif
-#else
+#ifndef _WIN32
 static void sig_doback(int blind);
 static void sig_back(int code) {        // ignorer et mettre en backing 
   if (global_opt != NULL && !global_opt->background_on_suspend) {
@@ -808,36 +787,6 @@ static void sig_back(int code) {        // ignorer et mettre en backing
     sig_doback(0);
   }
 }
-
-#if 0
-static void sig_ask(int code) { // demander
-  char s[256];
-
-  signal(code, sig_term);       // quitter si encore
-  printf
-    ("\nQuit program/Interrupt/Background/bLind background/Cancel? (Q/I/B/L/C) ");
-  fflush(stdout);
-  scanf("%s", s);
-  if ((s[0] == 'y') || (s[0] == 'Y') || (s[0] == 'o') || (s[0] == 'O')
-      || (s[0] == 'q') || (s[0] == 'Q'))
-    exit(0);                    // quitter
-  else if ((s[0] == 'b') || (s[0] == 'B') || (s[0] == 'a') || (s[0] == 'A'))
-    sig_doback(0);              // arrière plan
-  else if ((s[0] == 'l') || (s[0] == 'L'))
-    sig_doback(1);              // arrière plan
-  else if ((s[0] == 'i') || (s[0] == 'I')) {
-    if (global_opt != NULL) {
-      // ask for stop
-      printf("finishing pending transfers.. please wait\n");
-      global_opt->state.stop = 1;
-    }
-    signal(code, sig_ask);      // remettre signal
-  } else {
-    printf("cancel..\n");
-    signal(code, sig_ask);      // remettre signal
-  }
-}
-#endif
 
 static void sig_brpipe(int code) {      // treat if necessary
   signal(code, sig_brpipe);
@@ -951,23 +900,12 @@ static void sig_leave(int code) {
 
 static void signal_handlers(void) {
 #ifdef _WIN32
-#if 0                           /* BUG366763 */
-  signal(SIGINT, sig_ask);      // ^C
-#else
   signal(SIGINT, sig_leave);    // ^C
-#endif
   signal(SIGTERM, sig_finish);  // kill <process>
 #else
-#if 0                           /* BUG366763 */
-  signal(SIGHUP, sig_back);     // close window
-#endif
   signal(SIGTSTP, sig_back);    // ^Z
   signal(SIGTERM, sig_finish);  // kill <process>
-#if 0                           /* BUG366763 */
-  signal(SIGINT, sig_ask);      // ^C
-#else
   signal(SIGINT, sig_leave);    // ^C
-#endif
   signal(SIGPIPE, sig_brpipe);  // broken pipe (write into non-opened socket)
   signal(SIGCHLD, sig_ignore);  // child change status
 #endif

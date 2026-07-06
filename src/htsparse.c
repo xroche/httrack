@@ -395,7 +395,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       // terminaison (" ou ') du "<body onLoad=.."
       int inscriptgen = 0;      // on est dans un code générant, ex après obj.write("..
 
-      //int inscript_check_comments=0, inscript_in_comments=0;    // javascript comments
       char scriptgen_q = '\0';  // caractère faisant office de guillemet (' ou ")
 
       //int no_esc_utf=0;      // ne pas echapper chars > 127
@@ -404,7 +403,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
       int parseall_lastc = '\0';        // dernier caractère parsé pour parseall
 
-      //int parseall_incomment=0;   // dans un /* */ (exemple: a = /* URL */ "img.gif";)
       //
       const char *intag_start = html;
       const char *intag_name = NULL;
@@ -687,7 +685,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           ) {
           intag = 1;
           intag_ctype = 0;
-          //parseall_incomment=0;
           //inquote=0;  // effacer quote
           intag_start = html;
           for(intag_name = html + 1; is_realspace(*intag_name); intag_name++) ;
@@ -1100,27 +1097,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (p) {
                         if (intag_ctype == 1) {
                           p = 0;
-#if 0
-                          //if ((pos=rech_tageq(html, "content"))) {
-                          char temp[256];
-                          char *token = NULL;
-                          int len = rech_endtoken(html + pos, &token);
-
-                          if (len > 0 && len < sizeof(temp) - 2) {
-                            char *chpos;
-
-                            temp[0] = '\0';
-                            strncat(temp, token, len);
-                            if ((chpos = strstr(temp, "charset"))
-                                && (chpos = strchr(chpos, '='))
-                              ) {
-                              chpos++;
-                              while(is_space(*chpos))
-                                chpod++;
-                              //chpos
-                            }
-                          }
-#endif
                         }
                         // <META HTTP-EQUIV="Refresh" CONTENT="3;URL=http://www.example.com">
                         else if (intag_ctype == 2) {
@@ -1305,21 +1281,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 } else if (inscript) {
 
-#if 0
-                  /* Check // javascript comments */
-                  if (*html == 10 || *html == 13) {
-                    inscript_check_comments = 1;
-                    inscript_in_comments = 0;
-                  } else if (inscript_check_comments) {
-                    if (!is_realspace(*html)) {
-                      inscript_check_comments = 0;
-                      if (html[0] == '/' && html[1] == '/') {
-                        inscript_in_comments = 1;
-                      }
-                    }
-                  }
-#endif
-
                   /* Parse */
                   assertf(inscript_name != NULL);
                   if (*html == '/'
@@ -1343,8 +1304,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         HT_ADD("<@@ /inscript @@>");
                       }
                     }
-                  } else if (inscript_state_pos ==
-                             INSCRIPT_START /*!inscript_in_comments */ ) {
+                  } else if (inscript_state_pos == INSCRIPT_START) {
                     /*
                        Script Analyzing - different types supported:
                        foo="url"
@@ -1551,25 +1511,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           // risque: générer de faux fichiers parazites
           // fix: ne parse plus dans les commentaires
           // ------------------------------------------------------------
-          if (opt->parseall && (opt->parsejava & HTSPARSE_NO_AGGRESSIVE) == 0 && (ptr > 0) && (!in_media) /* && (!inscript_in_comments) */ ) {  // option parsing "brut"
-            //int incomment_justquit=0;
+          if (opt->parseall && (opt->parsejava & HTSPARSE_NO_AGGRESSIVE) == 0 &&
+              (ptr > 0) && (!in_media)) { // option parsing "brut"
             if (!is_realspace(*html)) {
               int noparse = 0;
 
-              // Gestion des /* */
-#if 0
-              if (inscript) {
-                if (parseall_incomment) {
-                  if ((*html == '/') && (*(html - 1) == '*'))
-                    parseall_incomment = 0;
-                  incomment_justquit = 1;       // ne pas noter dernier caractère
-                } else {
-                  if ((*html == '/') && (*(html + 1) == '*'))
-                    parseall_incomment = 1;
-                }
-              } else
-                parseall_incomment = 0;
-#endif
               /* ensure automate state  0 (not in comments, quotes..) */
               if (inscript
                   && (inscript_state_pos != INSCRIPT_INQUOTE
@@ -1583,7 +1529,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               // recherche d'URLs
               if (!noparse) {
-                //if ((!parseall_incomment) && (!noparse)) {
                 if (!p) {       // non déja trouvé
                   if (html != r->adr) {  // >1 caractère
                     // scanner les chaines
@@ -1664,10 +1609,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (!invalid_url) {
                                 // Un plus à la fin? Alors ne pas prendre sauf si extension ("/toto.html#"+tag)
                                 if (c != '+') { // PAS de plus à la fin
-#if 0
-                                  char *a;
-#endif
-                                  // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)                                  
+                                  // "Comparisons of scheme names MUST be
+                                  // case-insensitive" (RFC2616)
                                   if ((strfield(tempo, "http:"))
                                       || (strfield(tempo, "ftp:"))
 #if HTS_USEOPENSSL
@@ -1680,15 +1623,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     if (inscript)       // sinon si pas javascript, méfiance (répertoire style base?)
                                       url_ok = 1;
                                   }
-#if 0
-                                  else if ((a = strchr(tempo, '/'))) {  // un slash: ok..
-                                    if (inscript) {     // sinon si pas javascript, méfiance (style "text/css")
-                                      if (strchr(a + 1, '/'))   // un seul / : abandon (STYLE type='text/css')
-                                        if (!strchr(tempo, ' '))        // avoid spaces (too dangerous for comments)
-                                          url_ok = 1;
-                                    }
-                                  }
-#endif
                                 }
                                 // Prendre si extension reconnue
                                 if (!url_ok) {
@@ -1767,9 +1701,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
                   }
-                }               // p == 0               
+                } // p == 0
 
-              }                 // not in comment
+              } // not in comment
 
               // plus dans un commentaire
               if (inscript_state_pos == INSCRIPT_START
@@ -1778,7 +1712,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
 
             }                   // if realspace
-          }                     // if parseall
+          } // if parseall
 
           // ------------------------------------------------------------
           // p!=0 : on a repéré un éventuel lien
@@ -3134,16 +3068,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     } // sinon le lien sera écrit normalement
 
-#if 0
-                    if (fexist(save)) { // le fichier existe..
-                      adr[0] = '\0';
-                      //if ((opt->debug>0) && (opt->log!=NULL)) {
-                      hts_log_print(opt, LOG_WARNING,
-                                    "Link has already been written on disk, cancelled: %s",
-                                    save);
-                    }
-#endif
-
                     /* Security check */
                     if (strlen(afs.save) >= HTS_URLMAXSIZE) {
                       afs.af.adr[0] = '\0';
@@ -4391,30 +4315,8 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       // prochain lien
       // ptr++;
 
-      return 2;                 // goto jump_if_done;
-
+      return 2; // goto jump_if_done;
     }
-#if 0
-    /* FIXME - finalized HAS NO MORE THIS MEANING */
-    /* link put in cache by the backing system for memory spare - reclaim */
-    else if (back[b].finalized) {
-      assertf(back[b].r.adr == NULL);
-      /* read file in cache */
-      back[b].r =
-        cache_read_ro(opt, cache, back[b].url_adr, back[b].url_fil,
-                      back[b].url_sav, back[b].location_buffer);
-      /* ensure correct location buffer set */
-      back[b].r.location = back[b].location_buffer;
-      if (back[b].r.statuscode == STATUSCODE_INVALID) {
-        hts_log_print(opt, LOG_ERROR,
-                      "Unexpected error: %s%s not found anymore in cache",
-                      back[b].url_adr, back[b].url_fil);
-      } else {
-        hts_log_print(opt, LOG_DEBUG, "reclaim file %s%s (%d)", back[b].url_adr,
-                      back[b].url_fil, back[b].r.statuscode);
-      }
-    }
-#endif
 
     if (!opt->verbosedisplay) {
       if (!opt->quiet) {
@@ -4867,13 +4769,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       /* 'no error page' selected or file discarded by size rules! */
       if (!opt->errpage || (in_error == STATUSCODE_TOO_BIG)) {
         /* Note: the cache 'cached_tests' system will remember this error, and we'll only issue ONE request */
-#if 0
-        /* No (3.43) - don't do that. We must not post-exclude an authorized link, because this will prevent the cache
-           system from processing it, leading to refetch it endlessly. Just accept it, and handle the error as
-           usual during parsing.
-         */
-        *forbidden_url = 1;     /* Forbidden! */
-#endif
+        /* Do not post-exclude the link here (*forbidden_url): the cache system
+           would never process it again, and it would be refetched endlessly */
         if (in_error == STATUSCODE_TOO_BIG) {
           hts_log_print(opt, LOG_INFO,
                         "link not taken because of its size (%d bytes) at %s%s",

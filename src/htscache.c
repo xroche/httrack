@@ -1574,25 +1574,10 @@ void cache_init(cache_back * cache, httrackp * opt) {
       mkdir(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"),
             HTS_PROTECT_FOLDER);
 #endif
-      if ((fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/new.zip")))) {       // il existe déja un cache précédent.. renommer
-        /* Previous cache from the previous cache version */
-#if 0
-        /* No.. reuse with old httrack releases! */
-        if (fexist
-            (fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.dat")))
-          remove(fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.dat"));
-        if (fexist
-            (fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-              "hts-cache/old.ndx")))
-          remove(fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.ndx"));
-#endif
+      if ((fexist(fconcat(
+              OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+              StringBuff(opt->path_log),
+              "hts-cache/new.zip")))) { // a previous cache exists.. rename it
         /* Previous cache version */
         if ((fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/new.dat"))) && (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/new.ndx")))) {     // il existe déja un cache précédent.. renommer
           rename(fconcat
@@ -1633,7 +1618,13 @@ void cache_init(cache_back * cache, httrackp * opt) {
         } else {
           hts_log_print(opt, LOG_DEBUG, "Cache: successfully renamed");
         }
-      } else if ((fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/new.dat"))) && (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache/new.ndx")))) {        // il existe déja un cache précédent.. renommer
+      } else if ((fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.dat"))) &&
+                 (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.ndx")))) { // a previous cache
+                                                           // exists.. rename it
 #if DEBUGCA
         printf("work with former cache\n");
 #endif
@@ -1662,7 +1653,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
                 "hts-cache/new.ndx"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                               StringBuff(opt->path_log),
                                               "hts-cache/old.ndx"));
-      } else {                  // un des deux (ou les deux) fichiers cache absents: effacer l'autre éventuel
+      } else { // one or both cache files missing: remove the remaining one
 #if DEBUGCA
         printf("new cache\n");
 #endif

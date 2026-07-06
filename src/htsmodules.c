@@ -55,12 +55,6 @@ extern int fspc(httrackp * opt, FILE * fp, const char *type);
 
 /* >>> Put all modules variables here */
 
-#if 0
-t_gzopen gzopen = NULL;
-t_gzread gzread = NULL;
-t_gzclose gzclose = NULL;
-#endif
-
 int V6_is_available = HTS_INET6;
 
 static char WHAT_is_available[64] = "";

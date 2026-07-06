@@ -2507,9 +2507,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     busy_state = busy_recv = 0;
 
-#if 0
-    check_rate(stat_timestart, opt->maxrate);   // vérifier taux de transfert
-#endif
     // inscrire les sockets actuelles, et rechercher l'ID la plus élevée
     FD_ZERO(&fds);
     FD_ZERO(&fds_c);
@@ -3824,29 +3821,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                     }
 
-/********** NO - must complete the body! ********** */
-#if 0
-                  } else if (HTTP_IS_REDIRECT(back[i].r.statuscode)
-                             || (back[i].r.statuscode == 412)
-                             || (back[i].r.statuscode == 416)
-                    ) {         // Ne pas prendre le html, erreurs connues et gérées
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W
-                      ("back_wait(301,302,303,307,412,416..): deletehttp\n");
-#endif
-                    // Couper connexion
-                    /*KA deletehttp(&back[i].r); back[i].r.soc=INVALID_SOCKET; */
-                    back_maydeletehttp(opt, cache, sback, i);
-
-                    back[i].status = STATUS_READY;      // terminé
-                    back_set_finished(sback, i);
-                    // finalize
-                    if (back[i].r.statuscode > 0) {
-                      hts_log_print(opt, LOG_TRACE, "finalizing redirect & 4xx");
-                      back_finalize(opt, cache, sback, i);
-                    }
-#endif
-/********** **************************** ********** */
                   }
                   // MIME type excluded by a -mime: filter: abort, don't fetch
                   // the body (#58)

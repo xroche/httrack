@@ -716,24 +716,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
-#else
-#if 0
-            char _args[8][256];
-            char *args[8];
-
-            printf("Cheking for updates...\n");
-            strcpybuff(_args[0], argv[0]);
-            strcpybuff(_args[1], "--get");
-            sprintf(_args[2], HTS_UPDATE_WEBSITE, 0, "");
-            strcpybuff(_args[3], "--quickinfo");
-            args[0] = _args[0];
-            args[1] = _args[1];
-            args[2] = _args[2];
-            args[3] = _args[3];
-            args[4] = NULL;
-            if (execvp(args[0], args) == -1) {
-            }
-#endif
 #endif
           }
           //

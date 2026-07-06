@@ -2347,12 +2347,6 @@ int httpmirror(char *url1, httrackp * opt) {
 
 */
 int engine_stats(void) {
-#if 0
-  static FILE *debug_fp = NULL; /* ok */
-
-  if (!debug_fp)
-    debug_fp = fopen("esstat.txt", "wb");
-#endif
   HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
   if (HTS_STAT.HTS_TOTAL_RECV > 2048) {
@@ -2363,10 +2357,6 @@ int engine_stats(void) {
       if ((cdif - HTS_STAT.istat_timestart[i]) >= 2000) {
         TStamp dif;
 
-#if 0
-        fprintf(debug_fp, "set timer %d\n", i);
-        fflush(debug_fp);
-#endif
         dif = cdif - HTS_STAT.istat_timestart[i];
         if ((TStamp) (dif / 1000) > 0) {
           LLint byt = (HTS_STAT.HTS_TOTAL_RECV - HTS_STAT.istat_bytes[i]);
@@ -2385,10 +2375,6 @@ int engine_stats(void) {
     // timer #0 resync timer #1 when reaching 1 second limit
     if (HTS_STAT.istat_reference01 != HTS_STAT.istat_timestart[0]) {
       if ((cdif - HTS_STAT.istat_timestart[0]) >= 1000) {
-#if 0
-        fprintf(debug_fp, "resync timer 1\n");
-        fflush(debug_fp);
-#endif
         HTS_STAT.istat_bytes[1] = HTS_STAT.HTS_TOTAL_RECV;
         HTS_STAT.istat_timestart[1] = cdif;
         HTS_STAT.istat_reference01 = HTS_STAT.istat_timestart[0];
@@ -3222,28 +3208,6 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
   return 0;
 }
 
-// vérifier taux de transfert
-#if 0
-void check_rate(TStamp stat_timestart, int maxrate) {
-  // vérifier taux de transfert (pas trop grand?)
-  /*
-     if (maxrate>0) {
-     int r = (int) (HTS_STAT.HTS_TOTAL_RECV/(time_local()-stat_timestart));    // taux actuel de transfert
-     HTS_STAT.HTS_TOTAL_RECV_STATE=0;
-     if (r>maxrate) {    // taux>taux autorisé
-     int taux = (int) (((TStamp) (r - maxrate) * 100) / (TStamp) maxrate);
-     if (taux<15)
-     HTS_STAT.HTS_TOTAL_RECV_STATE=1;   // ralentir un peu (<15% dépassement)
-     else if (taux<50)
-     HTS_STAT.HTS_TOTAL_RECV_STATE=2;   // beaucoup (<50% dépassement)
-     else
-     HTS_STAT.HTS_TOTAL_RECV_STATE=3;   // énormément (>50% dépassement)
-     }
-     }
-   */
-}
-#endif
-
 // ---
 // sous routines liées au moteur et au backing
 
@@ -3253,21 +3217,8 @@ int backlinks_done(const struct_back * sback,
                    int ptr) {
   int n = 0;
 
-#if 0
-  int i;
-
-  //Links done and stored in cache
-  for(i = ptr + 1; i < lien_tot; i++) {
-    if (heap(i)) {
-      if (heap(i)->pass2 == -1) {
-        n++;
-      }
-    }
-  }
-#else
   // finalized in background
   n += HTS_STAT.stat_background;
-#endif
   n += back_done_incache(sback);
   return n;
 }
