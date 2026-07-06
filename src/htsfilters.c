@@ -102,9 +102,8 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
 // cet algo est 'un peu' récursif mais ne consomme pas trop de tm
 // * = toute lettre
 // --?-- : spécifique à HTTrack et aux ?
-HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * size,
-                          int *size_flag) {
-  //int err=0;
+HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
+                                LLint *size, int *size_flag) {
   if (strnotempty(joker) == 0) {        // fin de chaine joker
     if (strnotempty(chaine) == 0)       // fin aussi pour la chaine: ok
       return chaine;
@@ -236,9 +235,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
                 for(j = (int) (unsigned char) joker[i];
                     j <= (int) (unsigned char) joker[i + 2]; j++)
                   pass[j] = 1;
-
               }
-              // else err=1;
               i += 3;
             } else { // 1 car, ex: *[ ]
               pass[(int) (unsigned char) joker[i]] = 1;
@@ -262,7 +259,6 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
       for(i = 0; i < 256; i++)
         pass[i] = 1;            // tout autoriser
       jmp = 1;
-      ////if (joker[2]==LEFT) jmp=3;        // permet de recher *<crochet ouvrant>
     }
 
     {

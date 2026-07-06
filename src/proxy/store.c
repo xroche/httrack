@@ -1035,7 +1035,6 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
       if (unzOpenCurrentFile(index->zFile) == Z_OK) {
         char headerBuff[8192 + 2];
         int readSizeHeader;
-        //int totalHeader = 0;
         int dataincache = 0;
 
         /* For BIG comments */
@@ -1074,9 +1073,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);      // last-modified
               ZIP_READFIELD_STRING(line, value, "Etag", r->etag);       // Etag
               ZIP_READFIELD_STRING(line, value, "Location", r->location);       // 'location' pour moved
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r->cdispo);      // Content-disposition
-              //ZIP_READFIELD_STRING(line, value, "X-Addr", ..);            // Original address
-              //ZIP_READFIELD_STRING(line, value, "X-Fil", ..);            // Original URI filename
+              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
+                                   r->cdispo); // Content-disposition
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);      // Original save filename
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
@@ -1090,8 +1088,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 strcat(r->headers, "\r\n");
               }
             }
-          } while(offset < readSizeHeader && !lineEof);
-          //totalHeader = offset;
+          } while (offset < readSizeHeader && !lineEof);
 
           /* Previous entry */
           if (previous_save_[0] != '\0') {
@@ -1202,7 +1199,6 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                       strcpy(r->msg, "Cache Read Error : Read Data");
                     } else
                       *(r->adr + r->size) = '\0';
-                    //printf(">%s status %d\n",back[p].r->contenttype,back[p].r->statuscode);
                   } else {      // erreur
                     r->statuscode = STATUSCODE_INVALID;
                     strcpy(r->msg, "Cache Memory Error");
@@ -1484,14 +1480,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
               a += cache_brstr(a, firstline);
               strcpy(cache->lastmodified, firstline);
             } else {
-              // fprintf(opt->errlog,"Cache: version 1.%d not supported, ignoring current cache"LF,cache->version);
               fclose(cache->dat);
               cache->dat = NULL;
               free(use);
               use = NULL;
             }
-          } else {              // non supporté
-            // fspc(opt->errlog,"error"); fprintf(opt->errlog,"Cache: %s not supported, ignoring current cache"LF,firstline);
+          } else { // non supporté
             fclose(cache->dat);
             cache->dat = NULL;
             free(use);
@@ -1500,7 +1494,6 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
           /* */
         } else {                // Vieille version du cache
           /* */
-          // hts_log_print(opt, LOG_WARNING, "Cache: importing old cache format");
           cache->version = 0;   // cache 1.0
           strcpy(cache->lastmodified, firstline);
         }

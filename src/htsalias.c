@@ -283,7 +283,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       char *position;
       int need_param = 1;
 
-      //int return_param=0;
       int pos;
 
       command[0] = param[0] = addcommand[0] = '\0';
@@ -361,7 +360,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
               strlcatbuff(return_argv[0], "0", return_argv_size);
             else if (strcmp(param, "on") == 0) {
               // on is the default
-              // strcatbuff(return_argv[0],"1");
             } else
               strlcatbuff(return_argv[0], param, return_argv_size);
           }

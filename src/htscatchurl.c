@@ -197,7 +197,6 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             htsblk blkretour;
 
             hts_init_htsblk(&blkretour);
-            //memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
             sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
@@ -207,8 +206,8 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
               strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
               strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
             }
-            // CR/LF final de l'en tête inutile car déja placé via la ligne vide juste au dessus
-            //strcatbuff(data,"\r\n");
+            // CR/LF final de l'en tête inutile car déja placé via la ligne vide
+            // juste au dessus
             if (blkretour.totalsize > 0) {
               int len = (int) min(blkretour.totalsize, 32000);
               int pos = (int) strlen(data);

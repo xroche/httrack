@@ -68,16 +68,6 @@ struct find_handle_struct {
   char path[2048];
 };
 #endif
-//#ifndef HTS_DEF_FWSTRUCT_topindex_chain
-//#define HTS_DEF_FWSTRUCT_topindex_chain
-//typedef struct topindex_chain topindex_chain;
-//#endif
-//struct topindex_chain {
-//  int level;                    /* sort level */
-//  char *category;               /* category */
-//  char name[2048];              /* path */
-//  struct topindex_chain *next;  /* next element */
-//};
 
 /* Tools */
 
@@ -293,7 +283,6 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   char BIGSTK newcurr_fil[HTS_URLMAXSIZE * 2], newlink[HTS_URLMAXSIZE * 2];
   char *curr;
 
-  //int n=0;
   char *a;
   int slash = 0;
 
@@ -338,7 +327,6 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
     if (*curr == '/')
       curr++;
     l = link;
-    //c=curr;
     // couper ce qui est commun
     while((streql(*link, *curr)) && (*link != 0)) {
       link++;
@@ -350,8 +338,6 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
       link--;
       curr--;
     }
-    //if (*link=='/') link++;
-    //if (*curr=='/') curr++;
   }
 
   // calculer la profondeur du répertoire courant et remonter
@@ -362,7 +348,6 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   while(*a)
     if (*(a++) == '/')
       strlcatbuff(s, "../", ssize);
-  //if (strlen(s)==0) strcatbuff(s,"/");
 
   if (slash)
     strlcatbuff(s, "/", ssize); // keep it absolute!

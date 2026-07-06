@@ -142,8 +142,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   char keyword[KEYW_LEN + 32];
   int i = 0;
 
-  //
-  //int WordIndexSize = 1024;
   coucal WordIndexHash = NULL;
   FILE *tmpfp = NULL;
 
@@ -178,8 +176,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
              || (strfield2(mime, "text/css"))
     ) {
     inscript = 1;
-    //} else if (strfield2(mime, "text/vnd.wap.wml")) {   // humm won't work in many cases
-    //  inscript=0;
   } else
     return 0;
 
@@ -275,8 +271,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Process indexing for this page
   {
-    //FILE* fp=NULL;
-    //fp=fopen(concat(indexpath,"index.txt"),"ab");
     if (fp_tmpproject) {
       while(!feof(tmpfp)) {
         char line[KEYW_LEN + 32];
@@ -286,7 +280,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           intptr_t e = 0;
 
           if (coucal_read(WordIndexHash, line, &e)) {
-            //if (e) {
             char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
             e++;                /* 0 means "once" */
@@ -300,11 +293,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
             fprintf(fp_tmpproject, "%s %d %s\n", line,
                     (int) (KEYW_SORT_MAXCOUNT - e), savelst);
             hts_primindex_size++;
-            //}
           }
         }
       }
-      //fclose(fp);
     }
   }
 
@@ -330,7 +321,6 @@ void index_finish(const char *indexpath, int mode) {
   off_t size = fpsize(fp_tmpproject);
 
   if (size > 0) {
-    //FILE* fp=fopen(concat(indexpath,"index.txt"),"rb");
     if (fp_tmpproject) {
       tab = (char **) malloct(sizeof(char *) * (hts_primindex_size + 2));
       if (tab) {
@@ -398,8 +388,6 @@ void index_finish(const char *indexpath, int mode) {
                       if (total_hit) {
                         if (mode == 1)  // TEXT
                           fprintf(fp, "\t=%d\r\n", total_hit);
-                        //else                // HTML
-                        //  fprintf(fp,"<br>(%d total hits)\r\n",total_hit);
                         if ((((total_hit * 1000) / hts_primindex_words) >=
                              KEYW_USELESS1K)
                             || (((total_line * 1000) / index) >=
@@ -416,8 +404,6 @@ void index_finish(const char *indexpath, int mode) {
                           if (mode == 1)        // TEXT
                             fprintf(fp, "\t(%d)\r\n",
                                     ((total_hit * 1000) / hts_primindex_words));
-                          //else                // HTML
-                          //  fprintf(fp,"(%d)\r\n",((total_hit*1000)/hts_primindex_words));
                         }
                       }
                       if (mode == 1)    // TEXT

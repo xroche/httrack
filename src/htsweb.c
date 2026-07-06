@@ -639,8 +639,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
           for(_i = 0 + k; (_i < max(back_max * k, 1)) && (index < NStatsBuffer); _i++) {        // no lien
             int i = (back_index + _i) % back_max;       // commencer par le "premier" (l'actuel)
 
-            if (back[i].status >= 0) {  // signifie "lien actif"
-              // int ok=0;  // OPTI
+            if (back[i].status >= 0) { // signifie "lien actif"
               ok = 0;
               switch (j) {
               case 0:          // prioritaire

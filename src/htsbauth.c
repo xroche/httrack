@@ -107,7 +107,6 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
 #if DEBUG_COOK
   printf("add_new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
          cook_name, cook_value, domain, path);
-  //printf(">>>cook: %s<<<\n",cookie->data);
 #endif
   return 0;
 }
@@ -207,8 +206,6 @@ char *cookie_nextfield(char *a) {
 int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
   char catbuff[CATBUFF_SIZE];
   char buffer[8192];
-
-  //  cookie->data[0]='\0';
 
   // Fusionner d'abord les éventuels cookies IE
 #ifdef _WIN32

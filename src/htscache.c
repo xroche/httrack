@@ -265,8 +265,6 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   char BIGSTK headers[8192];
   int headersSize = 0;
 
-  //int entryBodySize = 0;
-  //int entryFilenameSize = 0;
   zip_fileinfo fi;
   const char *url_save_suffix = url_save;
   int zErr;
@@ -358,8 +356,6 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);    // Original address
   ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);     // Original URI filename
   ZIP_FIELD_STRING(headers, headersSize, "X-Save", url_save_suffix);    // Original save filename
-
-  //entryFilenameSize = (int) ( strlen(url_adr) + strlen(url_fil));
 
   /* Filename */
   if (!link_has_authority(url_adr)) {
@@ -725,7 +721,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
         char BIGSTK headerBuff[8192 + 2];
         int readSizeHeader;
 
-        //int totalHeader = 0;
         int dataincache = 0;
 
         /* For BIG comments */
@@ -776,13 +771,10 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                    HTS_URLMAXSIZE * 2);
               ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo,
                                    sizeof(r.cdispo));
-              //ZIP_READFIELD_STRING(line, value, "X-Addr", ..);            // Original address
-              //ZIP_READFIELD_STRING(line, value, "X-Fil", ..);            // Original URI filename
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
             }
-          } while(offset < readSizeHeader && !lineEof);
-          //totalHeader = offset;
+          } while (offset < readSizeHeader && !lineEof);
 
           /* Previous entry */
           if (previous_save_[0] != '\0') {
@@ -964,7 +956,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg,
                              "Cache Write Error : Unable to Create File");
-                  //printf("%s\n",save);
                 }
               }
 
@@ -1042,7 +1033,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                     strcpybuff(r.msg, "Cache Read Error : Read Data");
                   } else
                     *(r.adr + r.size) = '\0';
-                  //printf(">%s status %d\n",back[p].r.contenttype,back[p].r.statuscode);
                 } else {        // erreur
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg, "Cache Memory Error");
@@ -1221,17 +1211,14 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
         // sécurité
         r.adr = NULL;
         r.out = NULL;
-        ////r.location=NULL;  non, fixée lors des 301 ou 302
         r.fp = NULL;
 
         if ((r.statuscode >= 0) && (r.statuscode <= 999)
             && (r.notmodified >= 0) && (r.notmodified <= 9)) {  // petite vérif intégrité
-          if ((save) && (!header_only)) {       /* ne pas lire uniquement header */
-            //int to_file=0;
+          if ((save) && (!header_only)) { /* ne pas lire uniquement header */
 
             r.adr = NULL;
             r.soc = INVALID_SOCKET;
-            // // r.location=NULL;
 
 #if HTS_DIRECTDISK
             // Court-circuit:
@@ -1240,12 +1227,11 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
               int ok = 0;
 
               r.is_write = 1;   // écrire
-              if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {  // un fichier existe déja
-                //if (fsize_utf8(fconv(save))==r.size) {  // même taille -- NON tant pis (taille mal declaree)
+              if (fexist_utf8(fconv(catbuff, sizeof(catbuff),
+                                    save))) { // un fichier existe déja
                 ok = 1;         // plus rien à faire
                 filenote(&opt->state.strc, save, NULL); // noter comme connu
                 file_notify(opt, adr, fil, save, 0, 0, 0);
-                //}
               }
 
               if ((pos < 0) && (!ok)) { // Pas de donnée en cache et fichier introuvable : erreur!
@@ -1296,7 +1282,6 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg,
                              "Cache Write Error : Unable to Create File");
-                  //printf("%s\n",save);
                 }
               }
 
@@ -1344,14 +1329,13 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
                     strcpybuff(r.msg, "Cache Read Error : Read Data");
                   } else
                     *(r.adr + r.size) = '\0';
-                  //printf(">%s status %d\n",back[p].r.contenttype,back[p].r.statuscode);
                 } else {        // erreur
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg, "Cache Memory Error");
                 }
               }
             }
-          }                     // si save==null, ne rien charger (juste en tête)
+          } // si save==null, ne rien charger (juste en tête)
         } else {
 #if DEBUGCA
           printf("Cache Read Error : Bad Data");
@@ -2022,12 +2006,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
                    "hts-cache/new.lst"), "wb");
           strcpybuff(opt->state.strc.path, StringBuff(opt->path_html));
           opt->state.strc.lst = cache->lst;
-          //{
-          //filecreate_params tmp;
-          //strcpybuff(tmp.path,StringBuff(opt->path_html));    // chemin
-          //tmp.lst=cache->lst;                 // fichier lst
-          //filenote("",&tmp);        // initialiser filecreate
-          //}
 
           // supprimer old.txt
           if (fexist
@@ -2116,12 +2094,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
                    "hts-cache/new.lst"), "wb");
           strcpybuff(opt->state.strc.path, StringBuff(opt->path_html));
           opt->state.strc.lst = cache->lst;
-          //{
-          //  filecreate_params tmp;
-          //  strcpybuff(tmp.path,StringBuff(opt->path_html));    // chemin
-          //  tmp.lst=cache->lst;                 // fichier lst
-          //  filenote("",&tmp);        // initialiser filecreate
-          //}
 
           // supprimer old.txt
           if (fexist
@@ -2153,8 +2125,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
                     "statuscode\tstatus ('servermsg')\tMIME\tEtag|Date\tURL\tlocalfile\t(from URL)"
                     LF);
           }
-          // test
-          // cache_writedata(cache->ndx,cache->dat,"//[TEST]//","test1","TEST PIPO",9);
         }                       // cache->ndx!=NULL
       }                         //cache->zipOutput != NULL
 

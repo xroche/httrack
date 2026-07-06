@@ -333,12 +333,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
   T_SOC socICP = smallserver_init(proxyAddr, icpPort, SOCK_DGRAM);
 
   if (soc != INVALID_SOCKET && socICP != INVALID_SOCKET) {
-    //char url[HTS_URLMAXSIZE * 2];
-    //char method[32];
-    //char data[32768];
 
-    //url[0] = method[0] = data[0] = '\0';
-    //
     printf("HTTP Proxy installed on %s:%d/\n", proxyAddr, proxyPort);
     printf("ICP Proxy installed on %s:%d/\n", icpAddr, icpPort);
 #ifndef _WIN32
@@ -943,7 +938,6 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     char *command;
     char *proto;
     char *surl;
-    //int directHit = 0;
     int headRequest = 0;
     int listRequest = 0;
 
@@ -1085,10 +1079,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
       /* Post-process request */
       if (link_has_authority(surl)) {
-        if (strncasecmp
-            (surl, "http://proxytrack/",
-             sizeof("http://proxytrack/") - 1) == 0) {
-          //directHit = 1;        /* Another direct hit hack */
+        if (strncasecmp(surl, "http://proxytrack/",
+                        sizeof("http://proxytrack/") - 1) == 0) {
         }
         StringCopy(url, surl);
       } else {
@@ -1109,7 +1101,6 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
               toHit += 7;
             }
             /* Direct hit */
-            //directHit = 1;
             StringCopy(url, "");
             if (!link_has_authority(toHit))
               StringCat(url, "http://");
@@ -1120,7 +1111,6 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             const char *toHit = surl + sizeof("/proxytrack/") - 1;
 
             /* Direct hit */
-            //directHit = 1;
             StringCopy(url, "");
             if (!link_has_authority(toHit))
               StringCat(url, "http://");
@@ -1604,10 +1594,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         unsigned char Opcode = buffer[0];
         unsigned char Version = buffer[1];
         unsigned short Message_Length = READ_NET16(&buffer[2]);
-        unsigned int Request_Number = READ_NET32(&buffer[4]);   /* Session ID */
-        //unsigned int Options = READ_NET32(&buffer[8]);
-        //unsigned int Option_Data = READ_NET32(&buffer[12]);     /* ICP_FLAG_SRC_RTT */
-        //unsigned int Sender_Host_Address = READ_NET32(&buffer[16]);     /* ignored */
+        unsigned int Request_Number = READ_NET32(&buffer[4]); /* Session ID */
         unsigned char *Payload = &buffer[20];
 
         buffer[bufferSize] = '\0';      /* Ensure payload is NULL terminated */

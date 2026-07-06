@@ -1332,8 +1332,7 @@ int url_savename(lien_adrfilsave *const afs,
 
     while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
-    if (*a != '.') {            // agh pas de point
-      //strcatbuff(save,".none");                 // a éviter
+    if (*a != '.') {                         // agh pas de point
       strcatbuff(afs->save, ".html");        // préférable!
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_complete, fil_complete, afs->save);
@@ -1471,17 +1470,6 @@ int url_savename(lien_adrfilsave *const afs,
   fil_simplifie(afs->save);
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
-  //if (charset != NULL && charset[0] != '\0') {
-  //  char *const s = hts_convertStringToUTF8(save, (int) strlen(save), charset);
-
-  //  if (s != NULL) {
-  //    hts_log_print(opt, LOG_DEBUG,
-  //                  "engine: save-name: charset conversion from '%s' to '%s' using charset '%s'",
-  //                  save, s, charset);
-  //    strcpybuff(save, s);
-  //    free(s);
-  //  }
-  //}
 
   /* callback */
   RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
@@ -1629,10 +1617,6 @@ int url_savename(lien_adrfilsave *const afs,
         int sameAdr = (strfield2(heap(i)->adr, normadr) != 0);
         int sameFil;
 
-        // NO - URL hack is only for stripping // and www.
-        //if (opt->urlhack != 0)
-        //  sameFil = ( strfield2(heap(i)->fil, normfil) != 0);
-        //else
         sameFil = (strcmp(heap(i)->fil, normfil) == 0);
         if (sameAdr && sameFil) {       // ok c'est le même lien, adresse déja définie
           /* Take the existing name not to screw up with cAsE sEnSiTiViTy of Linux/Unix */
@@ -1698,17 +1682,13 @@ int url_savename(lien_adrfilsave *const afs,
 
           strcpybuff(afs->save, tempo);
 
-          //printf("switched: %s\n",save);
-
         }                       // if
       }
 #if DEBUG_SAVENAME
       printf("\nEnd search, %s\n", fil_complete);
 #endif
-    } while(!nom_ok);
-
+    } while (!nom_ok);
   }
-  //printf("'%s' %s %s\n",save,adr,fil);
 
   return 0;
 }

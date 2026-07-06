@@ -188,12 +188,10 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
   /* Doit-on traiter les non html? */
   if ((opt->getmode & HTS_GETMODE_NONHTML) == 0) { // non on ne doit pas
-    if (!ishtml(opt, fil)) {    // non il ne faut pas
-      //adr[0]='\0';    // ne pas traiter ce lien, pas traiter
+    if (!ishtml(opt, fil)) {                       // non il ne faut pas
       forbidden_url = 1;        // interdire récupération du lien
       hts_log_print(opt, LOG_DEBUG, "non-html file ignored at %s : %s", adr,
                     fil);
-
     }
   }
 
@@ -352,7 +350,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
   } else {                      // adresse différente, sortir?
 
-    //if (!opt->wizard) {    // mode non wizard
     // doit-on traiter ce lien?.. vérifier droits de sortie
     switch ((opt->travel & HTS_TRAVEL_SCOPE_MASK)) {
     case HTS_TRAVEL_SAME_ADDRESS:
@@ -380,7 +377,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       if ((i > 0) && (j > 0)) {
         if (!strfield2(adr + i, urladr() + j)) { // !=
           if (!opt->wizard) {                    // mode non wizard
-            // printf("refused: %s\n",adr);
             forbidden_url = 1; // pas même domaine
             hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
                           adr, fil);
@@ -408,7 +404,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       if ((i > 0) && (j > 0)) {
         if (!strfield2(adr + i, urladr() + j)) { // !-
           if (!opt->wizard) {                    // mode non wizard
-            // printf("refused: %s\n",adr);
             forbidden_url = 1; // pas même .xx
             hts_log_print(opt, LOG_DEBUG,
                           "foreign location link canceled: %s%s", adr, fil);
@@ -439,7 +434,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   // récupérer les liens à côtés d'un lien (nearlink) (nvelle pos)
   if (forbidden_url != 0 && opt->nearlink) {
     if (!ishtml(opt, fil)) {    // non html
-      //printf("ok %s%s\n",ad,fil);
       forbidden_url = 0;        // autoriser
       may_set_prio_to = 1 + 1;  // set prio to 1 (parse but skip urls) if near is the winner
       hts_log_print(opt, LOG_DEBUG, "near link authorized: %s%s", adr, fil);
@@ -887,7 +881,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         }
       }
     }
-    //adr[0]='\0';  // cancel
   }
   // -------------------- FINAL PHASE --------------------
   // Test if the "Near" test won

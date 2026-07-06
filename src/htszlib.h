@@ -36,7 +36,6 @@ Please visit our Website: http://www.httrack.com
 
 /* ZLib */
 #include "zlib.h"
-//#include "zutil.h"
 
 /* MiniZip */
 #include "minizip/zip.h"

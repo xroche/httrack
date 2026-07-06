@@ -152,16 +152,6 @@ void help_wizard(httrackp * opt) {
 #define str (buffers->str)
 #define argv (buffers->argv)
 
-  //char *urls = (char *) malloct(HTS_URLMAXSIZE * 2);
-  //char *mainpath = (char *) malloct(256);
-  //char *projname = (char *) malloct(256);
-  //char *stropt = (char *) malloct(2048);        // options
-  //char *stropt2 = (char *) malloct(2048);       // options longues
-  //char *strwild = (char *) malloct(2048);       // wildcards
-  //char *cmd = (char *) malloct(4096);
-  //char *str = (char *) malloct(256);
-  //char **argv = (char **) malloct(256 * sizeof(char *));
-
   //
   char *a;
 
@@ -347,8 +337,6 @@ void help_wizard(httrackp * opt) {
       }
       hts_main(argc, argv);
     }
-    //} else {
-    //  help("httrack",1);
   }
 
   /* Free buffers */
@@ -789,7 +777,4 @@ void help(const char *app, int more) {
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
 #endif
   infomsg(NULL);
-
-//  infomsg("  R  *relative links (e.g ../link)\n");
-//  infomsg("  A   absolute links (e.g /www.adr/link)\n");
 }

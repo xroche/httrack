@@ -55,8 +55,6 @@ Please visit our Website: http://www.httrack.com
 // inline function in Wspiapi.h.
 #include <ws2tcpip.h>
 #include <Wspiapi.h>
-// #include <winsock2.h>
-// #include <tpipv6.h>
 
 #endif
 

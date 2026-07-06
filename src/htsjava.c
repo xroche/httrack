@@ -175,15 +175,14 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
 #if JAVADEBUG
       printf("fopen\n");
 #endif
-      if ((fpout = FOPEN(fconv(catbuff, sizeof(catbuff), file), "r+b")) == NULL) {
-        //fprintf(stderr, "Cannot open input file.\n");
+      if ((fpout = FOPEN(fconv(catbuff, sizeof(catbuff), file), "r+b")) ==
+          NULL) {
         sprintf(str->err_msg, "Unable to open file %s", file);
         return 0;               // une erreur..
       }
 #if JAVADEBUG
       printf("fread\n");
 #endif
-      //if (fread(&header,1,sizeof(JAVA_HEADER),fpout) != sizeof(JAVA_HEADER)) {   // pas complet..
       if (fread(&header, 1, 10, fpout) != 10) { // pas complet..
         fclose(fpout);
         sprintf(str->err_msg, "File header too small (file len = " LLintP ")",
@@ -257,12 +256,10 @@ static int hts_parse_java(t_hts_callbackarg * carg, httrackp * opt,
       printf("addfiles\n");
 #endif
       {
-        //unsigned int acess;
         unsigned int Class;
         unsigned int SClass;
         int i;
 
-        //acess = readshort(fpout);
         Class = readshort(fpout);
         SClass = readshort(fpout);
 
@@ -407,11 +404,9 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
 
       p = &buffer[0];
 
-      //fflush(fp); 
       trans.file_position = ftell(fp);
       length = readshort(fp);
       if (length < HTS_URLMAXSIZE) {
-        // while ((length > 0) && (length<500)) {
         while(length > 0) {
           *p++ = fgetc(fp);
 
@@ -419,17 +414,13 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
         }
         *p = '\0';
 
-        //#if JDEBUG
-        //      if(tris(buffer)==1) printf("%s\n ",buffer);
-        //      if(tris(buffer)==2)  printf("%s\n ",printname(buffer));
-        //#endif
         if (tris(str->opt, buffer) == 1)
           str->addLink(str, buffer);    /* trans.file_position */
         else if (tris(str->opt, buffer) == 2)
           str->addLink(str, printname(rname, buffer));
 
         strcpy(trans.name, buffer);
-      } else {                  // gros pb
+      } else { // gros pb
         while((length > 0) && (!feof(fp))) {
           fgetc(fp);
           length--;
@@ -445,7 +436,6 @@ static RESP_STRUCT readtable(htsmoduleStruct * str, FILE * fp,
     }
     break;
   default:
-    // printf("Type inconnue\n");
     // on arrête tout 
     sprintf(str->err_msg, "Internal structure unknown (type %d)", trans.type);
     *error = 1;
@@ -508,7 +498,6 @@ static char *printname(char rname[1024], char name[1024]) {
     return rname;  // ""
   }
   p += 2;
-  //rname=(char*)calloct(strlen(name)+8,sizeof(char));
   p1 = rname;
   for(j = 0; name[j] != '\0'; j++, p++) {
     if (*p == '/')

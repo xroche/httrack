@@ -106,18 +106,6 @@ int hts_parse_externals(htsmoduleStruct * str) {
   return -1;
 }
 
-//static void addCallback(htscallbacks* chain, void* moduleHandle, htscallbacksfncptr exitFnc) {
-//  while(chain->next != NULL) {
-//    chain = chain->next;
-//  }
-//  chain->next = calloct(1, sizeof(htscallbacks));
-//  assertf(chain->next != NULL);
-//  chain = chain->next;
-//  memset(chain, 0, sizeof(*chain));
-//  chain->exitFnc = exitFnc;
-//  chain->moduleHandle = moduleHandle;
-//}
-
 void clearCallbacks(htscallbacks * chain_);
 void clearCallbacks(htscallbacks * chain_) {
   htscallbacks *chain;
