@@ -105,7 +105,6 @@ typedef struct htsfilters htsfilters;
 struct htsfilters {
   char ***filters; /**< pointer to the +/-pattern filter array */
   int *filptr;     /**< pointer to the current filter count */
-  // int*    filter_max;
 };
 
 /* User callbacks chain */
@@ -440,7 +439,6 @@ struct httrackp {
   float maxconn;          /**< max connections per second */
   int waittime;           /**< scheduled start time (wall-clock seconds) */
   hts_cachemode cache;    /**< cache generation mode */
-  // int aff_progress;     // progress bar
   hts_boolean shell; /**< driven by a shell over stdin/stdout pipes */
   t_proxy proxy;     /**< proxy configuration */
   hts_savename_83
@@ -492,7 +490,6 @@ struct httrackp {
   hts_verbosedisplay verbosedisplay; /**< animated text progress display */
   String footer; /**< footer/info line injected into pages */
   int maxcache;  /**< in-memory cache backing limit (bytes) */
-  // int maxcache_anticipate; // maximum links to anticipate (upper bound)
   hts_boolean ftp_proxy;    /**< use the HTTP proxy for FTP too */
   String filelist;          /**< file listing URLs to include */
   String urllist;           /**< file listing filters to include */
@@ -549,8 +546,6 @@ typedef struct hts_stat_struct hts_stat_struct;
 struct hts_stat_struct {
   LLint HTS_TOTAL_RECV; /**< total bytes received from the network */
   LLint stat_bytes;     /**< total bytes written to disk */
-  // int HTS_TOTAL_RECV_STATE;  // status: 0 ok 1: slow down a little 2: slow
-  // down 3: a lot
   TStamp stat_timestart; /**< mirror start time */
   //
   LLint total_packed;    /**< compressed bytes received (on the wire) */
@@ -682,7 +677,6 @@ struct lien_url {
   int depth;        /**< remaining allowed depth; >0 strong, 0 weak */
   int pass2;        /**< second-pass marker; -1 means handled in background */
   char link_import; /**< imported after a move; skip the usual up/down rules */
-  // int moved;          // pointer to moved
   int retry;    /**< remaining retries */
   int testmode; /**< test only: send just a HEAD */
 };
@@ -727,9 +721,6 @@ struct lien_back {
   LLint chunk_size; /**< size of the chunk being loaded */
   LLint chunk_blocksize; /**< data size declared by the chunk */
   LLint compressed_size; /**< compressed size (stats only) */
-  //
-  // int links_index;        // to access liens[links_index]
-  //
   char info[256]; /**< status text, e.g. for FTP */
   int stop_ftp;   /**< stop flag for FTP */
   int finalized;  /**< finalized (memory optimization) */

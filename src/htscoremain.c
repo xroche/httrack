@@ -145,7 +145,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char *url = NULL;             // URLS séparées par un espace
   int url_sz = 65535;
 
-  //char url[65536];         // URLS séparées par un espace
   // the parametres
   int httrack_logmode = 3;      // ONE log file
 
@@ -290,12 +289,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (tmp_argc == 1) {    /* pas -P & co */
           if (!cmdl_opt(tmp_argv[0])) { /* pas -c0 & co */
             if (argv_url < 0)
-              argv_url = 0;     // -1==force -> 1=one url already detected, wipe all previous options
-            //if (argv_url>=0) {
+              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
+                            // previous options
             argv_url++;
             if (!argv_firsturl)
               argv_firsturl = x_argv[x_argc - 1];
-            //}
           } else {
             if (strcmp(tmp_argv[0], "-h") == 0) {
               help(argv[0], !opt->quiet);
@@ -324,8 +322,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         } else if (tmp_argc == 2) {
           if ((strcmp(tmp_argv[0], "-%L") == 0)) {      // liste d'URLs
             if (argv_url < 0)
-              argv_url = 0;     // -1==force -> 1=one url already detected, wipe all previous options
-            //if (argv_url>=0)
+              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
+                            // previous options
             argv_url++;         /* forcer */
           }
         }
@@ -403,15 +401,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     else
                       inQuote = 1;
                   } else if (!inQuote && !noDbl && argv[na][i] == ',') {
-                    //StringAddchar(path, '\0');
-                    //j = 0;
                     path = &opt->path_log;
                   } else {
                     StringAddchar(*path, argv[na][i]);
-                    //path[j++] = argv[na][i];
                   }
                 }
-                //path[j++] = '\0';
                 if (StringLength(opt->path_log) == 0) {
                   StringCopyS(opt->path_log, opt->path_html);
                 }
@@ -420,7 +414,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 if (check_path(&opt->path_html, argv_firsturl)) {
                   opt->dir_topindex = 1;        // rebuilt top index
                 }
-                //printf("-->%s\n%s\n",StringBuff(opt->path_html),StringBuff(opt->path_log));                
               }
               break;
             }                   // switch
@@ -539,8 +532,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             insert_after++;
           }
         }
-      } while(lastp != NULL);
-      //fclose(fp);
+      } while (lastp != NULL);
     }
   }
 
@@ -716,24 +708,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
-#else
-#if 0
-            char _args[8][256];
-            char *args[8];
-
-            printf("Cheking for updates...\n");
-            strcpybuff(_args[0], argv[0]);
-            strcpybuff(_args[1], "--get");
-            sprintf(_args[2], HTS_UPDATE_WEBSITE, 0, "");
-            strcpybuff(_args[3], "--quickinfo");
-            args[0] = _args[0];
-            args[1] = _args[1];
-            args[2] = _args[2];
-            args[3] = _args[3];
-            args[4] = NULL;
-            if (execvp(args[0], args) == -1) {
-            }
-#endif
 #endif
           }
           //
@@ -750,103 +724,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
     }
   }
-
-  // Compter urls/jokers
-  /*
-     if (argv_url<=0) { 
-     int na;
-     argv_url=0;
-     for(na=1;na<argc;na++) {
-     if ( (strcmp(argv[na],"-P")==0) || (strcmp(argv[na],"-N")==0) || (strcmp(argv[na],"-F")==0) || (strcmp(argv[na],"-O")==0) || (strcmp(argv[na],"-V")==0) ) {
-     na++;    // sauter nom de proxy
-     } else if (!cmdl_opt(argv[na])) { 
-     argv_url++;   // un de plus       
-     } else if (strcmp(argv[na],"-h")==0) {
-     help(argv[0],!opt->quiet);
-     htsmain_free();
-     return 0;
-     } else {
-     if ((strchr(argv[na],'q')!=NULL))
-     opt->quiet=1;    // ne pas poser de questions! (nohup par exemple)
-     if ((strchr(argv[na],'i')!=NULL)) {  // doit.log!
-     argv_url=0;
-     na=argc;
-     }
-     }
-     }
-     }  
-   */
-
-  // Ici on ajoute les arguments qui ont été appelés avant au cas où on récupère une session
-  // Exemple: httrack www.truc.fr -L0 puis ^C puis httrack sans URL : ajouter URL précédente
-  /*
-     if (argv_url==0) {
-     //if ((fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.dat"))) && (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/new.ndx")))) {  // il existe déja un cache précédent.. renommer
-     if (fexist(fconcat(StringBuff(opt->path_log),"hts-cache/doit.log"))) {    // un cache est présent
-
-     x_argvblk=(char*) calloct(32768,1);
-
-     if (x_argvblk!=NULL) {
-     FILE* fp;
-     int x_argc;
-
-     //strcpybuff(x_argvblk,"httrack ");
-     fp=fopen(fconcat(StringBuff(opt->path_log),"hts-cache/doit.log"),"rb");
-     if (fp) {
-     linput(fp,x_argvblk+strlen(x_argvblk),8192);
-     fclose(fp); fp=NULL;
-     }
-
-     // calculer arguments selon derniers arguments
-     x_argv[0]=argv[0];
-     x_argc=1;
-     {
-     char* p=x_argvblk;
-     do {
-     x_argv[x_argc++]=p;
-     //p=strstr(p," ");
-     // exemple de chaine: "echo \"test\"" c:\a "\$0"
-     p=next_token(p,1);    // prochain token
-     if (p) {
-     *p=0;    // octet nul (tableau)
-     p++;
-     }            
-     } while(p!=NULL);
-     }
-     // recopier arguments actuels (pointeurs uniquement)
-     {
-     int na;
-     for(na=1;na<argc;na++) {
-     if (strcmp(argv[na],"-O") != 0)    // SAUF le path!
-     x_argv[x_argc++]=argv[na];
-     else
-     na++;
-     }
-     }
-     argc=x_argc;      // nouvel argc
-     argv=x_argv;      // nouvel argv
-     }
-
-     }
-     //}
-     }
-   */
-
-  // Vérifier quiet
-  /*
-     { 
-     int na;    
-     for(na=1;na<argc;na++) {
-     if (!cmdl_opt(argv[na])) { 
-     if ((strcmp(argv[na],"-P")==0) || (strcmp(argv[na],"-N")==0) || (strcmp(argv[na],"-F")==0) || (strcmp(argv[na],"-O")==0) || (strcmp(argv[na],"-V")==0))
-     na++;    // sauter nom de proxy
-     } else {
-     if ((strchr(argv[na],'q')!=NULL) || (strchr(argv[na],'i')!=NULL))
-     opt->quiet=1;    // ne pas poser de questions! (nohup par exemple)
-     }
-     }
-     }
-   */
 
   /* Engine self-tests: -#test lists them, -#test=NAME [args] runs one. Handled
      here, ahead of the no-URL usage gate below, so they need no dummy URL. */
@@ -954,8 +831,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   } else {                      // plus de 2 paramètres
     // un fichier log existe?
     if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-      StringBuff(opt->path_log), "hts-in_progress.lock"))) {        // fichier lock?
-      //char s[32];
+                       StringBuff(opt->path_log),
+                       "hts-in_progress.lock"))) { // fichier lock?
 
       opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
       if (opt->quiet == 0) {
@@ -986,11 +863,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           }
         }
       }
-    } else
-      if (fexist
-          (fconcat
-           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html), "index.html"))) {
-      //char s[32];
+    } else if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_html), "index.html"))) {
       opt->cache = HTS_CACHE_TEST_UPDATE;
       if (opt->quiet == 0) {
         if ((fexist
@@ -1085,7 +959,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             //
           case 'g':            // récupérer un (ou plusieurs) fichiers isolés
             opt->wizard = HTS_WIZARD_AUTO;
-            //opt->wizard=0;             // pas de wizard
             opt->cache = HTS_CACHE_NONE; // ni de cache
             opt->makeindex = 0; // ni d'index
             httrack_logmode = 1;        // erreurs à l'écran
@@ -1185,9 +1058,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
-            //
-            //case 'A': opt->urlmode=1; break;
-            //case 'R': opt->urlmode=2; break;
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
@@ -1199,8 +1069,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             }
-            //if (*(com+1)=='0') { opt->urlmode=2; com++; } break;
-            //
           case 'c':
             if (isdigit((unsigned char) *(com + 1))) {
               sscanf(com + 1, "%d", &opt->maxsoc);
@@ -1688,7 +1556,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   } else {
                     char *a;
 
-                    //char* b = StringBuff(opt->mimedefs) + StringLength(opt->mimedefs);
                     for(a = argv[na]; *a != '\0'; a++) {
                       if (*a == ';') {  /* next one */
                         StringAddchar(opt->mimedefs, '\n');
@@ -2027,10 +1894,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   HTS_PANIC_PRINTF(s);
                   htsmain_free();
                   return -1;
-                }
-                break;
-
-                //case 's': opt->sslengine=1; if (isdigit((unsigned char)*(com+1))) { sscanf(com+1,"%d",&opt->sslengine); while(isdigit((unsigned char)*(com+1))) com++; } break;
+              } break;
               }
             }
             break;
@@ -2274,15 +2138,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 return 0;
                 break;
               case '~':        /* internal lib test */
-                HTS_PANIC_PRINTF
-                  ("Option #~ is disabled for security reasons");
-                //Disabled because choke on GCC 4.3 (toni from links2linux.de)
-                //{
-                //  char thisIsATestYouShouldSeeAnError[12];
-                //  const char *const bufferOverflowTest = "0123456789012345678901234567890123456789";
-                //  strcpybuff(thisIsATestYouShouldSeeAnError, bufferOverflowTest);
-                //  return 0;
-                //}
+                HTS_PANIC_PRINTF("Option #~ is disabled for security reasons");
                 break;
               case 'f':
                 opt->flush = 1;
@@ -2384,7 +2240,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               opt->proxy.active = 1;
               // Rechercher MAIS en partant de la fin à cause de user:pass@proxy:port
               a = argv[na] + strlen(argv[na]) - 1;
-              // a=strstr(argv[na],":");  // port
               while((a > argv[na]) && (*a != ':') && (*a != '@'))
                 a--;
               if (*a == ':') {  // un port est présent, <proxy>:port
@@ -2489,7 +2344,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
 #endif
 
-  //printf("WARNING! This is *only* a beta-release of HTTrack\n");
   io_flush;
 
 #if DEBUG_STEPS
@@ -2573,7 +2427,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     {
       FILE *fp = NULL;
 
-      //int n=0;
       char t[256];
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
@@ -2607,9 +2460,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
 
       strcpybuff(n_lock,
-             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-in_progress.lock"));
-      //sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log), "hts-in_progress.lock"));
       /*do {
          if (!n)
          sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
@@ -2685,8 +2537,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fprintf(fp, LF);
           fclose(fp);
           fp = NULL;
-          //} else if (opt->debug>1) {
-          //  printf("! FileOpen error, \"%s\"\n",strerror(errno));
         }
       }
       // petit message dans le lock

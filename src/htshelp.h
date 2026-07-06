@@ -45,7 +45,6 @@ typedef struct httrackp httrackp;
 
 void infomsg(const char *msg);
 void help(const char *app, int more);
-void make_empty_index(const char *str);
 void help_wizard(httrackp * opt);
 int help_query(const char *list, int def);
 void help_catchurl(const char *dest_path);

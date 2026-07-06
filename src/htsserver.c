@@ -265,7 +265,6 @@ T_SOC smallserver_init(int *port, char *adr) {
       SOCaddr_initport(server, *port);
       if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
         if (listen(soc, 10) >= 0) {
-          // SOCaddr_inetntoa(adr, 128, server2);
           strcpy(adr, h_loc);
         } else {
 #ifdef _WIN32
@@ -439,7 +438,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         meth = 10;
       } else {
 #ifdef _DEBUG
-        // assert(FALSE);
 #endif
       }
       if (meth) {
@@ -1360,7 +1358,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
             StringCat(headers, error_hdr);
             StringCat(output, error);
-            //assert(file == NULL);
           }
         }
       } else {
@@ -1388,12 +1385,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   != StringLength(output)))
         ) {
 #ifdef _DEBUG
-        //assert(FALSE);
 #endif
       }
     } else {
 #ifdef _DEBUG
-      // assert(FALSE);
 #endif
     }
 
@@ -1540,8 +1535,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
             } while(strnotempty(test));
           }
 
-          if (!strnotempty(test)) {     // éviter doublons
-            // conv_printf(key,key);
+          if (!strnotempty(test)) { // éviter doublons
             const size_t len = strlen(intkey);
             char *const buff = (char *) malloc(len + 1);
 
@@ -1632,8 +1626,6 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
                     intkey = "";
                 } else {
                   if (loops > 0) {
-                    //err_msg += intkey;
-                    //err_msg += " ";
                   }
                 }
               }
@@ -1740,13 +1732,7 @@ static void LANG_DELETE(void) {
 }
 
 // sélection de la langue
-static void LANG_INIT(const char *path) {
-  //CWinApp* pApp = AfxGetApp();
-  //if (pApp) {
-  /* pApp->GetProfileInt("Language","IntId",0); */
-  LANG_T(path, 0 /*pApp->GetProfileInt("Language","IntId",0) */ );
-  //}
-}
+static void LANG_INIT(const char *path) { LANG_T(path, 0); }
 
 static int LANG_T(const char *path, int l) {
   if (l >= 0) {

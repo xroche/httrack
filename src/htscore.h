@@ -412,10 +412,6 @@ char *readfile_utf8(const char *fil);
 
 char *readfile_or(const char *fil, const char *defaultdata);
 
-#if 0
-void check_rate(TStamp stat_timestart, int maxrate);
-#endif
-
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
 
@@ -466,11 +462,6 @@ int ask_continue(httrackp * opt);
 
 /* Number of decimal digits in n. */
 int nombre_digit(int n);
-
-// Java
-#if 0
-int hts_add_file(char *file, int file_position);
-#endif
 
 // Polling
 #if HTS_POLL

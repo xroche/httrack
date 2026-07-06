@@ -66,7 +66,6 @@ struct htsmoduleStructExtended {
   char ***filters_;
   robots_wizard *robots_;
   hash_struct *hash_;
-  //int *lien_max_;
 
   /* Base & codebase */
   char *base;

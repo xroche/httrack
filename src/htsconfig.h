@@ -54,10 +54,6 @@ Please visit our Website: http://www.httrack.com
 // extension par défaut pour fichiers n'en ayant pas
 #define DEFAULT_EXT ".html"
 #define DEFAULT_EXT_SHORT ".htm"
-// #define DEFAULT_BIN_EXT   ".bin"
-// #define DEFAULT_BIN_EXT_SHORT ".bin"
-// #define DEFAULT_EXT       ".txt"
-// #define DEFAULT_EXT_SHORT ".txt"
 
 // éviter les /nul, /con..
 #define HTS_OVERRIDE_DOS_FOLDERS 1
@@ -80,10 +76,6 @@ Please visit our Website: http://www.httrack.com
 // always direct-to-disk (0/1)
 #define HTS_DIRECTDISK_ALWAYS 1
 
-// gérer une table de hachage?
-// REMOVED
-// #define HTS_HASH 1
-
 // fast cache (build hash table)
 #define HTS_FAST_CACHE 1
 
@@ -97,27 +89,10 @@ Please visit our Website: http://www.httrack.com
 // always transform a '//' into a sigle '/'
 #define HTS_STRIP_DOUBLE_SLASH 0
 
-// case-sensitive pour les dossiers et fichiers (0/1)
-// [normalement 1, mais pose des problèmes (url malformée par exemple) et n'est
-// pas très utile..
-// ..et pas bcp respecté]
-// REMOVED
-// #define HTS_CASSE 0
-
-// Un fichier ayant une taille différente du content-length doit il être annulé?
-// SEE opt.tolerant and opt.http10
-// #define HTS_CL_IS_FATAL 0
-
 // une erreur supprime le fichier sur disque
 // (non fixé pour cause de retry)
 #define HTS_REMOVE_BAD_FILES 0
 
-// en cas de Range: xx- donnant un Content-length: xx
-// alors skipper le fichier, considéré comme transmis
-// #define HTS_SKIP_FULL_RANGE 1
-
-// nombre max de filtres que l'utilisateur peut fixer
-// #define HTS_FILTERSMAX 10000
 #define HTS_FILTERSINC 1000
 
 // connect non bloquant? (poll sur write)

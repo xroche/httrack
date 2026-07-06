@@ -55,12 +55,6 @@ extern int fspc(httrackp * opt, FILE * fp, const char *type);
 
 /* >>> Put all modules variables here */
 
-#if 0
-t_gzopen gzopen = NULL;
-t_gzread gzread = NULL;
-t_gzclose gzclose = NULL;
-#endif
-
 int V6_is_available = HTS_INET6;
 
 static char WHAT_is_available[64] = "";
@@ -111,18 +105,6 @@ int hts_parse_externals(htsmoduleStruct * str) {
   /* Not detected */
   return -1;
 }
-
-//static void addCallback(htscallbacks* chain, void* moduleHandle, htscallbacksfncptr exitFnc) {
-//  while(chain->next != NULL) {
-//    chain = chain->next;
-//  }
-//  chain->next = calloct(1, sizeof(htscallbacks));
-//  assertf(chain->next != NULL);
-//  chain = chain->next;
-//  memset(chain, 0, sizeof(*chain));
-//  chain->exitFnc = exitFnc;
-//  chain->moduleHandle = moduleHandle;
-//}
 
 void clearCallbacks(htscallbacks * chain_);
 void clearCallbacks(htscallbacks * chain_) {

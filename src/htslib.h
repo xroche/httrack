@@ -171,7 +171,6 @@ HTSEXT_API const char* hts_version(void);
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
-//int HTS_TOTAL_RECV_CHECK(int var);
 LLint check_downloadable_bytes(int rate);
 
 HTSEXT_API int hts_uninit_module(void);
@@ -190,7 +189,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
 int http_cookie_header_selftest(t_cookie *cookie, const char *domain,
                                 const char *path, char *dst, size_t dst_size);
 
-//int newhttp(char* iadr,char* err=NULL);
 T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
               int waitconnect);
 /* Like newhttp(), but connect to the addr_index-th resolved address of the host
