@@ -1,5 +1,5 @@
 
-SUBDIRS = src man m4 libtest templates lang html tests
+SUBDIRS = src man m4 libtest templates lang html tests fuzz
 
 ACLOCAL_AMFLAGS = -I m4
 

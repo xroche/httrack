@@ -310,6 +310,37 @@ AC_ARG_ENABLE([online-unit-tests],
 	])
 AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
 
+## libFuzzer harnesses (fuzz/); requires clang
+AC_MSG_CHECKING(whether to build fuzzers)
+AC_ARG_ENABLE([fuzzers],
+	[AS_HELP_STRING([--enable-fuzzers],[Build libFuzzer harnesses in fuzz/ (requires clang) @<:@default=no@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		fuzzers=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR(bad value for fuzzers, expected yes/no)
+		;;
+	esac
+	],
+	[
+	fuzzers=no
+	AC_MSG_RESULT(no)
+	])
+if test x"$fuzzers" = x"yes"; then
+	# Instrument the whole build for coverage; harnesses link -fsanitize=fuzzer.
+	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link],
+		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fsanitize=fuzzer-no-link"],
+		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
+	# clang's static sanitizer runtimes clash with -Wl,--no-undefined on the .so.
+	if test x"$enable_shared" != x"no"; then
+		AC_MSG_ERROR([--enable-fuzzers requires --disable-shared])
+	fi
+fi
+AM_CONDITIONAL([FUZZERS], [test x"$fuzzers" = x"yes"])
+
 # Final output
 AC_CONFIG_FILES([
 Makefile
@@ -321,5 +352,6 @@ lang/Makefile
 html/Makefile
 libtest/Makefile
 tests/Makefile
+fuzz/Makefile
 ])
 AC_OUTPUT
