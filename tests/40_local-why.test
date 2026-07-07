@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# --why: report which +/- filter rule decides for a URL, without crawling.
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+why() {
+    local want="$1" out
+    shift
+    out="$(httrack -O "$tmpdir/p" -q "$@" |
+        grep -E 'accepted|rejected|no filter|unable')"
+    test "$out" == "$want" || {
+        echo "want: $want"
+        echo "got : $out"
+        exit 1
+    }
+}
+
+base=http://www.example.com
+why "$base/x.zip: rejected by rule #2 (-*.zip)" \
+    --why "$base/x.zip" "$base/" '+*.png' '-*.zip'
+why "$base/a.png: accepted by rule #1 (+*.png)" \
+    --why "$base/a.png" "$base/" '+*.png' '-*.zip'
+why "$base/i.html: no filter rule matches; the wizard decides (same-site links are followed by default)" \
+    --why "$base/i.html" "$base/" '+*.png' '-*.zip'
+# scheme-less input gets the same http:// default as primary URLs
+why "$base/x.zip: rejected by rule #2 (-*.zip)" \
+    --why "www.example.com/x.zip" "$base/" '+*.png' '-*.zip'
+# the rule latest in the list decides
+why "$base/x.zip: accepted by rule #3 (+*x.zip)" \
+    --why "$base/x.zip" "$base/" '+*.png' '-*.zip' '+*x.zip'

@@ -6006,6 +6006,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
   StringCopy(opt->strip_query, "");
   StringCopy(opt->cookies_file, "");
+  StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;
   opt->ftp_proxy = HTS_TRUE;
@@ -6153,6 +6154,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->mod_blacklist);
     StringFree(opt->strip_query);
     StringFree(opt->cookies_file);
+    StringFree(opt->why_url);
 
     StringFree(opt->path_html);
     StringFree(opt->path_html_utf8);

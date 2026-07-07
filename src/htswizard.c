@@ -524,28 +524,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
         // filters, 0=sait pas 1=ok -1=interdit
         {
-          int jokDepth1 = 0, jokDepth2 = 0;
-          int jok1 = 0, jok2 = 0;
+          int jokDepth = 0;
 
-          jok1 =
-            fa_strjoker( /*url */ 0, _FILTERS, *_FILTERS_PTR, lfull, NULL, NULL,
-                        &jokDepth1);
-          jok2 =
-            fa_strjoker( /*url */ 0, _FILTERS, *_FILTERS_PTR, l, NULL, NULL,
-                        &jokDepth2);
-          if (jok2 == 0) {      // #2 doesn't know
-            jok = jok1;         // then, use #1
-            mdepth = _FILTERS[jokDepth1];
-          } else if (jok1 == 0) {       // #1 doesn't know
-            jok = jok2;         // then, use #2
-            mdepth = _FILTERS[jokDepth2];
-          } else if (jokDepth1 >= jokDepth2) {  // #1 matching rule is "after" #2, then it is prioritary
-            jok = jok1;
-            mdepth = _FILTERS[jokDepth1];
-          } else {              // #2 matching rule is "after" #1, then it is prioritary
-            jok = jok2;
-            mdepth = _FILTERS[jokDepth2];
-          }
+          jok = fa_strjoker_dual(/*url */ 0, _FILTERS, *_FILTERS_PTR, lfull, l,
+                                 NULL, NULL, &jokDepth);
+          mdepth = _FILTERS[jokDepth];
         }
 
         if (jok == 1) {         // autorisé
@@ -965,34 +948,10 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
 
       // filters, 0=sait pas 1=ok -1=interdit
       {
-        int jokDepth1 = 0, jokDepth2 = 0;
-        int jok1 = 0, jok2 = 0;
-        LLint sz1 = size, sz2 = size;
-        int size_flag1 = 0, size_flag2 = 0;
-
-        jok1 =
-          fa_strjoker( /*url */ 0, *opt->filters.filters, *opt->filters.filptr,
-                      lfull, &sz1, &size_flag1, &jokDepth1);
-        jok2 =
-          fa_strjoker( /*url */ 0, *opt->filters.filters, *opt->filters.filptr,
-                      l, &sz2, &size_flag2, &jokDepth2);
-        if (jok2 == 0) {        // #2 doesn't know
-          jok = jok1;           // then, use #1
-          sz = sz1;
-          size_flag = size_flag1;
-        } else if (jok1 == 0) { // #1 doesn't know
-          jok = jok2;           // then, use #2
-          sz = sz2;
-          size_flag = size_flag2;
-        } else if (jokDepth1 >= jokDepth2) {    // #1 matching rule is "after" #2, then it is prioritary
-          jok = jok1;
-          sz = sz1;
-          size_flag = size_flag1;
-        } else {                // #2 matching rule is "after" #1, then it is prioritary
-          jok = jok2;
-          sz = sz2;
-          size_flag = size_flag2;
-        }
+        sz = size;
+        jok = fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
+                               *opt->filters.filptr, lfull, l, &sz, &size_flag,
+                               NULL);
       }
 
       // log

@@ -35,6 +35,7 @@ TESTS = \
 	01_engine-entities.test \
 	01_engine-filelist.test \
 	01_engine-filter.test \
+	01_engine-filterdual.test \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
 	01_engine-hashtable.test \
@@ -105,6 +106,7 @@ TESTS = \
 	36_local-bigcrawl.test \
 	37_local-cache-outage.test \
 	38_local-update-304.test \
-	39_local-delayed-cancel.test
+	39_local-delayed-cancel.test \
+	40_local-why.test
 
 CLEANFILES = check-network_sh.cache

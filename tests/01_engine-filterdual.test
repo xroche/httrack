@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# fa_strjoker_dual: merged verdict on the two URL forms the engine tests;
+# the match latest in the filter list wins, an unknown verdict defers.
+
+fdual() {
+    local want="$1"
+    shift
+    test "$(httrack -O /dev/null -#test=filterdual "$@")" == "$want" || exit 1
+}
+
+fdual 'verdict=unknown rule=0' zzz yyy '+a*'     # neither form matches
+fdual 'verdict=forbidden rule=0' aaa zzz '-a*'   # only form 1 matches
+fdual 'verdict=forbidden rule=0' zzz aaa '-a*'   # only form 2 matches
+fdual 'verdict=forbidden rule=1' a b '+a*' '-b*' # later rule wins (form 2)
+fdual 'verdict=forbidden rule=1' b a '+a*' '-b*' # later rule wins (form 1)
+fdual 'verdict=allowed rule=0' a aa '+a*'        # tie: form 1 wins
