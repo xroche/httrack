@@ -278,6 +278,45 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # libFuzzer smoke: build the fuzz/ harnesses over the pure hostile-input
+  # parsers and replay each seed corpus under ASan+UBSan+LeakSanitizer. Replay
+  # (not open-ended mutation) keeps CI deterministic -- it can't hit strjoker's
+  # catastrophic backtracking -- and pins the regression seeds for the bugs the
+  # fuzzers found. Deep discovery is a maintainer / OSS-Fuzz activity.
+  fuzz:
+    name: fuzz (libFuzzer corpus replay, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Configure (fuzzers, static)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=clang \
+            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=address,undefined" \
+            --enable-fuzzers --disable-shared
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Replay corpora
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: bash fuzz/run-fuzzers.sh fuzz check
+
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even
   # installed here so configure cannot silently re-enable it. The matrix above
