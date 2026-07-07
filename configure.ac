@@ -102,13 +102,21 @@ AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -
 AX_CHECK_COMPILE_FLAG([-Werror=attribute-warning], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=attribute-warning"])
 AX_CHECK_COMPILE_FLAG([-Werror=user-defined-warnings], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=user-defined-warnings"])
 AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"])
-AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"])
+AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector-strong"],
+	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"])])
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"])
 AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"])
 AX_CHECK_LINK_FLAG([-Wl,--discard-all], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--discard-all"])
 AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--no-undefined"])
 AX_CHECK_LINK_FLAG([-Wl,-z,relro,-z,now], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro,-z,now"])
 AX_CHECK_LINK_FLAG([-Wl,-z,noexecstack], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,noexecstack"])
+
+# Fortify libc calls (=3, else =2) unless the toolchain predefines it; skip
+# sanitizer builds, whose interceptors want the unfortified calls.
+case "$CFLAGS" in
+*-fsanitize=*) ;;
+*) AX_ADD_FORTIFY_SOURCE ;;
+esac
 
 # Force libc back into DT_NEEDED for libraries that reach it only through
 # libhttrack (libhtsjava, the libtest callbacks), but only with a GNU-style
