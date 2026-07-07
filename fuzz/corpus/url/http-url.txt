@@ -1,0 +1,1 @@
+http://user:pass@www.example.com:8080/a/b/../c/./d.html?q=1#frag
