@@ -1,0 +1,57 @@
+# CodeQL static analysis (C). The security-extended suite covers the classes
+# this codebase actually fights: overflows, tainted-size allocs, format bugs.
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # Weekly re-scan of master so new/updated queries land without a push.
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (c-cpp)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # Upload findings to the repo's code-scanning dashboard.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended
+
+      # Manual build: CodeQL traces the compiler, so build exactly what ships.
+      - name: Build
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          make -j"$(nproc)"
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:c-cpp"
