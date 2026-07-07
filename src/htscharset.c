@@ -910,19 +910,19 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
                 /* Reader: can read bytes up to j */
 #define RD ( utfSeq < j ? segData[utfSeq++] : -1 )
 
-                /* Writer: upon error, return FFFD (replacement character) */
-#define WR(C) do { \
-  if ((C) != -1) { \
-    /* copy character */ \
-    assertf(segOutputSize < segSize); \
-    segInt[segOutputSize++] = (C); \
-  } \
-  /* In case of error, abort. */ \
-  else { \
-    FREE_BUFFER(); \
-    return NULL; \
-  } \
-} while(0)
+                /* Writer: a malformed sequence abandons the encode (NULL) */
+#define WR(C)                                                                  \
+  do {                                                                         \
+    if ((C) != -1) {                                                           \
+      /* copy character */                                                     \
+      assertf(segOutputSize < segSize);                                        \
+      segInt[segOutputSize++] = (C);                                           \
+    } else {                                                                   \
+      freet(segInt);                                                           \
+      FREE_BUFFER();                                                           \
+      return NULL;                                                             \
+    }                                                                          \
+  } while (0)
 
                 /* Read/Write Unicode character. */
                 READ_UNICODE(RD, WR);
@@ -1144,7 +1144,7 @@ int hts_isStringUTF8(const char *s, size_t size) {
     /* Reader: can read bytes up to j */
 #define RD ( i < size ? data[i++] : -1 )
 
-    /* Writer: upon error, return FFFD (replacement character) */
+    /* Writer: a malformed sequence means the string is not UTF-8 (return 0) */
 #define WR(C) if ((C) == -1) { return 0; }
 
     /* Read Unicode character. */

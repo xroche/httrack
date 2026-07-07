@@ -2497,6 +2497,10 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   // effacer adrfil->adr et adrfil->fil
   adrfil->adr[0] = adrfil->fil[0] = '\0';
 
+  // Reject an over-long URL: a root-relative path is copied whole into fil[].
+  if (strlen(url) >= HTS_URLMAXSIZE * 2)
+    return -1;
+
 #if HDEBUG
   printf("protocol: %s\n", url);
 #endif
@@ -2572,7 +2576,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     if (*p == '/' || *p == '\\') {      /* adrfil->file:///.. */
       strcatbuff(adrfil->fil, p);       // fichier local ; adrfil->adr="#"
     } else {
-      if (p[1] != ':') {
+      if (*p == '\0' || p[1] != ':') {  /* empty path: not a DOS drive letter */
         strcatbuff(adrfil->fil, "//");  /* adrfil->file://server/foo */
         strcatbuff(adrfil->fil, p);
       } else {

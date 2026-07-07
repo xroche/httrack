@@ -286,7 +286,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
       if (!unique)
         max = (int) strlen(chaine);
       else                      /* *(a) only match a (not aaaaa) */
-        max = 1;
+        max = strnotempty(chaine) ? 1 : 0; /* empty chaine: no char to eat */
       while(i < (int) max) {
         if (pass[(int) (unsigned char) chaine[i]]) {    // caractère autorisé
           if ((adr = strjoker(chaine + i + 1, joker + jmp, size, size_flag))) {

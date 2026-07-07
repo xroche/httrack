@@ -12,6 +12,11 @@ match() {
 nomatch() {
     test "$(httrack -O /dev/null -#test=filter "$1" "$2")" == "$2 does NOT match $1" || exit 1
 }
+# single-arg call means an empty subject (unreachable as a CLI arg); '*(' used
+# to force max=1 and over-read past it.
+nomatch_empty() {
+    test "$(httrack -O /dev/null -#test=filter "$1")" == " does NOT match $1" || exit 1
+}
 
 # bare star matches everything
 match '*' 'anything/at/all'
@@ -122,3 +127,7 @@ nomatch '*[file]end' 'foo?xend'
 nomatch '*[name]X' 'abc?X'
 match '*[file]' 'foo?x=1' # trailing query: tolerated, as for *.aspx
 match '*.aspx' 'page.aspx?y=2'
+
+# empty subject against a unique-match allow-all pattern (heap over-read regress)
+nomatch_empty '*(('
+nomatch_empty '**(('
