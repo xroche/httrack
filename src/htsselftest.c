@@ -1163,6 +1163,26 @@ static int st_header(httrackp *opt, int argc, char **argv) {
     treathead(NULL, "www.example.com", "/", &r, line);
   }
   printf("contenttype=%s cdispo=%s\n", r.contenttype, r.cdispo);
+  printf("contentencoding=%s\n", r.contentencoding);
+  return 0;
+}
+
+/* An over-long header value must not overflow treathead's tempo[1100]. */
+static int st_headerlong(httrackp *opt, int argc, char **argv) {
+  htsblk r;
+  char BIGSTK line[HTS_URLMAXSIZE * 2];
+  const char *const name = argc >= 1 ? argv[0] : "Content-Type:";
+  const int pad = 1500; /* > tempo[1100] */
+  size_t n;
+
+  (void) opt;
+  memset(&r, 0, sizeof(r));
+  n = (size_t) snprintf(line, sizeof(line), "%s ", name);
+  memset(line + n, 'a', pad);
+  line[n + pad] = '\0';
+  treathead(NULL, "www.example.com", "/", &r, line);
+  printf("contenttype_len=%d contentencoding_len=%d\n",
+         (int) strlen(r.contenttype), (int) strlen(r.contentencoding));
   return 0;
 }
 
@@ -2185,6 +2205,9 @@ static const struct selftest_entry {
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
+    {"headerlong", "[header-name:]",
+     "over-long header value must not overflow the parse scratch",
+     st_headerlong},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",

@@ -1562,7 +1562,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       }
       // An empty/whitespace Content-Type value yields no token: keep the
       // sentinel default rather than reading an uninitialized tempo.
-      if (sscanf(rcvd + p, "%s", tempo) == 1) {
+      if (sscanf(rcvd + p, "%1099s", tempo) == 1) { // tempo[1100], server data
         if (strlen(tempo) < sizeof(retour->contenttype) - 2) // pas trop long!!
           strcpybuff(retour->contenttype, tempo);
         else
@@ -1657,11 +1657,11 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         if (a)
           *a = '\0';
       }
-      sscanf(a, "%s", tempo);
-      if (strlen(tempo) < 64)   // pas trop long!!
+      // Bound to tempo[1100]; no token => leave empty, don't read uninit tempo.
+      if (sscanf(a, "%1099s", tempo) == 1 && strlen(tempo) < 64)
         strcpybuff(retour->contentencoding, tempo);
       else
-        retour->contentencoding[0] = '\0';      // erreur
+        retour->contentencoding[0] = '\0';
 #if HTS_USEZLIB
       /* Check known encodings */
       if (retour->contentencoding[0]) {
