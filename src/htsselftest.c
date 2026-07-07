@@ -620,6 +620,26 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Merged two-form filter verdict via fa_strjoker_dual (see htsfilters.h). */
+static int st_filterdual(httrackp *opt, int argc, char **argv) {
+  int depth = -1, verdict;
+
+  (void) opt;
+  if (argc < 3) {
+    fprintf(stderr,
+            "filterdual: needs <string1> <string2> <filter> [filter...]\n");
+    return 1;
+  }
+  verdict = fa_strjoker_dual(0, &argv[2], argc - 2, argv[0], argv[1], NULL,
+                             NULL, &depth);
+  printf("verdict=%s rule=%d\n",
+         verdict > 0   ? "allowed"
+         : verdict < 0 ? "forbidden"
+                       : "unknown",
+         depth);
+  return 0;
+}
+
 static int st_simplify(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -2134,6 +2154,8 @@ static const struct selftest_entry {
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},
+    {"filterdual", "<string1> <string2> <filter>...",
+     "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},

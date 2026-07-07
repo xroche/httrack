@@ -1803,6 +1803,23 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCopy(opt->cookies_file, argv[na]);
                 }
                 break;
+              case 'Y': // why: explain the filter verdict for a URL, no crawl
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF("Option why needs a blank space and a URL");
+                  printf(
+                      "Example: --why \"http://www.example.com/file.zip\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
+                    HTS_PANIC_PRINTF("why URL too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCopy(opt->why_url, argv[na]);
+                }
+                break;
               case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF("Option pause needs a blank space and a "

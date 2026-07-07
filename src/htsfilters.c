@@ -94,6 +94,32 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
   return verdict;
 }
 
+int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
+                     const char *nom2, LLint *size, int *size_flag,
+                     int *depth) {
+  int depth1 = 0, depth2 = 0;
+  int flag1 = 0, flag2 = 0;
+  LLint sz1 = 0, sz2 = 0;
+  int jok1, jok2, use1;
+
+  if (size) {
+    sz1 = *size;
+    sz2 = *size;
+  }
+  jok1 = fa_strjoker(type, filters, nfil, nom1, size ? &sz1 : NULL,
+                     size_flag ? &flag1 : NULL, &depth1);
+  jok2 = fa_strjoker(type, filters, nfil, nom2, size ? &sz2 : NULL,
+                     size_flag ? &flag2 : NULL, &depth2);
+  use1 = jok2 == 0 || (jok1 != 0 && depth1 >= depth2);
+  if (size)
+    *size = use1 ? sz1 : sz2;
+  if (size_flag)
+    *size_flag = use1 ? flag1 : flag2;
+  if (depth)
+    *depth = use1 ? depth1 : depth2;
+  return use1 ? jok1 : jok2;
+}
+
 // supercomparateur joker (tm)
 // compare a et b (b=avec joker dedans), case insensitive [voir CI]
 // renvoi l'adresse de la première lettre de la chaine

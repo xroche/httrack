@@ -846,6 +846,52 @@ int httpmirror(char *url1, httrackp * opt) {
       }
     }                           // while
 
+    /* --why: print which filter rule decides for this URL, then stop */
+    if (StringNotEmpty(opt->why_url)) {
+      char BIGSTK url[HTS_URLMAXSIZE * 2];
+      lien_adrfil af;
+
+      if (strstr(StringBuff(opt->why_url), ":/") == NULL)
+        snprintf(url, sizeof(url), "http://%s", StringBuff(opt->why_url));
+      else
+        strcpybuff(url, StringBuff(opt->why_url));
+      if (ident_url_absolute(url, &af) < 0) {
+        printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
+      } else {
+        char BIGSTK l[HTS_URLMAXSIZE * 2], lfull[HTS_URLMAXSIZE * 2];
+        int jok, jokDepth = 0;
+
+        /* the two forms the wizard tests */
+        strcpybuff(l, jump_identification_const(af.adr));
+        if (*af.fil != '/')
+          strcatbuff(l, "/");
+        strcatbuff(l, af.fil);
+        if (!link_has_authority(af.adr))
+          strcpybuff(lfull, "http://");
+        else
+          lfull[0] = '\0';
+        strcatbuff(lfull, af.adr);
+        if (*af.fil != '/')
+          strcatbuff(lfull, "/");
+        strcatbuff(lfull, af.fil);
+        jok = fa_strjoker_dual(/*url */ 0, filters, filptr, lfull, l, NULL,
+                               NULL, &jokDepth);
+        if (jok > 0)
+          printf("%s: accepted by rule #%d (%s)" LF, url, jokDepth + 1,
+                 filters[jokDepth]);
+        else if (jok < 0)
+          printf("%s: rejected by rule #%d (%s)" LF, url, jokDepth + 1,
+                 filters[jokDepth]);
+        else
+          printf("%s: no filter rule matches; the wizard decides "
+                 "(same-site links are followed by default)" LF,
+                 url);
+      }
+      freet(primary);
+      XH_extuninit;
+      return 1;
+    }
+
     /* load URL file list */
     /* OPTIMIZED for fast load */
     if (StringNotEmpty(opt->filelist)) {

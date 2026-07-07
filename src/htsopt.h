@@ -536,6 +536,8 @@ struct httrackp {
                                  (--cookies-file) */
   int pause_min_ms; /**< inter-file pause lower bound, ms (0=off, #185) */
   int pause_max_ms; /**< inter-file pause upper bound, ms */
+  String why_url;   /**< URL to diagnose (--why): print the deciding filter rule
+                         and exit without crawling */
 };
 
 /* Running statistics for a mirror. */
