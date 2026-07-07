@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# ident_url_absolute splits a raw URL into (adr, fil), the first parser to touch
+# it. -#test=identurl <url> [pad] prints "adr=.. fil=.." or "error"; pad appends
+# N 'a's, reaching lengths a CLI arg can't.
+
+split() {
+    test "$(httrack -O /dev/null -#test=identurl "$1")" == "$2" || exit 1
+}
+
+split 'http://www.example.com/a/b/../c.html' 'adr=www.example.com fil=/a/c.html'
+split 'ftp://ftp.example.com/pub/file.txt' 'adr=ftp://ftp.example.com fil=/pub/file.txt'
+split 'file:///etc/hostname' 'adr=file:// fil=/etc/hostname'
+
+# empty-path file:// used to read one byte past the URL (p[1] with *p=0)
+split 'file://' 'adr=file:// fil=//'
+
+# a root-relative path is copied whole into fil[HTS_URLMAXSIZE*2], so a URL at
+# the buffer size is the tightest overflow; it must be rejected, not abort.
+split_pad() {
+    test "$(httrack -O /dev/null -#test=identurl "$1" "$2")" == "$3" || exit 1
+}
+split_pad '/' 2047 'error' # 1 + 2047 = 2048 = HTS_URLMAXSIZE*2
+split_pad 'http://h/' 3000 'error'

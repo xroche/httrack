@@ -579,15 +579,16 @@ static int st_filter(httrackp *opt, int argc, char **argv) {
   int matched;
 
   (void) opt;
-  if (argc < 2) {
+  if (argc < 1) {
     fprintf(stderr, "filter: needs a filter pattern and a string\n");
     return 1;
   }
-  /* exact-size heap copies so a sanitizer traps any over-read of the pattern */
-  str = strdupt(argv[1]);
+  /* exact-size heap copies so a sanitizer traps an over-read; a missing
+     subject means "" (not reachable as a CLI arg) */
+  str = strdupt(argc >= 2 ? argv[1] : "");
   pat = strdupt(argv[0]);
   matched = strjoker(str, pat, NULL, NULL) != NULL;
-  printf("%s does %s %s\n", argv[1], matched ? "match" : "NOT match", argv[0]);
+  printf("%s does %s %s\n", str, matched ? "match" : "NOT match", argv[0]);
   freet(str);
   freet(pat);
   return 0;
@@ -1091,6 +1092,33 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
     printf("adr=%s fil=%s\n", af.adr, af.fil);
   else
     printf("error=%d\n", r);
+  return 0;
+}
+
+/* Split a URL into (adr, fil), or print "error" if rejected. A second arg pads
+   the URL with that many 'a's to reach lengths a CLI arg can't. */
+static int st_identurl(httrackp *opt, int argc, char **argv) {
+  lien_adrfil af;
+  char *url;
+  size_t len, pad = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "identurl: needs a URL\n");
+    return 1;
+  }
+  if (argc >= 2)
+    pad = (size_t) atoi(argv[1]);
+  len = strlen(argv[0]);
+  url = malloct(len + pad + 1);
+  memcpy(url, argv[0], len);
+  memset(url + len, 'a', pad);
+  url[len + pad] = '\0';
+  if (ident_url_absolute(url, &af) >= 0)
+    printf("adr=%s fil=%s\n", af.adr, af.fil);
+  else
+    printf("error\n");
+  freet(url);
   return 0;
 }
 
@@ -2132,6 +2160,7 @@ static const struct selftest_entry {
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
+    {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
     {"savename", "<fil> <content-type> [key=value ...]",

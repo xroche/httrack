@@ -8,8 +8,8 @@ set -euo pipefail
 
 enc() { test "$(httrack -O /dev/null -#test=idna-encode "$1")" == "$2" || exit 1; }
 dec() { test "$(httrack -O /dev/null -#test=idna-decode "$1")" == "$2" || exit 1; }
-# crash probe: malformed ACE input must exit cleanly, not abort.
-runs() { httrack -O /dev/null -#test=idna-decode "$1" >/dev/null 2>&1 || exit 1; }
+# a malformed encode input must be rejected (empty output), not encoded or leaked.
+enc_bad() { test -z "$(httrack -O /dev/null -#test=idna-encode "$1" 2>/dev/null)" || exit 1; }
 
 # encode
 enc 'www.café.com' 'www.xn--caf-dma.com'
@@ -33,6 +33,9 @@ enc 'xn--already-encoded.com' 'xn--already-encoded.com'
 # an empty punycode payload decodes back to the bare xn-- label
 dec 'xn--' 'xn--'
 
-# malformed ACE payloads (invalid base-36, garbage) must not crash
-runs 'xn--!!!'
-runs 'xn--already-encoded.com'
+# malformed ACE payloads decode to a stable (garbage) string, not a crash
+dec 'xn--!!!' '㚯'
+dec 'xn--already-encoded.com' 'ǮalǭǮreaǭǫdy.com'
+
+# second label has a truncated UTF-8 sequence: used to leak the segment buffer.
+enc_bad "$(printf 'b\xc3\xbcchev.\xe4\xbe\x8b\xe5\xad\x62\xc3\xbccheple')"
