@@ -1953,18 +1953,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     char BIGSTK url[HTS_URLMAXSIZE * 2];
                     char linepos[256];
                     int pos;
-                    char *cacheNdx =
-                      readfile(fconcat
-                               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                                "hts-cache/new.ndx"));
+                    LLint cacheNdxLen = 0;
+                    char *cacheNdx = readfile2(
+                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                StringBuff(opt->path_log), "hts-cache/new.ndx"),
+                        &cacheNdxLen);
                     cache_init(&cache, opt);    /* load cache */
                     if (cacheNdx != NULL) {
                       char firstline[256];
                       char *a = cacheNdx;
+                      const char *const end = cacheNdx + cacheNdxLen;
 
                       a += cache_brstr(a, firstline, sizeof(firstline));
                       a += cache_brstr(a, firstline, sizeof(firstline));
-                      while(a != NULL) {
+                      while (a != NULL && a < end) {
                         a = strchr(a + 1, '\n');        /* start of line */
                         if (a) {
                           htsblk r;
@@ -1972,15 +1974,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                           /* */
                           a++;
                           /* read "host/file" */
-                          a += binput(a, afs.af.adr, HTS_URLMAXSIZE);
-                          a += binput(a, afs.af.fil, HTS_URLMAXSIZE);
+                          a += cache_binput(a, end, afs.af.adr, HTS_URLMAXSIZE);
+                          a += cache_binput(a, end, afs.af.fil, HTS_URLMAXSIZE);
                           url[0] = '\0';
                           if (!link_has_authority(afs.af.adr))
                             strcatbuff(url, "http://");
                           strcatbuff(url, afs.af.adr);
                           strcatbuff(url, afs.af.fil);
                           /* read position */
-                          a += binput(a, linepos, 200);
+                          a += cache_binput(a, end, linepos, 200);
                           sscanf(linepos, "%d", &pos);
                           if (!hasFilter
                               || (strjoker(url, filter, NULL, NULL) != NULL)
