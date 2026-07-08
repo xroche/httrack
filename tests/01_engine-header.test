@@ -27,3 +27,16 @@ hdr 'contenttype= cdispo=report.pdf' \
 # Path components in the filename are dropped on the wire (RFC 2616).
 hdr 'contenttype= cdispo=evil.pdf' \
     'Content-Disposition: attachment; filename="../../evil.pdf"'
+
+# An over-long header value must not overflow the parse scratch (ASan aborts
+# here on the pre-fix binary).
+test "$(httrack -O /dev/null -#test=headerlong 'Content-Type:')" \
+    == 'contenttype_len=32 contentencoding_len=0'
+test "$(httrack -O /dev/null -#test=headerlong 'Content-Encoding:')" \
+    == 'contenttype_len=0 contentencoding_len=0'
+
+# An empty Content-Encoding yields no token: leave it empty, don't read the
+# uninitialized scratch (MSan aborts here on the pre-fix binary).
+enc() { httrack -O /dev/null -#test=header "$1" | grep '^contentencoding='; }
+test "$(enc 'Content-Encoding:')" == 'contentencoding='
+test "$(enc 'Content-Encoding: gzip')" == 'contentencoding=gzip'
