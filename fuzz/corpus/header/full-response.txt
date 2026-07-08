@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: 1234
+Content-Encoding: gzip
+Last-Modified: Mon, 01 Jan 2024 00:00:00 GMT
+Etag: "abc"
+Location: http://example.com/x
+Set-Cookie: ID=42; path=/; domain=.example.com
+Content-Range: bytes 0-99/100
+Transfer-Encoding: chunked

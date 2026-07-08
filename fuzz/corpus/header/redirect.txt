@@ -1,0 +1,3 @@
+HTTP/1.0 301 Moved
+Location: /elsewhere
+Content-Disposition: attachment; filename="a.pdf"
