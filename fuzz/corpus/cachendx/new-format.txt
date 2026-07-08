@@ -1,0 +1,7 @@
+8
+CACHE-1.1
+28
+Mon, 01 Jan 2024 00:00:00 GMT
+www.example.com
+/index.html
+123
