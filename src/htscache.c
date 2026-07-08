@@ -1938,15 +1938,17 @@ void cache_init(cache_back * cache, httrackp * opt) {
             char linepos[256];
             int pos;
 
-            while((a != NULL) && (a < (cache->use + buffl))) {
+            const char *const end = cache->use + buffl;
+
+            while ((a != NULL) && (a < end)) {
               a = strchr(a + 1, '\n');  /* start of line */
               if (a) {
                 a++;
                 /* read "host/file" */
-                a += binput(a, line, HTS_URLMAXSIZE);
-                a += binput(a, line + strlen(line), HTS_URLMAXSIZE);
+                a += cache_binput(a, end, line, HTS_URLMAXSIZE);
+                a += cache_binput(a, end, line + strlen(line), HTS_URLMAXSIZE);
                 /* read position */
-                a += binput(a, linepos, 200);
+                a += cache_binput(a, end, linepos, 200);
                 sscanf(linepos, "%d", &pos);
                 coucal_add(cache->hashtable, line, pos);
               }
@@ -2291,21 +2293,38 @@ int cache_brstr(char *adr, char *s, size_t s_size) {
   char buff[256 + 4];
 
   off = binput(adr, buff, 256);
-  adr += off;
-  sscanf(buff, "%d", &i);
-  if (i < 0 || i > 32768) /* guard a corrupt length */
+  /* binput stops at the buffer's terminating NUL; a value can only follow a
+     real line terminator, so never step past end-of-buffer. */
+  if (adr[off - 1] == '\0') {
+    s[0] = '\0';
+    return off - 1;
+  }
+  /* an empty/non-numeric field leaves i unset: treat as length 0 */
+  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > 32768)
     i = 0;
   if (i > 0) {
-    /* copy at most s_size-1 bytes; advance past the full field regardless */
-    const size_t store = (size_t) i < s_size ? (size_t) i : s_size - 1;
+    /* A corrupt/truncated cache may declare a length past the buffer end;
+       bound both the copy and the advance to the bytes actually present. */
+    const size_t avail = strnlen(adr + off, (size_t) i);
+    const size_t store = avail < s_size ? avail : s_size - 1;
 
-    strncpy(s, adr, store);
+    memcpy(s, adr + off, store);
     s[store] = '\0';
+    off += (int) avail;
   } else {
     s[0] = '\0';
   }
-  off += i;
   return off;
+}
+
+/* binput bounded to a NUL-terminated buffer: refuse to start a read at or
+   past `end`, so a prior over-advance can't walk a cache-index parse OOB. */
+int cache_binput(char *adr, const char *end, char *s, int max) {
+  if (adr >= end) {
+    s[0] = '\0';
+    return 0;
+  }
+  return binput(adr, s, max);
 }
 
 /* idem, mais en int */

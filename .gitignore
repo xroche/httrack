@@ -34,8 +34,9 @@ Makefile
 *.so.*
 *.a
 
-# make dist output.
+# make dist output; dist/ holds httrack-gh-release staging artifacts.
 /httrack-*.tar.gz
+/dist/
 
 # Editor / autotools backup files.
 *~

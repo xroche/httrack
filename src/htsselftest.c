@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsparse.h"
+#include "htscache.h"
 #include "htscache_selftest.h"
 #include "htsdns_selftest.h"
 #include "htscharset.h"
@@ -1390,6 +1391,78 @@ static int st_cache(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A corrupt cache index (.ndx) must not walk the length-prefixed scan past
+   the buffer. Checks the two primitives the loader is built from. */
+static int st_cacheindex(httrackp *opt, int argc, char **argv) {
+  int fail = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A length prefix that overstates the bytes present must bound the advance
+     to the buffer, not trust the declared length. */
+  {
+    static const char src[] = "32768\nCACHE-1.1";
+    const size_t len = sizeof(src) - 1;
+    char *buf = malloct(len + 1);
+    char s[256];
+    int off;
+
+    memcpy(buf, src, len + 1);
+    off = cache_brstr(buf, s, sizeof(s));
+    if (off > (int) len) {
+      printf("cacheindex: over-advance off=%d len=%d\n", off, (int) len);
+      fail = 1;
+    }
+    if (strcmp(s, "CACHE-1.1") != 0) {
+      printf("cacheindex: value=%s\n", s);
+      fail = 1;
+    }
+    freet(buf);
+  }
+
+  /* cache_binput reads a field while in bounds, but refuses one starting at
+     or past end-of-buffer. */
+  {
+    char buf[8] = "ab\ncd";
+    const char *const end = buf + 5;
+    char s[16];
+
+    if (cache_binput(buf, end, s, sizeof(s)) != 3 || strcmp(s, "ab") != 0)
+      fail = 1; /* normal read: "ab" then the '\n', 3 bytes consumed */
+    if (cache_binput(end, end, s, sizeof(s)) != 0 || s[0] != '\0')
+      fail = 1;
+  }
+
+  /* Drive the full loader scan over a truncated index: a declared length that
+     overshoots plus a half-written entry. ASan aborts here on the pre-fix
+     scan; the cursor must never leave the buffer. */
+  {
+    static const char src[] = "9\nCACHE-1.1\n99\nwww.example.com\n/a";
+    const size_t len = sizeof(src) - 1;
+    char *buf = malloct(len + 1);
+    const char *const end = buf + len;
+    char line[256];
+    char *a = buf;
+
+    memcpy(buf, src, len + 1);
+    a += cache_brstr(a, line, sizeof(line));
+    a += cache_brstr(a, line, sizeof(line));
+    while (a != NULL && a < end) {
+      a = strchr(a + 1, '\n');
+      if (a == NULL)
+        break;
+      a++;
+      a += cache_binput(a, end, line, sizeof(line));
+    }
+    freet(buf);
+  }
+
+  printf("cacheindex: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
 static int st_cache_golden(httrackp *opt, int argc, char **argv) {
   int regen, err;
 
@@ -2213,6 +2286,8 @@ static const struct selftest_entry {
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
+    {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
+     st_cacheindex},
     {"cache-golden", "<dir> [regen]", "frozen cache-format read self-test",
      st_cache_golden},
     {"cache-writefail", "<dir>", "cache write-failure handling self-test",

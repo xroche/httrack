@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Cache-index (.ndx) parse must stay inside the buffer on a corrupt length
+# prefix (ASan aborts here on the pre-fix binary; the OK check gates the
+# non-sanitized build too).
+
+test "$(httrack -O /dev/null -#test=cacheindex)" == 'cacheindex: OK'
