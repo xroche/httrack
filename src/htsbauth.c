@@ -307,14 +307,25 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
   return -1;
 }
 
-// écrire cookies.txt
-// !=0 : erreur
+/* Write cookies.txt; returns 0 on success. The jar holds live session
+   cookies, so keep it owner-only on Unix (Windows inherits folder ACLs). */
 int cookie_save(t_cookie * cookie, const char *name) {
   char catbuff[CATBUFF_SIZE];
 
   if (strnotempty(cookie->data)) {
     char BIGSTK line[8192];
+#ifdef _WIN32
     FILE *fp = fopen(fconv(catbuff, sizeof(catbuff), name), "wb");
+#else
+    const int fd = open(fconv(catbuff, sizeof(catbuff), name),
+                        O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
+    FILE *fp = fd != -1 ? fdopen(fd, "wb") : NULL;
+
+    if (fd != -1 && fp == NULL)
+      close(fd);    /* fdopen failed: don't leak the descriptor */
+    if (fp != NULL) /* O_CREAT's mode skips pre-existing jars: tighten those */
+      (void) fchmod(fd, HTS_PROTECT_FILE);
+#endif
 
     if (fp) {
       char *a = cookie->data;

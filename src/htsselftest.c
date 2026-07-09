@@ -1551,6 +1551,24 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     err = 1;
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
+#ifndef _WIN32
+  /* the jar holds live session cookies: cookie_save must keep it 0600 */
+  {
+    const char *jar = "st-cookies-jar.txt";
+    struct stat st;
+
+    (void) UNLINK(jar);
+    assertf(cookie_save(&cookie, jar) == 0);
+    assertf(stat(jar, &st) == 0);
+    assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
+    /* a pre-existing world-readable jar must be tightened, not kept */
+    assertf(chmod(jar, 0644) == 0);
+    assertf(cookie_save(&cookie, jar) == 0);
+    assertf(stat(jar, &st) == 0);
+    assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
+    (void) UNLINK(jar);
+  }
+#endif
   printf("cookie-header: %s\n", err ? "FAIL" : "OK");
   if (err)
     printf("  got: %s\n", hdr);
