@@ -50,9 +50,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   while (p != NULL && *p != '\0') {
     char *nl = strchr(p, '\n');
     size_t n = (nl != NULL) ? (size_t) (nl - p) : strlen(p);
+    size_t i, len = 0;
 
-    memcpy(line, p, n);
-    line[n] = '\0';
+    /* binput drops every '\r' on the wire; mirror it */
+    for (i = 0; i < n; i++)
+      if (p[i] != '\r')
+        line[len++] = p[i];
+    line[len] = '\0';
     if (first) {
       treatfirstline(&r, line);
       first = 0;
