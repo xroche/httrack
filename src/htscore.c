@@ -138,14 +138,6 @@ RUN_CALLBACK0(opt, end); \
       freet(cache.use);                                                        \
       cache.use = NULL;                                                        \
     }                                                                          \
-    if (cache.dat) {                                                           \
-      fclose(cache.dat);                                                       \
-      cache.dat = NULL;                                                        \
-    }                                                                          \
-    if (cache.ndx) {                                                           \
-      fclose(cache.ndx);                                                       \
-      cache.ndx = NULL;                                                        \
-    }                                                                          \
     if (cache.zipOutput) {                                                     \
       zipClose(cache.zipOutput,                                                \
                "Created by HTTrack Website Copier/" HTTRACK_VERSION);          \
@@ -154,10 +146,6 @@ RUN_CALLBACK0(opt, end); \
     if (cache.zipInput) {                                                      \
       unzClose(cache.zipInput);                                                \
       cache.zipInput = NULL;                                                   \
-    }                                                                          \
-    if (cache.olddat) {                                                        \
-      fclose(cache.olddat);                                                    \
-      cache.olddat = NULL;                                                     \
     }                                                                          \
     if (cache.lst) {                                                           \
       fclose(cache.lst);                                                       \
@@ -488,32 +476,11 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
   *makeindex_done = 1;
 }
 
-/* Flush the parsed HTML output buffer to disk, skipping the rewrite when the
- * on-disk MD5 is unchanged. */
+/* Flush the parsed HTML output buffer to disk. */
 void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save) {
-  char digest[32 + 2];
-  off_t fsize_old =
-      fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), save));
-  int ok = 0;
-
-  digest[0] = '\0';
-  domd5mem(ht_buff, ht_len, digest, 1);
-  if (fsize_old == (off_t) ht_len) {
-    int mlen = 0;
-    char *mbuff;
-
-    cache_readdata(cache, "//[HTML-MD5]//", save, &mbuff, &mlen);
-    if (mlen)
-      mbuff[mlen] = '\0';
-    if ((mlen == 32) && (strcmp(((mbuff != NULL) ? mbuff : ""), digest) == 0)) {
-      ok = 1;
-      hts_log_print(opt, LOG_DEBUG, "File not re-written (md5): %s", save);
-    }
-    freet(mbuff);
-  }
-  if (!ok) {
+  {
     file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
     *fp = filecreate(&opt->state.strc, save);
     if (*fp) {
@@ -545,13 +512,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
       if (fcheck)
         hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
     }
-  } else {
-    file_notify(opt, adr, fil, save, 0, 0, r->notmodified);
-    filenote(&opt->state.strc, save, NULL);
   }
-  if (cache->ndx)
-    cache_writedata(cache->ndx, cache->dat, "//[HTML-MD5]//", save, digest,
-                    (int) strlen(digest));
 }
 
 /* does it look like XML ? (SVG et al.) */

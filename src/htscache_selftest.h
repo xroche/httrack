@@ -60,6 +60,10 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir);
    under <dir>. Returns the failed-check count. */
 int cache_reconcile_selftest(httrackp *opt, const char *dir);
 
+/* Verify cache_init refuses a pre-3.31 .dat/.ndx cache without touching it.
+   Returns the number of failed checks (0 = pass). */
+int cache_legacy_refused_selftest(httrackp *opt, const char *dir);
+
 /* Inject read-side corruption (zip byte surgery: bad size, header, deflate)
    under <dir> and assert every case degrades to STATUSCODE_INVALID without
    tainting a sibling entry. */

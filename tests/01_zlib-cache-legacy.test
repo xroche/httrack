@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# The pre-3.31 .dat/.ndx cache import was removed: cache_init must refuse the
+# legacy pair and leave the files untouched (httrack -#test=cache-legacy <dir>).
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# the refusal errors land on stdout (no log file); pin them and the verdict
+out=$(httrack -#test=cache-legacy "$dir" 2>/dev/null)
+cnt=$(printf '%s\n' "$out" | grep -c 'no longer supported' || true)
+test "$cnt" = 2 || {
+    echo "expected 2 refusal messages, got $cnt" >&2
+    exit 1
+}
+out=$(printf '%s\n' "$out" | tail -n1)
+
+test "$out" = "cache-legacy: OK" || {
+    echo "expected 'cache-legacy: OK', got: $out" >&2
+    exit 1
+}
