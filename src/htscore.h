@@ -193,7 +193,7 @@ struct cache_back {
   /* */
   int type;
   int ro;                   /**< read-only: no new cache is written */
-  FILE *dat, *ndx, *olddat; /**< new data, new index, old data files */
+
   char *use;                /**< in-memory list of cached adr+fil keys */
   FILE *lst;                /**< file list, used for purge */
   FILE *txt;                /**< human-readable file list (info) */
@@ -288,12 +288,12 @@ struct filecreate_params {
 
 /* True if a new cache is being written (plain or zip backend). */
 HTS_STATIC int cache_writable(cache_back * cache) {
-  return (cache != NULL && (cache->dat != NULL || cache->zipOutput != NULL));
+  return (cache != NULL && cache->zipOutput != NULL);
 }
 
 /* True if an old cache is available to read (plain or zip backend). */
 HTS_STATIC int cache_readable(cache_back * cache) {
-  return (cache != NULL && (cache->olddat != NULL || cache->zipInput != NULL));
+  return (cache != NULL && cache->zipInput != NULL);
 }
 
 #endif

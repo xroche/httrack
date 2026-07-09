@@ -89,11 +89,6 @@ typedef enum {
    the involved files are absent. */
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 
-int cache_writedata(FILE * cache_ndx, FILE * cache_dat, const char *str1,
-                    const char *str2, char *outbuff, int len);
-int cache_readdata(cache_back * cache, const char *str1, const char *str2,
-                   char **inbuff, int *len);
-
 void cache_rstr(FILE *fp, char *s, size_t s_size);
 char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s, size_t s_size);

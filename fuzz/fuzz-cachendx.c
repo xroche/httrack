@@ -27,7 +27,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Fuzz the cache-index (.ndx) parser: a corrupt or truncated index must not
    walk the length-prefixed cache_brstr/cache_binput scan past the buffer.
-   Mirrors the loader in cache_readex_new (htscache.c). */
+   Mirrors the -#C cache-listing scan (htscoremain.c). */
 #include "fuzz.h"
 #include "htscache.h"
 #include "htslib.h"
@@ -42,9 +42,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   a += cache_brstr(a, firstline, sizeof(firstline));
   a += cache_brstr(a, firstline, sizeof(firstline));
 
-  /* body: newline-delimited host/file/position triples. The coucal insert
-     the real loader ends with is a separate library's concern; this harness
-     targets the length-prefixed scan that must stay inside the buffer. */
+  /* body: newline-delimited host/file/position triples; the length-prefixed
+     scan must stay inside the buffer */
   while (a != NULL && a < end) {
     char BIGSTK line[HTS_URLMAXSIZE * 2];
     char linepos[256];

@@ -78,14 +78,6 @@ static void selftest_open_for_read(cache_back *cache, httrackp *opt) {
 }
 
 static void selftest_close(cache_back *cache) {
-  if (cache->dat != NULL) {
-    fclose(cache->dat);
-    cache->dat = NULL;
-  }
-  if (cache->ndx != NULL) {
-    fclose(cache->ndx);
-    cache->ndx = NULL;
-  }
   if (cache->zipOutput != NULL) {
     zipClose(cache->zipOutput,
              "Created by HTTrack Website Copier (cache self-test)");
@@ -989,26 +981,15 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures +=
       reconcile_expect(opt, "hts-cache/old.zip", SOLID, "promote-zip-noop");
 
-  /* PROMOTE: a pure-legacy old generation is promoted too (was dead when no
-     zip cache existed) */
+  /* PROMOTE: the removed pre-3.31 legacy pair is left alone */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-cache/old.dat", SOLID);
   reconcile_put(opt, "hts-cache/old.ndx", TINY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
-  failures += reconcile_expect(opt, "hts-cache/new.dat", SOLID, "promote-dat");
-  failures += reconcile_expect(opt, "hts-cache/new.ndx", TINY, "promote-dat");
-  failures += reconcile_expect(opt, "hts-cache/old.dat", -1, "promote-dat");
-
-  /* PROMOTE: a half-written legacy new pair is replaced by the old pair */
-  reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.dat", TINY);
-  reconcile_put(opt, "hts-cache/old.dat", SOLID);
-  reconcile_put(opt, "hts-cache/old.ndx", TINY);
-  hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.dat", SOLID, "promote-dat-partial");
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.ndx", TINY, "promote-dat-partial");
+  failures += reconcile_expect(opt, "hts-cache/new.dat", -1, "promote-dat");
+  failures += reconcile_expect(opt, "hts-cache/new.ndx", -1, "promote-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.dat", SOLID, "promote-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.ndx", TINY, "promote-dat");
 
   /* INTERRUPTED: no lock file, no action */
   reconcile_wipe(opt);
@@ -1058,7 +1039,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures +=
       reconcile_expect(opt, "hts-cache/new.zip", MID, "interrupted-bignew");
 
-  /* INTERRUPTED: the legacy pair follows the same size rule (was dead code) */
+  /* INTERRUPTED: the removed pre-3.31 legacy pair is left alone */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
   reconcile_put(opt, "hts-cache/new.dat", TINY);
@@ -1067,9 +1048,13 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   reconcile_put(opt, "hts-cache/old.ndx", MID);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures +=
-      reconcile_expect(opt, "hts-cache/new.dat", SOLID, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/new.dat", TINY, "interrupted-dat");
   failures +=
-      reconcile_expect(opt, "hts-cache/new.ndx", MID, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/new.ndx", TINY, "interrupted-dat");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.dat", SOLID, "interrupted-dat");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.ndx", MID, "interrupted-dat");
 
   /* ROLLBACK: the old zip generation is restored (a zip cache used to lose
      its only good generation here) */
@@ -1089,17 +1074,18 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures += reconcile_expect(opt, "hts-cache/new.lst", MID, "rollback-lst");
   failures += reconcile_expect(opt, "hts-cache/new.txt", MID, "rollback-txt");
 
-  /* ROLLBACK: full legacy generation incl. sidecars (historical behavior) */
+  /* ROLLBACK: sidecars restored, the removed pre-3.31 pair left alone */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-cache/new.dat", TINY);
-  reconcile_put(opt, "hts-cache/new.ndx", TINY);
   reconcile_put(opt, "hts-cache/old.dat", SOLID);
   reconcile_put(opt, "hts-cache/old.ndx", MID);
   reconcile_put(opt, "hts-cache/old.lst", MID);
   reconcile_put(opt, "hts-cache/old.txt", MID);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
-  failures += reconcile_expect(opt, "hts-cache/new.dat", SOLID, "rollback-dat");
-  failures += reconcile_expect(opt, "hts-cache/new.ndx", MID, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/new.dat", TINY, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/new.ndx", -1, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.dat", SOLID, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.ndx", MID, "rollback-dat");
   failures += reconcile_expect(opt, "hts-cache/new.lst", MID, "rollback-dat");
   failures += reconcile_expect(opt, "hts-cache/new.txt", MID, "rollback-dat");
 
@@ -1108,6 +1094,101 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   reconcile_put(opt, "hts-cache/new.zip", TINY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
   failures += reconcile_expect(opt, "hts-cache/new.zip", TINY, "rollback-noop");
+
+  reconcile_wipe(opt);
+  return failures;
+}
+
+/* The pre-3.31 .dat/.ndx import was removed: cache_init must refuse the
+   legacy pair, leave the files in place, and not flag an update run. */
+int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
+  int failures = 0;
+  int variant;
+
+  selftest_tag = "cache-legacy";
+  golden_setup(opt, dir);
+#ifdef _WIN32
+  mkdir(reconcile_st_path(opt, "hts-cache"));
+#else
+  mkdir(reconcile_st_path(opt, "hts-cache"), HTS_PROTECT_FOLDER);
+#endif
+
+  /* variant 0: old.dat/old.ndx (--update layout); 1: new.dat/new.ndx (ro) */
+  for (variant = 0; variant < 2; variant++) {
+    cache_back cache;
+    const char *const dat =
+        variant == 0 ? "hts-cache/old.dat" : "hts-cache/new.dat";
+    const char *const ndx =
+        variant == 0 ? "hts-cache/old.ndx" : "hts-cache/new.ndx";
+
+    reconcile_wipe(opt);
+    reconcile_put(opt, dat, 4096);
+    reconcile_put(opt, ndx, 4096);
+    opt->is_update = 0;
+    selftest_open(&cache, opt, /*ro*/ variant == 1);
+    if (cache_readable(&cache)) {
+      printf("cache-legacy: variant %d imported a removed format\n", variant);
+      failures++;
+    }
+    if (coucal_nitems(cache.hashtable) != 0) { /* no phantom index entries */
+      printf("cache-legacy: variant %d imported index entries\n", variant);
+      failures++;
+    }
+    if (opt->is_update) {
+      printf("cache-legacy: variant %d flagged an update\n", variant);
+      failures++;
+    }
+    if (fsize(reconcile_st_path(opt, dat)) != 4096 ||
+        fsize(reconcile_st_path(opt, ndx)) != 4096) {
+      printf("cache-legacy: variant %d touched the legacy files\n", variant);
+      failures++;
+    }
+    if (cache.lst != NULL) {
+      fclose(cache.lst);
+      cache.lst = NULL;
+    }
+    if (cache.txt != NULL) {
+      fclose(cache.txt);
+      cache.txt = NULL;
+    }
+    selftest_close(&cache);
+  }
+
+  /* a healthy zip must win over stray legacy files, with no refusal */
+  {
+    cache_back cache;
+    const char *const body = "<html>zip wins</html>";
+
+    reconcile_wipe(opt);
+    selftest_open_for_write(&cache, opt);
+    store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
+                "OK", "text/html", "utf-8", "", "", "", "", body, strlen(body));
+    selftest_close(&cache);
+    reconcile_put(opt, "hts-cache/old.ndx", 4096);
+    reconcile_put(opt, "hts-cache/old.dat", 4096);
+    selftest_open_for_read(&cache, opt);
+    if (!cache_readable(&cache)) {
+      printf("cache-legacy: stray legacy files shadowed the zip cache\n");
+      failures++;
+    }
+    failures +=
+        check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
+                    "utf-8", "", "", "", "", body, strlen(body));
+    if (fsize(reconcile_st_path(opt, "hts-cache/old.ndx")) != 4096 ||
+        fsize(reconcile_st_path(opt, "hts-cache/old.dat")) != 4096) {
+      printf("cache-legacy: zip-wins pass touched the legacy files\n");
+      failures++;
+    }
+    if (cache.lst != NULL) {
+      fclose(cache.lst);
+      cache.lst = NULL;
+    }
+    if (cache.txt != NULL) {
+      fclose(cache.txt);
+      cache.txt = NULL;
+    }
+    selftest_close(&cache);
+  }
 
   reconcile_wipe(opt);
   return failures;
