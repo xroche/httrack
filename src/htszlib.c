@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 
 /*
   Unpack file into a new file (gzip, zlib RFC1950 or raw deflate RFC1951).
+  A body with no compressed framing at all is copied verbatim (identity).
   Return value: size of the new file, or -1 if an error occurred
 */
 /* Note: utf-8 */
@@ -128,6 +129,28 @@ int hts_zunpack(char *filename, char *newfile) {
         }
         inflateEnd(&strm);
         fclose(fpout);
+      }
+      /* neither framing decodes and no gzip/zlib header: server mislabeled
+         an identity body as compressed; keep it verbatim (#47) */
+      if (ret < 0 && !wrapped) {
+        FILE *const fpout =
+            FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
+
+        if (fpout != NULL && fseek(in, 0, SEEK_SET) == 0) {
+          int size = 0;
+
+          while ((navail = fread(inbuf, 1, sizeof(inbuf), in)) > 0) {
+            if (fwrite(inbuf, 1, navail, fpout) != navail) {
+              size = -1;
+              break;
+            }
+            size += (int) navail;
+          }
+          if (size >= 0 && !ferror(in))
+            ret = size;
+        }
+        if (fpout != NULL)
+          fclose(fpout);
       }
       fclose(in);
     }

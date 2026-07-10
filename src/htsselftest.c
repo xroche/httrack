@@ -2123,6 +2123,19 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   return ok ? 0 : 1;
 }
 
+/* Write src[0..len) to path as-is; 0 on success. */
+static int ae_write_raw(const char *path, const unsigned char *src,
+                        size_t len) {
+  FILE *const f = FOPEN(path, "wb");
+  int ok;
+
+  if (f == NULL)
+    return 1;
+  ok = fwrite(src, 1, len, f) == len;
+  fclose(f);
+  return ok ? 0 : 1;
+}
+
 /* Compare path's bytes to expect[0..len); 0 if equal. Streams (large files). */
 static int ae_check_decoded(const char *path, const unsigned char *expect,
                             size_t len) {
@@ -2190,6 +2203,24 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     assertf(ae_write_collision(inpath, body, 64) == 0);
     assertf(hts_zunpack(inpath, outpath) == 64);
     assertf(ae_check_decoded(outpath, body, 64) == 0);
+    /* Identity fallback (#47): a plain body mislabeled as compressed is kept
+       verbatim; a wrapped-but-truncated stream must still fail. */
+    assertf(ae_write_raw(inpath, small, slen) == 0);
+    assertf(hts_zunpack(inpath, outpath) == (int) slen);
+    assertf(ae_check_decoded(outpath, small, slen) == 0);
+    assertf(ae_write_packed(inpath, 16 + MAX_WBITS, small, slen) == 0);
+    {
+      unsigned char gz[512];
+      size_t glen;
+      FILE *const f = FOPEN(inpath, "rb");
+
+      assertf(f != NULL);
+      glen = fread(gz, 1, sizeof(gz), f);
+      fclose(f);
+      assertf(glen > 8 && glen < sizeof(gz));
+      assertf(ae_write_raw(inpath, gz, glen - 8) == 0);
+    }
+    assertf(hts_zunpack(inpath, outpath) < 0);
     freet(body);
   }
 #else
