@@ -788,6 +788,30 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static int st_metacharset(httrackp *opt, int argc, char **argv) {
+  char *s;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "metacharset: needs an html string\n");
+    return 1;
+  }
+  s = hts_getCharsetFromMeta(argv[0], strlen(argv[0]));
+  printf("%s\n", s != NULL ? s : "(none)");
+  freet(s);
+  return 0;
+}
+
+static int st_isutf8(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "isutf8: needs a string\n");
+    return 1;
+  }
+  printf("%d\n", hts_isStringUTF8(argv[0], strlen(argv[0])) ? 1 : 0);
+  return 0;
+}
+
 static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   char *s;
 
@@ -2447,6 +2471,9 @@ static const struct selftest_entry {
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <string>",
      "convert a string to UTF-8 from a charset", st_charset},
+    {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
+     st_metacharset},
+    {"isutf8", "<string>", "is the string valid UTF-8 (1/0)", st_isutf8},
     {"idna-encode", "<host>", "encode a hostname to IDNA/punycode",
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",

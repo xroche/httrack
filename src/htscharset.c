@@ -84,7 +84,7 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
 
 /* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
 static char *hts_stringMemCopy(const char *s, size_t size) {
-  char *dest = malloc(size + 1);
+  char *dest = malloct(size + 1);
 
   if (dest != NULL) {
     memcpy(dest, s, size);
@@ -549,42 +549,6 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 
 #endif
 
-HTS_STATIC char *hts_getCharsetFromContentType(const char *mime) {
-  /* text/html; charset=utf-8 */
-  const char *const charset = "charset";
-  char *pos = strstr(mime, charset);
-
-  if (pos != NULL) {
-    /* Skip spaces */
-    int eq = 0;
-
-    for(pos += strlen(charset);
-        *pos == ' ' || *pos == '=' || *pos == '"' || *pos == '\''; pos++) {
-      if (*pos == '=') {
-        eq = 1;
-      }
-    }
-    if (eq == 1) {
-      int len;
-
-      for(len = 0;
-          pos[len] == ' ' || pos[len] == ';' || pos[len] == '"' || *pos == '\'';
-          pos++) ;
-      if (len != 0) {
-        char *const s = malloc(len + 1);
-        int i;
-
-        for(i = 0; i < len; i++) {
-          s[i] = pos[i];
-        }
-        s[len] = '\0';
-        return s;
-      }
-    }
-  }
-  return NULL;
-}
-
 #ifdef _WIN32
 #define strcasecmp(a,b) stricmp(a,b)
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
@@ -644,58 +608,106 @@ int hts_isCharsetUTF8(const char *charset) {
          || strcasecmp(charset, "utf8") == 0 );
 }
 
+/* Extract X from a "text/html; charset=X" content= attribute value. */
+static char *charset_from_content(const char *s, size_t len) {
+  size_t i;
+
+  for (i = 0; i + 7 < len; i++) {
+    if ((i == 0 || is_space(s[i - 1]) || s[i - 1] == ';') &&
+        strncasecmp(&s[i], "charset", 7) == 0 && is_space_or_equal(s[i + 7])) {
+      size_t j, val;
+
+      for (j = i + 7; j < len && is_space_or_equal_or_quote(s[j]); j++)
+        ;
+      for (val = j; j < len && s[j] != '"' && s[j] != '\'' && s[j] != ';' &&
+                    !is_space(s[j]);
+           j++)
+        ;
+      if (j != val) {
+        return hts_stringMemCopy(&s[val], j - val);
+      }
+    }
+  }
+  return NULL;
+}
+
 char *hts_getCharsetFromMeta(const char *html, size_t size) {
-  int i;
+  size_t i;
 
-  /* <META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8" > */
-  for(i = 0; i < size; i++) {
-    if (html[i] == '<' && strncasecmp(&html[i + 1], "meta", 4) == 0
-        && is_space(html[i + 5])) {
-      /* Skip spaces */
-      for(i += 5; is_space(html[i]); i++) ;
-      if (strncasecmp(&html[i], "HTTP-EQUIV", 10) == 0
-          && is_space_or_equal(html[i + 10])) {
-        for(i += 10; is_space_or_equal_or_quote(html[i]); i++) ;
-        if (strncasecmp(&html[i], "CONTENT-TYPE", 12) == 0) {
-          for(i += 12; is_space_or_equal_or_quote(html[i]); i++) ;
-          if (strncasecmp(&html[i], "CONTENT", 7) == 0
-              && is_space_or_equal(html[i + 7])) {
-            for(i += 7; is_space_or_equal_or_quote(html[i]); i++) ;
-            /* Skip content-type */
-            for(;
-                i < size && html[i] != ';' && html[i] != '"' && html[i] != '\'';
-                i++) ;
-            /* Expect charset attribute here */
-            if (html[i] == ';') {
-              for(i++; is_space(html[i]); i++) ;
-              /* Look for charset */
-              if (strncasecmp(&html[i], "charset", 7) == 0
-                  && is_space_or_equal(html[i + 7])) {
-                int len;
+  /* HTML5 <meta charset=X> or legacy
+     <meta http-equiv="Content-Type" content="text/html; charset=X">,
+     attributes in any order; first resolvable tag wins. */
+  for (i = 0; i + 6 < size; i++) {
+    size_t j;
+    const char *equiv = NULL, *content = NULL;
+    size_t equiv_len = 0, content_len = 0;
 
-                for(i += 7; is_space_or_equal(html[i]) || html[i] == '\'';
-                    i++) ;
-                /* Charset */
-                for(len = 0;
-                    i + len < size && html[i + len] != '"'
-                    && html[i + len] != '\'' && html[i + len] != ' '; len++) ;
-                /* No error ? */
-                if (len != 0 && i < size) {
-                  char *const s = malloc(len + 1);
-                  int j;
+    if (html[i] != '<' || strncasecmp(&html[i + 1], "meta", 4) != 0 ||
+        !is_space(html[i + 5])) {
+      continue;
+    }
+    /* Attribute scan, strictly bounded by size. */
+    for (j = i + 6; j < size && html[j] != '>';) {
+      size_t name, name_len, val = 0, val_len = 0;
 
-                  for(j = 0; j < len; j++) {
-                    s[j] = html[i + j];
-                  }
-                  s[len] = '\0';
-                  return s;
-                }
-              }
-            }
+      if (is_space(html[j]) || html[j] == '/') {
+        j++;
+        continue;
+      }
+      for (name = j; j < size && html[j] != '=' && html[j] != '>' &&
+                     html[j] != '/' && !is_space(html[j]);
+           j++)
+        ;
+      name_len = j - name;
+      for (; j < size && is_space(html[j]); j++)
+        ;
+      if (j < size && html[j] == '=') {
+        for (j++; j < size && is_space(html[j]); j++)
+          ;
+        if (j < size && (html[j] == '"' || html[j] == '\'')) {
+          const char quote = html[j++];
+
+          for (val = j; j < size && html[j] != quote; j++)
+            ;
+          if (j >= size) /* unterminated quote: drop the tag */
+            break;
+          val_len = j++ - val;
+        } else {
+          /* unquoted: ends at whitespace or '>' only (HTML5 prescan); '/'
+             belongs to the value except as the tail of a self-close */
+          for (val = j; j < size && !is_space(html[j]) && html[j] != '>'; j++)
+            ;
+          val_len = j - val;
+          if (val_len != 0 && j < size && html[j] == '>' &&
+              html[val + val_len - 1] == '/') {
+            val_len--;
           }
         }
       }
+      /* first occurrence of each attribute wins, as in browsers */
+      if (val_len != 0) {
+        if (name_len == 7 && strncasecmp(&html[name], "charset", 7) == 0) {
+          return hts_stringMemCopy(&html[val], val_len);
+        } else if (equiv == NULL && name_len == 10 &&
+                   strncasecmp(&html[name], "http-equiv", 10) == 0) {
+          equiv = &html[val];
+          equiv_len = val_len;
+        } else if (content == NULL && name_len == 7 &&
+                   strncasecmp(&html[name], "content", 7) == 0) {
+          content = &html[val];
+          content_len = val_len;
+        }
+      }
     }
+    if (equiv_len == 12 && strncasecmp(equiv, "content-type", 12) == 0 &&
+        content != NULL) {
+      char *const s = charset_from_content(content, content_len);
+
+      if (s != NULL) {
+        return s;
+      }
+    }
+    i = j;
   }
   return NULL;
 }
@@ -1140,17 +1152,45 @@ int hts_isStringUTF8(const char *s, size_t size) {
   const unsigned char *const data = (const unsigned char*) s;
   size_t i;
 
+  /* Strict RFC 3629: reject overlongs, surrogates, > U+10FFFF, 5/6-byte. */
   for(i = 0 ; i < size ; ) {
-    /* Reader: can read bytes up to j */
-#define RD ( i < size ? data[i++] : -1 )
+    const unsigned char c = data[i];
+    size_t len, k;
+    hts_UCS4 uc, min;
 
-    /* Writer: a malformed sequence means the string is not UTF-8 (return 0) */
-#define WR(C) if ((C) == -1) { return 0; }
+    if (c < 0x80) {
+      i++;
+      continue;
+    } else if (c >= 0xc2 && c <= 0xdf) {
+      len = 2;
+      min = 0x80;
+      uc = c & 0x1f;
+    } else if (c >= 0xe0 && c <= 0xef) {
+      len = 3;
+      min = 0x800;
+      uc = c & 0x0f;
+    } else if (c >= 0xf0 && c <= 0xf4) {
+      len = 4;
+      min = 0x10000;
+      uc = c & 0x07;
+    } else { /* continuation byte, overlong C0/C1, or F5..FF lead */
+      return 0;
+    }
+    if (size - i < len) {
+      return 0;
+    }
+    for (k = 1; k < len; k++) {
+      const unsigned char cc = data[i + k];
 
-    /* Read Unicode character. */
-    READ_UNICODE(RD, WR);
-#undef RD
-#undef WR
+      if ((cc & 0xc0) != 0x80) {
+        return 0;
+      }
+      uc = (uc << 6) | (cc & 0x3f);
+    }
+    if (uc < min || uc > 0x10FFFF || (uc >= 0xD800 && uc <= 0xDFFF)) {
+      return 0;
+    }
+    i += len;
   }
 
   return 1;

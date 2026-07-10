@@ -36,3 +36,64 @@ test "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café' 2>/dev
 # malformed UTF-8 (lone continuation byte, truncated lead byte) must not crash
 runs 'utf-8' $'\x80'
 runs 'utf-8' $'\xc3'
+
+# hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
+# -#test=metacharset <html> prints the charset, or "(none)".
+meta() {
+    test "$(httrack -O /dev/null -#test=metacharset "$1")" == "$2" || exit 1
+}
+
+# HTML5 form, quoting/spacing flavors
+meta '<meta charset="utf-8">' 'utf-8'
+meta "<meta charset='utf-8'>" 'utf-8'
+meta '<meta charset=utf-8>' 'utf-8'
+meta '<meta charset=utf-8 />' 'utf-8'
+meta '<meta charset=utf-8/>' 'utf-8'
+# charset labels are case-insensitive downstream; only require case-insensitive match
+test "$(httrack -O /dev/null -#test=metacharset '<META CHARSET=UTF-8>' | tr '[:upper:]' '[:lower:]')" == 'utf-8' || exit 1
+meta '<html><head><meta   charset = "utf-8"  ></head>' 'utf-8'
+
+# legacy http-equiv form, attributes in any order
+meta '<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">' 'iso-8859-1'
+meta '<meta content="text/html; charset=gb2312" http-equiv="content-type">' 'gb2312'
+meta '<meta http-equiv=Content-Type content="text/html;charset=euc-jp">' 'euc-jp'
+meta '<meta http-equiv="Content-Type" content="text/html; charset = koi8-r ">' 'koi8-r'
+meta '<meta http-equiv="Content-Type" content="text/html; charset=utf-8;">' 'utf-8'
+meta '<meta http-equiv=content-type content=text/html;charset=utf-8 />' 'utf-8'
+meta '<meta http-equiv=content-type content=text/html;charset=utf-8>' 'utf-8'
+
+# first resolvable meta wins; unrelated metas are skipped
+meta '<meta name="viewport" content="width=1"><meta charset="koi8-r">' 'koi8-r'
+meta '<meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=gb2312">' 'utf-8'
+
+# duplicate attribute: first wins, as in browsers
+meta '<meta http-equiv="Content-Type" content="text/html; charset=big5" http-equiv="refresh">' 'big5'
+
+# negatives: wrong tag/attribute, empty value
+meta '<p>x</p>' '(none)'
+meta '<meta name="desc" content="charset=bogus">' '(none)'
+meta '<meta http-equiv="refresh" content="0; url=x.html">' '(none)'
+meta '<body charset="utf-8">' '(none)'
+meta '<meta charset="">' '(none)'
+
+# hostile truncations: no crash, no match
+meta '<meta charset="utf-8' '(none)'
+meta '<meta charset=' '(none)'
+meta '<meta ' '(none)'
+meta '<meta' '(none)'
+
+# hts_isStringUTF8: valid-UTF-8 probe (guards the #180 link conversion).
+utf8() {
+    test "$(httrack -O /dev/null -#test=isutf8 "$1")" == "$2" || exit 1
+}
+utf8 'plain' '1'
+utf8 'café' '1'
+utf8 '统计' '1'
+utf8 "$(printf 'caf\xe9')" '0'              # latin-1 accent
+utf8 "$(printf '\xc3')" '0'                 # truncated lead byte
+utf8 "$(printf '\xa9')" '0'                 # lone continuation byte
+utf8 "$(printf '\xf0\x9f\x98\x80')" '1'     # 4-byte emoji
+utf8 "$(printf '\xc0\xaf')" '0'             # overlong (latin-1 "À¯" must stay convertible)
+utf8 "$(printf '\xed\xa0\x80')" '0'         # UTF-16 surrogate
+utf8 "$(printf '\xf4\x90\x80\x80')" '0'     # above U+10FFFF
+utf8 "$(printf '\xf8\x88\x80\x80\x80')" '0' # legacy 5-byte form

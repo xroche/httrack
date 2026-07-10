@@ -109,6 +109,7 @@ TESTS = \
 	37_local-cache-outage.test \
 	38_local-update-304.test \
 	39_local-delayed-cancel.test \
-	40_local-why.test
+	40_local-why.test \
+	41_local-utf8-link.test
 
 CLEANFILES = check-network_sh.cache
