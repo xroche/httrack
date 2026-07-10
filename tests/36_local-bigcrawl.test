@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Diverse seeded /big/ crawl: 12 pattern families, decoy absence, update pass
-# must 304-revalidate. 360 = 1 index + 96 pages + 192 imgs + 5 shared + 60
+# must 304-revalidate. 361 = 1 index + 96 pages + 192 imgs + 5 shared + 61
 # family + 6 singles; the 4 planted errors write -o1 pages, not counted.
 
 set -euo pipefail
@@ -9,7 +9,7 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --rerun \
-    --errors 4 --files 360 \
+    --errors 4 --files 361 \
     --found 'big/p/95.html' \
     --found 'big/a/d1/d2/d3/d4/d5/d6/d7/d8/deep.png' \
     --found 'big/a/f2-2x.png' \
@@ -40,6 +40,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --not-found 'big/x/bj.jar' \
     --not-found 'big/x/is1.png' \
     --not-found 'big/x/concat.html' \
+    --file-matches 'big/f1/gzid.html' '<p>gzid</p>' \
     --file-matches 'big/p/2.html' 'srcset="\.\./a/f2-1x\.png 1x, \.\./a/f2-2x\.png 2x"' \
     --file-matches 'big/a/blk2.css' 'url\(blk2-bg\.png\)' \
     --file-matches 'big/p/5.html' "document\\.write\\('<a href=\"\\.\\./f5/dw\\.html\"" \

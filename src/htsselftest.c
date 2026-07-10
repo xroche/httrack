@@ -2123,6 +2123,19 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   return ok ? 0 : 1;
 }
 
+/* Write src[0..len) to path as-is; 0 on success. */
+static int ae_write_raw(const char *path, const unsigned char *src,
+                        size_t len) {
+  FILE *const f = FOPEN(path, "wb");
+  int ok;
+
+  if (f == NULL)
+    return 1;
+  ok = fwrite(src, 1, len, f) == len;
+  fclose(f);
+  return ok ? 0 : 1;
+}
+
 /* Compare path's bytes to expect[0..len); 0 if equal. Streams (large files). */
 static int ae_check_decoded(const char *path, const unsigned char *expect,
                             size_t len) {
@@ -2190,6 +2203,46 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     assertf(ae_write_collision(inpath, body, 64) == 0);
     assertf(hts_zunpack(inpath, outpath) == 64);
     assertf(ae_check_decoded(outpath, body, 64) == 0);
+    /* Identity fallback (#47): a plain body mislabeled as compressed is kept
+       verbatim, small and multi-chunk (> one 8 KiB fread). */
+    assertf(ae_write_raw(inpath, small, slen) == 0);
+    assertf(hts_zunpack(inpath, outpath) == (int) slen);
+    assertf(ae_check_decoded(outpath, small, slen) == 0);
+    {
+      const size_t ilen = 16 * 1024;
+      unsigned char *idbody = malloct(ilen);
+
+      assertf(idbody != NULL);
+      for (i = 0; i < ilen; i++)
+        idbody[i] = small[i % slen];
+      assertf(ae_write_raw(inpath, idbody, ilen) == 0);
+      assertf(hts_zunpack(inpath, outpath) == (int) ilen);
+      assertf(ae_check_decoded(outpath, idbody, ilen) == 0);
+      freet(idbody);
+    }
+    /* Truncated gzip (CRC+ISIZE cut), zlib (ADLER32 cut) and raw deflate
+       must all still fail, not fall back to a verbatim copy. */
+    {
+      static const struct {
+        int wb;
+        size_t cut;
+      } tr[] = {{16 + MAX_WBITS, 8}, {MAX_WBITS, 4}, {-MAX_WBITS, 5}};
+
+      for (i = 0; i < sizeof(tr) / sizeof(tr[0]); i++) {
+        unsigned char z[512];
+        size_t zlen;
+        FILE *f;
+
+        assertf(ae_write_packed(inpath, tr[i].wb, small, slen) == 0);
+        f = FOPEN(inpath, "rb");
+        assertf(f != NULL);
+        zlen = fread(z, 1, sizeof(z), f);
+        fclose(f);
+        assertf(zlen > tr[i].cut && zlen < sizeof(z));
+        assertf(ae_write_raw(inpath, z, zlen - tr[i].cut) == 0);
+        assertf(hts_zunpack(inpath, outpath) < 0);
+      }
+    }
     freet(body);
   }
 #else

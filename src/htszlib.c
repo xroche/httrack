@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 
 /*
   Unpack file into a new file (gzip, zlib RFC1950 or raw deflate RFC1951).
+  A body provably in no deflate framing is copied verbatim (identity).
   Return value: size of the new file, or -1 if an error occurred
 */
 /* Note: utf-8 */
@@ -68,6 +69,10 @@ int hts_zunpack(char *filename, char *newfile) {
             ((inbuf[0] & 0x0f) == Z_DEFLATED &&
              (((unsigned) inbuf[0] << 8 | inbuf[1]) % 31) == 0)));
       int attempt;
+      /* not_deflate: the raw attempt hit a data error, so the body is in no
+         deflate framing at all. env_error: local I/O or memory failure. */
+      hts_boolean not_deflate = HTS_FALSE;
+      hts_boolean env_error = HTS_FALSE;
 
       /* deflate is ambiguous; on failure retry with the other windowBits */
       for (attempt = 0; attempt < 2 && ret < 0; attempt++) {
@@ -78,15 +83,20 @@ int hts_zunpack(char *filename, char *newfile) {
 
         if (attempt > 0) {
           /* rewind input; reopening fpout "wb" discards the partial output */
-          if (fseek(in, 0, SEEK_SET) != 0)
+          if (fseek(in, 0, SEEK_SET) != 0) {
+            env_error = HTS_TRUE;
             break;
+          }
           navail = fread(inbuf, 1, sizeof(inbuf), in);
         }
         fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
-        if (fpout == NULL)
+        if (fpout == NULL) {
+          env_error = HTS_TRUE;
           break;
+        }
         memset(&strm, 0, sizeof(strm));
         if (inflateInit2(&strm, windowBits) != Z_OK) {
+          env_error = HTS_TRUE;
           fclose(fpout);
           break;
         }
@@ -108,12 +118,17 @@ int hts_zunpack(char *filename, char *newfile) {
               zerr = inflate(&strm, Z_NO_FLUSH);
               if (zerr == Z_NEED_DICT || zerr == Z_DATA_ERROR ||
                   zerr == Z_MEM_ERROR || zerr == Z_STREAM_ERROR) {
+                if (zerr == Z_MEM_ERROR || zerr == Z_STREAM_ERROR)
+                  env_error = HTS_TRUE;
+                else if (windowBits < 0)
+                  not_deflate = HTS_TRUE;
                 ok = HTS_FALSE;
                 break;
               }
               produced = sizeof(outbuf) - strm.avail_out;
               if (produced > 0 &&
                   fwrite(outbuf, 1, produced, fpout) != produced) {
+                env_error = HTS_TRUE;
                 ok = HTS_FALSE;
                 break;
               }
@@ -128,6 +143,28 @@ int hts_zunpack(char *filename, char *newfile) {
         }
         inflateEnd(&strm);
         fclose(fpout);
+      }
+      /* keep a mislabeled identity body verbatim only when provably not
+         deflate; truncation or a local failure must keep failing (#47) */
+      if (ret < 0 && !wrapped && not_deflate && !env_error && !ferror(in)) {
+        FILE *const fpout =
+            FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
+
+        if (fpout != NULL && fseek(in, 0, SEEK_SET) == 0) {
+          int size = 0;
+
+          while ((navail = fread(inbuf, 1, sizeof(inbuf), in)) > 0) {
+            if (fwrite(inbuf, 1, navail, fpout) != navail) {
+              size = -1;
+              break;
+            }
+            size += (int) navail;
+          }
+          if (size >= 0 && !ferror(in))
+            ret = size;
+        }
+        if (fpout != NULL)
+          fclose(fpout);
       }
       fclose(in);
     }
