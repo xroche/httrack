@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# #180: raw non-ASCII hrefs must reach the wire UTF-8 percent-encoded whatever
+# the declared page charset; each PDF exists only at its exact UTF-8 path.
+
+set -euo pipefail
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun \
+    --found 'charset/header/统计大数据服务平台.pdf' \
+    --found 'charset/meta5/统计大数据服务平台.pdf' \
+    --found 'charset/metaeq/统计大数据服务平台.pdf' \
+    --found 'charset/none/统计大数据服务平台.pdf' \
+    --found 'charset/latin1hdr/统计大数据服务平台.pdf' \
+    --found 'charset/latin1real/café.pdf' \
+    --found 'charset/metalatin1/déjà.pdf' \
+    --found 'charset/latin1ovl/À¡x.pdf' \
+    --found 'charset/priority/nuée.pdf' \
+    --found 'charset/preenc/统计大数据服务平台.pdf' \
+    --found 'charset/bom/统计大数据服务平台.pdf' \
+    httrack 'BASEURL/charset/index.html'

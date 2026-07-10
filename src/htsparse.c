@@ -2007,7 +2007,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                 /* Unescape/escape %20 and other &nbsp; */
                 {
-                  // Note: always true (iso-8859-1 as default)
+                  // NULL when UTF-8 conversion is off (-%T0)
                   const char *const charset = str->page_charset_;
                   const int hasCharset = charset != NULL 
                     && *charset != '\0';
@@ -2030,11 +2030,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                   // Force to encode non-printable chars (should never happend)
                   escape_remove_control(lien);
-                  
-                  // charset conversion for the URI filename, 
-                  // and not already UTF-8
-                  // (note: not for the query string!)
-                  if (hasCharset && !hts_isCharsetUTF8(charset)) {
+
+                  // charset conversion for the URI filename (not the query
+                  // string), unless the bytes already are valid UTF-8:
+                  // converting those would double-encode them (#180)
+                  if (hasCharset && !hts_isCharsetUTF8(charset) &&
+                      !hts_isStringUTF8(lien, strlen(lien))) {
                     char *const s = hts_convertStringToUTF8(lien, strlen(lien), charset);
                     if (s != NULL) {
                       hts_log_print(opt, LOG_DEBUG,

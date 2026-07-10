@@ -660,6 +660,97 @@ class Handler(SimpleHTTPRequestHandler):
     def route_intl_page(self):
         self.send_raw(b"<html><body>accented page</body></html>\n", "text/html")
 
+    # Raw non-ASCII href matrix (#180): each variant declares the page charset
+    # differently; the PDF exists only at its exact UTF-8 path, so a
+    # mis-decoded link 404s.
+    CHARSET_CJK = "统计大数据服务平台.pdf"
+    # variant -> (index Content-Type, <head> bytes, href bytes, pdf name)
+    CHARSET_VARIANTS = {
+        "header": ("text/html; charset=utf-8", b"", CHARSET_CJK.encode(), CHARSET_CJK),
+        "meta5": (
+            "text/html",
+            b'<meta charset="utf-8">',
+            CHARSET_CJK.encode(),
+            CHARSET_CJK,
+        ),
+        "metaeq": (
+            "text/html",
+            b'<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+            CHARSET_CJK.encode(),
+            CHARSET_CJK,
+        ),
+        "none": ("text/html", b"", CHARSET_CJK.encode(), CHARSET_CJK),
+        "latin1hdr": (
+            "text/html; charset=iso-8859-1",
+            b"",
+            CHARSET_CJK.encode(),
+            CHARSET_CJK,
+        ),
+        # genuine latin-1 href: the charset conversion must still apply
+        "latin1real": (
+            "text/html; charset=iso-8859-1",
+            b"",
+            "café.pdf".encode("latin-1"),
+            "café.pdf",
+        ),
+        # latin-1 declared by META only: the meta parser is load-bearing
+        "metalatin1": (
+            "text/html",
+            b'<meta charset="iso-8859-1">',
+            "déjà.pdf".encode("latin-1"),
+            "déjà.pdf",
+        ),
+        # latin-1 bytes that form an overlong UTF-8 shape: strict validation
+        # must still convert them
+        "latin1ovl": (
+            "text/html; charset=iso-8859-1",
+            b"",
+            "À¡x.pdf".encode("latin-1"),
+            "À¡x.pdf",
+        ),
+        # header wins over meta: latin-1 href only resolves if iso-8859-1 is kept
+        "priority": (
+            "text/html; charset=iso-8859-1",
+            b'<meta charset="utf-8">',
+            "nuée.pdf".encode("latin-1"),
+            "nuée.pdf",
+        ),
+        "preenc": ("text/html", b"", quote(CHARSET_CJK).encode(), CHARSET_CJK),
+        "bom": ("text/html", b"", CHARSET_CJK.encode(), CHARSET_CJK),
+    }
+
+    def route_charset(self):
+        path = unquote(urlsplit(self.path).path)
+        parts = path.split("/")
+        if path == "/charset/index.html":
+            self.send_html(
+                "".join(
+                    '\t<a href="%s/index.html">%s</a>\n' % (v, v)
+                    for v in self.CHARSET_VARIANTS
+                )
+            )
+            return
+        if len(parts) == 4 and parts[2] in self.CHARSET_VARIANTS:
+            ctype, head, href, pdf = self.CHARSET_VARIANTS[parts[2]]
+            if parts[3] == "index.html":
+                body = (
+                    b"<html><head>"
+                    + head
+                    + b'</head><body><a href="'
+                    + href
+                    + b'">doc</a></body></html>'
+                )
+                if parts[2] == "bom":
+                    body = b"\xef\xbb\xbf" + body
+                self.send_raw(body, ctype)
+                return
+            if parts[3] == pdf:
+                self.send_raw(self.FAKE_PDF, "application/pdf")
+                return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
     # can be interrupted (partial + temp-ref); every later request is 416.
     RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
@@ -1193,6 +1284,9 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith("/big/"):
             self.route_big()
+            return True
+        if path.startswith("/charset/"):
+            self.route_charset()
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
