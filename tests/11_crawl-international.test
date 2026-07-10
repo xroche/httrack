@@ -22,9 +22,9 @@ bash crawl-test.sh \
     httrack http://ut.httrack.com/unicode-links/utf8.html
 
 bash crawl-test.sh \
-    --errors 4 --files 7 \
-    --found ut.httrack.com/unicode-links/cafÃ©3860.html \
-    --found ut.httrack.com/unicode-links/cafÃ©9fa8.html \
+    --errors 2 --files 9 \
+    --found ut.httrack.com/unicode-links/café3860.html \
+    --found ut.httrack.com/unicode-links/café9fa8.html \
     --found ut.httrack.com/unicode-links/café30f4.html \
     --found ut.httrack.com/unicode-links/café5e1f.html \
     --found ut.httrack.com/unicode-links/café7b30.html \
