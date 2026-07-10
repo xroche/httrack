@@ -131,3 +131,17 @@ match '*.aspx' 'page.aspx?y=2'
 # empty subject against a unique-match allow-all pattern (heap over-read regress)
 nomatch_empty '*(('
 nomatch_empty '**(('
+
+# star-heavy non-match must stay polynomial (#501); 400 chars also exercises
+# the heap-allocated memo. timeout (where available) turns a hang into a FAIL.
+with_timeout() {
+    if command -v timeout >/dev/null; then timeout 60 "$@"; else "$@"; fi
+}
+pat=$(printf '*[a]%.0s' $(seq 1 12))b
+subj=$(printf 'a%.0s' $(seq 1 400))
+test "$(with_timeout httrack -O /dev/null -#test=filter "$pat" "$subj")" == "$subj does NOT match $pat" || exit 1
+
+# a later star's class dead-end must re-extend the earlier star, not give up
+# (guards against a single-backtrack-point matcher rewrite)
+match '*[aX]X*[a]Y' 'aXaXaY'
+nomatch '*[aX]X*[a]Y' 'aXbXaY'

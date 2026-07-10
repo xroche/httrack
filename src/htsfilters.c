@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htslib.h"
 #include <ctype.h>
+#include <stdint.h>
 /* END specific definitions */
 
 // à partir d'un tableau de {"+*.toto","-*.zip","+*.tata"} définit si nom est autorisé
@@ -120,16 +121,73 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
   return use1 ? jok1 : jok2;
 }
 
-// supercomparateur joker (tm)
-// compare a et b (b=avec joker dedans), case insensitive [voir CI]
-// renvoi l'adresse de la première lettre de la chaine
-// (càd *[..]toto.. renvoi adresse de toto dans la chaine)
-// accepte les délires du genre www.*.*/ * / * truc*.*
-// cet algo est 'un peu' récursif mais ne consomme pas trop de tm
-// * = toute lettre
-// --?-- : spécifique à HTTrack et aux ?
+/* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
+   pair keeps star-heavy patterns polynomial instead of exponential (#501). */
+typedef struct strjoker_memo {
+  const char *chaine0, *joker0; /* offsets are relative to these bases */
+  size_t stride;                /* strlen(joker0) + 1 */
+  unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
+} strjoker_memo;
+
+static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
+                                 const char *joker, LLint *size,
+                                 int *size_flag);
+
+/* A pair that failed once fails forever (*size is only written on the success
+   path), so record NULL results and cut the re-exploration. */
+static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
+                                const char *joker, LLint *size,
+                                int *size_flag) {
+  size_t bit = 0;
+  const char *adr;
+
+  if (memo->failed) {
+    bit = (size_t) (chaine - memo->chaine0) * memo->stride +
+          (size_t) (joker - memo->joker0);
+    if (memo->failed[bit >> 3] & (unsigned char) (1u << (bit & 7)))
+      return NULL;
+  }
+  adr = strjoker_impl(memo, chaine, joker, size, size_flag);
+  if (adr == NULL && memo->failed)
+    memo->failed[bit >> 3] |= (unsigned char) (1u << (bit & 7));
+  return adr;
+}
+
+// wildcard comparator: match chaine against joker (pattern), case-insensitive
+// returns the address of the first matched letter past any leading joker
+// (ie. *[..]toto.. returns the address of toto within chaine), NULL on mismatch
 HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
                                 LLint *size, int *size_flag) {
+  strjoker_memo memo = {chaine, joker, 0, NULL};
+  unsigned char stackbits[2048];
+  hts_boolean onheap = HTS_FALSE;
+  const char *adr;
+
+  if (chaine != NULL && joker != NULL) {
+    const size_t n1 = strlen(chaine) + 1;
+
+    memo.stride = strlen(joker) + 1;
+    if (n1 <= (SIZE_MAX - 7) / memo.stride) { // overflow-safe bitmap size
+      const size_t bytes = (n1 * memo.stride + 7) / 8;
+
+      if (bytes <= sizeof(stackbits)) {
+        memset(stackbits, 0, bytes);
+        memo.failed = stackbits;
+      } else {
+        memo.failed = (unsigned char *) calloct(bytes, 1);
+        onheap = memo.failed != NULL ? HTS_TRUE : HTS_FALSE;
+      }
+    }
+  }
+  adr = strjoker_rec(&memo, chaine, joker, size, size_flag);
+  if (onheap)
+    freet(memo.failed);
+  return adr;
+}
+
+static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
+                                 const char *joker, LLint *size,
+                                 int *size_flag) {
   if (strnotempty(joker) == 0) {        // fin de chaine joker
     if (strnotempty(chaine) == 0)       // fin aussi pour la chaine: ok
       return chaine;
@@ -303,7 +361,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
 
       // tester sans le joker (pas ()+ mais ()*)
       if (!unique) {
-        if ((adr = strjoker(chaine, joker + jmp, size, size_flag))) {
+        if ((adr = strjoker_rec(memo, chaine, joker + jmp, size, size_flag))) {
           return adr;
         }
       }
@@ -315,7 +373,8 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
         max = strnotempty(chaine) ? 1 : 0; /* empty chaine: no char to eat */
       while(i < (int) max) {
         if (pass[(int) (unsigned char) chaine[i]]) {    // caractère autorisé
-          if ((adr = strjoker(chaine + i + 1, joker + jmp, size, size_flag))) {
+          if ((adr = strjoker_rec(memo, chaine + i + 1, joker + jmp, size,
+                                  size_flag))) {
             return adr;
           }
           i++;
@@ -325,7 +384,8 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
 
       // tester chaîne vide
       if (i != max + 2)         // avant c'est ok
-        if ((adr = strjoker(chaine + max, joker + jmp, size, size_flag)))
+        if ((adr = strjoker_rec(memo, chaine + max, joker + jmp, size,
+                                size_flag)))
           return adr;
 
       return NULL;              // perdu
@@ -347,7 +407,7 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
       // comparaison ok?
       if (ok) {
         // continuer la comparaison.
-        if (strjoker(chaine + jmp, joker + jmp, size, size_flag))
+        if (strjoker_rec(memo, chaine + jmp, joker + jmp, size, size_flag))
           return chaine;        // retourner 1e lettre
       }
 
