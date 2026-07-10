@@ -1,3 +1,13 @@
+httrack (3.49.12-1) unstable; urgency=medium
+
+  * New upstream release: security and crawl-correctness fixes (remote stack
+    overflow in Content-Type/-Encoding parsing, fuzzer-found parser over-reads,
+    world-readable cookies.txt, filter-pattern denial of service) plus a new
+    --why filter diagnostic; full list in history.txt.
+  * Build with _FORTIFY_SOURCE and -fstack-protector-strong.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 10 Jul 2026 21:11:09 +0200
+
 httrack (3.49.11-1) unstable; urgency=medium
 
   * New upstream release: crawl correctness and security fixes (network-facing

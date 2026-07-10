@@ -4,6 +4,23 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-12
++ New: --why explains which filter rule accepts or rejects a given URL, then exits (#505)
++ Fixed: links carrying raw UTF-8 bytes were fetched double-encoded and 404'd (#516)
++ Fixed: an uncompressed body mislabeled as gzip no longer loses the page (#515)
++ Fixed: remote stack overflow and uninitialized read in Content-Type/-Encoding parsing (#506)
++ Fixed: several over-reads and a leak in the filter, URL and IDNA parsers (#499)
++ Fixed: bound the cache-index (.ndx) parser to its buffer (#507)
++ Fixed: catastrophic backtracking on '*'-heavy filter patterns (#513)
++ Fixed: cookies.txt was created world-readable (#511)
++ Fixed: a single corrupt cache entry no longer aborts the whole mirror (#494)
++ Fixed: cache-reconcile policy was broken for zip caches (#491, #493, #495)
++ Fixed: cancelling a crawl mid type-check no longer orphans .delayed placeholders (#496)
++ Fixed: detect URLs after the first inline script and in mid-tag attributes (#497)
++ Changed: build with _FORTIFY_SOURCE and -fstack-protector-strong (#504)
++ Changed: removed the pre-3.31 (.dat/.ndx) cache import (#512)
++ Changed: multiple internal hardening and build improvements (libFuzzer harnesses, CodeQL, dead-code removal)
+
 3.49-11
 + New: parse robots.txt Allow rules and path wildcards per RFC 9309 (#452)
 + New: advertise deflate in Accept-Encoding and decode deflate responses (#450)
