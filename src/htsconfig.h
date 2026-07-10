@@ -76,9 +76,6 @@ Please visit our Website: http://www.httrack.com
 // always direct-to-disk (0/1)
 #define HTS_DIRECTDISK_ALWAYS 1
 
-// fast cache (build hash table)
-#define HTS_FAST_CACHE 1
-
 // le > peut être considéré comme un tag de fermeture de commentaire (<!-- > est
 // valide)
 #define GT_ENDS_COMMENT 1

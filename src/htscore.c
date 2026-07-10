@@ -134,10 +134,6 @@ RUN_CALLBACK0(opt, end); \
     back_delete_all(opt, &cache, sback);                                       \
     back_free(&sback);                                                         \
     checkrobots_free(&robots);                                                 \
-    if (cache.use) {                                                           \
-      freet(cache.use);                                                        \
-      cache.use = NULL;                                                        \
-    }                                                                          \
     if (cache.zipOutput) {                                                     \
       zipClose(cache.zipOutput,                                                \
                "Created by HTTrack Website Copier/" HTTRACK_VERSION);          \
