@@ -185,6 +185,14 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
   return adr;
 }
 
+/* Test-only oracle: the same matcher without the failure memo. */
+const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
+                            int *size_flag) {
+  const strjoker_memo memo = {chaine, joker, 0, NULL};
+
+  return strjoker_rec(&memo, chaine, joker, size, size_flag);
+}
+
 static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
                                  const char *joker, LLint *size,
                                  int *size_flag) {

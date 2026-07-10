@@ -132,6 +132,53 @@ match '*.aspx' 'page.aspx?y=2'
 nomatch_empty '*(('
 nomatch_empty '**(('
 
+# near-miss negatives: word order, exact tails, range boundaries, class case
+nomatch 'foo*bar' 'foobaz'
+nomatch '*foo*bar' 'barfoo' # both words present, wrong order
+nomatch '*.gif' 'a.gifx'    # trailing junk after the extension
+nomatch '*.gif' 'a.gi'
+nomatch '*[b-y]' 'a'
+nomatch '*[b-y]' 'z'
+nomatch '*[a-z].txt' 'B.txt' # classes are case-sensitive...
+match 'FoO*' 'foobar'        # ...literals are not
+
+# a star may match an empty run, but never skip a required literal
+match '*[0-9].gif' '.gif'
+nomatch '*[0-9].gif' 'x.gif'
+
+# a descending range *[c-a] is an empty class, not c..a reversed
+match '*[c-a]x' 'x'
+nomatch '*[c-a]x' 'cx'
+
+# *[param] is all-or-nothing on '?': spans everything after one, else nothing
+match 'a*[param]' 'a?x=1'
+nomatch 'a*[param]' 'ab?x=1'
+
+# the latest matching rule wins, regardless of sign
+fsize 'verdict=forbidden size_flag=0' -1 a.gif '+*.gif' '-*.gif'
+fsize 'verdict=allowed size_flag=0' -1 a.gif '-*.gif' '+*.gif'
+
+# a failed size test sets size_flag but leaves the rule unmatched
+fsize 'verdict=unknown size_flag=1' 5 foo.jpg '-*.jpg*[>10]'
+
+# mime filters (-#test=filtermime = fa_strjoker type=1): only mime: rules
+# apply to a mime type, and mime: rules never apply to a URL
+fmime() {
+    local want="$1"
+    shift
+    test "$(httrack -O /dev/null -#test=filtermime "$@")" == "verdict=$want" || exit 1
+}
+fmime allowed 'image/png' '+mime:image/*'
+fmime unknown 'text/html' '+mime:image/*'
+fmime forbidden 'image/png' '+mime:image/*' '-mime:image/png' # last wins
+fmime allowed 'image/png' '-mime:image/png' '+mime:image/*'
+fmime unknown 'image/png' '+image/*'                               # URL rule: skipped
+fsize 'verdict=unknown size_flag=0' -1 'image/png' '+mime:image/*' # and vice versa
+
+# memoized vs no-memo differential over seeded random patterns and subjects,
+# matching and non-matching (the self-test asserts both polarities occurred)
+test "$(httrack -O /dev/null -#test=filtermemo)" == "filtermemo: 20000 cases OK" || exit 1
+
 # star-heavy non-match must stay polynomial (#501); 400 chars also exercises
 # the heap-allocated memo. timeout (where available) turns a hang into a FAIL.
 with_timeout() {
