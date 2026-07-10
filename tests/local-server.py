@@ -374,6 +374,7 @@ def big_index(port):
         '<img src="/big/a/d1/d2/d3/d4/d5/d6/d7/d8/deep.png">'
         '<a href="/big/f1/long.html?x=%s">long</a>'
         '<a href="/big/f1/gzok.html">gzok</a>'
+        '<a href="/big/f1/gzid.html">gzid</a>'
         '<a href="//127.0.0.1:%d/big/f1/protorel.html">protorel</a>'
         '<a href="http://127.0.0.1:%d/big/f1/abshost.html">abshost</a>'
         '<a href="/big/e/404.html">e404</a>'
@@ -399,6 +400,7 @@ BIG_SIMPLE_PAGES = {
     "/big/f1/dir/": "dir index",
     "/big/f1/long.html": "long",
     "/big/f1/gzok.html": "gzok",
+    "/big/f1/gzid.html": "gzid",
     "/big/f1/protorel.html": "protorel",
     "/big/f1/abshost.html": "abshost",
     "/big/f5/dw.html": "dw target",
@@ -1076,6 +1078,13 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/big/f1/gzok.html":
                 self.big_send(
                     gzip.compress(body, mtime=0),
+                    "text/html",
+                    extra=[("Content-Encoding", "gzip")],
+                )
+            elif path == "/big/f1/gzid.html":
+                # Plain body mislabeled as gzip: identity fallback keeps it (#47)
+                self.big_send(
+                    body,
                     "text/html",
                     extra=[("Content-Encoding", "gzip")],
                 )
