@@ -1646,138 +1646,104 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
       }
     }
     // tester cache
-    if ((strcmp(adr, "file://"))        /* pas fichier */
-        &&((!test) || (cache->type == 1))       /* cache prioritaire, laisser passer en test! */
-        &&((strnotempty(save)) || (strcmp(fil, "/robots.txt") == 0))) { // si en test on ne doit pas utiliser le cache sinon telescopage avec le 302..
-#if HTS_FAST_CACHE
+    if ((strcmp(adr, "file://")) /* pas fichier */
+        && ((!test) ||
+            (cache->type == 1)) /* cache prioritaire, laisser passer en test! */
+        &&
+        ((strnotempty(save)) || (strcmp(fil, "/robots.txt") ==
+                                 0))) { // si en test on ne doit pas utiliser le
+                                        // cache sinon telescopage avec le 302..
       intptr_t hash_pos;
       int hash_pos_return = 0;
-#else
-      char *a = NULL;
-#endif
-#if HTS_FAST_CACHE
+
       if (cache->hashtable) {
-#else
-      if (cache->use) {
-#endif
         char BIGSTK buff[HTS_URLMAXSIZE * 4];
 
-#if HTS_FAST_CACHE
         strcpybuff(buff, adr);
         strcatbuff(buff, fil);
         hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
-#else
-        buff[0] = '\0';
-        strcatbuff(buff, "\n");
-        strcatbuff(buff, adr);
-        strcatbuff(buff, "\n");
-        strcatbuff(buff, fil);
-        strcatbuff(buff, "\n");
-        a = strstr(cache->use, buff);
-#endif
 
-        // Ok, noté en cache->. mais bien présent dans le cache ou sur disque?
-#if HTS_FAST_CACHE
         // negative values when data is not in cache
         if (hash_pos_return < 0) {
-#else
-        if (a) {
-#endif
-          if (!test) {          // non mode test
-#if HTS_FAST_CACHE==0
-            int pos = -1;
+          if (!test) { // not test mode
+            /* note: no check with IS_DELAYED_EXT() enabled - postcheck by
+             * client please! */
+            if (save[0] != '\0' && !IS_DELAYED_EXT(save) &&
+                fsize_utf8(fconv(catbuff, sizeof(catbuff), save)) <=
+                    0) { // final file missing or empty
+              int found = 0;
 
-            a += strlen(buff);
-            sscanf(a, "%d", &pos);      // lire position
-#endif
+              /* It is possible that the file has been moved due to changes in
+               * build structure */
+              {
+                char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
+                htsblk r;
 
-#if HTS_FAST_CACHE==0
-            if (pos < 0) {      // pas de mise en cache data, vérifier existence
-#endif
-              /* note: no check with IS_DELAYED_EXT() enabled - postcheck by client please! */
-              if (save[0] != '\0' && !IS_DELAYED_EXT(save) && fsize_utf8(fconv(catbuff, sizeof(catbuff), save)) <= 0) {  // fichier final n'existe pas ou est vide!
-                int found = 0;
-
-                /* It is possible that the file has been moved due to changes in build structure */
-                {
-                  char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
-                  htsblk r;
-
-                  previous_save[0] = '\0';
-                  r =
-                    cache_readex(opt, cache, adr, fil, /*head */ NULL,
+                previous_save[0] = '\0';
+                r = cache_readex(opt, cache, adr, fil, /*head */ NULL,
                                  /*bound to back[p] (temporary) */
                                  back[p].location_buffer, previous_save, /*ro */
                                  1);
-                  /* Is supposed to be on disk only */
-                  if (r.is_write && previous_save[0] != '\0') {
-                    /* Exists, but with another (old) filename: rename (almost) silently */
-                    if (strcmp(previous_save, save) != 0
-                        && fexist_utf8(fconv(catbuff, sizeof(catbuff), previous_save))) {
-                      rename(fconv(catbuff, sizeof(catbuff), previous_save),
-                             fconv(catbuff2, sizeof(catbuff2), save));
-                      if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {
-                        found = 1;
-                        hts_log_print(opt, LOG_DEBUG,
-                                      "File '%s' has been renamed since last mirror to '%s' ; applying changes",
-                                      previous_save, save);
-                      } else {
-                        hts_log_print(opt, LOG_ERROR,
-                                      "Could not rename '%s' to '%s' ; will have to retransfer it",
-                                      previous_save, save);
-                      }
+                /* Is supposed to be on disk only */
+                if (r.is_write && previous_save[0] != '\0') {
+                  /* Exists, but with another (old) filename: rename (almost)
+                   * silently */
+                  if (strcmp(previous_save, save) != 0 &&
+                      fexist_utf8(
+                          fconv(catbuff, sizeof(catbuff), previous_save))) {
+                    rename(fconv(catbuff, sizeof(catbuff), previous_save),
+                           fconv(catbuff2, sizeof(catbuff2), save));
+                    if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {
+                      found = 1;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "File '%s' has been renamed since last "
+                                    "mirror to '%s' ; applying changes",
+                                    previous_save, save);
+                    } else {
+                      hts_log_print(opt, LOG_ERROR,
+                                    "Could not rename '%s' to '%s' ; will have "
+                                    "to retransfer it",
+                                    previous_save, save);
                     }
                   }
-                  back[p].location_buffer[0] = '\0';
                 }
+                back[p].location_buffer[0] = '\0';
+              }
 
-                /* Not found ? */
-                if (!found) {
-#if HTS_FAST_CACHE
-                  hash_pos_return = 0;
-#else
-                  a = NULL;
-#endif
-                  // dévalider car non présent sur disque dans structure originale!!!
-                  // sinon, le fichier est ok à priori, mais on renverra un if-modified-since pour
-                  // en être sûr
-                  if (opt->norecatch) { // tester norecatch
-                    if (!fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {   // fichier existe pas mais déclaré: on l'a effacé
-                      FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), save), "wb");
+              /* Not found ? */
+              if (!found) {
+                // invalidate: gone from disk, force a refetch
+                hash_pos_return = 0;
+                if (opt->norecatch) {
+                  if (!fexist_utf8(fconv(
+                          catbuff, sizeof(catbuff),
+                          save))) { // declared but missing: user erased it
+                    FILE *fp =
+                        FOPEN(fconv(catbuff, sizeof(catbuff), save), "wb");
 
-                      if (fp)
-                        fclose(fp);
-                      hts_log_print(opt, LOG_WARNING,
-                                    "Previous file '%s' not found (erased by user ?), ignoring: %s%s",
-                                    save, back[p].url_adr, back[p].url_fil);
-                    }
-                  } else {
+                    if (fp)
+                      fclose(fp);
                     hts_log_print(opt, LOG_WARNING,
-                                  "Previous file '%s' not found (erased by user ?), recatching: %s%s",
+                                  "Previous file '%s' not found (erased by "
+                                  "user ?), ignoring: %s%s",
                                   save, back[p].url_adr, back[p].url_fil);
                   }
+                } else {
+                  hts_log_print(opt, LOG_WARNING,
+                                "Previous file '%s' not found (erased by user "
+                                "?), recatching: %s%s",
+                                save, back[p].url_adr, back[p].url_fil);
                 }
-              }                 // fsize() <= 0
-#if HTS_FAST_CACHE==0
-            }
-#endif
+              }
+            } // fsize() <= 0
           }
         }
         //
       } else {
-#if HTS_FAST_CACHE
         hash_pos_return = 0;
-#else
-        a = NULL;
-#endif
       }
 
-      // Existe pas en cache, ou bien pas de cache présent
-#if HTS_FAST_CACHE
-      if (hash_pos_return) {    // OK existe en cache (et données aussi)!
-#else
-      if (a != NULL) {          // OK existe en cache (et données aussi)!
-#endif
+      if (hash_pos_return) { // in cache, with data
         const int cache_is_prioritary = cache->type == 1
           || opt->state.stop != 0;
         if (cache_is_prioritary) {      // cache prioritaire (pas de test if-modified..)
@@ -1898,7 +1864,8 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
 #endif
         }
       }
-      /* Not in cache ; maybe in temporary cache ? Warning: non-movable "url_sav" */
+      /* Not in cache ; maybe in temporary cache ? Warning: non-movable
+         "url_sav" */
       else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
         const off_t file_size = fsize_utf8(itemback->url_sav);
 

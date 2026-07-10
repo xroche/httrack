@@ -491,11 +491,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
   /* avoid errors on data entries */
   if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
-#if HTS_FAST_CACHE
     hash_pos_return = 0;
-#else
-    a = NULL;
-#endif
   }
 
   if (hash_pos_return != 0) {

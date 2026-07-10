@@ -194,7 +194,6 @@ struct cache_back {
   int type;
   int ro;                   /**< read-only: no new cache is written */
 
-  char *use;                /**< in-memory list of cached adr+fil keys */
   FILE *lst;                /**< file list, used for purge */
   FILE *txt;                /**< human-readable file list (info) */
   char lastmodified[256];
