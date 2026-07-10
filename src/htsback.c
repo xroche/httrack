@@ -2050,13 +2050,9 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
 
       if (!back_trylive(opt, cache, sback, p)) {
 #if HTS_XGETHOST
-#if HDEBUG
-        printf("back_solve..\n");
-#endif
-        back[p].status = STATUS_WAIT_DNS;       // tentative de résolution du nom de host
-        soc = INVALID_SOCKET;   // pas encore ouverte
-        back_solve(opt, &back[p]);      // préparer
-        if (host_wait(opt, &back[p])) { // prêt, par ex fichier ou dispo dans dns
+        back[p].status = STATUS_WAIT_DNS; // host name resolution attempt
+        soc = INVALID_SOCKET;             // not opened yet
+        if (host_wait(opt, &back[p])) {   // ready (file, or cached dns)
 #if HDEBUG
           printf("ok, dns cache ready..\n");
 #endif
@@ -2199,37 +2195,9 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
 }
 
 #if HTS_XGETHOST
-// attendre que le host (ou celui du proxy) ait été résolu
-// si c'est un fichier, la résolution est immédiate
-// idem pour ftp://
-void back_solve(httrackp * opt, lien_back * back) {
-  assertf(opt != NULL);
-  assertf(back != NULL);
-  if ((!strfield(back->url_adr, "file://"))
-      && !strfield(back->url_adr, "ftp://")
-    ) {
-    const char *a;
-
-    if (!(back->r.req.proxy.active))
-      a = back->url_adr;
-    else
-      a = back->r.req.proxy.name;
-    assertf(a != NULL);
-    a = jump_protocol_const(a);
-    if (check_hostname_dns(a)) {
-      hts_log_print(opt, LOG_DEBUG, "resolved: %s", a);
-    } else {
-      hts_log_print(opt, LOG_DEBUG, "failed to resolve: %s", a);
-    }
-  }
-}
-
-// détermine si le host a pu être résolu
-int host_wait(httrackp * opt, lien_back * back) {
-  // Always synchronous. No more background DNS resolution
-  // (does not really improve performances)
-  return 1;
-}
+// Resolution is synchronous inside the connect path; no pre-resolve step, so
+// the host is always immediately ready.
+int host_wait(httrackp *opt, lien_back *back) { return 1; }
 #endif
 
 // élimine les fichiers non html en backing (anticipation)
