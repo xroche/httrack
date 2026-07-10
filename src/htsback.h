@@ -138,7 +138,6 @@ LLint back_transferred(LLint add, struct_back * sback);
 
 // hostback
 #if HTS_XGETHOST
-void back_solve(httrackp * opt, lien_back * sback);
 int host_wait(httrackp * opt, lien_back * sback);
 #endif
 int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);

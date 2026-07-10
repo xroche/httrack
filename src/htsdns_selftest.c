@@ -297,6 +297,26 @@ int dns_selftests(httrackp *opt) {
     IPV6_resolver = 0;
   }
 
+  /* "host:port" resolves as the bare host: the cache/connect path strips
+     ":port" before both the backend and the cache key (#181). */
+  mock_reset_calls();
+  {
+    SOCaddr a;
+    char ip[64];
+    const char *err = NULL;
+
+    /* cache miss: the backend is hit with the stripped host, not "host:port" */
+    CHECK(hts_dns_resolve2(opt, "v6only.test:8080", &a, &err) != NULL);
+    CHECK(mock_find("v6only.test")->calls == 1);
+    /* the bare host shares that one cache entry (stripped key) */
+    CHECK(hts_dns_resolve2(opt, "v6only.test", &a, &err) != NULL);
+    CHECK(mock_find("v6only.test")->calls == 1);
+    /* a port variant of an already-cached host also hits, right address */
+    CHECK(hts_dns_resolve2(opt, "v4only.test:1234", &a, &err) != NULL);
+    SOCaddr_inetntoa(ip, sizeof(ip), a);
+    CHECK(strcmp(ip, "1.2.3.4") == 0);
+  }
+
   /* newhttp_addr() must connect to the addr_index-th address, not always the
      first: this is what back_connect_next relies on to reach the fallback. */
   {
