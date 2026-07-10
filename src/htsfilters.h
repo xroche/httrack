@@ -48,6 +48,10 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
                      const char *nom2, LLint *size, int *size_flag, int *depth);
 HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * size,
                           int *size_flag);
+/* strjoker() without the failure memo (exponential worst case); test-only
+   oracle for the memoized matcher. */
+const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
+                            int *size_flag);
 const char *strjokerfind(const char *chaine, const char *joker);
 #endif
 

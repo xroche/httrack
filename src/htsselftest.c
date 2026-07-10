@@ -621,6 +621,105 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Mime-type filter verdict via fa_strjoker(type=1): only mime: rules apply. */
+static int st_filtermime(httrackp *opt, int argc, char **argv) {
+  int verdict;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "filtermime: needs <mime> <filter> [filter...]\n");
+    return 1;
+  }
+  verdict = fa_strjoker(1, &argv[1], argc - 1, argv[0], NULL, NULL, NULL);
+  printf("verdict=%s\n", verdict > 0   ? "allowed"
+                         : verdict < 0 ? "forbidden"
+                                       : "unknown");
+  return 0;
+}
+
+/* SplitMix64: deterministic, platform-independent case generator. */
+static uint64_t st_mix64(uint64_t *state) {
+  uint64_t z = (*state += UINT64_C(0x9E3779B97F4A7C15));
+
+  z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4B5B9);
+  z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+  return z ^ (z >> 31);
+}
+
+/* Differential test: memoized strjoker vs the no-memo oracle on seeded random
+   pattern/subject/size cases must agree on result, *size and *size_flag. */
+static int st_filtermemo(httrackp *opt, int argc, char **argv) {
+  static const char *const pieces[] = {
+      "a",       "b",        "A",    "c",      ".",       "/",
+      "?",       "*",        "*[a]", "*[ab]",  "*[a-c]",  "*[A-Z]",
+      "*[<5]",   "*[>5]",    "*(a)", "*(a,b)", "*[file]", "*[path]",
+      "*[name]", "*[param]", "*[]",  "*[\\a]", "*[a-"};
+  static const char subject_chars[] = "abAc./?";
+  uint64_t rng = UINT64_C(0x501);
+  int iters = 20000, matched = 0, unmatched = 0;
+  int it;
+
+  (void) opt;
+  if (argc >= 1)
+    sscanf(argv[0], "%d", &iters);
+  for (it = 0; it < iters; it++) {
+    char pat[64], str[16];
+    size_t pl = 0;
+    const int npieces = (int) (st_mix64(&rng) % 5);
+    const int slen = (int) (st_mix64(&rng) % 13);
+    const int szsel = (int) (st_mix64(&rng) % 4); /* none/unknown/3/20 */
+    LLint sz1, sz2, off1, off2;
+    int i, flag1 = 0, flag2 = 0;
+    char *hpat, *hstr;
+    const char *adr;
+
+    for (i = 0; i < npieces; i++) {
+      const char *p =
+          pieces[st_mix64(&rng) % (sizeof(pieces) / sizeof(pieces[0]))];
+      const size_t len = strlen(p);
+
+      if (len >= sizeof(pat) - pl)
+        break;
+      memcpy(pat + pl, p, len);
+      pl += len;
+    }
+    pat[pl] = '\0';
+    for (i = 0; i < slen; i++)
+      str[i] = subject_chars[st_mix64(&rng) % (sizeof(subject_chars) - 1)];
+    str[slen] = '\0';
+    sz1 = sz2 = (szsel <= 1) ? -1 : (szsel == 2) ? 3 : 20;
+    /* exact-size heap copies per run so a sanitizer traps any over-read */
+    hpat = strdupt(pat);
+    hstr = strdupt(str);
+    adr = strjoker(hstr, hpat, szsel ? &sz1 : NULL, szsel ? &flag1 : NULL);
+    off1 = adr != NULL ? (LLint) (adr - hstr) : -1;
+    freet(hpat);
+    freet(hstr);
+    hpat = strdupt(pat);
+    hstr = strdupt(str);
+    adr =
+        strjoker_nomemo(hstr, hpat, szsel ? &sz2 : NULL, szsel ? &flag2 : NULL);
+    off2 = adr != NULL ? (LLint) (adr - hstr) : -1;
+    freet(hpat);
+    freet(hstr);
+    if (off1 != off2 || sz1 != sz2 || flag1 != flag2) {
+      printf("filtermemo MISMATCH pat=[%s] str=[%s] szsel=%d: "
+             "off %d/%d size %d/%d flag %d/%d\n",
+             pat, str, szsel, (int) off1, (int) off2, (int) sz1, (int) sz2,
+             flag1, flag2);
+      return 1;
+    }
+    if (off1 >= 0)
+      matched++;
+    else
+      unmatched++;
+  }
+  /* both polarities must actually occur or the test proves nothing */
+  assertf(matched > 0 && unmatched > 0);
+  printf("filtermemo: %d cases OK\n", iters);
+  return 0;
+}
+
 /* Merged two-form filter verdict via fa_strjoker_dual (see htsfilters.h). */
 static int st_filterdual(httrackp *opt, int argc, char **argv) {
   int depth = -1, verdict;
@@ -2279,6 +2378,10 @@ static const struct selftest_entry {
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},
+    {"filtermime", "<mime> <filter>...",
+     "mime-type filter verdict (fa_strjoker type=1)", st_filtermime},
+    {"filtermemo", "[iterations]",
+     "memoized vs unmemoized matcher differential", st_filtermemo},
     {"filterdual", "<string1> <string2> <filter>...",
      "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},

@@ -36,6 +36,7 @@ EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/unescape/percent.txt \
 	corpus/filters/filter.bin corpus/filters/filter-size.bin \
 	corpus/filters/regress-empty-subject-unique.bin \
+	corpus/filters/redos-star-classes.bin \
 	corpus/url/http-url.txt corpus/url/relative-path.txt \
 	corpus/url/regress-file-empty-path.txt corpus/url/regress-long-path-abort.txt \
 	corpus/header/full-response.txt corpus/header/redirect.txt \

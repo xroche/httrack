@@ -2,8 +2,8 @@
 # Drive every built harness against its seed corpus.
 #   run-fuzzers.sh <build-fuzz-dir> check       deterministic replay (CI smoke)
 #   run-fuzzers.sh <build-fuzz-dir> [seconds]   timed mutation run (discovery)
-# Replay is crash/leak-only and never mutates, so it can't hit strjoker's
-# catastrophic backtracking; the timed mode can, hence the per-unit -timeout.
+# Replay is crash/leak-only and never mutates; the per-unit -timeout guards
+# both modes against pathological slowdowns (e.g. pre-#501 strjoker).
 set -euo pipefail
 
 srcdir=$(cd "$(dirname "$0")" && pwd)
