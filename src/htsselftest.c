@@ -1561,11 +1561,13 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     assertf(cookie_save(&cookie, jar) == 0);
     assertf(stat(jar, &st) == 0);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
+    assertf(st.st_size > 0); /* mode-only checks would pass an empty jar */
     /* a pre-existing world-readable jar must be tightened, not kept */
     assertf(chmod(jar, 0644) == 0);
     assertf(cookie_save(&cookie, jar) == 0);
     assertf(stat(jar, &st) == 0);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
+    assertf(st.st_size > 0);
     (void) UNLINK(jar);
   }
 #endif
