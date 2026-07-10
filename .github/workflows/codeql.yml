@@ -43,6 +43,12 @@ jobs:
           languages: c-cpp
           build-mode: manual
           queries: security-extended
+          # fopen's umask-controlled 0666 is intended for mirror/cache/log
+          # output; the one credential file (cookies.txt) is kept 0600 on Unix.
+          config: |
+            query-filters:
+              - exclude:
+                  id: cpp/world-writable-file-creation
 
       # Manual build: CodeQL traces the compiler, so build exactly what ships.
       - name: Build

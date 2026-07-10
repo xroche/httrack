@@ -422,9 +422,10 @@ typedef int T_SOC;
 #endif
 
 /* Permission bits for created folders and files (mkdir and chmod).
-   PROTECT_FOLDER is owner-only. With HTS_ACCESS set (the default) the ACCESS_
-   modes also grant group/other read; otherwise they stay owner-only. */
+   PROTECT_FOLDER/FILE are owner-only. With HTS_ACCESS set (the default) the
+   ACCESS_ modes also grant group/other read; otherwise they stay owner-only. */
 #define HTS_PROTECT_FOLDER (S_IRUSR | S_IWUSR | S_IXUSR)
+#define HTS_PROTECT_FILE (S_IRUSR | S_IWUSR)
 
 #if HTS_ACCESS
 #define HTS_ACCESS_FILE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
