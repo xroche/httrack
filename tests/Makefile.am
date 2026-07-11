@@ -114,6 +114,7 @@ TESTS = \
 	42_local-maxsize-slow.test \
 	43_local-update-truncate.test \
 	44_local-update-errormask.test \
-	45_local-maxsize-recv.test
+	45_local-maxsize-recv.test \
+	46_local-update-304-resume.test
 
 CLEANFILES = check-network_sh.cache
