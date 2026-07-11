@@ -12,9 +12,11 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   server, so `-j` never contends and a multi-minute serial run drops to
   seconds. A new `.test` added to `$(TESTS)` is scheduled onto a free worker
   automatically; only a test slower than the current longest raises the floor.
-  On a few-core box, `-j` at 2x the core count is faster still: the tests spend
-  much of their wall time asleep (server trickles, httrack self-pacing), so an
-  idle core covers a sleeping one. CI uses `min(2*cores, 16)` for `make check`.
+  On a few-core Linux box, `-j` at 2x the core count is faster still: the tests
+  spend much of their wall time asleep (server trickles, httrack self-pacing),
+  so an idle core covers a sleeping one. CI uses `min(2*cores, 16)` for `make
+  check` on Linux, but one job per core on macOS (there the extra concurrent
+  `-c8` connections overload the loopback and flake the exact-count tests).
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants

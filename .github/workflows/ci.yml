@@ -136,9 +136,10 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       - name: Test
-        run: |
-          jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+        # No 2x oversubscription here: on macOS it multiplies each crawl's -c8
+        # connections past what the loopback tolerates, dropping fetches and
+        # flaking the exact-count tests (36_local-bigcrawl). One job per core.
+        run: make check -j"$(sysctl -n hw.ncpu)"
 
       - name: Print the test log on failure
         if: failure()
