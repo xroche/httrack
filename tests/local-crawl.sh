@@ -13,15 +13,19 @@
 #
 # Usage:
 #   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
+#       [--rerun-args 'ARGS'] \
 #       --errors N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
-#       --max-mirror-bytes N \
+#       --file-min-bytes PATH N --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl.
+# --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
+# --rerun-args runs a second pass (same server and mirror dir) with the given
+# extra httrack args appended, e.g. an --update run under a cap.
 # --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
 # which the ephemeral port forces into the cookie domain) and passes it to
 # httrack via --cookies-file, to exercise preloaded cookies.
@@ -39,6 +43,7 @@ key="${testdir}/server.key"
 tls=
 verbose=
 rerun=
+rerun_args=
 rerun_dead=
 tmpdir=
 serverpid=
@@ -122,6 +127,10 @@ while test "$pos" -lt "$nargs"; do
         pos=$((pos + 1))
         cookies+=("${args[$pos]}")
         ;;
+    --rerun-args)
+        pos=$((pos + 1))
+        rerun_args="${args[$pos]}"
+        ;;
     --errors | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
@@ -130,7 +139,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --file-matches | --file-not-matches)
+    --file-matches | --file-not-matches | --file-min-bytes)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}" "${args[$((pos + 2))]}")
         pos=$((pos + 2))
         ;;
@@ -239,6 +248,25 @@ if test -n "$rerun"; then
         result "update pass did not report cache activity"
         exit 1
     fi
+fi
+
+# --- optional second pass with extra args (e.g. an --update run under a cap) ---
+# Same server and mirror dir as the first pass, so the second pass sees the
+# cache the first pass wrote. Used to exercise re-fetch/update behaviour.
+if test -n "$rerun_args"; then
+    read -ra extra <<<"$rerun_args"
+    info "re-running httrack with ${rerun_args}"
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+        "${moreargs[@]}" "${hts[@]}" "${extra[@]}" >"${log}.2" 2>&1 &
+    crawlpid=$!
+    wait "$crawlpid"
+    crawlres=$?
+    crawlpid=
+    test "$crawlres" -eq 0 || ! result "second pass exited $crawlres" || {
+        cat "${log}.2" >&2
+        exit 1
+    }
+    result "OK (second pass)"
 fi
 
 # --- optional dead pass: server stopped, the cache must survive the rollback --
@@ -387,6 +415,16 @@ while test "$i" -lt "${#audit[@]}"; do
             result "matched"
             exit 1
         else result "OK"; fi
+        ;;
+    --file-min-bytes)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        sz=$(wc -c <"${hostroot}/${path}" 2>/dev/null | tr -d '[:space:]')
+        info "checking ${path} size ${sz:-0} >= ${audit[$i]} bytes"
+        if test -n "$sz" && test "$sz" -ge "${audit[$i]}"; then result "OK"; else
+            result "file too small (or missing)"
+            exit 1
+        fi
         ;;
     esac
     i=$((i + 1))

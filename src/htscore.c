@@ -1904,8 +1904,11 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
 
-          // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!          
-          if (r.adr != NULL || r.size == 0) {
+          // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!
+          // An empty body must not overwrite the file when the transfer failed
+          // (statuscode <= 0, e.g. an -M hard-stop): it would truncate a good
+          // copy to 0 (#77 follow-up).
+          if (r.adr != NULL || (r.size == 0 && r.statuscode > 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
             if (filesave(opt, r.adr, (int) r.size, savename(), urladr(), urlfil()) !=
                 0) {
@@ -1926,7 +1929,6 @@ int httpmirror(char *url1, httrackp * opt) {
                */
             }
           }
-
         }
 
         /* Parsing of other media types (java, ram..) */
