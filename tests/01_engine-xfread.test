@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# http_xfread1 must refuse an in-memory receive buffer that would exceed a
+# 32-bit index (hostile Content-Length, or an endless stream) rather than
+# allocate it. -#test=xfread-limit drives both paths.
+
+out="$(httrack -O /dev/null -#test=xfread-limit)"
+for case in bylen bygrow; do
+    echo "$out" | grep -q "${case}: refused=1 adr=null msg=In-memory content too large" || {
+        echo "FAIL ${case}: $out"
+        exit 1
+    }
+done

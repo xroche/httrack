@@ -2004,6 +2004,15 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
   if (bufl > 0) {
     if (!r->is_write) {         // stocker en mémoire
+      // In-memory content must fit a 32-bit size (int offsets below): reject a
+      // hostile Content-Length or endless stream instead of allocating >2 GiB.
+      const LLint inmem_want =
+          (r->totalsize >= 0) ? r->totalsize : (r->size + bufl);
+      if (inmem_want > INT32_MAX) {
+        r->statuscode = STATUSCODE_INVALID;
+        strcpybuff(r->msg, "In-memory content too large");
+        return READ_ERROR;
+      }
       if (r->totalsize >= 0) {  // totalsize déterminé ET ALLOUE
         if (r->adr == NULL) {
           r->adr = (char *) malloct((size_t) r->totalsize + 1);
