@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Cookie-wall self-redirect (#15): a page 302s to itself with a Set-Cookie;
+# httrack must replay the cookie and mirror the real page (unknown- and known-ext).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'cookiewall/wall.html' \
+    --file-matches 'cookiewall/wall.html' 'REAL-CONTENT-BEHIND-COOKIE-WALL' \
+    httrack 'BASEURL/cookiewall/index.html'
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'cookiewall2/wall.html' \
+    --file-matches 'cookiewall2/wall.html' 'REAL-CONTENT-BEHIND-COOKIE-WALL' \
+    httrack 'BASEURL/cookiewall2/index.html'

@@ -119,6 +119,7 @@ TESTS = \
 	45_local-maxsize-recv.test \
 	46_local-update-304-resume.test \
 	47_local-crange-overflow.test \
-	48_local-crange-memresume.test
+	48_local-crange-memresume.test \
+	49_local-cookiewall.test
 
 CLEANFILES = check-network_sh.cache

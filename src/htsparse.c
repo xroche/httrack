@@ -4311,6 +4311,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       *forbidden_url == 0 && IS_DELAYED_EXT(afs->save) && !opt->state.stop) {
     int loops;
     int continue_loop;
+    char BIGSTK jar_snapshot[sizeof(((t_cookie *) 0)->data)]; /* #15 */
 
     hts_log_print(opt, LOG_DEBUG, "Waiting for type to be known: %s%s", afs->af.adr,
                   afs->af.fil);
@@ -4319,6 +4320,10 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
     for(loops = 0, continue_loop = 1;
         IS_DELAYED_EXT(afs->save) && continue_loop && loops < 7; loops++) {
       continue_loop = 0;
+      /* #15: snapshot jar to detect a Set-Cookie set by a self-redirect */
+      jar_snapshot[0] = '\0';
+      if (opt->accept_cookie && opt->cookie != NULL)
+        strlcpybuff(jar_snapshot, opt->cookie->data, sizeof(jar_snapshot));
 
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
@@ -4516,6 +4521,11 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           /* Moved! */
           else if (HTTP_IS_REDIRECT(back[b].r.statuscode)) {
             char BIGSTK mov_url[HTS_URLMAXSIZE * 2];
+            /* #15: raw headers are gone here, but a Set-Cookie was folded into
+             * the jar; a changed jar is the cookie-wall signal. */
+            const hts_boolean jar_changed =
+                opt->accept_cookie && opt->cookie != NULL &&
+                strcmp(jar_snapshot, opt->cookie->data) != 0;
 
             mov_url[0] = '\0';
             strcpybuff(mov_url, back[b].r.location);    // copier URL
@@ -4585,11 +4595,24 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
                   url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, 
                                opt, sback, cache, hash, ptr, numero_passe,
                                &delayed_back);
+                } else if (jar_changed) {
+                  // #15: cookie-wall self-redirect; evict the cached
+                  // fast-header so the re-issue refetches with the cookie.
+                  if (cache->cached_tests != NULL)
+                    coucal_remove(cache->cached_tests,
+                                  concat(OPT_GET_BUFF(opt),
+                                         OPT_GET_BUFF_SIZE(opt), afs->af.adr,
+                                         afs->af.fil));
+                  afs->save[0] = '\0';
+                  url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
+                               sback, cache, hash, ptr, numero_passe,
+                               &delayed_back);
+                  continue_loop = 1;
                 } else {
                   hts_log_print(opt, LOG_WARNING,
                                 "Unable to test %s%s (loop to same filename)",
                                 afs->af.adr, afs->af.fil);
-                }               // loop to same location
+                } // loop to same location
               }                 // ident_url_relatif()
             }                   // location
           }                     // redirect
