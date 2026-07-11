@@ -1340,6 +1340,26 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
          r.msg);
   if (r.adr != NULL)
     freet(r.adr);
+
+  // Exactly at the 2 GiB index (size + bufl == INT32_MAX): must also be
+  // refused, since the reallocs below add 1 (a `> INT32_MAX` check would let
+  // this through and overflow the int realloc size).
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  r.size = (LLint) INT32_MAX - 8192;
+  http_xfread1(&r, 8192);
+  printf("boundary: msg=%s\n", r.msg);
+
+  // A legitimate small size must NOT be refused by the guard (the read then
+  // fails on the invalid socket, but the size-too-large msg must not be set).
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = 1000;
+  http_xfread1(&r, 8192);
+  printf("accept: msg=%s\n", r.msg);
+  if (r.adr != NULL)
+    freet(r.adr);
   return 0;
 }
 
