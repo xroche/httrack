@@ -3038,12 +3038,11 @@ HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n) {
 /* See http://physics.nist.gov/cuu/Units/binary.html */
 #define ToLLint(a) ((LLint)(a))
 #define ToLLintKiB (ToLLint(1024))
-#define ToLLintMiB (ToLLintKiB*ToLLintKiB)
-#ifdef HTS_LONGLONG
-#define ToLLintGiB (ToLLintKiB*ToLLintKiB*ToLLintKiB)
-#define ToLLintTiB (ToLLintKiB*ToLLintKiB*ToLLintKiB*ToLLintKiB)
-#define ToLLintPiB (ToLLintKiB*ToLLintKiB*ToLLintKiB*ToLLintKiB*ToLLintKiB)
-#endif
+#define ToLLintMiB (ToLLintKiB * ToLLintKiB)
+#define ToLLintGiB (ToLLintKiB * ToLLintKiB * ToLLintKiB)
+#define ToLLintTiB (ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB)
+#define ToLLintPiB                                                             \
+  (ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB)
 HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
   if (n < ToLLintKiB) {
     sprintf(strc->buff1, "%d", (int) (LLint) n);
@@ -3052,9 +3051,7 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
     sprintf(strc->buff1, "%d,%02d", (int) ((LLint) (n / ToLLintKiB)),
             (int) ((LLint) ((n % ToLLintKiB) * 100) / ToLLintKiB));
     strcpybuff(strc->buff2, "KiB");
-  }
-#ifdef HTS_LONGLONG
-  else if (n < ToLLintGiB) {
+  } else if (n < ToLLintGiB) {
     sprintf(strc->buff1, "%d,%02d", (int) ((LLint) (n / (ToLLintMiB))),
             (int) ((LLint) (((n % (ToLLintMiB)) * 100) / (ToLLintMiB))));
     strcpybuff(strc->buff2, "MiB");
@@ -3071,13 +3068,6 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
             (int) ((LLint) (((n % (ToLLintPiB)) * 100) / (ToLLintPiB))));
     strcpybuff(strc->buff2, "PiB");
   }
-#else
-  else {
-    sprintf(strc->buff1, "%d,%02d", (int) ((LLint) (n / (ToLLintMiB))),
-            (int) ((LLint) (((n % (ToLLintMiB)) * 100) / (ToLLintMiB))));
-    strcpybuff(strc->buff2, "MiB");
-  }
-#endif
   strc->buffadr[0] = strc->buff1;
   strc->buffadr[1] = strc->buff2;
   return strc->buffadr;
