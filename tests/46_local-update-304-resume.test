@@ -26,7 +26,8 @@ trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 serverlog="${tmpdir}/server.log"
 counter="${tmpdir}/reqcount"
-RESUME304_COUNTER="$counter" python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
+mark="${tmpdir}/got304"
+RESUME304_COUNTER="$counter" RESUME304_MARK="$mark" python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do
@@ -106,3 +107,12 @@ test "$hits" -ge 2 || {
     exit 1
 }
 echo "OK (${hits} requests)"
+
+# The recovery must go through the resume path: a Range request that drew the
+# bogus 304 (a fresh re-crawl sends no Range, so this marker stays empty).
+printf '[resume Range drew a 304] ..\t'
+test -s "$mark" || {
+    echo "FAIL: no Range request got a 304; the resume path was not exercised"
+    exit 1
+}
+echo "OK"

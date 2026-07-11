@@ -823,6 +823,10 @@ class Handler(SimpleHTTPRequestHandler):
                     pass
             return
         if rng is not None:  # resume request: bogus out-of-protocol 304
+            mark = os.environ.get("RESUME304_MARK")
+            if mark:
+                with open(mark, "a") as fp:
+                    fp.write("z")
             self.send_response(304)
             self.send_header("ETag", '"c7"')
             self.send_header("Content-Length", "0")
