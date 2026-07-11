@@ -1310,6 +1310,59 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* http_xfread1 must refuse an in-memory buffer whose size would exceed a 32-bit
+   index (hostile Content-Length or endless stream) rather than allocate it.
+   The guard returns before any socket read, so no real connection is needed. */
+static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
+  htsblk r;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  // Content-Length just over 2 GiB.
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = (LLint) INT32_MAX + 1;
+  printf("bylen: refused=%d adr=%s msg=%s\n",
+         http_xfread1(&r, 8192) == READ_ERROR, r.adr != NULL ? "alloc" : "null",
+         r.msg);
+  if (r.adr != NULL)
+    freet(r.adr);
+
+  // Unknown length, buffer already at the limit: the next read would exceed it.
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  r.size = (LLint) INT32_MAX;
+  printf("bygrow: refused=%d adr=%s msg=%s\n",
+         http_xfread1(&r, 8192) == READ_ERROR, r.adr != NULL ? "alloc" : "null",
+         r.msg);
+  if (r.adr != NULL)
+    freet(r.adr);
+
+  // Exactly at the 2 GiB index (size + bufl == INT32_MAX): must also be
+  // refused, since the reallocs below add 1 (a `> INT32_MAX` check would let
+  // this through and overflow the int realloc size).
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  r.size = (LLint) INT32_MAX - 8192;
+  http_xfread1(&r, 8192);
+  printf("boundary: msg=%s\n", r.msg);
+
+  // A legitimate small size must NOT be refused by the guard (the read then
+  // fails on the invalid socket, but the size-too-large msg must not be set).
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = 1000;
+  http_xfread1(&r, 8192);
+  printf("accept: msg=%s\n", r.msg);
+  if (r.adr != NULL)
+    freet(r.adr);
+  return 0;
+}
+
 /* Parse a Content-Range header and print the sanitized triple. A hostile value
    (negative or INT64 extreme) must clamp to 0 without signed-overflow UB. */
 static int st_crange(httrackp *opt, int argc, char **argv) {
@@ -2521,6 +2574,8 @@ static const struct selftest_entry {
      st_headerlong},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
+    {"xfread-limit", "", "in-memory receive buffer size bound",
+     st_xfread_limit},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",

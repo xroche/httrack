@@ -66,6 +66,7 @@ TESTS = \
 	01_engine-urlhack.test \
 	01_engine-unescape-bounds.test \
 	01_engine-useragent.test \
+	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
 	01_zlib-cache.test \
 	01_zlib-cache-corrupt.test \
