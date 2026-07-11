@@ -2384,8 +2384,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   back_clean(opt, cache, sback);
 #endif
 
-  /* Time limit exceeded past grace: abort in-flight transfers so no wait loop
-     starves (#481). FTP slots stay, their thread owns the socket. */
+  /* Time/size limit exceeded past grace: abort in-flight transfers so no wait
+     loop starves (#481, #77). FTP slots stay, their thread owns the socket. */
   if (!back_checkmirror(opt)) {
     int aborted = 0;
     unsigned int i;
@@ -2408,7 +2408,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     }
     if (aborted > 0)
       hts_log_print(opt, LOG_WARNING,
-                    "time limit reached, %d transfer(s) aborted", aborted);
+                    "mirror limit reached, %d transfer(s) aborted", aborted);
     return;
   }
 
@@ -4113,6 +4113,9 @@ static int back_maxtime_grace(const int maxtime) {
   return maximum(5, minimum(30, maxtime / 10));
 }
 
+/* Bytes the smooth stop may overrun before in-flight transfers are aborted. */
+static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
+
 int back_checkmirror(httrackp * opt) {
   // Check max size
   if ((opt->maxsite > 0) && (HTS_STAT.stat_bytes >= opt->maxsite)) {
@@ -4124,9 +4127,9 @@ int back_checkmirror(httrackp * opt) {
       /* cancel mirror smoothly */
       hts_request_stop(opt, 0);
     }
-    return 1;                   /* don'k break mirror too sharply for size limits, but stop requested */
-    /*return 0;
-     */
+    /* smooth stop overran the grace margin: stop waiting (#77) */
+    if (HTS_STAT.stat_bytes - opt->maxsite >= back_maxsize_grace(opt->maxsite))
+      return 0;
   }
   // Check max time
   if (opt->maxtime > 0) {
