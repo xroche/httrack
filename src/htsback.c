@@ -3908,10 +3908,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           if (fp) {
                             LLint alloc_mem = resume + 1;
 
-                            // Reject a hostile Content-Length that would
-                            // overflow the buffer size: drop the partial and
-                            // refetch.
-                            if (back[i].r.totalsize > INT64_MAX - alloc_mem) {
+                            // Bound the in-memory buffer to a 32-bit size (real
+                            // in-RAM resources are far smaller); a hostile
+                            // Content-Length that would overflow the add or the
+                            // (size_t) cast is dropped and refetched instead.
+                            if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
                               url_savename_refname_remove(opt, back[i].url_adr,
                                                           back[i].url_fil);
                               UNLINK(back[i].url_sav);
