@@ -66,9 +66,12 @@ test -n "$port" || {
 }
 
 out="$tmpdir/crawl"
+# macOS has only 127.0.0.1, so the dead 127.0.0.x connects block to the timeout
+# instead of refusing instantly (as on Linux); a small --timeout + --retries=0
+# bound the stall without changing what the fallback exercises.
 HTTRACK_DEBUG_RESOLVE="deadhost:127.0.0.2,127.0.0.1" \
     httrack "http://deadhost:$port/simple/basic.html" -O "$out" \
-    -c1 --robots=0 --timeout=30 --quiet -Z >"$tmpdir/log" 2>&1
+    -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z >"$tmpdir/log" 2>&1
 
 log="$out/hts-log.txt"
 
@@ -92,12 +95,12 @@ test -f "$out/deadhost_$port/simple/basic.html" || {
     exit 1
 }
 
-# every address refused: the slot exhausts the list, then errors out (the
-# harness timeout would catch a hang/loop; refused connects are instant)
+# every address dead: the slot exhausts the list, then errors out (the harness
+# timeout would catch a hang/loop)
 out2="$tmpdir/crawl2"
 HTTRACK_DEBUG_RESOLVE="alldead:127.0.0.2,127.0.0.3" \
     httrack "http://alldead:$port/simple/basic.html" -O "$out2" \
-    -c1 --robots=0 --timeout=30 --quiet -Z >"$tmpdir/log2" 2>&1
+    -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z >"$tmpdir/log2" 2>&1
 log2="$out2/hts-log.txt"
 
 grep -q "trying next address" "$log2" || {
