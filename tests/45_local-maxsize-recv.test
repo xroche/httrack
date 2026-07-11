@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# -M caps received volume, not saved 200-only bytes (#520): links to large 404
+# bodies pump received >> saved; the cap must trip though little lands on disk.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Saved stays ~700 B (index only); received crosses -M after the first 404 body,
+# so the cap fires. Metering saved bytes never trips and fetches all 16 links.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found 'More than 500000 bytes have been transferred.. giving up' \
+    httrack 'BASEURL/maxrecv/index.html' -M500000 -c4
