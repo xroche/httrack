@@ -14,11 +14,13 @@
 # Usage:
 #   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
 #       [--rerun-args 'ARGS'] \
-#       --errors N --files N --found PATH ... --directory PATH ... \
+#       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
 #       --file-min-bytes PATH N --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
+# --errors counts every "Error:" log line; --errors-content drops transient
+# network failures (codes -2..-6) that flake on busy loopback under -c8.
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
@@ -131,7 +133,7 @@ while test "$pos" -lt "$nargs"; do
         pos=$((pos + 1))
         rerun_args="${args[$pos]}"
         ;;
-    --errors | --files)
+    --errors | --errors-content | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -333,6 +335,14 @@ while test "$i" -lt "${#audit[@]}"; do
         i=$((i + 1))
         assert_equals "checking errors" "${audit[$i]}" \
             "$(grep -iEc "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt")"
+        ;;
+    --errors-content)
+        i=$((i + 1))
+        total=$(grep -icE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt")
+        # transient network failures (statuscode -2..-6) flake on busy loopback;
+        # the code parens are followed by " at link" or " after N retries at link"
+        transient=$(grep -cE '\(-[2-6]\) (at link|after )' "${out}/hts-log.txt" || true)
+        assert_equals "checking content errors" "${audit[$i]}" "$((total - transient))"
         ;;
     --files)
         i=$((i + 1))
