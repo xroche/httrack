@@ -105,7 +105,7 @@ function start-crawl {
     log="${tmp}/log"
     debug starting httrack -O "${tmp}" "${moreargs[@]}" "${@:pos}"
     info "running httrack ${*:pos}"
-    httrack -O "${tmp}" --user-agent="httrack $ver ut ($(uname -omrs))" "${moreargs[@]}" "${@:pos}" >"${log}" 2>&1 &
+    httrack -O "${tmp}" --user-agent="httrack $ver ut ($(uname -mrs))" "${moreargs[@]}" "${@:pos}" >"${log}" 2>&1 &
     crawlpid="$!"
     debug "started cralwer on pid $crawlpid"
     wait "$crawlpid"

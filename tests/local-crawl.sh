@@ -213,7 +213,7 @@ mkdir "$out" || die "could not create $out"
 declare -a moreargs=(--quiet --max-time=120 --timeout=30 --disable-security-limits --robots=0)
 log="${tmpdir}/log"
 info "running httrack ${hts[*]}"
-httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
+httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
 crawlpid=$!
 wait "$crawlpid"
 crawlres=$?
@@ -230,7 +230,7 @@ grep -iE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt" >&2
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
     wait "$crawlpid"
@@ -258,7 +258,7 @@ fi
 if test -n "$rerun_args"; then
     read -ra extra <<<"$rerun_args"
     info "re-running httrack with ${rerun_args}"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" "${extra[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
     wait "$crawlpid"
@@ -281,7 +281,7 @@ if test -n "$rerun_dead"; then
     wait "$serverpid" 2>/dev/null
     serverpid=
     info "re-running httrack against the stopped server"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -omrs))" \
+    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &
     crawlpid=$!
     wait "$crawlpid" || true
