@@ -533,27 +533,53 @@ int back_nsoc_overall(const struct_back * sback) {
 
 /* generate temporary file on lien_back */
 /* Note: utf-8 */
-static int create_back_tmpfile(httrackp * opt, lien_back *const back) {
+static int create_back_tmpfile(httrackp *opt, lien_back *const back,
+                               const char *ext) {
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav != NULL && back->url_sav[0] != '\0') {
-    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s.z", 
-             back->url_sav);
+    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s.%s",
+             back->url_sav, ext);
     back->tmpfile = back->tmpfile_buffer;
     if (structcheck(back->tmpfile) != 0) {
-      hts_log_print(opt, LOG_WARNING, "can not create directory to %s", 
+      hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
       return -1;
     }
   } else {
-    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer),
-             "%s/tmp%d.z", StringBuff(opt->path_html_utf8),
-             opt->state.tmpnameid++);
+    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s/tmp%d.%s",
+             StringBuff(opt->path_html_utf8), opt->state.tmpnameid++, ext);
     back->tmpfile = back->tmpfile_buffer;
   }
   /* OK */
   hts_log_print(opt, LOG_TRACE, "produced temporary name %s", back->tmpfile);
   return 0;
+}
+
+/* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
+   existing file moved the good copy to back->tmpfile before truncating url_sav.
+   commit keeps the new file and drops the backup; else restore it so an aborted
+   transfer leaves the previous copy intact. Skips the zlib .z temp. */
+static void back_finalize_backup(httrackp *opt, lien_back *const back,
+                                 const hts_boolean commit) {
+  if (back->tmpfile == NULL || back->r.compressed)
+    return;
+  if (commit) {
+    (void) UNLINK(back->tmpfile); /* new copy is good; drop the backup */
+  } else {
+    if (back->r.out != NULL) {
+      fclose(back->r.out);
+      back->r.out = NULL;
+    }
+    (void) UNLINK(back->url_sav); /* drop the failed partial */
+    /* On rename failure keep the backup: it still holds the good copy, so
+       losing it would be worse than an orphaned temp. */
+    if (RENAME(back->tmpfile, back->url_sav) != 0)
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "could not restore %s; previous copy kept as %s",
+                    back->url_sav, back->tmpfile);
+  }
+  back->tmpfile = NULL;
 }
 
 // objet (lien) téléchargé ou transféré depuis le cache
@@ -591,6 +617,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                       LLintP " got " LLintP "): %s%s", back[p].r.totalsize,
                       back[p].r.size, back[p].url_adr, back[p].url_fil);
       }
+      back_finalize_backup(opt, &back[p], HTS_FALSE);
       return -1;
     }
 
@@ -609,7 +636,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             // en mémoire -> passage sur disque
             if (!back[p].r.is_write) {
               // do not use tempnam() but a regular filename
-              if (create_back_tmpfile(opt, &back[p]) == 0) {
+              if (create_back_tmpfile(opt, &back[p], "z") == 0) {
                 assertf(back[p].tmpfile != NULL);
                 /* note: tmpfile is utf-8 */
                 back[p].r.out = FOPEN(back[p].tmpfile, "wb");
@@ -682,6 +709,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           }
         }
 #endif
+        /* Body fully received: keep the freshly written url_sav, drop the
+           backup of the previous copy. */
+        back_finalize_backup(opt, &back[p], HTS_TRUE);
         /* Write mode to disk */
         if (back[p].r.is_write && back[p].r.adr != NULL) {
           freet(back[p].r.adr);
@@ -910,6 +940,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
       }
     }
   }
+  /* Aborted, error, or not ready: url_sav (if written) is broken; restore the
+     previous copy from the backup. */
+  back_finalize_backup(opt, &back[p], HTS_FALSE);
   return -1;
 }
 
@@ -2913,7 +2946,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0
                                 && strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "tgz") == 0
                               ) {
-                              if (create_back_tmpfile(opt, &back[i]) == 0) {
+                              if (create_back_tmpfile(opt, &back[i], "z") ==
+                                  0) {
                                 assertf(back[i].tmpfile != NULL);
                                 /* note: tmpfile is utf-8 */
                                 if ((back[i].r.out =
@@ -2926,6 +2960,20 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           back[i].url_sav, 1, 1,
                                           back[i].r.notmodified);
                               back[i].r.compressed = 0;
+                              /* Re-fetch over an existing file (#77 follow-up):
+                                 move the good copy aside before truncating it
+                                 so an aborted transfer can restore it. url_sav
+                                 is still written normally (file list intact).
+                               */
+                              back[i].tmpfile = NULL;
+                              if (fexist_utf8(back[i].url_sav)) {
+                                if (create_back_tmpfile(opt, &back[i], "bak") !=
+                                        0 ||
+                                    RENAME(back[i].url_sav, back[i].tmpfile) !=
+                                        0) {
+                                  back[i].tmpfile = NULL;
+                                }
+                              }
                               if ((back[i].r.out =
                                    filecreate(&opt->state.strc,
                                               back[i].url_sav)) == NULL) {

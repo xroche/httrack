@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# -M hard-abort must not destroy already-complete files (#77 follow-up).
+# Pass 1 mirrors bigtrunc fully. Pass 2 re-fetches under --update -M: fast.bin
+# overruns the cap, its abort tears down slow.bin's stalled re-fetch. Both were
+# complete on disk from pass 1, and both must survive the aborted update:
+#   - slow.bin's re-fetch is incomplete; the direct-to-disk write must not be
+#     left truncated (the previous copy is restored).
+#   - fast.bin fully arrives but is torn down; the aborted slot must not overwrite
+#     it with an empty body.
+# Unfixed, slow.bin is truncated and fast.bin is zeroed while the cache still
+# records them complete.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update -M400000' \
+    --log-found 'More than 400000 bytes have been transferred.. giving up' \
+    --found bigtrunc/slow.bin \
+    --file-min-bytes bigtrunc/slow.bin 655360 \
+    --file-min-bytes bigtrunc/fast.bin 655360 \
+    httrack 'BASEURL/bigtrunc/index.html' -c2

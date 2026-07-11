@@ -1043,6 +1043,40 @@ class Handler(SimpleHTTPRequestHandler):
             "".join('\t<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(4))
         )
 
+    # -M hard-abort must not destroy an already-complete file (#77 follow-up).
+    # "fast.bin" alone overruns -M and completes; "slow.bin" transfers fully on
+    # its first fetch (initial mirror) but stalls on every later fetch (the
+    # --update re-fetch), so the -M abort tears it down mid-body. An engine that
+    # truncates the good local copy on the aborted re-fetch loses data.
+    slow_seen = 0
+
+    def route_bigtrunc_index(self):
+        self.send_html('\t<a href="fast.bin">fast</a>\n\t<a href="slow.bin">slow</a>\n')
+
+    def route_bigtrunc_slow(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(self.BIGFILE_BYTES))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        # Count body fetches only, so a stray HEAD can't shift which pass stalls.
+        Handler.slow_seen += 1
+        first = Handler.slow_seen == 1
+        try:
+            if first:
+                self.wfile.write(b"x" * self.BIGFILE_BYTES)
+                self.wfile.flush()
+            else:
+                self.wfile.write(b"x" * 4096)
+                self.wfile.flush()
+                for _ in range(120):
+                    self.wfile.write(b"x")
+                    self.wfile.flush()
+                    time.sleep(1.0)
+        except OSError:
+            pass
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1120,6 +1154,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigtrickle/p1.bin": route_trickle_page,
         "/bigtrickle/p2.bin": route_trickle_page,
         "/bigtrickle/p3.bin": route_trickle_page,
+        "/bigtrunc/index.html": route_bigtrunc_index,
+        "/bigtrunc/fast.bin": route_bigfile,
+        "/bigtrunc/slow.bin": route_bigtrunc_slow,
         "/delayed/noloc.php": route_delayed_noloc,
         "/delayed/selfloop.php": route_delayed_selfloop,
         "/delayed/redir.php": route_delayed_redir,
