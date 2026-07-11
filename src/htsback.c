@@ -3611,7 +3611,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       if (back[i].r.statuscode == HTTP_OK && !back[i].testmode) {       // 'OK'
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil)) {  // not HTML
                           if (strnotempty(back[i].url_sav)) {   // target found
-                            int size = fsize_utf8(back[i].url_sav);     // target size
+                            off_t size = fsize_utf8(back[i].url_sav);
 
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
@@ -3839,7 +3839,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       const hts_boolean range_ok =
                           back[i].r.crange > 0 && resume >= 0 &&
                           resume <= (LLint) sz &&
-                          back[i].r.crange_end + 1 == back[i].r.crange &&
+                          back[i].r.crange_end == back[i].r.crange - 1 &&
                           (back[i].r.totalsize < 0 ||
                            back[i].r.totalsize ==
                                back[i].r.crange_end - resume + 1);
@@ -3908,11 +3908,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           if (fp) {
                             LLint alloc_mem = resume + 1;
 
-                            if (back[i].r.totalsize >= 0)
+                            // Reject a hostile Content-Length that would
+                            // overflow the buffer size: drop the partial and
+                            // refetch.
+                            if (back[i].r.totalsize > INT64_MAX - alloc_mem) {
+                              url_savename_refname_remove(opt, back[i].url_adr,
+                                                          back[i].url_fil);
+                              UNLINK(back[i].url_sav);
+                              alloc_mem = -1;
+                            } else if (back[i].r.totalsize >= 0)
                               alloc_mem += back[i].r.totalsize; // AJOUTER RESTANT!
-                            if (deleteaddr(&back[i].r)
-                                && (back[i].r.adr =
-                                    (char *) malloct((size_t) alloc_mem))) {
+                            if (alloc_mem >= 0 && deleteaddr(&back[i].r) &&
+                                (back[i].r.adr =
+                                     (char *) malloct((size_t) alloc_mem))) {
                               back[i].r.size = resume;
                               if (back[i].r.totalsize >= 0)
                                 back[i].r.totalsize += resume; // -> full size

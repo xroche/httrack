@@ -1,0 +1,96 @@
+#!/bin/bash
+# C2: a resume whose 206 carries a Content-Range end of INT64_MAX must not
+# sign-overflow the crange+1 range check (UBSan aborts on the pre-fix binary).
+# Pass 1 leaves a partial + temp-ref; pass 2 resumes, gets the hostile 206, and
+# must reject the range and refetch the whole file rather than overflow. Teeth
+# are UBSan-only: a normal build wraps to the same reject+restart.
+set -u
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+server="${testdir}/local-server.py"
+
+command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crange.XXXXXX") || exit 1
+serverpid=
+crawlpid=
+cleanup() {
+    test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
+    if test -n "$serverpid"; then
+        kill "$serverpid" 2>/dev/null
+        wait "$serverpid" 2>/dev/null
+    fi
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+out="${tmpdir}/crawl"
+mkdir "$out"
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1)
+refdir="${out}/hts-cache/ref"
+
+# --- pass 1: crawl, interrupt once the blob download is underway -------------
+printf '[pass 1: interrupt mid-download] ..\t'
+httrack "${common[@]}" "${base}/crange206/index.html" >"${tmpdir}/log1" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+sleep 0.3
+kill -TERM "$crawlpid" 2>/dev/null
+wait "$crawlpid" 2>/dev/null
+crawlpid=
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
+    echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
+    exit 1
+}
+echo "OK (temp-ref present)"
+
+# --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
+printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
+httrack "${common[@]}" --continue "${base}/crange206/index.html" >"${tmpdir}/log2" 2>&1
+echo "OK (terminated)"
+
+blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
+full=6008 # len(CRANGE206_BODY) = len("CR206DAT") + 6000
+
+printf '[file recovered whole] ..\t'
+test -s "$blob" || {
+    echo "FAIL: blob.bin missing after the hostile 206"
+    exit 1
+}
+got=$(wc -c <"$blob")
+test "$got" -eq "$full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${full}"
+    exit 1
+}
+echo "OK (${got} bytes)"

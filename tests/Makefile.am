@@ -30,6 +30,7 @@ TESTS = \
 	01_engine-cmdline.test \
 	01_engine-cookies.test \
 	01_engine-copyopt.test \
+	01_engine-crange.test \
 	01_engine-dns.test \
 	01_engine-doitlog.test \
 	01_engine-entities.test \
@@ -115,6 +116,8 @@ TESTS = \
 	43_local-update-truncate.test \
 	44_local-update-errormask.test \
 	45_local-maxsize-recv.test \
-	46_local-update-304-resume.test
+	46_local-update-304-resume.test \
+	47_local-crange-overflow.test \
+	48_local-crange-memresume.test
 
 CLEANFILES = check-network_sh.cache
