@@ -15,8 +15,8 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   On a few-core Linux box, `-j` at 2x the core count is faster still: the tests
   spend much of their wall time asleep (server trickles, httrack self-pacing),
   so an idle core covers a sleeping one. CI uses `min(2*cores, 16)` for `make
-  check` on Linux, but one job per core on macOS (there the extra concurrent
-  `-c8` connections overload the loopback and flake the exact-count tests).
+  check` on Linux; macOS runs serial (parallel crawls overload its loopback and
+  flake 36_local-bigcrawl's exact file count).
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants

@@ -136,10 +136,11 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       - name: Test
-        # No 2x oversubscription here: on macOS it multiplies each crawl's -c8
-        # connections past what the loopback tolerates, dropping fetches and
-        # flaking the exact-count tests (36_local-bigcrawl). One job per core.
-        run: make check -j"$(sysctl -n hw.ncpu)"
+        # Serial on macOS: any parallel make check runs bigcrawl's -c8 alongside
+        # other crawls, overloading the loopback so it drops fetches and flakes
+        # 36_local-bigcrawl's exact file count (the #527 macOS drop, now on the
+        # file count). Revisit once that test tolerates transient drops.
+        run: make check
 
       - name: Print the test log on failure
         if: failure()
