@@ -1,0 +1,11 @@
+#!/bin/bash
+# Issue #176: on --update a page that 200'd on the first crawl but now 403s must
+# keep its good local copy, not be overwritten by the error body nor purged.
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --rerun \
+    --found 'errmask/keep.dat' \
+    --file-min-bytes 'errmask/keep.dat' 1024 \
+    httrack 'BASEURL/errmask/index.html'

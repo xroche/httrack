@@ -112,6 +112,7 @@ TESTS = \
 	40_local-why.test \
 	41_local-utf8-link.test \
 	42_local-maxsize-slow.test \
-	43_local-update-truncate.test
+	43_local-update-truncate.test \
+	44_local-update-errormask.test
 
 CLEANFILES = check-network_sh.cache
