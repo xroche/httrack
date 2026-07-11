@@ -56,6 +56,10 @@ Please visit our Website: http://www.httrack.com
 // Platform detection (sizes, feature macros)
 #include "htsconfig.h"
 
+// Fixed-width integer types + PRI* format macros for the LLint/TStamp typedefs
+#include <stdint.h>
+#include <inttypes.h>
+
 // WIN32 types
 #ifdef _WIN32
 #ifndef SIZEOF_LONG
@@ -109,29 +113,6 @@ Please visit our Website: http://www.httrack.com
 
 #ifndef SETUID
 #define HTS_DO_NOT_USE_UID
-#endif
-
-#ifndef HTS_LONGLONG
-#ifdef SIZEOF_LONG_LONG
-#if SIZEOF_LONG_LONG == 8
-#define HTS_LONGLONG 1
-#endif
-#endif
-
-#ifndef HTS_LONGLONG
-#ifdef __sun
-#define HTS_LONGLONG 0
-#endif
-#ifdef __osf__
-#define HTS_LONGLONG 0
-#endif
-#ifdef __linux
-#define HTS_LONGLONG 1
-#endif
-#ifdef _WIN32
-#define HTS_LONGLONG 1
-#endif
-#endif
 #endif
 
 #ifdef DLLIB
@@ -326,66 +307,14 @@ typedef int hts_tristate;
 #define HTS_DEPRECATED(msg)
 #endif
 
-#ifndef HTS_LONGLONG
-#ifdef HTS_NO_64_BIT
-#define HTS_LONGLONG 0
-#else
-#define HTS_LONGLONG 1
-#endif
-#endif
-
-/* Wide integer types, chosen per platform.
-   LLint:  signed 64-bit counter for byte counts and large sizes (falls back to
-           plain int where 64-bit is unavailable).
-   TStamp: timestamp/duration in the same width (a double in the no-64-bit
-           fallback).
-   LLintP: the printf conversion for an LLint. */
-#if HTS_LONGLONG
-#ifdef LLINT_FORMAT
-typedef LLINT_TYPE LLint;
-
-typedef LLINT_TYPE TStamp;
-
-#define LLintP LLINT_FORMAT
-#else
-
-#ifdef _WIN32
-typedef __int64 LLint;
-
-typedef __int64 TStamp;
-
-#define LLintP "%I64d"
-/* x32/ILP32 sets __x86_64__ but long is 32-bit; exclude it so LLint stays
- * 64-bit. */
-#elif (defined(_LP64) || defined(__x86_64__) || defined(__powerpc64__) ||      \
-       defined(__64BIT__)) &&                                                  \
-    !defined(__ILP32__)
-
-typedef long int LLint;
-
-typedef long int TStamp;
-
-#define LLintP "%ld"
-#else
-typedef long long int LLint;
-
-typedef long long int TStamp;
-
-#define LLintP "%lld"
-#endif
-
-#endif /* HTS_LONGLONG */
-
-/* Claiming long-long support must yield a real 64-bit LLint (x32 regressed:
-   __x86_64__ set but long is 32-bit). Compile-time trip, portable to C90. */
-typedef char hts_assert_llint_is_64bit[sizeof(LLint) == 8 ? 1 : -1];
-
-#else
-typedef int LLint;
-
-#define LLintP "%d"
-typedef double TStamp;
-#endif
+/* LLint: signed 64-bit byte/size counter (-1 is a sentinel engine-wide);
+   TStamp: timestamp/duration in the same width; LLintP: its printf conversion.
+   int64_t/PRId64 give an exact width and the right format on every C99 target,
+   so no per-platform ladder is needed. */
+typedef int64_t LLint;
+typedef int64_t TStamp;
+/* PRId64 has no '%'; callers use LLintP as a full conversion ("X: " LLintP). */
+#define LLintP "%" PRId64
 
 /* Integer type for file offsets/sizes passed to the C library. Widens to
    LLint (with HTS_FSEEKO for fseeko/ftello) under large-file support, plain
