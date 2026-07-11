@@ -9,7 +9,7 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --rerun \
-    --errors 4 --files 361 \
+    --errors-content 4 --files 361 \
     --found 'big/p/95.html' \
     --found 'big/a/d1/d2/d3/d4/d5/d6/d7/d8/deep.png' \
     --found 'big/a/f2-2x.png' \
