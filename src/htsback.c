@@ -3540,22 +3540,20 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   if (back[i].r.statuscode == 406) {    // 'Not Acceptable'
                     back[i].r.statuscode = HTTP_OK;
                   }
-                  // 'do not erase already downloaded file'
-                  // on an updated file
-                  // with an error : consider a 304 error
-                  if (!opt->delete_old) {
-                    if (HTTP_IS_ERROR(back[i].r.statuscode) && back[i].is_update
-                        && !back[i].testmode) {
-                      if (back[i].url_sav[0] && fexist_utf8(back[i].url_sav)) {
-                        hts_log_print(opt, LOG_DEBUG,
-                                      "Error ignored %d (%s) because of 'no purge' option for %s%s",
-                                      back[i].r.statuscode, back[i].r.msg,
-                                      back[i].url_adr, back[i].url_fil);
-                        back[i].r.statuscode = HTTP_NOT_MODIFIED;
-                        deletehttp(&back[i].r);
-                        back[i].r.soc = INVALID_SOCKET;
-                      }
-                    }
+                  // On update, keep the good copy on error (mask as 304); skip
+                  // resume paths so a stale-partial 416 still re-fetches.
+                  if (HTTP_IS_ERROR(back[i].r.statuscode) &&
+                      back[i].is_update && !back[i].testmode &&
+                      back[i].range_req_size == 0 && back[i].url_sav[0] &&
+                      fexist_utf8(back[i].url_sav)) {
+                    hts_log_print(opt, LOG_DEBUG,
+                                  "Error %d (%s) ignored on update, keeping "
+                                  "existing copy: %s%s",
+                                  back[i].r.statuscode, back[i].r.msg,
+                                  back[i].url_adr, back[i].url_fil);
+                    back[i].r.statuscode = HTTP_NOT_MODIFIED;
+                    deletehttp(&back[i].r);
+                    back[i].r.soc = INVALID_SOCKET;
                   }
                   // Various hacks to limit re-transfers when updating a mirror
                   // Force update if same size detected

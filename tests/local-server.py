@@ -934,6 +934,33 @@ class Handler(SimpleHTTPRequestHandler):
     def route_mini304_page(self):
         self.big_send(b"<html><body>tiny cacheable page</body></html>\n", "text/html")
 
+    # --- /errmask/: issue #176 — a page that 200'd on the first crawl but 403s
+    # on the update fetch must keep its good copy, not be overwritten nor purged.
+    ERRMASK_GOOD = b"KEEP" + b"." * 1020  # 1024 B distinctive non-HTML body
+    ERRMASK_ERR = b"<html><body>error 403</body></html>\n"
+
+    def route_errmask_index(self):
+        self.send_html('\t<a href="keep.dat">keep</a>\n')
+
+    def route_errmask_keep(self):
+        # First crawl (no validator) gets the 1024 B body + Last-Modified; the
+        # update sends a conditional and gets a 403 error page.
+        if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
+            self.send_response(403, "Forbidden")
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(self.ERRMASK_ERR)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.ERRMASK_ERR)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Last-Modified", BIG_LASTMOD)
+        self.send_header("Content-Length", str(len(self.ERRMASK_GOOD)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.ERRMASK_GOOD)
+
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
         self.send_html(
@@ -1177,6 +1204,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/target.html": route_redir_target,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
+        "/errmask/index.html": route_errmask_index,
+        "/errmask/keep.dat": route_errmask_keep,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------
