@@ -10,7 +10,9 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   -j"$(nproc)"`. Always pass `-j` to `make check`: the suite runs under
   automake's parallel harness and each crawl test binds its own ephemeral-port
   server, so `-j` never contends and a multi-minute serial run drops to
-  seconds. Or run `sh build.sh` to do bootstrap + configure + make in one shot.
+  seconds. A new `.test` added to `$(TESTS)` is scheduled onto a free worker
+  automatically; only a test slower than the current longest raises the floor.
+  Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
