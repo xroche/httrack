@@ -1586,13 +1586,19 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         a = strchr(rcvd + p, '/');
         if (a != NULL) {
           a++;
-          if (sscanf(a, LLintP, &retour->crange) == 1) {
+          if (sscanf(a, LLintP, &retour->crange) == 1 && retour->crange >= 0) {
             retour->crange_start = 0;
             retour->crange_end = retour->crange - 1;
           } else {
             retour->crange = 0;
           }
         }
+      }
+      // A valid Content-Range has no negative field; reject hostile values so
+      // the crange +/- 1 arithmetic downstream cannot sign-overflow (UB).
+      if (retour->crange_start < 0 || retour->crange_end < 0 ||
+          retour->crange < 0) {
+        retour->crange_start = retour->crange_end = retour->crange = 0;
       }
     }
   } else if ((p = strfield(rcvd, "Connection:")) != 0) {

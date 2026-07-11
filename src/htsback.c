@@ -3611,7 +3611,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       if (back[i].r.statuscode == HTTP_OK && !back[i].testmode) {       // 'OK'
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil)) {  // not HTML
                           if (strnotempty(back[i].url_sav)) {   // target found
-                            int size = fsize_utf8(back[i].url_sav);     // target size
+                            off_t size = fsize_utf8(back[i].url_sav);
 
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
@@ -3839,7 +3839,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       const hts_boolean range_ok =
                           back[i].r.crange > 0 && resume >= 0 &&
                           resume <= (LLint) sz &&
-                          back[i].r.crange_end + 1 == back[i].r.crange &&
+                          back[i].r.crange_end == back[i].r.crange - 1 &&
                           (back[i].r.totalsize < 0 ||
                            back[i].r.totalsize ==
                                back[i].r.crange_end - resume + 1);

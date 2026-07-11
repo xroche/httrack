@@ -1310,6 +1310,29 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Parse a Content-Range header and print the sanitized triple. A hostile value
+   (negative or INT64 extreme) must clamp to 0 without signed-overflow UB. */
+static int st_crange(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "crange: needs at least one raw Content-Range line\n");
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    htsblk r;
+    char BIGSTK line[HTS_URLMAXSIZE * 2];
+
+    memset(&r, 0, sizeof(r));
+    strcpybuff(line, argv[i]);
+    treathead(NULL, "www.example.com", "/", &r, line);
+    printf("crange_start=" LLintP " crange_end=" LLintP " crange=" LLintP "\n",
+           (LLint) r.crange_start, (LLint) r.crange_end, (LLint) r.crange);
+  }
+  return 0;
+}
+
 /* Decode a body argument ("hex:FFD8.." or literal text) into buf. */
 static size_t st_decode_body(const char *arg, char *buf, size_t size) {
   size_t n = 0;
@@ -2496,6 +2519,8 @@ static const struct selftest_entry {
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
+    {"crange", "<raw-content-range-line> ...",
+     "Content-Range parse integer safety", st_crange},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",

@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Content-Range parse (treathead via -#test=crange). Hostile values must clamp
+# to 0, and the crange +/- 1 arithmetic must not sign-overflow (UBSan aborts on
+# the pre-fix binary at the INT64_MIN cases).
+
+cr() {
+    local want="$1"
+    shift
+    out="$(httrack -O /dev/null -#test=crange "$@")"
+    test "$out" == "$want" || {
+        echo "FAIL: $* -> '$out' (want '$want')"
+        exit 1
+    }
+}
+
+# Normal range and the '*/N' fallback both parse through unchanged.
+cr 'crange_start=0 crange_end=70870 crange=70871' 'Content-Range: bytes 0-70870/70871'
+cr 'crange_start=0 crange_end=70870 crange=70871' 'Content-Range: bytes */70871'
+
+# INT64_MIN total in the fallback would make crange-1 overflow: clamp to 0.
+cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes */-9223372036854775808'
+
+# Any negative field in the 3-field form clamps the whole triple to 0.
+cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes -1--1/-1'
+
+# INT64_MAX is non-negative: it passes through, the parse must not mangle it.
+cr 'crange_start=0 crange_end=9223372036854775807 crange=9223372036854775807' \
+    'Content-Range: bytes 0-9223372036854775807/9223372036854775807'
