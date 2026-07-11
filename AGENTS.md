@@ -6,8 +6,11 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 ## Build & test
 - Fresh clone first: `git submodule update --init src/coucal`
 - `./bootstrap` (regenerates `configure` via `autoreconf`; needs autoconf,
-  automake, libtool), then `bash configure && make && make check`. Or run
-  `sh build.sh` to do bootstrap + configure + make in one shot.
+  automake, libtool), then `bash configure && make -j"$(nproc)" && make check
+  -j"$(nproc)"`. Always pass `-j` to `make check`: the suite runs under
+  automake's parallel harness and each crawl test binds its own ephemeral-port
+  server, so `-j` never contends and a multi-minute serial run drops to
+  seconds. Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every

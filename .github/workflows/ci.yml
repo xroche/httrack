@@ -55,7 +55,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test
-        run: make check
+        run: make check -j"$(nproc)"
 
       - name: Print the test log on failure
         if: failure()
@@ -99,7 +99,7 @@ jobs:
           sudo find /usr/bin /usr/local/bin -maxdepth 1 -name 'python3*' \
             -exec mv {} {}.hidden \;
           ! command -v python3
-          make check
+          make check -j"$(nproc)"
 
       - name: Print the test log on failure
         if: failure()
@@ -133,7 +133,7 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       - name: Test
-        run: make check
+        run: make check -j"$(sysctl -n hw.ncpu)"
 
       - name: Print the test log on failure
         if: failure()
@@ -171,7 +171,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test
-        run: make check
+        run: make check -j"$(nproc)"
 
       - name: Print the test log on failure
         if: failure()
@@ -226,7 +226,7 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: make check
+        run: make check -j"$(nproc)"
 
       - name: Print the test log on failure
         if: failure()
@@ -272,7 +272,7 @@ jobs:
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
-          make check TESTS="$tests"
+          make check -j"$(nproc)" TESTS="$tests"
 
       - name: Print the test log on failure
         if: failure()
@@ -347,7 +347,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test
-        run: make check
+        run: make check -j"$(nproc)"
 
       - name: Print the test log on failure
         if: failure()
