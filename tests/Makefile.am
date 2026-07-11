@@ -110,6 +110,7 @@ TESTS = \
 	38_local-update-304.test \
 	39_local-delayed-cancel.test \
 	40_local-why.test \
-	41_local-utf8-link.test
+	41_local-utf8-link.test \
+	42_local-maxsize-slow.test
 
 CLEANFILES = check-network_sh.cache

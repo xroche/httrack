@@ -1035,6 +1035,14 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigfile(self):
         self.send_raw(b"x" * self.BIGFILE_BYTES, "application/octet-stream")
 
+    # -M under a slow server (#77): p0 is a fast 640KB file that alone overruns
+    # -M; p1..p3 trickle for a minute. The cap must abort those in-flight
+    # transfers, not wait them out.
+    def route_bigtrickle_index(self):
+        self.send_html(
+            "".join('\t<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(4))
+        )
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1107,6 +1115,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfiles/p5.bin": route_bigfile,
         "/bigfiles/p6.bin": route_bigfile,
         "/bigfiles/p7.bin": route_bigfile,
+        "/bigtrickle/index.html": route_bigtrickle_index,
+        "/bigtrickle/p0.bin": route_bigfile,
+        "/bigtrickle/p1.bin": route_trickle_page,
+        "/bigtrickle/p2.bin": route_trickle_page,
+        "/bigtrickle/p3.bin": route_trickle_page,
         "/delayed/noloc.php": route_delayed_noloc,
         "/delayed/selfloop.php": route_delayed_selfloop,
         "/delayed/redir.php": route_delayed_redir,

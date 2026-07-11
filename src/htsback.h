@@ -141,8 +141,8 @@ LLint back_transferred(LLint add, struct_back * sback);
 int host_wait(httrackp * opt, lien_back * sback);
 #endif
 int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
-/* Enforce -M/-E quotas: requests a smooth stop when reached; returns 0 once
-   the -E deadline overran its grace period (callers must stop waiting). */
+/* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
+   or -E deadline overruns its grace period (callers must stop waiting). */
 int back_checkmirror(httrackp * opt);
 
 #endif
