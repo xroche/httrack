@@ -307,13 +307,10 @@ typedef int hts_tristate;
 #define HTS_DEPRECATED(msg)
 #endif
 
-/* LLint: signed 64-bit byte/size counter (-1 is a sentinel engine-wide);
-   TStamp: timestamp/duration in the same width; LLintP: its printf conversion.
-   int64_t/PRId64 give an exact width and the right format on every C99 target,
-   so no per-platform ladder is needed. */
+/* LLint/TStamp: signed exact-width 64-bit; -1 is a sentinel engine-wide. */
 typedef int64_t LLint;
 typedef int64_t TStamp;
-/* PRId64 has no '%'; callers use LLintP as a full conversion ("X: " LLintP). */
+/* Full printf conversion, '%' included (PRId64 has none): "X: " LLintP. */
 #define LLintP "%" PRId64
 
 /* Integer type for file offsets/sizes passed to the C library. Widens to
