@@ -6,8 +6,19 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 ## Build & test
 - Fresh clone first: `git submodule update --init src/coucal`
 - `./bootstrap` (regenerates `configure` via `autoreconf`; needs autoconf,
-  automake, libtool), then `bash configure && make && make check`. Or run
-  `sh build.sh` to do bootstrap + configure + make in one shot.
+  automake, libtool), then `bash configure && make -j"$(nproc)" && make check
+  -j"$(nproc)"`. Always pass `-j` to `make check`: the suite runs under
+  automake's parallel harness and each crawl test binds its own ephemeral-port
+  server, so `-j` never contends and a multi-minute serial run drops to
+  seconds. A new `.test` added to `$(TESTS)` is scheduled onto a free worker
+  automatically; only a test slower than the current longest raises the floor.
+  On a few-core Linux box, `-j` at 2x the core count is faster still: the tests
+  spend much of their wall time asleep (server trickles, httrack self-pacing),
+  so an idle core covers a sleeping one. CI uses `min(2*cores, 16)`. macOS runs
+  36_local-bigcrawl alone in a second pass: its sustained `-c8` crawl overloads
+  the macOS loopback when it competes with other crawls and flakes its exact
+  file count (Linux tolerates the full parallel run).
+  Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
