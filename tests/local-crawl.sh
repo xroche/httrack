@@ -20,7 +20,7 @@
 #       --file-min-bytes PATH N --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --errors counts every "Error:" log line; --errors-content drops transient
-# network failures (codes -2..-7) that flake on busy loopback under -c8.
+# network failures (codes -2..-6) that flake on busy loopback under -c8.
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
@@ -339,8 +339,9 @@ while test "$i" -lt "${#audit[@]}"; do
     --errors-content)
         i=$((i + 1))
         total=$(grep -icE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt")
-        # transient network failures (statuscode -2..-7) flake on busy loopback
-        transient=$(grep -cE '\(-[2-7]\) at link ' "${out}/hts-log.txt" || true)
+        # transient network failures (statuscode -2..-6) flake on busy loopback;
+        # the code parens are followed by " at link" or " after N retries at link"
+        transient=$(grep -cE '\(-[2-6]\) (at link|after )' "${out}/hts-log.txt" || true)
         assert_equals "checking content errors" "${audit[$i]}" "$((total - transient))"
         ;;
     --files)
