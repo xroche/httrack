@@ -355,8 +355,11 @@ typedef __int64 LLint;
 typedef __int64 TStamp;
 
 #define LLintP "%I64d"
+/* x32/ILP32 sets __x86_64__ but long is 32-bit; exclude it so LLint stays
+ * 64-bit. */
 #elif (defined(_LP64) || defined(__x86_64__) || defined(__powerpc64__) ||      \
-       defined(__64BIT__))
+       defined(__64BIT__)) &&                                                  \
+    !defined(__ILP32__)
 
 typedef long int LLint;
 
@@ -372,6 +375,10 @@ typedef long long int TStamp;
 #endif
 
 #endif /* HTS_LONGLONG */
+
+/* Claiming long-long support must yield a real 64-bit LLint (x32 regressed:
+   __x86_64__ set but long is 32-bit). Compile-time trip, portable to C90. */
+typedef char hts_assert_llint_is_64bit[sizeof(LLint) == 8 ? 1 : -1];
 
 #else
 typedef int LLint;
