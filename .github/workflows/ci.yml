@@ -136,11 +136,15 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       - name: Test
-        # Serial on macOS: any parallel make check runs bigcrawl's -c8 alongside
-        # other crawls, overloading the loopback so it drops fetches and flakes
-        # 36_local-bigcrawl's exact file count (the #527 macOS drop, now on the
-        # file count). Revisit once that test tolerates transient drops.
-        run: make check
+        # bigcrawl's sustained -c8 crawl drops fetches on macOS's loopback when
+        # it competes with other crawls, flaking its exact file count (the #527
+        # macOS drop). Run everything else in parallel, then bigcrawl alone (its
+        # serial-safe condition). Linux tolerates the full parallel run.
+        run: |
+          jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          rest=$(cd tests && ls *.test | grep -v '^36_local-bigcrawl\.test$' | tr '\n' ' ')
+          make check -j"$jobs" TESTS="$rest"
+          make check TESTS=36_local-bigcrawl.test
 
       - name: Print the test log on failure
         if: failure()
