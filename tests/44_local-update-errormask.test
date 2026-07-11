@@ -8,4 +8,6 @@ set -euo pipefail
 bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --found 'errmask/keep.dat' \
     --file-min-bytes 'errmask/keep.dat' 1024 \
+    --file-matches 'errmask/keep.dat' '^KEEP' \
+    --file-not-matches 'errmask/keep.dat' 'error 403' \
     httrack 'BASEURL/errmask/index.html'
