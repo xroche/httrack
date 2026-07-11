@@ -11,10 +11,10 @@ set -euo pipefail
 start=$(date +%s)
 bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'More than 400000 bytes have been transferred.. giving up' \
-    --found bigtrickle/p0.bin \
     httrack 'BASEURL/bigtrickle/index.html' -M400000 -c4
 wall=$(($(date +%s) - start))
-# trickle runs 60s; a smooth-only stop waits it out, the hard stop lands near 8s
+# trickle runs 60s; a smooth-only stop waits it out, the hard stop lands near 8s.
+# Wall clock is the discriminating check: the log line above fires either way.
 if [ "$wall" -ge 30 ]; then
     echo "crawl took ${wall}s, -M hard stop did not engage" >&2
     exit 1

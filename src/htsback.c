@@ -68,6 +68,15 @@ static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
 
+/* Which hard quota, if any, is currently aborting the mirror. */
+typedef enum {
+  HTS_MIRROR_LIMIT_NONE = 0,
+  HTS_MIRROR_LIMIT_SIZE,
+  HTS_MIRROR_LIMIT_TIME,
+} hts_mirror_limit;
+
+static hts_mirror_limit back_mirror_limit(httrackp *opt);
+
 struct_back *back_new(httrackp *opt, int back_max) {
   int i;
   struct_back *sback = calloct(1, sizeof(struct_back));
@@ -2387,6 +2396,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   /* Time/size limit exceeded past grace: abort in-flight transfers so no wait
      loop starves (#481, #77). FTP slots stay, their thread owns the socket. */
   if (!back_checkmirror(opt)) {
+    const hts_mirror_limit limit = back_mirror_limit(opt);
+    const char *const reason =
+        (limit == HTS_MIRROR_LIMIT_SIZE) ? "size limit" : "time limit";
+    const char *const slotmsg = (limit == HTS_MIRROR_LIMIT_SIZE)
+                                    ? "Mirror Size Limit"
+                                    : "Mirror Time Out";
     int aborted = 0;
     unsigned int i;
 
@@ -2400,15 +2415,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))
           back_delayed_discard(opt, &back[i]);
         back[i].r.statuscode = STATUSCODE_TIMEOUT;
-        strcpybuff(back[i].r.msg, "Mirror Time Out");
+        strcpybuff(back[i].r.msg, slotmsg);
         back[i].status = STATUS_READY;
         back_set_finished(sback, i);
         aborted++;
       }
     }
     if (aborted > 0)
-      hts_log_print(opt, LOG_WARNING,
-                    "mirror limit reached, %d transfer(s) aborted", aborted);
+      hts_log_print(opt, LOG_WARNING, "%s reached, %d transfer(s) aborted",
+                    reason, aborted);
     return;
   }
 
@@ -4113,41 +4128,43 @@ static int back_maxtime_grace(const int maxtime) {
   return maximum(5, minimum(30, maxtime / 10));
 }
 
-/* Bytes the smooth stop may overrun before in-flight transfers are aborted. */
+/* Bytes the smooth stop may overrun before in-flight transfers are aborted.
+   No floor (unlike the time grace): a size overrun should abort promptly. */
 static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
 
-int back_checkmirror(httrackp * opt) {
-  // Check max size
-  if ((opt->maxsite > 0) && (HTS_STAT.stat_bytes >= opt->maxsite)) {
-    if (!opt->state.stop) {     /* not yet stopped */
-      hts_log_print(opt, LOG_ERROR,
-                    "More than " LLintP
-                    " bytes have been transferred.. giving up",
-                    (LLint) opt->maxsite);
-      /* cancel mirror smoothly */
-      hts_request_stop(opt, 0);
-    }
-    /* smooth stop overran the grace margin: stop waiting (#77) */
-    if (HTS_STAT.stat_bytes - opt->maxsite >= back_maxsize_grace(opt->maxsite))
-      return 0;
-  }
-  // Check max time
+/* Which cap has overrun its grace and must hard-stop the mirror (#77, #481). */
+static hts_mirror_limit back_mirror_limit(httrackp *opt) {
+  if (opt->maxsite > 0 && HTS_STAT.stat_bytes >= opt->maxsite &&
+      HTS_STAT.stat_bytes - opt->maxsite >= back_maxsize_grace(opt->maxsite))
+    return HTS_MIRROR_LIMIT_SIZE;
   if (opt->maxtime > 0) {
     const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
 
-    if (elapsed >= opt->maxtime) {
-      if (!opt->state.stop) { /* not yet stopped */
-        hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
-                      opt->maxtime);
-        /* cancel mirror smoothly */
-        hts_request_stop(opt, 0);
-      }
-      /* smooth stop starved past the grace period: stop waiting (#481) */
-      if (elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
-        return 0;
-    }
+    if (elapsed >= opt->maxtime &&
+        elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
+      return HTS_MIRROR_LIMIT_TIME;
   }
-  return 1;                     /* Ok, go on */
+  return HTS_MIRROR_LIMIT_NONE;
+}
+
+int back_checkmirror(httrackp *opt) {
+  /* request a smooth stop the first time each cap is reached */
+  if (opt->maxsite > 0 && HTS_STAT.stat_bytes >= opt->maxsite &&
+      !opt->state.stop) {
+    hts_log_print(opt, LOG_ERROR,
+                  "More than " LLintP
+                  " bytes have been transferred.. giving up",
+                  (LLint) opt->maxsite);
+    hts_request_stop(opt, 0);
+  }
+  if (opt->maxtime > 0 && !opt->state.stop &&
+      (time_local() - HTS_STAT.stat_timestart) >= opt->maxtime) {
+    hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
+                  opt->maxtime);
+    hts_request_stop(opt, 0);
+  }
+  /* hard stop once a cap overruns its grace (callers must stop waiting) */
+  return back_mirror_limit(opt) == HTS_MIRROR_LIMIT_NONE;
 }
 
 // octets transférés + add
