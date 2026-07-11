@@ -950,6 +950,49 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(self.CRANGE206_BODY)
 
+    # C2 memory branch: a resume answered with a 206 that lies text/html (so the
+    # resume buffers in memory) plus a matching INT64_MAX Content-Length would
+    # overflow the buffer-size add. Stall first, then send that hostile 206.
+    _crange206mem_started = False
+
+    def route_crange206mem_index(self):
+        self.send_html('\t<a href="blob.bin">blob</a>')
+
+    def route_crange206mem(self):
+        rng = self.headers.get("Range")
+        if not Handler._crange206mem_started:
+            Handler._crange206mem_started = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(self.CRANGE206_BODY)))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.CRANGE206_BODY[:3000])
+                self.wfile.flush()
+                try:
+                    while True:
+                        time.sleep(3600)
+                except OSError:
+                    pass
+            return
+        if rng is not None:  # resume: text/html + matching INT64_MAX Content-Length
+            self.send_response(206, "Partial Content")
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", "9223372036854775807")
+            self.send_header(
+                "Content-Range", "bytes 0-9223372036854775806/9223372036854775807"
+            )
+            self.end_headers()
+            return  # the overflow is computed before any body read
+        # range-less refetch after the resume is rejected: whole file.
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(self.CRANGE206_BODY)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.CRANGE206_BODY)
+
     # error pages / 0-byte files (#17): -o0 ("no error pages") must keep 4xx/5xx
     # bodies off disk; a genuine 0-byte 200 is a valid file and stays.
     def route_errpage_index(self):
@@ -1251,6 +1294,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/overlap/full.bin": route_overlap_full,
         "/crange206/index.html": route_crange206_index,
         "/crange206/blob.bin": route_crange206,
+        "/crange206mem/index.html": route_crange206mem_index,
+        "/crange206mem/blob.bin": route_crange206mem,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
         "/errpage/index.html": route_errpage_index,

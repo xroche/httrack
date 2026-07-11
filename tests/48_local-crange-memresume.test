@@ -1,9 +1,9 @@
 #!/bin/bash
-# C2: a resume whose 206 carries a Content-Range end of INT64_MAX must not
-# sign-overflow the crange+1 range check (UBSan aborts on the pre-fix binary).
-# Pass 1 leaves a partial + temp-ref; pass 2 resumes, gets the hostile 206, and
-# must reject the range and refetch the whole file rather than overflow. Teeth
-# are UBSan-only: a normal build wraps to the same reject+restart.
+# C2 (memory branch): a resume whose 206 lies text/html with a matching
+# INT64_MAX Content-Length must not overflow the resume buffer-size add
+# (UBSan aborts on the pre-fix binary at alloc_mem += totalsize). Pass 1 leaves
+# a partial + temp-ref; pass 2 resumes and must reject and refetch the whole
+# file. Teeth are UBSan-only: a normal build wraps to the same reject+restart.
 set -u
 
 : "${top_srcdir:=..}"
@@ -12,7 +12,7 @@ server="${testdir}/local-server.py"
 
 command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
 
-tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crange.XXXXXX") || exit 1
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crangemem.XXXXXX") || exit 1
 serverpid=
 crawlpid=
 cleanup() {
@@ -58,7 +58,7 @@ refdir="${out}/hts-cache/ref"
 
 # --- pass 1: crawl, interrupt once the blob download is underway -------------
 printf '[pass 1: interrupt mid-download] ..\t'
-httrack "${common[@]}" "${base}/crange206/index.html" >"${tmpdir}/log1" 2>&1 &
+httrack "${common[@]}" "${base}/crange206mem/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
 for _ in $(seq 1 300); do
     test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
@@ -77,7 +77,7 @@ echo "OK (temp-ref present)"
 
 # --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
 printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
-httrack "${common[@]}" --continue "${base}/crange206/index.html" >"${tmpdir}/log2" 2>&1
+httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)

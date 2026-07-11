@@ -24,8 +24,10 @@ cr 'crange_start=0 crange_end=70870 crange=70871' 'Content-Range: bytes */70871'
 # INT64_MIN total in the fallback would make crange-1 overflow: clamp to 0.
 cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes */-9223372036854775808'
 
-# Any negative field in the 3-field form clamps the whole triple to 0.
+# Any negative field in the 3-field form clamps the whole triple to 0 (each
+# field independently: a leading negative start/end alone still zeroes all).
 cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes -1--1/-1'
+cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes -5-10/20'
 
 # INT64_MAX is non-negative: it passes through, the parse must not mangle it.
 cr 'crange_start=0 crange_end=9223372036854775807 crange=9223372036854775807' \
