@@ -3512,6 +3512,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     continue;
                   }
 
+                  // The server really sent 304 here; the *-hacks below force
+                  // NOT_MODIFIED only after confirming the file is complete.
+                  const hts_boolean server_sent_304 =
+                      (back[i].r.statuscode == HTTP_NOT_MODIFIED);
+
                   /*
                      Solve "false" 416 problems
                    */
@@ -3699,6 +3704,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       else
                         strcpybuff(back[i].r.msg, "Test: File too big");
                     }
+                  }
+
+                  // Out-of-protocol 304 to a Range resume: the file is still
+                  // partial, so drop it and refetch instead of trusting it.
+                  if (server_sent_304 && back[i].range_req_size > 0) {
+                    url_savename_refname_remove(opt, back[i].url_adr,
+                                                back[i].url_fil);
+                    UNLINK(back[i].url_sav);
+                    deletehttp(&back[i].r);
+                    back[i].r.soc = INVALID_SOCKET;
+                    back[i].r.statuscode = STATUSCODE_NON_FATAL;
+                    strcpybuff(back[i].r.msg,
+                               "Bogus 304 on resume, restarting");
+                    back[i].status = STATUS_READY;
+                    back_set_finished(sback, i);
                   }
 
                   /* sinon, continuer */

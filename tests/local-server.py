@@ -790,6 +790,52 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # C7: stall the first GET (partial + temp-ref), then answer the resume's
+    # Range with a bogus 304; httrack must drop the partial and refetch.
+    RESUME304_BODY = b"C7DATA--" + bytes((i * 7 + 3) % 256 for i in range(8192))
+    _resume304_started = False
+
+    def route_resume304_index(self):
+        self.send_html('\t<a href="blob.bin">blob</a>')
+
+    def route_resume304(self):
+        counter = os.environ.get("RESUME304_COUNTER")
+        if counter:
+            with open(counter, "a") as fp:
+                fp.write("x")
+        rng = self.headers.get("Range")
+        if not Handler._resume304_started:
+            Handler._resume304_started = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(self.RESUME304_BODY)))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Last-Modified", BIG_LASTMOD)
+            self.send_header("ETag", '"c7"')
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.RESUME304_BODY[:4096])
+                self.wfile.flush()
+                try:
+                    while True:
+                        time.sleep(3600)
+                except OSError:
+                    pass
+            return
+        if rng is not None:  # resume request: bogus out-of-protocol 304
+            self.send_response(304)
+            self.send_header("ETag", '"c7"')
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        # Range-less refetch after the partial is dropped: whole file.
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(self.RESUME304_BODY)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.RESUME304_BODY)
+
     # 206 resume must honor the server's Content-Range, not the offset we asked
     # for (#198): a server resuming a few bytes *before* the request must not
     # leave httrack duplicating the overlap onto the partial. flaky.bin
@@ -1149,6 +1195,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/intl/" + INTL_NAME: route_intl_page,
         "/resume/index.html": route_resume_index,
         "/resume/blob.txt": route_resume,
+        "/resume304/index.html": route_resume304_index,
+        "/resume304/blob.bin": route_resume304,
         "/overlap/index.html": route_overlap_index,
         "/overlap/flaky.bin": route_overlap,
         "/overlap/full.bin": route_overlap_full,

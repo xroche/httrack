@@ -1,0 +1,108 @@
+#!/bin/bash
+# C7: a server 304 answering a resume's Range request is out of protocol; httrack
+# must drop the partial and refetch, not finalize it as complete at the partial
+# byte count. Pass 1 leaves a partial + temp-ref; pass 2 resumes, gets a bogus
+# 304, and must recover the whole file.
+set -u
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+server="${testdir}/local-server.py"
+
+command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_c7.XXXXXX") || exit 1
+serverpid=
+crawlpid=
+cleanup() {
+    test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
+    if test -n "$serverpid"; then
+        kill "$serverpid" 2>/dev/null
+        wait "$serverpid" 2>/dev/null
+    fi
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+counter="${tmpdir}/reqcount"
+RESUME304_COUNTER="$counter" python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+out="${tmpdir}/crawl"
+mkdir "$out"
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1)
+refdir="${out}/hts-cache/ref"
+
+# --- pass 1: crawl, interrupt once the blob download is underway -------------
+printf '[pass 1: interrupt mid-download] ..\t'
+httrack "${common[@]}" "${base}/resume304/index.html" >"${tmpdir}/log1" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -s "$counter" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+sleep 0.5
+kill -TERM "$crawlpid" 2>/dev/null
+wait "$crawlpid" 2>/dev/null
+crawlpid=
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
+    echo "FAIL: no temp-ref survived pass 1; cannot drive C7"
+    exit 1
+}
+echo "OK (temp-ref present)"
+before=$(wc -c <"$counter" 2>/dev/null || echo 0)
+
+# --- pass 2: --continue -> resume Range -> bogus 304 -> drop + refetch --------
+printf '[pass 2: resume gets 304, must refetch] ..\t'
+httrack "${common[@]}" --continue "${base}/resume304/index.html" >"${tmpdir}/log2" 2>&1
+echo "OK (terminated)"
+
+blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
+full=8200 # len(RESUME304_BODY) = len("C7DATA--") + 8192
+
+printf '[file recovered whole] ..\t'
+test -s "$blob" || {
+    echo "FAIL: blob.bin missing after the 304 resume (partial dropped, not refetched)"
+    exit 1
+}
+got=$(wc -c <"$blob")
+test "$got" -eq "$full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${full} (partial finalized as complete)"
+    exit 1
+}
+echo "OK (${got} bytes)"
+
+# Pass 2 must issue at least two requests: the resume (Range -> 304) and the
+# range-less refetch (-> 200). Exactly one means the partial was trusted.
+after=$(wc -c <"$counter" 2>/dev/null || echo 0)
+hits=$((after - before))
+printf '[resume then refetch] ..\t'
+test "$hits" -ge 2 || {
+    echo "FAIL: only ${hits} pass-2 request(s); the 304 was trusted, no refetch"
+    exit 1
+}
+echo "OK (${hits} requests)"
