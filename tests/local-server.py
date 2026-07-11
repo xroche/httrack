@@ -1104,6 +1104,22 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # -M received-volume cap (#520): links to large 404 bodies. httrack receives
+    # each (HTS_TOTAL_RECV climbs) but saves none, so saved stays far below -M.
+    def route_maxrecv_index(self):
+        self.send_html(
+            "".join('\t<a href="r%d.bin">r%d</a>\n' % (i, i) for i in range(16))
+        )
+
+    def route_maxrecv_404(self):
+        body = b"x" * self.BIGFILE_BYTES
+        self.send_response(404, "Not Found")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1206,6 +1222,23 @@ class Handler(SimpleHTTPRequestHandler):
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,
         "/errmask/keep.dat": route_errmask_keep,
+        "/maxrecv/index.html": route_maxrecv_index,
+        "/maxrecv/r0.bin": route_maxrecv_404,
+        "/maxrecv/r1.bin": route_maxrecv_404,
+        "/maxrecv/r2.bin": route_maxrecv_404,
+        "/maxrecv/r3.bin": route_maxrecv_404,
+        "/maxrecv/r4.bin": route_maxrecv_404,
+        "/maxrecv/r5.bin": route_maxrecv_404,
+        "/maxrecv/r6.bin": route_maxrecv_404,
+        "/maxrecv/r7.bin": route_maxrecv_404,
+        "/maxrecv/r8.bin": route_maxrecv_404,
+        "/maxrecv/r9.bin": route_maxrecv_404,
+        "/maxrecv/r10.bin": route_maxrecv_404,
+        "/maxrecv/r11.bin": route_maxrecv_404,
+        "/maxrecv/r12.bin": route_maxrecv_404,
+        "/maxrecv/r13.bin": route_maxrecv_404,
+        "/maxrecv/r14.bin": route_maxrecv_404,
+        "/maxrecv/r15.bin": route_maxrecv_404,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

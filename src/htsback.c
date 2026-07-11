@@ -4178,10 +4178,13 @@ static int back_maxtime_grace(const int maxtime) {
    No floor (unlike the time grace): a size overrun should abort promptly. */
 static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
 
-/* Which cap has overrun its grace and must hard-stop the mirror (#77, #481). */
+/* Which cap has overrun its grace and must hard-stop the mirror (#77, #481).
+   -M measures received volume (HTS_TOTAL_RECV), not saved 200-only stat_bytes
+   which undercounts redirect/error-heavy crawls (#520). */
 static hts_mirror_limit back_mirror_limit(httrackp *opt) {
-  if (opt->maxsite > 0 && HTS_STAT.stat_bytes >= opt->maxsite &&
-      HTS_STAT.stat_bytes - opt->maxsite >= back_maxsize_grace(opt->maxsite))
+  if (opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite &&
+      HTS_STAT.HTS_TOTAL_RECV - opt->maxsite >=
+          back_maxsize_grace(opt->maxsite))
     return HTS_MIRROR_LIMIT_SIZE;
   if (opt->maxtime > 0) {
     const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
@@ -4195,7 +4198,7 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
 
 int back_checkmirror(httrackp *opt) {
   /* request a smooth stop the first time each cap is reached */
-  if (opt->maxsite > 0 && HTS_STAT.stat_bytes >= opt->maxsite &&
+  if (opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite &&
       !opt->state.stop) {
     hts_log_print(opt, LOG_ERROR,
                   "More than " LLintP

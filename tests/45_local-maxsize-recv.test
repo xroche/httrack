@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# -M caps received volume, not saved 200-only bytes (#520): links to large 404
+# bodies pump received >> saved; the cap must trip though little lands on disk.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# The mirror bound is the load-bearing half: it fires while <100 KB is saved,
+# so the cap can only have tripped on received volume, not saved bytes (which
+# would exceed the cap and fetch all 16 links).
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found 'More than 500000 bytes have been transferred.. giving up' \
+    --max-mirror-bytes 100000 \
+    httrack 'BASEURL/maxrecv/index.html' -M500000 -c4
