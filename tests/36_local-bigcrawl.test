@@ -53,4 +53,4 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --log-found ', no files updated' \
     --max-mirror-bytes 700000 \
     --min-mirror-bytes 500000 \
-    httrack 'BASEURL/big/index.html' --retries=0 -c8 -%c100 -A100000000
+    httrack 'BASEURL/big/index.html' --retries=0 -c16 -%c100 -A100000000

@@ -14,10 +14,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   automatically; only a test slower than the current longest raises the floor.
   On a few-core Linux box, `-j` at 2x the core count is faster still: the tests
   spend much of their wall time asleep (server trickles, httrack self-pacing),
-  so an idle core covers a sleeping one. CI uses `min(2*cores, 16)`. macOS runs
-  36_local-bigcrawl alone in a second pass: its sustained `-c8` crawl overloads
-  the macOS loopback when it competes with other crawls and flakes its exact
-  file count (Linux tolerates the full parallel run).
+  so an idle core covers a sleeping one. CI uses `min(2*cores, 16)` on every
+  platform, macOS included: the test server raises its listen backlog
+  (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
+  `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 
 ## Hard invariants
