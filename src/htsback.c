@@ -3881,7 +3881,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                            "Can not truncate partial file, "
                                            "restarting");
                               } else {
-                                fseeko(back[i].r.out, (off_t) resume, SEEK_SET);
+                                /* not (off_t): 32-bit on MSVC, truncating a
+                                   resume past 2GB */
+                                fseeko(back[i].r.out, resume, SEEK_SET);
                                 /* create a temporary reference file in case of
                                  * broken mirror */
                                 if (back_serialize_ref(opt, &back[i]) != 0) {
