@@ -40,7 +40,6 @@ These are the principals limits of HTTrack for that moment. Note that we did not
 that would have solved them.
 
 - Several scripts generating complex filenames may not find them (ex: img.src='image'+a+Mobj.dst+'.gif')
-- Some java classes may not find some files on them (class included)
 - Cgi-bin links may not work properly in some cases (parameters needed). To avoid them: use filters like -*cgi-bin*
 
 

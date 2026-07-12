@@ -243,7 +243,7 @@ Build options:
 Spider options:
   bN accept cookies in cookies.txt (0=do not accept,* 1=accept) (--cookies[=N])
   u  check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always) (--check-type[=N])
-  j *parse Java Classes (j0 don't parse) (--parse-java[=N])
+  j *parse scripts (j0 don't parse) (--parse-java[=N])
   sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always) (--robots[=N])
  %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (--http-10)
  %B  tolerant requests (accept bogus responses on some servers, but not standard!) (--tolerant)
@@ -417,7 +417,7 @@ site. Specifically, the defauls are:
   X *purge old files after update (X0 keep delete)
   bN  accept cookies in cookies.txt (0=do not accept,* 1=accept)
   u check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)
-  j *parse Java Classes (j0 don't parse)
+  j *parse scripts (j0 don't parse)
   sN  follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always)
   C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)
   f *log file mode
@@ -497,9 +497,9 @@ about your browser retaining them.
 <p align=justify> This causes different document types to be analyzed
 differently.
 
-<pre><b><i>  j *parse Java Classes (j0 don't parse) </i></b></pre>
+<pre><b><i>  j *parse scripts (j0 don't parse) </i></b></pre>
 
-<p align=justify> This causes Java class files to be parsed looking for
+<p align=justify> This causes scripts to be parsed looking for
 URLs.
 
 <pre><b><i>  sN  follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always) </i></b></pre>
@@ -1178,7 +1178,7 @@ accepted and sent back in order to allow access.
 Spider options:
  bN  accept cookies in cookies.txt (0=do not accept,* 1=accept)
  u   check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)
- j   *parse Java Classes (j0 don't parse)
+ j   *parse scripts (j0 don't parse)
  sN  follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always)
  %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies)
  %B  tolerant requests (accept bogus responses on some servers, but not standard!)
@@ -2451,12 +2451,10 @@ work.  We still are working to improve the mirror quality of HTTrack.
 
 <p align=justify><b>Q: Some Java applets do not work properly! </b>
 
-<p align=justify> A: Java applets may not work in some cases, for
-example if HTTrack failed to detect all included classes or files called
-within the class file.  Sometimes, Java applets need to be online,
-because remote files are directly caught.  Finally, the site structure
-can be incompatible with the class (always try to keep the original site
-structure when you want to get Java classes)
+<p align=justify> A: Java applets may not work in some cases, because
+HTTrack does not parse compiled class files to find the resources they
+load.  Java applets often need to be online anyway, since remote files
+are fetched directly at runtime.
 
 <p align=justify> If there is no way to make some classes work properly,
 you can exclude them with the filters.  They will be available, but only
