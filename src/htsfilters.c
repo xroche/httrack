@@ -121,12 +121,18 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
   return use1 ? jok1 : jok2;
 }
 
+/* Real filters/URLs fit HTS_URLMAXSIZE*2; past it a hostile pattern recurses
+   O(len) deep or runs O(n^2*stars). Cap length (depth) and steps (work). */
+#define STRJOKER_MAXLEN (HTS_URLMAXSIZE * 2)
+#define STRJOKER_MAXSTEPS 2000000u
+
 /* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
    pair keeps star-heavy patterns polynomial instead of exponential (#501). */
 typedef struct strjoker_memo {
   const char *chaine0, *joker0; /* offsets are relative to these bases */
   size_t stride;                /* strlen(joker0) + 1 */
   unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
+  size_t *nsteps; /* shared work counter; NULL: unbounded (oracle) */
 } strjoker_memo;
 
 static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
@@ -141,6 +147,8 @@ static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
   size_t bit = 0;
   const char *adr;
 
+  if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
+    return NULL; /* work budget spent: fail the match safely */
   if (memo->failed) {
     bit = (size_t) (chaine - memo->chaine0) * memo->stride +
           (size_t) (joker - memo->joker0);
@@ -153,22 +161,24 @@ static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
   return adr;
 }
 
-// wildcard comparator: match chaine against joker (pattern), case-insensitive
-// returns the address of the first matched letter past any leading joker
-// (ie. *[..]toto.. returns the address of toto within chaine), NULL on mismatch
-HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
-                                LLint *size, int *size_flag) {
-  strjoker_memo memo = {chaine, joker, 0, NULL};
+/* Match chaine against joker with a shared work budget *nsteps (a strjokerfind
+   sweep passes one counter, bounding the whole scan). */
+static const char *strjoker_bounded(const char *chaine, const char *joker,
+                                    LLint *size, int *size_flag,
+                                    size_t *nsteps) {
+  strjoker_memo memo = {chaine, joker, 0, NULL, nsteps};
   unsigned char stackbits[2048];
   hts_boolean onheap = HTS_FALSE;
   const char *adr;
 
   if (chaine != NULL && joker != NULL) {
-    const size_t n1 = strlen(chaine) + 1;
+    const size_t l1 = strlen(chaine), l2 = strlen(joker);
 
-    memo.stride = strlen(joker) + 1;
-    if (n1 <= (SIZE_MAX - 7) / memo.stride) { // overflow-safe bitmap size
-      const size_t bytes = (n1 * memo.stride + 7) / 8;
+    if (l1 > STRJOKER_MAXLEN || l2 > STRJOKER_MAXLEN)
+      return NULL; /* beyond any real filter/URL: bound depth+work */
+    memo.stride = l2 + 1;
+    if (l1 + 1 <= (SIZE_MAX - 7) / memo.stride) { // overflow-safe bitmap size
+      const size_t bytes = ((l1 + 1) * memo.stride + 7) / 8;
 
       if (bytes <= sizeof(stackbits)) {
         memset(stackbits, 0, bytes);
@@ -183,6 +193,16 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
   if (onheap)
     freet(memo.failed);
   return adr;
+}
+
+// wildcard comparator: match chaine against joker (pattern), case-insensitive
+// returns the address of the first matched letter past any leading joker
+// (ie. *[..]toto.. returns the address of toto within chaine), NULL on mismatch
+HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
+                                LLint *size, int *size_flag) {
+  size_t nsteps = 0;
+
+  return strjoker_bounded(chaine, joker, size, size_flag, &nsteps);
 }
 
 /* Test-only oracle: the same matcher without the failure memo. */
@@ -431,12 +451,18 @@ static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
 // d'un strcpy sur une variable ayant un nom en lettres et copiant une chaine de chiffres
 // ATTENTION!! Eviter les jokers en début, où gare au temps machine!
 const char *strjokerfind(const char *chaine, const char *joker) {
+  size_t nsteps = 0; /* one budget for the whole scan */
   const char *adr;
 
+  if (chaine != NULL && strlen(chaine) > STRJOKER_MAXLEN)
+    return NULL;
   while(*chaine) {
-    if ((adr = strjoker(chaine, joker, NULL, NULL))) {  // ok trouvé
+    if ((adr = strjoker_bounded(chaine, joker, NULL, NULL,
+                                &nsteps))) { // ok trouvé
       return adr;
     }
+    if (nsteps > STRJOKER_MAXSTEPS) // scan budget spent: no match
+      return NULL;
     chaine++;
   }
   return NULL;
