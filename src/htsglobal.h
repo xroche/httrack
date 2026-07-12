@@ -329,13 +329,6 @@ typedef int INTsys;
 #define INTsysP "%d"
 #endif
 
-/* MSVC ships these POSIX functions under other names. */
-#ifdef _MSC_VER
-#define fseeko _fseeki64
-#define ftello _ftelli64
-#define timegm _mkgmtime
-#endif
-
 /* Socket-handle type. An unsigned integer wide enough for a Windows SOCKET;
    a plain int file descriptor on POSIX. */
 #ifdef _WIN32

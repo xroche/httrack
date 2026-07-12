@@ -3868,8 +3868,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               // drop bytes past the resume point; a silent
                               // failure could leave a stale tail, so on error
                               // drop the partial and refetch the whole file
-                              if (HTS_FTRUNCATE(back[i].r.out,
-                                                (off_t) resume) != 0) {
+                              /* not (off_t): 32-bit on MSVC, wrapping a resume
+                                 past 2GB */
+                              if (HTS_FTRUNCATE(back[i].r.out, resume) != 0) {
                                 fclose(back[i].r.out);
                                 back[i].r.out = NULL;
                                 url_savename_refname_remove(
