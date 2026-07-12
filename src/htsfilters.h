@@ -52,6 +52,10 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
    oracle for the memoized matcher. */
 const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
                             int *size_flag);
+/* strjoker() reporting the work-budget steps it spent and the cap; test-only,
+   lets a self-test assert the budget bounds a hostile pattern's work. */
+const char *strjoker_steps(const char *chaine, const char *joker,
+                           size_t *nsteps_out, size_t *maxsteps_out);
 const char *strjokerfind(const char *chaine, const char *joker);
 #endif
 

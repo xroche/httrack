@@ -744,29 +744,33 @@ static int st_filterdual(httrackp *opt, int argc, char **argv) {
    process (OSS-Fuzz 5060751291908096 / 5745936014573568). */
 static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   const size_t big = 100000; /* well past the length cap */
-  const size_t stars = 900;  /* star-heavy pattern, under the cap */
+  const size_t stars = 1023; /* pattern len 2047, under the length cap */
+  const size_t subjlen = 2048;
   char *subj = malloct(big + 1);
   char *pat = malloct(2 * stars + 2);
-  size_t i;
+  size_t steps = 0, maxsteps = 0, i;
 
   (void) opt;
   (void) argc;
   (void) argv;
   memset(subj, 'a', big);
   subj[big] = '\0';
-  /* '*' matches anything, but an over-length subject is refused by the cap */
+  /* '*' matches anything, but an over-length subject trips the length cap */
   assertf(strjoker(subj, "*", NULL, NULL) == NULL);
   assertf(strjokerfind(subj, "*") == NULL);
-  /* within-cap star-heavy dead-end: the step budget keeps it bounded (a hang
-     would time the test out) */
+  /* Star-heavy dead-end at the length cap: unbounded it runs ~1.26e9 memo-steps
+     (~6s). */
   for (i = 0; i < stars; i++) {
     pat[2 * i] = '*';
     pat[2 * i + 1] = 'a';
   }
   pat[2 * stars] = 'b'; /* never matches an all-'a' subject */
   pat[2 * stars + 1] = '\0';
-  subj[stars] = '\0';
-  assertf(strjoker(subj, pat, NULL, NULL) == NULL);
+  subj[subjlen] = '\0';
+  /* Budget must bound the work; NULL alone wouldn't prove it (a cheap mismatch
+     is NULL too). */
+  assertf(strjoker_steps(subj, pat, &steps, &maxsteps) == NULL);
+  assertf(steps < 10 * maxsteps);
   assertf(strjokerfind(subj, pat) == NULL);
   freet(pat);
   freet(subj);
