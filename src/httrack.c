@@ -919,7 +919,6 @@ static void signal_handlers(void) {
 #ifdef SIGSEGV
   signal(SIGSEGV, sig_fatal);   // segmentation violation
 #endif
-  // No SIGSTKFLT: Linux marks it unused; stack overflow raises SIGSEGV.
 }
 
 // fin routines de détournement de SIGHUP & co
