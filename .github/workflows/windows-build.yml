@@ -27,8 +27,17 @@ jobs:
         with:
           submodules: recursive   # coucal lives in src/coucal
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+      # Located through vswhere rather than microsoft/setup-msbuild: the repo
+      # only allows GitHub-owned actions.
+      - name: Find MSBuild
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
+            -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          Write-Host "MSBuild: $msbuild"
+          "MSBUILD=$msbuild" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Enable vcpkg MSBuild integration
         shell: pwsh
@@ -37,7 +46,7 @@ jobs:
       - name: Build libhttrack
         shell: pwsh
         run: |
-          msbuild src\libhttrack.vcxproj `
+          & $env:MSBUILD src\libhttrack.vcxproj `
             /m `
             /p:Configuration=${{ matrix.configuration }} `
             /p:Platform=${{ matrix.platform }} `
