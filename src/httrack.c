@@ -919,9 +919,6 @@ static void signal_handlers(void) {
 #ifdef SIGSEGV
   signal(SIGSEGV, sig_fatal);   // segmentation violation
 #endif
-#ifdef SIGSTKFLT
-  signal(SIGSTKFLT, sig_fatal); // stack fault
-#endif
 }
 
 // fin routines de détournement de SIGHUP & co
