@@ -1059,10 +1059,10 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   return cook;
 }
 
-/* Self-test entry for append_cookie_header(): build the request Cookie line
-   into dst (always NUL-terminated). Returns the number of cookies emitted. */
-int http_cookie_header_selftest(t_cookie *cookie, const char *domain,
-                                const char *path, char *dst, size_t dst_size) {
+/* Build the request Cookie line for domain/path into dst (always
+   NUL-terminated). Returns the number of cookies emitted. */
+int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
+                       char *dst, size_t dst_size) {
   buff_struct bstr = {dst, dst_size, 0};
 
   assertf(dst != NULL && dst_size > 0);

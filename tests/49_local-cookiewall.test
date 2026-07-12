@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Cookie-wall self-redirect (#15): httrack replays a Set-Cookie to mirror the
+# real page, gives up when nothing changes, and stays bounded when it never does.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Unknown-ext (wall.php) and known-ext (wall.html): the wall sets the cookie once,
+# then serves real content; httrack must replay it and mirror that content.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'cookiewall/wall.html' \
+    --file-matches 'cookiewall/wall.html' 'REAL-CONTENT-BEHIND-COOKIE-WALL' \
+    httrack 'BASEURL/cookiewall/index.html'
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'cookiewall2/wall.html' \
+    --file-matches 'cookiewall2/wall.html' 'REAL-CONTENT-BEHIND-COOKIE-WALL' \
+    httrack 'BASEURL/cookiewall2/index.html'
+
+# No Set-Cookie: the jar never changes, so httrack must give up at once (retry
+# stays gated) and not mirror the wall. A dropped gate would skip this log line.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --not-found 'cookiewall3/wall.html' \
+    --log-found 'loop to same filename' \
+    httrack 'BASEURL/cookiewall3/index.html'
+
+# Ever-changing cookie never satisfies the wall: httrack must stop at the retry
+# cap (bounded, no early give-up) and not mirror it.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --not-found 'cookiewall4/wall.html' \
+    --log-not-found 'loop to same filename' \
+    httrack 'BASEURL/cookiewall4/index.html'

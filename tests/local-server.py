@@ -1143,6 +1143,56 @@ class Handler(SimpleHTTPRequestHandler):
     def route_delayed_empty(self):
         self.send_raw(b"", "text/html")  # 200 + Content-Length: 0
 
+    # --- /cookiewall/ (#15): a self-redirect that only sets a cookie is a
+    # consent wall; httrack must replay the cookie and fetch the real page.
+    WALL_MARK = b"REAL-CONTENT-BEHIND-COOKIE-WALL"
+
+    def route_cookiewall_index(self):
+        self.send_html('\t<a href="wall.php">wall</a>')
+
+    def route_cookiewall_wall(self):
+        self._cookiewall_reply("wall.php")
+
+    # Known-extension twin: .html so the type is not delayed-resolved.
+    def route_cookiewall2_index(self):
+        self.send_html('\t<a href="wall.html">wall</a>')
+
+    def route_cookiewall2_wall(self):
+        self._cookiewall_reply("wall.html")
+
+    def _cookiewall_reply(self, location):
+        if self.request_cookies().get("gate") == "1":
+            self.send_raw(
+                b"<html><body>" + self.WALL_MARK + b"</body></html>\n", "text/html"
+            )
+        else:
+            self._wall_redirect(location, "gate=1; Path=/")
+
+    # No-cookie self-redirect: the jar never changes, so httrack must give up at
+    # once rather than re-fetch (proves the cookie-wall retry stays gated on #15).
+    def route_cookiewall3_index(self):
+        self.send_html('\t<a href="wall.php">wall</a>')
+
+    def route_cookiewall3_wall(self):
+        self._wall_redirect("wall.php", None)
+
+    # Ever-changing cookie: every hit sets a fresh value, so the jar keeps
+    # changing; httrack must stop at the loops<7 cap, not spin forever.
+    def route_cookiewall4_index(self):
+        self.send_html('\t<a href="wall.php">wall</a>')
+
+    def route_cookiewall4_wall(self):
+        nonce = int(self.request_cookies().get("gate", "0")) + 1
+        self._wall_redirect("wall.php", f"gate={nonce}; Path=/")
+
+    def _wall_redirect(self, location, set_cookie):
+        self.send_response(302, "Found")
+        self.send_header("Location", location)
+        if set_cookie is not None:
+            self.send_header("Set-Cookie", set_cookie)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # -E time-limit (#481): pages that trickle far longer than any -E budget,
     # so only an engine-side abort can end the crawl.
     TRICKLE_SECONDS = 60
@@ -1359,6 +1409,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/delayed/chain7.php": route_delayed_chain,
         "/delayed/chain8.php": route_delayed_chain,
         "/delayed/chain9.php": route_delayed_chain,
+        "/cookiewall/index.html": route_cookiewall_index,
+        "/cookiewall/wall.php": route_cookiewall_wall,
+        "/cookiewall2/index.html": route_cookiewall2_index,
+        "/cookiewall2/wall.html": route_cookiewall2_wall,
+        "/cookiewall3/index.html": route_cookiewall3_index,
+        "/cookiewall3/wall.php": route_cookiewall3_wall,
+        "/cookiewall4/index.html": route_cookiewall4_index,
+        "/cookiewall4/wall.php": route_cookiewall4_wall,
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
