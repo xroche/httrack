@@ -47,7 +47,6 @@ TESTS = \
 	01_engine-identabs.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
-	01_engine-java.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
@@ -103,7 +102,6 @@ TESTS = \
 	28_local-pause.test \
 	29_local-redirect-fragment.test \
 	30_local-fragment-link.test \
-	31_local-javaclass.test \
 	32_local-cdispo.test \
 	33_local-delayed.test \
 	34_local-maxtime.test \

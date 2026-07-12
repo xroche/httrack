@@ -2580,21 +2580,6 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* hts_count_fits caps the .class constant-pool entry count to the file size,
-   rejecting the ~68 MB-per-file calloc DoS. */
-static int st_java(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
-  assertf(hts_count_fits(10, 1000) == HTS_TRUE);
-  assertf(hts_count_fits(0, 10) == HTS_TRUE);
-  assertf(hts_count_fits(65535, 10) == HTS_FALSE);
-  assertf(hts_count_fits(1, 0) == HTS_FALSE);
-  assertf(hts_count_fits(1, -1) == HTS_FALSE);
-  printf("java constant-pool cap self-test OK\n");
-  return 0;
-}
-
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -2695,7 +2680,6 @@ static const struct selftest_entry {
      st_ftpline},
 #endif
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
-    {"java", "", "java .class constant-pool count cap self-test", st_java},
 };
 
 static void list_selftests(void) {

@@ -44,7 +44,7 @@ httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 
-lib_LTLIBRARIES = libhttrack.la libhtsjava.la
+lib_LTLIBRARIES = libhttrack.la
 
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
 proxytrack_SOURCES = proxy/main.c \
@@ -82,14 +82,6 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
-libhtsjava_la_SOURCES = htsjava.c htsjava.h
-libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
-# This thin JNI wrapper reaches libc only through libhttrack, so the direct
-# libc edge is dropped from DT_NEEDED (library-not-linked-against-libc). Force
-# libc back as a dependency; configure gates the flag since only a GNU-style
-# linker accepts it (LIBC_FORCE_LINK is empty on e.g. macOS).
-libhtsjava_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO) $(LIBC_FORCE_LINK)
-
 EXTRA_DIST = httrack.h webhttrack \
 		coucal/murmurhash3.h.diff \
 		coucal/murmurhash3.h.orig \
@@ -119,7 +111,6 @@ EXTRA_DIST = httrack.h webhttrack \
 		coucal/README.md \
 		coucal/sample.c \
 		coucal/tests.c \
-		htsjava.vcproj \
 		httrack.dsp httrack.dsw httrack.vcproj \
 		libhttrack.dsp libhttrack.dsw libhttrack.vcproj \
 		webhttrack.dsp webhttrack.dsw webhttrack.vcproj
