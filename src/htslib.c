@@ -1708,6 +1708,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #if DEBUG_COOK
     printf("set-cookie detected\n");
 #endif
+    /* Over-long host overflows the fail-safe domain[] copy (abort); drop it. */
+    if (adr && strlen(jump_identification_const(adr)) >= sizeof(domain))
+      return;
     while(*a) {
       char *token_st, *token_end;
       char *value_st, *value_end;

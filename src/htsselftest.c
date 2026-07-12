@@ -1816,6 +1816,27 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   http_cookie_header(&cookie, dom, "/", hdr, sizeof(hdr));
   if (strcmp(hdr, expected) != 0)
     err = 1;
+
+  /* A hostile over-long request host must not overflow domain[256] in
+     treathead's default-domain copy (that would abort the mirror). */
+  {
+    static t_cookie ck2;
+    htsblk r;
+    char host[600];
+
+    memset(&r, 0, sizeof(r));
+    memset(host, 'a', sizeof(host) - 1);
+    host[sizeof(host) - 1] = '\0';
+    ck2.max_len = (int) sizeof(ck2.data);
+    ck2.data[0] = '\0';
+    treathead(&ck2, host, "/", &r, "Set-Cookie: SID=1; path=/");
+    if (strnotempty(ck2.data)) // oversize-host cookie was not dropped
+      err = 1;
+    /* control: a normal host still yields a cookie through treathead */
+    treathead(&ck2, dom, "/", &r, "Set-Cookie: SID=1; path=/");
+    if (strstr(ck2.data, "SID") == NULL) // guard wrongly dropped a valid cookie
+      err = 1;
+  }
   if (strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL)
     err = 1;
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
