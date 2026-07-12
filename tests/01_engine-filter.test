@@ -192,3 +192,6 @@ test "$(with_timeout httrack -O /dev/null -#test=filter "$pat" "$subj")" == "$su
 # (guards against a single-backtrack-point matcher rewrite)
 match '*[aX]X*[a]Y' 'aXaXaY'
 nomatch '*[aX]X*[a]Y' 'aXbXaY'
+
+# hostile patterns must not stack-overflow or hang: length + work caps
+test "$(with_timeout httrack -O /dev/null -#test=filterbounds)" == "filterbounds: OK" || exit 1

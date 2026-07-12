@@ -740,6 +740,40 @@ static int st_filterdual(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Length/work caps stop a hostile pattern stack-overflowing or hanging the
+   process (OSS-Fuzz 5060751291908096 / 5745936014573568). */
+static int st_filterbounds(httrackp *opt, int argc, char **argv) {
+  const size_t big = 100000; /* well past the length cap */
+  const size_t stars = 900;  /* star-heavy pattern, under the cap */
+  char *subj = malloct(big + 1);
+  char *pat = malloct(2 * stars + 2);
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(subj, 'a', big);
+  subj[big] = '\0';
+  /* '*' matches anything, but an over-length subject is refused by the cap */
+  assertf(strjoker(subj, "*", NULL, NULL) == NULL);
+  assertf(strjokerfind(subj, "*") == NULL);
+  /* within-cap star-heavy dead-end: the step budget keeps it bounded (a hang
+     would time the test out) */
+  for (i = 0; i < stars; i++) {
+    pat[2 * i] = '*';
+    pat[2 * i + 1] = 'a';
+  }
+  pat[2 * stars] = 'b'; /* never matches an all-'a' subject */
+  pat[2 * stars + 1] = '\0';
+  subj[stars] = '\0';
+  assertf(strjoker(subj, pat, NULL, NULL) == NULL);
+  assertf(strjokerfind(subj, pat) == NULL);
+  freet(pat);
+  freet(subj);
+  printf("filterbounds: OK\n");
+  return 0;
+}
+
 static int st_simplify(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -2561,6 +2595,8 @@ static const struct selftest_entry {
      "memoized vs unmemoized matcher differential", st_filtermemo},
     {"filterdual", "<string1> <string2> <filter>...",
      "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
+    {"filterbounds", "", "matcher length/work caps reject hostile patterns",
+     st_filterbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},
