@@ -35,14 +35,16 @@ EOF
 chmod +x "$stubdir/uname"
 
 # Stub browser: webhttrack tries its browser-name list in order and runs the
-# first it finds, so shadow the first entry, "x-www-browser". It gets the server
-# URL, fetches it, and records the result (htsserver only lives until webhttrack
-# exits, so the check has to happen here).
+# first it finds, so shadow the first entry, "x-www-browser". It fetches the
+# server URL and records PASS only for the working UI: the brand string AND the
+# step-2 form action, which a truncated/degraded template page would lack (the
+# bare title alone is not enough). htsserver only lives until webhttrack exits,
+# so the check has to happen here.
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 cat >"$stubdir/x-www-browser" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
-if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack; then
+if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html; then
     echo PASS >"$marker"
 else
     echo "FAIL: unexpected response from \$1" >"$marker"
@@ -55,15 +57,8 @@ echo "launching webhttrack"
 "$wht" </dev/null >"$work/webhttrack.log" 2>&1 &
 whpid=$!
 
-# Hard watchdog: macOS has no timeout(1), and webhttrack can block if htsserver
-# never publishes a URL, so guarantee the tree dies regardless of the poll below.
-(
-    sleep 40
-    kill "$whpid" 2>/dev/null || true
-    pkill -f "$prefix/bin/htsserver" 2>/dev/null || true
-) &
-wdpid=$!
-
+# Bounded poll for the marker (macOS has no timeout(1)); teardown below kills
+# webhttrack and reaps htsserver, so the run is bounded without a watchdog.
 for i in $(seq 1 45); do
     test -f "$marker" && {
         echo "marker written after ${i}s"
@@ -76,8 +71,8 @@ for i in $(seq 1 45); do
     sleep 1
 done
 
-# Reap webhttrack and the htsserver it spawned; stop the watchdog. Confirm death
-# with a bounded poll instead of a blocking wait (which could hang on macOS).
+# Reap webhttrack and the htsserver it spawned. Confirm death with a bounded poll
+# (not a blocking wait, which could hang on macOS); SIGKILL if it ignores TERM.
 echo "tearing down"
 kill "$whpid" 2>/dev/null || true
 if pkill -f "$prefix/bin/htsserver" 2>/dev/null; then
@@ -85,11 +80,11 @@ if pkill -f "$prefix/bin/htsserver" 2>/dev/null; then
 else
     echo "no lingering htsserver"
 fi
-kill "$wdpid" 2>/dev/null || true
 for _ in $(seq 1 10); do
     kill -0 "$whpid" 2>/dev/null || break
     sleep 1
 done
+kill -9 "$whpid" 2>/dev/null || true
 
 echo "--- webhttrack.log ---"
 cat "$work/webhttrack.log" 2>/dev/null || true
