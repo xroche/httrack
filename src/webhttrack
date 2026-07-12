@@ -12,10 +12,9 @@ if test -n "${BROWSER}"; then
 fi
 # Patch for Darwin/Mac by Ross Williams
 if test "$(uname -s)" == "Darwin"; then
-    # Darwin/Mac OS X uses a system 'open' command to find
-    # the default browser. The -W flag causes it to wait for
-    # the browser to exit
-    BROWSEREXE="/usr/bin/open -W"
+    # Darwin's 'open -W' launches the default browser and waits for it to quit.
+    # Keep it only as a fallback so a configured $BROWSER still wins the search.
+    BROWSEREXEFALLBACK="/usr/bin/open -W"
 fi
 BINWD=$(dirname "$0")
 SRCHPATH=("$BINWD" /usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin "${HOME}/usr/bin" "${HOME}/bin")
@@ -81,6 +80,7 @@ for i in "${SRCHBROWSEREXE[@]}"; do
     done
     test -n "$BROWSEREXE" && break
 done
+test -n "$BROWSEREXE" || BROWSEREXE="${BROWSEREXEFALLBACK}"
 test -n "$BROWSEREXE" || ! log "Could not find any suitable browser" || exit 1
 
 # "browse" command
