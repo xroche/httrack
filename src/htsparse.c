@@ -4311,7 +4311,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       *forbidden_url == 0 && IS_DELAYED_EXT(afs->save) && !opt->state.stop) {
     int loops;
     int continue_loop;
-    char BIGSTK jar_snapshot[sizeof(((t_cookie *) 0)->data)]; /* #15 */
+    char BIGSTK
+        cookie_before[16384]; /* #15: this URL's Cookie header, pre-request */
 
     hts_log_print(opt, LOG_DEBUG, "Waiting for type to be known: %s%s", afs->af.adr,
                   afs->af.fil);
@@ -4320,10 +4321,12 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
     for(loops = 0, continue_loop = 1;
         IS_DELAYED_EXT(afs->save) && continue_loop && loops < 7; loops++) {
       continue_loop = 0;
-      /* #15: snapshot jar to detect a Set-Cookie set by a self-redirect */
-      jar_snapshot[0] = '\0';
+      /* #15: snapshot the Cookie header THIS url would send, so only its own
+         self-redirect Set-Cookie trips the retry, not a concurrent slot's. */
+      cookie_before[0] = '\0';
       if (opt->accept_cookie && opt->cookie != NULL)
-        strlcpybuff(jar_snapshot, opt->cookie->data, sizeof(jar_snapshot));
+        http_cookie_header(opt->cookie, jump_identification_const(afs->af.adr),
+                           afs->af.fil, cookie_before, sizeof(cookie_before));
 
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
@@ -4521,11 +4524,17 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           /* Moved! */
           else if (HTTP_IS_REDIRECT(back[b].r.statuscode)) {
             char BIGSTK mov_url[HTS_URLMAXSIZE * 2];
-            /* #15: raw headers are gone here, but a Set-Cookie was folded into
-             * the jar; a changed jar is the cookie-wall signal. */
-            const hts_boolean jar_changed =
-                opt->accept_cookie && opt->cookie != NULL &&
-                strcmp(jar_snapshot, opt->cookie->data) != 0;
+            char BIGSTK cookie_after[16384];
+            hts_boolean cookies_changed;
+
+            /* #15: cookie-wall signal: this URL's own Cookie header changed
+               across its self-redirect (a Set-Cookie it just set). */
+            cookie_after[0] = '\0';
+            if (opt->accept_cookie && opt->cookie != NULL)
+              http_cookie_header(
+                  opt->cookie, jump_identification_const(afs->af.adr),
+                  afs->af.fil, cookie_after, sizeof(cookie_after));
+            cookies_changed = strcmp(cookie_before, cookie_after) != 0;
 
             mov_url[0] = '\0';
             strcpybuff(mov_url, back[b].r.location);    // copier URL
@@ -4595,7 +4604,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
                   url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, 
                                opt, sback, cache, hash, ptr, numero_passe,
                                &delayed_back);
-                } else if (jar_changed) {
+                } else if (cookies_changed) {
                   // #15: cookie-wall self-redirect; evict the cached
                   // fast-header so the re-issue refetches with the cookie.
                   if (cache->cached_tests != NULL)

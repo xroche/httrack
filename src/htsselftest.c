@@ -1755,7 +1755,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  http_cookie_header_selftest(&cookie, dom, "/", hdr, sizeof(hdr));
+  http_cookie_header(&cookie, dom, "/", hdr, sizeof(hdr));
   if (strcmp(hdr, expected) != 0)
     err = 1;
   if (strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL)
