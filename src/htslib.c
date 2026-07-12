@@ -2575,6 +2575,11 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     // recopier adrfil->adresse www..
     strncatbuff(adrfil->adr, p, ((int) (q - p)));
     // *( adrfil->adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
+
+    // fil[] holds the path plus a possible leading '/' the top strlen() misses.
+    if (strlen(q) >= sizeof(adrfil->fil) - (q[0] != '/' ? 1 : 0))
+      return -1;
+
     // recopier chemin /pub/..
     if (q[0] != '/')            // page par défaut (/)
       strcatbuff(adrfil->fil, "/");

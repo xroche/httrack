@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# A 2047-byte hostless "?"-URL used to overflow fil[] by one byte and abort in
+# strncat_safe_; the guard now returns -1 while valid URLs still parse.
+test "$(httrack -O /dev/null -#test=identabs)" == "identabs self-test OK" || exit 1
