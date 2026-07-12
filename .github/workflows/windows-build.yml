@@ -1,4 +1,5 @@
-# Windows build of libhttrack (VS2022 v143 + vcpkg).
+# Windows build of the engine (VS2022 v143 + vcpkg): libhttrack, the CLI,
+# webhttrack, proxytrack.
 #
 # The autotools CI covers the unix builds; this covers the MSVC one, which had
 # no coverage at all and had drifted (the old .vcproj pinned OpenSSL 1.0.1j).
@@ -43,31 +44,54 @@ jobs:
         shell: pwsh
         run: vcpkg integrate install
 
-      - name: Build libhttrack
+      # httrack and webhttrack carry a ProjectReference to libhttrack, so building
+      # them builds it first; proxytrack is standalone.
+      - name: Build
         shell: pwsh
         run: |
-          & $env:MSBUILD src\libhttrack.vcxproj `
-            /m `
-            /p:Configuration=${{ matrix.configuration }} `
-            /p:Platform=${{ matrix.platform }} `
-            /p:VcpkgEnableManifest=true `
-            /flp:LogFile=msbuild.log`;Verbosity=normal
+          foreach ($proj in @("libhttrack", "httrack", "webhttrack", "proxytrack")) {
+            & $env:MSBUILD "src\$proj.vcxproj" `
+              /m `
+              /p:Configuration=${{ matrix.configuration }} `
+              /p:Platform=${{ matrix.platform }} `
+              /p:VcpkgEnableManifest=true `
+              /flp:LogFile=msbuild-$proj.log`;Verbosity=normal
+            if ($LASTEXITCODE -ne 0) { throw "$proj failed" }
+          }
 
       # WinHTTrack links src\$(Platform)\$(Configuration)\libhttrack.lib, so the
       # import lib and the DLL both have to land there under that exact name.
-      - name: Check the DLL and import lib landed where WinHTTrack expects
+      - name: Check the binaries landed where they are expected
         shell: pwsh
         run: |
           $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
-          foreach ($f in @("libhttrack.dll", "libhttrack.lib")) {
+          $want = @("libhttrack.dll", "libhttrack.lib", "httrack.exe",
+                    "webhttrack.exe", "proxytrack.exe")
+          foreach ($f in $want) {
             if (-not (Test-Path "$dir\$f")) { throw "missing $dir\$f" }
             Write-Host "found $dir\$f"
           }
 
-      - name: Upload MSBuild log
+      # A CRT split across the exe/DLL boundary links fine and crashes on the
+      # first cross-heap free, so assert one shared vcruntime instead.
+      - name: Check the CRT is shared across the boundary
+        shell: pwsh
+        run: |
+          $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
+          foreach ($f in @("libhttrack.dll", "httrack.exe")) {
+            $deps = & $dumpbin /dependents "$dir\$f"
+            if ($deps -notmatch "vcruntime140\.dll") {
+              throw "$f does not import vcruntime140.dll: a static or mismatched CRT"
+            }
+            Write-Host "$f imports vcruntime140.dll"
+          }
+
+      - name: Upload MSBuild logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
-          path: msbuild.log
+          path: msbuild-*.log
           if-no-files-found: ignore
