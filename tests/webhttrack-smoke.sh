@@ -18,13 +18,27 @@ export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
 
+stubdir="$work/bin"
+mkdir -p "$stubdir"
+
+# On Darwin webhttrack hardcodes "open -W", which launches a real GUI browser and
+# blocks headless. Shadow uname so it takes the generic path and picks the stub
+# browser below; htsserver and webhttrack's path resolution still run for real.
+cat >"$stubdir/uname" <<'EOF'
+#!/bin/bash
+[ "${1:-}" = "-s" ] && {
+    echo Linux
+    exit 0
+}
+exec /usr/bin/uname "$@"
+EOF
+chmod +x "$stubdir/uname"
+
 # Stub browser: webhttrack tries its browser-name list in order and runs the
 # first it finds, so shadow the first entry, "x-www-browser". It gets the server
 # URL, fetches it, and records the result (htsserver only lives until webhttrack
 # exits, so the check has to happen here).
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
-stubdir="$work/bin"
-mkdir -p "$stubdir"
 cat >"$stubdir/x-www-browser" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
