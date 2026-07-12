@@ -135,6 +135,14 @@ jobs:
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
 
+      - name: Add loopback aliases (macOS lacks 127.0.0.2/.3)
+        # 19_local-connect-fallback needs the dead 127.0.0.2/.3 to refuse
+        # instantly like Linux; alias them onto lo0 so they don't stall to timeout.
+        run: |
+          set -euo pipefail
+          sudo ifconfig lo0 alias 127.0.0.2 up
+          sudo ifconfig lo0 alias 127.0.0.3 up
+
       - name: Test
         run: |
           jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
