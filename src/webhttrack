@@ -132,12 +132,12 @@ function cleanup {
 }
 
 # Cleanup in case of emergency
-trap "cleanup now; exit" HUP INT QUIT ILL TRAP ABRT BUS FPE SEGV PIPE ALRM TERM XCPU XFSZ
+trap "cleanup now; exit" HUP INT QUIT PIPE TERM
 
 # Got SRVURL, launch browser
 launch_browser "${BROWSEREXE}" "${SRVURL}"
 
 # That's all, folks!
-trap "" HUP INT QUIT ILL TRAP ABRT BUS FPE SEGV PIPE ALRM TERM XCPU XFSZ
+trap "" HUP INT QUIT PIPE TERM
 cleanup
 exit 0
