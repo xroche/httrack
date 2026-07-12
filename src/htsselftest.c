@@ -1266,6 +1266,30 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Regression for the one-byte fil[] overflow: a 2047-byte hostless "?"-URL used
+   to abort in strncat_safe_ when the missing leading '/' pushed fil to 2048. */
+static int st_identabs(httrackp *opt, int argc, char **argv) {
+  lien_adrfil af;
+  const size_t len =
+      sizeof(af.fil) - 1; /* 2047: max URL the top guard admits */
+  char *url = malloct(len + 1);
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  url[0] = '?';
+  memset(url + 1, 'a', len - 1);
+  url[len] = '\0';
+  assertf(ident_url_absolute(url, &af) == -1);
+  freet(url);
+  /* valid URLs still parse, so the guard is not over-rejecting */
+  assertf(ident_url_absolute("http://www.example.com/a/b/c.html?x=1", &af) ==
+          0);
+  assertf(ident_url_absolute("www.foo.com?bar=1", &af) == 0);
+  printf("identabs self-test OK\n");
+  return 0;
+}
+
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
    no-www= no-slash= no-query= n83= type=, plus repeatable prior=adr|fil|sav
    registering an already-crawled link (dedup/collision paths). */
@@ -2567,6 +2591,8 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"identabs", "", "ident_url_absolute one-byte fil[] overflow self-test",
+     st_identabs},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
     {"headerlong", "[header-name:]",
