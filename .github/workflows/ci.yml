@@ -150,6 +150,35 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Runtime smoke of the WebHTTrack launcher on macOS: it carries a Darwin-only
+  # browser path (open -W) and nothing else exercises htsserver. Install into a
+  # temp prefix, then check webhttrack brings up htsserver and serves the UI.
+  webhttrack-macos:
+    name: webhttrack smoke (macOS arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive
+
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ssl="$(brew --prefix openssl@3)"
+          autoreconf -fi
+          ./configure CPPFLAGS="-I${ssl}/include" LDFLAGS="-L${ssl}/lib" \
+            --prefix="$RUNNER_TEMP/inst"
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Smoke-test webhttrack
+        run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
+
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
   # and bounds math can truncate or wrap in ways 64-bit never reveals (the axis
