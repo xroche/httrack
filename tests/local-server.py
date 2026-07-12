@@ -1645,7 +1645,12 @@ def main():
     def factory(*a, **kw):
         return Handler(*a, directory=root, **kw)
 
-    httpd = ThreadingHTTPServer((args.bind, 0), factory)
+    # macOS/BSD drop SYNs when the listen backlog overflows (Linux is lenient);
+    # raise it from Python's default 5 so a busy -c8 crawl can't lose fetches.
+    class BacklogHTTPServer(ThreadingHTTPServer):
+        request_queue_size = 128
+
+    httpd = BacklogHTTPServer((args.bind, 0), factory)
 
     if args.tls:
         import ssl
