@@ -11,7 +11,9 @@ test -x "$wht" || {
 }
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
+# to this prefix) so a lingering server can never hold the CI step open.
+trap 'pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work"' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
@@ -20,11 +22,11 @@ marker="$work/marker"
 # first it finds, so shadow the first entry, "x-www-browser". It gets the server
 # URL, fetches it, and records the result (htsserver only lives until webhttrack
 # exits, so the check has to happen here).
+# -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 stubdir="$work/bin"
 mkdir -p "$stubdir"
 cat >"$stubdir/x-www-browser" <<EOF
 #!/bin/bash
-# -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack; then
     echo PASS >"$marker"
 else
@@ -34,25 +36,33 @@ EOF
 chmod +x "$stubdir/x-www-browser"
 export PATH="$stubdir:$prefix/bin:$PATH"
 
-# webhttrack self-exits once the browser stub returns; poll for the marker and
-# reap it, with a kill guard in case htsserver never publishes a URL.
-"$wht" >"$work/webhttrack.log" 2>&1 &
+echo "launching webhttrack"
+"$wht" </dev/null >"$work/webhttrack.log" 2>&1 &
 whpid=$!
-for _ in $(seq 1 60); do
+
+for i in $(seq 1 45); do
     test -f "$marker" && break
-    kill -0 "$whpid" 2>/dev/null || break
+    kill -0 "$whpid" 2>/dev/null || {
+        echo "webhttrack exited on its own after ${i}s"
+        break
+    }
     sleep 1
 done
+
+# Kill webhttrack and the htsserver it spawned. Reaping htsserver is the point:
+# it outlives webhttrack, and a survivor holds the CI step open (the macOS hang).
+echo "tearing down"
 kill "$whpid" 2>/dev/null || true
+pkill -f "$prefix/bin/htsserver" 2>/dev/null || true
 wait "$whpid" 2>/dev/null || true
+
+echo "--- webhttrack.log ---"
+cat "$work/webhttrack.log" 2>/dev/null || true
+echo "--- end ---"
 
 if test "$(cat "$marker" 2>/dev/null || true)" = PASS; then
     echo "webhttrack smoke: PASS"
 else
     echo "webhttrack smoke: FAIL" >&2
-    echo "--- marker ---" >&2
-    cat "$marker" >&2 2>/dev/null || echo "(no marker written)" >&2
-    echo "--- webhttrack.log ---" >&2
-    cat "$work/webhttrack.log" >&2 || true
     exit 1
 fi
