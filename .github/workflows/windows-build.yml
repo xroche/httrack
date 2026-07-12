@@ -1,0 +1,64 @@
+# Windows build of libhttrack (VS2022 v143 + vcpkg).
+#
+# The autotools CI covers the unix builds; this covers the MSVC one, which had
+# no coverage at all and had drifted (the old .vcproj pinned OpenSSL 1.0.1j).
+# libhttrack.dll is what the WinHTTrack GUI links against.
+name: windows-build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  libhttrack:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, Win32]
+        configuration: [Release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # coucal lives in src/coucal
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Enable vcpkg MSBuild integration
+        shell: pwsh
+        run: vcpkg integrate install
+
+      - name: Build libhttrack
+        shell: pwsh
+        run: |
+          msbuild src\libhttrack.vcxproj `
+            /m `
+            /p:Configuration=${{ matrix.configuration }} `
+            /p:Platform=${{ matrix.platform }} `
+            /p:VcpkgEnableManifest=true `
+            /flp:LogFile=msbuild.log`;Verbosity=normal
+
+      # WinHTTrack links src\$(Platform)\$(Configuration)\libhttrack.lib, so the
+      # import lib and the DLL both have to land there under that exact name.
+      - name: Check the DLL and import lib landed where WinHTTrack expects
+        shell: pwsh
+        run: |
+          $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
+          foreach ($f in @("libhttrack.dll", "libhttrack.lib")) {
+            if (-not (Test-Path "$dir\$f")) { throw "missing $dir\$f" }
+            Write-Host "found $dir\$f"
+          }
+
+      - name: Upload MSBuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
+          path: msbuild.log
+          if-no-files-found: ignore
