@@ -5018,7 +5018,7 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
   return ai;
 }
 
-static void override_freeaddrinfo(struct addrinfo *res) {
+static void HTS_RESOLVER_CALL override_freeaddrinfo(struct addrinfo *res) {
   while (res != NULL) {
     struct addrinfo *const next = res->ai_next;
 
@@ -5028,9 +5028,10 @@ static void override_freeaddrinfo(struct addrinfo *res) {
   }
 }
 
-static int override_getaddrinfo(const char *node, const char *service,
-                                const struct addrinfo *hints,
-                                struct addrinfo **res) {
+static int HTS_RESOLVER_CALL override_getaddrinfo(const char *node,
+                                                  const char *service,
+                                                  const struct addrinfo *hints,
+                                                  struct addrinfo **res) {
   const char *const spec = getenv("HTTRACK_DEBUG_RESOLVE");
   const int want = (hints != NULL) ? hints->ai_family : PF_UNSPEC;
   const char *colon;
