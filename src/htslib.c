@@ -5926,17 +5926,7 @@ int multipleStringMatch(const char *s, const char *match) {
 }
 
 HTSEXT_API httrackp *hts_create_opt(void) {
-#if ( defined(_WIN32) || defined(__ANDROID__) )
-  static const char *defaultModules[] = {
-    "htsswf", "htsjava", "httrack-plugin", NULL
-  };
-#else
-#ifndef HTS_LIBHTSJAVA_NAME
-#define HTS_LIBHTSJAVA_NAME "libhtsjava.so" /* non-autoconf fallback */
-#endif
-  static const char *defaultModules[] = {"libhtsswf.so.1", HTS_LIBHTSJAVA_NAME,
-                                         "httrack-plugin", NULL};
-#endif
+  static const char *defaultModules[] = {"httrack-plugin", NULL};
   httrackp *opt = malloc(sizeof(httrackp));
 
   /* default options */

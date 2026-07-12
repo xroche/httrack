@@ -3875,7 +3875,6 @@ void voidf(void) {
   a = "|                      HTTrack Website Copier   |" CRLF;
   a = "|Code:         Windows Interface Xavier Roche   |" CRLF;
   a = "|                    HTS/HTTrack Xavier Roche   |" CRLF;
-  a = "|                .class Parser Yann Philippot   |" CRLF;
   a = "|                                               |" CRLF;
   a = "|Tested on:                 Windows95,98,NT,2K  |" CRLF;
   a = "|                           Linux PC            |" CRLF;

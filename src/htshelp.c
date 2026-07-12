@@ -546,8 +546,8 @@ void help(const char *app, int more) {
   infomsg(" %Y  explain which filter rule accepts or rejects a URL, then exit");
   infomsg
     ("  u  check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)");
-  infomsg
-    ("  j *parse Java Classes (j0 don't parse, bitmask: |1 parse default, |2 don't parse .class |4 don't parse .js |8 don't be aggressive)");
+  infomsg("  j *parse scripts (j0 don't parse, bitmask: |1 parse default, |4 "
+          "don't parse .js |8 don't be aggressive)");
   infomsg
     ("  sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always (even strict rules))");
   infomsg
@@ -571,8 +571,7 @@ void help(const char *app, int more) {
     ("     can also be used to force a specific file type: --assume foo.cgi=text/html");
   infomsg
     (" @iN internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only)");
-  infomsg
-    (" %w  disable a specific external mime module (-%w htsswf -%w htsjava)");
+  infomsg(" %w  disable a specific external mime module (-%w httrack-plugin)");
   infomsg("");
   infomsg("Browser ID:");
   infomsg

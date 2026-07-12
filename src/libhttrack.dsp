@@ -224,14 +224,6 @@ SOURCE=htsinthash.c
 # End Source File
 # Begin Source File
 
-SOURCE=htsjava.c
-# End Source File
-# Begin Source File
-
-SOURCE=htsjava.h
-# End Source File
-# Begin Source File
-
 SOURCE=htslib.c
 # End Source File
 # Begin Source File

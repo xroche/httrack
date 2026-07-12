@@ -1452,7 +1452,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF
                     ("Option %w needs to be followed by a blank space, and a module name");
-                  printf("Example: -%%w htsswf\n");
+                  printf("Example: -%%w httrack-plugin\n");
                   htsmain_free();
                   return -1;
                 } else {

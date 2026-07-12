@@ -609,10 +609,9 @@ most mirrors do work. We still are working to improve the mirror quality of HTTr
 <br>
 
 </a><a NAME="Q2b">Q: <strong>Some Java applets do not work properly!</strong><br>
-A: <em>Java applets may not work in some cases, for example if HTTrack failed to detect all included classes
-or files called within the class file. Sometimes, Java applets need to be online, because remote files are
-directly caught. Finally, the site structure can be incompatible with the class (always try to keep the original site structure
-when you want to get Java classes)<br>
+A: <em>Java applets may not work in some cases, because HTTrack does not parse compiled class files to find
+the resources they load. Java applets often need to be online anyway, since remote files are fetched directly
+at runtime.<br>
 If there is no way to make some classes work properly, you can exclude them with the filters. 
 They will be available, but only online.
 </em>

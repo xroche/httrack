@@ -456,13 +456,6 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
   return b->buf;
 }
 
-/** True if 'count' records of >= 1 byte each fit in 'available' bytes; guards
-    an attacker-controlled count driving a large allocation. */
-static HTS_INLINE HTS_UNUSED hts_boolean hts_count_fits(size_t count,
-                                                        LLint available) {
-  return (available >= 0 && (LLint) count <= available) ? HTS_TRUE : HTS_FALSE;
-}
-
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates
    NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the

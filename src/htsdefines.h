@@ -70,7 +70,7 @@ typedef struct t_hts_callbackarg t_hts_callbackarg;
 #endif
 
 /* Marks a symbol an external wrapper module exports back to the engine.
-   Must override -fvisibility=hidden on ELF, or dlopen()ed plugins (htsjava)
+   Must override -fvisibility=hidden on ELF, or dlopen()ed plugins
    hide their own hts_plug()/hts_unplug() entry points. */
 #ifndef EXTERNAL_FUNCTION
 #ifdef _WIN32

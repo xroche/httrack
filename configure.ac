@@ -64,16 +64,6 @@ AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 # Export version info
 AC_SUBST(VERSION_INFO)
 
-# Versioned plugin name for dlopen() in hts_create_opt(); soname major is
-# libtool's current - age, so this tracks VERSION_INFO bumps automatically.
-HTS_SONAME_MAJOR=$((${VERSION_INFO%%:*} - ${VERSION_INFO##*:}))
-case "$host_os" in
-darwin*) HTS_LIBHTSJAVA_NAME="libhtsjava.$HTS_SONAME_MAJOR.dylib" ;;
-*) HTS_LIBHTSJAVA_NAME="libhtsjava.so.$HTS_SONAME_MAJOR" ;;
-esac
-AC_DEFINE_UNQUOTED([HTS_LIBHTSJAVA_NAME], ["$HTS_LIBHTSJAVA_NAME"],
-  [Versioned libhtsjava runtime name, derived from VERSION_INFO])
-
 ### Default CFLAGS
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
 -Wmultichar -Wwrite-strings -Wcast-qual -Wcast-align \
@@ -119,8 +109,8 @@ case "$CFLAGS" in
 esac
 
 # Force libc back into DT_NEEDED for libraries that reach it only through
-# libhttrack (libhtsjava, the libtest callbacks), but only with a GNU-style
-# linker; Apple ld rejects these flags and links libSystem unconditionally.
+# libhttrack (the libtest callbacks), but only with a GNU-style linker; Apple
+# ld rejects these flags and links libSystem unconditionally.
 AX_CHECK_LINK_FLAG([-Wl,--push-state,--no-as-needed,-lc,--pop-state],
 	[LIBC_FORCE_LINK="-Wl,--push-state,--no-as-needed,-lc,--pop-state"])
 AC_SUBST([LIBC_FORCE_LINK])

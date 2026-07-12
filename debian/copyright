@@ -7,9 +7,8 @@ Files: *
 Copyright: 1998-2026 Xavier Roche and other contributors
 License: GPL-3+
 Comment:
- The engine includes contributions from Yann Philippot (src/htsjava.c,
- src/htsjava.h). htsbasenet.h links against the system OpenSSL library
- (originally by Eric Young); no OpenSSL/SSLeay code is bundled here.
+ htsbasenet.h links against the system OpenSSL library (originally by Eric
+ Young); no OpenSSL/SSLeay code is bundled here.
 
 Files: src/minizip/*
 Copyright: 1998-2010 Gilles Vollant

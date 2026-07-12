@@ -1,7 +1,0 @@
-#!/bin/bash
-#
-
-set -euo pipefail
-
-# .class constant-pool count is capped to the file size (calloc DoS).
-httrack -O /dev/null -#test=java run | grep -q "java constant-pool cap self-test OK"
