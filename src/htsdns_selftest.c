@@ -133,9 +133,10 @@ static struct addrinfo *mock_mkai(const mock_addr *a) {
   return ai;
 }
 
-static int mock_getaddrinfo(const char *node, const char *service,
-                            const struct addrinfo *hints,
-                            struct addrinfo **res) {
+static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
+                                              const char *service,
+                                              const struct addrinfo *hints,
+                                              struct addrinfo **res) {
   mock_host *const h = mock_find(node);
   const int want = (hints != NULL) ? hints->ai_family : PF_UNSPEC;
   struct addrinfo *head = NULL, *tail = NULL;
@@ -164,7 +165,7 @@ static int mock_getaddrinfo(const char *node, const char *service,
   return 0;
 }
 
-static void mock_freeaddrinfo(struct addrinfo *res) {
+static void HTS_RESOLVER_CALL mock_freeaddrinfo(struct addrinfo *res) {
   while (res != NULL) {
     struct addrinfo *const next = res->ai_next;
 

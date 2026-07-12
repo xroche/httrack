@@ -493,6 +493,14 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 #define snprintf _snprintf
 #endif
 
+/* MSVC ships these POSIX functions under other names. Kept out of the installed
+   headers: they would rewrite the same identifiers in a consumer's own code. */
+#ifdef _MSC_VER
+#define fseeko _fseeki64
+#define ftello _ftelli64
+#define timegm _mkgmtime
+#endif
+
 #define strfield2(f,s) ( (strlen(f)!=strlen(s)) ? 0 : (strfield(f,s)) )
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?

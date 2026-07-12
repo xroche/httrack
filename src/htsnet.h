@@ -309,10 +309,19 @@ typedef socklen_t SOClen;
     self-test can script DNS answers (families, multiplicity, errors)
     in-process. The free function must match its getaddrinfo (a fake allocates
     its own chain), hence the pair. */
+/* Winsock's resolver is __stdcall; a plain pointer only compiles on x64, where
+   there is one convention. Backend implementations must carry this too. */
+#ifdef _WIN32
+#define HTS_RESOLVER_CALL WSAAPI
+#else
+#define HTS_RESOLVER_CALL
+#endif
+
 typedef struct hts_resolver_backend {
-  int (*getaddrinfo)(const char *node, const char *service,
-                     const struct addrinfo *hints, struct addrinfo **res);
-  void (*freeaddrinfo)(struct addrinfo *res);
+  int(HTS_RESOLVER_CALL *getaddrinfo)(const char *node, const char *service,
+                                      const struct addrinfo *hints,
+                                      struct addrinfo **res);
+  void(HTS_RESOLVER_CALL *freeaddrinfo)(struct addrinfo *res);
 } hts_resolver_backend;
 
 /** Install a resolver backend for the process; NULL restores the libc default.
