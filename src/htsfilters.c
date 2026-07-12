@@ -213,6 +213,20 @@ const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
   return strjoker_rec(&memo, chaine, joker, size, size_flag);
 }
 
+/* Test-only: strjoker() reporting the work-budget steps spent and the cap, so a
+   self-test can prove the budget bounds a hostile pattern's work. */
+const char *strjoker_steps(const char *chaine, const char *joker,
+                           size_t *nsteps_out, size_t *maxsteps_out) {
+  size_t nsteps = 0;
+  const char *r = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps);
+
+  if (nsteps_out != NULL)
+    *nsteps_out = nsteps;
+  if (maxsteps_out != NULL)
+    *maxsteps_out = STRJOKER_MAXSTEPS;
+  return r;
+}
+
 static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
                                  const char *joker, LLint *size,
                                  int *size_flag) {
