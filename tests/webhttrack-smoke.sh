@@ -27,6 +27,7 @@ stubdir="$work/bin"
 mkdir -p "$stubdir"
 cat >"$stubdir/x-www-browser" <<EOF
 #!/bin/bash
+echo "stub browser invoked with: \$1" >&2
 if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack; then
     echo PASS >"$marker"
 else
@@ -40,8 +41,20 @@ echo "launching webhttrack"
 "$wht" </dev/null >"$work/webhttrack.log" 2>&1 &
 whpid=$!
 
+# Hard watchdog: macOS has no timeout(1), and webhttrack can block if htsserver
+# never publishes a URL, so guarantee the tree dies regardless of the poll below.
+(
+    sleep 40
+    kill "$whpid" 2>/dev/null || true
+    pkill -f "$prefix/bin/htsserver" 2>/dev/null || true
+) &
+wdpid=$!
+
 for i in $(seq 1 45); do
-    test -f "$marker" && break
+    test -f "$marker" && {
+        echo "marker written after ${i}s"
+        break
+    }
     kill -0 "$whpid" 2>/dev/null || {
         echo "webhttrack exited on its own after ${i}s"
         break
@@ -49,16 +62,25 @@ for i in $(seq 1 45); do
     sleep 1
 done
 
-# Kill webhttrack and the htsserver it spawned. Reaping htsserver is the point:
-# it outlives webhttrack, and a survivor holds the CI step open (the macOS hang).
+# Reap webhttrack and the htsserver it spawned; stop the watchdog. Confirm death
+# with a bounded poll instead of a blocking wait (which could hang on macOS).
 echo "tearing down"
 kill "$whpid" 2>/dev/null || true
-pkill -f "$prefix/bin/htsserver" 2>/dev/null || true
-wait "$whpid" 2>/dev/null || true
+if pkill -f "$prefix/bin/htsserver" 2>/dev/null; then
+    echo "reaped a lingering htsserver"
+else
+    echo "no lingering htsserver"
+fi
+kill "$wdpid" 2>/dev/null || true
+for _ in $(seq 1 10); do
+    kill -0 "$whpid" 2>/dev/null || break
+    sleep 1
+done
 
 echo "--- webhttrack.log ---"
 cat "$work/webhttrack.log" 2>/dev/null || true
 echo "--- end ---"
+echo "marker=[$(cat "$marker" 2>/dev/null || echo NONE)]"
 
 if test "$(cat "$marker" 2>/dev/null || true)" = PASS; then
     echo "webhttrack smoke: PASS"
