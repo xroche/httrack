@@ -767,10 +767,10 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   pat[2 * stars] = 'b'; /* never matches an all-'a' subject */
   pat[2 * stars + 1] = '\0';
   subj[subjlen] = '\0';
-  /* Budget must bound the work; NULL alone wouldn't prove it (a cheap mismatch
-     is NULL too). */
+  /* Budget must fire and hold: steps > cap (deleting the budget zeroes the
+     counter that is the enforcement), steps < 10*cap (unbudgeted ~1.26e9). */
   assertf(strjoker_steps(subj, pat, &steps, &maxsteps) == NULL);
-  assertf(steps < 10 * maxsteps);
+  assertf(steps > maxsteps && steps < 10 * maxsteps);
   assertf(strjokerfind(subj, pat) == NULL);
   freet(pat);
   freet(subj);
