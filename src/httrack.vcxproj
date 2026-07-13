@@ -67,6 +67,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <!-- main() calls WSAStartup/WSACleanup itself. -->
+      <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
