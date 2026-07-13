@@ -86,18 +86,28 @@ jobs:
           if (-not $dumpbin) { throw "dumpbin not found" }
           $wantMachine = if ("${{ matrix.platform }}" -eq "x64") { "x64" } else { "x86" }
 
+          function Get-Crt($path) {
+            $out = & $dumpbin /dependents /headers $path
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $path" }
+            ,@($out | Select-String -Pattern '^\s*(vcruntime\d+d?\.dll)$' |
+               ForEach-Object { $_.Matches[0].Groups[1].Value.ToLower() })
+          }
+
+          # Negative control: cmd.exe links the old msvcrt, not vcruntime140. If
+          # this came back non-empty the detector would match anything, and the
+          # assertion below would pass on a mismatched CRT too.
+          if ((Get-Crt "$env:SystemRoot\System32\cmd.exe").Count -ne 0) {
+            throw "negative control failed: the vcruntime detector matches anything"
+          }
+
           $crts = @{}
           foreach ($f in @("libhttrack.dll", "httrack.exe")) {
-            $out = & $dumpbin /dependents /headers "$dir\$f"
-            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $f" }
-
-            # -match on an array filters it: keep the matching lines, don't test them.
-            $crt = @($out | Select-String -Pattern '^\s*(vcruntime\d+d?\.dll)$' |
-                     ForEach-Object { $_.Matches[0].Groups[1].Value.ToLower() })
+            $crt = Get-Crt "$dir\$f"
             if ($crt.Count -eq 0) { throw "$f imports no vcruntime: static or mismatched CRT" }
             $crts[$f] = $crt
 
-            if (-not ($out | Select-String -SimpleMatch "machine ($wantMachine)")) {
+            $hdr = & $dumpbin /headers "$dir\$f"
+            if (-not ($hdr | Select-String -SimpleMatch "machine ($wantMachine)")) {
               throw "$f is not $wantMachine"
             }
             Write-Host "$f -> $($crt -join ',') ($wantMachine)"
