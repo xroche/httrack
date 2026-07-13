@@ -544,6 +544,16 @@ jobs:
       - name: shfmt
         run: shfmt -d -i 4 $SHELL_SCRIPTS
 
+      # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
+      # catch it here in seconds rather than on a Windows runner minutes in.
+      - name: XML well-formedness (MSBuild project files)
+        run: |
+          set -euo pipefail
+          for f in src/*.vcxproj; do
+            python3 -c "import sys,xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])" "$f"
+            echo "ok $f"
+          done
+
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
   # (it was shaped by an old Visual Studio formatter) and does not round-trip,
   # so we never reformat the whole tree -- only the lines a PR touches.
