@@ -328,8 +328,8 @@ typedef enum hts_wizard {
 
 typedef enum hts_robots {
   HTS_ROBOTS_NEVER = 0,        /**< ignore robots rules */
-  HTS_ROBOTS_SOMETIMES = 1,    /**< partial obedience (default) */
-  HTS_ROBOTS_ALWAYS = 2,       /**< obey robots rules */
+  HTS_ROBOTS_SOMETIMES = 1,    /**< partial obedience, set by -s */
+  HTS_ROBOTS_ALWAYS = 2,       /**< obey robots rules (default) */
   HTS_ROBOTS_ALWAYS_STRICT = 3 /**< obey even strict rules */
 } hts_robots;
 #endif
