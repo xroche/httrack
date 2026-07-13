@@ -45,6 +45,12 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
 
   <PropertyGroup>
+    <!-- No direct vcpkg dependency, but the triplet drives applocal deployment:
+         without it the OpenSSL and zlib DLLs libhttrack needs never land beside
+         httrack.exe. -->
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgTriplet Condition="'$(Platform)'=='Win32'">x86-windows</VcpkgTriplet>
+    <VcpkgTriplet Condition="'$(Platform)'=='x64'">x64-windows</VcpkgTriplet>
     <OutDir>$(MSBuildThisFileDirectory)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(MSBuildThisFileDirectory)$(Platform)\$(Configuration)\obj\httrack\</IntDir>
     <TargetName>httrack</TargetName>

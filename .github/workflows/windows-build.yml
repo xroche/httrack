@@ -73,19 +73,40 @@ jobs:
           }
 
       # A CRT split across the exe/DLL boundary links fine and crashes on the
-      # first cross-heap free, so assert one shared vcruntime instead.
+      # first cross-heap free, so assert both sides import the *same* vcruntime.
+      # Also assert the machine type: Test-Path alone would accept an x64 binary
+      # sitting in the Win32 output dir.
       - name: Check the CRT is shared across the boundary
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
           $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin not found" }
+          $wantMachine = if ("${{ matrix.platform }}" -eq "x64") { "x64" } else { "x86" }
+
+          $crts = @{}
           foreach ($f in @("libhttrack.dll", "httrack.exe")) {
-            $deps = & $dumpbin /dependents "$dir\$f"
-            if ($deps -notmatch "vcruntime140\.dll") {
-              throw "$f does not import vcruntime140.dll: a static or mismatched CRT"
+            $out = & $dumpbin /dependents /headers "$dir\$f"
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $f" }
+
+            # -match on an array filters it: keep the matching lines, don't test them.
+            $crt = @($out | Select-String -Pattern '^\s*(vcruntime\d+d?\.dll)$' |
+                     ForEach-Object { $_.Matches[0].Groups[1].Value.ToLower() })
+            if ($crt.Count -eq 0) { throw "$f imports no vcruntime: static or mismatched CRT" }
+            $crts[$f] = $crt
+
+            if (-not ($out | Select-String -SimpleMatch "machine ($wantMachine)")) {
+              throw "$f is not $wantMachine"
             }
-            Write-Host "$f imports vcruntime140.dll"
+            Write-Host "$f -> $($crt -join ',') ($wantMachine)"
+          }
+
+          $a = $crts["libhttrack.dll"] | Sort-Object
+          $b = $crts["httrack.exe"] | Sort-Object
+          if (Compare-Object $a $b) {
+            throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
       - name: Upload MSBuild logs
