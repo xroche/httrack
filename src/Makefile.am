@@ -83,6 +83,9 @@ libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
 EXTRA_DIST = httrack.h webhttrack \
+		version.rc \
+		libhttrack.rc \
+		httrack.rc \
 		coucal/murmurhash3.h.diff \
 		coucal/murmurhash3.h.orig \
 		minizip/iowin32.c \

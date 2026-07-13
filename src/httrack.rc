@@ -1,0 +1,5 @@
+// Version resource for httrack.exe, the command line program. See version.rc.
+#define VER_FILE_DESCRIPTION "HTTrack Website Copier (command line)"
+#define VER_ORIGINAL_FILENAME "httrack.exe"
+#define VER_FILETYPE VFT_APP
+#include "version.rc"

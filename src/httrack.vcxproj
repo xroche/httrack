@@ -108,6 +108,9 @@
       <Project>{e76ad871-54c1-45e8-a657-6117adeffb46}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="httrack.rc" />
+  </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
