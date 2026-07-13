@@ -1,0 +1,5 @@
+// Version resource for libhttrack.dll. See version.rc.
+#define VER_FILE_DESCRIPTION "HTTrack Website Copier engine"
+#define VER_ORIGINAL_FILENAME "libhttrack.dll"
+#define VER_FILETYPE VFT_DLL
+#include "version.rc"

@@ -138,6 +138,9 @@
     <ClCompile Include="minizip\zip.c" />
     <ClCompile Include="punycode.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="libhttrack.rc" />
+  </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

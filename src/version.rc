@@ -1,0 +1,50 @@
+// Version resource for libhttrack.dll and httrack.exe. Signing enforces that every
+// binary in a release names the same product and version, so both need one.
+// Spelled out here because a VERSIONINFO cannot take a version string apart;
+// tests/01_engine-version-macros.test fails if this drifts from htsglobal.h.
+// The per-binary parts come from libhttrack.rc / httrack.rc.
+
+#include <winver.h>
+
+#ifndef VER_FILE_DESCRIPTION
+#define VER_FILE_DESCRIPTION "HTTrack Website Copier"
+#endif
+#ifndef VER_ORIGINAL_FILENAME
+#define VER_ORIGINAL_FILENAME ""
+#endif
+#ifndef VER_FILETYPE
+#define VER_FILETYPE VFT_APP
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+  FILEVERSION 3, 49, 12, 0
+  PRODUCTVERSION 3, 49, 12, 0
+  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+  FILEFLAGS VS_FF_DEBUG
+#else
+  FILEFLAGS 0x0L
+#endif
+  FILEOS VOS_NT_WINDOWS32
+  FILETYPE VER_FILETYPE
+  FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"  // U.S. English, Unicode
+    BEGIN
+      VALUE "CompanyName", "Xavier Roche"
+      VALUE "FileDescription", VER_FILE_DESCRIPTION
+      VALUE "FileVersion", "3.49.12"
+      VALUE "InternalName", VER_ORIGINAL_FILENAME
+      VALUE "LegalCopyright", "Copyright (C) 1998-2026 Xavier Roche and other contributors. GNU GPL v3 or later."
+      VALUE "OriginalFilename", VER_ORIGINAL_FILENAME
+      VALUE "ProductName", "HTTrack Website Copier"
+      VALUE "ProductVersion", "3.49-12"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

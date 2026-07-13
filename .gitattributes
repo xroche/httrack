@@ -1,0 +1,3 @@
+# Resource scripts are Windows tooling input and must stay CRLF: the engine has no
+# encoding guard, so an autocrlf checkout could otherwise flatten them silently.
+*.rc text eol=crlf

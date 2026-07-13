@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# version.rc repeats the version that htsglobal.h declares. Signing enforces that
+# every binary in a release reports the same one, so a drift fails the signing
+# request on release day rather than the build. Assert the two agree.
+
+set -euo pipefail
+
+src="${top_srcdir:-..}/src"
+h="$src/htsglobal.h"
+rc="$src/version.rc"
+for f in "$h" "$rc"; do
+    [ -f "$f" ] || {
+        echo "cannot find $f"
+        exit 1
+    }
+done
+
+# 3.49-12 (display) and 3.49.12 (dotted).
+version=$(sed -n 's/^#define HTTRACK_VERSION[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$h")
+versionid=$(sed -n 's/^#define HTTRACK_VERSIONID[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$h")
+if [ -z "$version" ] || [ -z "$versionid" ]; then
+    echo "could not read the version from $h"
+    exit 1
+fi
+
+# The same version, as version.rc states it.
+fileversion=$(sed -n 's/^[[:space:]]*FILEVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' \r')
+productversion=$(sed -n 's/^[[:space:]]*PRODUCTVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' \r')
+rc_fileversion=$(sed -n 's/.*VALUE "FileVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
+rc_productversion=$(sed -n 's/.*VALUE "ProductVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
+rc_productname=$(sed -n 's/.*VALUE "ProductName",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
+
+# 3.49.12 -> 3,49,12,0
+expected_numeric="$(echo "$versionid" | tr '.' ','),0"
+
+fail=0
+check() { # what expected actual
+    if [ "$2" != "$3" ]; then
+        echo "version.rc $1 is \"$3\", but htsglobal.h says it should be \"$2\""
+        fail=1
+    fi
+}
+check FILEVERSION "$expected_numeric" "$fileversion"
+check PRODUCTVERSION "$expected_numeric" "$productversion"
+check FileVersion "$versionid" "$rc_fileversion"
+check ProductVersion "$version" "$rc_productversion"
+
+# Signing pins the product name too.
+check ProductName "HTTrack Website Copier" "$rc_productname"
+
+[ "$fail" -eq 0 ] || exit 1
+
+# And the shipped binary must agree with the header it was built from.
+out=$(httrack --version)
+case "$out" in
+*"$version"*) ;;
+*)
+    echo "httrack --version says \"$out\", which does not mention $version"
+    exit 1
+    ;;
+esac
+
+echo "version resource agrees with htsglobal.h: $version ($expected_numeric)"
