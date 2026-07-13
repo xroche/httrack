@@ -14,14 +14,17 @@ if test "${BROTLI_ENABLED:-yes}" != "yes" || test "${ZSTD_ENABLED:-yes}" != "yes
     exit 77
 fi
 
-bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --files 5 \
+# bad.html (in memory) and bin.dat (direct-to-disk) both carry an undecodable
+# coding: the fetch fails and neither leaves coded bytes on disk.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 2 --files 5 \
     --file-matches 'codec/br.html' 'coded body' \
     --file-matches 'codec/zstd.html' 'coded body' \
     --file-matches 'codec/junk.html' 'junk coding' \
     --file-matches 'codec/ae.html' 'AE=gzip, deflate,' \
     --file-not-matches 'codec/ae.html' ' br' \
     --file-not-matches 'codec/ae.html' 'zstd' \
-    --file-not-matches 'codec/bad.html' 'never decoded' \
+    --not-found 'codec/bad.html' \
+    --not-found 'codec/bin.dat' \
     --log-found 'Unsupported Content-Encoding' \
     httrack 'BASEURL/codec/index.html'
 
@@ -30,6 +33,6 @@ if test "${HTTPS_SUPPORT:-}" == "no"; then
     exit 0
 fi
 
-bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 1 --files 5 \
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 2 --files 5 \
     --file-matches 'codec/ae.html' 'AE=gzip, deflate, br, zstd,' \
     httrack 'BASEURL/codec/index.html'

@@ -655,6 +655,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="zstd.html">zstd</a>\n'
             '\t<a href="junk.html">junk</a>\n'
             '\t<a href="bad.html">bad</a>\n'
+            '\t<a href="bin.dat">bin</a>\n'
             '\t<a href="ae.html">ae</a>\n'
         )
 
@@ -682,6 +683,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(
             b"<html><body><p>never decoded</p></body></html>",
             "text/html",
+            extra_headers=[("Content-Encoding", "compress")],
+        )
+
+    # Same, on a non-HTML body: this takes the direct-to-disk (is_write) branch,
+    # a different discard path than the in-memory bad.html above.
+    def route_codec_bin(self):
+        self.send_raw(
+            b"\x00\x01\x02 CODED-BINARY-MUST-NOT-LAND \xff\xfe" * 8,
+            "application/octet-stream",
             extra_headers=[("Content-Encoding", "compress")],
         )
 
@@ -1380,6 +1390,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/codec/zstd.html": route_codec_zstd,
         "/codec/junk.html": route_codec_junk,
         "/codec/bad.html": route_codec_bad,
+        "/codec/bin.dat": route_codec_bin,
         "/codec/ae.html": route_codec_ae,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
