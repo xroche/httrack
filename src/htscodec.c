@@ -126,6 +126,21 @@ hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
   }
 }
 
+#if HTS_USEBROTLI || HTS_USEZSTD
+/* Append produced bytes to out under the decoded-size budget, advancing *total.
+   HTS_FALSE on a short write or once the budget is exceeded (a bomb); the
+   over-budget bytes are never written. */
+static hts_boolean codec_sink(FILE *out, const void *buf, size_t produced,
+                              LLint *total, LLint maxout) {
+  if (produced == 0)
+    return HTS_TRUE;
+  *total += (LLint) produced;
+  if (*total > maxout)
+    return HTS_FALSE;
+  return fwrite(buf, 1, produced, out) == produced ? HTS_TRUE : HTS_FALSE;
+}
+#endif
+
 #if HTS_USEBROTLI
 static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout) {
   BrotliDecoderState *const state =
@@ -152,12 +167,9 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout) {
       res = BrotliDecoderDecompressStream(state, &avail_in, &next_in,
                                           &avail_out, &next_out, NULL);
       produced = sizeof(outbuf) - avail_out;
-      if (produced > 0) {
-        total += (LLint) produced;
-        if (total > maxout || fwrite(outbuf, 1, produced, out) != produced) {
-          ok = HTS_FALSE;
-          break;
-        }
+      if (!codec_sink(out, outbuf, produced, &total, maxout)) {
+        ok = HTS_FALSE;
+        break;
       }
       if (res == BROTLI_DECODER_RESULT_ERROR) {
         ok = HTS_FALSE;
@@ -232,13 +244,9 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout) {
         ok = HTS_FALSE;
         break;
       }
-      if (output.pos > 0) {
-        total += (LLint) output.pos;
-        if (total > maxout ||
-            fwrite(outbuf, 1, output.pos, out) != output.pos) {
-          ok = HTS_FALSE;
-          break;
-        }
+      if (!codec_sink(out, outbuf, output.pos, &total, maxout)) {
+        ok = HTS_FALSE;
+        break;
       }
     }
     if (ferror(in))
@@ -288,11 +296,6 @@ LLint hts_codec_coded_size(FILE *in) {
 
 int hts_codec_unpack(hts_codec codec, const char *filename,
                      const char *newfile) {
-  char catbuff[CATBUFF_SIZE];
-  FILE *in, *out;
-  LLint maxout;
-  int ret = -1;
-
   if (filename == NULL || newfile == NULL || !filename[0] || !newfile[0])
     return -1;
   switch (codec) {
@@ -308,26 +311,36 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
   default: /* IDENTITY never reaches the unpacker; UNSUPPORTED must fail */
     return -1;
   }
-  in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
-  if (in == NULL)
-    return -1;
-  maxout = hts_codec_maxout(hts_codec_coded_size(in));
-  out = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
-  if (out == NULL) {
-    fclose(in);
-    return -1;
-  }
+#if HTS_USEBROTLI || HTS_USEZSTD
+  {
+    char catbuff[CATBUFF_SIZE];
+    FILE *out, *in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
+    LLint maxout;
+    int ret = -1;
+
+    if (in == NULL)
+      return -1;
+    maxout = hts_codec_maxout(hts_codec_coded_size(in));
+    out = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
+    if (out == NULL) {
+      fclose(in);
+      return -1;
+    }
 #if HTS_USEBROTLI
-  if (codec == HTS_CODEC_BROTLI)
-    ret = codec_unpack_brotli(in, out, maxout);
+    if (codec == HTS_CODEC_BROTLI)
+      ret = codec_unpack_brotli(in, out, maxout);
 #endif
 #if HTS_USEZSTD
-  if (codec == HTS_CODEC_ZSTD)
-    ret = codec_unpack_zstd(in, out, maxout);
+    if (codec == HTS_CODEC_ZSTD)
+      ret = codec_unpack_zstd(in, out, maxout);
 #endif
-  fclose(out);
-  fclose(in);
-  return ret;
+    fclose(out);
+    fclose(in);
+    return ret;
+  }
+#else
+  return -1;
+#endif
 }
 
 size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len, void *out,
