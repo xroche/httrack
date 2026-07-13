@@ -1938,6 +1938,9 @@ static time_t getGMT(struct tm *tm) {   /* hey, time_t is local! */
 #if (defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
     time_t now = time(NULL);
     time_t timezone = -localtime(&now)->tm_gmtoff;
+#elif defined(_MSC_VER)
+    /* MSVC spells it _timezone */
+    const time_t timezone = _timezone;
 #endif
     return (time_t) (t - timezone);
   }
