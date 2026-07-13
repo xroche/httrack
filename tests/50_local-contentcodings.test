@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# br and zstd on the wire: both decode, a junk coding leaves the body alone, an
+# undecodable one fails the fetch, and br/zstd are advertised over TLS only.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Both decoders are needed for the wire fixtures; the codec-off matrix is
+# covered by the fenced 01_zlib-contentcodings self-test.
+if test "${BROTLI_ENABLED:-yes}" != "yes" || test "${ZSTD_ENABLED:-yes}" != "yes"; then
+    echo "brotli/zstd not both compiled, skipping"
+    exit 77
+fi
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --files 5 \
+    --file-matches 'codec/br.html' 'coded body' \
+    --file-matches 'codec/zstd.html' 'coded body' \
+    --file-matches 'codec/junk.html' 'junk coding' \
+    --file-matches 'codec/ae.html' 'AE=gzip, deflate,' \
+    --file-not-matches 'codec/ae.html' ' br' \
+    --file-not-matches 'codec/ae.html' 'zstd' \
+    --file-not-matches 'codec/bad.html' 'never decoded' \
+    --log-found 'Unsupported Content-Encoding' \
+    httrack 'BASEURL/codec/index.html'
+
+if test "${HTTPS_SUPPORT:-}" == "no"; then
+    echo "no https support compiled, skipping the TLS leg"
+    exit 0
+fi
+
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 1 --files 5 \
+    --file-matches 'codec/ae.html' 'AE=gzip, deflate, br, zstd,' \
+    httrack 'BASEURL/codec/index.html'

@@ -59,15 +59,17 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <!-- LIBHTTRACK_EXPORTS turns HTSEXT_API into __declspec(dllexport); ZLIB_DLL
-           imports zlib from its DLL. Windows 7 floor, matching WinHTTrack. -->
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+           imports zlib from its DLL. HTS_USEBROTLI/HTS_USEZSTD enable the br and
+           zstd content codings. Windows 7 floor, matching WinHTTrack. -->
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;HTS_USEBROTLI=1;HTS_USEZSTD=1;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)coucal;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>
-      <!-- vcpkg auto-links libssl/libcrypto/zlib; only the OS import lib is explicit. -->
+      <!-- vcpkg auto-links libssl/libcrypto/zlib/brotli/zstd; only the OS import
+           lib is explicit. -->
       <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
@@ -107,6 +109,7 @@
     <ClCompile Include="htscache_selftest.c" />
     <ClCompile Include="htscatchurl.c" />
     <ClCompile Include="htscharset.c" />
+    <ClCompile Include="htscodec.c" />
     <ClCompile Include="htsconcat.c" />
     <ClCompile Include="htscore.c" />
     <ClCompile Include="htscoremain.c" />

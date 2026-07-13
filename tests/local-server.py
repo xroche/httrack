@@ -14,6 +14,7 @@ stdlib only (http.server + ssl) -- no new build or runtime dependency.
 """
 
 import argparse
+import base64
 import gzip
 import hashlib
 import os
@@ -631,6 +632,65 @@ class Handler(SimpleHTTPRequestHandler):
             gzip.compress(self.FAKE_JPEG),
             "image/png",
             extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    # --- content codings ---------------------------------------------------
+    # Canned br/zstd bodies (no brotli/zstd module in the stdlib): both decode
+    # to CODEC_BODY. Regenerate with the brotli/zstd CLIs over that string.
+    CODEC_BODY = (
+        b"<html><head><title>codec</title></head>"
+        b"<body><p>coded body</p></body></html>"
+    )
+    CODEC_BR = base64.b64decode(
+        "G0sAAAQccqSBBfJlUvOccsDeitqC9CbHwENWiptQj5aExP0mBjjVgy2DF17olLzLo2T2Eg=="
+    )
+    CODEC_ZSTD = base64.b64decode(
+        "KLUv/SBMFQIAFAM8aHRtbD48aGVhZD48dGl0bGU+Y29kZWM8LzwvYm9keT48"
+        "cGQgPC9wPjwvL2h0bWw+BQA7p8QMDNQ1PgcWhjkG"
+    )
+
+    def route_codec_index(self):
+        self.send_html(
+            '\t<a href="br.html">br</a>\n'
+            '\t<a href="zstd.html">zstd</a>\n'
+            '\t<a href="junk.html">junk</a>\n'
+            '\t<a href="bad.html">bad</a>\n'
+            '\t<a href="ae.html">ae</a>\n'
+        )
+
+    def route_codec_br(self):
+        self.send_raw(
+            self.CODEC_BR, "text/html", extra_headers=[("Content-Encoding", "br")]
+        )
+
+    def route_codec_zstd(self):
+        self.send_raw(
+            self.CODEC_ZSTD, "text/html", extra_headers=[("Content-Encoding", "zstd")]
+        )
+
+    # Junk token on a plain body: the page must survive (broken servers do this)
+    def route_codec_junk(self):
+        self.send_raw(
+            b"<html><body><p>junk coding</p></body></html>",
+            "text/html",
+            extra_headers=[("Content-Encoding", "utf-8")],
+        )
+
+    # A real coding we have no decoder for: the fetch must fail rather than
+    # save the coded bytes as the page.
+    def route_codec_bad(self):
+        self.send_raw(
+            b"<html><body><p>never decoded</p></body></html>",
+            "text/html",
+            extra_headers=[("Content-Encoding", "compress")],
+        )
+
+    # Echo what httrack advertised, so a crawl can assert the header.
+    def route_codec_ae(self):
+        self.send_raw(
+            b"<html><body><p>AE=%s</p></body></html>"
+            % self.headers.get("Accept-Encoding", "").encode(),
+            "text/html",
         )
 
     # --- MIME-type exclusion abort (issue #58) -----------------------------
@@ -1315,6 +1375,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/gated/index.php": route_gated_index,
         "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
+        "/codec/index.html": route_codec_index,
+        "/codec/br.html": route_codec_br,
+        "/codec/zstd.html": route_codec_zstd,
+        "/codec/junk.html": route_codec_junk,
+        "/codec/bad.html": route_codec_bad,
+        "/codec/ae.html": route_codec_ae,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,

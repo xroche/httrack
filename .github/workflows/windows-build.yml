@@ -119,6 +119,23 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
+      # The engine self-tests exercise the codecs the DLL was linked with: a
+      # missing brotli/zstd decoder shows up here, not just at link time.
+      - name: Run the content-coding self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "src\${{ matrix.platform }}\${{ matrix.configuration }}\httrack.exe"
+          $tmp = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "st")
+          foreach ($t in @("acceptencoding", "contentcodings")) {
+            $out = & $exe -O NUL "-#test=$t" $tmp.FullName run
+            if ($LASTEXITCODE -ne 0) { throw "$t failed" }
+            if (-not ($out | Select-String -SimpleMatch "$t self-test OK")) {
+              throw "$t did not report OK: $out"
+            }
+            Write-Host ($out -join "`n")
+          }
+
       - name: Upload MSBuild logs
         if: always()
         uses: actions/upload-artifact@v4

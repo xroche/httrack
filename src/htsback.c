@@ -44,6 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 
 #include "htsftp.h"
+#include "htscodec.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #else
@@ -627,8 +628,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
       if (!back[p].testmode) {  // not test mode
         const char *state = "unknown";
 
-        /* décompression */
-#if HTS_USEZLIB
+        /* Undo the content coding */
         if (back[p].r.compressed) {
           if (back[p].r.size > 0) {
             // stats
@@ -674,12 +674,15 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             // décompression
             if (back[p].tmpfile != NULL) {
               if (back[p].url_sav[0]) {
+                const hts_codec codec =
+                    hts_codec_parse(back[p].r.contentencoding);
                 LLint size;
 
                 file_notify(opt, back[p].url_adr, back[p].url_fil,
                             back[p].url_sav, 1, 1, back[p].r.notmodified);
                 filecreateempty(&opt->state.strc, back[p].url_sav);     // filenote & co
-                if ((size = hts_zunpack(back[p].tmpfile, back[p].url_sav)) >= 0) {
+                if ((size = hts_codec_unpack(codec, back[p].tmpfile,
+                                             back[p].url_sav)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
                   // fichier -> mémoire
                   if (!back[p].r.is_write) {
@@ -694,7 +697,16 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   }
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
-                  strcpybuff(back[p].r.msg, "Error when decompressing");
+                  snprintf(back[p].r.msg, sizeof(back[p].r.msg),
+                           codec == HTS_CODEC_UNSUPPORTED
+                               ? "Unsupported Content-Encoding (%s)"
+                               : "Error when decompressing (%s)",
+                           back[p].r.contentencoding);
+                  /* Drop the undecoded body and its placeholder so the writer
+                     can't commit the coded bytes as the page. */
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
+                  UNLINK(back[p].url_sav);
                 }
               }
               /* ensure that no remaining temporary file exists */
@@ -708,7 +720,6 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             // unflag
           }
         }
-#endif
         /* Body fully received: keep the freshly written url_sav, drop the
            backup of the previous copy. */
         back_finalize_backup(opt, &back[p], HTS_TRUE);
@@ -807,7 +818,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           else
             strcatbuff(flags, "-");
           if (back[p].r.compressed)
-            strcatbuff(flags, "Z");     // gzip
+            strcatbuff(flags, "Z"); // content coding
           else
             strcatbuff(flags, "-");
           /* Err I had to split these.. */
@@ -816,9 +827,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           fprintf(cache->txt, LLintP, (LLint) back[p].r.totalsize);
           fprintf(cache->txt, "\t%s\t", flags);
         }
-#if HTS_USEZLIB
         back[p].r.compressed = 0;
-#endif
 
         if (back[p].r.statuscode == HTTP_OK) {
           if (back[p].r.size >= 0) {
@@ -2941,11 +2950,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             int last_errno = 0;
 
                             back[i].r.is_write = 1;     // écrire
+                            /* a .gz/.br/.zst saved under its own coding stays
+                               packed on disk */
                             if (back[i].r.compressed &&
-                                /* .gz are *NOT* depacked!! */
-                                strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "gz") == 0
-                                && strfield(get_ext(catbuff, sizeof(catbuff), back[i].url_sav), "tgz") == 0
-                              ) {
+                                !hts_codec_is_archive_ext(
+                                    hts_codec_parse(back[i].r.contentencoding),
+                                    get_ext(catbuff, sizeof(catbuff),
+                                            back[i].url_sav))) {
                               if (create_back_tmpfile(opt, &back[i], "z") ==
                                   0) {
                                 assertf(back[i].tmpfile != NULL);
