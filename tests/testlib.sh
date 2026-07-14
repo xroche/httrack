@@ -2,8 +2,8 @@
 #
 # Helpers shared by the crawl tests. Sourced, not run.
 
-# Python 3 interpreter, or empty. Windows installs it as python.exe only, and a
-# bare "python" may be 2.x or the Store stub, so probe rather than trust the name.
+# Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
+# "python" may be 2.x or the Store stub.
 find_python() {
     local py
     for py in "${PYTHON:-}" python3 python; do
@@ -15,8 +15,7 @@ find_python() {
     return 1
 }
 
-# Native form of a path, for arguments handed to a non-MSYS binary: httrack.exe
-# and python.exe cannot resolve the /d/a/... paths Git Bash hands out.
+# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
 nativepath() {
     if is_windows && command -v cygpath >/dev/null 2>&1; then
         cygpath -m "$1"
@@ -32,11 +31,9 @@ is_windows() {
     esac
 }
 
-# Stop a backgrounded test server and reap it, so the port is released and the
-# tmpdir can be removed. MSYS cannot deliver a signal to a native python.exe, so
-# only -9 (TerminateProcess) lands there; without it the wait below never returns.
-# Every step is "|| true": the caller runs under set -e, and reaping a server we
-# just signalled makes wait return 143.
+# Stop a backgrounded server and reap it; MSYS cannot signal a native python.exe,
+# so only -9 lands. Every step is "|| true": callers run under set -e, and reaping
+# a server we just signalled makes wait return 143.
 stop_server() {
     test -n "${1:-}" || return 0
     kill "$1" 2>/dev/null || true

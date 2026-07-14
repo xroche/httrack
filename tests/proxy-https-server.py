@@ -141,8 +141,7 @@ def main():
         open(os.path.join(logdir, name), "w").close()
     origin_port = start_origin(certfile, logdir)
     proxy_port = start_proxy(logdir, mode)
-    # Keep the discovery lines LF: Windows would translate the \n, and the \r
-    # would land in the ports the caller parses out.
+    # Keep the port lines the caller parses LF: Windows would emit \r\n.
     sys.stdout.reconfigure(newline="\n")
     print("ORIGIN %d" % origin_port, flush=True)
     print("PROXY %d" % proxy_port, flush=True)

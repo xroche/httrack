@@ -156,7 +156,6 @@ done
 # --- start the server --------------------------------------------------------
 test -r "$server" || die "cannot read $server"
 serverlog="${tmpdir}/server.log"
-# python.exe is native and cannot resolve the /d/a/... paths Git Bash hands out.
 serverargs=(--root "$(nativepath "$root")")
 if test -n "$tls"; then
     serverargs+=(--tls --cert "$(nativepath "$cert")" --key "$(nativepath "$key")")

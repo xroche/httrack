@@ -123,10 +123,8 @@ jobs:
       # is Linux/macOS only. These are the offline ones, driven from Git Bash
       # against the native httrack.exe. They subsume the self-tests this step
       # used to run inline (codecs, cache, fsize).
-      #
-      # The *_local-* ones crawl the bundled Python server over loopback: the
-      # real TLS handshake, cache, and file writer, i.e. what HTTrack actually
-      # does, none of which any other Windows check exercises.
+      # The *_local-* ones crawl the bundled Python server over loopback: the real
+      # TLS handshake, cache and file writer, which nothing else on Windows covers.
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
@@ -146,9 +144,8 @@ jobs:
           TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
           export TMPDIR
 
-          # Mirror what configure hands the suite; the crawl tests gate on these.
-          # LC_ALL fixes the codeset MSYS uses to map a UTF-8 mirror name onto
-          # UTF-16, which the international crawls assert with "test -f".
+          # Mirror what configure hands the suite. LC_ALL sets the codeset MSYS maps
+          # a UTF-8 mirror name onto UTF-16 with, which the intl crawls "test -f".
           export HTTPS_SUPPORT=yes BROTLI_ENABLED=yes ZSTD_ENABLED=yes
           export LC_ALL=C.UTF-8
 
@@ -178,11 +175,8 @@ jobs:
           echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
             tee -a "$GITHUB_STEP_SUMMARY"
 
-          # Every gate in these scripts exits 77, so a suite that degraded to
-          # all-skipped would report green having tested nothing. Pin the skips
-          # rather than count them: an unexpected one is a gate that silently
-          # turned a test off (no python, no openssl, a codec disabled). The floor
-          # is the backstop for the glob itself going empty.
+          # Every gate here exits 77, so an all-skipped suite would report green having
+          # tested nothing: pin the skips, and floor the passes in case the glob empties.
           expected_skips=" 19_local-connect-fallback.test"  # pending #579
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
           [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
