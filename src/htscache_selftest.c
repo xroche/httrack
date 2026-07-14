@@ -232,11 +232,10 @@ static int disk_fallback_selftest(httrackp *opt) {
   static const char body[] = "BINARY-on-disk-body-0123456789-no-trailing-nul";
   const size_t body_len = sizeof(body) - 1;
 
-  /* X-Save must start with path_html_utf8 so the reader resolves it verbatim
-     (otherwise it re-roots it as a pre-3.40 relative path); then the body we
-     create at fconv(save) is exactly where cache_readex looks for it. */
-  fconcat(save, sizeof(save), StringBuff(opt->path_html_utf8),
-          "example.com/blob.bin");
+  /* a DOS-ified X-Save loses the path_html_utf8 prefix the reader matches on,
+     and gets re-rooted as a pre-3.40 relative path; fconv() only on access */
+  concat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+         "example.com/blob.bin");
 
   /* write only the header (X-In-Cache: 0); the body stays on disk */
   selftest_open_for_write(&cache, opt);
@@ -1253,8 +1252,9 @@ static void corrupt_build_disk(httrackp *opt) {
   memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
   remove(reconcile_st_path(opt, "hts-cache/new.zip"));
   remove(reconcile_st_path(opt, "hts-cache/old.zip"));
-  fconcat(save, sizeof(save), StringBuff(opt->path_html_utf8),
-          CORRUPT_ADR "/victim.bin");
+  /* X-Save stored verbatim: see disk_fallback_selftest */
+  concat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+         CORRUPT_ADR "/victim.bin");
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
               "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
