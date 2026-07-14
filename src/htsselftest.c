@@ -1363,8 +1363,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
   /* the greeting offers no-auth only, and the origin goes out by name, port 80
    */
@@ -1376,37 +1375,32 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   len = socks5_reply(script, 0x04, v6, sizeof(v6));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
 
   len = socks5_reply(script, 0x03, domain, sizeof(domain));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
 
   /* an unknown address type has no known length: fail, never guess */
   len = socks5_reply(script, 0x02, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          0);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
 
   /* truncated frames (here: no BND.PORT) fail instead of over-reading */
   len = socks5_reply(script, 0x01, v4, sizeof(v4)) - 3;
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          0);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
 
   /* explicit origin port is encoded big-endian (8443 = 0x20fb) */
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "https://origin.test:8443", proxy,
-                                    &io) == 1);
+  assertf(socks5_handshake_scripted(opt, "origin.test:8443", proxy, &io) == 1);
   assertf(memcmp(io.sent + io.sent_len - 2, "\x20\xfb", 2) == 0);
 
   /* credentials: split on the first colon of the escaped userinfo, so %3a stays
@@ -1420,7 +1414,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
 
     io.reply = auth_script;
     io.reply_len = sizeof(auth_script);
-    assertf(socks5_handshake_scripted(opt, "http://origin.test",
+    assertf(socks5_handshake_scripted(opt, "origin.test",
                                       "socks5://us%3aer:p:ass@127.0.0.1",
                                       &io) == 1);
     assertf(SOCKS5_SENTINEL_LEFT(io, sizeof(auth_script)));
@@ -1431,19 +1425,16 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   /* a proxy demanding auth we cannot provide, and one refusing every method */
   io.reply = (const unsigned char *) "\x05\x02";
   io.reply_len = 2;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          0);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
   io.reply = (const unsigned char *) "\x05\xff";
   io.reply_len = 2;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          0);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
 
   /* a refused CONNECT is an error, not a tunnel */
   io.reply = (const unsigned char
                   *) "\x05\x00\x05\x05\x00\x01\x7f\x00\x00\x01\x1f\x90";
   io.reply_len = 12;
-  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
-          0);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
 
   /* over-long host or credentials are rejected before anything is sent */
   {
@@ -1451,7 +1442,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     char name[1024];
     size_t i;
 
-    strcpybuff(host, "http://");
+    host[0] = '\0';
     for (i = 0; i < 256; i++)
       strcatbuff(host, "a");
     io.reply = script;
@@ -1465,8 +1456,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     strcatbuff(name, "@127.0.0.1");
     io.reply = script;
     io.reply_len = len;
-    assertf(socks5_handshake_scripted(opt, "http://origin.test", name, &io) ==
-            0);
+    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io) == 0);
     assertf(io.sent_len == 0);
   }
 
