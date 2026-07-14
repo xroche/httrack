@@ -4772,22 +4772,17 @@ LLint fsize_utf8(const char *s) {
   }
 }
 
+/* fseeko/ftello, never fseek/ftell: ftell returns long, which cannot carry an
+   offset past 2GB on a 32-bit platform and fails with EOVERFLOW there. */
 LLint fpsize(FILE *fp) {
   LLint oldpos, size;
 
   if (!fp)
     return -1;
-#ifdef HTS_FSEEKO
   oldpos = ftello(fp);
   fseeko(fp, 0, SEEK_END);
   size = ftello(fp);
   fseeko(fp, oldpos, SEEK_SET);
-#else
-  oldpos = ftell(fp);
-  fseek(fp, 0, SEEK_END);
-  size = ftell(fp);
-  fseek(fp, oldpos, SEEK_SET);
-#endif
   return size;
 }
 
