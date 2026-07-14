@@ -1241,23 +1241,27 @@ char *readfile(const char *fil) {
 char *readfile2(const char *fil, LLint * size) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
-  INTsys len = 0;
+  const LLint len = fsize(fil);
 
-  len = fsize(fil);
-  if (len >= 0) {               // exists
+  /* a size too large for size_t (32-bit Windows/i386) must fail closed: it
+     would wrap malloct() short while fread() still read the untruncated len */
+  const size_t buflen = len >= 0 ? llint_to_size_t(len) : (size_t) -1;
+
+  if (buflen != (size_t) -1) { // exists, and is addressable
     FILE *fp;
 
     fp = fopen(fconv(catbuff, sizeof(catbuff), fil), "rb");
     if (fp != NULL) {           // n'existe pas (!)
-      adr = (char *) malloct(len + 1);
+      adr = (char *) malloct(buflen + 1);
       if (size != NULL)
         *size = len;
       if (adr != NULL) {
-        if (len > 0 && fread(adr, 1, len, fp) != len) { // fichier endommagé ?
+        if (buflen > 0 &&
+            fread(adr, 1, buflen, fp) != buflen) { // fichier endommagé ?
           freet(adr);
           adr = NULL;
         } else
-          *(adr + len) = '\0';
+          *(adr + buflen) = '\0';
       }
       fclose(fp);
     }
@@ -1270,18 +1274,20 @@ char *readfile_utf8(const char *fil) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
   const LLint len = fsize_utf8(fil);
+  const size_t buflen = len >= 0 ? llint_to_size_t(len) : (size_t) -1;
 
-  if (len >= 0) {               // exists
+  if (buflen != (size_t) -1) { // exists, and is addressable (see readfile2)
     FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), fil), "rb");
 
     if (fp != NULL) {           // n'existe pas (!)
-      adr = (char *) malloct(len + 1);
+      adr = (char *) malloct(buflen + 1);
       if (adr != NULL) {
-        if (len > 0 && fread(adr, 1, len, fp) != len) { // fichier endommagé ?
+        if (buflen > 0 &&
+            fread(adr, 1, buflen, fp) != buflen) { // fichier endommagé ?
           freet(adr);
           adr = NULL;
         } else {
-          adr[len] = '\0';
+          adr[buflen] = '\0';
         }
       }
       fclose(fp);

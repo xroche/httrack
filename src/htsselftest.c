@@ -72,6 +72,9 @@ Please visit our Website: http://www.httrack.com
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <unistd.h>
+#else
+#include <io.h>       /* _get_osfhandle, for the sparse-file hint */
+#include <winioctl.h> /* FSCTL_SET_SPARSE */
 #endif
 
 /* very minimalistic internal tests */
@@ -1509,14 +1512,18 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* fsize()/fpsize() must report a size past 2GB, where a 32-bit off_t wraps
-   (MSVC's off_t and struct _stat st_size are long, 32-bit even on x64). */
+/* fsize()/fsize_utf8()/fpsize() must report a size past 4GB: 32-bit wraps both
+   ways there (MSVC's off_t and struct _stat st_size are long, 32-bit even on
+   x64), and a size under 4GB would survive an *unsigned* 32-bit truncation. */
 static int st_fsize(httrackp *opt, int argc, char **argv) {
-  const LLint expected = 3 * 1024 * 1024 * 1024LL;
+  const LLint expected = 5 * 1024 * 1024 * 1024LL;
   char BIGSTK path[HTS_URLMAXSIZE * 2];
-  const int width = (int) sizeof(fsize_utf8(""));
+  char BIGSTK absent[HTS_URLMAXSIZE * 2];
+  /* both variants: only fsize() feeds the >2GB readers (file://, --list) */
+  const int width = (int) sizeof(fsize(""));
+  const int width_utf8 = (int) sizeof(fsize_utf8(""));
   FILE *fp;
-  LLint got, gotp;
+  LLint got, got_utf8, gotp, gone;
   int rc = 0;
 
   (void) opt;
@@ -1524,14 +1531,27 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "fsize: needs a directory\n");
     return 1;
   }
-  concat(path, sizeof(path), argv[0], "/sparse-3g.bin");
+  concat(path, sizeof(path), argv[0], "/sparse-5g.bin");
+  concat(absent, sizeof(absent), argv[0], "/no-such-file.bin");
 
-  /* sparse: seek past 2GB and write the last byte */
+  /* sparse: seek past 4GB and write the last byte */
   fp = FOPEN(path, "wb");
   if (fp == NULL) {
     fprintf(stderr, "fsize: cannot create '%s': %s\n", path, strerror(errno));
     return 1;
   }
+#ifdef _WIN32
+  {
+    /* NTFS allocates the hole unless asked not to; POSIX gives it for free.
+       Best-effort: a non-sparse file still measures the same, just costs 5GB.
+     */
+    HANDLE h = (HANDLE) _get_osfhandle(_fileno(fp));
+    DWORD ret;
+
+    if (h != INVALID_HANDLE_VALUE)
+      (void) DeviceIoControl(h, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &ret, NULL);
+  }
+#endif
   if (fseeko(fp, expected - 1, SEEK_SET) != 0 || fputc(0, fp) == EOF ||
       fclose(fp) != 0) {
     fprintf(stderr, "fsize: cannot extend '%s' to " LLintP ": %s\n", path,
@@ -1540,7 +1560,8 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  got = fsize_utf8(path);
+  got = fsize(path);
+  got_utf8 = fsize_utf8(path);
   fp = FOPEN(path, "rb");
   if (fp == NULL) {
     fprintf(stderr, "fsize: cannot reopen '%s': %s\n", path, strerror(errno));
@@ -1550,21 +1571,30 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
     fclose(fp);
   }
   UNLINK(path);
+  gone = fsize(absent); /* contract: -1, not 0, when absent */
 
-  printf("fsize: width=%d size=" LLintP " psize=" LLintP "\n", width, got,
-         gotp);
-  if (width != 8) {
-    fprintf(stderr, "fsize: return type is %d bytes, expected 8\n", width);
+  printf("fsize: width=%d,%d size=" LLintP "," LLintP " psize=" LLintP
+         " absent=" LLintP "\n",
+         width, width_utf8, got, got_utf8, gotp, gone);
+  if (width != 8 || width_utf8 != 8) {
+    fprintf(stderr, "fsize: return types are %d/%d bytes, expected 8\n", width,
+            width_utf8);
     rc = 1;
   }
-  if (got != expected) {
-    fprintf(stderr, "fsize: fsize_utf8 is " LLintP ", expected " LLintP "\n",
-            got, expected);
+  if (got != expected || got_utf8 != expected) {
+    fprintf(stderr,
+            "fsize: fsize/fsize_utf8 are " LLintP "/" LLintP
+            ", expected " LLintP "\n",
+            got, got_utf8, expected);
     rc = 1;
   }
   if (gotp != expected) {
     fprintf(stderr, "fsize: fpsize is " LLintP ", expected " LLintP "\n", gotp,
             expected);
+    rc = 1;
+  }
+  if (gone != -1) {
+    fprintf(stderr, "fsize: absent file is " LLintP ", expected -1\n", gone);
     rc = 1;
   }
   return rc;

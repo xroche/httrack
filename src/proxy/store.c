@@ -1385,7 +1385,7 @@ static char *cache_rstr_addr(FILE * fp) {
   char buff[256 + 4];
 
   linput(fp, buff, 256);
-  sscanf(buff, "%d", &i);
+  sscanf(buff, INTsysP, &i);
   if (i < 0 || i > 32768)       /* error, something nasty happened */
     i = 0;
   if (i > 0) {
