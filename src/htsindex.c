@@ -318,7 +318,7 @@ void index_finish(const char *indexpath, int mode) {
   char catbuff[CATBUFF_SIZE];
   char **tab;
   char *blk;
-  off_t size = fpsize(fp_tmpproject);
+  LLint size = fpsize(fp_tmpproject);
 
   if (size > 0) {
     if (fp_tmpproject) {

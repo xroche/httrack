@@ -322,16 +322,15 @@ typedef int64_t TStamp;
 /* Full printf conversion, '%' included (PRId64 has none): "X: " LLintP. */
 #define LLintP "%" PRId64
 
-/* Integer type for file offsets/sizes passed to the C library. Widens to
-   LLint (with HTS_FSEEKO for fseeko/ftello) under large-file support, plain
-   int otherwise; INTsysP is its printf conversion. */
-#ifdef LFS_FLAG
+/* Integer type for file offsets/sizes passed to the C library; INTsysP is its
+   printf conversion. FIXME: LFS_FLAG is a configure make variable, never a C
+   macro, so this test is dead and INTsys stays int on POSIX despite large-file
+   support (the real macro is HTS_LFS). Widening it there is an installed-header
+   type change, so it is left alone here. */
+#if defined(LFS_FLAG) || defined(_MSC_VER)
 typedef LLint INTsys;
 
 #define INTsysP LLintP
-#ifdef __linux
-#define HTS_FSEEKO
-#endif
 #else
 typedef int INTsys;
 

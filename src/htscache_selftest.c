@@ -938,9 +938,9 @@ static void reconcile_put(httrackp *opt, const char *name, size_t size) {
 }
 
 /* Expect `name` to weigh `size` bytes, or be absent when size == -1. */
-static int reconcile_expect(httrackp *opt, const char *name, off_t size,
+static int reconcile_expect(httrackp *opt, const char *name, LLint size,
                             const char *what) {
-  const off_t got = fsize(reconcile_st_path(opt, name));
+  const LLint got = fsize(reconcile_st_path(opt, name));
 
   if (got != size) {
     fprintf(stderr, "cache-reconcile: %s: %s is %d bytes, expected %d\n", what,
@@ -954,7 +954,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
 
   /* around the interrupted-run thresholds (new < 32768, old > 65536) */
-  static const off_t TINY = 1024, MID = 40000, SOLID = 131072;
+  static const LLint TINY = 1024, MID = 40000, SOLID = 131072;
 
   golden_setup(opt, dir);
 #ifdef _WIN32

@@ -1509,7 +1509,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   htsmain_free();
                   return -1;
                 } else {
-                  off_t fz;
+                  LLint fz;
 
                   na++;
                   fz = fsize(argv[na]);

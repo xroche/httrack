@@ -5089,26 +5089,31 @@ int fexist_utf8(const char *s) {
   return 0;
 }
 
-/* Taille d'un fichier, -1 si n'existe pas */
+/* File size, -1 if absent */
 /* Note: NOT utf-8 */
-off_t fsize(const char *s) {
-  struct stat st;
+LLint fsize(const char *s) {
+  STRUCT_STAT st;
 
-  if (!strnotempty(s))          // nom vide: erreur
+  if (!strnotempty(s)) // empty name: error
     return -1;
+  /* _stat64, not stat(): the latter is 32-bit on MSVC */
+#ifdef _WIN32
+  if (_stat64(s, &st) == 0 && S_ISREG(st.st_mode)) {
+#else
   if (stat(s, &st) == 0 && S_ISREG(st.st_mode)) {
+#endif
     return st.st_size;
   } else {
     return -1;
   }
 }
 
-/* Taille d'un fichier, -1 si n'existe pas */
+/* File size, -1 if absent */
 /* Note: utf-8 */
-off_t fsize_utf8(const char *s) {
+LLint fsize_utf8(const char *s) {
   STRUCT_STAT st;
 
-  if (!strnotempty(s))          // nom vide: erreur
+  if (!strnotempty(s)) // empty name: error
     return -1;
   if (STAT(s, &st) == 0 && S_ISREG(st.st_mode)) {
     return st.st_size;
@@ -5117,24 +5122,17 @@ off_t fsize_utf8(const char *s) {
   }
 }
 
-off_t fpsize(FILE * fp) {
-  off_t oldpos, size;
+/* fseeko/ftello, never fseek/ftell: ftell returns long, which cannot carry an
+   offset past 2GB on a 32-bit platform and fails with EOVERFLOW there. */
+LLint fpsize(FILE *fp) {
+  LLint oldpos, size;
 
   if (!fp)
     return -1;
-#ifdef HTS_FSEEKO
   oldpos = ftello(fp);
-#else
-  oldpos = ftell(fp);
-#endif
-  fseek(fp, 0, SEEK_END);
-#ifdef HTS_FSEEKO
+  fseeko(fp, 0, SEEK_END);
   size = ftello(fp);
   fseeko(fp, oldpos, SEEK_SET);
-#else
-  size = ftell(fp);
-  fseek(fp, oldpos, SEEK_SET);
-#endif
   return size;
 }
 
@@ -6898,13 +6896,13 @@ int hts_stat_utf8(const char *path, STRUCT_STAT * buf) {
   LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
 
   if (wpath != NULL) {
-    const int result = _wstat(wpath, buf);
+    const int result = _wstat64(wpath, buf);
 
     free(wpath);
     return result;
   } else {
     // Fallback on conversion error.
-    return _stat(path, buf);
+    return _stat64(path, buf);
   }
 }
 

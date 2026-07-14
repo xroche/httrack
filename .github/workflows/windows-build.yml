@@ -136,6 +136,22 @@ jobs:
             Write-Host ($out -join "`n")
           }
 
+      # These fail only on Windows: the cache ones on a DOS-ified save name (fconv
+      # is a no-op on POSIX, so make check cannot see it), fsize on a 32-bit
+      # st_size/off_t. They report failure by exit code, not an "OK" line.
+      - name: Run the Windows-sensitive self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "src\${{ matrix.platform }}\${{ matrix.configuration }}\httrack.exe"
+          foreach ($t in @("cache", "cache-corrupt", "fsize")) {
+            $tmp = New-Item -ItemType Directory -Force `
+              -Path (Join-Path $env:RUNNER_TEMP "st-$t")
+            $out = & $exe -O NUL "-#test=$t" $tmp.FullName run 2>&1
+            Write-Host ($out -join "`n")
+            if ($LASTEXITCODE -ne 0) { throw "$t failed (exit $LASTEXITCODE)" }
+          }
+
       - name: Upload MSBuild logs
         if: always()
         uses: actions/upload-artifact@v4

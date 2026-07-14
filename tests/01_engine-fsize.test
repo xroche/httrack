@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# File sizes past the 32-bit wrap ('httrack -#test=fsize <dir>'). 5GB, so a
+# signed *and* an unsigned truncation both show up; sparse, so it costs no disk.
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+out=$(httrack -#test=fsize "$dir")
+echo "$out"
+
+want="fsize: width=8,8 size=5368709120,5368709120 psize=5368709120 absent=-1"
+test "$out" == "$want" || {
+    echo "FAIL: unexpected size report (want '$want')"
+    exit 1
+}

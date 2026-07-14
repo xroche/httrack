@@ -344,10 +344,11 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
 int fexist(const char *s);
 int fexist_utf8(const char *s);
 
-/*LLint fsize(const char* s);    */
-off_t fpsize(FILE * fp);
-off_t fsize(const char *s);
-off_t fsize_utf8(const char *s);
+/* File size in bytes, -1 if absent or not a regular file. LLint, not off_t:
+   the latter is a 32-bit long on MSVC, truncating any file of 2GB or more. */
+LLint fpsize(FILE *fp);
+LLint fsize(const char *s);
+LLint fsize_utf8(const char *s);
 
 // Threads
 typedef void *(*beginthread_type) (void *);
@@ -427,7 +428,8 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
      HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
 
 #define STAT hts_stat_utf8
-     typedef struct _stat STRUCT_STAT;
+     /* _stat64: _stat's st_size is a 32-bit long, even in x64 builds */
+     typedef struct _stat64 STRUCT_STAT;
      HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT * buf);
 
 #define UNLINK hts_unlink_utf8
@@ -625,9 +627,9 @@ HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
 #endif
 
 // returns (size_t) -1 upon error
-static HTS_UNUSED size_t off_t_to_size_t(off_t o) {
+static HTS_UNUSED size_t llint_to_size_t(LLint o) {
   const size_t so = (size_t) o;
-  if ((off_t) so == o) {
+  if ((LLint) so == o) {
     return so;
   } else {
     return (size_t) -1;

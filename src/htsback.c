@@ -775,7 +775,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         if (back[p].r.statuscode == HTTP_OK) {  // OK (ou 304 en backing)
           if (back[p].r.is_write) {     // Written file
             if (may_be_hypertext_mime(opt, back[p].r.contenttype, back[p].url_fil)) {   // to parse!
-              off_t sz;
+              LLint sz;
 
               sz = fsize_utf8(back[p].url_sav);
               if (sz > 0) {     // ok, exists!
@@ -1952,7 +1952,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
       /* Not in cache ; maybe in temporary cache ? Warning: non-movable
          "url_sav" */
       else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
-        const off_t file_size = fsize_utf8(itemback->url_sav);
+        const LLint file_size = fsize_utf8(itemback->url_sav);
 
         /* Found file on disk */
         if (file_size > 0) {
@@ -1987,7 +1987,7 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
       }
       /* Not in cache or temporary cache ; found on disk ? (hack) */
       else if (fexist_utf8(save)) {
-        const off_t sz = fsize_utf8(save);
+        const LLint sz = fsize_utf8(save);
 
         // Bon, là il est possible que le fichier ait été partiellement transféré
         // (s'il l'avait été en totalité il aurait été inscrit dans le cache ET existerait sur disque)
@@ -3694,7 +3694,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       if (back[i].r.statuscode == HTTP_OK && !back[i].testmode) {       // 'OK'
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil)) {  // not HTML
                           if (strnotempty(back[i].url_sav)) {   // target found
-                            off_t size = fsize_utf8(back[i].url_sav);
+                            LLint size = fsize_utf8(back[i].url_sav);
 
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
@@ -3913,7 +3913,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // traiter 206 (partial content)
                     // xxc SI CHUNK VERIFIER QUE CA MARCHE??
                     if (back[i].r.statuscode == 206) {  // on nous envoie un morceau (la fin) coz une partie sur disque!
-                      off_t sz = fsize_utf8(back[i].url_sav);
+                      LLint sz = fsize_utf8(back[i].url_sav);
                       /* RFC 7233: resume at the server's Content-Range start,
                          not the offset we requested; a server may resume
                          earlier and appending the overlap duplicates bytes
