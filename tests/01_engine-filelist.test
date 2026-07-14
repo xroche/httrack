@@ -52,14 +52,15 @@ run "$tmp/dir" "$tmp/adir"
 loghas 'Could not include URL list "[^"]+": not a regular file'
 
 # unreadable regular file: the fopen() errno arm fires, distinct from the
-# directory branch. Root bypasses mode 000, so skip it there.
-if test "$(id -u)" -ne 0; then
-    : >"$tmp/noperm.txt"
-    chmod 000 "$tmp/noperm.txt"
+# directory branch. Needs an OS that enforces mode 000: root bypasses it, and
+# Windows ignores chmod entirely, so probe rather than assume.
+: >"$tmp/noperm.txt"
+chmod 000 "$tmp/noperm.txt"
+if ! cat "$tmp/noperm.txt" >/dev/null 2>&1; then
     run "$tmp/perm" "$tmp/noperm.txt"
-    chmod 644 "$tmp/noperm.txt"
     loghas 'Could not include URL list "[^"]+": .+'
     lognot 'not a regular file'
 fi
+chmod 644 "$tmp/noperm.txt"
 
 exit 0

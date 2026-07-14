@@ -820,7 +820,11 @@ static int st_mime(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static size_t st_decode_body(const char *arg, char *buf, size_t size);
+
 static int st_charset(httrackp *opt, int argc, char **argv) {
+  char buf[512];
+  size_t len;
   char *s;
 
   (void) opt;
@@ -828,7 +832,8 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "charset: needs a charset and a string\n");
     return 1;
   }
-  s = hts_convertStringToUTF8(argv[1], strlen(argv[1]), argv[0]);
+  len = st_decode_body(argv[1], buf, sizeof(buf));
+  s = hts_convertStringToUTF8(buf, len, argv[0]);
   if (s != NULL) {
     printf("%s\n", s);
     freet(s);
@@ -853,12 +858,16 @@ static int st_metacharset(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_isutf8(httrackp *opt, int argc, char **argv) {
+  char buf[512];
+  size_t len;
+
   (void) opt;
   if (argc < 1) {
     fprintf(stderr, "isutf8: needs a string\n");
     return 1;
   }
-  printf("%d\n", hts_isStringUTF8(argv[0], strlen(argv[0])) ? 1 : 0);
+  len = st_decode_body(argv[0], buf, sizeof(buf));
+  printf("%d\n", hts_isStringUTF8(buf, len) ? 1 : 0);
   return 0;
 }
 
@@ -1616,7 +1625,8 @@ static int st_crange(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Decode a body argument ("hex:FFD8.." or literal text) into buf. */
+/* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
+   bytes cannot survive a Windows command line, so hostile inputs go as hex. */
 static size_t st_decode_body(const char *arg, char *buf, size_t size) {
   size_t n = 0;
 
@@ -2890,11 +2900,43 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Connected stream pair over loopback; Windows has no socketpair(). */
+static int st_socketpair(T_SOC sv[2]) {
+  struct sockaddr_in sa;
+  socklen_t len = sizeof(sa);
+  T_SOC srv, cli, acc;
+
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  if ((srv = (T_SOC) socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
+    return -1;
+  if (bind(srv, (struct sockaddr *) &sa, sizeof(sa)) != 0 ||
+      listen(srv, 1) != 0 ||
+      getsockname(srv, (struct sockaddr *) &sa, &len) != 0) {
+    deletesoc(srv);
+    return -1;
+  }
+  if ((cli = (T_SOC) socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+    deletesoc(srv);
+    return -1;
+  }
+  if (connect(cli, (struct sockaddr *) &sa, sizeof(sa)) != 0 ||
+      (acc = (T_SOC) accept(srv, NULL, NULL)) == INVALID_SOCKET) {
+    deletesoc(cli);
+    deletesoc(srv);
+    return -1;
+  }
+  deletesoc(srv);
+  sv[0] = acc;
+  sv[1] = cli;
+  return 0;
+}
+
 /* get_ftp_line must bound a hostile, CRLF-less reply into its internal
    1024-byte buffer; ASan turns the pre-fix overflow into an abort here. */
-#ifndef _WIN32
 static int st_ftpline(httrackp *opt, int argc, char **argv) {
-  int sv[2];
+  T_SOC sv[2];
   char line[2048];
   char flood[4096];
 
@@ -2902,19 +2944,19 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
   memset(flood, 'x', sizeof(flood));
-  assertf(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0);
-  assertf(write(sv[1], "220 ", 4) == 4); // valid 3-digit code
-  assertf(write(sv[1], flood, sizeof(flood)) == (ssize_t) sizeof(flood));
-  assertf(write(sv[1], "\r\n", 2) == 2); // end the line so we return
-  close(sv[1]);
+  assertf(st_socketpair(sv) == 0);
+  // the 4102-byte reply fits the loopback send buffer, so no reader is needed
+  assertf(send(sv[1], "220 ", 4, 0) == 4); // valid 3-digit code
+  assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
+  assertf(send(sv[1], "\r\n", 2, 0) == 2); // end the line so we return
+  deletesoc(sv[1]);
   line[0] = '\0';
   get_ftp_line(sv[0], line, sizeof(line), 5);
-  close(sv[0]);
+  deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));
   return 0;
 }
-#endif
 
 /* ftp_split_userpass: well-formed split, plus a hostile over-long userinfo
    that pre-fix overran user[256]/pass[256]. */
@@ -2986,11 +3028,11 @@ static const struct selftest_entry {
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
-    {"charset", "<charset> <string>",
+    {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
-    {"isutf8", "<string>", "is the string valid UTF-8 (1/0)", st_isutf8},
+    {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
     {"idna-encode", "<host>", "encode a hostname to IDNA/punycode",
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
@@ -3058,10 +3100,8 @@ static const struct selftest_entry {
      st_contentcodings},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
-#ifndef _WIN32
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
-#endif
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
 };
 

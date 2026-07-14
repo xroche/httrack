@@ -23,7 +23,7 @@ conv 'iso-8859-1' 'café' 'cafÃ©'
 
 # windows-1252 is NOT latin-1: 0x80 is the euro sign, not U+0080. This is the
 # case that actually exercises the cp1252 table (the 0x80-0x9F range).
-conv 'windows-1252' $'\x80' '€'
+conv 'windows-1252' 'hex:80' '€'
 
 # pure ASCII is charset-invariant
 conv 'us-ascii' 'hello' 'hello'
@@ -34,8 +34,8 @@ conv 'no-such-charset-xyz' 'abc' 'abc'
 test "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café' 2>/dev/null)" == "" || exit 1
 
 # malformed UTF-8 (lone continuation byte, truncated lead byte) must not crash
-runs 'utf-8' $'\x80'
-runs 'utf-8' $'\xc3'
+runs 'utf-8' 'hex:80'
+runs 'utf-8' 'hex:c3'
 
 # hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
 # -#test=metacharset <html> prints the charset, or "(none)".
@@ -89,11 +89,11 @@ utf8() {
 utf8 'plain' '1'
 utf8 'café' '1'
 utf8 '统计' '1'
-utf8 "$(printf 'caf\xe9')" '0'              # latin-1 accent
-utf8 "$(printf '\xc3')" '0'                 # truncated lead byte
-utf8 "$(printf '\xa9')" '0'                 # lone continuation byte
-utf8 "$(printf '\xf0\x9f\x98\x80')" '1'     # 4-byte emoji
-utf8 "$(printf '\xc0\xaf')" '0'             # overlong (latin-1 "À¯" must stay convertible)
-utf8 "$(printf '\xed\xa0\x80')" '0'         # UTF-16 surrogate
-utf8 "$(printf '\xf4\x90\x80\x80')" '0'     # above U+10FFFF
-utf8 "$(printf '\xf8\x88\x80\x80\x80')" '0' # legacy 5-byte form
+utf8 'hex:636166e9' '0'   # latin-1 accent
+utf8 'hex:c3' '0'         # truncated lead byte
+utf8 'hex:a9' '0'         # lone continuation byte
+utf8 'hex:f09f9880' '1'   # 4-byte emoji
+utf8 'hex:c0af' '0'       # overlong (latin-1 "À¯" must stay convertible)
+utf8 'hex:eda080' '0'     # UTF-16 surrogate
+utf8 'hex:f4908080' '0'   # above U+10FFFF
+utf8 'hex:f888808080' '0' # legacy 5-byte form
