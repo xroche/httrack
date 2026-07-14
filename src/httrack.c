@@ -40,12 +40,12 @@ Please visit our Website: http://www.httrack.com
 #include "httrack-library.h"
 
 #include "htsglobal.h"
-#include "htscharset.h"
 #include "htsbase.h"
 #include "htsopt.h"
 #include "htsdefines.h"
 #include "httrack.h"
 #include "htslib.h"
+#include "htscharset.h" // after htslib.h: winsock2.h must precede windows.h
 
 /* Static definitions */
 static int fexist(const char *s);
