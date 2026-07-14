@@ -140,8 +140,9 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
 
 /* Pending-connect result for a non-blocking socket reported ready by select():
    0 = connected, >0 = the connect errno (refused, unreachable, ...), -1 if the
-   probe itself failed. A failed connect is reported writable too, so this is
-   how success is told from failure without blocking. */
+   probe itself failed. A failed connect is reported ready as well (writable on
+   posix, exception set on winsock), so this is how success is told from failure
+   without blocking. */
 static int connect_socket_error(T_SOC soc) {
   int soerr = 0;
   socklen_t len = (socklen_t) sizeof(soerr);
@@ -2658,7 +2659,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
       unsigned int i = (i_mod + mod_random) % (back_max);
 
-      if (back[i].status > 0) {
+      // winsock flags a failed connect in the exception set only: leave a
+      // connecting slot to the connect handler, which can still fall back
+      if (back[i].status > 0 && back[i].status != STATUS_CONNECTING) {
         if (!back[i].r.is_file) {       // not file..
           if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             int err = FD_ISSET(back[i].r.soc, &fds_e);
@@ -2672,10 +2675,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
               back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_CONNERROR;
-              if (back[i].status == STATUS_CONNECTING)
-                strcpybuff(back[i].r.msg, "Connect Error");
-              else
-                strcpybuff(back[i].r.msg, "Receive Error");
+              strcpybuff(back[i].r.msg, "Receive Error");
               if (back[i].status == STATUS_ALIVE) {     /* Keep-alive socket */
                 back_delete(opt, cache, sback, i);
               } else {
@@ -2708,10 +2708,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             gestion_timeout = 1;
 
         // connecté?
-        dispo = FD_ISSET(back[i].r.soc, &fds_c);
+        dispo = back[i].r.soc != INVALID_SOCKET &&
+                (FD_ISSET(back[i].r.soc, &fds_c) ||
+                 FD_ISSET(back[i].r.soc, &fds_e));
         if (dispo) { // socket ready: connect() finished (ok or failed)
-          // a refused/failed connect is reported writable too; probe SO_ERROR
-          // and, on failure, fall back to the next address (or fail the slot)
+          // probe SO_ERROR and, on failure, fall back to the next address
           if (connect_socket_error(back[i].r.soc) != 0) {
             if (!back_connect_next(opt, sback, i)) {
               deletehttp(&back[i].r);
