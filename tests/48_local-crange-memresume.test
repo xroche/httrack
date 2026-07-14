@@ -78,7 +78,14 @@ echo "OK (temp-ref present)"
 
 # --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
 printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
-httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1
+rc=0
+httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1 || rc=$?
+# a crash here would otherwise read as a clean "terminated"
+test "$rc" -eq 0 || {
+    echo "FAIL: httrack exited $rc"
+    cat "${tmpdir}/log2" >&2
+    exit 1
+}
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
@@ -88,6 +95,7 @@ printf '[file recovered whole] ..\t'
 test -s "$blob" || {
     echo "FAIL: blob.bin missing after the hostile 206"
     tail -40 "${out}/hts-log.txt" >&2
+    cat "${tmpdir}/log2" >&2
     find "$out" -type f >&2
     exit 1
 }
