@@ -3890,18 +3890,21 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
   const char *a;
   size_t namelen;
 
+  if (name_size == 0)
+    return;
   // scan back to the port ':' (or userinfo '@'), but never past the authority,
-  // so a scheme's own colon is not read as a port separator
+  // so a scheme's own colon is not read as a port separator; inspect a[-1] from
+  // one-past-end so no pointer below the string is ever formed
   authority = (authority != NULL) ? authority + 3 : arg;
-  a = arg + strlen(arg) - 1;
-  while (a >= authority && *a != ':' && *a != '@')
+  a = arg + strlen(arg);
+  while (a > authority && a[-1] != ':' && a[-1] != '@')
     a--;
-  if (a >= authority && *a == ':') {
+  if (a > authority && a[-1] == ':') {
     int p = -1;
 
-    sscanf(a + 1, "%d", &p);
+    sscanf(a, "%d", &p);
     *port = (p > 0) ? p : proxy_default_port(arg);
-    namelen = (size_t) (a - arg);
+    namelen = (size_t) (a - 1 - arg);
   } else {
     *port = proxy_default_port(arg);
     namelen = strlen(arg);

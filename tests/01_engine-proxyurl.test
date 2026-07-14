@@ -28,4 +28,9 @@ p 'http://proxy' 'name=http://proxy port=8080 host=proxy'
 p 'socks5://host:1080' 'name=socks5://host port=1080 host=host'
 p 'socks5://host' 'name=socks5://host port=1080 host=host'
 p 'socks5h://host' 'name=socks5h://host port=1080 host=host'
+# explicit port wins over the 1080 default, with and without userinfo
+p 'socks5://host:9050' 'name=socks5://host port=9050 host=host'
 p 'socks5://user:pass@host:9050' 'name=socks5://user:pass@host port=9050 host=host'
+
+# a lone ':' must not underflow the backward scan
+p ':' 'name= port=8080 host='
