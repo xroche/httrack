@@ -872,6 +872,8 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_idna_encode(httrackp *opt, int argc, char **argv) {
+  char buf[512];
+  size_t len;
   char *s;
 
   (void) opt;
@@ -879,7 +881,8 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "idna-encode: needs a hostname\n");
     return 1;
   }
-  s = hts_convertStringUTF8ToIDNA(argv[0], strlen(argv[0]));
+  len = st_decode_body(argv[0], buf, sizeof(buf));
+  s = hts_convertStringUTF8ToIDNA(buf, len);
   if (s != NULL) {
     printf("%s\n", s);
     freet(s);
@@ -1141,7 +1144,10 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
        comes from argv so its length is opaque to the compiler (no static
        -Wstringop-overflow, genuine runtime check). "overflow-buff" exercises
        htsbuff. */
-    char small[4];
+    /* Not sizeof(char*): on ILP32 a char[4] equals the pointer size, and the
+       MSVC array-vs-pointer heuristic (sizeof(A) != sizeof(char*)) then reads
+       it as a pointer and silently skips the bound. */
+    char small[6];
     const char *const src = (argc >= 2) ? argv[1] : "overflowing";
 
     if (strcmp(argv[0], "overflow-buff") == 0) {

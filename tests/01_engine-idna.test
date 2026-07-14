@@ -38,4 +38,7 @@ dec 'xn--!!!' '㚯'
 dec 'xn--already-encoded.com' 'ǮalǭǮreaǭǫdy.com'
 
 # second label has a truncated UTF-8 sequence: used to leak the segment buffer.
-enc_bad "$(printf 'b\xc3\xbcchev.\xe4\xbe\x8b\xe5\xad\x62\xc3\xbccheple')"
+# Fed as hex: the raw bytes must reach the encoder intact, but invalid UTF-8
+# cannot survive a Windows command line (it round-trips through UTF-16 to valid
+# U+FFFD, which then encodes fine instead of being rejected).
+enc_bad 'hex:62c3bc636865762ee4be8be5ad62c3bc636865706c65'
