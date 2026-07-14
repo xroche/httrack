@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_CHARSET_DEFH
 
 /** Standard includes. **/
+#include "htsglobal.h"
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
@@ -175,6 +176,15 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * This function is WIN32 specific.
  **/
 extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+
+/**
+ * Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
+ * command line: every char* is UTF-8 on Windows (FOPEN, STAT, ... convert at
+ * the syscall boundary). Keeps the CRT's argv on failure; the new array is
+ * writable, NULL-terminated, and lives for the process.
+ * This function is WIN32 specific.
+ **/
+HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
 #endif
 
 #endif

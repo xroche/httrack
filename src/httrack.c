@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "httrack-library.h"
 
 #include "htsglobal.h"
+#include "htscharset.h"
 #include "htsbase.h"
 #include "htsopt.h"
 #include "htsdefines.h"
@@ -206,6 +207,7 @@ int main(int argc, char **argv) {
   httrackp *opt;
 
 #ifdef _WIN32
+  hts_argv_utf8(&argc, &argv);
   {
     WORD wVersionRequested;     // requested version WinSock API
     WSADATA wsadata;            // Windows Sockets API data
