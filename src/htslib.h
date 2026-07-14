@@ -216,6 +216,34 @@ int check_writeinput_t(T_SOC soc, int timeout);
    2xx tunnel, 0 on failure (retour->msg/statuscode set). */
 int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
                       int timeout);
+
+/* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
+hts_boolean hts_proxy_is_socks(const char *name);
+
+/* SOCKS5 (RFC 1928, RFC 1929 auth) handshake on the raw proxy socket, before
+   any TLS: `retour->soc` must be TCP-connected to the proxy and `adr` is the
+   origin (url_adr). The origin name is sent verbatim (ATYP=domain), so the
+   proxy resolves it; a bracketed IPv6 literal origin is rejected. Blocks up to
+   `timeout` seconds. Returns 1 with the stream positioned on the first origin
+   byte, 0 on failure (retour->msg set). */
+int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
+                     int timeout);
+
+/* Self-test hook (-#test=socks5): run the handshake against `reply`, a scripted
+   server byte stream, instead of a socket. `sent` captures the client frames,
+   `consumed` the reply bytes eaten (the frame-desync guard). */
+typedef struct socks5_test_io {
+  const unsigned char *reply;
+  size_t reply_len;
+  size_t consumed;
+  unsigned char sent[1024];
+  size_t sent_len;
+  char msg[256];
+} socks5_test_io;
+
+int socks5_handshake_scripted(httrackp *opt, const char *adr,
+                              const char *proxy_name, socks5_test_io *io);
+
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);

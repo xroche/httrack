@@ -1,0 +1,182 @@
+#!/bin/bash
+#
+# Issue #563: a SOCKS5 proxy must carry both http and https, resolve the origin
+# name REMOTELY (ATYP=domain, never a local lookup), and authenticate per RFC
+# 1929 without leaking the credentials to the origin.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+if test "${HTTPS_SUPPORT:-}" == "no"; then
+    echo "no https support compiled, skipping"
+    exit 77
+fi
+if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+    echo "python3/openssl missing, skipping"
+    exit 77
+fi
+
+# a .invalid name never resolves (RFC 6761): reaching the page at all proves the
+# proxy did the DNS
+host="socks-origin.invalid"
+server="$top_srcdir/tests/socks5-server.py"
+tmpdir=$(mktemp -d)
+pids=
+
+cleanup() {
+    for pid in $pids; do
+        kill "$pid" 2>/dev/null || true
+    done
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT
+
+openssl req -x509 -newkey rsa:2048 -keyout "$tmpdir/key.pem" \
+    -out "$tmpdir/cert.pem" -days 2 -nodes -subj "/CN=127.0.0.1" \
+    >/dev/null 2>&1
+cat "$tmpdir/key.pem" "$tmpdir/cert.pem" >"$tmpdir/both.pem"
+
+# start_server <logdir> <mode>: sets $tls_port/$http_port/$socks_port
+start_server() {
+    local dir="$1" mode="$2" ports
+    mkdir -p "$dir"
+    ports="$dir/ports.txt"
+    python3 "$server" "$tmpdir/both.pem" "$dir" "$mode" \
+        >"$ports" 2>"$dir/server.err" &
+    pids="$pids $!"
+    for _ in $(seq 1 100); do
+        grep -q "^ready" "$ports" 2>/dev/null && break
+        sleep 0.1
+    done
+    grep -q "^ready" "$ports" 2>/dev/null || {
+        echo "server ($mode) did not start" >&2
+        cat "$dir/server.err" >&2
+        exit 1
+    }
+    tls_port=$(awk '/^TLS/{print $2}' "$ports")
+    http_port=$(awk '/^HTTP/{print $2}' "$ports")
+    socks_port=$(awk '/^SOCKS/{print $2}' "$ports")
+}
+
+# kill a hung httrack so a missing read bound surfaces as $HANG_RC instead of
+# stalling the job (macOS has no `timeout`)
+HANG_RC=137 # 128 + SIGKILL
+run_crawl() {
+    local out="$1" url="$2" proxy="$3"
+    rm -rf "$out"
+    httrack "$url" --proxy "$proxy" \
+        -O "$out" -r1 -s0 --timeout=10 >"$out.log" 2>&1 &
+    local pid=$!
+    (sleep 60 && kill -9 "$pid" 2>/dev/null) &
+    local guard=$!
+    local rc=0
+    wait "$pid" 2>/dev/null || rc=$?
+    kill "$guard" 2>/dev/null || true
+    wait "$guard" 2>/dev/null || true
+    return "$rc"
+}
+
+# --- https over socks, remote DNS -------------------------------------------
+ok="$tmpdir/ok"
+start_server "$ok" ok
+
+run_crawl "$ok/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}"
+grep -rq "ORIGIN-PAGE-563" "$ok/out" || {
+    echo "FAIL: origin page not downloaded through the socks proxy" >&2
+    cat "$ok/out.log" "$ok/server.err" >&2
+    exit 1
+}
+grep -q "^ATYP domain ${host}\$" "$ok/socks.log" || {
+    echo "FAIL: proxy did not receive ATYP=domain ${host} (no remote DNS)" >&2
+    cat "$ok/socks.log" >&2
+    exit 1
+}
+# a client that resolved locally would have sent an address, not a name
+grep -q "^ATYP ipv4" "$ok/socks.log" && {
+    echo "FAIL: httrack resolved locally and sent an IPv4 to the proxy" >&2
+    cat "$ok/socks.log" >&2
+    exit 1
+}
+echo "OK: https tunneled through socks5 with remote DNS"
+
+# --- plain http over socks --------------------------------------------------
+: >"$ok/origin-headers.log" # the https crawl above also logged a request line
+run_crawl "$ok/outh" "http://${host}:${http_port}/" "socks5://127.0.0.1:${socks_port}"
+grep -rq "ORIGIN-PAGE-563" "$ok/outh" || {
+    echo "FAIL: plain http not tunneled through the socks proxy" >&2
+    cat "$ok/outh.log" "$ok/socks.log" >&2
+    exit 1
+}
+# the tunneled request is origin-form, as on a direct connection: the http-proxy
+# absolute URI would reach the origin as "GET http://host/"
+grep -q "^REQUEST GET / " "$ok/origin-headers.log" || {
+    echo "FAIL: tunneled request is not origin-form" >&2
+    cat "$ok/origin-headers.log" >&2
+    exit 1
+}
+grep -q "^REQUEST GET http" "$ok/origin-headers.log" && {
+    echo "FAIL: absolute-URI request sent through the socks tunnel" >&2
+    cat "$ok/origin-headers.log" >&2
+    exit 1
+}
+echo "OK: plain http tunneled through socks5"
+
+# --- authenticated socks (RFC 1929) -----------------------------------------
+# over plain http: that is the request an http proxy would decorate with
+# Proxy-Authorization, so the no-leak check below has teeth
+auth="$tmpdir/auth"
+start_server "$auth" ok
+run_crawl "$auth/out" "http://${host}:${http_port}/" \
+    "socks5://user:secret@127.0.0.1:${socks_port}"
+grep -rq "ORIGIN-PAGE-563" "$auth/out" || {
+    echo "FAIL: origin not downloaded through the authenticated socks proxy" >&2
+    cat "$auth/out.log" "$auth/socks.log" >&2
+    exit 1
+}
+grep -q "^METHOD userpass\$" "$auth/socks.log" || {
+    echo "FAIL: user/pass method not negotiated (auth ignored)" >&2
+    cat "$auth/socks.log" >&2
+    exit 1
+}
+grep -q "^AUTH user secret\$" "$auth/socks.log" || {
+    echo "FAIL: wrong socks credentials sent" >&2
+    cat "$auth/socks.log" >&2
+    exit 1
+}
+grep -qi "secret\|proxy-authorization" "$auth/origin-headers.log" && {
+    echo "FAIL: socks credentials leaked into the origin request" >&2
+    cat "$auth/origin-headers.log" >&2
+    exit 1
+}
+echo "OK: socks5 user/pass negotiated, creds not leaked to origin"
+
+# --- hostile: refusing proxy ------------------------------------------------
+ref="$tmpdir/refuse"
+start_server "$ref" refuse
+rc=0
+run_crawl "$ref/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}" || rc=$?
+test "$rc" -ne "$HANG_RC" || {
+    echo "FAIL: crawl hung on a refusing socks proxy" >&2
+    exit 1
+}
+grep -rq "ORIGIN-PAGE-563" "$ref/out" 2>/dev/null && {
+    echo "FAIL: refusing proxy unexpectedly served the page" >&2
+    exit 1
+}
+echo "OK: refusing socks proxy fails cleanly, no hang"
+
+# --- hostile: truncated handshake reply -------------------------------------
+trunc="$tmpdir/trunc"
+start_server "$trunc" truncate
+rc=0
+run_crawl "$trunc/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}" || rc=$?
+test "$rc" -ne "$HANG_RC" || {
+    echo "FAIL: crawl hung on a truncated socks reply (bounded read missing)" >&2
+    exit 1
+}
+grep -rq "ORIGIN-PAGE-563" "$trunc/out" 2>/dev/null && {
+    echo "FAIL: truncated-reply proxy unexpectedly served the page" >&2
+    exit 1
+}
+echo "OK: bounded socks handshake, no hang on a truncated reply"

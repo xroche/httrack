@@ -1324,6 +1324,156 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Scripted SOCKS5 server: no-auth method reply, then a success CONNECT reply
+   carrying the given ATYP address, then a sentinel origin byte the handshake
+   must leave unread (an off-by-one in the reply framing eats it). */
+static size_t socks5_reply(unsigned char *buf, unsigned char atyp,
+                           const unsigned char *addr, size_t addrlen) {
+  size_t n = 0;
+
+  buf[n++] = 0x05;
+  buf[n++] = 0x00; /* method: no authentication */
+  buf[n++] = 0x05;
+  buf[n++] = 0x00; /* REP: succeeded */
+  buf[n++] = 0x00;
+  buf[n++] = atyp;
+  memcpy(buf + n, addr, addrlen);
+  n += addrlen;
+  buf[n++] = 0x1f;
+  buf[n++] = 0x90; /* BND.PORT */
+  buf[n++] = 0xAA; /* sentinel */
+  return n;
+}
+
+#define SOCKS5_SENTINEL_LEFT(io, len) ((io).consumed == (len) - 1)
+
+static int st_socks5(httrackp *opt, int argc, char **argv) {
+  static const unsigned char v4[4] = {127, 0, 0, 1};
+  static const unsigned char v6[16] = {0};
+  static const unsigned char domain[6] = {5, 'p', 'r', 'o', 'x', 'y'};
+  const char *const proxy = "socks5://127.0.0.1";
+  unsigned char script[64];
+  socks5_test_io io;
+  size_t len;
+
+  (void) argc;
+  (void) argv;
+
+  /* each reply address type is drained exactly, sentinel untouched */
+  len = socks5_reply(script, 0x01, v4, sizeof(v4));
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          1);
+  assertf(SOCKS5_SENTINEL_LEFT(io, len));
+  /* the greeting offers no-auth only, and the origin goes out by name, port 80
+   */
+  assertf(io.sent_len == 3 + 7 + 11);
+  assertf(memcmp(io.sent, "\x05\x01\x00", 3) == 0);
+  assertf(memcmp(io.sent + 3, "\x05\x01\x00\x03\x0borigin.test\x00\x50", 18) ==
+          0);
+
+  len = socks5_reply(script, 0x04, v6, sizeof(v6));
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          1);
+  assertf(SOCKS5_SENTINEL_LEFT(io, len));
+
+  len = socks5_reply(script, 0x03, domain, sizeof(domain));
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          1);
+  assertf(SOCKS5_SENTINEL_LEFT(io, len));
+
+  /* an unknown address type has no known length: fail, never guess */
+  len = socks5_reply(script, 0x02, v4, sizeof(v4));
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          0);
+
+  /* truncated frames (here: no BND.PORT) fail instead of over-reading */
+  len = socks5_reply(script, 0x01, v4, sizeof(v4)) - 3;
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          0);
+
+  /* explicit origin port is encoded big-endian (8443 = 0x20fb) */
+  len = socks5_reply(script, 0x01, v4, sizeof(v4));
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "https://origin.test:8443", proxy,
+                                    &io) == 1);
+  assertf(memcmp(io.sent + io.sent_len - 2, "\x20\xfb", 2) == 0);
+
+  /* credentials: split on the first colon of the escaped userinfo, so %3a stays
+     inside the username and a colon in the password is not a delimiter */
+  {
+    static const unsigned char auth_script[] = {
+        0x05, 0x02,             /* method: user/pass */
+        0x01, 0x00,             /* auth: success */
+        0x05, 0x00, 0x00, 0x01, /* REP: succeeded, ATYP ipv4 */
+        127,  0,    0,    1,    0x1f, 0x90, 0xAA};
+
+    io.reply = auth_script;
+    io.reply_len = sizeof(auth_script);
+    assertf(socks5_handshake_scripted(opt, "http://origin.test",
+                                      "socks5://us%3aer:p:ass@127.0.0.1",
+                                      &io) == 1);
+    assertf(SOCKS5_SENTINEL_LEFT(io, sizeof(auth_script)));
+    assertf(memcmp(io.sent, "\x05\x02\x00\x02", 4) == 0);
+    assertf(memcmp(io.sent + 4, "\x01\x05us:er\x05p:ass", 13) == 0);
+  }
+
+  /* a proxy demanding auth we cannot provide, and one refusing every method */
+  io.reply = (const unsigned char *) "\x05\x02";
+  io.reply_len = 2;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          0);
+  io.reply = (const unsigned char *) "\x05\xff";
+  io.reply_len = 2;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          0);
+
+  /* a refused CONNECT is an error, not a tunnel */
+  io.reply = (const unsigned char
+                  *) "\x05\x00\x05\x05\x00\x01\x7f\x00\x00\x01\x1f\x90";
+  io.reply_len = 12;
+  assertf(socks5_handshake_scripted(opt, "http://origin.test", proxy, &io) ==
+          0);
+
+  /* over-long host or credentials are rejected before anything is sent */
+  {
+    char host[512];
+    char name[1024];
+    size_t i;
+
+    strcpybuff(host, "http://");
+    for (i = 0; i < 256; i++)
+      strcatbuff(host, "a");
+    io.reply = script;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, host, proxy, &io) == 0);
+    assertf(io.sent_len == 0);
+
+    strcpybuff(name, "socks5://user:");
+    for (i = 0; i < 256; i++)
+      strcatbuff(name, "p");
+    strcatbuff(name, "@127.0.0.1");
+    io.reply = script;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, "http://origin.test", name, &io) ==
+            0);
+    assertf(io.sent_len == 0);
+  }
+
+  printf("socks5 self-test OK\n");
+  return 0;
+}
+
 /* Regression for the one-byte fil[] overflow: a 2047-byte hostless "?"-URL used
    to abort in strncat_safe_ when the missing leading '/' pushed fil to 2048. */
 static int st_identabs(httrackp *opt, int argc, char **argv) {
@@ -2774,6 +2924,8 @@ static const struct selftest_entry {
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
      st_proxyurl},
+    {"socks5", "", "SOCKS5 handshake framing and credential self-test",
+     st_socks5},
     {"identabs", "", "ident_url_absolute one-byte fil[] overflow self-test",
      st_identabs},
     {"header", "<raw-header-line> ...", "response header-line parsing",
