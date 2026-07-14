@@ -1567,11 +1567,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
               if (!firstSeen) {
                 if (strstr(line, "/robots.txt") == NULL) {
                   PT_Index__Old index = cache;
+                  const char *scheme =
+                      link_has_authority(line) ? "" : "http://";
 
                   firstSeen = 1;
-                  if (!link_has_authority(line))
-                    strcat(index->startUrl, "http://");
-                  strcat(index->startUrl, line);
+                  snprintf(index->startUrl, sizeof(index->startUrl), "%s%s",
+                           scheme, line);
                 }
               }
 
