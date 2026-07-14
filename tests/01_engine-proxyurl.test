@@ -32,5 +32,13 @@ p 'socks5h://host' 'name=socks5h://host port=1080 host=host'
 p 'socks5://host:9050' 'name=socks5://host port=9050 host=host'
 p 'socks5://user:pass@host:9050' 'name=socks5://user:pass@host port=9050 host=host'
 
+# the split is byte-transparent: percent-escapes stay encoded (decoded later at
+# auth time), only structural ASCII ':'/'@' delimit, and the last '@' ends the
+# userinfo. So %40/%3A and UTF-8 bytes never mis-split host or port.
+p 'socks5://user:p%40ss@host:1080' 'name=socks5://user:p%40ss@host port=1080 host=host'
+p 'socks5://us%3Aer:pass@host:1080' 'name=socks5://us%3Aer:pass@host port=1080 host=host'
+p 'socks5://a@b:c@host:1080' 'name=socks5://a@b:c@host port=1080 host=host'
+p 'socks5://naïve:pass@héllo:1080' 'name=socks5://naïve:pass@héllo port=1080 host=héllo'
+
 # a lone ':' must not underflow the backward scan
 p ':' 'name= port=8080 host='
