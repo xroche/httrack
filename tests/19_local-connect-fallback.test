@@ -38,10 +38,7 @@ tmpdir=$(mktemp -d)
 serverpid=
 
 cleanup() {
-    if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null || true
-        wait "$serverpid" 2>/dev/null || true
-    fi
+    stop_server "$serverpid"
     rm -rf "$tmpdir"
     return 0
 }

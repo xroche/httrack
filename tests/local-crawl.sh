@@ -69,24 +69,13 @@ function debug {
 function info { printf "[%s] ..\t" "$*" >&2; }
 function result { echo "$*" >&2; }
 
-function stop_server {
-    test -n "$serverpid" || return 0
-    kill "$serverpid" 2>/dev/null
-    # MSYS cannot deliver a signal to a native python.exe; -9 maps to
-    # TerminateProcess, which does land, so the wait below always has a corpse.
-    is_windows && kill -9 "$serverpid" 2>/dev/null
-    # Reap it so the port is released before we rm the tmpdir/log.
-    wait "$serverpid" 2>/dev/null
-    serverpid=
-    return 0
-}
-
 function cleanup {
     if test -n "$crawlpid"; then
         kill -9 "$crawlpid" 2>/dev/null
         crawlpid=
     fi
-    stop_server
+    stop_server "$serverpid"
+    serverpid=
     if test -n "$tmpdir" && test -d "$tmpdir"; then
         test -n "$nopurge" || rm -rf "$tmpdir"
     fi
@@ -288,7 +277,8 @@ if test -n "$rerun_dead"; then
     test -s "$zip" || die "no cache was written by the first pass"
     cp "$zip" "${tmpdir}/cache-before.zip"
     cp "${out}/hts-log.txt" "${tmpdir}/log-before.txt"
-    stop_server
+    stop_server "$serverpid"
+    serverpid=
     info "re-running httrack against the stopped server"
     httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &

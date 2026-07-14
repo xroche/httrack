@@ -27,7 +27,7 @@ pids=
 
 cleanup() {
     for pid in $pids; do
-        kill "$pid" 2>/dev/null || true
+        stop_server "$pid"
     done
     rm -rf "$tmpdir"
 }

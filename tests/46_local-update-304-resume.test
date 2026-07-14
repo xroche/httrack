@@ -18,10 +18,7 @@ serverpid=
 crawlpid=
 cleanup() {
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null
-        wait "$serverpid" 2>/dev/null
-    fi
+    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 trap cleanup EXIT HUP INT QUIT PIPE TERM

@@ -31,3 +31,18 @@ is_windows() {
     *) return 1 ;;
     esac
 }
+
+# Stop a backgrounded test server and reap it, so the port is released and the
+# tmpdir can be removed. MSYS cannot deliver a signal to a native python.exe, so
+# only -9 (TerminateProcess) lands there; without it the wait below never returns.
+# Every step is "|| true": the caller runs under set -e, and reaping a server we
+# just signalled makes wait return 143.
+stop_server() {
+    test -n "${1:-}" || return 0
+    kill "$1" 2>/dev/null || true
+    if is_windows; then
+        kill -9 "$1" 2>/dev/null || true
+    fi
+    wait "$1" 2>/dev/null || true
+    return 0
+}

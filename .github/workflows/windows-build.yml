@@ -156,14 +156,15 @@ jobs:
           watchdog=""
           command -v timeout >/dev/null && watchdog="timeout 600"
 
-          pass=0 fail=0 skip=0 failed=""
-          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test *_local-*.test; do
+          pass=0 fail=0 skip=0 failed="" skipped=""
+          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
+                   *_local-*.test 13_crawl_proxy_https.test; do
             rc=0
             # shellcheck disable=SC2086
             $watchdog bash "$t" >"$t.log" 2>&1 || rc=$?
             case "$rc" in
               0) pass=$((pass + 1)); echo "PASS $t" ;;
-              77) skip=$((skip + 1)); echo "SKIP $t" ;;
+              77) skip=$((skip + 1)) skipped="$skipped $t"; echo "SKIP $t" ;;
               *)
                 fail=$((fail + 1)) failed="$failed $t"
                 echo "FAIL $t (exit $rc)"
@@ -178,9 +179,12 @@ jobs:
             tee -a "$GITHUB_STEP_SUMMARY"
 
           # Every gate in these scripts exits 77, so a suite that degraded to
-          # all-skipped would report green having tested nothing: assert a floor
-          # on what actually ran, not just the absence of failures.
+          # all-skipped would report green having tested nothing. Nothing here is
+          # expected to skip on Windows, so a skip is a gate that silently turned
+          # a test off (no python, no openssl, a codec disabled); the floor is the
+          # backstop for the glob itself going empty.
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
+          [ "$skip" -eq 0 ] || { echo "::error::skipped:$skipped"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
 
       - name: Upload the test logs
