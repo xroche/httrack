@@ -7,7 +7,8 @@ set -u
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
-server="${testdir}/local-server.py"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
@@ -24,8 +25,9 @@ trap cleanup EXIT HUP INT QUIT PIPE TERM
 # --- start the server, discover its ephemeral port --------------------------
 # RESUME_COUNTER gets a byte per /resume/blob.txt request (pass-2 delta bounds re-gets).
 serverlog="${tmpdir}/server.log"
+: >"$serverlog"
 counter="${tmpdir}/blobcount"
-RESUME_COUNTER="$counter" "$python" "$(nativepath "$server")" --root "$(nativepath "${testdir}/server-root")" >"$serverlog" 2>&1 &
+RESUME_COUNTER="$counter" "$python" "$server" --root "$root" >"$serverlog" 2>&1 &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do

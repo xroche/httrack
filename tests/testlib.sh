@@ -18,7 +18,7 @@ find_python() {
 # Native form of a path, for arguments handed to a non-MSYS binary: httrack.exe
 # and python.exe cannot resolve the /d/a/... paths Git Bash hands out.
 nativepath() {
-    if command -v cygpath >/dev/null 2>&1; then
+    if is_windows && command -v cygpath >/dev/null 2>&1; then
         cygpath -m "$1"
     else
         printf '%s\n' "$1"

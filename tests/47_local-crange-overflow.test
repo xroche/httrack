@@ -10,7 +10,8 @@ set -u
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
-server="${testdir}/local-server.py"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
@@ -25,7 +26,8 @@ cleanup() {
 trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 serverlog="${tmpdir}/server.log"
-"$python" "$(nativepath "$server")" --root "$(nativepath "${testdir}/server-root")" >"$serverlog" 2>&1 &
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do

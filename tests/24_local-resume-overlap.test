@@ -11,7 +11,8 @@ set -eu
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
-server="${testdir}/local-server.py"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
@@ -27,10 +28,11 @@ trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 # OVERLAP_COUNTER gets a byte per flaky.bin request so pass 1 knows when to interrupt.
 serverlog="${tmpdir}/server.log"
+: >"$serverlog"
 counter="${tmpdir}/hits"
 resumed="${tmpdir}/resumed" # gets a byte when the server serves a resume 206
 OVERLAP_COUNTER="$counter" OVERLAP_RESUMED="$resumed" \
-    "$python" "$(nativepath "$server")" --root "$(nativepath "${testdir}/server-root")" \
+    "$python" "$server" --root "$root" \
     >"$serverlog" 2>&1 &
 serverpid=$!
 port=
