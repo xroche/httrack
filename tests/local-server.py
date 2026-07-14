@@ -731,6 +731,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="disk.bin">disk</a>\n'
             '\t<a href="unsup.html">unsup</a>\n'
             '\t<a href="fresh.html">fresh</a>\n'
+            '\t<a href="freshdisk.bin">freshdisk</a>\n'
         )
 
     MEM_V1 = b"<html><body><p>MIRRORED-MEM-V1</p></body></html>"
@@ -760,6 +761,13 @@ class Handler(SimpleHTTPRequestHandler):
         pass1 = self.upcodec_pass() == 1
         body = b"<html><body><p>FRESH-V%d</p></body></html>" % (1 if pass1 else 2)
         self.send_coded(self.gzipped(body), "text/html")
+
+    # Same, direct-to-disk: the update pass decodes, so the temp is renamed over
+    # an existing mirror file.
+    def route_upcodec_freshdisk(self):
+        pass1 = self.upcodec_pass() == 1
+        body = b"FRESHDISK-V%d\n" % (1 if pass1 else 2) + b"\x03\x02\x01\xfe" * 8192
+        self.send_coded(self.gzipped(body), "application/octet-stream")
 
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
@@ -1463,6 +1471,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/upcodec/disk.bin": route_upcodec_disk,
         "/upcodec/unsup.html": route_upcodec_unsup,
         "/upcodec/fresh.html": route_upcodec_fresh,
+        "/upcodec/freshdisk.bin": route_upcodec_freshdisk,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,

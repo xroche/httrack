@@ -319,9 +319,10 @@ done
 test -n "$hostroot" || die "could not find host root under $out"
 debug "host root: $hostroot"
 
-# No crawl, even a cancelled one, may leave .delayed temporaries (#107, #483).
-info "checking for leftover .delayed files"
-leftovers=$(find "$out" -name '*.delayed' 2>/dev/null | head -5)
+# No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
+# #483), or the .z/.u content-coding temps (#557).
+info "checking for leftover engine temporaries"
+leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) 2>/dev/null | head -5)
 if test -z "$leftovers"; then result "OK"; else
     result "leftover: $leftovers"
     exit 1

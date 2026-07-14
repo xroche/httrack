@@ -3,9 +3,11 @@
 # A coded re-fetch that fails to decode must not destroy the mirrored file (#557).
 # Pass 1 mirrors from valid gzip; pass 2 (--update) serves an undecodable body for
 # mem.html (in-memory), disk.bin (direct-to-disk) and unsup.html (a coding we have
-# no decoder for). All three must keep their pass-1 content. fresh.html decodes on
-# both passes: it is the control that the fix still lets a good update through.
-# Unfixed, the decode target is the mirror itself, so all three are lost.
+# no decoder for). All three must keep their pass-1 content. fresh.html and
+# freshdisk.bin decode on both passes: they are the controls that a good update
+# still lands, in memory and direct-to-disk (the latter renaming the decoded temp
+# over an existing file). Unfixed, the decode target is the mirror itself, so the
+# first three are lost.
 
 set -euo pipefail
 
@@ -21,7 +23,6 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-min-bytes 'upcodec/disk.bin' 32768 \
     --file-matches 'upcodec/unsup.html' 'MIRRORED-UNSUP-V1' \
     --file-matches 'upcodec/fresh.html' 'FRESH-V2' \
-    --not-found 'upcodec/mem.html.u' \
-    --not-found 'upcodec/disk.bin.u' \
-    --not-found 'upcodec/disk.bin.z' \
+    --file-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V2' \
+    --file-min-bytes 'upcodec/freshdisk.bin' 32768 \
     httrack 'BASEURL/upcodec/index.html'

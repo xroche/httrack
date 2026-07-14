@@ -581,10 +581,9 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
       fclose(back->r.out);
       back->r.out = NULL;
     }
-    (void) UNLINK(back->url_sav); /* drop the failed partial */
     /* On rename failure keep the backup: it still holds the good copy, so
        losing it would be worse than an orphaned temp. */
-    if (RENAME(back->tmpfile, back->url_sav) != 0)
+    if (replace_file(back->tmpfile, back->url_sav) != 0)
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
@@ -714,7 +713,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     strcpybuff(back[p].r.msg,
                                "Write error when decompressing (can not rename "
                                "the temporary file)");
-                    UNLINK(unpacked);
+                    /* The failed replace may have removed the previous copy,
+                       leaving the decoded body as the only one: keep it. */
+                    hts_log_print(
+                        opt, LOG_WARNING | LOG_ERRNO,
+                        "could not replace %s; decoded copy kept as %s",
+                        back[p].url_sav, unpacked);
                   }
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
