@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# hts_parse_proxy splits a -P argument "[scheme://][user:pass@]host[:port]" into
+# the proxy host string and port. -#test=proxyurl <arg> prints
+# "name=.. port=.. host=..", where host= is what the connect resolves.
+
+p() {
+    test "$(httrack -O /dev/null -#test=proxyurl "$1")" == "$2" || exit 1
+}
+
+# bare host, with and without an explicit port
+p 'proxy.example.com:8080' 'name=proxy.example.com port=8080 host=proxy.example.com'
+p 'proxy.example.com' 'name=proxy.example.com port=8080 host=proxy.example.com'
+
+# user:pass@ is kept in name (for proxy auth) and stripped from host
+p 'user:pass@proxy:3128' 'name=user:pass@proxy port=3128 host=proxy'
+p 'user:pass@proxy' 'name=user:pass@proxy port=8080 host=proxy'
+
+# a scheme colon must not be read as a port: http://host with no port used to
+# parse to name=http with a garbage port
+p 'http://proxy:8080' 'name=http://proxy port=8080 host=proxy'
+p 'http://proxy' 'name=http://proxy port=8080 host=proxy'
+
+# socks5/socks5h default to 1080 and resolve to the bare host
+p 'socks5://host:1080' 'name=socks5://host port=1080 host=host'
+p 'socks5://host' 'name=socks5://host port=1080 host=host'
+p 'socks5h://host' 'name=socks5h://host port=1080 host=host'
+# explicit port wins over the 1080 default, with and without userinfo
+p 'socks5://host:9050' 'name=socks5://host port=9050 host=host'
+p 'socks5://user:pass@host:9050' 'name=socks5://user:pass@host port=9050 host=host'
+
+# the split is byte-transparent: percent-escapes stay encoded (decoded later at
+# auth time), only structural ASCII ':'/'@' delimit, and the last '@' ends the
+# userinfo. So %40/%3A and UTF-8 bytes never mis-split host or port.
+p 'socks5://user:p%40ss@host:1080' 'name=socks5://user:p%40ss@host port=1080 host=host'
+p 'socks5://us%3Aer:pass@host:1080' 'name=socks5://us%3Aer:pass@host port=1080 host=host'
+p 'socks5://a@b:c@host:1080' 'name=socks5://a@b:c@host port=1080 host=host'
+p 'socks5://naïve:pass@héllo:1080' 'name=socks5://naïve:pass@héllo port=1080 host=héllo'
+
+# a lone ':' must not underflow the backward scan
+p ':' 'name= port=8080 host='
