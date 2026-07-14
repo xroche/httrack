@@ -179,12 +179,13 @@ jobs:
             tee -a "$GITHUB_STEP_SUMMARY"
 
           # Every gate in these scripts exits 77, so a suite that degraded to
-          # all-skipped would report green having tested nothing. Nothing here is
-          # expected to skip on Windows, so a skip is a gate that silently turned
-          # a test off (no python, no openssl, a codec disabled); the floor is the
-          # backstop for the glob itself going empty.
+          # all-skipped would report green having tested nothing. Pin the skips
+          # rather than count them: an unexpected one is a gate that silently
+          # turned a test off (no python, no openssl, a codec disabled). The floor
+          # is the backstop for the glob itself going empty.
+          expected_skips=" 19_local-connect-fallback.test"  # pending #579
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
-          [ "$skip" -eq 0 ] || { echo "::error::skipped:$skipped"; exit 1; }
+          [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
 
       - name: Upload the test logs
