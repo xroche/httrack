@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# A coded re-fetch that fails to decode must not destroy the mirrored file (#557).
+# Pass 1 mirrors from valid gzip; pass 2 (--update) serves an undecodable body for
+# mem.html (in-memory), disk.bin (direct-to-disk) and unsup.html (a coding we have
+# no decoder for). All three must keep their pass-1 content. fresh.html and
+# freshdisk.bin decode on both passes: they are the controls that a good update
+# still lands, in memory and direct-to-disk (the latter renaming the decoded temp
+# over an existing file). Unfixed, the decode target is the mirror itself, so the
+# first three are lost.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# A restrictive umask makes the decoded direct-to-disk file's mode observable:
+# it is committed by renaming a temp, so it needs the chmod filecreate() does.
+umask 077
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --errors 3 \
+    --log-found 'decompressing.*upcodec/mem\.html' \
+    --log-found 'decompressing.*upcodec/disk\.bin' \
+    --log-found 'Unsupported Content-Encoding.*upcodec/unsup\.html' \
+    --file-matches 'upcodec/mem.html' 'MIRRORED-MEM-V1' \
+    --file-matches 'upcodec/disk.bin' 'MIRRORED-DISK-V1' \
+    --file-min-bytes 'upcodec/disk.bin' 32768 \
+    --file-mode 'upcodec/disk.bin' 644 \
+    --file-matches 'upcodec/unsup.html' 'MIRRORED-UNSUP-V1' \
+    --file-matches 'upcodec/fresh.html' 'FRESH-V2' \
+    --file-not-matches 'upcodec/fresh.html' 'FRESH-V1' \
+    --file-mode 'upcodec/fresh.html' 644 \
+    --file-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V2' \
+    --file-not-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V1' \
+    --file-min-bytes 'upcodec/freshdisk.bin' 32768 \
+    --file-mode 'upcodec/freshdisk.bin' 644 \
+    httrack 'BASEURL/upcodec/index.html'
