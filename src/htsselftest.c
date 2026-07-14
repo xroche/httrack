@@ -1308,6 +1308,22 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static int st_proxyurl(httrackp *opt, int argc, char **argv) {
+  char BIGSTK name[HTS_URLMAXSIZE * 2];
+  int port = -1;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "proxyurl: needs a proxy argument\n");
+    return 1;
+  }
+  hts_parse_proxy(argv[0], name, sizeof(name), &port);
+  // host= is what the connect actually resolves (scheme + user:pass stripped)
+  printf("name=%s port=%d host=%s\n", name, port,
+         jump_identification_const(name));
+  return 0;
+}
+
 /* Regression for the one-byte fil[] overflow: a 2047-byte hostless "?"-URL used
    to abort in strncat_safe_ when the missing leading '/' pushed fil to 2048. */
 static int st_identabs(httrackp *opt, int argc, char **argv) {
@@ -2756,6 +2772,8 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
+     st_proxyurl},
     {"identabs", "", "ident_url_absolute one-byte fil[] overflow self-test",
      st_identabs},
     {"header", "<raw-header-line> ...", "response header-line parsing",

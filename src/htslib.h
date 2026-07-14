@@ -289,6 +289,12 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 const char *strrchr_limit(const char *s, char c, const char *limit);
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
+
+/* Split a -P proxy argument "[scheme://][user:pass@]host[:port]" into the proxy
+   host string (scheme and any user:pass kept, for later stripping and auth),
+   written NUL-terminated into name[name_size] (truncated to fit), and the port
+   in *port. The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
+void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)

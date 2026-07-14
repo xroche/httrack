@@ -2253,21 +2253,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               htsmain_free();
               return -1;
             } else {
-              char *a;
+              char BIGSTK pname[HTS_URLMAXSIZE * 2];
 
               na++;
               opt->proxy.active = 1;
-              // Rechercher MAIS en partant de la fin à cause de user:pass@proxy:port
-              a = argv[na] + strlen(argv[na]) - 1;
-              while((a > argv[na]) && (*a != ':') && (*a != '@'))
-                a--;
-              if (*a == ':') {  // un port est présent, <proxy>:port
-                sscanf(a + 1, "%d", &opt->proxy.port);
-                StringCopyN(opt->proxy.name, argv[na], (int) (a - argv[na]));
-              } else {          // <proxy>
-                opt->proxy.port = 8080;
-                StringCopy(opt->proxy.name, argv[na]);
-              }
+              hts_parse_proxy(argv[na], pname, sizeof(pname), &opt->proxy.port);
+              StringCopy(opt->proxy.name, pname);
             }
             break;
           case 'F':            // user-agent field

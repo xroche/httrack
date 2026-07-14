@@ -3866,6 +3866,10 @@ const char *jump_protocol_const(const char *source) {
     source += p;
   else if ((p = strfield(source, "file:")))
     source += p;
+  else if ((p = strfield(source, "socks5h:")))
+    source += p;
+  else if ((p = strfield(source, "socks5:")))
+    source += p;
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
@@ -3873,6 +3877,40 @@ const char *jump_protocol_const(const char *source) {
 }
 
 DECLARE_NON_CONST_VERSION(jump_protocol)
+
+// default proxy port for a -P argument, keyed on the scheme
+static int proxy_default_port(const char *arg) {
+  if (strfield(arg, "socks5h:") || strfield(arg, "socks5:"))
+    return 1080;
+  return 8080;
+}
+
+void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
+  const char *authority = strstr(arg, "://");
+  const char *a;
+  size_t namelen;
+
+  // scan back to the port ':' (or userinfo '@'), but never past the authority,
+  // so a scheme's own colon is not read as a port separator
+  authority = (authority != NULL) ? authority + 3 : arg;
+  a = arg + strlen(arg) - 1;
+  while (a >= authority && *a != ':' && *a != '@')
+    a--;
+  if (a >= authority && *a == ':') {
+    int p = -1;
+
+    sscanf(a + 1, "%d", &p);
+    *port = (p > 0) ? p : proxy_default_port(arg);
+    namelen = (size_t) (a - arg);
+  } else {
+    *port = proxy_default_port(arg);
+    namelen = strlen(arg);
+  }
+  if (namelen >= name_size) // arg is user-controlled: truncate, don't overflow
+    namelen = name_size - 1;
+  memcpy(name, arg, namelen);
+  name[namelen] = '\0';
+}
 
 // codage base 64 a vers b
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
