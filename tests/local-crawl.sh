@@ -17,7 +17,7 @@
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
-#       --file-min-bytes PATH N --max-mirror-bytes N \
+#       --file-min-bytes PATH N --file-mode PATH OCTAL --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --errors counts every "Error:" log line; --errors-content drops transient
 # network failures (codes -2..-6) that flake on busy loopback under -c8.
@@ -26,6 +26,7 @@
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl.
 # --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
+# --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
 # extra httrack args appended, e.g. an --update run under a cap.
 # --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
@@ -141,7 +142,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --file-matches | --file-not-matches | --file-min-bytes)
+    --file-matches | --file-not-matches | --file-min-bytes | --file-mode)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}" "${args[$((pos + 2))]}")
         pos=$((pos + 2))
         ;;
@@ -434,6 +435,17 @@ while test "$i" -lt "${#audit[@]}"; do
         info "checking ${path} size ${sz:-0} >= ${audit[$i]} bytes"
         if test -n "$sz" && test "$sz" -ge "${audit[$i]}"; then result "OK"; else
             result "file too small (or missing)"
+            exit 1
+        fi
+        ;;
+    --file-mode)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        mode=$(stat -c '%a' "${hostroot}/${path}" 2>/dev/null ||
+            stat -f '%Lp' "${hostroot}/${path}" 2>/dev/null)
+        info "checking ${path} mode ${mode:-none} is ${audit[$i]}"
+        if test "$mode" = "${audit[$i]}"; then result "OK"; else
+            result "wrong mode"
             exit 1
         fi
         ;;

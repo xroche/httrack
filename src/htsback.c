@@ -557,13 +557,12 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   return 0;
 }
 
-/* Replace dst with src: RENAME does not clobber an existing target on Windows.
- */
-static int replace_file(const char *src, const char *dst) {
+/* Move src onto dst; RENAME does not clobber an existing target on Windows. */
+static hts_boolean replace_file(const char *src, const char *dst) {
   if (RENAME(src, dst) == 0)
-    return 0;
+    return HTS_TRUE;
   (void) UNLINK(dst);
-  return RENAME(src, dst);
+  return RENAME(src, dst) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
@@ -581,9 +580,9 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
       fclose(back->r.out);
       back->r.out = NULL;
     }
-    /* On rename failure keep the backup: it still holds the good copy, so
-       losing it would be worse than an orphaned temp. */
-    if (replace_file(back->tmpfile, back->url_sav) != 0)
+    /* On failure keep the backup: an orphaned temp beats losing the good copy.
+     */
+    if (!replace_file(back->tmpfile, back->url_sav))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
@@ -685,9 +684,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 const hts_codec codec =
                     hts_codec_parse(back[p].r.contentencoding);
                 /* Never decode over url_sav: a failed decode would destroy the
-                   copy an --update re-fetch is supposed to refresh (#557).
-                   Sized so the suffix always fits, url_sav being *2. */
-                char BIGSTK unpacked[HTS_URLMAXSIZE * 2 + 4];
+                   copy an --update re-fetch is supposed to refresh (#557). */
+                char BIGSTK unpacked[HTS_URLMAXSIZE * 2 + 4]; // room for ".u"
                 LLint size;
 
                 snprintf(unpacked, sizeof(unpacked), "%s.u", back[p].url_sav);
@@ -704,7 +702,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                  "Read error when decompressing");
                     }
                     UNLINK(unpacked);
-                  } else if (replace_file(unpacked, back[p].url_sav) == 0) {
+                  } else if (replace_file(unpacked, back[p].url_sav)) {
+                    /* The temp bypassed filecreate(), which is what chmods. */
+#ifndef _WIN32
+                    chmod(back[p].url_sav, HTS_ACCESS_FILE);
+#endif
                     file_notify(opt, back[p].url_adr, back[p].url_fil,
                                 back[p].url_sav, 1, 1, back[p].r.notmodified);
                     filenote(&opt->state.strc, back[p].url_sav, NULL);
@@ -713,8 +715,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     strcpybuff(back[p].r.msg,
                                "Write error when decompressing (can not rename "
                                "the temporary file)");
-                    /* The failed replace may have removed the previous copy,
-                       leaving the decoded body as the only one: keep it. */
+                    /* Keep the decoded body: the failed replace may have
+                       removed the previous copy, leaving this as the only one.
+                     */
                     hts_log_print(
                         opt, LOG_WARNING | LOG_ERRNO,
                         "could not replace %s; decoded copy kept as %s",
@@ -728,8 +731,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                : "Error when decompressing (%s)",
                            back[p].r.contentencoding);
                   /* Drop the undecoded body so the writer can't commit the
-                     coded bytes as the page; url_sav, if any, is left
-                     untouched. */
+                     coded bytes as the page; url_sav is left untouched. */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
                   UNLINK(unpacked);

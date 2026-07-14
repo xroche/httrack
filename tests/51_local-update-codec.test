@@ -13,6 +13,10 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
+# A restrictive umask makes the decoded direct-to-disk file's mode observable:
+# it is committed by renaming a temp, so it needs the chmod filecreate() does.
+umask 077
+
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
     --errors 3 \
@@ -25,4 +29,6 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-matches 'upcodec/fresh.html' 'FRESH-V2' \
     --file-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V2' \
     --file-min-bytes 'upcodec/freshdisk.bin' 32768 \
+    --file-mode 'upcodec/freshdisk.bin' 644 \
+    --file-mode 'upcodec/fresh.html' 644 \
     httrack 'BASEURL/upcodec/index.html'
