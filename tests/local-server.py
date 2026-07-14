@@ -695,6 +695,72 @@ class Handler(SimpleHTTPRequestHandler):
             extra_headers=[("Content-Encoding", "compress")],
         )
 
+    # --- coded re-fetch that fails to decode (#557) -------------------------
+    # Pass 1 mirrors each file from a valid gzip body; pass 2 (--update) serves
+    # a body that cannot be decoded. The previously-mirrored copy must survive.
+    # fresh.html is the control: its pass-2 body decodes, so it must be updated.
+    UPCODEC_SEEN = {}
+
+    def upcodec_pass(self):
+        """1 on the first body fetch of this path, 2 on the next ones. HEADs
+        don't count, so a stray one can't shift which pass gets the bad body."""
+        if self.command == "HEAD":
+            return 1
+        seen = Handler.UPCODEC_SEEN.get(self.path, 0) + 1
+        Handler.UPCODEC_SEEN[self.path] = seen
+        return seen
+
+    @staticmethod
+    def gzipped(body):
+        return gzip.compress(body)
+
+    @staticmethod
+    def bad_gzip(body):
+        """A gzip stream whose deflate payload is mangled: inflate fails partway
+        through, after some plausible output has already been produced."""
+        raw = bytearray(gzip.compress(body))
+        raw[20:40] = b"\xff" * 20
+        return bytes(raw[:-4])
+
+    def send_coded(self, body, content_type, coding="gzip"):
+        self.send_raw(body, content_type, extra_headers=[("Content-Encoding", coding)])
+
+    def route_upcodec_index(self):
+        self.send_html(
+            '\t<a href="mem.html">mem</a>\n'
+            '\t<a href="disk.bin">disk</a>\n'
+            '\t<a href="unsup.html">unsup</a>\n'
+            '\t<a href="fresh.html">fresh</a>\n'
+        )
+
+    MEM_V1 = b"<html><body><p>MIRRORED-MEM-V1</p></body></html>"
+    DISK_V1 = b"MIRRORED-DISK-V1\n" + b"\x00\x01\x02\xff" * 8192
+    UNSUP_V1 = b"<html><body><p>MIRRORED-UNSUP-V1</p></body></html>"
+
+    def route_upcodec_mem(self):
+        if self.upcodec_pass() == 1:
+            self.send_coded(self.gzipped(self.MEM_V1), "text/html")
+        else:
+            self.send_coded(self.bad_gzip(self.MEM_V1), "text/html")
+
+    def route_upcodec_disk(self):
+        if self.upcodec_pass() == 1:
+            self.send_coded(self.gzipped(self.DISK_V1), "application/octet-stream")
+        else:
+            self.send_coded(self.bad_gzip(self.DISK_V1), "application/octet-stream")
+
+    # Pass 2 switches to a coding we have no decoder for.
+    def route_upcodec_unsup(self):
+        if self.upcodec_pass() == 1:
+            self.send_coded(self.gzipped(self.UNSUP_V1), "text/html")
+        else:
+            self.send_coded(self.UNSUP_V1, "text/html", coding="compress")
+
+    def route_upcodec_fresh(self):
+        pass1 = self.upcodec_pass() == 1
+        body = b"<html><body><p>FRESH-V%d</p></body></html>" % (1 if pass1 else 2)
+        self.send_coded(self.gzipped(body), "text/html")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -1392,6 +1458,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/codec/bad.html": route_codec_bad,
         "/codec/bin.dat": route_codec_bin,
         "/codec/ae.html": route_codec_ae,
+        "/upcodec/index.html": route_upcodec_index,
+        "/upcodec/mem.html": route_upcodec_mem,
+        "/upcodec/disk.bin": route_upcodec_disk,
+        "/upcodec/unsup.html": route_upcodec_unsup,
+        "/upcodec/fresh.html": route_upcodec_fresh,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,

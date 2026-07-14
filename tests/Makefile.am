@@ -124,6 +124,7 @@ TESTS = \
 	47_local-crange-overflow.test \
 	48_local-crange-memresume.test \
 	49_local-cookiewall.test \
-	50_local-contentcodings.test
+	50_local-contentcodings.test \
+	51_local-update-codec.test
 
 CLEANFILES = check-network_sh.cache

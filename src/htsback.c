@@ -557,6 +557,15 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   return 0;
 }
 
+/* Replace dst with src: RENAME does not clobber an existing target on Windows.
+ */
+static int replace_file(const char *src, const char *dst) {
+  if (RENAME(src, dst) == 0)
+    return 0;
+  (void) UNLINK(dst);
+  return RENAME(src, dst);
+}
+
 /* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
    existing file moved the good copy to back->tmpfile before truncating url_sav.
    commit keeps the new file and drops the backup; else restore it so an aborted
@@ -676,24 +685,36 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               if (back[p].url_sav[0]) {
                 const hts_codec codec =
                     hts_codec_parse(back[p].r.contentencoding);
+                /* Never decode over url_sav: a failed decode would destroy the
+                   copy an --update re-fetch is supposed to refresh (#557).
+                   Sized so the suffix always fits, url_sav being *2. */
+                char BIGSTK unpacked[HTS_URLMAXSIZE * 2 + 4];
                 LLint size;
 
-                file_notify(opt, back[p].url_adr, back[p].url_fil,
-                            back[p].url_sav, 1, 1, back[p].r.notmodified);
-                filecreateempty(&opt->state.strc, back[p].url_sav);     // filenote & co
+                snprintf(unpacked, sizeof(unpacked), "%s.u", back[p].url_sav);
                 if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                             back[p].url_sav)) >= 0) {
+                                             unpacked)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
-                  // fichier -> mémoire
                   if (!back[p].r.is_write) {
+                    // fichier -> mémoire ; le fichier est écrit plus tard
                     deleteaddr(&back[p].r);
-                    back[p].r.adr = readfile_utf8(back[p].url_sav);
+                    back[p].r.adr = readfile_utf8(unpacked);
                     if (!back[p].r.adr) {
                       back[p].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[p].r.msg,
                                  "Read error when decompressing");
                     }
-                    UNLINK(back[p].url_sav);
+                    UNLINK(unpacked);
+                  } else if (replace_file(unpacked, back[p].url_sav) == 0) {
+                    file_notify(opt, back[p].url_adr, back[p].url_fil,
+                                back[p].url_sav, 1, 1, back[p].r.notmodified);
+                    filenote(&opt->state.strc, back[p].url_sav, NULL);
+                  } else {
+                    back[p].r.statuscode = STATUSCODE_INVALID;
+                    strcpybuff(back[p].r.msg,
+                               "Write error when decompressing (can not rename "
+                               "the temporary file)");
+                    UNLINK(unpacked);
                   }
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
@@ -702,12 +723,19 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                ? "Unsupported Content-Encoding (%s)"
                                : "Error when decompressing (%s)",
                            back[p].r.contentencoding);
-                  /* Drop the undecoded body and its placeholder so the writer
-                     can't commit the coded bytes as the page. */
+                  /* Drop the undecoded body so the writer can't commit the
+                     coded bytes as the page; url_sav, if any, is left
+                     untouched. */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
-                  UNLINK(back[p].url_sav);
+                  UNLINK(unpacked);
                 }
+                /* A failed decode keeps the previously-mirrored copy: note it,
+                   or the update purge (in old.lst, absent from new.lst) would
+                   delete what we just took care not to overwrite. */
+                if (back[p].r.statuscode == STATUSCODE_INVALID &&
+                    fexist_utf8(back[p].url_sav))
+                  filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
               /* ensure that no remaining temporary file exists */
               unlink(back[p].tmpfile);
