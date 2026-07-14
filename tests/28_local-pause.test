@@ -9,9 +9,12 @@ set -e
 
 : "${top_srcdir:=..}"
 
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
 # python3 runs the local server (mirror local-crawl.sh); skip when absent, else
 # run() swallows its exit-77 and the serverless 0s/0s crawl looks like a fail.
-command -v python3 >/dev/null || {
+find_python >/dev/null || {
     echo "python3 not found; skipping local crawl tests"
     exit 77
 }

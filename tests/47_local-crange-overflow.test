@@ -8,9 +8,11 @@ set -u
 
 : "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
 server="${testdir}/local-server.py"
 
-command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crange.XXXXXX") || exit 1
 serverpid=
@@ -26,7 +28,7 @@ cleanup() {
 trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 serverlog="${tmpdir}/server.log"
-python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
+"$python" "$(nativepath "$server")" --root "$(nativepath "${testdir}/server-root")" >"$serverlog" 2>&1 &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do

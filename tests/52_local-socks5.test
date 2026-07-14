@@ -8,11 +8,15 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
 if test "${HTTPS_SUPPORT:-}" == "no"; then
     echo "no https support compiled, skipping"
     exit 77
 fi
-if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+python=$(find_python) || python=
+if test -z "$python" || ! command -v openssl >/dev/null 2>&1; then
     echo "python3/openssl missing, skipping"
     exit 77
 fi
@@ -42,7 +46,7 @@ start_server() {
     local dir="$1" mode="$2" ports
     mkdir -p "$dir"
     ports="$dir/ports.txt"
-    python3 "$server" "$tmpdir/both.pem" "$dir" "$mode" \
+    "$python" "$(nativepath "$server")" "$(nativepath "$tmpdir/both.pem")" "$(nativepath "$dir")" "$mode" \
         >"$ports" 2>"$dir/server.err" &
     pids="$pids $!"
     for _ in $(seq 1 100); do

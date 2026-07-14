@@ -123,9 +123,14 @@ jobs:
       # is Linux/macOS only. These are the offline ones, driven from Git Bash
       # against the native httrack.exe. They subsume the self-tests this step
       # used to run inline (codecs, cache, fsize).
+      #
+      # The *_local-* ones crawl the bundled Python server over loopback: the
+      # real TLS handshake, cache, and file writer, i.e. what HTTrack actually
+      # does, none of which any other Windows check exercises.
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
+        timeout-minutes: 45
         run: |
           set -u
           bin="$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}"
@@ -141,10 +146,21 @@ jobs:
           TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
           export TMPDIR
 
+          # Mirror what configure hands the suite; the crawl tests gate on these.
+          # LC_ALL fixes the codeset MSYS uses to map a UTF-8 mirror name onto
+          # UTF-16, which the international crawls assert with "test -f".
+          export HTTPS_SUPPORT=yes BROTLI_ENABLED=yes ZSTD_ENABLED=yes
+          export LC_ALL=C.UTF-8
+
+          # A wedged crawl must not eat the job's whole timeout budget.
+          watchdog=""
+          command -v timeout >/dev/null && watchdog="timeout 600"
+
           pass=0 fail=0 skip=0 failed=""
-          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test; do
+          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test *_local-*.test; do
             rc=0
-            bash "$t" >"$t.log" 2>&1 || rc=$?
+            # shellcheck disable=SC2086
+            $watchdog bash "$t" >"$t.log" 2>&1 || rc=$?
             case "$rc" in
               0) pass=$((pass + 1)); echo "PASS $t" ;;
               77) skip=$((skip + 1)); echo "SKIP $t" ;;
@@ -164,7 +180,7 @@ jobs:
           # Every gate in these scripts exits 77, so a suite that degraded to
           # all-skipped would report green having tested nothing: assert a floor
           # on what actually ran, not just the absence of failures.
-          [ "$pass" -ge 45 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
+          [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
 
       - name: Upload the test logs

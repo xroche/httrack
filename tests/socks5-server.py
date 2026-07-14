@@ -217,6 +217,9 @@ def main():
     tls_port = start_origin(logdir, certfile)
     http_port = start_origin(logdir, None)
     socks_port = start_socks(logdir, mode)
+    # Keep the discovery lines LF: Windows would translate the \n, and the \r
+    # would land in the ports the caller parses out.
+    sys.stdout.reconfigure(newline="\n")
     print("TLS %d" % tls_port, flush=True)
     print("HTTP %d" % http_port, flush=True)
     print("SOCKS %d" % socks_port, flush=True)
