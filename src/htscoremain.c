@@ -2584,21 +2584,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 hts_get_version_info(opt), t, url);
         fprintf(opt->log, "(");
         for(i = 0; i < argc; i++) {
-#ifdef _WIN32
-          char *carg =
-            hts_convertStringSystemToUTF8(argv[i], (int) strlen(argv[i]));
-          char *arg = carg != NULL ? carg : argv[i];
-#else
-          const char *arg = argv[i];
-#endif
+          const char *arg = argv[i]; // already UTF-8 on every platform
           if (strchr(arg, ' ') == NULL || strchr(arg, '\"') != NULL)
             fprintf(opt->log, "%s ", arg);
           else                  // entre "" (si espace(s) et pas déja de ")
             fprintf(opt->log, "\"%s\" ", arg);
-#ifdef _WIN32
-          if (carg != NULL)
-            free(carg);
-#endif
         }
         fprintf(opt->log, ")" LF);
         fprintf(opt->log, LF);

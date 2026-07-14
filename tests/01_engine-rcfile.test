@@ -32,6 +32,13 @@ esac
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rcfile.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
 
+# HTS_HTTRACKRC is ".httrackrc" on POSIX but "httrackrc" on Windows: write both,
+# each platform reads the one it knows.
+write_rc() {
+    cat >"$1/.httrackrc"
+    cp "$1/.httrackrc" "$1/httrackrc"
+}
+
 # --- 1. alias token survives the bound intact -------------------------------
 d1="$tmp/intact"
 mkdir -p "$d1"
@@ -40,7 +47,7 @@ echo '<html><body>hello</body></html>' >"$d1/index.html"
 # optinclude_file() lowercases each config line, so the marker is lowercase to
 # survive the comparison verbatim.
 marker='zzz_rcfile_marker_0123456789_abcdefghijklmnopqrstuvwxyz_intact'
-printf 'user-agent=%s\n' "$marker" >"$d1/.httrackrc"
+printf 'user-agent=%s\n' "$marker" | write_rc "$d1"
 
 # Run with no -O so the working-directory .httrackrc is loaded (an -O path makes
 # the engine skip the rc files). Output lands in the temp dir. Guard the run so a
@@ -73,7 +80,7 @@ echo '<html><body>hi</body></html>' >"$d2/index.html"
 val=$(printf 'a%.0s' $(seq 1 200))
 for _ in $(seq 1 400); do
     printf 'user-agent=%s\n' "$val"
-done >"$d2/.httrackrc"
+done | write_rc "$d2"
 
 # The process aborts (httrack turns the fatal signal into exit 134 either way),
 # so the exit code does not distinguish the bounded abort from a heap overflow;

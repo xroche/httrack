@@ -31,6 +31,9 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htscharset.h"
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
 #include "htsbase.h"
 #include "punycode.h"
 #include "htssafe.h"
@@ -384,6 +387,40 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 
 char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
   return hts_convertStringCPToUTF8(s, size, GetACP());
+}
+
+HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv) {
+  int wargc = 0;
+  LPWSTR *const wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+  char **argv;
+  int i;
+
+  // On any failure keep the CRT's ANSI argv: lossy, but never half-converted.
+  if (wargv == NULL)
+    return;
+  if (wargc <= 0 ||
+      (argv = calloct((size_t) wargc + 1, sizeof(char *))) == NULL) {
+    LocalFree(wargv);
+    return;
+  }
+  for (i = 0; i < wargc; i++) {
+    const int wsize = (int) wcslen(wargv[i]);
+
+    // hts_convertUCS2StringToUTF8() returns NULL on an empty string
+    argv[i] =
+        wsize != 0 ? hts_convertUCS2StringToUTF8(wargv[i], wsize) : strdupt("");
+    if (argv[i] == NULL) {
+      while (i-- != 0)
+        freet(argv[i]);
+      freet(argv);
+      LocalFree(wargv);
+      return;
+    }
+  }
+  argv[wargc] = NULL; // callers may rely on argv[argc] == NULL
+  LocalFree(wargv);
+  *pargc = wargc;
+  *pargv = argv; // never freed: argv lives for the process
 }
 
 #else

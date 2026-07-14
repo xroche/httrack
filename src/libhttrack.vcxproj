@@ -70,7 +70,7 @@
     <Link>
       <!-- vcpkg auto-links libssl/libcrypto/zlib/brotli/zstd; only the OS import
            lib is explicit. -->
-      <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>

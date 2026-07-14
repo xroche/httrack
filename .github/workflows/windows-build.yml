@@ -119,38 +119,61 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
-      # The engine self-tests exercise the codecs the DLL was linked with: a
-      # missing brotli/zstd decoder shows up here, not just at link time.
-      - name: Run the content-coding self-tests
-        shell: pwsh
+      # The engine ships ~90 tests and none had ever run on Windows: "make check"
+      # is Linux/macOS only. These are the offline ones, driven from Git Bash
+      # against the native httrack.exe. They subsume the self-tests this step
+      # used to run inline (codecs, cache, fsize).
+      - name: Run the engine test suite (offline tests)
+        shell: bash
+        working-directory: tests
         run: |
-          $ErrorActionPreference = "Stop"
-          $exe = "src\${{ matrix.platform }}\${{ matrix.configuration }}\httrack.exe"
-          $tmp = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "st")
-          foreach ($t in @("acceptencoding", "contentcodings")) {
-            $out = & $exe -O NUL "-#test=$t" $tmp.FullName run
-            if ($LASTEXITCODE -ne 0) { throw "$t failed" }
-            if (-not ($out | Select-String -SimpleMatch "$t self-test OK")) {
-              throw "$t did not report OK: $out"
-            }
-            Write-Host ($out -join "`n")
-          }
+          set -u
+          bin="$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}"
+          export PATH="$bin:$PATH"
+          command -v httrack >/dev/null || { echo "::error::no httrack.exe in $bin"; exit 1; }
 
-      # These fail only on Windows: the cache ones on a DOS-ified save name (fconv
-      # is a no-op on POSIX, so make check cannot see it), fsize on a 32-bit
-      # st_size/off_t. They report failure by exit code, not an "OK" line.
-      - name: Run the Windows-sensitive self-tests
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $exe = "src\${{ matrix.platform }}\${{ matrix.configuration }}\httrack.exe"
-          foreach ($t in @("cache", "cache-corrupt", "fsize")) {
-            $tmp = New-Item -ItemType Directory -Force `
-              -Path (Join-Path $env:RUNNER_TEMP "st-$t")
-            $out = & $exe -O NUL "-#test=$t" $tmp.FullName run 2>&1
-            Write-Host ($out -join "`n")
-            if ($LASTEXITCODE -ne 0) { throw "$t failed (exit $LASTEXITCODE)" }
-          }
+          # httrack.exe is native, so MSYS rewrites any argument shaped like a
+          # POSIX path, and a URL path is shaped exactly like one: "/a/b.html"
+          # reached the engine as "C:/Program Files/Git/a/b.html". Switch that
+          # off, and hand the tests a TMPDIR that is already a Windows path.
+          export MSYS_NO_PATHCONV=1
+          export MSYS2_ARG_CONV_EXCL='*'
+          TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
+          export TMPDIR
+
+          pass=0 fail=0 skip=0 failed=""
+          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test; do
+            rc=0
+            bash "$t" >"$t.log" 2>&1 || rc=$?
+            case "$rc" in
+              0) pass=$((pass + 1)); echo "PASS $t" ;;
+              77) skip=$((skip + 1)); echo "SKIP $t" ;;
+              *)
+                fail=$((fail + 1)) failed="$failed $t"
+                echo "FAIL $t (exit $rc)"
+                # These assert with `test "$(...)" == "..." || exit 1`, which
+                # says nothing at all on failure. Re-run traced.
+                bash -x "$t" >>"$t.log" 2>&1 || true
+                tail -n 25 "$t.log" | sed 's/^/      /'
+                ;;
+            esac
+          done
+          echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+          # Every gate in these scripts exits 77, so a suite that degraded to
+          # all-skipped would report green having tested nothing: assert a floor
+          # on what actually ran, not just the absence of failures.
+          [ "$pass" -ge 45 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
+          [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
+
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-tests-${{ matrix.platform }}-${{ matrix.configuration }}
+          path: tests/*.log
+          if-no-files-found: warn
 
       - name: Upload MSBuild logs
         if: always()

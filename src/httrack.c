@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "httrack.h"
 #include "htslib.h"
+#include "htscharset.h" // after htslib.h: winsock2.h must precede windows.h
 
 /* Static definitions */
 static int fexist(const char *s);
@@ -206,6 +207,7 @@ int main(int argc, char **argv) {
   httrackp *opt;
 
 #ifdef _WIN32
+  hts_argv_utf8(&argc, &argv);
   {
     WORD wVersionRequested;     // requested version WinSock API
     WSADATA wsadata;            // Windows Sockets API data

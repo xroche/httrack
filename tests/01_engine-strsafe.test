@@ -32,10 +32,10 @@ case "$err" in
 esac
 
 # Same guarantee for the htsbuff builder. The source is exactly the buffer
-# capacity (4 bytes into a 4-byte buffer), so this also pins the boundary: a
+# capacity (6 bytes into a 6-byte buffer), so this also pins the boundary: a
 # '<=' off-by-one in the capacity check would let it through (and print "NOT
 # aborted"). Match the specific htsbuff abort message, not just any assert.
-err=$(httrack -#test=strsafe overflow-buff "abcd" 2>&1) || true
+err=$(httrack -#test=strsafe overflow-buff "abcdef" 2>&1) || true
 case "$err" in
 *"strsafe: NOT aborted"*)
     echo "htsbuff over-capacity write was NOT caught" >&2
