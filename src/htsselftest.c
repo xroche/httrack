@@ -64,6 +64,7 @@ Please visit our Website: http://www.httrack.com
 #include "coucal/coucal.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1528,23 +1529,26 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   /* sparse: seek past 2GB and write the last byte */
   fp = FOPEN(path, "wb");
   if (fp == NULL) {
-    fprintf(stderr, "fsize: cannot create '%s'\n", path);
+    fprintf(stderr, "fsize: cannot create '%s': %s\n", path, strerror(errno));
     return 1;
   }
-  if (fseeko(fp, expected - 1, SEEK_SET) != 0 || fputc(0, fp) == EOF) {
-    fprintf(stderr, "fsize: cannot extend '%s' to " LLintP "\n", path,
-            expected);
-    fclose(fp);
+  if (fseeko(fp, expected - 1, SEEK_SET) != 0 || fputc(0, fp) == EOF ||
+      fclose(fp) != 0) {
+    fprintf(stderr, "fsize: cannot extend '%s' to " LLintP ": %s\n", path,
+            expected, strerror(errno));
     UNLINK(path);
     return 1;
   }
-  fclose(fp);
 
   got = fsize_utf8(path);
   fp = FOPEN(path, "rb");
-  gotp = fp != NULL ? fpsize(fp) : -1;
-  if (fp != NULL)
+  if (fp == NULL) {
+    fprintf(stderr, "fsize: cannot reopen '%s': %s\n", path, strerror(errno));
+    gotp = -1;
+  } else {
+    gotp = fpsize(fp);
     fclose(fp);
+  }
   UNLINK(path);
 
   printf("fsize: width=%d size=" LLintP " psize=" LLintP "\n", width, got,
