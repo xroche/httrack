@@ -35,7 +35,8 @@ chk image/avif hex:0000001C6674797061766966 "$yes"
 chk image/avif hex:0000001C6674797068656963 "$no" # heic brand is not avif
 chk image/heic hex:0000001C6674797068656963 "$yes"
 chk image/svg+xml '<svg xmlns="x">' "$yes"
-chk image/svg+xml $'\xef\xbb\xbf  <?xml version="1.0"?>' "$yes" # BOM+ws skip
+# BOM+ws skip; hex, as Windows argv cannot carry the raw BOM through the ANSI codepage
+chk image/svg+xml hex:EFBBBF20203C3F786D6C2076657273696F6E3D22312E30223F3E "$yes"
 
 # audio / video
 chk audio/mpeg 'ID3xxx' "$yes"
