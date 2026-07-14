@@ -64,9 +64,13 @@ start_server() {
 HANG_RC=137 # 128 + SIGKILL
 run_crawl() {
     local out="$1" url="$2" proxy="$3"
+    shift 3
+    local extra="$*"
+    test -n "$extra" || extra="-r1 -s0"
     rm -rf "$out"
+    # shellcheck disable=SC2086
     httrack "$url" --proxy "$proxy" \
-        -O "$out" -r1 -s0 --timeout=10 >"$out.log" 2>&1 &
+        -O "$out" $extra --timeout=10 >"$out.log" 2>&1 &
     local pid=$!
     (sleep 60 && kill -9 "$pid" 2>/dev/null) &
     local guard=$!
@@ -121,6 +125,31 @@ grep -q "^REQUEST GET http" "$ok/origin-headers.log" && {
     exit 1
 }
 echo "OK: plain http tunneled through socks5"
+
+# --- keep-alive socket reuse must NOT re-run the handshake ------------------
+# A reused keep-alive socket is already tunneled; re-injecting the SOCKS
+# greeting corrupts the origin stream. -c1 + the origin's max>1 advert makes
+# httrack serve the whole plain-http crawl over one tunnel: exactly one
+# handshake, every subpage intact.
+ka="$tmpdir/ka"
+start_server "$ka" ok
+run_crawl "$ka/out" "http://${host}:${http_port}/" "socks5://127.0.0.1:${socks_port}" -r3 -c1
+missing=0
+for i in 1 2 3 4 5; do
+    grep -rq "SUBPAGE-563 /p${i}.html" "$ka/out" || missing=1
+done
+test "$missing" -eq 0 || {
+    echo "FAIL: a keep-alive subpage was lost (re-handshake corrupted the reused socket)" >&2
+    cat "$ka/out.log" "$ka/socks.log" >&2
+    exit 1
+}
+handshakes=$(grep -c "^CMD " "$ka/socks.log" || true)
+test "$handshakes" -eq 1 || {
+    echo "FAIL: expected 1 SOCKS handshake for the reused socket, got $handshakes" >&2
+    cat "$ka/socks.log" >&2
+    exit 1
+}
+echo "OK: keep-alive socket reused over one socks tunnel, no re-handshake"
 
 # --- authenticated socks (RFC 1929) -----------------------------------------
 # over plain http: that is the request an http proxy would decorate with

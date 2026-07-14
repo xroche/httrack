@@ -2725,9 +2725,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           busy_state = 1;
 
           // socks5: tunnel to the origin before anything is written, for http
-          // as well as https; ssl_con skips the post-TLS re-entry here (#563)
+          // as well as https. Skip on a reused keep-alive socket (already
+          // tunneled) and on the post-TLS re-entry (ssl_con set) (#563).
           if (back[i].r.req.proxy.active &&
-              hts_proxy_is_socks(back[i].r.req.proxy.name)
+              hts_proxy_is_socks(back[i].r.req.proxy.name) &&
+              !back[i].r.keep_alive
 #if HTS_USEOPENSSL
               && back[i].r.ssl_con == NULL
 #endif

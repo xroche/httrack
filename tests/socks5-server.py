@@ -19,13 +19,18 @@ import threading
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
 REMOTE_HOST = b"socks-origin.invalid"
-ORIGIN_BODY = b"<html><body>ORIGIN-PAGE-563</body></html>"
+# index links the subpages so an -r3 crawl reuses one keep-alive socket
+LINKS = "".join('<a href="/p%d.html">%d</a>' % (i, i) for i in range(1, 6))
+ORIGIN_BODY = ("<html><body>ORIGIN-PAGE-563 " + LINKS + "</body></html>").encode()
 SOCKS_LOG = "socks.log"
 ORIGIN_LOG = "origin-headers.log"
 
 
 def make_origin(logdir):
     class Origin(http.server.BaseHTTPRequestHandler):
+        # HTTP/1.1 + a max>1 advertisement lets httrack keep the socket alive
+        protocol_version = "HTTP/1.1"
+
         def do_GET(self):
             with open(os.path.join(logdir, ORIGIN_LOG), "a") as handle:
                 handle.write(
@@ -34,11 +39,19 @@ def make_origin(logdir):
                 )
                 for key in self.headers.keys():
                     handle.write(key + ": " + self.headers[key] + "\n")
+            if "p" in self.path and ".html" in self.path:
+                body = (
+                    b"<html><body>SUBPAGE-563 " + self.path.encode() + b"</body></html>"
+                )
+            else:
+                body = ORIGIN_BODY
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
-            self.send_header("Content-Length", str(len(ORIGIN_BODY)))
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Keep-Alive", "timeout=15, max=100")
+            self.send_header("Connection", "keep-alive")
             self.end_headers()
-            self.wfile.write(ORIGIN_BODY)
+            self.wfile.write(body)
 
         def log_message(self, *args):
             pass
@@ -46,8 +59,13 @@ def make_origin(logdir):
     return Origin
 
 
+class ThreadingTCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 def start_origin(logdir, certfile=None):
-    httpd = socketserver.TCPServer(("127.0.0.1", 0), make_origin(logdir))
+    httpd = ThreadingTCPServer(("127.0.0.1", 0), make_origin(logdir))
     if certfile is not None:
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ctx.load_cert_chain(certfile)
