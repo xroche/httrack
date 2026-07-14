@@ -581,7 +581,7 @@ PT_Index PT_LoadCache(const char *filename) {
 
           snprintf(index->slots.common.startUrl,
                    sizeof(index->slots.common.startUrl), "%s%s", scheme,
-                   chain->name);
+                   (const char *) chain->name);
         }
       }
     }
