@@ -784,6 +784,16 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   /* Depth caps the stack: uncapped this recurses 2046 frames, ~900KB (#574). */
   assertf(depth == maxdepth);
   assertf(strjokerfind(subj, pat) == NULL);
+  /* Pin the cap from below: 32 segments must still match, so a cap set so low
+     it would break real multi-segment filters (which use far fewer) fails. */
+  for (i = 0; i < 32; i++) {
+    pat[2 * i] = '*';
+    pat[2 * i + 1] = 'a';
+  }
+  pat[64] = '\0';
+  memset(subj, 'a', 32);
+  subj[32] = '\0';
+  assertf(strjoker(subj, pat, NULL, NULL) != NULL);
   freet(pat);
   freet(subj);
   printf("filterbounds: OK\n");
