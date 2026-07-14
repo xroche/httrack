@@ -87,7 +87,7 @@ full=6008 # len(CRANGE206_BODY) = len("CR206DAT") + 6000
 printf '[file recovered whole] ..\t'
 test -s "$blob" || {
     echo "FAIL: blob.bin missing after the hostile 206"
-    grep -aE "Error:|Warning:|restarting" "${out}/hts-log.txt" >&2 || true
+    tail -40 "${out}/hts-log.txt" >&2
     find "$out" -type f >&2
     exit 1
 }
