@@ -20,15 +20,19 @@ umask 077
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
     --errors 3 \
-    --log-found 'Error when decompressing' \
-    --log-found 'Unsupported Content-Encoding' \
+    --log-found 'decompressing.*upcodec/mem\.html' \
+    --log-found 'decompressing.*upcodec/disk\.bin' \
+    --log-found 'Unsupported Content-Encoding.*upcodec/unsup\.html' \
     --file-matches 'upcodec/mem.html' 'MIRRORED-MEM-V1' \
     --file-matches 'upcodec/disk.bin' 'MIRRORED-DISK-V1' \
     --file-min-bytes 'upcodec/disk.bin' 32768 \
+    --file-mode 'upcodec/disk.bin' 644 \
     --file-matches 'upcodec/unsup.html' 'MIRRORED-UNSUP-V1' \
     --file-matches 'upcodec/fresh.html' 'FRESH-V2' \
+    --file-not-matches 'upcodec/fresh.html' 'FRESH-V1' \
+    --file-mode 'upcodec/fresh.html' 644 \
     --file-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V2' \
+    --file-not-matches 'upcodec/freshdisk.bin' 'FRESHDISK-V1' \
     --file-min-bytes 'upcodec/freshdisk.bin' 32768 \
     --file-mode 'upcodec/freshdisk.bin' 644 \
-    --file-mode 'upcodec/fresh.html' 644 \
     httrack 'BASEURL/upcodec/index.html'
