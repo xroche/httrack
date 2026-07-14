@@ -283,9 +283,6 @@ int ishttperror(int err);
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
 int give_mimext(char *s, size_t ssize, const char *st);
 
-/* Advertised Accept-Encoding value (no header name/CRLF); see htslib.c. */
-const char *hts_acceptencoding(hts_boolean compressible);
-
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 

@@ -61,7 +61,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.c htslib.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
-	htsmd5.c htszlib.c htswrap.c htsconcat.c \
+	htsmd5.c htscodec.c htszlib.c htswrap.c htsconcat.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c htssniff.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
@@ -72,13 +72,13 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.h htsindex.h htslib.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h  \
-	htstools.h htswizard.h htswrap.h htszlib.h  \
+	htstools.h htswizard.h htswrap.h htscodec.h htszlib.h  \
 	htsstrings.h htsarrays.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
-libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
+libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 

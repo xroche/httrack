@@ -140,6 +140,15 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USEZLIB 1
 #endif
 
+// brotli and zstd content codings; off unless the build opted in (configure,
+// or the Visual Studio projects, which link the vcpkg libraries)
+#ifndef HTS_USEBROTLI
+#define HTS_USEBROTLI 0
+#endif
+#ifndef HTS_USEZSTD
+#define HTS_USEZSTD 0
+#endif
+
 #ifndef HTS_INET6
 #define HTS_INET6 0
 #endif

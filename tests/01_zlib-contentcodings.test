@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# brotli/zstd decode, unknown codings, and the decoded-size budget.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=contentcodings "$dir" run |
+    grep -q "contentcodings self-test OK"

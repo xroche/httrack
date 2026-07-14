@@ -2,7 +2,7 @@ Source: httrack
 Section: web
 Maintainer: Xavier Roche <roche@httrack.com>
 Standards-Version: 4.7.4
-Build-Depends: debhelper-compat (= 14), autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev
+Build-Depends: debhelper-compat (= 14), autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev, libbrotli-dev, libzstd-dev
 Rules-Requires-Root: no
 Homepage: http://www.httrack.com
 Vcs-Git: https://github.com/xroche/httrack.git

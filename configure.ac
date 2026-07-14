@@ -173,6 +173,10 @@ AC_CHECK_HEADERS([execinfo.h])
 ### zlib
 CHECK_ZLIB()
 
+### brotli and zstd content codings (optional)
+CHECK_BROTLI()
+CHECK_ZSTD()
+
 ### OpenSSL is explicitly enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
 AC_ARG_ENABLE([https],

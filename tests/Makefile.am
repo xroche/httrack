@@ -15,6 +15,8 @@ TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
 ### TESTS_ENVIRONMENT += $(SHLIBPATH_VAR)="$(top_builddir)/src/$(LT_CV_OBJDIR)$${$(SHLIBPATH_VAR):+$(PATH_SEPARATOR)}$$$(SHLIBPATH_VAR)"
 TESTS_ENVIRONMENT += ONLINE_UNIT_TESTS=$(ONLINE_UNIT_TESTS)
 TESTS_ENVIRONMENT += HTTPS_SUPPORT=$(HTTPS_SUPPORT)
+TESTS_ENVIRONMENT += BROTLI_ENABLED=$(BROTLI_ENABLED)
+TESTS_ENVIRONMENT += ZSTD_ENABLED=$(ZSTD_ENABLED)
 TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 
@@ -69,6 +71,7 @@ TESTS = \
 	01_engine-version-macros.test \
 	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
+	01_zlib-contentcodings.test \
 	01_zlib-cache.test \
 	01_zlib-cache-corrupt.test \
 	01_zlib-cache-legacy.test \
@@ -120,6 +123,7 @@ TESTS = \
 	46_local-update-304-resume.test \
 	47_local-crange-overflow.test \
 	48_local-crange-memresume.test \
-	49_local-cookiewall.test
+	49_local-cookiewall.test \
+	50_local-contentcodings.test
 
 CLEANFILES = check-network_sh.cache

@@ -41,7 +41,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure
         run: |
@@ -50,6 +50,9 @@ jobs:
           # committed generated files already let a plain checkout build.
           autoreconf -fi
           ./configure
+          # a missing decoder would silently drop the coding from Accept-Encoding
+          grep -q "define HTS_USEBROTLI 1" config.h
+          grep -q "define HTS_USEZSTD 1" config.h
 
       - name: Build
         run: make -j"$(nproc)"
@@ -82,7 +85,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure
         run: |
@@ -123,14 +126,18 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew install autoconf automake libtool autoconf-archive
+          brew install autoconf automake libtool autoconf-archive brotli zstd
 
       - name: Configure
         run: |
           set -euo pipefail
           ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
           autoreconf -fi
-          ./configure CPPFLAGS="-I${ssl}/include" LDFLAGS="-L${ssl}/lib"
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib"
+          grep -q "define HTS_USEBROTLI 1" config.h
+          grep -q "define HTS_USEZSTD 1" config.h
 
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
@@ -166,14 +173,16 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew install autoconf automake libtool autoconf-archive
+          brew install autoconf automake libtool autoconf-archive brotli zstd
 
       - name: Build and install into a temp prefix
         run: |
           set -euo pipefail
           ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
           autoreconf -fi
-          ./configure CPPFLAGS="-I${ssl}/include" LDFLAGS="-L${ssl}/lib" \
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
             --prefix="$RUNNER_TEMP/inst"
           make -j"$(sysctl -n hw.ncpu)"
           make install
@@ -201,7 +210,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential gcc-multilib autoconf automake libtool \
-            autoconf-archive zlib1g-dev:i386 libssl-dev:i386
+            autoconf-archive zlib1g-dev:i386 libssl-dev:i386 \
+            libbrotli-dev:i386 libzstd-dev:i386
 
       - name: Configure
         run: |
@@ -242,7 +252,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure (sanitized)
         run: |
@@ -344,7 +354,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure (fuzzers, static)
         run: |
@@ -424,7 +434,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
             debhelper devscripts lintian fakeroot
 
       - uses: actions/checkout@v6
@@ -468,7 +478,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: distcheck
         run: |

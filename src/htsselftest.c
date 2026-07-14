@@ -54,8 +54,12 @@ Please visit our Website: http://www.httrack.com
 #include "htsftp.h"
 #include "htsmd5.h"
 #include "htssniff.h"
+#include "htscodec.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
+#endif
+#if HTS_USEZSTD
+#include <zstd.h>
 #endif
 #include "coucal/coucal.h"
 
@@ -2305,6 +2309,7 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   freet(buf);
   return ok ? 0 : 1;
 }
+#endif
 
 /* Write src[0..len) to path as-is; 0 on success. */
 static int ae_write_raw(const char *path, const unsigned char *src,
@@ -2338,17 +2343,22 @@ static int ae_check_decoded(const char *path, const unsigned char *expect,
   fclose(f);
   return (off == len) ? 0 : 1;
 }
-#endif
 
 /* Accept-Encoding (#450): advertise gzip+deflate; both decode (hts_zunpack) */
 static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
-  const char *off = hts_acceptencoding(HTS_FALSE);
-  const char *on = hts_acceptencoding(HTS_TRUE);
+  const char *off = hts_acceptencoding(HTS_FALSE, HTS_TRUE);
+  const char *on = hts_acceptencoding(HTS_TRUE, HTS_FALSE);
+  const char *tls = hts_acceptencoding(HTS_TRUE, HTS_TRUE);
 
   (void) opt;
   assertf(strcmp(off, "identity") == 0);
   assertf(strstr(on, "gzip") != NULL);
   assertf(strstr(on, "deflate") != NULL); /* fails on the old gzip-only list */
+  /* br and zstd ride on TLS only, so a cleartext proxy can not be handed a
+     coding it may try to rewrite */
+  assertf(strstr(on, "br") == NULL && strstr(on, "zstd") == NULL);
+  assertf((strstr(tls, ", br") != NULL) == (HTS_USEBROTLI != 0));
+  assertf((strstr(tls, "zstd") != NULL) == (HTS_USEZSTD != 0));
 #if HTS_USEZLIB
   if (argc >= 1) {
     static const int windowBits[] = {16 + MAX_WBITS, MAX_WBITS, -MAX_WBITS};
@@ -2433,6 +2443,115 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   (void) argv;
 #endif
   printf("acceptencoding self-test OK: %s\n", on);
+  return 0;
+}
+
+#if HTS_USEBROTLI
+/* No brotli encoder is linked, so the coded bytes are canned: brotli quality 9
+   over cc_text, and over 4 MiB of 'A' (14 bytes, ~300000x). */
+static const unsigned char cc_br_text[] = {
+    0x1b, 0x43, 0x00, 0x00, 0x44, 0xdd, 0x96, 0xea, 0xe8, 0x22, 0xdd, 0x90,
+    0xa4, 0x1b, 0x8a, 0xf7, 0x47, 0x0e, 0xc2, 0xc5, 0x3d, 0x09, 0x1b, 0x70,
+    0xe0, 0x1e, 0x60, 0xa0, 0x8b, 0xcc, 0xbe, 0xcb, 0xb0, 0x31, 0x76, 0x9e,
+    0xcf, 0x6e, 0x41, 0xb5, 0xe8, 0x2e, 0x56, 0x78, 0x08, 0x1b, 0xfa, 0x08,
+    0x8a, 0x50, 0x83, 0x4e, 0x62, 0x7f, 0xbf, 0x05, 0xf2, 0x22, 0x8f, 0xdf,
+    0x28, 0xdc, 0x9f, 0xa9, 0x90, 0x50, 0x37, 0x62, 0x56, 0x4f, 0xa8};
+static const unsigned char cc_br_bomb[] = {0x9b, 0xff, 0xff, 0x3f, 0x00,
+                                           0x24, 0x82, 0xe2, 0xb1, 0x40,
+                                           0x72, 0xef, 0x7f, 0x00};
+#endif
+
+static const unsigned char cc_text[] =
+    "content codings: HTTrack decodes gzip, brotli and zstd bodies alike.";
+
+/* Content codings: br and zstd decode, junk tokens stay identity, a coding we
+   can not undo fails the fetch, and a bomb never lands on disk. */
+static int st_contentcodings(httrackp *opt, int argc, char **argv) {
+  const size_t tlen = sizeof(cc_text) - 1;
+  char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
+
+  (void) opt;
+  assertf(hts_codec_parse("gzip") == HTS_CODEC_DEFLATE);
+  assertf(hts_codec_parse("x-deflate") == HTS_CODEC_DEFLATE);
+  assertf(hts_codec_parse("") == HTS_CODEC_IDENTITY);
+  assertf(hts_codec_parse("identity") == HTS_CODEC_IDENTITY);
+  /* servers do label plain bodies with junk; the page must survive that */
+  assertf(hts_codec_parse("utf-8") == HTS_CODEC_IDENTITY);
+  /* a real coding with no decoder here: fail, never save the coded bytes */
+  assertf(hts_codec_parse("compress") == HTS_CODEC_UNSUPPORTED);
+  assertf(hts_codec_parse("br") ==
+          (HTS_USEBROTLI ? HTS_CODEC_BROTLI : HTS_CODEC_UNSUPPORTED));
+  assertf(hts_codec_parse("zstd") ==
+          (HTS_USEZSTD ? HTS_CODEC_ZSTD : HTS_CODEC_UNSUPPORTED));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, "tgz"));
+  assertf(!hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, "html"));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_BROTLI, "br"));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_ZSTD, "zst"));
+  /* decoded-size budget: 4096x, floor 1 MiB, ceiling INT_MAX */
+  assertf(hts_codec_maxout(1) == 1024 * 1024);
+  assertf(hts_codec_maxout(1024) == 4096 * 1024);
+  assertf(hts_codec_maxout(1024 * 1024) == INT_MAX);
+
+  if (argc >= 1) {
+    snprintf(inpath, sizeof(inpath), "%s/cc-in", argv[0]);
+    snprintf(outpath, sizeof(outpath), "%s/cc-out", argv[0]);
+#if HTS_USEBROTLI
+    {
+      unsigned char head[16];
+
+      assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) ==
+              (int) tlen);
+      assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
+      assertf(hts_codec_head(HTS_CODEC_BROTLI, cc_br_text, sizeof(cc_br_text),
+                             head, sizeof(head)) == sizeof(head));
+      assertf(memcmp(head, cc_text, sizeof(head)) == 0);
+      /* truncated: must fail, not fall back to a verbatim copy */
+      assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
+      /* cc_br_bomb is a valid stream that expands to 4 MiB; the budget, not a
+         corrupt frame, is what must reject it. */
+      assertf((LLint) (4 * 1024 * 1024) >
+              hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
+      assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
+    }
+#endif
+#if HTS_USEZSTD
+    {
+      const size_t bomblen = 4 * 1024 * 1024;
+      const size_t bound = ZSTD_compressBound(bomblen);
+      unsigned char *bomb = malloct(bomblen);
+      unsigned char *zbuf = malloct(bound);
+      unsigned char head[16];
+      size_t zlen;
+
+      assertf(bomb != NULL && zbuf != NULL);
+      zlen = ZSTD_compress(zbuf, bound, cc_text, tlen, 6);
+      assertf(!ZSTD_isError(zlen));
+      assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == (int) tlen);
+      assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
+      assertf(hts_codec_head(HTS_CODEC_ZSTD, zbuf, zlen, head, sizeof(head)) ==
+              sizeof(head));
+      assertf(memcmp(head, cc_text, sizeof(head)) == 0);
+      assertf(ae_write_raw(inpath, zbuf, zlen - 4) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
+      memset(bomb, 'A', bomblen);
+      zlen = ZSTD_compress(zbuf, bound, bomb, bomblen, 6);
+      assertf(!ZSTD_isError(zlen));
+      /* the fixture must really be past the budget, whatever the ratio is */
+      assertf((LLint) bomblen > hts_codec_maxout((LLint) zlen));
+      assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
+      freet(bomb);
+      freet(zbuf);
+    }
+#endif
+    /* a coding we can not undo yields no file at all */
+    assertf(hts_codec_unpack(HTS_CODEC_UNSUPPORTED, inpath, outpath) < 0);
+  }
+  printf("contentcodings self-test OK\n");
   return 0;
 }
 
@@ -2677,6 +2796,9 @@ static const struct selftest_entry {
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
+    {"contentcodings", "[dir]",
+     "brotli and zstd bodies decode; bombs and unknown codings are refused",
+     st_contentcodings},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
 #ifndef _WIN32

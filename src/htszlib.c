@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 #include "htscore.h"
+#include "htscodec.h"
 #include "htszlib.h"
 
 #if HTS_USEZLIB
@@ -46,13 +47,8 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 */
 
-/*
-  Unpack file into a new file (gzip, zlib RFC1950 or raw deflate RFC1951).
-  A body provably in no deflate framing is copied verbatim (identity).
-  Return value: size of the new file, or -1 if an error occurred
-*/
 /* Note: utf-8 */
-int hts_zunpack(char *filename, char *newfile) {
+int hts_zunpack(const char *filename, const char *newfile) {
   int ret = -1;
 
   if (filename != NULL && newfile != NULL && filename[0] && newfile[0]) {
@@ -61,6 +57,7 @@ int hts_zunpack(char *filename, char *newfile) {
 
     if (in != NULL) {
       unsigned char BIGSTK inbuf[8192];
+      const LLint maxout = hts_codec_maxout(hts_codec_coded_size(in));
       size_t navail = fread(inbuf, 1, sizeof(inbuf), in);
       /* gzip/zlib headers -> +32 windowBits; else raw deflate (RFC1951) */
       const hts_boolean wrapped =
@@ -73,9 +70,10 @@ int hts_zunpack(char *filename, char *newfile) {
          deflate framing at all. env_error: local I/O or memory failure. */
       hts_boolean not_deflate = HTS_FALSE;
       hts_boolean env_error = HTS_FALSE;
+      hts_boolean bomb = HTS_FALSE;
 
       /* deflate is ambiguous; on failure retry with the other windowBits */
-      for (attempt = 0; attempt < 2 && ret < 0; attempt++) {
+      for (attempt = 0; attempt < 2 && ret < 0 && !bomb; attempt++) {
         const int windowBits =
             (attempt == 0 ? wrapped : !wrapped) ? (32 + MAX_WBITS) : -MAX_WBITS;
         FILE *fpout;
@@ -102,7 +100,7 @@ int hts_zunpack(char *filename, char *newfile) {
         }
         {
           hts_boolean ok = HTS_TRUE;
-          int size = 0;
+          LLint size = 0;
           int zerr = Z_OK;
 
           /* chunked inflate; first chunk in inbuf, single member */
@@ -126,27 +124,33 @@ int hts_zunpack(char *filename, char *newfile) {
                 break;
               }
               produced = sizeof(outbuf) - strm.avail_out;
+              size += (LLint) produced;
+              if (size > maxout) { /* decompression bomb: no retry, no copy */
+                bomb = HTS_TRUE;
+                ok = HTS_FALSE;
+                break;
+              }
               if (produced > 0 &&
                   fwrite(outbuf, 1, produced, fpout) != produced) {
                 env_error = HTS_TRUE;
                 ok = HTS_FALSE;
                 break;
               }
-              size += (int) produced;
             } while (strm.avail_out == 0);
             if (!ok || zerr == Z_STREAM_END)
               break;
             navail = fread(inbuf, 1, sizeof(inbuf), in);
           } while (navail > 0);
           if (ok && zerr == Z_STREAM_END)
-            ret = size;
+            ret = (int) size;
         }
         inflateEnd(&strm);
         fclose(fpout);
       }
       /* keep a mislabeled identity body verbatim only when provably not
          deflate; truncation or a local failure must keep failing (#47) */
-      if (ret < 0 && !wrapped && not_deflate && !env_error && !ferror(in)) {
+      if (ret < 0 && !bomb && !wrapped && not_deflate && !env_error &&
+          !ferror(in)) {
         FILE *const fpout =
             FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
 
@@ -170,6 +174,25 @@ int hts_zunpack(char *filename, char *newfile) {
     }
   }
   return ret;
+}
+
+size_t hts_zhead(const void *in, size_t in_len, void *out, size_t out_len) {
+  z_stream zs;
+  size_t n = 0;
+  int err;
+
+  memset(&zs, 0, sizeof(zs));
+  if (inflateInit2(&zs, 47) != Z_OK) /* 47: gzip or zlib, autodetected */
+    return 0;
+  zs.next_in = (const Bytef *) in;
+  zs.avail_in = (uInt) in_len;
+  zs.next_out = (Bytef *) out;
+  zs.avail_out = (uInt) out_len;
+  err = inflate(&zs, Z_SYNC_FLUSH);
+  if (err == Z_OK || err == Z_STREAM_END || err == Z_BUF_ERROR)
+    n = out_len - zs.avail_out;
+  inflateEnd(&zs);
+  return n;
 }
 
 int hts_extract_meta(const char *path) {

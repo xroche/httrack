@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmodules.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htscodec.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -1279,11 +1280,16 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       // Compression accepted ?
       if (retour->req.http11) {
         hts_boolean compressible = HTS_FALSE;
+        hts_boolean secure = HTS_FALSE;
+
 #if HTS_USEZLIB
         compressible = (!retour->req.range_used && !retour->req.nocompression);
 #endif
+#if HTS_USEOPENSSL
+        secure = retour->ssl ? HTS_TRUE : HTS_FALSE;
+#endif
         print_buffer(&bstr, "Accept-Encoding: %s" H_CRLF,
-                     hts_acceptencoding(compressible));
+                     hts_acceptencoding(compressible, secure));
       }
 
       /* Authentification */
@@ -1668,22 +1674,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         strcpybuff(retour->contentencoding, tempo);
       else
         retour->contentencoding[0] = '\0';
-#if HTS_USEZLIB
-      /* Check known encodings */
-      if (retour->contentencoding[0]) {
-        if ((strfield2(retour->contentencoding, "gzip"))
-            || (strfield2(retour->contentencoding, "x-gzip"))
-            /*
-               || (strfield2(retour->contentencoding, "compress"))
-               || (strfield2(retour->contentencoding, "x-compress"))
-             */
-            || (strfield2(retour->contentencoding, "deflate"))
-            || (strfield2(retour->contentencoding, "x-deflate"))
-          ) {
-          retour->compressed = 1;
-        }
-      }
-#endif
+      /* A coding to undo (or one we can not undo, which must fail the fetch
+         rather than save the coded bytes as the page) */
+      if (hts_codec_parse(retour->contentencoding) != HTS_CODEC_IDENTITY)
+        retour->compressed = 1;
     }
   } else if ((p = strfield(rcvd, "Location:")) != 0) {
     if (retour) {
@@ -4363,11 +4357,6 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
 HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
                              int flag) {
   (void) get_httptype_sized(opt, s, HTS_MIMETYPE_SIZE, fil, flag);
-}
-
-/* Advertised Accept-Encoding; gzip and deflate both decode via hts_zunpack */
-const char *hts_acceptencoding(hts_boolean compressible) {
-  return compressible ? "gzip, deflate, identity;q=0.9" : "identity";
 }
 
 // get type of fil (php)

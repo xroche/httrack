@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htssniff.h"
+#include "htscodec.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
@@ -151,29 +152,6 @@ typedef struct sniff_src {
   const char *prev_save; /* previous run's save name (cache X-Save) */
 } sniff_src;
 
-#if HTS_USEZLIB
-/* Inflate the head of a gzip/zlib stream; 0 when undecodable. */
-static size_t sniff_inflate_head(const void *in, size_t in_len, void *out,
-                                 size_t out_len) {
-  z_stream zs;
-  size_t n = 0;
-  int err;
-
-  memset(&zs, 0, sizeof(zs));
-  if (inflateInit2(&zs, 47) != Z_OK) /* 47: gzip or zlib, autodetected */
-    return 0;
-  zs.next_in = (const Bytef *) in;
-  zs.avail_in = (uInt) in_len;
-  zs.next_out = (Bytef *) out;
-  zs.avail_out = (uInt) out_len;
-  err = inflate(&zs, Z_SYNC_FLUSH);
-  if (err == Z_OK || err == Z_STREAM_END || err == Z_BUF_ERROR)
-    n = out_len - zs.avail_out;
-  inflateEnd(&zs);
-  return n;
-}
-#endif
-
 static size_t sniff_read_head(const char *path, void *buf, size_t len) {
   char catbuff[CATBUFF_SIZE];
   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
@@ -205,16 +183,12 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
       n = sniff_read_head(slot->tmpfile, buf, len);
   }
   if (n > 0 && r->compressed) {
-#if HTS_USEZLIB
     unsigned char raw[HTS_SNIFF_LEN];
 
     if (n > sizeof(raw))
       n = sizeof(raw);
     memcpy(raw, buf, n);
-    n = sniff_inflate_head(raw, n, buf, len);
-#else
-    n = 0;
-#endif
+    n = hts_codec_head(hts_codec_parse(r->contentencoding), raw, n, buf, len);
   }
   return n;
 }
