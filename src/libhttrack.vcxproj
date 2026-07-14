@@ -110,7 +110,6 @@
     <ClCompile Include="htscatchurl.c" />
     <ClCompile Include="htscharset.c" />
     <ClCompile Include="htscodec.c" />
-    <ClCompile Include="htsproxy.c" />
     <ClCompile Include="htsconcat.c" />
     <ClCompile Include="htscore.c" />
     <ClCompile Include="htscoremain.c" />
@@ -126,6 +125,7 @@
     <ClCompile Include="htsmodules.c" />
     <ClCompile Include="htsname.c" />
     <ClCompile Include="htsparse.c" />
+    <ClCompile Include="htsproxy.c" />
     <ClCompile Include="htsrobots.c" />
     <ClCompile Include="htsselftest.c" />
     <ClCompile Include="htssniff.c" />
