@@ -2111,6 +2111,17 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
                         "error: forbidden test with ftp link for back_add");
           return -1;            // erreur pas de test permis
         }
+        // the ftp client dials the origin itself: over socks that would bypass
+        // the proxy, so fail the link rather than leak the connection (#563)
+        if (back[p].r.req.proxy.active &&
+            hts_proxy_is_socks(back[p].r.req.proxy.name)) {
+          back[p].r.statuscode = STATUSCODE_NON_FATAL;
+          strcpybuff(back[p].r.msg,
+                     "ftp:// is not supported over a SOCKS proxy");
+          back[p].status = STATUS_READY;
+          back_set_finished(sback, p);
+          return 0;
+        }
         if (!(back[p].r.req.proxy.active && opt->ftp_proxy)) {  // connexion directe, gérée en thread
           FTPDownloadStruct *str =
             (FTPDownloadStruct *) malloc(sizeof(FTPDownloadStruct));
@@ -2713,13 +2724,40 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
           busy_state = 1;
 
+          // socks5: tunnel to the origin before anything is written, for http
+          // as well as https. Skip on a reused keep-alive socket (already
+          // tunneled) and on the post-TLS re-entry (ssl_con set) (#563).
+          if (back[i].r.req.proxy.active &&
+              hts_proxy_is_socks(back[i].r.req.proxy.name) &&
+              !back[i].r.keep_alive
+#if HTS_USEOPENSSL
+              && back[i].r.ssl_con == NULL
+#endif
+          ) {
+            const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
+
+            if (!socks5_handshake(opt, &back[i].r, back[i].url_adr, timeout)) {
+              if (!strnotempty(back[i].r.msg))
+                strcpybuff(back[i].r.msg, "SOCKS5 handshake failed");
+              deletehttp(&back[i].r);
+              back[i].r.soc = INVALID_SOCKET;
+              back[i].r.statuscode = STATUSCODE_NON_FATAL;
+              back[i].status = STATUS_READY;
+              back_set_finished(sback, i);
+              continue;
+            }
+          }
+
 #if HTS_USEOPENSSL
           /* SSL mode */
           if (back[i].r.ssl) {
             int tunnel_ok = 1;
 
-            // https via proxy: CONNECT-tunnel before TLS (#85)
-            if (back[i].r.req.proxy.active && back[i].r.ssl_con == NULL) {
+            // https via an http proxy: CONNECT-tunnel before TLS (#85); socks
+            // already carries the origin connection
+            if (back[i].r.req.proxy.active &&
+                !hts_proxy_is_socks(back[i].r.req.proxy.name) &&
+                back[i].r.ssl_con == NULL) {
               const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
 
               tunnel_ok =

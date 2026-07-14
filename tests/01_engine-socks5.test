@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# The SOCKS5 handshake framing and credential split, driven against scripted
+# server replies (frame draining, oversize rejects, RFC 1929 fields).
+
+httrack -O /dev/null '-#test=socks5' | grep -q "socks5 self-test OK"
