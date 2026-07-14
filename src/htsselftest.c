@@ -55,6 +55,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htssniff.h"
 #include "htscodec.h"
+#include "htsproxy.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
