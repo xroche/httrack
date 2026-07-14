@@ -52,10 +52,12 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * s
    oracle for the memoized matcher. */
 const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
                             int *size_flag);
-/* strjoker() reporting the work-budget steps it spent and the cap; test-only,
-   lets a self-test assert the budget bounds a hostile pattern's work. */
-const char *strjoker_steps(const char *chaine, const char *joker,
-                           size_t *nsteps_out, size_t *maxsteps_out);
+/* strjoker() reporting the work-budget steps and the recursion depth it spent,
+   with their caps; test-only, lets a self-test assert both bound a hostile
+   pattern (depth bounds the stack: an uncapped one overflows Windows' 1MB). */
+const char *strjoker_bounds(const char *chaine, const char *joker,
+                            size_t *nsteps_out, size_t *maxsteps_out,
+                            size_t *depth_out, size_t *maxdepth_out);
 const char *strjokerfind(const char *chaine, const char *joker);
 #endif
 

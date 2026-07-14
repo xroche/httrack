@@ -193,5 +193,13 @@ test "$(with_timeout httrack -O /dev/null -#test=filter "$pat" "$subj")" == "$su
 match '*[aX]X*[a]Y' 'aXaXaY'
 nomatch '*[aX]X*[a]Y' 'aXbXaY'
 
-# hostile patterns must not stack-overflow or hang: length + work caps
+# hostile patterns must not stack-overflow or hang: length + depth + work caps
 test "$(with_timeout httrack -O /dev/null -#test=filterbounds)" == "filterbounds: OK" || exit 1
+
+# and the depth cap must hold on the 1MB stack a Windows thread gets (#574):
+# uncapped, the same pattern recursed ~900KB deep. Skipped where 512K is too
+# small to even start the binary.
+if (ulimit -s 512 && httrack --version >/dev/null 2>&1); then
+    out=$(ulimit -s 512 && with_timeout httrack -O /dev/null -#test=filterbounds)
+    test "$out" == "filterbounds: OK" || exit 1
+fi

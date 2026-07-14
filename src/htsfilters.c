@@ -122,8 +122,11 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 }
 
 /* Real filters/URLs fit HTS_URLMAXSIZE*2; past it a hostile pattern recurses
-   O(len) deep or runs O(n^2*stars). Cap length (depth) and steps (work). */
+   O(len) deep or runs O(n^2*stars). Cap length, recursion depth and steps
+   (work): the length cap alone still allows ~2000 frames, ~900KB of stack,
+   which overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXLEN (HTS_URLMAXSIZE * 2)
+#define STRJOKER_MAXDEPTH 256u
 #define STRJOKER_MAXSTEPS 2000000u
 
 /* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
@@ -133,20 +136,28 @@ typedef struct strjoker_memo {
   size_t stride;                /* strlen(joker0) + 1 */
   unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
   size_t *nsteps; /* shared work counter; NULL: unbounded (oracle) */
+  size_t maxdepth; /* deepest recursion reached */
+  hts_boolean cut; /* a branch hit the depth cap: its failures are not final */
 } strjoker_memo;
 
-static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
-                                 const char *joker, LLint *size,
-                                 int *size_flag);
+static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
+                                 const char *joker, LLint *size, int *size_flag,
+                                 size_t depth);
 
 /* A pair that failed once fails forever (*size is only written on the success
    path), so record NULL results and cut the re-exploration. */
-static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
-                                const char *joker, LLint *size,
-                                int *size_flag) {
+static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
+                                const char *joker, LLint *size, int *size_flag,
+                                size_t depth) {
   size_t bit = 0;
   const char *adr;
 
+  if (depth > memo->maxdepth)
+    memo->maxdepth = depth;
+  if (depth >= STRJOKER_MAXDEPTH) {
+    memo->cut = HTS_TRUE;
+    return NULL; /* nesting beyond any real filter: fail the branch safely */
+  }
   if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
     return NULL; /* work budget spent: fail the match safely */
   if (memo->failed) {
@@ -155,8 +166,9 @@ static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
     if (memo->failed[bit >> 3] & (unsigned char) (1u << (bit & 7)))
       return NULL;
   }
-  adr = strjoker_impl(memo, chaine, joker, size, size_flag);
-  if (adr == NULL && memo->failed)
+  adr = strjoker_impl(memo, chaine, joker, size, size_flag, depth + 1);
+  /* a cut branch may fail here yet match when reached at a shallower depth */
+  if (adr == NULL && memo->failed && !memo->cut)
     memo->failed[bit >> 3] |= (unsigned char) (1u << (bit & 7));
   return adr;
 }
@@ -164,13 +176,15 @@ static const char *strjoker_rec(const strjoker_memo *memo, const char *chaine,
 /* Match chaine against joker with a shared work budget *nsteps (a strjokerfind
    sweep passes one counter, bounding the whole scan). */
 static const char *strjoker_bounded(const char *chaine, const char *joker,
-                                    LLint *size, int *size_flag,
-                                    size_t *nsteps) {
-  strjoker_memo memo = {chaine, joker, 0, NULL, nsteps};
+                                    LLint *size, int *size_flag, size_t *nsteps,
+                                    size_t *maxdepth) {
+  strjoker_memo memo = {chaine, joker, 0, NULL, nsteps, 0, HTS_FALSE};
   unsigned char stackbits[2048];
   hts_boolean onheap = HTS_FALSE;
   const char *adr;
 
+  if (maxdepth != NULL)
+    *maxdepth = 0;
   if (chaine != NULL && joker != NULL) {
     const size_t l1 = strlen(chaine), l2 = strlen(joker);
 
@@ -189,9 +203,11 @@ static const char *strjoker_bounded(const char *chaine, const char *joker,
       }
     }
   }
-  adr = strjoker_rec(&memo, chaine, joker, size, size_flag);
+  adr = strjoker_rec(&memo, chaine, joker, size, size_flag, 0);
   if (onheap)
     freet(memo.failed);
+  if (maxdepth != NULL)
+    *maxdepth = memo.maxdepth;
   return adr;
 }
 
@@ -202,34 +218,39 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
                                 LLint *size, int *size_flag) {
   size_t nsteps = 0;
 
-  return strjoker_bounded(chaine, joker, size, size_flag, &nsteps);
+  return strjoker_bounded(chaine, joker, size, size_flag, &nsteps, NULL);
 }
 
 /* Test-only oracle: the same matcher without the failure memo. */
 const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
                             int *size_flag) {
-  const strjoker_memo memo = {chaine, joker, 0, NULL};
+  strjoker_memo memo = {chaine, joker, 0, NULL, NULL, 0, HTS_FALSE};
 
-  return strjoker_rec(&memo, chaine, joker, size, size_flag);
+  return strjoker_rec(&memo, chaine, joker, size, size_flag, 0);
 }
 
-/* Test-only: strjoker() reporting the work-budget steps spent and the cap, so a
-   self-test can prove the budget bounds a hostile pattern's work. */
-const char *strjoker_steps(const char *chaine, const char *joker,
-                           size_t *nsteps_out, size_t *maxsteps_out) {
-  size_t nsteps = 0;
-  const char *r = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps);
+/* Test-only: strjoker() reporting the work and depth spent and their caps, so a
+   self-test can prove both bound a hostile pattern. */
+const char *strjoker_bounds(const char *chaine, const char *joker,
+                            size_t *nsteps_out, size_t *maxsteps_out,
+                            size_t *depth_out, size_t *maxdepth_out) {
+  size_t nsteps = 0, depth = 0;
+  const char *r = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps, &depth);
 
   if (nsteps_out != NULL)
     *nsteps_out = nsteps;
   if (maxsteps_out != NULL)
     *maxsteps_out = STRJOKER_MAXSTEPS;
+  if (depth_out != NULL)
+    *depth_out = depth;
+  if (maxdepth_out != NULL)
+    *maxdepth_out = STRJOKER_MAXDEPTH;
   return r;
 }
 
-static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
-                                 const char *joker, LLint *size,
-                                 int *size_flag) {
+static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
+                                 const char *joker, LLint *size, int *size_flag,
+                                 size_t depth) {
   if (strnotempty(joker) == 0) {        // fin de chaine joker
     if (strnotempty(chaine) == 0)       // fin aussi pour la chaine: ok
       return chaine;
@@ -403,7 +424,8 @@ static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
 
       // tester sans le joker (pas ()+ mais ()*)
       if (!unique) {
-        if ((adr = strjoker_rec(memo, chaine, joker + jmp, size, size_flag))) {
+        if ((adr = strjoker_rec(memo, chaine, joker + jmp, size, size_flag,
+                                depth))) {
           return adr;
         }
       }
@@ -416,7 +438,7 @@ static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
       while(i < (int) max) {
         if (pass[(int) (unsigned char) chaine[i]]) {    // caractère autorisé
           if ((adr = strjoker_rec(memo, chaine + i + 1, joker + jmp, size,
-                                  size_flag))) {
+                                  size_flag, depth))) {
             return adr;
           }
           i++;
@@ -427,7 +449,7 @@ static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
       // tester chaîne vide
       if (i != max + 2)         // avant c'est ok
         if ((adr = strjoker_rec(memo, chaine + max, joker + jmp, size,
-                                size_flag)))
+                                size_flag, depth)))
           return adr;
 
       return NULL;              // perdu
@@ -449,7 +471,8 @@ static const char *strjoker_impl(const strjoker_memo *memo, const char *chaine,
       // comparaison ok?
       if (ok) {
         // continuer la comparaison.
-        if (strjoker_rec(memo, chaine + jmp, joker + jmp, size, size_flag))
+        if (strjoker_rec(memo, chaine + jmp, joker + jmp, size, size_flag,
+                         depth))
           return chaine;        // retourner 1e lettre
       }
 
@@ -471,8 +494,8 @@ const char *strjokerfind(const char *chaine, const char *joker) {
   if (chaine != NULL && strlen(chaine) > STRJOKER_MAXLEN)
     return NULL;
   while(*chaine) {
-    if ((adr = strjoker_bounded(chaine, joker, NULL, NULL,
-                                &nsteps))) { // ok trouvé
+    if ((adr = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps,
+                                NULL))) { // ok trouvé
       return adr;
     }
     if (nsteps > STRJOKER_MAXSTEPS) // scan budget spent: no match
