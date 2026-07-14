@@ -46,6 +46,7 @@ TESTS = \
 	01_engine-header.test \
 	01_engine-idna.test \
 	01_engine-identurl.test \
+	01_engine-proxyurl.test \
 	01_engine-identabs.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
