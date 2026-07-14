@@ -577,9 +577,11 @@ PT_Index PT_LoadCache(const char *filename) {
           chain = coucal_enum_next(&en);
         }
         if (chain != NULL) {
-          if (!link_has_authority(chain->name))
-            strcat(index->slots.common.startUrl, "http://");
-          strcat(index->slots.common.startUrl, chain->name);
+          const char *scheme = link_has_authority(chain->name) ? "" : "http://";
+
+          snprintf(index->slots.common.startUrl,
+                   sizeof(index->slots.common.startUrl), "%s%s", scheme,
+                   chain->name);
         }
       }
     }
@@ -632,7 +634,7 @@ int PT_EnumCache(PT_Indexes indexes,
       const long int index_id = (long int) chain->value.intg;
       const char *const url = chain->name;
 
-      if (index_id >= 0 && index_id <= indexes->index_size) {
+      if (index_id >= 0 && index_id < indexes->index_size) {
         PT_Element item =
           PT_ReadCache(indexes->index[index_id], url,
                        FETCH_HEADERS | FETCH_BODY);
@@ -757,7 +759,7 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags) {
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
     if (coucal_read(indexes->cil, url, &index_id)) {
-      if (index_id >= 0 && index_id <= indexes->index_size) {
+      if (index_id >= 0 && index_id < indexes->index_size) {
         PT_Element item = PT_ReadCache(indexes->index[index_id], url, flags);
 
         if (item != NULL) {
@@ -780,7 +782,7 @@ int PT_LookupIndex(PT_Indexes indexes, const char *url) {
     if (strncmp(url, "http://", 7) == 0)
       url += 7;
     if (coucal_read(indexes->cil, url, &index_id)) {
-      if (index_id >= 0 && index_id <= indexes->index_size) {
+      if (index_id >= 0 && index_id < indexes->index_size) {
         return 1;
       } else {
         proxytrack_print_log(CRITICAL,
@@ -967,10 +969,12 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                 /* First link as starting URL */
                 if (!firstSeen) {
                   if (strstr(filenameIndex, "/robots.txt") == NULL) {
+                    const char *scheme =
+                        link_has_authority(filenameIndex) ? "" : "http://";
+
                     firstSeen = 1;
-                    if (!link_has_authority(filenameIndex))
-                      strcat(index->startUrl, "http://");
-                    strcat(index->startUrl, filenameIndex);
+                    snprintf(index->startUrl, sizeof(index->startUrl), "%s%s",
+                             scheme, filenameIndex);
                   }
                 }
               } else {
@@ -1102,7 +1106,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                           && (!isalpha(previous_save_[0]) || previous_save_[1] != ':')) // c:/home/foo/bar.gif
               ) {
               index->safeCache = 1;
-              sprintf(previous_save, "%s%s", index->path, previous_save_);
+              snprintf(previous_save, sizeof(previous_save), "%s%s",
+                       index->path, previous_save_);
             }
             // bogus format (includes buggy absolute path)
             else {
@@ -1127,15 +1132,16 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 int saveLen = (int) strlen(previous_save_);
 
                 if (index->fixedPath < saveLen) {
-                  sprintf(previous_save, "%s%s", index->path,
-                          previous_save_ + index->fixedPath);
+                  snprintf(previous_save, sizeof(previous_save), "%s%s",
+                           index->path, previous_save_ + index->fixedPath);
                 } else {
                   snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                           previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                sprintf(previous_save, "%s%s", index->path, previous_save_);
+                snprintf(previous_save, sizeof(previous_save), "%s%s",
+                         index->path, previous_save_);
               }
             }
           }
@@ -1348,22 +1354,37 @@ static int PT_SaveCache__New(PT_Indexes indexes, const char *filename) {
 /* Old HTTrack cache (dat/ndx) format                           */
 /* ------------------------------------------------------------ */
 
-static int cache_brstr(char *adr, char *s) {
+static int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
-  char buff[256 + 1];
+  char buff[256 + 4];
 
   off = binput(adr, buff, 256);
-  adr += off;
-  sscanf(buff, "%d", &i);
-  if (i > 0)
-    strncpy(s, adr, i);
-  *(s + i) = '\0';
-  off += i;
+  /* binput stops at adr's terminating NUL; a value only follows a real line
+     terminator, so never step past end-of-buffer. */
+  if (adr[off - 1] == '\0') {
+    s[0] = '\0';
+    return off - 1;
+  }
+  /* an empty/non-numeric field leaves i unset: treat as length 0 */
+  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > 32768)
+    i = 0;
+  if (i > 0) {
+    /* a corrupt cache may declare a length past the buffer end; bound the copy
+       and the advance to the bytes actually present */
+    const size_t avail = strnlen(adr + off, (size_t) i);
+    const size_t store = avail < s_size ? avail : s_size - 1;
+
+    memcpy(s, adr + off, store);
+    s[store] = '\0';
+    off += (int) avail;
+  } else {
+    s[0] = '\0';
+  }
   return off;
 }
 
-static void cache_rstr(FILE * fp, char *s) {
+static void cache_rstr(FILE *fp, char *s, size_t s_size) {
   INTsys i = 0;
   char buff[256 + 4];
 
@@ -1372,11 +1393,22 @@ static void cache_rstr(FILE * fp, char *s) {
   if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
     i = 0;
   if (i > 0) {
-    if ((int) fread(s, 1, i, fp) != i) {
+    /* store at most s_size-1 bytes, but consume all i bytes so the next field
+       stays aligned when a tampered cache declares more than the destination
+       holds */
+    const size_t want = (size_t) i;
+    const size_t store = want < s_size ? want : s_size - 1;
+
+    if (fread(s, 1, store, fp) != store) {
       assertf(! "fread_cache_failed");
     }
+    if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0) {
+      assertf(!"fseek_cache_failed");
+    }
+    s[store] = '\0';
+  } else {
+    s[0] = '\0';
   }
-  *(s + i) = '\0';
 }
 
 static char *cache_rstr_addr(FILE * fp) {
@@ -1400,19 +1432,31 @@ static char *cache_rstr_addr(FILE * fp) {
   return addr;
 }
 
+/* Allocate n+1 bytes for an n-byte cache body, rejecting a hostile/corrupt
+   length that would demand an absurd allocation or wrap n+1. NULL on refuse. */
+static char *cache_alloc_body(size_t n) {
+  if (n >= (size_t) INT32_MAX)
+    return NULL;
+  return (char *) malloc(n + 1);
+}
+
 static void cache_rint(FILE * fp, int *i) {
   char s[256];
 
-  cache_rstr(fp, s);
-  sscanf(s, "%d", i);
+  cache_rstr(fp, s, sizeof(s));
+  if (sscanf(s, "%d", i) != 1)
+    *i = 0;
 }
 
 static void cache_rLLint(FILE * fp, unsigned long *i) {
   int l;
   char s[256];
 
-  cache_rstr(fp, s);
-  sscanf(s, "%d", &l);
+  cache_rstr(fp, s, sizeof(s));
+  /* reject a non-numeric or negative field: a negative length cast to unsigned
+     would wrap a later malloc(size+1) to a tiny buffer */
+  if (sscanf(s, "%d", &l) != 1 || l < 0)
+    l = 0;
   *i = (unsigned long) l;
 }
 
@@ -1472,12 +1516,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
         char *a = use;
 
         use[ndxSize] = '\0';
-        a += cache_brstr(a, firstline);
+        a += cache_brstr(a, firstline, sizeof(firstline));
         if (strncmp(firstline, "CACHE-", 6) == 0) {     // Nouvelle version du cache
           if (strncmp(firstline, "CACHE-1.", 8) == 0) { // Version 1.1x
             cache->version = (int) (firstline[8] - '0');        // cache 1.x
             if (cache->version <= 5) {
-              a += cache_brstr(a, firstline);
+              a += cache_brstr(a, firstline, sizeof(firstline));
               strcpy(cache->lastmodified, firstline);
             } else {
               fclose(cache->dat);
@@ -1623,9 +1667,13 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           String urlDecoded;
 
           r->statuscode = old_r.statuscode;
-          r->size = old_r.size; // taille fichier
-          strcpy(r->msg, old_r.msg);
-          strcpy(r->contenttype, old_r.contenttype);
+          r->size = old_r.size > 0 ? (size_t) old_r.size : 0; // taille fichier
+          /* these fixed fields come straight from fread and carry no guaranteed
+             NUL; terminate them before the bounded copy */
+          old_r.msg[sizeof(old_r.msg) - 1] = '\0';
+          old_r.contenttype[sizeof(old_r.contenttype) - 1] = '\0';
+          strcpybuff(r->msg, old_r.msg);
+          strcpybuff(r->contenttype, old_r.contenttype);
 
           /* Guess the destination filename.. this sucks, because this method is not reliable.
              Yes, the old 1.0 cache format was *that* bogus. /rx */
@@ -1666,26 +1714,27 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
         cache_rint(cache->dat, &r->statuscode);
         cache_rLLint(cache->dat, &size_);
         r->size = (size_t) size_;
-        cache_rstr(cache->dat, r->msg);
-        cache_rstr(cache->dat, r->contenttype);
+        cache_rstr(cache->dat, r->msg, sizeof(r->msg));
+        cache_rstr(cache->dat, r->contenttype, sizeof(r->contenttype));
         if (cache->version >= 3)
-          cache_rstr(cache->dat, r->charset);
-        cache_rstr(cache->dat, r->lastmodified);
-        cache_rstr(cache->dat, r->etag);
-        cache_rstr(cache->dat, r->location);
+          cache_rstr(cache->dat, r->charset, sizeof(r->charset));
+        cache_rstr(cache->dat, r->lastmodified, sizeof(r->lastmodified));
+        cache_rstr(cache->dat, r->etag, sizeof(r->etag));
+        cache_rstr(cache->dat, r->location, sizeof(location_default));
         if (cache->version >= 2)
-          cache_rstr(cache->dat, r->cdispo);
+          cache_rstr(cache->dat, r->cdispo, sizeof(r->cdispo));
         if (cache->version >= 4) {
-          cache_rstr(cache->dat, previous_save_);       // adr
-          cache_rstr(cache->dat, previous_save_);       // fil
+          cache_rstr(cache->dat, previous_save_, sizeof(previous_save_)); // adr
+          cache_rstr(cache->dat, previous_save_, sizeof(previous_save_)); // fil
           previous_save[0] = '\0';
-          cache_rstr(cache->dat, previous_save_);       // save
+          cache_rstr(cache->dat, previous_save_,
+                     sizeof(previous_save_)); // save
         }
         if (cache->version >= 5) {
           r->headers = cache_rstr_addr(cache->dat);
         }
         //
-        cache_rstr(cache->dat, check);
+        cache_rstr(cache->dat, check, sizeof(check));
         if (strcmp(check, "HTS") == 0) {        /* intégrité OK */
           ok = 1;
         }
@@ -1714,7 +1763,8 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                                         && (!isalpha(previous_save_[0]) || previous_save_[1] != ':'))   // c:/home/foo/bar.gif
             ) {
             index->safeCache = 1;
-            sprintf(previous_save, "%s%s", index->path, previous_save_);
+            snprintf(previous_save, sizeof(previous_save), "%s%s", index->path,
+                     previous_save_);
           }
           // bogus format (includes buggy absolute path)
           else {
@@ -1739,15 +1789,16 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               int saveLen = (int) strlen(previous_save_);
 
               if (index->fixedPath < saveLen) {
-                sprintf(previous_save, "%s%s", index->path,
-                        previous_save_ + index->fixedPath);
+                snprintf(previous_save, sizeof(previous_save), "%s%s",
+                         index->path, previous_save_ + index->fixedPath);
               } else {
                 snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                         previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
               }
             } else {
-              sprintf(previous_save, "%s%s", index->path, previous_save_);
+              snprintf(previous_save, sizeof(previous_save), "%s%s",
+                       index->path, previous_save_);
             }
           }
         }
@@ -1764,7 +1815,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               FILE *fp = fopen(previous_save, "rb");
 
               if (fp != NULL) {
-                r->adr = (char *) malloc(r->size + 1);
+                r->adr = cache_alloc_body(r->size);
                 if (r->adr != NULL) {
                   if (r->size > 0 && fread(r->adr, 1, r->size, fp) != r->size) {
                     r->statuscode = STATUSCODE_INVALID;
@@ -1784,7 +1835,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           } else {
             // lire fichier (d'un coup)
             if (flags & FETCH_BODY) {
-              r->adr = (char *) malloc(r->size + 1);
+              r->adr = cache_alloc_body(r->size);
               if (r->adr != NULL) {
                 if (fread(r->adr, 1, r->size, cache->dat) != r->size) { // erreur
                   free(r->adr);

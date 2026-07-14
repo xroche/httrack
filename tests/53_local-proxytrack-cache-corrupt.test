@@ -1,0 +1,21 @@
+#!/bin/bash
+# A corrupt proxytrack .ndx must not overflow the fixed cache-read buffers. The
+# sanitizer CI build turns any regression here into a hard stack/heap overflow.
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# The first length-prefixed field declares far more than firstline[256] holds;
+# cache_brstr must clamp the copy to the destination, not the declared length.
+{
+    printf '4000\n'
+    head -c 4000 /dev/zero | tr '\0' 'A'
+} >"$dir/foo.ndx"
+: >"$dir/foo.dat" # cache_brstr runs only when the sibling .dat opens
+
+proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack crashed/errored on a corrupt cache index"
+    exit 1
+}
