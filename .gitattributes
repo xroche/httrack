@@ -1,3 +1,8 @@
 # Resource scripts are Windows tooling input and must stay CRLF: the engine has no
 # encoding guard, so an autocrlf checkout could otherwise flatten them silently.
 *.rc text eol=crlf
+
+# The test scripts run under Git Bash on the Windows CI; a CRLF checkout makes
+# bash die on $'\r' on every line of them.
+*.test text eol=lf
+*.sh text eol=lf
