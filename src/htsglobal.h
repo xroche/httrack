@@ -324,12 +324,13 @@ typedef int64_t TStamp;
 
 /* Integer type for file offsets/sizes passed to the C library. Widens to
    LLint (with HTS_FSEEKO for fseeko/ftello) under large-file support, plain
-   int otherwise; INTsysP is its printf conversion. */
-#ifdef LFS_FLAG
+   int otherwise; INTsysP is its printf conversion. MSVC has no LFS_FLAG but
+   ships the 64-bit _stat64/_fseeki64 family (aliased in htslib.h). */
+#if defined(LFS_FLAG) || defined(_MSC_VER)
 typedef LLint INTsys;
 
 #define INTsysP LLintP
-#ifdef __linux
+#if defined(__linux) || defined(_MSC_VER)
 #define HTS_FSEEKO
 #endif
 #else

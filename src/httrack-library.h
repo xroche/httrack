@@ -743,7 +743,8 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
 
 #define STAT hts_stat_utf8
-typedef struct _stat STRUCT_STAT;
+/* _stat64: _stat's st_size is a 32-bit long, even in x64 builds */
+typedef struct _stat64 STRUCT_STAT;
 
 HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT *buf);
 

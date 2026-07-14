@@ -356,7 +356,7 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
       FILE *fp;
 
       // On recopie le fichier->.
-      off_t file_size = fsize_utf8(fconv(catbuff, sizeof(catbuff), url_save));
+      LLint file_size = fsize_utf8(fconv(catbuff, sizeof(catbuff), url_save));
 
       if (file_size >= 0) {
         fp = FOPEN(fconv(catbuff, sizeof(catbuff), url_save), "rb");
@@ -1269,7 +1269,7 @@ char *readfile2(const char *fil, LLint * size) {
 char *readfile_utf8(const char *fil) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
-  const off_t len = fsize_utf8(fil);
+  const LLint len = fsize_utf8(fil);
 
   if (len >= 0) {               // exists
     FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), fil), "rb");

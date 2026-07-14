@@ -855,7 +855,7 @@ int httpmirror(char *url1, httrackp * opt) {
       char *filelist_buff = NULL;
       size_t filelist_sz = 0;
       const char *filelist_err = NULL; /* failure reason, NULL on success */
-      const off_t fs = fsize(StringBuff(opt->filelist));
+      const LLint fs = fsize(StringBuff(opt->filelist));
 
       if (fs < 0) {
         /* fsize() hides the cause; redo stat() for a precise errno (#49) */
@@ -863,7 +863,7 @@ int httpmirror(char *url1, httrackp * opt) {
         filelist_err = stat(StringBuff(opt->filelist), &st) != 0
                            ? strerror(errno)
                            : "not a regular file";
-      } else if ((filelist_sz = off_t_to_size_t(fs)) == (size_t) -1) {
+      } else if ((filelist_sz = llint_to_size_t(fs)) == (size_t) -1) {
         filelist_err = "file too large";
         filelist_sz = 0;
       } else {
@@ -2089,10 +2089,9 @@ int httpmirror(char *url1, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                "hts-cache/old.lst"), "rb");
       if (old_lst) {
-        const size_t sz =
-          off_t_to_size_t(fsize(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                 "hts-cache/new.lst")));
+        const size_t sz = llint_to_size_t(
+            fsize(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-cache/new.lst")));
         new_lst =
           fopen(fconcat
                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),

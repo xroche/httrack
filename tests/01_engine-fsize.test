@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# File sizes past the 2GB signed-32-bit wrap ('httrack -#test=fsize <dir>').
+# Uses a sparse file, so it costs no real disk.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+out=$(httrack -#test=fsize "$dir")
+echo "$out"
+
+test "$out" == "fsize: width=8 size=3221225472 psize=3221225472" || {
+    echo "FAIL: unexpected size report"
+    exit 1
+}

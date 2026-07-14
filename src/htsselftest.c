@@ -1024,7 +1024,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
 
   /* produce random patterns, or read from a file */
   if (sscanf(snum, "%lu", &count) != 1) {
-    const off_t size = fsize(snum);
+    const LLint size = fsize(snum);
     FILE *fp = fopen(snum, "rb");
     if (fp != NULL) {
       buff = malloct(size);
@@ -1490,6 +1490,64 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
          hts_sniff_mime_known(argv[0]) == HTS_TRUE,
          hts_sniff_mime_consistent(body, n, argv[0]) == HTS_TRUE);
   return 0;
+}
+
+/* fsize()/fpsize() must report a size past 2GB, where a 32-bit off_t wraps
+   (MSVC's off_t and struct _stat st_size are long, 32-bit even on x64). */
+static int st_fsize(httrackp *opt, int argc, char **argv) {
+  const LLint expected = 3 * 1024 * 1024 * 1024LL;
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  const int width = (int) sizeof(fsize_utf8(""));
+  FILE *fp;
+  LLint got, gotp;
+  int rc = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "fsize: needs a directory\n");
+    return 1;
+  }
+  concat(path, sizeof(path), argv[0], "/sparse-3g.bin");
+
+  /* sparse: seek past 2GB and write the last byte */
+  fp = FOPEN(path, "wb");
+  if (fp == NULL) {
+    fprintf(stderr, "fsize: cannot create '%s'\n", path);
+    return 1;
+  }
+  if (fseeko(fp, expected - 1, SEEK_SET) != 0 || fputc(0, fp) == EOF) {
+    fprintf(stderr, "fsize: cannot extend '%s' to " LLintP "\n", path,
+            expected);
+    fclose(fp);
+    UNLINK(path);
+    return 1;
+  }
+  fclose(fp);
+
+  got = fsize_utf8(path);
+  fp = FOPEN(path, "rb");
+  gotp = fp != NULL ? fpsize(fp) : -1;
+  if (fp != NULL)
+    fclose(fp);
+  UNLINK(path);
+
+  printf("fsize: width=%d size=" LLintP " psize=" LLintP "\n", width, got,
+         gotp);
+  if (width != 8) {
+    fprintf(stderr, "fsize: return type is %d bytes, expected 8\n", width);
+    rc = 1;
+  }
+  if (got != expected) {
+    fprintf(stderr, "fsize: fsize_utf8 is " LLintP ", expected " LLintP "\n",
+            got, expected);
+    rc = 1;
+  }
+  if (gotp != expected) {
+    fprintf(stderr, "fsize: fpsize is " LLintP ", expected " LLintP "\n", gotp,
+            expected);
+    rc = 1;
+  }
+  return rc;
 }
 
 static int st_savename(httrackp *opt, int argc, char **argv) {
@@ -2771,6 +2829,7 @@ static const struct selftest_entry {
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
+    {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},
