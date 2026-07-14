@@ -757,7 +757,7 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   const size_t subjlen = 2048;
   char *subj = malloct(big + 1);
   char *pat = malloct(2 * stars + 2);
-  size_t steps = 0, maxsteps = 0, i;
+  size_t steps = 0, maxsteps = 0, depth = 0, maxdepth = 0, i;
 
   (void) opt;
   (void) argc;
@@ -778,9 +778,22 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   subj[subjlen] = '\0';
   /* Budget must fire and hold: steps > cap (deleting the budget zeroes the
      counter that is the enforcement), steps < 10*cap (unbudgeted ~1.26e9). */
-  assertf(strjoker_steps(subj, pat, &steps, &maxsteps) == NULL);
+  assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, &depth, &maxdepth) ==
+          NULL);
   assertf(steps > maxsteps && steps < 10 * maxsteps);
+  /* Depth caps the stack: uncapped this recurses 2046 frames, ~900KB (#574). */
+  assertf(depth == maxdepth);
   assertf(strjokerfind(subj, pat) == NULL);
+  /* Pin the cap from below: 32 segments must still match, so a cap set so low
+     it would break real multi-segment filters (which use far fewer) fails. */
+  for (i = 0; i < 32; i++) {
+    pat[2 * i] = '*';
+    pat[2 * i + 1] = 'a';
+  }
+  pat[64] = '\0';
+  memset(subj, 'a', 32);
+  subj[32] = '\0';
+  assertf(strjoker(subj, pat, NULL, NULL) != NULL);
   freet(pat);
   freet(subj);
   printf("filterbounds: OK\n");
