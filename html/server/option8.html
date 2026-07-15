@@ -103,6 +103,12 @@ ${do:end-if}
 > ${LANG_I58}
 <br><br>
 
+${LANG_COOKIEFILE}
+<input name="cookiesfile" value="${cookiesfile}" size="40"
+			onMouseOver="info('${html:LANG_COOKIEFILETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<br><br>
+
 ${LANG_I59}
 <br>
 <select name="checktype"
@@ -134,6 +140,27 @@ ${listid:robots:LISTDEF_8}
 <input type="checkbox" name="urlhack" ${checked:urlhack}
 			onMouseOver="info('${html:LANG_I1k2}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I62b2}
+<br><br>
+
+<input type="checkbox" name="keepwww" ${checked:keepwww}
+			onMouseOver="info('${html:LANG_KEEPWWWTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_KEEPWWW}
+<br><br>
+
+<input type="checkbox" name="keepslashes" ${checked:keepslashes}
+			onMouseOver="info('${html:LANG_KEEPSLASHESTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_KEEPSLASHES}
+<br><br>
+
+<input type="checkbox" name="keepqueryorder" ${checked:keepqueryorder}
+			onMouseOver="info('${html:LANG_KEEPQUERYORDERTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_KEEPQUERYORDER}
+<br><br>
+
+${LANG_STRIPQUERY}
+<input name="stripquery" value="${stripquery}" size="40"
+			onMouseOver="info('${html:LANG_STRIPQUERYTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
 <br><br>
 
 <input type="checkbox" name="toler" ${checked:toler}

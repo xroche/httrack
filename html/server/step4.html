@@ -178,6 +178,12 @@ ${do:end-if}
 	${test:parsejava:--parse-java=0:}
 	${test:updhack:--updatehack}
 	${test:urlhack:--urlhack=0:--urlhack}
+	${test:keepwww:--keep-www-prefix}
+	${test:keepslashes:--keep-double-slashes}
+	${test:keepqueryorder:--keep-query-order}
+	${test:cookiesfile:--cookies-file "}${html:cookiesfile}${test:cookiesfile:"}
+	${test:pausefiles:--pause "}${pausefiles}${test:pausefiles:"}
+	${test:stripquery:--strip-query "}${html:stripquery}${test:stripquery:"}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
@@ -186,7 +192,7 @@ ${do:end-if}
 	${test:logtype:::--extra-log:--debug-log}
 	${test:index:--index=0:}
 	${test:index2:--search-index=0:--search-index}
-	${test:prox:--proxy "}${prox}${test:prox:\3A}${portprox}${test:prox:"}
+	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype:socks5\3A//}${do:end-if}${do:output-mode:html}${prox}${test:prox:\3A}${portprox}${test:prox:"}
 	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
 </textarea>
 
@@ -219,15 +225,21 @@ NoPwdInPages=${ztest:hidepwd:0:1}
 NoQueryStrings=${ztest:hidequery:0:1}
 NoPurgeOldFiles=${ztest:nopurge:0:1}
 Cookies=${ztest:cookies:0:1}
+CookiesFile=${cookiesfile}
 CheckType=${ztest:checktype:0:1:2}
 ParseJava=${ztest:parsejava:0:1}
 HTTP10=${ztest:http10:0:1}
 TolerantRequests=${ztest:toler:0:1}
 UpdateHack=${ztest:updhack:0:1}
 URLHack=${ztest:urlhack:0:1}
+KeepWww=${ztest:keepwww:0:1}
+KeepSlashes=${ztest:keepslashes:0:1}
+KeepQueryOrder=${ztest:keepqueryorder:0:1}
+StripQuery=${stripquery}
 StoreAllInCache=${ztest:cache2:0:1}
 LogType=${logtype}
 UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
+ProxyType=${proxytype}
 Build=${build}
 PrimaryScan=${filter}
 Travel=${travel}
@@ -238,6 +250,7 @@ MaxHtml=${maxhtml}
 MaxOther=${othermax}
 MaxAll=${sizemax}
 MaxWait=${pausebytes}
+PauseFiles=${pausefiles}
 Sockets=${connexion}
 Retry=${retry}
 MaxTime=${maxtime}
