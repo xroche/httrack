@@ -46,6 +46,12 @@ jobs:
           # fopen's umask-controlled 0666 is intended for mirror/cache/log
           # output; the one credential file (cookies.txt) is kept 0600 on Unix.
           config: |
+            paths-ignore:
+              # Demo callback samples, not part of libhttrack.
+              - libtest
+              # ProxyTrack: a separate legacy binary with no auth surface; its
+              # recv/cache-parse code trips taint queries by design.
+              - src/proxy
             query-filters:
               - exclude:
                   id: cpp/world-writable-file-creation
