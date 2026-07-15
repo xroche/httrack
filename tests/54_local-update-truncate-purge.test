@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# An --update re-fetch that comes in short must not delete the mirrored file (#562).
+# Pass 1 mirrors page.html (in-memory) and file.bin (direct-to-disk); pass 2 serves
+# both with the full declared Content-Length but half the body, then closes. httrack
+# refuses the partial ("will be retried") — and unfixed, the end-of-update purge then
+# deletes the good pass-1 copy, which was never overwritten. stay.html is the control:
+# fully served both passes, it must update to V2.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --log-found 'incomplete transfer.*uptrunc/page\.html' \
+    --log-found 'incomplete transfer.*uptrunc/file\.bin' \
+    --file-matches 'uptrunc/page.html' 'MIRRORED-PAGE-V1' \
+    --file-matches 'uptrunc/file.bin' 'MIRRORED-BIN-V1' \
+    --file-min-bytes 'uptrunc/file.bin' 32768 \
+    --file-matches 'uptrunc/stay.html' 'STAY-V2' \
+    --file-not-matches 'uptrunc/stay.html' 'STAY-V1' \
+    httrack 'BASEURL/uptrunc/index.html'

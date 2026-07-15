@@ -130,6 +130,7 @@ TESTS = \
 	50_local-contentcodings.test \
 	51_local-update-codec.test \
 	52_local-socks5.test \
-	53_local-proxytrack-cache-corrupt.test
+	53_local-proxytrack-cache-corrupt.test \
+	54_local-update-truncate-purge.test
 
 CLEANFILES = check-network_sh.cache

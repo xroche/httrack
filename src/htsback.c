@@ -628,6 +628,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                       back[p].r.size, back[p].url_adr, back[p].url_fil);
       }
       back_finalize_backup(opt, &back[p], HTS_FALSE);
+      /* Keep the surviving copy in new.lst, else the update purge drops the
+         file we refused to overwrite with the partial body (#562). */
+      if (fexist_utf8(back[p].url_sav))
+        filenote(&opt->state.strc, back[p].url_sav, NULL);
       return -1;
     }
 
