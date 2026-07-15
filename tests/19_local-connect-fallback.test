@@ -31,11 +31,6 @@ GNU | GNU/*)
     exit 77
     ;;
 esac
-# TODO: drop once https://github.com/xroche/httrack/issues/579 is fixed.
-if is_windows; then
-    echo "Windows: the connect fallback never runs (#579), skipping"
-    exit 77
-fi
 
 server=$(nativepath "$top_srcdir/tests/local-server.py")
 root=$(nativepath "$top_srcdir/tests/server-root")
