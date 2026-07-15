@@ -132,6 +132,7 @@ TESTS = \
 	52_local-socks5.test \
 	53_local-proxytrack-cache-corrupt.test \
 	54_local-update-truncate-purge.test \
-	55_local-chunked.test
+	55_local-chunked.test \
+	56_local-proxy-noleak.test
 
 CLEANFILES = check-network_sh.cache
