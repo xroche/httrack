@@ -12,14 +12,17 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver list/override is IPv6-only), skipping"
     exit 77
 fi
-if ! command -v python3 >/dev/null 2>&1; then
+python=$(find_python) || {
     echo "python3 missing, skipping"
     exit 77
-fi
+}
 # The fixture needs a second loopback IP (dead 127.0.0.2 + live 127.0.0.1) for
 # the fallback to have a target; GNU/Hurd has only 127.0.0.1, so skip there.
 case "$(uname -s)" in
@@ -28,24 +31,26 @@ GNU | GNU/*)
     exit 77
     ;;
 esac
+# TODO: drop once https://github.com/xroche/httrack/issues/579 is fixed.
+if is_windows; then
+    echo "Windows: the connect fallback never runs (#579), skipping"
+    exit 77
+fi
 
-server="$top_srcdir/tests/local-server.py"
-root="$top_srcdir/tests/server-root"
+server=$(nativepath "$top_srcdir/tests/local-server.py")
+root=$(nativepath "$top_srcdir/tests/server-root")
 tmpdir=$(mktemp -d)
 serverpid=
 
 cleanup() {
-    if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null || true
-        wait "$serverpid" 2>/dev/null || true
-    fi
+    stop_server "$serverpid"
     rm -rf "$tmpdir"
     return 0
 }
 trap cleanup EXIT
 
 # bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
-python3 "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+"$python" "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do

@@ -8,11 +8,15 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
 if test "${HTTPS_SUPPORT:-}" == "no"; then
     echo "no https support compiled, skipping"
     exit 77
 fi
-if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+python=$(find_python) || python=
+if test -z "$python" || ! command -v openssl >/dev/null 2>&1; then
     echo "python3/openssl missing, skipping"
     exit 77
 fi
@@ -20,13 +24,13 @@ fi
 # a .invalid name never resolves (RFC 6761): reaching the page at all proves the
 # proxy did the DNS
 host="socks-origin.invalid"
-server="$top_srcdir/tests/socks5-server.py"
+server=$(nativepath "$top_srcdir/tests/socks5-server.py")
 tmpdir=$(mktemp -d)
 pids=
 
 cleanup() {
     for pid in $pids; do
-        kill "$pid" 2>/dev/null || true
+        stop_server "$pid"
     done
     rm -rf "$tmpdir"
 }
@@ -39,10 +43,13 @@ cat "$tmpdir/key.pem" "$tmpdir/cert.pem" >"$tmpdir/both.pem"
 
 # start_server <logdir> <mode>: sets $tls_port/$http_port/$socks_port
 start_server() {
-    local dir="$1" mode="$2" ports
+    local dir="$1" mode="$2" ports pem
     mkdir -p "$dir"
     ports="$dir/ports.txt"
-    python3 "$server" "$tmpdir/both.pem" "$dir" "$mode" \
+    pem=$(nativepath "$tmpdir/both.pem")
+    dir_native=$(nativepath "$dir")
+    : >"$ports"
+    "$python" "$server" "$pem" "$dir_native" "$mode" \
         >"$ports" 2>"$dir/server.err" &
     pids="$pids $!"
     for _ in $(seq 1 100); do

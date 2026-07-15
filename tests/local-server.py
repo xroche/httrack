@@ -18,6 +18,7 @@ import base64
 import gzip
 import hashlib
 import os
+import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit
@@ -1817,7 +1818,8 @@ def main():
         httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
 
     port = httpd.socket.getsockname()[1]
-    # The launcher reads this line to discover the ephemeral port.
+    # Keep the port line the launcher parses LF: Windows would emit \r\n.
+    sys.stdout.reconfigure(newline="\n")
     print(f"PORT {port}", flush=True)
 
     try:

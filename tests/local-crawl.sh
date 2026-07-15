@@ -38,6 +38,8 @@
 set -u
 
 testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
 server="${testdir}/local-server.py"
 root="${LOCAL_SERVER_ROOT:-${testdir}/server-root}"
 cert="${testdir}/server.crt"
@@ -72,12 +74,8 @@ function cleanup {
         kill -9 "$crawlpid" 2>/dev/null
         crawlpid=
     fi
-    if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null
-        # Reap it so the port is released before we rm the tmpdir/log.
-        wait "$serverpid" 2>/dev/null
-        serverpid=
-    fi
+    stop_server "$serverpid"
+    serverpid=
     if test -n "$tmpdir" && test -d "$tmpdir"; then
         test -n "$nopurge" || rm -rf "$tmpdir"
     fi
@@ -96,7 +94,7 @@ nopurge=
 trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention.
-command -v python3 >/dev/null || ! echo "python3 not found; skipping local crawl tests" || exit 77
+python=$(find_python) || ! echo "python3 not found; skipping local crawl tests" >&2 || exit 77
 
 tmptopdir=${TMPDIR:-/tmp}
 test -d "$tmptopdir" || mkdir -p "$tmptopdir" || die "no temporary directory; set TMPDIR"
@@ -158,12 +156,12 @@ done
 # --- start the server --------------------------------------------------------
 test -r "$server" || die "cannot read $server"
 serverlog="${tmpdir}/server.log"
-serverargs=(--root "$root")
+serverargs=(--root "$(nativepath "$root")")
 if test -n "$tls"; then
-    serverargs+=(--tls --cert "$cert" --key "$key")
+    serverargs+=(--tls --cert "$(nativepath "$cert")" --key "$(nativepath "$key")")
 fi
-debug "starting python3 $server ${serverargs[*]}"
-python3 "$server" "${serverargs[@]}" >"$serverlog" 2>&1 &
+debug "starting $python $server ${serverargs[*]}"
+"$python" "$(nativepath "$server")" "${serverargs[@]}" >"$serverlog" 2>&1 &
 serverpid=$!
 
 # Wait for the "PORT <n>" line (server prints it once bound).
@@ -203,7 +201,7 @@ if test "${#cookies[@]}" -gt 0; then
 fi
 
 # --- run httrack -------------------------------------------------------------
-which httrack >/dev/null || die "could not find httrack"
+command -v httrack >/dev/null || die "could not find httrack"
 ver=$(httrack -O /dev/null --version | sed -e 's/HTTrack version //')
 test -n "$ver" || die "could not run httrack"
 
@@ -278,8 +276,7 @@ if test -n "$rerun_dead"; then
     test -s "$zip" || die "no cache was written by the first pass"
     cp "$zip" "${tmpdir}/cache-before.zip"
     cp "${out}/hts-log.txt" "${tmpdir}/log-before.txt"
-    kill "$serverpid" 2>/dev/null
-    wait "$serverpid" 2>/dev/null
+    stop_server "$serverpid"
     serverpid=
     info "re-running httrack against the stopped server"
     httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
@@ -441,12 +438,18 @@ while test "$i" -lt "${#audit[@]}"; do
     --file-mode)
         path="${audit[$((i + 1))]}"
         i=$((i + 2))
-        mode=$(stat -c '%a' "${hostroot}/${path}" 2>/dev/null ||
-            stat -f '%Lp' "${hostroot}/${path}" 2>/dev/null)
-        info "checking ${path} mode ${mode:-none} is ${audit[$i]}"
-        if test "$mode" = "${audit[$i]}"; then result "OK"; else
-            result "wrong mode"
-            exit 1
+        if is_windows; then
+            # No POSIX modes, and the engine only chmods #ifndef _WIN32.
+            info "checking ${path} mode"
+            result "SKIP (no POSIX modes)"
+        else
+            mode=$(stat -c '%a' "${hostroot}/${path}" 2>/dev/null ||
+                stat -f '%Lp' "${hostroot}/${path}" 2>/dev/null)
+            info "checking ${path} mode ${mode:-none} is ${audit[$i]}"
+            if test "$mode" = "${audit[$i]}"; then result "OK"; else
+                result "wrong mode"
+                exit 1
+            fi
         fi
         ;;
     esac

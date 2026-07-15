@@ -8,25 +8,34 @@ set -u
 
 : "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
-server="${testdir}/local-server.py"
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
 
-command -v python3 >/dev/null || ! echo "python3 not found; skipping" || exit 77
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+# The resume needs a graceful pass-1 interrupt (a clean cache), which MSYS can't
+# deliver to a native exe, and the restart-whole path fails on a repaired cache
+# (#581); TODO: drop once that lands.
+if is_windows; then
+    echo "Windows: interrupted-resume restart fails on a repaired cache (#581), skipping"
+    exit 77
+fi
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crangemem.XXXXXX") || exit 1
 serverpid=
 crawlpid=
 cleanup() {
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    if test -n "$serverpid"; then
-        kill "$serverpid" 2>/dev/null
-        wait "$serverpid" 2>/dev/null
-    fi
+    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 serverlog="${tmpdir}/server.log"
-python3 "$server" --root "${testdir}/server-root" >"$serverlog" 2>&1 &
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
 serverpid=$!
 port=
 for _ in $(seq 1 50); do
@@ -77,7 +86,14 @@ echo "OK (temp-ref present)"
 
 # --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
 printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
-httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1
+rc=0
+httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1 || rc=$?
+# a crash here would otherwise read as a clean "terminated"
+test "$rc" -eq 0 || {
+    echo "FAIL: httrack exited $rc"
+    cat "${tmpdir}/log2" >&2
+    exit 1
+}
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
