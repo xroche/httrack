@@ -700,15 +700,17 @@ class Handler(SimpleHTTPRequestHandler):
     # Pass 1 mirrors each file from a valid gzip body; pass 2 (--update) serves
     # a body that cannot be decoded. The previously-mirrored copy must survive.
     # fresh.html is the control: its pass-2 body decodes, so it must be updated.
-    UPCODEC_SEEN = {}
+    # Per-path body-fetch counter shared by the update-refetch routes; paths are
+    # distinct so one dict serves all of them.
+    REFETCH_SEEN = {}
 
-    def upcodec_pass(self):
-        """1 on the first body fetch of this path, 2 on the next ones. HEADs
-        don't count, so a stray one can't shift which pass gets the bad body."""
+    def refetch_pass(self):
+        """1 on the first body fetch of this path, N on the Nth. HEADs don't
+        count, so a stray one can't shift which pass gets the special body."""
         if self.command == "HEAD":
             return 1
-        seen = Handler.UPCODEC_SEEN.get(self.path, 0) + 1
-        Handler.UPCODEC_SEEN[self.path] = seen
+        seen = Handler.REFETCH_SEEN.get(self.path, 0) + 1
+        Handler.REFETCH_SEEN[self.path] = seen
         return seen
 
     @staticmethod
@@ -740,47 +742,38 @@ class Handler(SimpleHTTPRequestHandler):
     UNSUP_V1 = b"<html><body><p>MIRRORED-UNSUP-V1</p></body></html>"
 
     def route_upcodec_mem(self):
-        if self.upcodec_pass() == 1:
+        if self.refetch_pass() == 1:
             self.send_coded(self.gzipped(self.MEM_V1), "text/html")
         else:
             self.send_coded(self.bad_gzip(self.MEM_V1), "text/html")
 
     def route_upcodec_disk(self):
-        if self.upcodec_pass() == 1:
+        if self.refetch_pass() == 1:
             self.send_coded(self.gzipped(self.DISK_V1), "application/octet-stream")
         else:
             self.send_coded(self.bad_gzip(self.DISK_V1), "application/octet-stream")
 
     # Pass 2 switches to a coding we have no decoder for.
     def route_upcodec_unsup(self):
-        if self.upcodec_pass() == 1:
+        if self.refetch_pass() == 1:
             self.send_coded(self.gzipped(self.UNSUP_V1), "text/html")
         else:
             self.send_coded(self.UNSUP_V1, "text/html", coding="compress")
 
     def route_upcodec_fresh(self):
-        pass1 = self.upcodec_pass() == 1
+        pass1 = self.refetch_pass() == 1
         body = b"<html><body><p>FRESH-V%d</p></body></html>" % (1 if pass1 else 2)
         self.send_coded(self.gzipped(body), "text/html")
 
     # Same, direct-to-disk: the update pass decodes, so the temp is renamed over
     # an existing mirror file.
     def route_upcodec_freshdisk(self):
-        pass1 = self.upcodec_pass() == 1
+        pass1 = self.refetch_pass() == 1
         body = b"FRESHDISK-V%d\n" % (1 if pass1 else 2) + b"\x03\x02\x01\xfe" * 8192
         self.send_coded(self.gzipped(body), "application/octet-stream")
 
     # #562: pass 1 mirrors fully; pass 2 (--update) declares the full
     # Content-Length but delivers half then closes, so httrack refuses the partial.
-    UPTRUNC_SEEN = {}
-
-    def uptrunc_pass(self):
-        if self.command == "HEAD":
-            return 1
-        seen = Handler.UPTRUNC_SEEN.get(self.path, 0) + 1
-        Handler.UPTRUNC_SEEN[self.path] = seen
-        return seen
-
     PAGE_V1 = b"<html><body><p>MIRRORED-PAGE-V1</p></body></html>"
     BIN_V1 = b"MIRRORED-BIN-V1\n" + b"\x00\x01\x02\xff" * 8192
 
@@ -805,20 +798,20 @@ class Handler(SimpleHTTPRequestHandler):
             pass
 
     def route_uptrunc_page(self):
-        if self.uptrunc_pass() == 1:
+        if self.refetch_pass() == 1:
             self.send_raw(self.PAGE_V1, "text/html")
         else:
             self.send_truncated(self.PAGE_V1, "text/html")
 
     def route_uptrunc_file(self):
-        if self.uptrunc_pass() == 1:
+        if self.refetch_pass() == 1:
             self.send_raw(self.BIN_V1, "application/octet-stream")
         else:
             self.send_truncated(self.BIN_V1, "application/octet-stream")
 
     # Control: fully served both passes, so a normal --update still lands.
     def route_uptrunc_stay(self):
-        v = 1 if self.uptrunc_pass() == 1 else 2
+        v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>STAY-V%d</p></body></html>" % v, "text/html")
 
     # Echo what httrack advertised, so a crawl can assert the header.
