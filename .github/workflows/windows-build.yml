@@ -177,8 +177,7 @@ jobs:
 
           # Every gate here exits 77, so an all-skipped suite would report green having
           # tested nothing: pin the skips, and floor the passes in case the glob empties.
-          # pending #579, #581
-          expected_skips=" 19_local-connect-fallback.test 48_local-crange-memresume.test"
+          expected_skips=" 48_local-crange-memresume.test"  # pending #581
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
           [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
