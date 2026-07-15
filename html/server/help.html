@@ -58,7 +58,7 @@ function info(str) {
 <table class="tableWidth" border="0" width="100%" cellspacing="0">
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" href="about.html" target="_new"
-			onMouseOver="info('${html:LANG_G21}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_G21}' onMouseOver="info('${html:LANG_G21}'); return true" onMouseOut="info('&nbsp;'); return true"
 			>
 ${LANG_O16}...
 </a>
@@ -67,7 +67,7 @@ ${LANG_O16}...
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" 
    href="http://www.httrack.com/update.php3?Product=HTTrack&Version=${HTTRACK_VERSIONID}&VersionStr=${HTTRACK_VERSION}&Platform=${HTS_PLATFORM}&LanguageId=${lang}" target="_new"
-			onMouseOver="info('${html:LANG_O17}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_O17}' onMouseOver="info('${html:LANG_O17}'); return true" onMouseOut="info('&nbsp;'); return true"
    >
 ${LANG_O17}...
 </a>
@@ -78,7 +78,7 @@ ${do:if-file-exists:html/index.html}
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" 
    href="/index.html" target="_new"
-			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
    >
 ${LANG_P16}
 </a>

@@ -52,7 +52,7 @@ function info(str) {
 	<td id="subTitle" align="right">
 		<a href="/server/file.html" target="_blank"
 			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_O1}' onMouseOver="info('${html:html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O1}
@@ -64,7 +64,7 @@ ${do:if-file-exists:html/index.html}
 	<td id="subTitle" align="right">
 		<a href="/index.html" target="_blank"
 			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O5}
@@ -93,7 +93,7 @@ ${do:if-file-exists:html/index.html}
 <td>
 	<a href="/step1.html" target="_blank"
 		onClick="window.open('/step1.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>${LANG_TIPHELP}</a>
 </td>
 ${do:end-if}
@@ -218,7 +218,7 @@ ${do:loadhash}
 
 		${LANG_S11}
 		<input name="projname" value="${projname}"
-			onMouseOver="info('${html:html:LANG_S1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_S1}' onMouseOver="info('${html:html:LANG_S1}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 
 <br>
@@ -233,7 +233,7 @@ ${do:loadhash}
 		</select>
 </td><td>
 		<input name="projcateg" value="${projcateg}"
-			onMouseOver="info('${html:html:LANG_S5}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_S5}' onMouseOver="info('${html:html:LANG_S5}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 
 </td></tr></table>
@@ -241,7 +241,7 @@ ${do:loadhash}
 <br>
 		${LANG_S12}
 		<input name="path" value="${path}"
-			onMouseOver="info('${html:html:LANG_S2}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_S2}' onMouseOver="info('${html:html:LANG_S2}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 		<input type="button" value="refresh" onClick="form.redirect.value='step2.html'; form.submit()">
 
@@ -250,11 +250,11 @@ ${do:loadhash}
 	<tr><td>
 		<table width="100%" border="0"><tr><td align="left">
 			<input type="submit" value=" << ${LANG_PREVIOUS} " onClick="form.redirect.value='index.html'; form.submit()"
-			onMouseOver="info('${html:html:LANG_TIPPREV}'); return true" onMouseOut="info('&nbsp;'); return true"			
+			title='${html:LANG_TIPPREV}' onMouseOver="info('${html:html:LANG_TIPPREV}'); return true" onMouseOut="info('&nbsp;'); return true"			
 			>
 		</td><td align="right">
 			<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> " onClick="return checkname();" default
-			onMouseOver="info('${html:html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPNEXT}' onMouseOver="info('${html:html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
 			>
 		</td></tr></table>
 

@@ -70,7 +70,7 @@ ${do:if-file-exists:html/index.html}
 <td>
 	<a href="/step9_opt5.html" target="_blank"
 		onClick="window.open('/step9_opt5.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>${LANG_TIPHELP}</a>
 </td>
 ${do:end-if}
@@ -107,12 +107,12 @@ ${LANG_Q3}
 ${do:output-mode:html-urlescaped}
 		onClick="if (confirm(str_replace(str_replace('${LANG_DIAL7}', '%20', ' '), '%0a', ' '))) { form.closeme.value=1; form.submit(); } return false;"
 ${do:output-mode:}
-				onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+				title='${html:LANG_TIPOK}' onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td><td align="right">
 	<input type="button" value="${LANG_CANCEL}"
 				onClick="window.close();"
-				onMouseOver="info('${html:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
+				title='${html:LANG_TIPCANCEL}' onMouseOver="info('${html:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td></tr>
 	</table>

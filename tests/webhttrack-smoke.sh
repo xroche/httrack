@@ -36,15 +36,19 @@ chmod +x "$stubdir/uname"
 
 # Stub browser: webhttrack tries its browser-name list in order and runs the
 # first it finds, so shadow the first entry, "x-www-browser". It fetches the
-# server URL and records PASS only for the working UI: the brand string AND the
-# step-2 form action, which a truncated/degraded template page would lack (the
-# bare title alone is not enough). htsserver only lives until webhttrack exits,
-# so the check has to happen here.
+# server URL and records PASS only for the working UI: the brand string, the
+# step-2 form action, and an option-page tooltip, which a truncated/degraded
+# template page would lack. htsserver only lives until webhttrack exits, so the
+# check has to happen here.
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 cat >"$stubdir/x-www-browser" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
-if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html; then
+# Also fetch an option page and require a rendered title='' tooltip: proves the
+# option template expands and the \${html:} filter escapes into the attribute.
+opturl="\${1%/}/server/option2.html"
+if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html &&
+    opt="\$(curl -fsSL --max-time 20 "\$opturl")" && printf '%s' "\$opt" | grep -qaF "title='"; then
     echo PASS >"$marker"
 else
     echo "FAIL: unexpected response from \$1" >"$marker"

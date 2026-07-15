@@ -73,7 +73,7 @@ function info(str) {
 	<td id="subTitle" align="right">
 		<a href="/server/file.html" target="_blank"
 			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_O1}' onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O1}
@@ -85,7 +85,7 @@ ${do:if-file-exists:html/index.html}
 	<td id="subTitle" align="right">
 		<a href="/index.html" target="_blank"
 			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O5}
@@ -118,20 +118,20 @@ ${do:end-if}
 <form action="${thisfile}" name="form">
 <table width="100%">
 <tr><td>${LANG_T2}</td><td>http://<input name="urladr"
-			onMouseOver="info('${html:LANG_T10}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_T10}' onMouseOver="info('${html:LANG_T10}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
 <tr><td colspan=2>
 
 <table width="100%">
 <th>${LANG_T4}</th>
 <tr><td>${LANG_T5}:</td><td><input name="urllogin"
-			onMouseOver="info('${html:LANG_T12}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_T12}' onMouseOver="info('${html:LANG_T12}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
 <tr><td>${LANG_T6}:</td><td><input name="urlpass"
-			onMouseOver="info('${html:LANG_T13}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_T13}' onMouseOver="info('${html:LANG_T13}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
 <tr><td>${LANG_T7}:</td><td><input type="button" value="${LANG_T8}" onClick="alert('not yet implemented!')"
-			onMouseOver="info('${html:LANG_T14}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_T14}' onMouseOver="info('${html:LANG_T14}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
 </table>
 
@@ -139,7 +139,7 @@ ${do:end-if}
 
 <tr><td>
 <input type="button" value="OK" onClick="if (do_add()) { window.close(); }"
-			onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPOK}' onMouseOver="info('${html:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 
