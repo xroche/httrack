@@ -1,7 +1,8 @@
 # libFuzzer harnesses; built only with --enable-fuzzers (requires clang).
 if FUZZERS
 noinst_PROGRAMS = fuzz-charset fuzz-meta fuzz-idna fuzz-entities \
-	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx
+	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
+	fuzz-htsparse
 endif
 
 AM_CPPFLAGS = \
@@ -25,6 +26,7 @@ fuzz_filters_SOURCES = fuzz-filters.c fuzz.h
 fuzz_url_SOURCES = fuzz-url.c fuzz.h
 fuzz_header_SOURCES = fuzz-header.c fuzz.h
 fuzz_cachendx_SOURCES = fuzz-cachendx.c fuzz.h
+fuzz_htsparse_SOURCES = fuzz-htsparse.c fuzz.h
 
 # List corpus files explicitly: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh \
@@ -42,4 +44,6 @@ EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/header/full-response.txt corpus/header/redirect.txt \
 	corpus/cachendx/new-format.txt corpus/cachendx/old-format.txt \
 	corpus/cachendx/regress-overadvance.bin \
-	corpus/cachendx/regress-truncated-entry.bin
+	corpus/cachendx/regress-truncated-entry.bin \
+	corpus/htsparse/basic.html corpus/htsparse/script-inscript.html \
+	corpus/htsparse/meta-usemap.html corpus/htsparse/malformed.html
