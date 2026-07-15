@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# A crawl through a proxy must never resolve or dial the origin itself: the proxy
+# does that. A dead proxy + a multi-address origin used to fall back to dialing
+# the origin direct (bypassing the proxy, leaking its DNS and IP). The decoy
+# origin here must therefore receive nothing.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override compiled out), skipping"
+    exit 77
+fi
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+
+server=$(nativepath "$top_srcdir/tests/local-server.py")
+root=$(nativepath "$top_srcdir/tests/server-root")
+tmpdir=$(mktemp -d)
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+    return 0
+}
+trap cleanup EXIT
+
+# decoy origin: it must stay silent. LOCAL_SERVER_VERBOSE logs any request it gets.
+LOCAL_SERVER_VERBOSE=1 "$python" "$server" --root "$root" --bind 127.0.0.1 \
+    >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$tmpdir/srv.out" 2>/dev/null || true)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$tmpdir/srv.err")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+
+# a proxy port nothing listens on: grab a free one and let it close (refuses).
+deadproxy=$("$python" -c \
+    'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+
+# origin resolves to two addresses so a fallback would have a second to dial;
+# 127.0.0.1 (the decoy) is the one the old bypass reached.
+out="$tmpdir/crawl"
+HTTRACK_DEBUG_RESOLVE="decoyhost:127.0.0.2,127.0.0.1" \
+    httrack "http://decoyhost:$port/simple/basic.html" -O "$out" \
+    -P "127.0.0.1:$deadproxy" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z \
+    >"$tmpdir/log" 2>&1
+
+log="$out/hts-log.txt"
+
+# the origin must have seen no connection (no leak/bypass)
+if grep -qE '"(GET|POST|HEAD|CONNECT) ' "$tmpdir/srv.err"; then
+    echo "FAIL: origin was contacted directly, bypassing the proxy"
+    cat "$tmpdir/srv.err"
+    exit 1
+fi
+
+# the crawl must fail at the proxy (proves it really tried the proxy, not a no-op)
+grep -q 'Connect Error' "$log" || {
+    echo "FAIL: expected a proxy connect error"
+    cat "$log"
+    exit 1
+}
+
+# and it must not have tried an origin-address fallback under the proxy
+if grep -q "trying next address" "$log"; then
+    echo "FAIL: fell back to an origin address under a proxy"
+    cat "$log"
+    exit 1
+fi
+
+echo "OK: a dead proxy fails cleanly without dialing the origin"

@@ -2696,9 +2696,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         int dispo = 0;
 
         // probe the resolved address list once per fresh connect (cache hit:
-        // the host was resolved when this connect was opened)
+        // the host was resolved when this connect was opened). Not under a
+        // proxy: the socket dials the proxy, so resolving the origin here leaks
+        // its DNS and lets a proxy-connect failure fall back to dialing it
+        // direct.
         if (cf->addr_count < 0 && back[i].r.soc != INVALID_SOCKET &&
-            !back[i].r.is_file) {
+            !back[i].r.is_file && !back[i].r.req.proxy.active) {
           SOCaddr scratch[HTS_MAXADDRNUM];
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
