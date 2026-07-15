@@ -1215,6 +1215,28 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    def route_chunked_index(self):
+        self.send_html('\t<a href="page.html">chunked</a>\n')
+
+    def route_chunked_page(self):
+        # Transfer-Encoding: chunked over many small chunks: drives the engine's
+        # chunk automaton (htsback.c). The mirrored file must equal the joined
+        # chunk bodies, so the 2GB in-RAM cap doesn't fire on ordinary traffic.
+        blob = big_html("chunked", "<p>" + "chunk-body " * 300 + "</p>")
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        step = 64
+        for off in range(0, len(blob), step):
+            piece = blob[off : off + step]
+            self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
+        self.wfile.write(b"0\r\n\r\n")
+
     # Content-Disposition naming: the attachment filename replaces the
     # URL-derived name; path components in it are stripped (RFC 2616).
     CDISPO_NAMES = {
@@ -1554,6 +1576,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/crange206mem/blob.bin": route_crange206mem,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
+        "/chunked/index.html": route_chunked_index,
+        "/chunked/page.html": route_chunked_page,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,
