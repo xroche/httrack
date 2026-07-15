@@ -43,7 +43,7 @@ function info(str) {
 	<td id="subTitle" align="right">
 		<a href="/server/file.html" target="_blank"
 			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_O1}' onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O1}
@@ -55,7 +55,7 @@ ${do:if-file-exists:html/index.html}
 	<td id="subTitle" align="right">
 		<a href="/index.html" target="_blank"
 			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O5}
@@ -113,7 +113,7 @@ ${LANG_THANKYOU}!
 
 	<tr><td align="right">
 		<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> "
-			onMouseOver="info('${html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPNEXT}' onMouseOver="info('${html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 	</td></tr>
 </table>
