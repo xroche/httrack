@@ -65,6 +65,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int makestat_lnk = 0;
   char base[HTS_URLMAXSIZE * 2] = "";
   char codebase[HTS_URLMAXSIZE * 2] = "";
+  char err_msg[1024] = "";
 
   if (!inited) {
     hts_init();
@@ -108,13 +109,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   r.statuscode = 200;
   r.size = (LLint) size;
   r.adr = malloct(size + 1);
-  memcpy(r.adr, data, size);
+  if (size)
+    memcpy(r.adr, data, size);
   r.adr[size] = '\0';
   strcpybuff(r.contenttype, "text/html");
 
   memset(&str, 0, sizeof(str));
   memset(&stre, 0, sizeof(stre));
-  str.err_msg = codebase; /* scratch; htsparse writes it only on error */
+  str.err_msg = err_msg;
   str.filename = heap(ptr)->sav;
   str.mime = r.contenttype;
   str.url_host = heap(ptr)->adr;
