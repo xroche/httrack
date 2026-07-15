@@ -21,26 +21,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the real HTML parser htsparse() (htsparse.c) over a mocked engine: the
-   tag/attribute/JS-inscript scanner, the link rewriter, and the
-   accept -> url_savename -> hts_record_link path, on every crawled page. The
-   coupling is state, not network, so we build the minimal crawl state
-   httpmirror() sets up and let the page walk it, then discard.
-   The str/stre wiring below mirrors the htsparse() call site in htscore.c; keep
-   it in sync if those structs gain a field the parser reads. */
+/* Fuzz the real htsparse() over a mocked engine: the minimal crawl state
+   httpmirror() builds, then a page walked through the parser and discarded. The
+   str/stre wiring below mirrors htsparse()'s call site in htscore.c; update it
+   in lockstep if those structs gain a field the parser reads. */
 #include "fuzz.h"
 
-#include "httrack-library.h" /* hts_init, hts_create_opt, hts_free_opt */
-#include "htscore.h"   /* heap(), hts_record_*, filters_init, cache_back */
-#include "htsback.h"   /* back_new, back_free, back_delete_all */
-#include "htshash.h"   /* hash_init, hash_free */
-#include "htsrobots.h" /* checkrobots_free, robots_wizard */
-#include "htsparse.h"  /* htsparse, htsmoduleStructExtended */
+#include "httrack-library.h"
+#include "htscore.h"
+#include "htsback.h"
+#include "htshash.h"
+#include "htsrobots.h"
+#include "htsparse.h"
 #include "htsmodules.h"
 #include "coucal.h"
 
-/* htsparse never calls the module addLink on the internal parse; stub anyway.
- */
+/* htsparse ignores str.addLink on the internal parse; stub it. */
 static int fuzz_addlink(htsmoduleStruct *str, char *link) {
   (void) str;
   (void) link;
@@ -77,7 +73,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   opt = hts_create_opt();
   opt->log = opt->errlog = NULL;
-  opt->robots = 0; /* skip the robots.txt fetch path */
+  opt->robots = 0;
 
   memset(&cache, 0, sizeof(cache));
   cache.type = 0; /* no on-disk cache */
@@ -101,15 +97,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
 
-  /* Seed the link heap: idx 0 primary, idx 1 the parsed page; ptr>0 selects
-     full HTML parsing + the rewriter. urladr()/urlfil()/savename() alias
-     heap(ptr); save=/dev/null makes the end-of-parse flush hermetic. */
+  /* ptr=1 (index 1 is the parsed page) selects full HTML parsing + the
+     rewriter; urladr()/urlfil()/savename() alias heap(ptr), save=/dev/null. */
   hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL);
   hts_record_link(opt, "example.com", "/index.html", "/dev/null", "", "", NULL);
   ptr = 1;
 
-  /* The downloaded object: NUL-terminated, size bytes in a size+1 allocation
-     (htsparse one-past-reads onto the terminator). */
+  /* NUL-terminated in a size+1 alloc: htsparse one-past-reads onto the NUL. */
   hts_init_htsblk(&r);
   r.statuscode = 200;
   r.size = (LLint) size;
