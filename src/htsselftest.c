@@ -794,6 +794,20 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   memset(subj, 'a', 32);
   subj[32] = '\0';
   assertf(strjoker(subj, pat, NULL, NULL) != NULL);
+  /* Same pin for the class-branch shape users actually write (*[..]), against a
+     long subject: it must match with room to spare under the work cap. */
+  {
+    const char *seg = "*[A-Z,a-z,0-9]";
+    const size_t seglen = strlen(seg), nseg = 16;
+
+    for (i = 0; i < (int) nseg; i++)
+      memcpy(pat + i * seglen, seg, seglen);
+    pat[nseg * seglen] = '\0';
+    memset(subj, 'a', 512);
+    subj[512] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
+    assertf(steps < maxsteps);
+  }
   freet(pat);
   freet(subj);
   printf("filterbounds: OK\n");

@@ -154,12 +154,14 @@ static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
 
   if (depth > memo->maxdepth)
     memo->maxdepth = depth;
+  /* Charge the budget before the depth cap: cut disables the memo, so uncounted
+     deep calls would let the sub-cap search explode (OSS-Fuzz 535114376). */
+  if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
+    return NULL; /* work budget spent: fail the match safely */
   if (depth >= STRJOKER_MAXDEPTH) {
     memo->cut = HTS_TRUE;
     return NULL; /* nesting beyond any real filter: fail the branch safely */
   }
-  if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
-    return NULL; /* work budget spent: fail the match safely */
   if (memo->failed) {
     bit = (size_t) (chaine - memo->chaine0) * memo->stride +
           (size_t) (joker - memo->joker0);
