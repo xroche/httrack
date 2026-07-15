@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+代理类型:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+代理协议: HTTP 或 SOCKS5 (SOCKS5 的默认端口为 1080)。
+Load cookies from file:
+从文件加载 cookies:
+Preload cookies from a Netscape cookies.txt file before crawling.
+在抓取前从 Netscape 格式的 cookies.txt 文件预加载 cookies。
+Pause between files:
+文件间暂停:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+文件下载之间的随机延迟（秒）。使用 MIN:MAX 指定随机范围 (例如 2:8)。
+Keep the www. prefix (do not merge www.host with host)
+保留 www. 前缀 (不将 www.host 与 host 合并)
+Do not treat www.host and host as the same site.
+不把 www.host 和 host 视为同一站点。
+Keep double slashes in URLs
+保留 URL 中的双斜杠
+Do not collapse duplicate slashes in URLs.
+不合并 URL 中重复的斜杠。
+Keep the original query-string order
+保留查询字符串的原始顺序
+Do not reorder query-string parameters when deduplicating URLs.
+在对 URL 去重时不重新排列查询字符串参数。
+Strip query keys:
+剥离查询键:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+用逗号分隔的查询键，将其从保存文件的命名中删除 (例如 sid,utm_source)。

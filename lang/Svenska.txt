@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+Proxytyp:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxyprotokoll: HTTP eller SOCKS5 (SOCKS5 använder som standard port 1080).
+Load cookies from file:
+Läs in cookies från fil:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Läs in cookies från en Netscape cookies.txt-fil innan crawlningen börjar.
+Pause between files:
+Paus mellan filer:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Slumpmässig fördröjning mellan filnedladdningar, i sekunder. Använd MIN:MAX för ett slumpmässigt intervall (t.ex. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Behåll www.-prefixet (slå inte ihop www.host med host)
+Do not treat www.host and host as the same site.
+Behandla inte www.host och host som samma webbplats.
+Keep double slashes in URLs
+Behåll dubbla snedstreck i URL:er
+Do not collapse duplicate slashes in URLs.
+Slå inte ihop upprepade snedstreck i URL:er.
+Keep the original query-string order
+Behåll frågesträngens ursprungliga ordning
+Do not reorder query-string parameters when deduplicating URLs.
+Ändra inte ordningen på frågesträngens parametrar när dubbletter av URL:er tas bort.
+Strip query keys:
+Ta bort frågenycklar:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Kommaseparerade frågenycklar som utelämnas vid namngivningen av sparade filer (t.ex. sid,utm_source).

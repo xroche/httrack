@@ -928,3 +928,31 @@ Server terminated
 Server terminated
 A fatal error has occurred during this mirror
 Joriy ko’chirish vaqtida jiddiy xatolik yuz berdi
+Proxy type:
+Proksi turi:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proksi protokoli: HTTP yoki SOCKS5 (SOCKS5 ning standart porti 1080).
+Load cookies from file:
+Fayldan cookies yuklamoq:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Ko’chirib olishdan oldin Netscape cookies.txt faylidan cookies’ni oldindan yuklamoq.
+Pause between files:
+Fayllar orasidagi pauza:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Fayllarni ko’chirib olish orasidagi tasodifiy kechikish, soniyalarda. Tasodifiy diapazon uchun MIN:MAX dan foydalaning (masalan, 2:8).
+Keep the www. prefix (do not merge www.host with host)
+www. prefiksini saqlash (www.host ni host bilan birlashtirmaslik)
+Do not treat www.host and host as the same site.
+www.host va host ni bir xil sayt deb hisoblamaslik.
+Keep double slashes in URLs
+URL lardagi qo’sh sleshlarni saqlash
+Do not collapse duplicate slashes in URLs.
+URL lardagi takroriy sleshlarni olib tashlamaslik.
+Keep the original query-string order
+So’rov satrining asl tartibini saqlash
+Do not reorder query-string parameters when deduplicating URLs.
+URL dublikatlarini olib tashlashda so’rov satri parametrlari tartibini o’zgartirmaslik.
+Strip query keys:
+Olib tashlanadigan so’rov kalitlari:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Saqlangan fayl nomidan olib tashlanadigan, vergul bilan ajratilgan so’rov kalitlari (masalan, sid,utm_source).

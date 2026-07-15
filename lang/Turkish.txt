@@ -928,3 +928,31 @@ Server terminated
 Sunucu sonlandýrdý
 A fatal error has occurred during this mirror
 Bu yansýlama iþlemi sýrasýnda ölümcül bir hata oluþtu
+Proxy type:
+Proxy türü:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxy protokolü: HTTP veya SOCKS5 (SOCKS5 varsayýlan portu 1080).
+Load cookies from file:
+Çerezleri dosyadan yükle:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Taramadan önce bir Netscape cookies.txt dosyasýndan çerezleri önceden yükle.
+Pause between files:
+Dosyalar arasýnda bekleme:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Dosya indirmeleri arasýnda saniye cinsinden rastgele gecikme. Rastgele bir aralýk için MIN:MAX kullanýn (örn. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+www. önekini koru (www.host ile host'u birleþtirme)
+Do not treat www.host and host as the same site.
+www.host ve host'u ayný site olarak deðerlendirme.
+Keep double slashes in URLs
+URL'lerdeki çift eðik çizgileri koru
+Do not collapse duplicate slashes in URLs.
+URL'lerdeki yinelenen eðik çizgileri birleþtirme.
+Keep the original query-string order
+Özgün sorgu dizesi sýrasýný koru
+Do not reorder query-string parameters when deduplicating URLs.
+URL'lerin yinelenenlerini ayýklarken sorgu dizesi parametrelerini yeniden sýralama.
+Strip query keys:
+Sorgu anahtarlarýný çýkar:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Kaydedilen dosya adlandýrmasýndan çýkarýlacak, virgülle ayrýlmýþ sorgu anahtarlarý (örn. sid,utm_source).

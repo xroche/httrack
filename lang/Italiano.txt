@@ -928,3 +928,31 @@ Server terminated
 Server disconnesso
 A fatal error has occurred during this mirror
 Si è verificato un errore fatale durante la copia
+Proxy type:
+Tipo di proxy:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Protocollo del proxy: HTTP o SOCKS5 (la porta SOCKS5 predefinita è 1080).
+Load cookies from file:
+Carica i cookie da un file:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Precarica i cookie da un file Netscape cookies.txt prima della copia.
+Pause between files:
+Pausa tra i file:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Ritardo casuale tra i download dei file, in secondi. Usa MIN:MAX per un intervallo casuale (ad es. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Mantieni il prefisso www. (non unire www.host con host)
+Do not treat www.host and host as the same site.
+Non trattare www.host e host come lo stesso sito.
+Keep double slashes in URLs
+Mantieni le doppie barre negli URL
+Do not collapse duplicate slashes in URLs.
+Non ridurre le barre duplicate negli URL.
+Keep the original query-string order
+Mantieni l'ordine originale della query string
+Do not reorder query-string parameters when deduplicating URLs.
+Non riordinare i parametri della query string durante la deduplicazione degli URL.
+Strip query keys:
+Rimuovi chiavi della query string:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Chiavi della query string, separate da virgole, da rimuovere dai nomi dei file salvati (ad es. sid,utm_source).

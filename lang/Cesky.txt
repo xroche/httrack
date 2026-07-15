@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+Typ proxy:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Protokol proxy: HTTP nebo SOCKS5 (výchozí port SOCKS5 je 1080).
+Load cookies from file:
+Naèíst cookies ze souboru:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Naèíst cookies ze souboru Netscape cookies.txt pøed zahájením stahování.
+Pause between files:
+Prodleva mezi soubory:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Náhodná prodleva mezi stahováním souborù, v sekundách. Pro náhodný rozsah použijte MIN:MAX (napø. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Zachovat pøedponu www. (nesluèovat www.host s host)
+Do not treat www.host and host as the same site.
+Nepovažovat www.host a host za stejný web.
+Keep double slashes in URLs
+Zachovat dvojitá lomítka v URL
+Do not collapse duplicate slashes in URLs.
+Nesluèovat opakovaná lomítka v URL.
+Keep the original query-string order
+Zachovat pùvodní poøadí øetìzce dotazu
+Do not reorder query-string parameters when deduplicating URLs.
+Nemìnit poøadí parametrù øetìzce dotazu pøi odstraòování duplicitních URL.
+Strip query keys:
+Odebrat klíèe dotazu:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Klíèe dotazu oddìlené èárkami, které se vynechají z pojmenování ukládaných souborù (napø. sid,utm_source).

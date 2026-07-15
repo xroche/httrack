@@ -930,3 +930,31 @@ Server terminated
 Ακυρώθηκε από τον εξυπηρετητή
 A fatal error has occurred during this mirror
 Ένα καταστροφικό σφάλμα προκλήθηκε κατά την αντιγραφή αυτού του τόπου
+Proxy type:
+Τύπος proxy:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Πρωτόκολλο proxy: HTTP ή SOCKS5 (η προεπιλεγμένη θύρα του SOCKS5 είναι 1080).
+Load cookies from file:
+Φόρτωση cookies από αρχείο:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Προφόρτωση των cookies από ένα αρχείο Netscape cookies.txt πριν την ανίχνευση.
+Pause between files:
+Παύση μεταξύ αρχείων:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Τυχαία καθυστέρηση μεταξύ των λήψεων αρχείων, σε δευτερόλεπτα. Χρησιμοποιήστε MIN:MAX για τυχαίο εύρος (π.χ. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Διατήρηση του προθέματος www. (χωρίς συγχώνευση του www.host με το host)
+Do not treat www.host and host as the same site.
+Να μην θεωρούνται τα www.host και host ως ο ίδιος ιστότοπος.
+Keep double slashes in URLs
+Διατήρηση των διπλών καθέτων στα URL
+Do not collapse duplicate slashes in URLs.
+Να μην συμπτύσσονται οι διπλές κάθετοι στα URL.
+Keep the original query-string order
+Διατήρηση της αρχικής σειράς του ερωτήματος αναζήτησης
+Do not reorder query-string parameters when deduplicating URLs.
+Να μην αναδιατάσσονται οι παράμετροι του ερωτήματος αναζήτησης κατά την αφαίρεση διπλότυπων URL.
+Strip query keys:
+Αφαίρεση κλειδιών ερωτήματος:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Κλειδιά ερωτήματος χωρισμένα με κόμμα, που θα αφαιρεθούν από την ονομασία των αποθηκευμένων αρχείων (π.χ. sid,utm_source).

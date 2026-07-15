@@ -928,3 +928,31 @@ Server terminated
 бх№тх№юђ х я№хъшэрђ
 A fatal error has occurred during this mirror
 Эрёђрэр єрђрыэр у№хјър я№ш ютюМ mirror
+Proxy type:
+Тип на прокси:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Протокол на прокси: HTTP или SOCKS5 (стандардната порта на SOCKS5 е 1080).
+Load cookies from file:
+Вчитај колачиња од датотека:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Однапред вчитај колачиња од датотека Netscape cookies.txt пред преземањето.
+Pause between files:
+Пауза меѓу датотеки:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Случајно доцнење меѓу преземањата на датотеки, во секунди. Користи MIN:MAX за случаен опсег (на пример 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Задржи го префиксот www. (не спојувај www.host со host)
+Do not treat www.host and host as the same site.
+Не третирај ги www.host и host како ист сајт.
+Keep double slashes in URLs
+Задржи ги двојните коси црти во URL
+Do not collapse duplicate slashes in URLs.
+Не отстранувај ги повторените коси црти во URL.
+Keep the original query-string order
+Задржи го изворниот редослед на параметрите во барањето
+Do not reorder query-string parameters when deduplicating URLs.
+Не менувај го редоследот на параметрите на барањето при отстранување дупликати URL.
+Strip query keys:
+Отстрани клучеви од барањето:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Клучеви од барањето, одделени со запирка, што се отстрануваат од името на зачуваната датотека (на пример sid,utm_source).
