@@ -6030,6 +6030,8 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->referer);
     StringFree(opt->from);
     StringFree(opt->lang_iso);
+    StringFree(opt->accept);
+    StringFree(opt->headers);
     StringFree(opt->sys_com);
     StringFree(opt->mimedefs);
     StringFree(opt->filelist);
