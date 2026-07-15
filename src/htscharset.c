@@ -385,7 +385,7 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
   return hts_convertStringCPFromUTF8(s, size, cp);
 }
 
-char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
+HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
   return hts_convertStringCPToUTF8(s, size, GetACP());
 }
 

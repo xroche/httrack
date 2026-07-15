@@ -175,7 +175,7 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  * Convert current system codepage to UTF-8.
  * This function is WIN32 specific.
  **/
-extern char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
 
 /**
  * Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
