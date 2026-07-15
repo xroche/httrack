@@ -928,3 +928,31 @@ Server terminated
 Server beeindigd
 A fatal error has occurred during this mirror
 Een fatale fout is opgetreden tijdens deze spiegeling
+Proxy type:
+Proxytype:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxyprotocol: HTTP of SOCKS5 (standaardpoort van SOCKS5 is 1080).
+Load cookies from file:
+Cookies uit bestand laden:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Cookies vooraf laden uit een Netscape cookies.txt-bestand voordat het crawlen begint.
+Pause between files:
+Pauze tussen bestanden:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Willekeurige vertraging tussen bestandsdownloads, in seconden. Gebruik MIN:MAX voor een willekeurig bereik (bijv. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+www.-voorvoegsel behouden (www.host niet samenvoegen met host)
+Do not treat www.host and host as the same site.
+Behandel www.host en host niet als dezelfde site.
+Keep double slashes in URLs
+Dubbele schuine strepen in URL's behouden
+Do not collapse duplicate slashes in URLs.
+Dubbele schuine strepen in URL's niet samenvoegen.
+Keep the original query-string order
+Oorspronkelijke volgorde van de query string behouden
+Do not reorder query-string parameters when deduplicating URLs.
+Query string-parameters niet herordenen bij het ontdubbelen van URL's.
+Strip query keys:
+Query-sleutels verwijderen:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Door komma's gescheiden query-sleutels die bij het benoemen van opgeslagen bestanden worden weggelaten (bijv. sid,utm_source).

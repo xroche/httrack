@@ -928,3 +928,31 @@ Server terminated
 Server terminat
 A fatal error has occurred during this mirror
 A survenit o eroare fatalã în timpul acestei clonãri.
+Proxy type:
+Tip proxy:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Protocol proxy: HTTP sau SOCKS5 (portul SOCKS5 implicit este 1080).
+Load cookies from file:
+Încarca cookies dintr-un fisier:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Preîncarca cookies dintr-un fisier Netscape cookies.txt înainte de copiere.
+Pause between files:
+Pauza între fisiere:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Întârziere aleatoare între descarcari de fisiere, în secunde. Folositi MIN:MAX pentru un interval aleatoriu (de ex. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Pastreaza prefixul www. (nu combina www.host cu host)
+Do not treat www.host and host as the same site.
+Nu trata www.host si host ca fiind acelasi site.
+Keep double slashes in URLs
+Pastreaza barele duble din URL-uri
+Do not collapse duplicate slashes in URLs.
+Nu comprima barele duplicate din URL-uri.
+Keep the original query-string order
+Pastreaza ordinea originala din query string
+Do not reorder query-string parameters when deduplicating URLs.
+Nu reordona parametrii din query string la eliminarea URL-urilor duplicate.
+Strip query keys:
+Elimina cheile din query string:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Chei din query string, separate prin virgula, de eliminat din denumirea fisierelor salvate (de ex. sid,utm_source).

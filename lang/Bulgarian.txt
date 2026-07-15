@@ -928,3 +928,31 @@ Server terminated
 Сървърът не отговаря
 A fatal error has occurred during this mirror
 Фатална грешка при създаването на този огледален сайт
+Proxy type:
+Тип на прокси:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Протокол на прокси: HTTP или SOCKS5 (стандартният порт на SOCKS5 е 1080).
+Load cookies from file:
+Зареждане на 'бисквитки' от файл:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Предварително зареждане на 'бисквитки' от файл Netscape cookies.txt преди обхождането.
+Pause between files:
+Пауза между файловете:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Случайно забавяне между изтеглянията на файлове, в секунди. Използвайте MIN:MAX за случаен диапазон (например 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Запазване на префикса www. (без сливане на www.host с host)
+Do not treat www.host and host as the same site.
+www.host и host да не се третират като един и същ сайт.
+Keep double slashes in URLs
+Запазване на двойните наклонени черти в URL
+Do not collapse duplicate slashes in URLs.
+Без премахване на повтарящите се наклонени черти в URL.
+Keep the original query-string order
+Запазване на оригиналния ред на параметрите в заявката
+Do not reorder query-string parameters when deduplicating URLs.
+Без пренареждане на параметрите на заявката при премахване на дублирани URL.
+Strip query keys:
+Премахване на ключове от заявката:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Ключове от заявката, разделени със запетая, които да се премахнат от името на записания файл (например sid,utm_source).

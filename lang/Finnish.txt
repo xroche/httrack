@@ -931,3 +931,31 @@ Palvelin lopetettu
 A fatal error has occurred during this mirror
 Tällä peilillä tapahtui vakava virhe
 
+Proxy type:
+Välityspalvelimen tyyppi:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Välityspalvelimen protokolla: HTTP tai SOCKS5 (SOCKS5:n oletusportti on 1080).
+Load cookies from file:
+Lataa evästeet tiedostosta:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Lataa evästeet Netscape cookies.txt -tiedostosta ennen sivuston läpikäyntiä.
+Pause between files:
+Tauko tiedostojen välillä:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Satunnainen viive tiedostolatausten välillä, sekunteina. Käytä muotoa MIN:MAX satunnaista väliä varten (esim. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Säilytä www.-etuliite (älä yhdistä www.host- ja host-osoitteita)
+Do not treat www.host and host as the same site.
+Älä käsittele www.host- ja host-osoitteita samana sivustona.
+Keep double slashes in URLs
+Säilytä kaksoiskenoviivat URL-osoitteissa
+Do not collapse duplicate slashes in URLs.
+Älä yhdistä toistuvia kenoviivoja URL-osoitteissa.
+Keep the original query-string order
+Säilytä kyselymerkkijonon alkuperäinen järjestys
+Do not reorder query-string parameters when deduplicating URLs.
+Älä järjestä kyselymerkkijonon parametreja uudelleen, kun URL-osoitteiden kaksoiskappaleet poistetaan.
+Strip query keys:
+Poista kyselyavaimet:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Pilkuin erotellut kyselyavaimet, jotka jätetään pois tallennettujen tiedostojen nimeämisestä (esim. sid,utm_source).

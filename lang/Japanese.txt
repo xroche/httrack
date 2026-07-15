@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+プロキシの種類:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+プロキシのプロトコル: HTTP または SOCKS5 (SOCKS5 の既定ポートは 1080)。
+Load cookies from file:
+クッキーをファイルから読み込む:
+Preload cookies from a Netscape cookies.txt file before crawling.
+クロールを開始する前に Netscape の cookies.txt ファイルからクッキーを読み込みます。
+Pause between files:
+ファイル間の待機:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+ファイルのダウンロード間のランダムな遅延（秒）。範囲を指定するには MIN:MAX を使用します (例: 2:8)。
+Keep the www. prefix (do not merge www.host with host)
+www. プレフィックスを保持する (www.host と host を統合しない)
+Do not treat www.host and host as the same site.
+www.host と host を同じサイトとして扱いません。
+Keep double slashes in URLs
+URL 内の二重スラッシュを保持する
+Do not collapse duplicate slashes in URLs.
+URL 内の連続したスラッシュをまとめません。
+Keep the original query-string order
+クエリ文字列の元の順序を保持する
+Do not reorder query-string parameters when deduplicating URLs.
+URL の重複排除時にクエリ文字列のパラメータを並べ替えません。
+Strip query keys:
+削除するクエリキー:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+保存ファイル名の生成から除外するクエリキーをカンマ区切りで指定します (例: sid,utm_source)。

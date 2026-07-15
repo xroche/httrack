@@ -928,3 +928,31 @@ Server terminated
 A kiszolgáló befejezte a kapcsolatot
 A fatal error has occurred during this mirror
 Végzetes hiba történt a tükrözés közben
+Proxy type:
+Proxy típusa:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxy protokoll: HTTP vagy SOCKS5 (a SOCKS5 alapértelmezett portja 1080).
+Load cookies from file:
+Sütik betöltése fájlból:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Sütik elõzetes betöltése egy Netscape cookies.txt fájlból a tükrözés elõtt.
+Pause between files:
+Szünet a fájlok között:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Véletlenszerû késleltetés a fájlletöltések között, másodpercben. Véletlen tartományhoz használja a MIN:MAX formát (pl. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+A www. elõtag megtartása (ne vonja össze a www.host és a host címet)
+Do not treat www.host and host as the same site.
+Ne kezelje a www.host és a host címet ugyanazon webhelyként.
+Keep double slashes in URLs
+Dupla perjelek megtartása az URL-ekben
+Do not collapse duplicate slashes in URLs.
+Ne vonja össze az ismétlõdõ perjeleket az URL-ekben.
+Keep the original query-string order
+Az eredeti lekérdezési szöveg sorrendjének megtartása
+Do not reorder query-string parameters when deduplicating URLs.
+Ne rendezze át a lekérdezési szöveg paramétereit az ismétlõdõ URL-ek kiszûrésekor.
+Strip query keys:
+Lekérdezési kulcsok eltávolítása:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Vesszõvel elválasztott lekérdezési kulcsok, amelyeket el kell hagyni a mentett fájl elnevezésébõl (pl. sid,utm_source).

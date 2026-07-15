@@ -976,3 +976,31 @@ Click on this notification to restart the interrupted mirror
 Klik på denne notifikation for at genstarte den afbrudte spejlkopiering
 HTTrack: could not save profile for '%s'!
 HTTrack: kunne ikke gemme profil for '%s'!
+Proxy type:
+Proxytype:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxyprotokol: HTTP eller SOCKS5 (SOCKS5 bruger som standard port 1080).
+Load cookies from file:
+Indlæs cookies fra fil:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Indlæs cookies fra en Netscape cookies.txt-fil, før crawlingen starter.
+Pause between files:
+Pause mellem filer:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Tilfældig forsinkelse mellem filoverførsler, i sekunder. Brug MIN:MAX for et tilfældigt interval (f.eks. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Behold www.-præfikset (sammenlæg ikke www.host med host)
+Do not treat www.host and host as the same site.
+Behandl ikke www.host og host som det samme websted.
+Keep double slashes in URLs
+Behold dobbelte skråstreger i URL'er
+Do not collapse duplicate slashes in URLs.
+Sammenfold ikke gentagne skråstreger i URL'er.
+Keep the original query-string order
+Behold den oprindelige rækkefølge i forespørgselsstrengen
+Do not reorder query-string parameters when deduplicating URLs.
+Omorden ikke forespørgselsstrengens parametre, når dublerede URL'er fjernes.
+Strip query keys:
+Fjern forespørgselsnøgler:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Kommaseparerede forespørgselsnøgler, der udelades i navngivningen af gemte filer (f.eks. sid,utm_source).

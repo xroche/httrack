@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+Тип проксі:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Протокол проксі: HTTP або SOCKS5 (за замовчуванням SOCKS5 використовує порт 1080).
+Load cookies from file:
+Завантажити cookies з файлу:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Попередньо завантажити cookies з файлу Netscape cookies.txt перед завантаженням.
+Pause between files:
+Пауза між файлами:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Випадкова затримка між завантаженнями файлів, у секундах. Використовуйте MIN:MAX для випадкового діапазону (наприклад, 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Зберігати префікс www. (не об'єднувати www.host з host)
+Do not treat www.host and host as the same site.
+Не вважати www.host і host одним і тим самим сайтом.
+Keep double slashes in URLs
+Зберігати подвійні слеші в URL
+Do not collapse duplicate slashes in URLs.
+Не видаляти повторювані слеші в URL.
+Keep the original query-string order
+Зберігати початковий порядок параметрів запиту
+Do not reorder query-string parameters when deduplicating URLs.
+Не змінювати порядок параметрів рядка запиту під час усунення дублікатів URL.
+Strip query keys:
+Вилучати ключі запиту:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Ключі запиту через кому, які вилучаються з імені збереженого файлу (наприклад, sid,utm_source).

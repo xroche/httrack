@@ -976,3 +976,31 @@ Build a mail archive
 Construire une archive mail
 Default referer URL
 Champ referer par défaut
+Proxy type:
+Type de proxy :
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Protocole du proxy : HTTP ou SOCKS5 (le port SOCKS5 par défaut est 1080).
+Load cookies from file:
+Charger les cookies depuis un fichier :
+Preload cookies from a Netscape cookies.txt file before crawling.
+Précharger les cookies depuis un fichier Netscape cookies.txt avant la copie du site.
+Pause between files:
+Pause entre les fichiers :
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Délai aléatoire entre les téléchargements de fichiers, en secondes. Utilisez MIN:MAX pour une plage aléatoire (par ex. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Conserver le préfixe www. (ne pas fusionner www.host avec host)
+Do not treat www.host and host as the same site.
+Ne pas traiter www.host et host comme le même site.
+Keep double slashes in URLs
+Conserver les doubles barres obliques dans les URL
+Do not collapse duplicate slashes in URLs.
+Ne pas réduire les barres obliques en double dans les URL.
+Keep the original query-string order
+Conserver l'ordre d'origine de la query string
+Do not reorder query-string parameters when deduplicating URLs.
+Ne pas réordonner les paramètres de la query string lors de la déduplication des URL.
+Strip query keys:
+Supprimer les clés de query string :
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Clés de query string à retirer du nommage des fichiers enregistrés, séparées par des virgules (par ex. sid,utm_source).

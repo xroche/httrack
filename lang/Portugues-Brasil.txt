@@ -976,3 +976,31 @@ Click on this notification to restart the interrupted mirror
 Clique nesta notificação para reiniciar o espelho interrompido
 HTTrack: could not save profile for '%s'!
 HTTrack: não foi possível salvar o perfil para '%s'!
+Proxy type:
+Tipo de proxy:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Protocolo do proxy: HTTP ou SOCKS5 (a porta SOCKS5 padrão é 1080).
+Load cookies from file:
+Carregar cookies de um arquivo:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Pré-carregar cookies de um arquivo Netscape cookies.txt antes de iniciar a cópia.
+Pause between files:
+Pausa entre arquivos:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Atraso aleatório entre downloads de arquivos, em segundos. Use MIN:MAX para um intervalo aleatório (ex.: 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Manter o prefixo www. (não mesclar www.host com host)
+Do not treat www.host and host as the same site.
+Não tratar www.host e host como o mesmo site.
+Keep double slashes in URLs
+Manter as barras duplas nas URLs
+Do not collapse duplicate slashes in URLs.
+Não reduzir as barras duplicadas nas URLs.
+Keep the original query-string order
+Manter a ordem original da query string
+Do not reorder query-string parameters when deduplicating URLs.
+Não reordenar os parâmetros da query string ao remover URLs duplicadas.
+Strip query keys:
+Remover chaves da query string:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Chaves da query string, separadas por vírgulas, a serem removidas da nomeação dos arquivos salvos (ex.: sid,utm_source).

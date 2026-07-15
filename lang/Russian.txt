@@ -928,3 +928,31 @@ Server terminated
 Server terminated
 A fatal error has occurred during this mirror
 Во время текущей закачки произошла фатальная ошибка
+Proxy type:
+Тип прокси:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Протокол прокси: HTTP или SOCKS5 (по умолчанию SOCKS5 использует порт 1080).
+Load cookies from file:
+Загрузить cookies из файла:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Предварительно загрузить cookies из файла Netscape cookies.txt перед закачкой.
+Pause between files:
+Пауза между файлами:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Случайная задержка между закачками файлов, в секундах. Используйте MIN:MAX для случайного диапазона (например, 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Сохранять префикс www. (не объединять www.host с host)
+Do not treat www.host and host as the same site.
+Не считать www.host и host одним и тем же сайтом.
+Keep double slashes in URLs
+Сохранять двойные слэши в URL
+Do not collapse duplicate slashes in URLs.
+Не удалять повторяющиеся слэши в URL.
+Keep the original query-string order
+Сохранять исходный порядок параметров запроса
+Do not reorder query-string parameters when deduplicating URLs.
+Не менять порядок параметров строки запроса при удалении дубликатов URL.
+Strip query keys:
+Удалять ключи запроса:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Ключи запроса через запятую, удаляемые из имени сохраняемого файла (например, sid,utm_source).

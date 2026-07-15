@@ -928,3 +928,31 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+Proxy type:
+Proxy tüüp:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxy protokoll: HTTP või SOCKS5 (SOCKS5 vaikeport on 1080).
+Load cookies from file:
+Lae küpsised failist:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Lae küpsised eelnevalt Netscape cookies.txt failist enne kopeerimist.
+Pause between files:
+Paus failide vahel:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Juhuslik viivitus failide allalaadimiste vahel, sekundites. Juhusliku vahemiku jaoks kasuta MIN:MAX (nt 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Säilita www. eesliide (ära ühenda www.host ja host)
+Do not treat www.host and host as the same site.
+Ära käsitle www.host ja host sama saidina.
+Keep double slashes in URLs
+Säilita topeltkaldkriipsud URL-ides
+Do not collapse duplicate slashes in URLs.
+Ära ühenda korduvaid kaldkriipse URL-ides.
+Keep the original query-string order
+Säilita päringustringi algne järjekord
+Do not reorder query-string parameters when deduplicating URLs.
+Ära järjesta päringustringi parameetreid ümber URL-ide korduste eemaldamisel.
+Strip query keys:
+Eemalda päringuvõtmed:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Komadega eraldatud päringuvõtmed, mis jäetakse salvestatud faili nimest välja (nt sid,utm_source).

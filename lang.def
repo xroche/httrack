@@ -1006,3 +1006,31 @@ LANG_SERVEND
 Server terminated
 LANG_FATALERR
 A fatal error has occurred during this mirror
+LANG_PROXYTYPE
+Proxy type:
+LANG_PROXYTYPETIP
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+LANG_COOKIEFILE
+Load cookies from file:
+LANG_COOKIEFILETIP
+Preload cookies from a Netscape cookies.txt file before crawling.
+LANG_PAUSEFILES
+Pause between files:
+LANG_PAUSEFILESTIP
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+LANG_KEEPWWW
+Keep the www. prefix (do not merge www.host with host)
+LANG_KEEPWWWTIP
+Do not treat www.host and host as the same site.
+LANG_KEEPSLASHES
+Keep double slashes in URLs
+LANG_KEEPSLASHESTIP
+Do not collapse duplicate slashes in URLs.
+LANG_KEEPQUERYORDER
+Keep the original query-string order
+LANG_KEEPQUERYORDERTIP
+Do not reorder query-string parameters when deduplicating URLs.
+LANG_STRIPQUERY
+Strip query keys:
+LANG_STRIPQUERYTIP
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).

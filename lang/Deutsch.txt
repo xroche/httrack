@@ -928,3 +928,31 @@ Server terminated
 Der Server wurde beendet
 A fatal error has occurred during this mirror
 Fataler Fehler während der Webseiten-Kopie
+Proxy type:
+Proxy-Typ:
+Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxy-Protokoll: HTTP oder SOCKS5 (Standardport von SOCKS5 ist 1080).
+Load cookies from file:
+Cookies aus Datei laden:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Cookies aus einer Netscape-cookies.txt-Datei laden, bevor das Crawlen beginnt.
+Pause between files:
+Pause zwischen Dateien:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Zufällige Verzögerung zwischen Datei-Downloads, in Sekunden. MIN:MAX für einen Zufallsbereich verwenden (z. B. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+www.-Präfix beibehalten (www.host nicht mit host zusammenführen)
+Do not treat www.host and host as the same site.
+www.host und host nicht als dieselbe Website behandeln.
+Keep double slashes in URLs
+Doppelte Schrägstriche in URLs beibehalten
+Do not collapse duplicate slashes in URLs.
+Doppelte Schrägstriche in URLs nicht zusammenführen.
+Keep the original query-string order
+Ursprüngliche Reihenfolge des Query-Strings beibehalten
+Do not reorder query-string parameters when deduplicating URLs.
+Query-String-Parameter beim Entfernen doppelter URLs nicht neu anordnen.
+Strip query keys:
+Query-Schlüssel entfernen:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Kommagetrennte Query-Schlüssel, die bei der Benennung gespeicherter Dateien entfallen (z. B. sid,utm_source).
