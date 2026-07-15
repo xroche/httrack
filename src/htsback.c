@@ -3310,18 +3310,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
-                        // totalsize sums attacker-declared chunk sizes; cap the
-                        // in-RAM buffer at 2GB so the (size_t) cast can't
-                        // truncate on 32-bit and under-allocate.
+                        // totalsize sums attacker-declared chunk sizes; past
+                        // 2GB the (size_t) cast below truncates on 32-bit and
+                        // under-allocates. Mark the chunk invalid so the shared
+                        // error path tears the transfer down.
                         if (back[i].r.totalsize > INT32_MAX) {
-                          back[i].r.statuscode = STATUSCODE_INVALID;
-                          strcpybuff(back[i].r.msg,
-                                     "Chunked resource too large");
-                          back[i].status = STATUS_READY;
-                          back_set_finished(sback, i);
                           hts_log_print(opt, LOG_WARNING,
                                         "Chunked resource too large for %s%s",
                                         back[i].url_adr, back[i].url_fil);
+                          chunk_size = -1;
                         } else {
                           back[i].r.adr = (char *) realloct(
                               back[i].r.adr, (size_t) back[i].r.totalsize + 1);

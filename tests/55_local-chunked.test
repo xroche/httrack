@@ -1,7 +1,8 @@
 #!/bin/bash
 # A well-formed Transfer-Encoding: chunked response mirrors intact: the chunk
 # automaton (htsback.c) joins the bodies and the 2GB in-RAM cap stays quiet.
-# '^40$' would be a leftover 64-byte chunk-size line if decoding didn't happen.
+# The 76-char run spans a 64-byte chunk boundary (only contiguous once joined);
+# a CR anywhere would be leftover framing; '</body>' proves no truncation.
 
 set -euo pipefail
 
@@ -9,7 +10,9 @@ set -euo pipefail
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'chunked/page.html' \
-    --file-matches 'chunked/page.html' 'chunk-body chunk-body' \
-    --file-not-matches 'chunked/page.html' '^40$' \
+    --file-matches 'chunked/page.html' \
+    'chunk-body chunk-body chunk-body chunk-body chunk-body chunk-body chunk-body' \
+    --file-matches 'chunked/page.html' '</body>' \
+    --file-not-matches 'chunked/page.html' $'\r' \
     --log-not-found 'too large' \
     httrack 'BASEURL/chunked/index.html'
