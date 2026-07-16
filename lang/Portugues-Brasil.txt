@@ -978,8 +978,8 @@ HTTrack: could not save profile for '%s'!
 HTTrack: não foi possível salvar o perfil para '%s'!
 Proxy type:
 Tipo de proxy:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Protocolo do proxy: HTTP ou SOCKS5 (a porta SOCKS5 padrão é 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Protocolo do proxy. HTTP: proxy padrão. HTTP (túnel CONNECT): envia cada requisição através de um túnel CONNECT, para proxies que só suportam CONNECT como o HTTPTunnelPort do Tor. SOCKS5: porta padrão 1080.
 Load cookies from file:
 Carregar cookies de um arquivo:
 Preload cookies from a Netscape cookies.txt file before crawling.

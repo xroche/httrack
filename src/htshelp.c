@@ -477,7 +477,7 @@ void help(const char *app, int more) {
     ("  Y   mirror ALL links located in the first level pages (mirror links)");
   infomsg("");
   infomsg("Proxy options:");
-  infomsg("  P  proxy use (-P [socks5://][user:pass@]proxy:port)");
+  infomsg("  P  proxy use (-P [socks5://|connect://][user:pass@]proxy:port)");
   infomsg(" %f *use proxy for ftp (f0 don't use)");
   infomsg(" %b  use this local hostname to make/send requests (-%b hostname)");
   infomsg("");

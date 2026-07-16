@@ -103,6 +103,7 @@ ${LANG_PROXYTYPE}
 			title='${html:LANG_PROXYTYPETIP}' onMouseOver="info('${html:LANG_PROXYTYPETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 <option value=""${ztest:proxytype: selected:}>HTTP</option>
+<option value="2"${test:proxytype::: selected}>HTTP (CONNECT tunnel)</option>
 <option value="1"${test:proxytype:: selected}>SOCKS5</option>
 </select>
 <br><br>

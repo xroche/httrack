@@ -90,12 +90,15 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   if (soc == INVALID_SOCKET)
     return 0;
 
-  // CONNECT needs an explicit host:port; default the https port
+  // CONNECT needs an explicit host:port; default :80 for http, :443 for https
   authority[0] = '\0';
   if (portsep != NULL)
     strlcatbuff(authority, host, sizeof(authority)); // already host:port
-  else
-    snprintf(authority, sizeof(authority), "%s:%d", host, 443);
+  else {
+    const int defport = (strncmp(adr, "https://", 8) == 0) ? 443 : 80;
+
+    snprintf(authority, sizeof(authority), "%s:%d", host, defport);
+  }
 
   // backstop: never let a stray CR/LF in the host smuggle a second line into
   // the CONNECT request (the host is already sanitized upstream)
@@ -132,7 +135,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 
-  // raw send: ssl is set, so sendc() would route to TLS
+  // raw send(): sendc() would route to TLS when ssl is set (https tunnel)
   {
     const char *p = req;
     size_t remain = strlen(req);

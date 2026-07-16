@@ -2757,6 +2757,28 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
           }
 
+          // plain http tunneled through a CONNECT-only proxy (#564)
+          if (back[i].r.req.proxy.active &&
+              hts_proxy_is_connect(back[i].r.req.proxy.name) &&
+              !back[i].r.keep_alive
+#if HTS_USEOPENSSL
+              && !back[i].r.ssl
+#endif
+          ) {
+            const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
+
+            if (!http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout)) {
+              if (!strnotempty(back[i].r.msg))
+                strcpybuff(back[i].r.msg, "proxy CONNECT failed");
+              deletehttp(&back[i].r);
+              back[i].r.soc = INVALID_SOCKET;
+              back[i].r.statuscode = STATUSCODE_NON_FATAL;
+              back[i].status = STATUS_READY;
+              back_set_finished(sback, i);
+              continue;
+            }
+          }
+
 #if HTS_USEOPENSSL
           /* SSL mode */
           if (back[i].r.ssl) {

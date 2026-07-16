@@ -1009,7 +1009,7 @@ A fatal error has occurred during this mirror
 LANG_PROXYTYPE
 Proxy type:
 LANG_PROXYTYPETIP
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
 LANG_COOKIEFILE
 Load cookies from file:
 LANG_COOKIEFILETIP
