@@ -2816,6 +2816,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
+                  // the handshake gets its own timeout window, as connect does
+                  if (back[i].timeout > 0)
+                    back[i].timeout_refresh = time_local();
                 } else
                   back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
               } else
@@ -2875,6 +2878,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       }
 #if HTS_USEOPENSSL
       else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE) {       // wait for SSL handshake
+        // a peer that never speaks TLS must be reaped by --timeout too (#607)
+        if (!gestion_timeout)
+          if (back[i].timeout > 0)
+            gestion_timeout = 1;
+
         /* SSL mode */
         if (back[i].r.ssl) {
           int conn_code;
@@ -4265,6 +4273,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 strcpybuff(back[i].r.msg, "Connect Time Out");
               else if (back[i].status == STATUS_WAIT_DNS)
                 strcpybuff(back[i].r.msg, "DNS Time Out");
+              else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE)
+                strcpybuff(back[i].r.msg, "SSL/TLS Handshake Time Out");
               else
                 strcpybuff(back[i].r.msg, "Receive Time Out");
               back[i].status = STATUS_READY;    // terminé

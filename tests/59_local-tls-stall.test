@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# Issue #607: a peer that accepts the TCP connect but never speaks TLS leaves the
+# slot stuck in the handshake. The per-slot --timeout must reap it; before the
+# fix only --max-time did, so this crawl ran until the kill guard.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+if test "${HTTPS_SUPPORT:-}" == "no"; then
+    echo "no https support compiled, skipping"
+    exit 77
+fi
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+
+server=$(nativepath "$top_srcdir/tests/tls-stall-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+    return 0
+}
+trap cleanup EXIT
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$tmpdir/srv.out" 2>/dev/null || true)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$tmpdir/srv.err")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+
+# no -E/--max-time on purpose: --timeout is the only thing that can end this.
+out="$tmpdir/crawl"
+start=$(date +%s)
+rc=0
+run_with_timeout 45 httrack "https://127.0.0.1:$port/" -O "$out" -c1 \
+    --robots=0 --timeout=3 --retries=0 --quiet -Z >"$tmpdir/log" 2>&1 || rc=$?
+wall=$(($(date +%s) - start))
+
+if test "$wall" -ge 30; then
+    echo "crawl took ${wall}s (rc=$rc): --timeout did not reap the stalled handshake" >&2
+    cat "$tmpdir/log" >&2
+    exit 1
+fi
+grep -q 'Handshake Time Out' "$out/hts-log.txt" || {
+    echo "crawl ended in ${wall}s but not on a handshake timeout" >&2
+    cat "$out/hts-log.txt" >&2
+    exit 1
+}
+echo "OK: stalled TLS handshake reaped by --timeout after ${wall}s"
