@@ -47,18 +47,20 @@ stop_server() {
 # Kill a backgrounded job and its whole descendant tree. POSIX: the caller must
 # have put the job in its own process group (run_with_timeout does) so we signal
 # the group; a bare kill would orphan the grandchildren. Windows: the tree is
-# native processes MSYS can't signal, so taskkill //T ends it by Windows PID.
+# native processes MSYS can't signal, so taskkill /T ends it by Windows PID.
+# Single-slash switches: the workflow sets MSYS_NO_PATHCONV/MSYS2_ARG_CONV_EXCL,
+# so args pass verbatim and a //T would reach taskkill unfolded and be rejected.
 kill_tree() {
     local pid=$1
     if is_windows; then
         local winpid=
         test -r "/proc/$pid/winpid" && winpid=$(cat "/proc/$pid/winpid" 2>/dev/null)
         if test -n "$winpid"; then
-            taskkill //F //T //PID "$winpid" >/dev/null 2>&1 || true
+            taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
         else
             # The offline suite runs serially, so no wanted process races this.
-            taskkill //F //IM httrack.exe >/dev/null 2>&1 || true
-            taskkill //F //IM python.exe >/dev/null 2>&1 || true
+            taskkill /F /IM httrack.exe >/dev/null 2>&1 || true
+            taskkill /F /IM python.exe >/dev/null 2>&1 || true
         fi
     fi
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
