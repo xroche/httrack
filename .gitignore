@@ -43,3 +43,6 @@ Makefile
 
 # Python bytecode (tests/local-server.py).
 __pycache__/
+
+# Per-checkout Claude Code rules (symlink into a local sandbox).
+/CLAUDE.local.md
