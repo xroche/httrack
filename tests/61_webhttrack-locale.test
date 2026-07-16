@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # webhttrack must map the caller's locale to the right lang.indexes number.
-# Regression guard: LC_ALL/LC_MESSAGES were ignored, and the region-qualified
-# entries (zh_tw, pt_br) were unreachable because the region was cut off.
+# Guards: LC_ALL/LC_MESSAGES were ignored, and zh_tw/pt_br were unreachable.
 
 set -euo pipefail
 
@@ -18,8 +17,7 @@ fail() {
 test -r "${script}" || fail "no ${script}"
 test -r "${distdir}/lang.indexes" || fail "no ${distdir}/lang.indexes"
 
-# Lift the locale code out of the launcher rather than reimplementing it, so this
-# tests the shipped logic whatever shape it takes.
+# Lift the locale code out of the launcher, so this tests the shipped logic itself.
 funcs=$(sed -n '/^function lang_index/,/^}/p' "${script}")
 block=$(sed -n '/^# Locale/,/^$/p' "${script}")
 echo "${block}" | grep -q 'LANGN=' || fail "could not lift the locale block from ${script}"
@@ -36,8 +34,7 @@ lang_of() {
         } 2>/dev/null
         # shellcheck disable=SC2034 # read by the eval'd locale block
         DISTPATH="${distdir}"
-        # the launcher runs under neither -e (its "! test -n x && y" idiom returns 1)
-        # nor -u (it reads LC_ALL and friends unset)
+        # the launcher runs under neither -e ("! test -n x && y" returns 1) nor -u
         set +eu
         eval "${funcs}"
         eval "${block}"
@@ -56,7 +53,7 @@ check() {
 }
 
 #      want  LANG            LC_ALL          LC_MESSAGES
-check 2 "fr_FR.UTF-8" "" ""                       # plain language
+check 2 "fr_FR.UTF-8" "" ""
 check 14 "zh_TW.UTF-8" "" ""                      # region-qualified: Chinese-BIG5, not Simplified (13)
 check 12 "pt_BR.UTF-8" "" ""                      # region-qualified: Portugues-Brasil, not Portugues (7)
 check 13 "zh_CN.UTF-8" "" ""                      # unlisted region falls back to the bare language
