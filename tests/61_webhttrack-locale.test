@@ -19,27 +19,36 @@ test -r "${distdir}/lang.indexes" || fail "no ${distdir}/lang.indexes"
 
 # Lift the locale code out of the launcher, so this tests the shipped logic itself.
 funcs=$(sed -n '/^function lang_index/,/^}/p' "${script}")
-block=$(sed -n '/^# Locale/,/^$/p' "${script}")
-echo "${block}" | grep -q 'LANGN=' || fail "could not lift the locale block from ${script}"
+# End on the next section, not a blank line: a blank line grown inside the block
+# would truncate the lift and silently stop testing everything below it.
+grep -q '^# Find the browser' "${script}" || fail "locale block terminator moved in ${script}"
+block=$(sed -n '/^# Locale/,/^# Find the browser/p' "${script}" | sed '$d')
+echo "${block}" | grep -q 'LANGN=.*lang_index' || fail "could not lift the whole locale block from ${script}"
+
+# Run the lifted block against whatever locale vars the caller exported.
+run_block() {
+    # shellcheck disable=SC2034 # read by the eval'd locale block
+    DISTPATH="${distdir}"
+    # the launcher runs under neither -e ("! test -n x && y" returns 1) nor -u
+    set +eu
+    eval "${funcs}"
+    eval "${block}"
+    # shellcheck disable=SC2153 # LANGN is set by the eval'd block, not a LANG typo
+    echo "${LANGN}"
+}
 
 # Resolve LANG/LC_ALL/LC_MESSAGES (empty = unset) to the language number.
 lang_of() {
     (
         unset LANG LC_ALL LC_MESSAGES
         # only the value matters here; hide bash's setlocale gripe when the locale is not installed
+        # shellcheck disable=SC2030 # confining the locale to this subshell is the point
         {
             if test -n "$1"; then export LANG="$1"; fi
             if test -n "$2"; then export LC_ALL="$2"; fi
             if test -n "$3"; then export LC_MESSAGES="$3"; fi
         } 2>/dev/null
-        # shellcheck disable=SC2034 # read by the eval'd locale block
-        DISTPATH="${distdir}"
-        # the launcher runs under neither -e ("! test -n x && y" returns 1) nor -u
-        set +eu
-        eval "${funcs}"
-        eval "${block}"
-        # shellcheck disable=SC2153 # LANGN is set by the eval'd block, not a LANG typo
-        echo "${LANGN}"
+        run_block
     )
 }
 
@@ -67,5 +76,16 @@ check 2 "fr_FR@euro" "" ""                        # @modifier without a charset
 check 1 "C" "" ""                                 # C, unknown and unset all mean English
 check 1 "xx_YY.UTF-8" "" ""
 check 1 "" "" ""
+
+# Exported but empty is unset (POSIX), so it must not mask LANG. lang_of cannot
+# express this: it exports nothing for an empty argument.
+got=$(
+    unset LANG LC_ALL LC_MESSAGES
+    # shellcheck disable=SC2031 # confining the locale to this subshell is the point
+    { export LANG="fr_FR.UTF-8" LC_ALL="" LC_MESSAGES=""; } 2>/dev/null
+    run_block
+)
+test "${got}" = 2 || fail "empty LC_ALL/LC_MESSAGES must not mask LANG: want 2, got ${got}"
+echo "ok: LANG='fr_FR.UTF-8' with LC_ALL='' exported -> ${got}"
 
 echo "PASS"
