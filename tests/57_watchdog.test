@@ -38,7 +38,10 @@ test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 # The native descendant tree is really dead, not orphaned. On Windows an outer
 # MSYS bash with a native ping grandchild is the exact case signals can't reap;
 # on POSIX a surviving grandchild would touch the marker after we stop waiting.
-pings() { tasklist //FI "IMAGENAME eq PING.EXE" //NH 2>/dev/null | grep -ci "ping.exe" || true; }
+# Plain tasklist, no switches: under the workflow's MSYS2_ARG_CONV_EXCL='*' a
+# //FI filter arg reaches tasklist mangled and matches nothing (a silent vacuous
+# pass), so scan the whole list for the image name instead.
+pings() { tasklist 2>/dev/null | grep -ci 'ping\.exe' || true; }
 rc=0
 if is_windows; then
     # Positive control: without it the zero-survivor check below could pass on a
