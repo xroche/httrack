@@ -1511,16 +1511,20 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   }
 
   /* the request is always ATYP=domain, which cannot carry an IPv6 literal: a
-     bracketed origin is rejected rather than sent as a bogus domain name */
+     bracketed origin is rejected rather than sent as a bogus domain name. The
+     msg check pins the reason: a stricter host validator would also reject
+     these, but for the wrong cause. */
   io.reply = script;
   io.reply_len = len;
   assertf(socks5_handshake_scripted(opt, "[::1]", proxy, &io) == 0);
   assertf(io.sent_len == 0);
+  assertf(strstr(io.msg, "IPv6") != NULL);
   io.reply = script;
   io.reply_len = len;
   assertf(socks5_handshake_scripted(opt, "[2001:db8::1]:8443", proxy, &io) ==
           0);
   assertf(io.sent_len == 0);
+  assertf(strstr(io.msg, "IPv6") != NULL);
 
   printf("socks5 self-test OK\n");
   return 0;
