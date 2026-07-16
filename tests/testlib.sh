@@ -57,7 +57,9 @@ dump_crawl_logs() {
             printf '\n--- %s (last 200 lines)\n' "$f"
             tail -n 200 "$f"
         done
-        rm -rf "$d" # so a later test's dump cannot re-report this one
+        # so a later test's dump cannot re-report this one; never fatal, the
+        # caller is already handling a failure and Windows may still hold a file
+        rm -rf "$d" || true
     done
 }
 
