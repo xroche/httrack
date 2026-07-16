@@ -136,7 +136,8 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 
-  // raw send: ssl is set, so sendc() would route to TLS
+  // raw send: for an https tunnel ssl is set, so sendc() would route to TLS
+  // before the tunnel is open; send() reaches the still-plain socket either way
   {
     const char *p = req;
     size_t remain = strlen(req);

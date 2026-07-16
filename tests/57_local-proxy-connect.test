@@ -59,9 +59,9 @@ start_server() {
 # (a portable stand-in for `timeout`, which macOS lacks).
 HANG_RC=137 # 128 + SIGKILL
 run_crawl() {
-    local out="$1" proxy="$2" port="$3"
+    local out="$1" proxy="$2" url="${4:-http://127.0.0.1:${3}/}"
     rm -rf "$out"
-    httrack "http://127.0.0.1:${port}/" --proxy "$proxy" \
+    httrack "$url" --proxy "$proxy" \
         -O "$out" -r1 -s0 --timeout=10 >"$out.log" 2>&1 &
     local pid=$!
     (sleep 60 && kill -9 "$pid" 2>/dev/null) &
@@ -100,7 +100,20 @@ if grep -q "^GET http://" "$ok/origin-headers.log"; then
 fi
 echo "OK: plain http tunneled origin-form through CONNECT"
 
-# 2. teeth: without connect://, httrack sends the absolute-URI form, which the
+# 2. default CONNECT port follows the origin scheme: a portless http origin
+# tunnels to :80 (not the https :443). Nothing serves :80 here so the fetch
+# fails; only the CONNECT target port is asserted. Reverting to a hardcoded 443
+# makes this log ":443" and fail.
+: >"$ok/proxy.log"
+run_crawl "$ok/out_port" "connect://127.0.0.1:${proxy_port}" "" "http://127.0.0.1/" || true
+grep -q "^CONNECT 127.0.0.1:80 " "$ok/proxy.log" || {
+    echo "FAIL: portless http origin did not CONNECT to the default port 80" >&2
+    cat "$ok/proxy.log" >&2
+    exit 1
+}
+echo "OK: portless http origin tunnels to the default port 80"
+
+# 3. teeth: without connect://, httrack sends the absolute-URI form, which the
 # CONNECT-only proxy rejects (501) -> nothing fetched. Proves the scheme is what
 # flips the behavior and that the proxy really is CONNECT-only.
 : >"$ok/proxy.log"
@@ -117,7 +130,7 @@ grep -q "^GET http://127.0.0.1:${origin_port}/" "$ok/proxy.log" || {
 }
 echo "OK: absolute-URI form (no connect://) rejected by the CONNECT-only proxy"
 
-# 3. authenticated proxy: creds ride the CONNECT, never reach the origin
+# 4. authenticated proxy: creds ride the CONNECT, never reach the origin
 : >"$ok/proxy.log"
 : >"$ok/origin-headers.log"
 run_crawl "$ok/out2" "connect://user:secret@127.0.0.1:${proxy_port}" "$origin_port"

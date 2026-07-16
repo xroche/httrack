@@ -2759,10 +2759,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           // plain http through a CONNECT-only proxy (tor HTTPTunnelPort, #564):
           // tunnel to the origin, then send origin-form. https tunnels in the
-          // SSL block below; keep_alive skips an already-tunneled reused socket.
-          if (!back[i].r.ssl && back[i].r.req.proxy.active &&
+          // SSL block; keep_alive skips an already-tunneled reused socket.
+          if (back[i].r.req.proxy.active &&
               hts_proxy_is_connect(back[i].r.req.proxy.name) &&
-              !back[i].r.keep_alive) {
+              !back[i].r.keep_alive
+#if HTS_USEOPENSSL
+              && !back[i].r.ssl
+#endif
+          ) {
             const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
 
             if (!http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout)) {
