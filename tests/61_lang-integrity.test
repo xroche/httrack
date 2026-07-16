@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# lang/*.txt are line pairs: an English msgid, then its translation. A stray
+# blank or a drifted msgid silently unhooks every translation that follows,
+# rather than failing, so assert the pairing and the join against English.txt.
+
+set -euo pipefail
+
+langdir="${top_srcdir:-..}/lang"
+def="${top_srcdir:-..}/lang.def"
+eng="$langdir/English.txt"
+for f in "$eng" "$def"; do
+    [ -f "$f" ] || {
+        echo "cannot find $f"
+        exit 1
+    }
+done
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+keys="$tmp/english.keys"
+
+# Byte-wise: each file is in its own declared legacy charset, lang.def is CRLF.
+LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$eng" >"$keys"
+
+# An empty parse would make every check below pass vacuously.
+nkeys=$(wc -l <"$keys")
+if [ "$nkeys" -lt 400 ]; then
+    echo "only $nkeys msgids parsed from $eng; the parse is broken"
+    exit 1
+fi
+
+nfiles=0
+fail=0
+for f in "$langdir"/*.txt; do
+    nfiles=$((nfiles + 1))
+    LC_ALL=C awk -v keys="$keys" -v name="${f##*/}" '
+        BEGIN { while ((getline k < keys) > 0) known[k] = 1 }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 {
+            if ($0 == "")
+                printf "%s:%d: blank line where an English msgid belongs\n", name, NR
+            else if (!($0 in known))
+                printf "%s:%d: msgid absent from English.txt: %s\n", name, NR, $0
+            else
+                next
+            bad++
+        }
+        END {
+            if (NR % 2) {
+                printf "%s: odd line count (%d): msgid/translation pairing is broken\n", name, NR
+                bad++
+            }
+            exit(bad > 0)
+        }
+    ' "$f" || fail=1
+done
+
+if [ "$nfiles" -lt 25 ]; then
+    echo "only $nfiles language files found in $langdir"
+    exit 1
+fi
+
+# lang.def maps each LANG_* macro to the English string the GUI compiles in,
+# which is the lookup key into every lang/*.txt: no msgid, no translations.
+LC_ALL=C awk -v keys="$keys" '
+    BEGIN { while ((getline k < keys) > 0) known[k] = 1 }
+    { sub(/\r$/, "") }
+    NR % 2 == 1 { macro = $0; next }
+    macro ~ /^(LANG_|LISTDEF_)/ {
+        n++
+        if (!($0 in known)) {
+            printf "lang.def:%d: %s maps to \"%s\", which is not a msgid in English.txt\n", NR, macro, $0
+            bad++
+        }
+    }
+    END {
+        if (n < 400) {
+            printf "lang.def: only %d LANG_ entries parsed; the parse is broken\n", n
+            bad++
+        }
+        exit(bad > 0)
+    }
+' "$def" || fail=1
+
+[ "$fail" -eq 0 ] || exit 1
+
+echo "$nfiles language files consistent with $nkeys English msgids"

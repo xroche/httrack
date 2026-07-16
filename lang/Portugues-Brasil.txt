@@ -918,7 +918,7 @@ normal\nextended\ndebug
 normal\nextendido\ncorrigir
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
 Copiar site(s) da Web\nCopiar site(s) interativos da Web (perguntas)\nReceber arquivos específicos\nCopiar todas as páginas do site (alternação múltipla)\nTestar links nas páginas (testar indicador)\n* Retomar download interrompido\n* Atualizar download existente
-Relative URL / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
 URI Relativa / URL Absoluta (padrão)\nURL Absoluta / URL Absoluta\nURI Absoluta / URL Absoluta\nURL Original / URL Original
 Open Source offline browser
 Abrir origem offline no navegador
