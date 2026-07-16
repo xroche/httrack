@@ -1,18 +1,43 @@
 #!/usr/bin/env python3
-"""Accept TCP connections on an ephemeral port and never speak TLS (#607).
+"""Peers that accept a connection and never speak TLS (#607).
 
-Prints "PORT <n>" once listening. Connections are held open and silent, so a
-client's TLS handshake stalls until its own timeout reaps it.
+Modes: "direct" stalls the handshake straight away; "proxy <secs>" answers a
+CONNECT after <secs> before stalling, so the handshake starts on a clock the
+connect has already eaten into. Prints "PORT <n>" once listening.
+Usage: tls-stall-server.py [direct | proxy <secs>]
 """
-import socket
+import os
+import sys
+import threading
+import time
 
-srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-srv.bind(("127.0.0.1", 0))
-srv.listen(16)
-print("PORT %d" % srv.getsockname()[1], flush=True)
+# python3 -P (PYTHONSAFEPATH) drops the script's own directory from sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-held = []
-while True:
-    conn, _ = srv.accept()
-    held.append(conn)  # keep it open: a closed socket would fail the handshake
+from proxytestlib import bind_ephemeral  # noqa: E402
+
+held = []  # keep every socket open: a close would fail the handshake outright
+
+
+def stall(conn, delay):
+    if delay is not None:
+        rfile = conn.makefile("rb")
+        while rfile.readline() not in (b"\r\n", b"\n", b""):
+            pass
+        time.sleep(delay)
+        conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
+    held.append(conn)
+
+
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else "direct"
+    delay = float(sys.argv[2]) if mode == "proxy" else None
+    srv, port = bind_ephemeral()
+    sys.stdout.reconfigure(newline="\n")  # Windows would emit \r\n
+    print("PORT %d" % port, flush=True)
+    while True:
+        conn, _ = srv.accept()
+        threading.Thread(target=stall, args=(conn, delay), daemon=True).start()
+
+
+main()

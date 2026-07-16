@@ -2,7 +2,7 @@
 #
 # Issue #607: a peer that accepts the TCP connect but never speaks TLS leaves the
 # slot stuck in the handshake. The per-slot --timeout must reap it; before the
-# fix only --max-time did, so this crawl ran until the kill guard.
+# fix only --max-time did, so these crawls ran until the kill guard.
 
 set -euo pipefail
 
@@ -31,42 +31,65 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
-serverpid=$!
-port=
-for _ in $(seq 1 50); do
-    line=$(head -n1 "$tmpdir/srv.out" 2>/dev/null || true)
-    if test "${line%% *}" == "PORT"; then
-        port="${line#PORT }"
-        break
-    fi
-    kill -0 "$serverpid" 2>/dev/null || {
-        echo "server exited early: $(cat "$tmpdir/srv.err")"
-        exit 1
-    }
-    sleep 0.1
-done
-test -n "$port" || {
+# start_stall_server <tag> <mode-args...>: sets $port from the announced one.
+start_stall_server() {
+    local tag="$1"
+    shift
+    "$python" "$server" "$@" >"$tmpdir/$tag.out" 2>"$tmpdir/$tag.err" &
+    serverpid=$!
+    port=
+    for _ in $(seq 1 50); do
+        line=$(head -n1 "$tmpdir/$tag.out" 2>/dev/null || true)
+        if test "${line%% *}" == "PORT"; then
+            port="${line#PORT }"
+            return 0
+        fi
+        kill -0 "$serverpid" 2>/dev/null || {
+            echo "server exited early: $(cat "$tmpdir/$tag.err")"
+            exit 1
+        }
+        sleep 0.1
+    done
     echo "could not discover server port"
     exit 1
 }
 
-# no -E/--max-time on purpose: --timeout is the only thing that can end this.
-out="$tmpdir/crawl"
-start=$(date +%s)
-rc=0
-run_with_timeout 45 httrack "https://127.0.0.1:$port/" -O "$out" -c1 \
-    --robots=0 --timeout=3 --retries=0 --quiet -Z >"$tmpdir/log" 2>&1 || rc=$?
-wall=$(($(date +%s) - start))
+# no -E/--max-time on purpose: --timeout is the only thing that can end these.
+# The kill guard stands in for the hang, so a wall time near it means no reap.
+crawl_wall() {
+    local out="$tmpdir/$1"
+    shift
+    local start
+    start=$(date +%s)
+    run_with_timeout 60 httrack -O "$out" -c1 --robots=0 --retries=0 --quiet -Z \
+        "$@" >>"$tmpdir/log" 2>&1 || true
+    echo $(($(date +%s) - start))
+}
 
-if test "$wall" -ge 30; then
-    echo "crawl took ${wall}s (rc=$rc): --timeout did not reap the stalled handshake" >&2
+# 1. handshake stalled from the first byte: reaped at --timeout, not before.
+start_stall_server direct direct
+wall=$(crawl_wall crawl1 "https://127.0.0.1:$port/" --timeout=5)
+if test "$wall" -ge 30 || test "$wall" -lt 3; then
+    echo "FAIL: stalled handshake reaped after ${wall}s, expected about 5s" >&2
     cat "$tmpdir/log" >&2
     exit 1
 fi
-grep -q 'Handshake Time Out' "$out/hts-log.txt" || {
-    echo "crawl ended in ${wall}s but not on a handshake timeout" >&2
-    cat "$out/hts-log.txt" >&2
+grep -q 'Handshake Time Out' "$tmpdir/crawl1/hts-log.txt" || {
+    echo "FAIL: crawl ended in ${wall}s but not on a handshake timeout" >&2
+    cat "$tmpdir/crawl1/hts-log.txt" >&2
     exit 1
 }
 echo "OK: stalled TLS handshake reaped by --timeout after ${wall}s"
+
+# 2. the handshake window is its own, not what the connect left over: a proxy
+# that takes 4s to answer CONNECT must still leave the full --timeout=5 for the
+# handshake (~9s total). Sharing the connect's clock would reap at ~5s.
+stop_server "$serverpid"
+start_stall_server proxy proxy 4
+wall=$(crawl_wall crawl2 "https://127.0.0.1:443/" -P "127.0.0.1:$port" --timeout=5)
+if test "$wall" -ge 20 || test "$wall" -lt 7; then
+    echo "FAIL: handshake after a slow connect reaped at ${wall}s, expected about 9s" >&2
+    cat "$tmpdir/log" >&2
+    exit 1
+fi
+echo "OK: handshake keeps its own timeout window after a slow connect (${wall}s)"
