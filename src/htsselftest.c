@@ -1510,6 +1510,18 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     assertf(io.sent_len == 0);
   }
 
+  /* the request is always ATYP=domain, which cannot carry an IPv6 literal: a
+     bracketed origin is rejected rather than sent as a bogus domain name */
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "[::1]", proxy, &io) == 0);
+  assertf(io.sent_len == 0);
+  io.reply = script;
+  io.reply_len = len;
+  assertf(socks5_handshake_scripted(opt, "[2001:db8::1]:8443", proxy, &io) ==
+          0);
+  assertf(io.sent_len == 0);
+
   printf("socks5 self-test OK\n");
   return 0;
 }
