@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# Unit-tests dump_crawl_logs (testlib.sh): the killed test's hts-log.txt must
+# reach the uploaded logs, or a Windows wedge past --max-time stays
+# undiagnosable (#605).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/httrack_salv.XXXXXX")
+export TMPDIR
+trap 'rm -rf "$TMPDIR"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+verdict="More than 120 seconds passed.. giving up"
+
+# Vacuity control: with nothing left behind the assertions below cannot pass on
+# ambient output.
+test -z "$(dump_crawl_logs)" || fail "dumped something with no crawl tmpdir"
+
+# A killed local-crawl.sh leaves exactly this shape.
+d="${TMPDIR}/httrack_local.probe"
+mkdir -p "$d/crawl"
+echo "$verdict" >"$d/crawl/hts-log.txt"
+echo "httrack stdout marker" >"$d/log"
+
+# Append to an unterminated line, as a killed test's own log always ends.
+art="${TMPDIR}/artifact.log"
+printf '[running httrack ...] ..\t' >"$art"
+dump_crawl_logs >>"$art"
+
+grep -qF "$verdict" "$art" || fail "hts-log.txt verdict not salvaged"
+grep -qF "httrack stdout marker" "$art" || fail "httrack stdout not salvaged"
+grep -q '^--- .*hts-log.txt' "$art" || fail "dump glued its header onto the unterminated line"
+
+# Cleared, so the next timing-out test cannot re-report this crawl as its own.
+test ! -d "$d" || fail "salvaged tmpdir left behind"
+test -z "$(dump_crawl_logs)" || fail "salvaged crawl reported twice"
+
+echo "crawl log salvage OK"

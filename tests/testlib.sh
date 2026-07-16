@@ -44,6 +44,23 @@ stop_server() {
     return 0
 }
 
+# Dump and clear the crawl logs a hard-killed test leaves in TMPDIR (its cleanup
+# trap never ran): hts-log.txt alone records "More than N seconds passed.. giving
+# up", so a wedge past --max-time is undiagnosable without it (#605).
+dump_crawl_logs() {
+    local d f
+    for d in "${TMPDIR:-/tmp}"/httrack_local.*; do
+        test -d "$d" || continue
+        for f in "$d/crawl/hts-log.txt" "$d/log" "$d/log.2"; do
+            test -f "$f" || continue
+            # Leading newline: the killed test's last line has no terminator.
+            printf '\n--- %s (last 200 lines)\n' "$f"
+            tail -n 200 "$f"
+        done
+        rm -rf "$d" # so a later test's dump cannot re-report this one
+    done
+}
+
 # Kill a backgrounded job and its whole descendant tree. POSIX: the caller must
 # have put the job in its own process group (run_with_timeout does) so we signal
 # the group; a bare kill would orphan the grandchildren. Windows: the tree is
