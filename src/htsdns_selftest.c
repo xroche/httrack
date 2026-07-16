@@ -104,6 +104,11 @@ static mock_host mock_hosts[] = {
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
 };
 
+/* Serializes mock_host bookkeeping: a timed-out resolve is abandoned, so its
+   worker is still inside the backend while the test reads the counters. */
+static htsmutex mock_lock = HTSMUTEX_INIT;
+static int mock_finished = 0; /* backend calls that have returned */
+
 static mock_host *mock_find(const char *name) {
   for (size_t i = 0; i < sizeof(mock_hosts) / sizeof(mock_hosts[0]); i++) {
     if (strcmp(mock_hosts[i].name, name) == 0)
@@ -113,8 +118,34 @@ static mock_host *mock_find(const char *name) {
 }
 
 static void mock_reset_calls(void) {
+  hts_mutexlock(&mock_lock);
   for (size_t i = 0; i < sizeof(mock_hosts) / sizeof(mock_hosts[0]); i++)
     mock_hosts[i].calls = 0;
+  mock_finished = 0;
+  hts_mutexrelease(&mock_lock);
+}
+
+static int mock_read_calls(const char *name) {
+  int calls;
+
+  hts_mutexlock(&mock_lock);
+  calls = mock_find(name)->calls;
+  hts_mutexrelease(&mock_lock);
+  return calls;
+}
+
+/* Wait for n backend calls to return, ordering their writes against ours. */
+static void mock_wait_finished(int n) {
+  for (;;) {
+    hts_boolean done;
+
+    hts_mutexlock(&mock_lock);
+    done = (mock_finished >= n) ? HTS_TRUE : HTS_FALSE;
+    hts_mutexrelease(&mock_lock);
+    if (done)
+      break;
+    Sleep(10);
+  }
 }
 
 /* Build one addrinfo node owning its sockaddr (freed by mock_freeaddrinfo). */
@@ -140,10 +171,10 @@ static struct addrinfo *mock_mkai(const mock_addr *a) {
   return ai;
 }
 
-static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
-                                              const char *service,
-                                              const struct addrinfo *hints,
-                                              struct addrinfo **res) {
+static int HTS_RESOLVER_CALL mock_getaddrinfo_(const char *node,
+                                               const char *service,
+                                               const struct addrinfo *hints,
+                                               struct addrinfo **res) {
   mock_host *const h = mock_find(node);
   const int want = (hints != NULL) ? hints->ai_family : PF_UNSPEC;
   struct addrinfo *head = NULL, *tail = NULL;
@@ -152,7 +183,9 @@ static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
   *res = NULL;
   if (h == NULL)
     return EAI_NONAME;
+  hts_mutexlock(&mock_lock);
   h->calls++; /* a real backend hit; a cached host skips this */
+  hts_mutexrelease(&mock_lock);
   if (h->slow_ms != 0)
     Sleep(h->slow_ms);
   if (h->gai_err != 0)
@@ -172,6 +205,18 @@ static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
     return EAI_NONAME; /* filtered to empty, as the libc resolver does */
   *res = head;
   return 0;
+}
+
+static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
+                                              const char *service,
+                                              const struct addrinfo *hints,
+                                              struct addrinfo **res) {
+  const int ret = mock_getaddrinfo_(node, service, hints, res);
+
+  hts_mutexlock(&mock_lock);
+  mock_finished++;
+  hts_mutexrelease(&mock_lock);
+  return ret;
 }
 
 static void HTS_RESOLVER_CALL mock_freeaddrinfo(struct addrinfo *res) {
@@ -426,36 +471,41 @@ int dns_timeout_selftests(httrackp *opt) {
   elapsed = mtime_local() - start;
 
   /* the resolve returns on opt->timeout, not when the resolver deigns to
-     answer: this is what lets --max-time and --timeout fire (#606) */
-  CHECK(elapsed < MOCK_SLOW_MS - 500);
+     answer: this is what lets --max-time and --timeout fire (#606). The bound
+     is derived from opt->timeout, never from the mock's sleep, or a resolve
+     that ignored opt->timeout would still pass under the mock. */
+  CHECK(elapsed < (TStamp) opt->timeout * 1000 + 500);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
 
   /* state.lock is not held across the resolve; a concurrent stop query, which
      the mirror API promises stays live, is not blocked behind it */
   for (;;) {
     hts_boolean done;
+    TStamp blocked;
 
     hts_mutexlock(&probe.lock);
     done = probe.done;
+    blocked = probe.blocked_ms;
     hts_mutexrelease(&probe.lock);
-    if (done)
+    if (done) {
+      CHECK(blocked < 500);
       break;
+    }
     Sleep(20);
   }
-  CHECK(probe.blocked_ms < 500);
   hts_mutexfree(&probe.lock);
 
   /* a timeout is not an answer, so it must not be negative-cached: the host is
      resolved again rather than written off for the rest of the crawl */
-  CHECK(mock_find("slow.test")->calls == 1);
+  CHECK(mock_read_calls("slow.test") == 1);
   count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
   CHECK(count == 0);
-  CHECK(mock_find("slow.test")->calls == 2); /* re-resolved, not cached */
+  CHECK(mock_read_calls("slow.test") == 2); /* re-resolved, not cached */
 
-  /* let both abandoned resolver threads finish and free their job */
-  Sleep(MOCK_SLOW_MS + 1000);
-
-  hts_dns_set_resolver_backend(NULL);
+  /* Both resolves were abandoned mid-backend; wait for their workers to leave
+     it before returning. The backend stays installed: an abandoned worker
+     still reads it (to free its addrinfo) after the last call returns. */
+  mock_wait_finished(2);
   return failures;
 }
 

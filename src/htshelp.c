@@ -496,8 +496,8 @@ void help(const char *app, int more) {
   infomsg("");
   infomsg("Flow control:");
   infomsg("  cN number of multiple connections (*c8)");
-  infomsg
-    ("  TN timeout, number of seconds after a non-responding link is shutdown");
+  infomsg("  TN timeout, number of seconds after a non-responding link is"
+          " shutdown; also bounds host name resolution");
   infomsg
     ("  RN number of retries, in case of timeout or non-fatal errors (*R1)");
   infomsg

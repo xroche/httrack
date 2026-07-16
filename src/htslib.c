@@ -5084,10 +5084,8 @@ HTSEXT_API int check_hostname_dns(const char *const hostname) {
   return hts_dns_resolve_nocache(hostname, &buffer) != NULL;
 }
 
-/* One resolve in flight on its own thread. Refcounted: caller and worker each
-   drop a reference, the last one out frees. A timed-out resolve is abandoned,
-   never cancelled (getaddrinfo has no portable cancellation), so the worker
-   must touch nothing but the job: not opt, not the DNS cache, not the stack. */
+/* A resolve in flight. Refcounted: a timed-out resolve is abandoned, not
+   cancelled, so the last of caller/worker to leave frees the job. */
 typedef struct dns_resolve_job {
   htsmutex lock;
   int refcount;
@@ -5097,6 +5095,14 @@ typedef struct dns_resolve_job {
   int count;
   const char *error;
 } dns_resolve_job;
+
+/* Copy the first min(count, max) addresses of src into dest. */
+static void dns_copy_addrs(SOCaddr *dest, SOCaddr *src, int count, int max) {
+  int i;
+
+  for (i = 0; i < count && i < max; i++)
+    SOCaddr_copy_SOCaddr(dest[i], src[i]);
+}
 
 static void dns_job_release(dns_resolve_job *job) {
   hts_boolean last;
@@ -5111,17 +5117,17 @@ static void dns_job_release(dns_resolve_job *job) {
   }
 }
 
+/* Outlives a timed-out resolve, so it writes only the job: never opt (freed
+   before the thread wait at exit) nor the DNS cache. */
 static void dns_resolve_thread(void *arg) {
   dns_resolve_job *const job = (dns_resolve_job *) arg;
   SOCaddr resolved[HTS_MAXADDRNUM];
   const char *error = NULL;
   const int count = hts_dns_resolve_nocache_list(job->hostname, resolved,
                                                  HTS_MAXADDRNUM, &error);
-  int i;
 
   hts_mutexlock(&job->lock);
-  for (i = 0; i < count; i++)
-    SOCaddr_copy_SOCaddr(job->addr[i], resolved[i]);
+  dns_copy_addrs(job->addr, resolved, count, HTS_MAXADDRNUM);
   job->count = count;
   job->error = error;
   job->done = HTS_TRUE; /* published last: gates the caller's read of addr[] */
@@ -5163,11 +5169,8 @@ static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
     hts_mutexlock(&job->lock);
     done = job->done;
     if (done) {
-      int i;
-
       count = job->count;
-      for (i = 0; i < count && i < max; i++)
-        SOCaddr_copy_SOCaddr(out[i], job->addr[i]);
+      dns_copy_addrs(out, job->addr, count, max);
       if (error != NULL)
         *error = job->error;
     }
@@ -5254,9 +5257,7 @@ int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
   hts_mutexrelease(&opt->state.lock);
 
   /* copy result to caller (cache store may have failed; result still valid) */
-  for (i = 0; i < count && i < max; i++) {
-    SOCaddr_copy_SOCaddr(out[i], resolved[i]);
-  }
+  dns_copy_addrs(out, resolved, count, max);
   return count;
 }
 
