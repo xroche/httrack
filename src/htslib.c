@@ -3748,7 +3748,7 @@ static int proxy_default_port(const char *arg) {
   return hts_proxy_is_socks(arg) ? 1080 : 8080;
 }
 
-// port "a" of -P argument "arg": *DIGIT in 1..65535 (RFC3986), else the scheme
+// port "a" of -P argument "arg": digits fitting TCP's 1..65535, else the scheme
 // default. Not sscanf("%d"): past INT_MAX it wraps to a garbage port (#602)
 static int parse_proxy_port(const char *a, const char *arg) {
   char *end;
