@@ -48,8 +48,10 @@ if is_windows; then
     # The grandchild ping records its own Windows PID: non-empty proves it ran
     # (positive control, so the reap check can't pass vacuously), then it must go.
     gw="$tmp/gcwinpid"
+    # `wait` keeps the bash alive on the ping past the deadline; without it the
+    # bash exits at once and run_with_timeout returns 0 instead of timing out.
     # shellcheck disable=SC2016 # $1 expands in the bash -c child, by design
-    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1 & cat /proc/$!/winpid >"$1"' _ "$gw" || rc=$?
+    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1 & cat /proc/$!/winpid >"$1"; wait' _ "$gw" || rc=$?
     test "$rc" -eq 124 || fail "grandchild hang reported $rc"
     w=$(cat "$gw" 2>/dev/null)
     test -n "$w" || fail "positive control: grandchild ping never started"
