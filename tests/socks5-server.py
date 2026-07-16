@@ -16,6 +16,8 @@ import struct
 import sys
 import threading
 
+from proxytestlib import pipe
+
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
 REMOTE_HOST = b"socks-origin.invalid"
@@ -83,23 +85,6 @@ def recvn(conn, n):
             raise OSError("short read")
         buf += chunk
     return buf
-
-
-def pipe(src, dst):
-    try:
-        while True:
-            data = src.recv(65536)
-            if not data:
-                break
-            dst.sendall(data)
-    except OSError:
-        pass
-    finally:
-        for sock in (src, dst):
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
 
 
 def log(logdir, line):
