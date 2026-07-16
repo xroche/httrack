@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Unit-tests the suite watchdog (run_with_timeout/kill_tree in testlib.sh): a
+# hung child must be killed tree-and-all and reported 124, never left to orphan
+# a spinning httrack.exe. Regression guard for the Windows x64 hangs that read as
+# "the hosted runner lost communication with the server".
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# Exit status passes through when the command finishes in time.
+rc=0 && run_with_timeout 30 sh -c 'exit 0' || rc=$?
+test "$rc" -eq 0 || fail "clean exit reported $rc"
+rc=0 && run_with_timeout 30 sh -c 'exit 7' || rc=$?
+test "$rc" -eq 7 || fail "exit 7 reported $rc"
+
+# An overrunning command is reported 124, near the deadline not the child's end.
+start=$SECONDS
+rc=0
+if is_windows; then
+    run_with_timeout 2 ping -n 30 127.0.0.1 || rc=$?
+else
+    run_with_timeout 2 sleep 30 || rc=$?
+fi
+test "$rc" -eq 124 || fail "hang reported $rc, want 124"
+test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
+
+# The native descendant tree is really dead, not orphaned. On Windows an outer
+# MSYS bash with a native ping grandchild is the exact case signals can't reap;
+# on POSIX a surviving grandchild would touch the marker after we stop waiting.
+rc=0
+if is_windows; then
+    # Existence by exact Windows PID, not a global ping.exe count: the timing
+    # sub-test above leaves a still-dying ping that a count would race. Plain
+    # tasklist, no switches (the workflow's MSYS2_ARG_CONV_EXCL='*' mangles a
+    # //FI filter arg into a silent no-match); $2 is the PID column.
+    alive() { tasklist 2>/dev/null | awk -v p="$1" '$2 == p {f = 1} END {exit !f}'; }
+    # The grandchild ping records its own Windows PID: non-empty proves it ran
+    # (positive control, so the reap check can't pass vacuously), then it must go.
+    gw="$tmp/gcwinpid"
+    # `wait` keeps the bash alive on the ping past the deadline; without it the
+    # bash exits at once and run_with_timeout returns 0 instead of timing out.
+    # shellcheck disable=SC2016 # $1 expands in the bash -c child, by design
+    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1 & cat /proc/$!/winpid >"$1"; wait' _ "$gw" || rc=$?
+    test "$rc" -eq 124 || fail "grandchild hang reported $rc"
+    w=$(cat "$gw" 2>/dev/null)
+    test -n "$w" || fail "positive control: grandchild ping never started"
+    sleep 1
+    ! alive "$w" || fail "native ping grandchild (pid $w) survived the watchdog"
+else
+    started="$tmp/started" marker="$tmp/alive"
+    # The grandchild (backgrounded subshell) marks that it ran, then would touch
+    # the marker after the deadline; killing only the direct child orphans it, so
+    # the marker still appears. started present + marker absent = ran and reaped.
+    # shellcheck disable=SC2016 # $1/$2 expand in the sh -c child, by design
+    run_with_timeout 2 sh -c '{ : >"$1"; sleep 10; : >"$2"; } & wait' _ "$started" "$marker" || rc=$?
+    test "$rc" -eq 124 || fail "grandchild hang reported $rc"
+    test -e "$started" || fail "positive control: grandchild never ran"
+    sleep 12
+    test ! -e "$marker" || fail "watchdog left a grandchild running"
+fi
+
+echo "watchdog OK"

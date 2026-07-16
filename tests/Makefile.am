@@ -135,6 +135,7 @@ TESTS = \
 	54_local-update-truncate-purge.test \
 	55_local-chunked.test \
 	56_local-proxy-noleak.test \
-	57_local-proxy-connect.test
+	57_local-proxy-connect.test \
+	58_watchdog.test
 
 CLEANFILES = check-network_sh.cache
