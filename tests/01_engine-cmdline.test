@@ -102,4 +102,38 @@ for bad in nan nan:5 5:nan inf 10:5 99999; do
     refused "#185: invalid --pause '$bad' not refused cleanly"
 done
 
+# An option is not -i (continue) merely because its name contains an 'i' (#615).
+# These used to wipe the URL given before them and exit on the usage screen.
+run "$tmp/ord-bti" --build-top-index
+accepted "$tmp/ord-bti" "#615: --build-top-index after the URL wiped the URL list"
+run "$tmp/ord-bti-s" "-%i"
+accepted "$tmp/ord-bti-s" "#615: -%i after the URL wiped the URL list"
+run "$tmp/ord-proto" --protocol 2
+accepted "$tmp/ord-proto" "#615: --protocol after the URL wiped the URL list"
+run "$tmp/ord-proto-s" "-@i2"
+accepted "$tmp/ord-proto-s" "#615: -@i2 after the URL wiped the URL list"
+
+# -%q trips the same defect on the neighbouring 'q' test, which only forces
+# quiet mode; the quiet flag itself is not observable here, so just check the
+# crawl still runs.
+run "$tmp/ord-iqs" "-%q"
+accepted "$tmp/ord-iqs" "#615: -%q after the URL broke the crawl"
+
+# The real -i still forces continue mode and drops the URL list, in every form:
+# a fix that merely stopped looking for 'i' would pass the checks above.
+run "$tmp/cont-s" -i
+refused "#615: -i after the URL no longer forces continue mode"
+run "$tmp/cont-c" -iC2
+refused "#615: -iC2 after the URL no longer forces continue mode"
+run "$tmp/cont-l" --continue
+refused "#615: --continue after the URL no longer forces continue mode"
+run "$tmp/cont-u" --update
+refused "#615: --update after the URL no longer forces continue mode"
+
+# Placed before the URL these always worked; they must keep working.
+run_only "$tmp/pre-bti" "-%i" "file://$tmp/index.html"
+accepted "$tmp/pre-bti" "#615: -%i before the URL broke the crawl"
+run_only "$tmp/pre-proto" "-@i2" "file://$tmp/index.html"
+accepted "$tmp/pre-proto" "#615: -@i2 before the URL broke the crawl"
+
 exit 0

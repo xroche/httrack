@@ -113,6 +113,7 @@ HTSEXT_API int hts_main(int argc, char **argv) {
 }
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
+static hts_boolean cmdl_shortopt_has(const char *s, char c);
 
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
@@ -304,11 +305,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                      hts_get_version_info(opt));
               return 0;
             } else {
-              if (strncmp(tmp_argv[0], "--", 2)) {      /* pas */
-                if ((strchr(tmp_argv[0], 'q') != NULL))
-                  opt->quiet = 1;       // ne pas poser de questions! (nohup par exemple)
-                if ((strchr(tmp_argv[0], 'i') != NULL)) {       // doit.log!
-                  argv_url = -1;        /* forcer */
+              if (strncmp(tmp_argv[0], "--", 2)) { /* not a long option */
+                if (cmdl_shortopt_has(tmp_argv[0], 'q'))
+                  opt->quiet = 1; // do not ask any question (nohup, etc.)
+                if (cmdl_shortopt_has(tmp_argv[0], 'i')) { // doit.log!
+                  argv_url = -1;
                   opt->quiet = 1;
                 }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
@@ -2805,6 +2806,14 @@ int check_path(String * s, char *defaultname) {
     StringCat(*s, "/");
 
   return return_value;
+}
+
+/* Does the plain short-option cluster s (-i, -iC2, -qg) carry flag c?
+   -%i, -@i and -#i are options in their own right, not clusters of flags. */
+static hts_boolean cmdl_shortopt_has(const char *s, char c) {
+  if (s[0] != '-' || s[1] == '-' || s[1] == '%' || s[1] == '@' || s[1] == '#')
+    return HTS_FALSE;
+  return strchr(s + 1, c) != NULL;
 }
 
 // détermine si l'argument est une option
