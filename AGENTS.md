@@ -67,8 +67,9 @@ Before pushing, and when reviewing others, don't skim for bugs:
 - **Co-Authored-By is mandatory for AI-assisted commits.** Carry a
   `Co-Authored-By:` trailer naming the assistant. Attribute there, never in a
   PR-body footer.
-- PRs land as a merge commit; every commit on the branch goes onto master, so
-  keep each commit message clean and meaningful.
+- PRs are squash-merged: one commit per PR lands on master, built from the PR
+  title and description, so those are what the history keeps. The branch's
+  intermediate commits are not preserved.
 
 ## PR descriptions
 - Plain concise prose; lead with what changed and why. No What/Why/How template.
