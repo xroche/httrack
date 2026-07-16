@@ -16,9 +16,13 @@ Proxy modes (argv[2], default "ok"):
 Usage: proxy-connect-server.py <logdir> [mode]
 Prints "ORIGIN <port>", "PROXY <port>", then "ready" (one per line) on stdout.
 """
+import os
 import sys
 
-import proxytestlib
+# python3 -P (PYTHONSAFEPATH) drops the script's own directory from sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import proxytestlib  # noqa: E402
 
 ORIGIN_BODY = b"<html><body>ORIGIN-PAGE-564</body></html>"
 

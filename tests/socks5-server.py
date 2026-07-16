@@ -16,7 +16,10 @@ import struct
 import sys
 import threading
 
-from proxytestlib import pipe
+# python3 -P (PYTHONSAFEPATH) drops the script's own directory from sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from proxytestlib import pipe  # noqa: E402
 
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
