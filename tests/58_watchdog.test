@@ -38,28 +38,23 @@ test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 # The native descendant tree is really dead, not orphaned. On Windows an outer
 # MSYS bash with a native ping grandchild is the exact case signals can't reap;
 # on POSIX a surviving grandchild would touch the marker after we stop waiting.
-# Plain tasklist, no switches: under the workflow's MSYS2_ARG_CONV_EXCL='*' a
-# //FI filter arg reaches tasklist mangled and matches nothing (a silent vacuous
-# pass), so scan the whole list for the image name instead.
-pings() { tasklist 2>/dev/null | grep -ci 'ping\.exe' || true; }
 rc=0
 if is_windows; then
-    # Positive control: without it the zero-survivor check below could pass on a
-    # ping that never launched or a mistyped filter. Prove a live ping is seen,
-    # then that kill_tree reaps it, before trusting the grandchild assertion.
-    ping -n 30 127.0.0.1 >/dev/null 2>&1 &
-    probe=$!
-    sleep 1
-    live=$(pings)
-    kill_tree "$probe"
-    sleep 1
-    test "$live" -ge 1 || fail "positive control: filter saw no live ping.exe"
-    test "$(pings)" -eq 0 || fail "kill_tree left the probe ping.exe alive"
-
-    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1' || rc=$?
+    # Existence by exact Windows PID, not a global ping.exe count: the timing
+    # sub-test above leaves a still-dying ping that a count would race. Plain
+    # tasklist, no switches (the workflow's MSYS2_ARG_CONV_EXCL='*' mangles a
+    # //FI filter arg into a silent no-match); $2 is the PID column.
+    alive() { tasklist 2>/dev/null | awk -v p="$1" '$2 == p {f = 1} END {exit !f}'; }
+    # The grandchild ping records its own Windows PID: non-empty proves it ran
+    # (positive control, so the reap check can't pass vacuously), then it must go.
+    gw="$tmp/gcwinpid"
+    # shellcheck disable=SC2016 # $1 expands in the bash -c child, by design
+    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1 & cat /proc/$!/winpid >"$1"' _ "$gw" || rc=$?
     test "$rc" -eq 124 || fail "grandchild hang reported $rc"
+    w=$(cat "$gw" 2>/dev/null)
+    test -n "$w" || fail "positive control: grandchild ping never started"
     sleep 1
-    test "$(pings)" -eq 0 || fail "ping.exe survived: native grandchild not reaped"
+    ! alive "$w" || fail "native ping grandchild (pid $w) survived the watchdog"
 else
     started="$tmp/started" marker="$tmp/alive"
     # The grandchild (backgrounded subshell) marks that it ran, then would touch
