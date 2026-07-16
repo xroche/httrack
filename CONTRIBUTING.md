@@ -6,8 +6,8 @@ with an AI assistant? The operational checklist is [AGENTS.md](AGENTS.md).
 ## Pull requests
 
 - One change per PR. Small diffs merge fast.
-- PRs land as a merge commit, so the branch's commits go onto master as-is: keep
-  each commit message clean and explain *why*.
+- PRs are squash-merged: one commit per PR goes onto master, built from the PR
+  title and description, so those are the history. Explain *why* there.
 - Be terse in the PR title and description: name the problem, not the fix, don't
   restate the diff, and calibrate length to the change.
 - Add or update tests for engine changes (`tests/`), and keep CI green.
