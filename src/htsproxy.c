@@ -90,8 +90,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   if (soc == INVALID_SOCKET)
     return 0;
 
-  // CONNECT needs an explicit host:port; default per the origin scheme (an http
-  // origin tunnels to :80, an https one to :443)
+  // CONNECT needs an explicit host:port; default :80 for http, :443 for https
   authority[0] = '\0';
   if (portsep != NULL)
     strlcatbuff(authority, host, sizeof(authority)); // already host:port
@@ -136,8 +135,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 
-  // raw send: for an https tunnel ssl is set, so sendc() would route to TLS
-  // before the tunnel is open; send() reaches the still-plain socket either way
+  // raw send(): sendc() would route to TLS when ssl is set (https tunnel)
   {
     const char *p = req;
     size_t remain = strlen(req);

@@ -1365,8 +1365,7 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   hts_parse_proxy(argv[0], name, sizeof(name), &port);
-  // host= is what the connect actually resolves (scheme + user:pass stripped);
-  // kind= is the transport the scheme selects
+  // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,
          jump_identification_const(name),
          hts_proxy_is_socks(name)     ? "socks"

@@ -947,8 +947,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
             size_t ret;
-            // absolute-URI for an http proxy; a socks or CONNECT tunnel takes
-            // origin-form
+            // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form
             if (retour->req.proxy.active &&
                 !hts_proxy_is_socks(retour->req.proxy.name) &&
                 !hts_proxy_is_connect(retour->req.proxy.name)) {
@@ -1035,8 +1034,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     if (xsend)
       print_buffer(&bstr, "%s", xsend);  // éventuelles autres lignes
 
-    // for https and connect://, auth rides the CONNECT (the tunneled GET would
-    // leak it); for socks, the handshake
+    // https/connect://: auth rides the CONNECT; socks: the handshake
     if (retour->req.proxy.active &&
         !hts_proxy_is_socks(retour->req.proxy.name) &&
         !hts_proxy_is_connect(retour->req.proxy.name) &&

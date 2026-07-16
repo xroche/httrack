@@ -2757,9 +2757,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
           }
 
-          // plain http through a CONNECT-only proxy (tor HTTPTunnelPort, #564):
-          // tunnel to the origin, then send origin-form. https tunnels in the
-          // SSL block; keep_alive skips an already-tunneled reused socket.
+          // plain http tunneled through a CONNECT-only proxy (#564)
           if (back[i].r.req.proxy.active &&
               hts_proxy_is_connect(back[i].r.req.proxy.name) &&
               !back[i].r.keep_alive
