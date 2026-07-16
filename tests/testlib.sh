@@ -43,3 +43,48 @@ stop_server() {
     wait "$1" 2>/dev/null || true
     return 0
 }
+
+# Kill a backgrounded job and its whole descendant tree. POSIX: the caller must
+# have put the job in its own process group (run_with_timeout does) so we signal
+# the group; a bare kill would orphan the grandchildren. Windows: the tree is
+# native processes MSYS can't signal, so taskkill //T ends it by Windows PID.
+kill_tree() {
+    local pid=$1
+    if is_windows; then
+        local winpid=
+        test -r "/proc/$pid/winpid" && winpid=$(cat "/proc/$pid/winpid" 2>/dev/null)
+        if test -n "$winpid"; then
+            taskkill //F //T //PID "$winpid" >/dev/null 2>&1 || true
+        else
+            # The offline suite runs serially, so no wanted process races this.
+            taskkill //F //IM httrack.exe >/dev/null 2>&1 || true
+            taskkill //F //IM python.exe >/dev/null 2>&1 || true
+        fi
+    fi
+    kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+}
+
+# Run "$@" under a wall-clock deadline of $1 seconds; return its exit status, or
+# 124 if it overran and was killed. timeout(1) is unusable here: it's absent on
+# macOS and its signals can't reap httrack.exe on Windows. We poll and kill_tree.
+run_with_timeout() {
+    local secs=$1
+    shift
+    local had_m=
+    case "$-" in *m*) had_m=1 ;; esac
+    is_windows || set -m # own process group, so kill_tree can signal the group
+    "$@" &
+    local pid=$!
+    test -n "$had_m" || is_windows || set +m
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if test "$waited" -ge "$secs"; then
+            kill_tree "$pid"
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    wait "$pid"
+}

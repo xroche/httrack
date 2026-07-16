@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# Unit-tests the suite watchdog (run_with_timeout/kill_tree in testlib.sh): a
+# hung child must be killed tree-and-all and reported 124, never left to orphan
+# a spinning httrack.exe. Regression guard for the Windows x64 hangs that read as
+# "the hosted runner lost communication with the server".
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# Exit status passes through when the command finishes in time.
+rc=0 && run_with_timeout 30 sh -c 'exit 0' || rc=$?
+test "$rc" -eq 0 || fail "clean exit reported $rc"
+rc=0 && run_with_timeout 30 sh -c 'exit 7' || rc=$?
+test "$rc" -eq 7 || fail "exit 7 reported $rc"
+
+# An overrunning command is reported 124, near the deadline not the child's end.
+start=$SECONDS
+rc=0
+if is_windows; then
+    run_with_timeout 2 ping -n 30 127.0.0.1 || rc=$?
+else
+    run_with_timeout 2 sleep 30 || rc=$?
+fi
+test "$rc" -eq 124 || fail "hang reported $rc, want 124"
+test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
+
+# The native descendant tree is really dead, not orphaned. On Windows an outer
+# MSYS bash with a native ping grandchild is the exact case signals can't reap;
+# on POSIX a surviving grandchild would touch the marker after we stop waiting.
+rc=0
+if is_windows; then
+    run_with_timeout 2 bash -c 'ping -n 30 127.0.0.1 >/dev/null 2>&1' || rc=$?
+    test "$rc" -eq 124 || fail "grandchild hang reported $rc"
+    sleep 1
+    n=$(tasklist //FI "IMAGENAME eq PING.EXE" //NH 2>/dev/null | grep -ci "ping.exe" || true)
+    test "$n" -eq 0 || fail "$n ping.exe survived: native grandchild not reaped"
+else
+    marker="$tmp/alive"
+    # A backgrounded subshell (the grandchild) touches the marker; killing only
+    # the direct child would orphan it and the marker would still appear.
+    # shellcheck disable=SC2016 # $1 expands in the sh -c child, by design
+    run_with_timeout 2 sh -c '{ sleep 10; : >"$1"; } & wait' _ "$marker" || rc=$?
+    test "$rc" -eq 124 || fail "grandchild hang reported $rc"
+    sleep 12
+    test ! -e "$marker" || fail "watchdog left a grandchild running"
+fi
+
+echo "watchdog OK"

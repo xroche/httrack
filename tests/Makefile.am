@@ -133,6 +133,7 @@ TESTS = \
 	53_local-proxytrack-cache-corrupt.test \
 	54_local-update-truncate-purge.test \
 	55_local-chunked.test \
-	56_local-proxy-noleak.test
+	56_local-proxy-noleak.test \
+	57_watchdog.test
 
 CLEANFILES = check-network_sh.cache
