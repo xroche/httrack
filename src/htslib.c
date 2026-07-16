@@ -947,9 +947,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
             size_t ret;
-            // absolute-URI for an http proxy; a socks tunnel takes origin-form
+            // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form
             if (retour->req.proxy.active &&
-                !hts_proxy_is_socks(retour->req.proxy.name)) {
+                !hts_proxy_is_socks(retour->req.proxy.name) &&
+                !hts_proxy_is_connect(retour->req.proxy.name)) {
               print_buffer(&bstr,
                       "%s http://%s%s %s\r\n", method, adr, url,
                       protocol);
@@ -985,9 +986,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         print_buffer(&bstr, "HEAD ");
     }
 
-    // an http proxy needs an absolute URI; a socks tunnel does not
+    // an http proxy needs an absolute URI; a socks or CONNECT tunnel does not
     if (retour->req.proxy.active &&
         !hts_proxy_is_socks(retour->req.proxy.name) &&
+        !hts_proxy_is_connect(retour->req.proxy.name) &&
         (strncmp(adr, "https://", 8) != 0)) {
       if (!link_has_authority(adr)) {   // default http
 #if HDEBUG
@@ -1032,10 +1034,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     if (xsend)
       print_buffer(&bstr, "%s", xsend);  // éventuelles autres lignes
 
-    // for https, auth rides the CONNECT (the tunneled GET would leak it); for
-    // socks, the handshake
+    // https/connect://: auth rides the CONNECT; socks: the handshake
     if (retour->req.proxy.active &&
         !hts_proxy_is_socks(retour->req.proxy.name) &&
+        !hts_proxy_is_connect(retour->req.proxy.name) &&
         strncmp(adr, "https://", 8) != 0) {
       if (link_has_authorization(retour->req.proxy.name)) {     // et hop, authentification proxy!
         const char *a = jump_identification_const(retour->req.proxy.name);
@@ -3717,6 +3719,8 @@ const char *jump_protocol_const(const char *source) {
     source += p;
   else if ((p = strfield(source, "socks5:")))
     source += p;
+  else if ((p = strfield(source, "connect:")))
+    source += p;
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
@@ -3730,6 +3734,12 @@ hts_boolean hts_proxy_is_socks(const char *name) {
     return HTS_FALSE;
   return (strfield(name, "socks5h:") || strfield(name, "socks5:")) ? HTS_TRUE
                                                                    : HTS_FALSE;
+}
+
+hts_boolean hts_proxy_is_connect(const char *name) {
+  if (name == NULL)
+    return HTS_FALSE;
+  return strfield(name, "connect:") ? HTS_TRUE : HTS_FALSE;
 }
 
 // default proxy port for a -P argument, keyed on the scheme

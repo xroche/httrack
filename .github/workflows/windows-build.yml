@@ -158,7 +158,7 @@ jobs:
 
           pass=0 fail=0 skip=0 failed="" skipped=""
           for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
-                   *_local-*.test 13_crawl_proxy_https.test 57_watchdog.test; do
+                   *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test; do
             rc=0
             run_with_timeout 600 bash "$t" >"$t.log" 2>&1 || rc=$?
             case "$rc" in

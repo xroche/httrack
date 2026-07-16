@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 這鏡像發生了不可回復的錯誤
 Proxy type:
 proxy 類型:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-proxy 協定: HTTP 或 SOCKS5 (SOCKS5 的預設連接埠為 1080)。
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+代理協定。HTTP：標準代理。HTTP（CONNECT 隧道）：透過 CONNECT 隧道傳送每個請求，用於僅支援 CONNECT 的代理，例如 Tor 的 HTTPTunnelPort。SOCKS5：預設連接埠 1080。
 Load cookies from file:
 從檔案載入 cookies:
 Preload cookies from a Netscape cookies.txt file before crawling.

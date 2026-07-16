@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 Фатална грешка при създаването на този огледален сайт
 Proxy type:
 Тип на прокси:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Протокол на прокси: HTTP или SOCKS5 (стандартният порт на SOCKS5 е 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Протокол на прокси. HTTP: стандартно прокси. HTTP (CONNECT тунел): изпраща всяка заявка през CONNECT тунел, за прокси поддържащи само CONNECT като HTTPTunnelPort на Tor. SOCKS5: порт по подразбиране 1080.
 Load cookies from file:
 Зареждане на 'бисквитки' от файл:
 Preload cookies from a Netscape cookies.txt file before crawling.

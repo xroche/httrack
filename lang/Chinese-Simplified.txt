@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 
 Proxy type:
 代理类型:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-代理协议: HTTP 或 SOCKS5 (SOCKS5 的默认端口为 1080)。
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+代理协议。HTTP：标准代理。HTTP（CONNECT 隧道）：通过 CONNECT 隧道发送每个请求，用于仅支持 CONNECT 的代理，例如 Tor 的 HTTPTunnelPort。SOCKS5：默认端口 1080。
 Load cookies from file:
 从文件加载 cookies:
 Preload cookies from a Netscape cookies.txt file before crawling.

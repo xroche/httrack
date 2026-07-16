@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 Fataler Fehler während der Webseiten-Kopie
 Proxy type:
 Proxy-Typ:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Proxy-Protokoll: HTTP oder SOCKS5 (Standardport von SOCKS5 ist 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Proxy-Protokoll. HTTP: normaler Proxy. HTTP (CONNECT-Tunnel): sendet jede Anfrage durch einen CONNECT-Tunnel, für Proxys, die nur CONNECT unterstützen, wie Tors HTTPTunnelPort. SOCKS5: Standardport 1080.
 Load cookies from file:
 Cookies aus Datei laden:
 Preload cookies from a Netscape cookies.txt file before crawling.

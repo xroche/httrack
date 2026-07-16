@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 Podczas tworzenia lustra wydarzyl sie fatalny blad.
 Proxy type:
 Typ proxy:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Protokó³ proxy: HTTP lub SOCKS5 (domy¶lny port SOCKS5 to 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Protokó³ proxy. HTTP: standardowe proxy. HTTP (tunel CONNECT): wysy³a ka¿de ¿±danie przez tunel CONNECT, dla proxy obs³uguj±cych tylko CONNECT, jak HTTPTunnelPort w Torze. SOCKS5: port domy¶lny 1080.
 Load cookies from file:
 Wczytaj ciasteczka z pliku:
 Preload cookies from a Netscape cookies.txt file before crawling.

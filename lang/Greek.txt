@@ -932,8 +932,8 @@ A fatal error has occurred during this mirror
 Ένα καταστροφικό σφάλμα προκλήθηκε κατά την αντιγραφή αυτού του τόπου
 Proxy type:
 Τύπος proxy:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Πρωτόκολλο proxy: HTTP ή SOCKS5 (η προεπιλεγμένη θύρα του SOCKS5 είναι 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Πρωτόκολλο διαμεσολαβητή. HTTP: τυπικός διαμεσολαβητής. HTTP (σήραγγα CONNECT): στέλνει κάθε αίτημα μέσω σήραγγας CONNECT, για διαμεσολαβητές που υποστηρίζουν μόνο CONNECT όπως το HTTPTunnelPort του Tor. SOCKS5: προεπιλεγμένη θύρα 1080.
 Load cookies from file:
 Φόρτωση cookies από αρχείο:
 Preload cookies from a Netscape cookies.txt file before crawling.

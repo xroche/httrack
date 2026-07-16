@@ -932,8 +932,8 @@ A fatal error has occurred during this mirror
 Tijekom ovog zrcaljenja je nastala fatalna pogreška
 Proxy type:
 Vrsta posrednika:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Protokol posrednika: HTTP ili SOCKS5 (zadani port za SOCKS5 je 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Protokol posrednika. HTTP: standardni posrednik. HTTP (CONNECT tunel): ¹alje svaki zahtjev kroz CONNECT tunel, za posrednike koji podr¾avaju samo CONNECT poput Torovog HTTPTunnelPorta. SOCKS5: zadani port 1080.
 Load cookies from file:
 Uèitati kolaèiæe iz datoteke:
 Preload cookies from a Netscape cookies.txt file before crawling.

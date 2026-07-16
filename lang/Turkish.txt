@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 Bu yansýlama iþlemi sýrasýnda ölümcül bir hata oluþtu
 Proxy type:
 Proxy türü:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Proxy protokolü: HTTP veya SOCKS5 (SOCKS5 varsayýlan portu 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Proxy protokolü. HTTP: standart proxy. HTTP (CONNECT tüneli): her isteði bir CONNECT tüneli üzerinden gönderir; Tor'un HTTPTunnelPort gibi yalnýzca CONNECT destekleyen proxy'ler için. SOCKS5: varsayýlan baðlantý noktasý 1080.
 Load cookies from file:
 Çerezleri dosyadan yükle:
 Preload cookies from a Netscape cookies.txt file before crawling.
