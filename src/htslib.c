@@ -5084,50 +5084,161 @@ HTSEXT_API int check_hostname_dns(const char *const hostname) {
   return hts_dns_resolve_nocache(hostname, &buffer) != NULL;
 }
 
-// Needs locking
-// Internal DNS cache. Fill out[0..count-1] with up to max addresses for _iadr,
-// resolving (and caching the full list) on a miss. Returns the count.
-static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
-                                 SOCaddr *const out, const int max,
-                                 const char **error) {
-  char BIGSTK iadr[HTS_URLMAXSIZE * 2];
-  coucal cache = hts_cache(opt); // le cache dns
+/* One resolve in flight on its own thread. Refcounted: caller and worker each
+   drop a reference, the last one out frees. A timed-out resolve is abandoned,
+   never cancelled (getaddrinfo has no portable cancellation), so the worker
+   must touch nothing but the job: not opt, not the DNS cache, not the stack. */
+typedef struct dns_resolve_job {
+  htsmutex lock;
+  int refcount;
+  hts_boolean done;
+  char *hostname;
+  SOCaddr addr[HTS_MAXADDRNUM];
   int count;
+  const char *error;
+} dns_resolve_job;
+
+static void dns_job_release(dns_resolve_job *job) {
+  hts_boolean last;
+
+  hts_mutexlock(&job->lock);
+  last = (--job->refcount == 0) ? HTS_TRUE : HTS_FALSE;
+  hts_mutexrelease(&job->lock);
+  if (last) {
+    hts_mutexfree(&job->lock);
+    freet(job->hostname);
+    freet(job);
+  }
+}
+
+static void dns_resolve_thread(void *arg) {
+  dns_resolve_job *const job = (dns_resolve_job *) arg;
+  SOCaddr resolved[HTS_MAXADDRNUM];
+  const char *error = NULL;
+  const int count = hts_dns_resolve_nocache_list(job->hostname, resolved,
+                                                 HTS_MAXADDRNUM, &error);
+  int i;
+
+  hts_mutexlock(&job->lock);
+  for (i = 0; i < count; i++)
+    SOCaddr_copy_SOCaddr(job->addr[i], resolved[i]);
+  job->count = count;
+  job->error = error;
+  job->done = HTS_TRUE; /* published last: gates the caller's read of addr[] */
+  hts_mutexrelease(&job->lock);
+  dns_job_release(job);
+}
+
+/* Resolve hostname on a worker thread, giving up after timeout seconds.
+   Returns the address count, or -1 on timeout -- distinct from 0 ("does not
+   resolve"), which is a real answer and gets negative-cached. */
+static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
+                                                SOCaddr *const out,
+                                                const int max,
+                                                const int timeout,
+                                                const char **error) {
+  dns_resolve_job *job;
+  TStamp deadline;
+  int count = -1;
+  int poll_ms = 1;
+
+  if (timeout <= 0) /* no bound asked for (--timeout 0) */
+    return hts_dns_resolve_nocache_list(hostname, out, max, error);
+
+  job = calloct(1, sizeof(*job));
+  assertf(job != NULL);
+  hts_mutexinit(&job->lock);
+  job->hostname = strdupt(hostname);
+  job->refcount = 2; /* this caller + the worker */
+  if (hts_newthread(dns_resolve_thread, job) != 0) {
+    job->refcount = 1; /* no worker: fall back to resolving inline */
+    dns_job_release(job);
+    return hts_dns_resolve_nocache_list(hostname, out, max, error);
+  }
+
+  deadline = mtime_local() + (TStamp) timeout * 1000;
+  for (;;) {
+    hts_boolean done;
+
+    hts_mutexlock(&job->lock);
+    done = job->done;
+    if (done) {
+      int i;
+
+      count = job->count;
+      for (i = 0; i < count && i < max; i++)
+        SOCaddr_copy_SOCaddr(out[i], job->addr[i]);
+      if (error != NULL)
+        *error = job->error;
+    }
+    hts_mutexrelease(&job->lock);
+    if (done || mtime_local() >= deadline)
+      break;
+    Sleep(poll_ms);
+    if (poll_ms < 50) /* short first polls keep a fast resolve fast */
+      poll_ms *= 2;
+  }
+  dns_job_release(job);
+  return count;
+}
+
+int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
+                        const char **error) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+  SOCaddr resolved[HTS_MAXADDRNUM];
+  coucal cache;
+  int count, i;
 
   assertf(opt != NULL);
-  assertf(_iadr != NULL);
   assertf(out != NULL);
+  if (!strnotempty(iadr) || max <= 0) {
+    return 0;
+  }
 
-  strcpybuff(iadr, jump_identification_const(_iadr));
-  // couper éventuel :
+  /* cache key and resolver input: identification and any ":port" stripped */
+  strcpybuff(host, jump_identification_const(iadr));
   {
     char *a;
 
-    if ((a = jump_toport(iadr)))
+    if ((a = jump_toport(host)))
       *a = '\0';
   }
 
-  /* get IP from the dns cache */
-  count = hts_ghbn_all(cache, iadr, out, max);
+  hts_mutexlock(&opt->state.lock);
+  cache = hts_cache(opt);
+#if HTS_INET6 != 0
+  hts_resolver_check_env(); /* settle the backend before a worker reads it */
+#endif
+  count = hts_ghbn_all(cache, host, out, max);
+  hts_mutexrelease(&opt->state.lock);
   if (count >= 0) { // cache hit (0 == negative-cached)
     return count;
-  } else { // non présent dans le cache dns, tester
-    SOCaddr resolved[HTS_MAXADDRNUM];
-    t_dnscache *record;
-    int i;
+  }
 
 #if DEBUGDNS
-    printf("resolving (not cached) %s\n", iadr);
+  printf("resolving (not cached) %s\n", host);
 #endif
 
-    count = hts_dns_resolve_nocache_list(iadr, resolved, HTS_MAXADDRNUM, error);
+  /* Resolve with no lock held: getaddrinfo can block for a long time, and
+     state.lock also gates the stop request (#606). */
+  count = hts_dns_resolve_nocache_list_bounded(host, resolved, HTS_MAXADDRNUM,
+                                               opt->timeout, error);
 
 #if HTS_WIDE_DEBUG
-    DEBUG_W("gethostbyname done\n");
+  DEBUG_W("gethostbyname done\n");
 #endif
 
-    /* attempt to store new entry (coucal owns it and dups the host key) */
-    record = malloct(sizeof(t_dnscache));
+  if (count < 0) { /* timed out: no answer to cache, and none to report */
+    if (error != NULL)
+      *error = "host name resolution timed out";
+    return 0;
+  }
+
+  hts_mutexlock(&opt->state.lock);
+  { /* store the full list (coucal owns the record and dups the host key; a
+       concurrent resolve of the same host replaces, and frees, this one) */
+    t_dnscache *const record = malloct(sizeof(t_dnscache));
+
     if (record != NULL) {
       memset(record, 0, sizeof(*record));
       record->host_count = count;
@@ -5137,28 +5248,15 @@ static int hts_dns_resolve_list_(httrackp *opt, const char *_iadr,
         memcpy(record->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
                record->host_length[i]);
       }
-      coucal_add_pvoid(cache, iadr, record);
+      coucal_add_pvoid(cache, host, record);
     }
-
-    /* copy result to caller (cache store may have failed; result still valid)
-     */
-    for (i = 0; i < count && i < max; i++) {
-      SOCaddr_copy_SOCaddr(out[i], resolved[i]);
-    }
-    return count;
-  } // retour hp du cache
-}
-
-int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
-                        const char **error) {
-  int count;
-
-  if (!strnotempty(iadr) || max <= 0) {
-    return 0;
   }
-  hts_mutexlock(&opt->state.lock);
-  count = hts_dns_resolve_list_(opt, iadr, out, max, error);
   hts_mutexrelease(&opt->state.lock);
+
+  /* copy result to caller (cache store may have failed; result still valid) */
+  for (i = 0; i < count && i < max; i++) {
+    SOCaddr_copy_SOCaddr(out[i], resolved[i]);
+  }
   return count;
 }
 

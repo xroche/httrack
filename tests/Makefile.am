@@ -35,6 +35,7 @@ TESTS = \
 	01_engine-copyopt.test \
 	01_engine-crange.test \
 	01_engine-dns.test \
+	01_engine-dnstimeout.test \
 	01_engine-doitlog.test \
 	01_engine-entities.test \
 	01_engine-filelist.test \

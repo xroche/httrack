@@ -46,6 +46,12 @@ typedef struct httrackp httrackp;
    Returns the number of failed checks (0 == success). */
 int dns_selftests(httrackp *opt);
 
+/* Drive a deliberately slow (mock) resolver, asserting that a resolve is
+   bounded by opt->timeout, does not hold opt->state.lock while it runs, and
+   does not cache a timeout as an answer (#606). Takes a few seconds.
+   Returns the number of failed checks (0 == success). */
+int dns_timeout_selftests(httrackp *opt);
+
 #endif
 
 #endif

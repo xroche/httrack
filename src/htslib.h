@@ -222,7 +222,8 @@ LLint http_xfread1(htsblk * r, int bufl);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
    Resolves once per host; later calls read the DNS cache. Must hold no lock
-   (brackets opt->state.lock itself). */
+   (brackets opt->state.lock itself, never across the resolve). A miss resolves
+   on a worker thread bounded by opt->timeout; a timeout reports 0, uncached. */
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,

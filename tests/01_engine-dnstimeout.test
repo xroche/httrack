@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# A resolve against a deliberately slow mock getaddrinfo (no network) must
+# return on --timeout, must not hold opt->state.lock meanwhile, and must not
+# cache the timeout as an answer (#606).
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=dnstimeout run)
+
+test "$out" = "dns-timeout-selftest: OK" || {
+    echo "expected 'dns-timeout-selftest: OK', got: $out" >&2
+    exit 1
+}
