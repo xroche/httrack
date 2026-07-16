@@ -54,6 +54,13 @@ refused() {
         ! echo "FAIL: $1 (exit $RC)" || exit 1
 }
 
+# assert continue mode was entered: it drops the URL list, so with no cache to
+# resume the run ends on the usage screen rather than on any other error
+continued() {
+    { test "$RC" -ne 0 && grep -q 'usage:' "$1/.log"; } ||
+        ! echo "FAIL: $2 (exit $RC)" || exit 1
+}
+
 # a value past the old 126/256 caps but within the cap is accepted, on both the
 # short and long form of each option
 long=$(nchars 900)
@@ -113,22 +120,34 @@ accepted "$tmp/ord-proto" "#615: --protocol after the URL wiped the URL list"
 run "$tmp/ord-proto-s" "-@i2"
 accepted "$tmp/ord-proto-s" "#615: -@i2 after the URL wiped the URL list"
 
-# -%q trips the same defect on the neighbouring 'q' test, which only forces
-# quiet mode; the quiet flag itself is not observable here, so just check the
-# crawl still runs.
+# %, &, @ and # take the letter after them into another option set, wherever
+# they sit in the cluster, so the i of -q%i is not the main-set -i either.
+run "$tmp/ord-qpi" "-q%i"
+accepted "$tmp/ord-qpi" "#615: -q%i after the URL wiped the URL list"
+run "$tmp/ord-qai" "-q@i"
+accepted "$tmp/ord-qai" "#615: -q@i after the URL wiped the URL list"
+
+# -%q only forces quiet mode, which nothing here can see: a run whose stdout is
+# not a tty is quiet from the start (htscoremain.c:174). Just check it crawls.
 run "$tmp/ord-iqs" "-%q"
 accepted "$tmp/ord-iqs" "#615: -%q after the URL broke the crawl"
 
 # The real -i still forces continue mode and drops the URL list, in every form:
 # a fix that merely stopped looking for 'i' would pass the checks above.
 run "$tmp/cont-s" -i
-refused "#615: -i after the URL no longer forces continue mode"
+continued "$tmp/cont-s" "#615: -i after the URL no longer forces continue mode"
 run "$tmp/cont-c" -iC2
-refused "#615: -iC2 after the URL no longer forces continue mode"
+continued "$tmp/cont-c" "#615: -iC2 after the URL no longer forces continue mode"
 run "$tmp/cont-l" --continue
-refused "#615: --continue after the URL no longer forces continue mode"
+continued "$tmp/cont-l" "#615: --continue after the URL no longer forces continue mode"
 run "$tmp/cont-u" --update
-refused "#615: --update after the URL no longer forces continue mode"
+continued "$tmp/cont-u" "#615: --update after the URL no longer forces continue mode"
+
+# ...including where another set's letter precedes it in the cluster.
+run "$tmp/cont-pq" "-%qi"
+continued "$tmp/cont-pq" "#615: -%qi after the URL no longer forces continue mode"
+run "$tmp/cont-pm" "-%Mi"
+continued "$tmp/cont-pm" "#615: -%Mi after the URL no longer forces continue mode"
 
 # Placed before the URL these always worked; they must keep working.
 run_only "$tmp/pre-bti" "-%i" "file://$tmp/index.html"

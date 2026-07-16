@@ -307,10 +307,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             } else {
               if (strncmp(tmp_argv[0], "--", 2)) { /* not a long option */
                 if (cmdl_shortopt_has(tmp_argv[0], 'q'))
-                  opt->quiet = 1; // do not ask any question (nohup, etc.)
+                  opt->quiet = HTS_TRUE; // never ask questions (nohup)
                 if (cmdl_shortopt_has(tmp_argv[0], 'i')) { // doit.log!
                   argv_url = -1;
-                  opt->quiet = 1;
+                  opt->quiet = HTS_TRUE;
                 }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
                 opt->quiet = 1; // ne pas poser de questions! (nohup par exemple)
@@ -2808,12 +2808,30 @@ int check_path(String * s, char *defaultname) {
   return return_value;
 }
 
-/* Does the plain short-option cluster s (-i, -iC2, -qg) carry flag c?
-   -%i, -@i and -#i are options in their own right, not clusters of flags. */
+/* Does the short-option cluster s carry c from the main option set (-i, -iC2,
+   -%Mi)? Walked as the parser does below: %, &, @ and # each take the letter
+   after them into another set, so the i of -%i is not the main-set -i. */
 static hts_boolean cmdl_shortopt_has(const char *s, char c) {
-  if (s[0] != '-' || s[1] == '-' || s[1] == '%' || s[1] == '@' || s[1] == '#')
+  const char *com;
+
+  if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
-  return strchr(s + 1, c) != NULL;
+  for (com = s + 1; *com != '\0'; com++) {
+    switch (*com) {
+    case '%':
+    case '&':
+    case '@':
+    case '#':
+      if (*(com + 1) != '\0')
+        com++; /* skip the other set's letter */
+      break;
+    default:
+      if (*com == c)
+        return HTS_TRUE;
+      break;
+    }
+  }
+  return HTS_FALSE;
 }
 
 // détermine si l'argument est une option
