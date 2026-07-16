@@ -3,7 +3,7 @@ Slovenian
 LANGUAGE_FILE
 Slovenian
 LANGUAGE_ISO
-si
+sl
 LANGUAGE_AUTHOR
 Jadran Rudec,iur.\r\njrudec@email.si \r\n
 LANGUAGE_CHARSET

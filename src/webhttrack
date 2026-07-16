@@ -33,6 +33,19 @@ function log {
     return 0
 }
 
+# Map a POSIX locale ("zh_TW.UTF-8@euro") to its lang.indexes number, English (1) if unknown
+function lang_index {
+    local locale=$1 indexes=$2 tag n t
+    tag=$(echo "${locale}" | cut -f1 -d'.' | cut -f1 -d'@' | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z_')
+    # a few languages carry a region-specific entry (zh_tw, pt_br); else use the bare language
+    for t in "${tag}" "${tag%%_*}"; do
+        n=$(grep -E "^${t}:" "${indexes}" | cut -f2 -d':')
+        test -n "${n}" && break
+    done
+    test -n "${n}" || n=1
+    echo "${n}"
+}
+
 function launch_browser {
     log "Launching $1"
     browser=$1
@@ -59,13 +72,11 @@ test -f "${DISTPATH}/lang.indexes" || ! log "Could not find ${DISTPATH}/lang.ind
 test -d "${DISTPATH}/lang" || ! log "Could not find ${DISTPATH}/lang" || exit 1
 test -d "${DISTPATH}/html" || ! log "Could not find ${DISTPATH}/html" || exit 1
 
-# Locale
-HTSLANG="${LC_MESSAGES}"
-! test -n "${HTSLANG}" && HTSLANG="${LC_ALL}"
+# Locale: POSIX precedence, LC_ALL overrides LC_MESSAGES overrides LANG
+HTSLANG="${LC_ALL}"
+! test -n "${HTSLANG}" && HTSLANG="${LC_MESSAGES}"
 ! test -n "${HTSLANG}" && HTSLANG="${LANG}"
-HTSLANG="$(echo "$LANG" | cut -f1 -d'.' | cut -f1 -d'_')"
-LANGN=$(grep -E "^${HTSLANG}:" "${DISTPATH}/lang.indexes" | cut -f2 -d':')
-! test -n "${LANGN}" && LANGN=1
+LANGN=$(lang_index "${HTSLANG}" "${DISTPATH}/lang.indexes")
 
 # Find the browser
 # note: not all systems have sensible-browser or www-browser alternative

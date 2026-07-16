@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# webhttrack must map the caller's locale to the right lang.indexes number.
+# Regression guard: LC_ALL/LC_MESSAGES were ignored, and the region-qualified
+# entries (zh_tw, pt_br) were unreachable because the region was cut off.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=$(cd "${testdir}/.." && pwd)
+script="${distdir}/src/webhttrack"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+test -r "${script}" || fail "no ${script}"
+test -r "${distdir}/lang.indexes" || fail "no ${distdir}/lang.indexes"
+
+# Lift the locale code out of the launcher rather than reimplementing it, so this
+# tests the shipped logic whatever shape it takes.
+funcs=$(sed -n '/^function lang_index/,/^}/p' "${script}")
+block=$(sed -n '/^# Locale/,/^$/p' "${script}")
+echo "${block}" | grep -q 'LANGN=' || fail "could not lift the locale block from ${script}"
+
+# Resolve LANG/LC_ALL/LC_MESSAGES (empty = unset) to the language number.
+lang_of() {
+    (
+        unset LANG LC_ALL LC_MESSAGES
+        # only the value matters here; hide bash's setlocale gripe when the locale is not installed
+        {
+            if test -n "$1"; then export LANG="$1"; fi
+            if test -n "$2"; then export LC_ALL="$2"; fi
+            if test -n "$3"; then export LC_MESSAGES="$3"; fi
+        } 2>/dev/null
+        # shellcheck disable=SC2034 # read by the eval'd locale block
+        DISTPATH="${distdir}"
+        # the launcher runs under neither -e (its "! test -n x && y" idiom returns 1)
+        # nor -u (it reads LC_ALL and friends unset)
+        set +eu
+        eval "${funcs}"
+        eval "${block}"
+        # shellcheck disable=SC2153 # LANGN is set by the eval'd block, not a LANG typo
+        echo "${LANGN}"
+    )
+}
+
+check() {
+    local want=$1 got desc
+    shift
+    desc="LANG='$1' LC_ALL='$2' LC_MESSAGES='$3'"
+    got=$(lang_of "$1" "$2" "$3")
+    test "${got}" = "${want}" || fail "${desc}: want ${want}, got ${got}"
+    echo "ok: ${desc} -> ${got}"
+}
+
+#      want  LANG            LC_ALL          LC_MESSAGES
+check 2 "fr_FR.UTF-8" "" ""                       # plain language
+check 14 "zh_TW.UTF-8" "" ""                      # region-qualified: Chinese-BIG5, not Simplified (13)
+check 12 "pt_BR.UTF-8" "" ""                      # region-qualified: Portugues-Brasil, not Portugues (7)
+check 13 "zh_CN.UTF-8" "" ""                      # unlisted region falls back to the bare language
+check 24 "sl_SI.UTF-8" "" ""                      # Slovenian is ISO 639-1 "sl"
+check 4 "" "de_DE.UTF-8" ""                       # LC_ALL alone
+check 4 "" "" "de_DE.UTF-8"                       # LC_MESSAGES alone
+check 4 "fr_FR.UTF-8" "de_DE.UTF-8" ""            # LC_ALL wins over LANG
+check 4 "fr_FR.UTF-8" "" "de_DE.UTF-8"            # LC_MESSAGES wins over LANG
+check 2 "de_DE.UTF-8" "fr_FR.UTF-8" "de_DE.UTF-8" # LC_ALL wins over LC_MESSAGES
+check 2 "fr_FR@euro" "" ""                        # @modifier without a charset
+check 1 "C" "" ""                                 # C, unknown and unset all mean English
+check 1 "xx_YY.UTF-8" "" ""
+check 1 "" "" ""
+
+echo "PASS"
