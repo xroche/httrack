@@ -61,9 +61,13 @@ p 'socks5://user:pass@[::1]' 'name=socks5://user:pass@[::1] port=1080 host=[::1]
 p 'socks5://user:pass@[::1]:9050' 'name=socks5://user:pass@[::1] port=9050 host=[::1] kind=socks'
 p '[::1]' 'name=[::1] port=8080 host=[::1] kind=http'
 p '[::1]:3128' 'name=[::1] port=3128 host=[::1] kind=http'
-# the ']' only ends the scan: one in the userinfo still leaves the port readable
+# the ']' only ends the scan: one outside a literal must eat neither the name nor
+# the port. The last two discriminate: when a real port follows the ']', a
+# truncating bug agrees by accident.
 p 'http://user:p]ass@host:80' 'name=http://user:p]ass@host port=80 host=host kind=http'
 p 'http://a]b:3128' 'name=http://a]b port=3128 host=a]b kind=http'
+p 'http://a]b' 'name=http://a]b port=8080 host=a]b kind=http'
+p 'http://a]b:c@host' 'name=http://a]b:c@host port=8080 host=host kind=http'
 
 # a lone ':' must not underflow the backward scan
 p ':' 'name= port=8080 host= kind=http'
