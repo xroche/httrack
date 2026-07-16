@@ -3754,12 +3754,12 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
 
   if (name_size == 0)
     return;
-  // scan back to the port ':' (or userinfo '@'), but never past the authority,
-  // so a scheme's own colon is not read as a port separator; inspect a[-1] from
-  // one-past-end so no pointer below the string is ever formed
+  // scan back to the port ':' (or userinfo '@'), never past the authority (a
+  // scheme's own colon is not a port separator) nor into an IPv6 literal (']'
+  // stops it); inspect a[-1] from one-past-end so no pointer underflows
   authority = (authority != NULL) ? authority + 3 : arg;
   a = arg + strlen(arg);
-  while (a > authority && a[-1] != ':' && a[-1] != '@')
+  while (a > authority && a[-1] != ':' && a[-1] != '@' && a[-1] != ']')
     a--;
   if (a > authority && a[-1] == ':') {
     int p = -1;

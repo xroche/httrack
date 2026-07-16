@@ -51,5 +51,16 @@ p 'socks5://us%3Aer:pass@host:1080' 'name=socks5://us%3Aer:pass@host port=1080 h
 p 'socks5://a@b:c@host:1080' 'name=socks5://a@b:c@host port=1080 host=host kind=socks'
 p 'socks5://naïve:pass@héllo:1080' 'name=socks5://naïve:pass@héllo port=1080 host=héllo kind=socks'
 
+# a bracketed IPv6 literal holds colons of its own: the backward scan must stop
+# at the ']', or a portless literal parses to a truncated name and port=1
+p 'http://[2001:db8::1]' 'name=http://[2001:db8::1] port=8080 host=[2001:db8::1] kind=http'
+p 'http://[2001:db8::1]:3128' 'name=http://[2001:db8::1] port=3128 host=[2001:db8::1] kind=http'
+p 'socks5://[::1]' 'name=socks5://[::1] port=1080 host=[::1] kind=socks'
+p 'socks5://[::1]:1080' 'name=socks5://[::1] port=1080 host=[::1] kind=socks'
+p 'socks5://user:pass@[::1]' 'name=socks5://user:pass@[::1] port=1080 host=[::1] kind=socks'
+p 'socks5://user:pass@[::1]:9050' 'name=socks5://user:pass@[::1] port=9050 host=[::1] kind=socks'
+p '[::1]' 'name=[::1] port=8080 host=[::1] kind=http'
+p '[::1]:3128' 'name=[::1] port=3128 host=[::1] kind=http'
+
 # a lone ':' must not underflow the backward scan
 p ':' 'name= port=8080 host= kind=http'
