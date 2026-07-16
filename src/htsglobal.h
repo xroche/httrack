@@ -323,11 +323,9 @@ typedef int64_t TStamp;
 #define LLintP "%" PRId64
 
 /* Integer type for file offsets/sizes passed to the C library; INTsysP is its
-   printf conversion. FIXME: LFS_FLAG is a configure make variable, never a C
-   macro, so this test is dead and INTsys stays int on POSIX despite large-file
-   support (the real macro is HTS_LFS). Widening it there is an installed-header
-   type change, so it is left alone here. */
-#if defined(LFS_FLAG) || defined(_MSC_VER)
+   printf conversion. HTS_LFS is the large-file macro: LFS_FLAG is a configure
+   make variable carrying the -D flags, never itself defined. */
+#if defined(HTS_LFS) || defined(_MSC_VER)
 typedef LLint INTsys;
 
 #define INTsysP LLintP
