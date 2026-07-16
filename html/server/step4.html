@@ -192,7 +192,7 @@ ${do:end-if}
 	${test:logtype:::--extra-log:--debug-log}
 	${test:index:--index=0:}
 	${test:index2:--search-index=0:--search-index}
-	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype:socks5\3A//}${do:end-if}${do:output-mode:html}${prox}${test:prox:\3A}${portprox}${test:prox:"}
+	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${prox}${test:prox:\3A}${portprox}${test:prox:"}
 	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
 </textarea>
 

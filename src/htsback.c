@@ -2757,6 +2757,26 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
           }
 
+          // plain http through a CONNECT-only proxy (tor HTTPTunnelPort, #564):
+          // tunnel to the origin, then send origin-form. https tunnels in the
+          // SSL block below; keep_alive skips an already-tunneled reused socket.
+          if (!back[i].r.ssl && back[i].r.req.proxy.active &&
+              hts_proxy_is_connect(back[i].r.req.proxy.name) &&
+              !back[i].r.keep_alive) {
+            const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
+
+            if (!http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout)) {
+              if (!strnotempty(back[i].r.msg))
+                strcpybuff(back[i].r.msg, "proxy CONNECT failed");
+              deletehttp(&back[i].r);
+              back[i].r.soc = INVALID_SOCKET;
+              back[i].r.statuscode = STATUSCODE_NON_FATAL;
+              back[i].status = STATUS_READY;
+              back_set_finished(sback, i);
+              continue;
+            }
+          }
+
 #if HTS_USEOPENSSL
           /* SSL mode */
           if (back[i].r.ssl) {

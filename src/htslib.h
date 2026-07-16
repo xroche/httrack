@@ -210,6 +210,10 @@ int check_writeinput_t(T_SOC soc, int timeout);
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
 hts_boolean hts_proxy_is_socks(const char *name);
 
+/* TRUE if this -P proxy name is a "connect://" proxy: an HTTP proxy driven with
+   CONNECT for every request, plain http included (tor HTTPTunnelPort, #564). */
+hts_boolean hts_proxy_is_connect(const char *name);
+
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);

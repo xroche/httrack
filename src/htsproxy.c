@@ -90,12 +90,16 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   if (soc == INVALID_SOCKET)
     return 0;
 
-  // CONNECT needs an explicit host:port; default the https port
+  // CONNECT needs an explicit host:port; default per the origin scheme (an http
+  // origin tunnels to :80, an https one to :443)
   authority[0] = '\0';
   if (portsep != NULL)
     strlcatbuff(authority, host, sizeof(authority)); // already host:port
-  else
-    snprintf(authority, sizeof(authority), "%s:%d", host, 443);
+  else {
+    const int defport = (strncmp(adr, "https://", 8) == 0) ? 443 : 80;
+
+    snprintf(authority, sizeof(authority), "%s:%d", host, defport);
+  }
 
   // backstop: never let a stray CR/LF in the host smuggle a second line into
   // the CONNECT request (the host is already sanitized upstream)

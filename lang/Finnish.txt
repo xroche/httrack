@@ -933,8 +933,8 @@ Tällä peilillä tapahtui vakava virhe
 
 Proxy type:
 Välityspalvelimen tyyppi:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Välityspalvelimen protokolla: HTTP tai SOCKS5 (SOCKS5:n oletusportti on 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Välityspalvelimen protokolla. HTTP: tavallinen välityspalvelin. HTTP (CONNECT-tunneli): lähettää jokaisen pyynnön CONNECT-tunnelin kautta, vain CONNECT-yhteyksiä tukeville välityspalvelimille kuten Torin HTTPTunnelPort. SOCKS5: oletusportti 1080.
 Load cookies from file:
 Lataa evästeet tiedostosta:
 Preload cookies from a Netscape cookies.txt file before crawling.

@@ -978,8 +978,8 @@ Default referer URL
 Champ referer par défaut
 Proxy type:
 Type de proxy :
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Protocole du proxy : HTTP ou SOCKS5 (le port SOCKS5 par défaut est 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Protocole du proxy. HTTP : proxy standard. HTTP (tunnel CONNECT) : envoie chaque requête via un tunnel CONNECT, pour les proxys acceptant uniquement CONNECT comme le HTTPTunnelPort de Tor. SOCKS5 : port par défaut 1080.
 Load cookies from file:
 Charger les cookies depuis un fichier :
 Preload cookies from a Netscape cookies.txt file before crawling.

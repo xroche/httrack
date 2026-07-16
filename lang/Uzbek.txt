@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 Joriy ko’chirish vaqtida jiddiy xatolik yuz berdi
 Proxy type:
 Proksi turi:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-Proksi protokoli: HTTP yoki SOCKS5 (SOCKS5 ning standart porti 1080).
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Proksi protokoli. HTTP: oddiy proksi. HTTP (CONNECT tuneli): har bir so'rovni CONNECT tuneli orqali yuboradi; faqat CONNECT'ni qo'llab-quvvatlaydigan proksilar uchun, masalan Tor HTTPTunnelPort. SOCKS5: standart port 1080.
 Load cookies from file:
 Fayldan cookies yuklamoq:
 Preload cookies from a Netscape cookies.txt file before crawling.

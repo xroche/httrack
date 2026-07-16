@@ -930,8 +930,8 @@ A fatal error has occurred during this mirror
 
 Proxy type:
 プロキシの種類:
-Proxy protocol: HTTP, or SOCKS5 (SOCKS5 default port is 1080).
-プロキシのプロトコル: HTTP または SOCKS5 (SOCKS5 の既定ポートは 1080)。
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+プロキシのプロトコル。HTTP: 標準のプロキシ。HTTP (CONNECT トンネル): すべてのリクエストを CONNECT トンネル経由で送信します。Tor の HTTPTunnelPort のような CONNECT のみのプロキシ用です。SOCKS5: 既定ポート 1080。
 Load cookies from file:
 クッキーをファイルから読み込む:
 Preload cookies from a Netscape cookies.txt file before crawling.
