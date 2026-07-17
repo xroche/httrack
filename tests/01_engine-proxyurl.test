@@ -71,3 +71,23 @@ p 'http://a]b:c@host' 'name=http://a]b:c@host port=8080 host=host kind=http'
 
 # a lone ':' must not underflow the backward scan
 p ':' 'name= port=8080 host= kind=http'
+
+# a port is *DIGIT in 1..65535, else the scheme default: sscanf("%d") used to
+# wrap past INT_MAX and hand back a garbage port (#602)
+p 'http://host:65535' 'name=http://host port=65535 host=host kind=http'
+p 'http://host:1' 'name=http://host port=1 host=host kind=http'
+p 'http://host:65536' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:2147483648' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:4294967296' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:99999999999999' 'name=http://host port=8080 host=host kind=http'
+# discriminating: this one wrapped to a plausible 80, so range-checking the
+# sscanf result instead of rejecting the overflow still passes everything above
+p 'http://host:4294967376' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:999999999999999999999999999999' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:0' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:-1' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:80x' 'name=http://host port=8080 host=host kind=http'
+p 'http://host: 80' 'name=http://host port=8080 host=host kind=http'
+p 'http://host:' 'name=http://host port=8080 host=host kind=http'
+# the fallback is the scheme's own default, not a hardcoded 8080
+p 'socks5://host:99999999999999' 'name=socks5://host port=1080 host=host kind=socks'

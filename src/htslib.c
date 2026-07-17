@@ -65,6 +65,7 @@ Please visit our Website: http://www.httrack.com
 #endif /* _WIN32 */
 #include <stdarg.h>
 
+#include <ctype.h>
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>
@@ -3747,6 +3748,20 @@ static int proxy_default_port(const char *arg) {
   return hts_proxy_is_socks(arg) ? 1080 : 8080;
 }
 
+// port "a" of -P argument "arg": digits fitting TCP's 1..65535, else the scheme
+// default. Not sscanf("%d"): past INT_MAX it wraps to a garbage port (#602)
+static int parse_proxy_port(const char *a, const char *arg) {
+  char *end;
+  long p;
+
+  if (!isdigit((unsigned char) *a)) // strtol would eat a sign or leading space
+    return proxy_default_port(arg);
+  p = strtol(a, &end, 10);
+  if (*end != '\0' || p < 1 || p > 65535) // ERANGE lands out of range too
+    return proxy_default_port(arg);
+  return (int) p;
+}
+
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
   const char *authority = strstr(arg, "://");
   const char *a;
@@ -3762,10 +3777,7 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
   while (a > authority && a[-1] != ':' && a[-1] != '@' && a[-1] != ']')
     a--;
   if (a > authority && a[-1] == ':') {
-    int p = -1;
-
-    sscanf(a, "%d", &p);
-    *port = (p > 0) ? p : proxy_default_port(arg);
+    *port = parse_proxy_port(a, arg);
     namelen = (size_t) (a - 1 - arg);
   } else {
     *port = proxy_default_port(arg);
