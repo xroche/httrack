@@ -896,7 +896,20 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
     if (fpo) {
       find_handle h;
 
-      verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/")); // générer gif
+      // générer gif. verif_backblue() is utf-8, but our path is the system
+      // charset, so on Windows convert it or the gifs land in a mangled twin
+      // dir (#217). Elsewhere the system charset is already utf-8.
+#ifdef _WIN32
+      {
+        const char *const base = concat(catbuff, sizeof(catbuff), rpath, "/");
+        char *const base_utf8 =
+            hts_convertStringSystemToUTF8(base, strlen(base));
+        verif_backblue(opt, base_utf8 != NULL ? base_utf8 : base);
+        free(base_utf8);
+      }
+#else
+      verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/"));
+#endif
       // Header
       hts_template_format(fpo, toptemplate_header,
               "<!-- Mirror and index made by HTTrack Website Copier/"
