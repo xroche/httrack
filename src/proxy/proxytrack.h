@@ -107,13 +107,12 @@ HTS_UNUSED static void proxytrack_print_log(const char *severity, const char *fo
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
+/* Same contract as hts_gethome(): proxytrack does not link libhttrack */
 HTS_UNUSED static const char *gethomedir(void) {
   const char *home = getenv("HOME");
 
-  if (home)
-    return home;
-  else
-    return ".";
+  /* An empty $HOME would resolve a relative path against the root */
+  return strnotempty(home) ? home : ".";
 }
 
 HTS_UNUSED static int linput(FILE * fp, char *s, int max) {
