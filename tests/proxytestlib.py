@@ -18,6 +18,15 @@ PROXY_LOG = "proxy.log"
 ORIGIN_LOG = "origin-headers.log"
 
 
+def bind_ephemeral():
+    """Listening socket on a free loopback port, and that port."""
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(16)
+    return srv, srv.getsockname()[1]
+
+
 def pipe(src, dst):
     """Relay bytes one way until EOF, then tear both ends down."""
     try:
@@ -113,11 +122,7 @@ def handle_client(conn, logdir, mode, default_port):
 
 
 def start_proxy(logdir, mode, default_port):
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("127.0.0.1", 0))
-    srv.listen(16)
-    port = srv.getsockname()[1]
+    srv, port = bind_ephemeral()
 
     def accept_loop():
         while True:

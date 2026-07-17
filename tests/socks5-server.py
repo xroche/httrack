@@ -19,7 +19,7 @@ import threading
 # python3 -P (PYTHONSAFEPATH) drops the script's own directory from sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from proxytestlib import pipe  # noqa: E402
+from proxytestlib import bind_ephemeral, pipe  # noqa: E402
 
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
@@ -180,11 +180,7 @@ def handle_socks(conn, logdir, mode):
 
 
 def start_socks(logdir, mode):
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("127.0.0.1", 0))
-    srv.listen(16)
-    port = srv.getsockname()[1]
+    srv, port = bind_ephemeral()
 
     def serve():
         while True:
