@@ -180,6 +180,12 @@ grep -q "^AUTH user secret\$" "$auth/socks.log" || {
     cat "$auth/socks.log" >&2
     exit 1
 }
+# the sub-negotiation carries RFC 1929's 0x01, not the 0x05 of the SOCKS5 greeting
+grep -q "^AUTHVER 1\$" "$auth/socks.log" || {
+    echo "FAIL: wrong RFC 1929 sub-negotiation version" >&2
+    cat "$auth/socks.log" >&2
+    exit 1
+}
 grep -qi "secret\|proxy-authorization" "$auth/origin-headers.log" && {
     echo "FAIL: socks credentials leaked into the origin request" >&2
     cat "$auth/origin-headers.log" >&2
