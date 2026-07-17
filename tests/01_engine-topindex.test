@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# hts_buildtopindex takes a system-charset path but verif_backblue below it
+# expects utf-8, mangling a non-ASCII project dir on Windows (#216, #217).
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=topindex "$dir" run |
+    grep -q "topindex self-test OK"
