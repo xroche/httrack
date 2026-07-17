@@ -567,24 +567,29 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
   return 0;
 }
 
-/* Get home directory, '.' if failed */
+/* Get home directory, '.' if unset or empty */
 /* example: /home/smith */
 const char *hts_gethome(void) {
   const char *home = getenv("HOME");
 
-  if (home)
-    return home;
-  else
-    return ".";
+  /* An empty $HOME would expand ~/foo into the absolute /foo */
+  return strnotempty(home) ? home : ".";
 }
 
-/* Convert ~/foo into /home/smith/foo */
+/* Convert ~/foo into /home/smith/foo (~user/ left alone: no getpwnam here) */
 void expand_home(String * str) {
-  if (StringSub(*str, 1) == '~') {
+  if (StringNotEmpty(*str) && StringSub(*str, 0) == '~' &&
+      (StringLength(*str) == 1 || StringSub(*str, 1) == '/')) {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+    const char *const home = hts_gethome();
+    const size_t homelen = strlen(home);
+    const size_t taillen = StringLength(*str) - 1;
 
-    strcpybuff(tempo, hts_gethome());
-    strcatbuff(tempo, StringBuff(*str) + 1);
-    StringCopy(*str, tempo);
+    /* Leave untouched rather than abort() in strcatbuff on a huge $HOME */
+    if (taillen < sizeof(tempo) && homelen < sizeof(tempo) - taillen) {
+      strcpybuff(tempo, home);
+      strcatbuff(tempo, StringBuff(*str) + 1);
+      StringCopy(*str, tempo);
+    }
   }
 }

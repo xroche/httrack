@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsdefines.h"
 #include "htslib.h"
+#include "htsalias.h"
 #include "htsparse.h"
 #include "htscache.h"
 #include "htscache_selftest.h"
@@ -822,6 +823,21 @@ static int st_simplify(httrackp *opt, int argc, char **argv) {
   }
   fil_simplifie(argv[0]);
   printf("simplified=%s\n", argv[0]);
+  return 0;
+}
+
+static int st_expandhome(httrackp *opt, int argc, char **argv) {
+  String path = STRING_EMPTY;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "expandhome: needs a path\n");
+    return 1;
+  }
+  StringCopy(path, argv[0]);
+  expand_home(&path);
+  printf("expanded=%s\n", StringBuff(path));
+  StringFree(path);
   return 0;
 }
 
@@ -3079,6 +3095,7 @@ static const struct selftest_entry {
     {"filterbounds", "", "matcher length/work caps reject hostile patterns",
      st_filterbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
+    {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",

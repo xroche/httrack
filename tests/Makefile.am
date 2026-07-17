@@ -59,6 +59,7 @@ TESTS = \
 	01_engine-pause.test \
 	01_engine-rcfile.test \
 	01_engine-reconcile.test \
+	01_engine-expandhome.test \
 	01_engine-fsize.test \
 	01_engine-redirect.test \
 	01_engine-relative.test \

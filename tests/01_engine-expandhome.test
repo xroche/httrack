@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+
+# SC2088: the literal, unexpanded '~' is the input under test.
+# shellcheck disable=SC2088
+
+set -euo pipefail
+
+# ~ expansion for the -O base path (expand_home). $HOME is pinned so the cases
+# cannot depend on the caller's, but MSYS rewrites it into a Windows path
+# before the native httrack.exe reads it: ask the engine what it saw rather
+# than hardcoding the value.
+ask() {
+    HOME=HTSHOME httrack -O /dev/null -#test=expandhome "$1"
+}
+exp() {
+    test "$(ask "$1")" == "expanded=$2" || exit 1
+}
+
+home=$(ask '~')
+home=${home#expanded=}
+
+# or every case below is vacuous: '~' means expansion never fired, '.' means it
+# fell back to the default without ever reading $HOME
+test "$home" != '~' || exit 1
+test "$home" != '.' || exit 1
+
+exp '~' "$home"
+exp '~/foo' "$home/foo"
+exp '~/foo/bar/#' "$home/foo/bar/#"
+exp '~/' "$home/"
+exp '~/../x' "$home/../x"
+
+# ~user/ needs getpwnam: left alone rather than mangled into $HOME + "user/"
+exp '~smith/foo' '~smith/foo'
+exp '~root' '~root'
+
+# only a leading '~' expands; anything else is a literal path component
+exp 'a~/x' 'a~/x'
+exp './~/x' './~/x'
+exp 'foo~bar' 'foo~bar'
+
+# an unset or empty $HOME must not turn ~/foo into the absolute /foo
+test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
+test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
+
+# A $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
+# rather than truncates. Only meaningful where the engine sees the value we set:
+# MSYS rewrites HOME into a path of its own choosing, long or not.
+if test "$home" = HTSHOME; then
+    long=$(printf '%04096d' 0 | tr '0' 'A')
+    test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
+fi
