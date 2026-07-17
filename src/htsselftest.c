@@ -2486,7 +2486,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   snprintf(path, sizeof(path), "%s/backblue.gif", projdir);
   assertf(fexist(path));
 
-  /* raw unlink/rmdir: the UNLINK macro is utf-8 on Windows, these paths aren't */
+  /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   unlink(path);
   snprintf(path, sizeof(path), "%s/fade.gif", projdir);
   unlink(path);
