@@ -572,21 +572,20 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
 const char *hts_gethome(void) {
   const char *home = getenv("HOME");
 
-  /* An empty $HOME is no better than an unset one: it would expand ~/foo into
-     the absolute /foo. */
+  /* An empty $HOME would expand ~/foo into the absolute /foo */
   return strnotempty(home) ? home : ".";
 }
 
 /* Convert ~/foo into /home/smith/foo (~user/ left alone: no getpwnam here) */
 void expand_home(String * str) {
-  if (StringNotEmpty(*str) && StringSub(*str, 0) == '~'
-      && (StringLength(*str) == 1 || StringSub(*str, 1) == '/')) {
+  if (StringNotEmpty(*str) && StringSub(*str, 0) == '~' &&
+      (StringLength(*str) == 1 || StringSub(*str, 1) == '/')) {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
     const char *const home = hts_gethome();
     const size_t homelen = strlen(home);
     const size_t taillen = StringLength(*str) - 1;
 
-    /* Leave untouched rather than let strcatbuff abort() on an oversized $HOME */
+    /* Leave untouched rather than abort() in strcatbuff on a huge $HOME */
     if (taillen < sizeof(tempo) && homelen < sizeof(tempo) - taillen) {
       strcpybuff(tempo, home);
       strcatbuff(tempo, StringBuff(*str) + 1);
