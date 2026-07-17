@@ -164,13 +164,12 @@ HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   return -1;
 }
 
+/* Same contract as hts_gethome(), which is hidden and out of reach from here */
 static const char *gethomedir(void) {
   const char *home = getenv("HOME");
 
-  if (home)
-    return home;
-  else
-    return ".";
+  /* An empty $HOME would put the base path and httrack.ini at the root */
+  return strnotempty(home) ? home : ".";
 }
 static int linput_cpp(FILE * fp, char *s, int max) {
   int rlen = 0;
