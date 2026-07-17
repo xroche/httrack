@@ -6,21 +6,22 @@
 
 set -euo pipefail
 
-# ~ expansion for the -O base path (expand_home). $HOME is pinned: the engine
-# reads it, so an inherited one would make these cases pass by accident.
+# ~ expansion for the -O base path (expand_home). $HOME is pinned so a case
+# cannot pass by accident, and has no leading '/': MSYS rewrites a POSIX
+# absolute one into C:\... when spawning the native httrack.exe on Windows.
 exp() {
-    test "$(HOME=/home/smith httrack -O /dev/null -#test=expandhome "$1")" == "expanded=$2" || exit 1
+    test "$(HOME=HTSHOME httrack -O /dev/null -#test=expandhome "$1")" == "expanded=$2" || exit 1
 }
 
-exp '~/foo' '/home/smith/foo'
-exp '~/foo/bar/#' '/home/smith/foo/bar/#'
-exp '~' '/home/smith'
-exp '~/' '/home/smith/'
+exp '~/foo' 'HTSHOME/foo'
+exp '~/foo/bar/#' 'HTSHOME/foo/bar/#'
+exp '~' 'HTSHOME'
+exp '~/' 'HTSHOME/'
 
 # ~user/ needs getpwnam: left alone rather than mangled into $HOME + "user/"
 exp '~smith/foo' '~smith/foo'
 exp '~root' '~root'
-exp '~/../x' '/home/smith/../x'
+exp '~/../x' 'HTSHOME/../x'
 
 # only a leading '~' expands; anything else is a literal path component
 exp 'a~/x' 'a~/x'
