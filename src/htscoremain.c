@@ -113,6 +113,7 @@ HTSEXT_API int hts_main(int argc, char **argv) {
 }
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
+static hts_boolean cmdl_shortopt_has(const char *s, char c);
 
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
@@ -304,12 +305,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                      hts_get_version_info(opt));
               return 0;
             } else {
-              if (strncmp(tmp_argv[0], "--", 2)) {      /* pas */
-                if ((strchr(tmp_argv[0], 'q') != NULL))
-                  opt->quiet = 1;       // ne pas poser de questions! (nohup par exemple)
-                if ((strchr(tmp_argv[0], 'i') != NULL)) {       // doit.log!
-                  argv_url = -1;        /* forcer */
-                  opt->quiet = 1;
+              if (strncmp(tmp_argv[0], "--", 2)) { /* not a long option */
+                if (cmdl_shortopt_has(tmp_argv[0], 'q'))
+                  opt->quiet = HTS_TRUE; // never ask questions (nohup)
+                if (cmdl_shortopt_has(tmp_argv[0], 'i')) { // doit.log!
+                  argv_url = -1;
+                  opt->quiet = HTS_TRUE;
                 }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
                 opt->quiet = 1; // ne pas poser de questions! (nohup par exemple)
@@ -2805,6 +2806,32 @@ int check_path(String * s, char *defaultname) {
     StringCat(*s, "/");
 
   return return_value;
+}
+
+/* Does the short-option cluster s carry c from the main option set (-i, -iC2,
+   -%Mi)? Walked as the parser does below: %, &, @ and # each take the letter
+   after them into another set, so the i of -%i is not the main-set -i. */
+static hts_boolean cmdl_shortopt_has(const char *s, char c) {
+  const char *com;
+
+  if (s[0] != '-' || s[1] == '-')
+    return HTS_FALSE;
+  for (com = s + 1; *com != '\0'; com++) {
+    switch (*com) {
+    case '%':
+    case '&':
+    case '@':
+    case '#':
+      if (*(com + 1) != '\0')
+        com++; /* skip the other set's letter */
+      break;
+    default:
+      if (*com == c)
+        return HTS_TRUE;
+      break;
+    }
+  }
+  return HTS_FALSE;
 }
 
 // détermine si l'argument est une option
