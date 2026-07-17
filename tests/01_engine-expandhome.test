@@ -20,9 +20,12 @@ exp() {
 home=$(ask '~')
 home=${home#expanded=}
 
-# '~' must expand to something else, or every case below is vacuous
+# or every case below is vacuous: '~' means expansion never fired, '.' means it
+# fell back to the default without ever reading $HOME
 test "$home" != '~' || exit 1
+test "$home" != '.' || exit 1
 
+exp '~' "$home"
 exp '~/foo' "$home/foo"
 exp '~/foo/bar/#' "$home/foo/bar/#"
 exp '~/' "$home/"
@@ -40,3 +43,7 @@ exp 'foo~bar' 'foo~bar'
 # an unset or empty $HOME must not turn ~/foo into the absolute /foo
 test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
 test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
+
+# a $HOME too long for the buffer is left alone: strcatbuff aborts, never truncates
+long=$(printf 'A%.0s' $(seq 1 70000))
+test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
