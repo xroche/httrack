@@ -111,7 +111,6 @@ def negotiate_auth(conn, logdir):
             log(logdir, "AUTHVER-BAD %d" % subver)
             conn.sendall(bytes([AUTH_VERSION, 0x01]))  # sub-negotiation failure
             return False
-        log(logdir, "AUTHVER %d" % subver)
         (ulen,) = recvn(conn, 1)
         uname = recvn(conn, ulen)
         (plen,) = recvn(conn, 1)

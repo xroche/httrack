@@ -165,6 +165,13 @@ auth="$tmpdir/auth"
 start_server "$auth" ok
 run_crawl "$auth/out" "http://${host}:${http_port}/" \
     "socks5://user:secret@127.0.0.1:${socks_port}"
+# name a rejected version byte here: the crawl check below only knows the
+# handshake failed, not why
+grep -q "^AUTHVER-BAD" "$auth/socks.log" && {
+    echo "FAIL: sub-negotiation version was not RFC 1929's 0x01" >&2
+    cat "$auth/socks.log" >&2
+    exit 1
+}
 grep -rq "ORIGIN-PAGE-563" "$auth/out" || {
     echo "FAIL: origin not downloaded through the authenticated socks proxy" >&2
     cat "$auth/out.log" "$auth/socks.log" >&2
@@ -177,12 +184,6 @@ grep -q "^METHOD userpass\$" "$auth/socks.log" || {
 }
 grep -q "^AUTH user secret\$" "$auth/socks.log" || {
     echo "FAIL: wrong socks credentials sent" >&2
-    cat "$auth/socks.log" >&2
-    exit 1
-}
-# the sub-negotiation carries RFC 1929's 0x01, not the 0x05 of the SOCKS5 greeting
-grep -q "^AUTHVER 1\$" "$auth/socks.log" || {
-    echo "FAIL: wrong RFC 1929 sub-negotiation version" >&2
     cat "$auth/socks.log" >&2
     exit 1
 }
