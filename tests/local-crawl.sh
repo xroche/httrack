@@ -47,6 +47,7 @@ key="${testdir}/server.key"
 
 tls=
 verbose=
+html_subdir=
 rerun=
 rerun_args=
 rerun_dead=
@@ -132,6 +133,13 @@ while test "$pos" -lt "$nargs"; do
         pos=$((pos + 1))
         rerun_args="${args[$pos]}"
         ;;
+    --html-subdir)
+        # Mirror into "$out/NAME" (path_html) but keep logs/cache in "$out"
+        # (path_log): a non-ASCII NAME exercises the -O path encoding (#621)
+        # without routing the harness-read hts-log.txt through a non-ASCII path.
+        pos=$((pos + 1))
+        html_subdir="${args[$pos]}"
+        ;;
     --errors | --errors-content | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
@@ -207,12 +215,21 @@ test -n "$ver" || die "could not run httrack"
 
 out="${tmpdir}/crawl"
 mkdir "$out" || die "could not create $out"
+# path_html holds the mirror + index; path_log holds hts-cache/hts-log.txt.
+# Default: both are "$out". With --html-subdir, path_html becomes "$out/NAME"
+# (the mirror root the audits inspect) while path_log stays "$out".
+mirrorroot="$out"
+odir="$out"
+if test -n "$html_subdir"; then
+    mirrorroot="${out}/${html_subdir}"
+    odir="${mirrorroot},${out}"
+fi
 # Localhost is fast; disable the rate/bandwidth safety limits but keep a
 # max-time backstop so a hang cannot wedge the suite.
 declare -a moreargs=(--quiet --max-time=120 --timeout=30 --disable-security-limits --robots=0)
 log="${tmpdir}/log"
 info "running httrack ${hts[*]}"
-httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
+httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
 crawlpid=$!
 wait "$crawlpid"
 crawlres=$?
@@ -229,7 +246,7 @@ grep -iE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt" >&2
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
+    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
     wait "$crawlpid"
@@ -257,7 +274,7 @@ fi
 if test -n "$rerun_args"; then
     read -ra extra <<<"$rerun_args"
     info "re-running httrack with ${rerun_args}"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
+    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" "${extra[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
     wait "$crawlpid"
@@ -279,7 +296,7 @@ if test -n "$rerun_dead"; then
     stop_server "$serverpid"
     serverpid=
     info "re-running httrack against the stopped server"
-    httrack -O "$out" --user-agent="httrack $ver local ($(uname -mrs))" \
+    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &
     crawlpid=$!
     wait "$crawlpid" || true
@@ -308,7 +325,7 @@ fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
 hostroot=
-for cand in "${out}/127.0.0.1_${port}" "${out}/127.0.0.1"; do
+for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
     if test -d "$cand"; then
         hostroot="$cand"
         break
