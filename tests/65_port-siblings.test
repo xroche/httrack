@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+testdir=$(cd "$(dirname "$0")" && pwd)
+# run_with_timeout: timeout(1) is absent on macOS, and the listen servers block.
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_portsib.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
 
@@ -23,13 +28,11 @@ overflowing="4295009395"
 malformed=("80x" "+80" " 80" "8.0" "")
 
 # --- htsserver --port ------------------------------------------------------
-# Its argv[1] is the html root; the option pairs follow.
+# Its argv[1] is the html root; the option pairs follow. It blocks serving once
+# a port is accepted, so bound it; we assert on the output, not the exit status.
 
-# run htsserver with the given --port value, leaving its output in $tmp/web.log.
-# It blocks serving once a port is accepted, so cap it; we assert on the output,
-# not the exit status.
 websrv() {
-    timeout 5 htsserver "$tmp" --port "$1" >"$tmp/web.log" 2>&1 || true
+    run_with_timeout 3 htsserver "$tmp" --port "$1" >"$tmp/web.log" 2>&1 || true
 }
 
 web_refused() {
@@ -42,13 +45,29 @@ web_refused() {
 }
 
 web_accepted() {
-    websrv "$1"
+    local port=$1
+    : >"$tmp/web.log"
+    # A bound server blocks, so stop it once it announces, not on a fixed
+    # deadline: the announce trails a local-hostname resolve that stalls on macOS,
+    # where a 3s kill landed mid-resolve, before the URL= line ever printed.
+    local had_m=
+    case "$-" in *m*) had_m=1 ;; esac
+    is_windows || set -m
+    htsserver "$tmp" --port "$port" >"$tmp/web.log" 2>&1 &
+    local pid=$!
+    test -n "$had_m" || is_windows || set +m
+    local waited=0
+    until grep -qE "^URL=http://.*:$port/|couldn't set the port number|Unable to initialize a temporary server" "$tmp/web.log"; do
+        test "$waited" -lt 20 || break
+        sleep 1
+        waited=$((waited + 1))
+    done
+    kill_tree "$pid"
+    wait "$pid" 2>/dev/null || true
     ! grep -q "couldn't set the port number" "$tmp/web.log" ||
-        ! echo "FAIL: #614: htsserver --port '$1' wrongly refused" || exit 1
-    # the value must reach the listener: either it bound, or the bind failed --
-    # both prove the parser passed it through, whether or not the port is free
-    grep -qE "^URL=http://.*:$1/|Unable to initialize a temporary server" "$tmp/web.log" ||
-        ! echo "FAIL: #614: htsserver --port '$1' never reached the listener" || exit 1
+        ! echo "FAIL: #614: htsserver --port '$port' wrongly refused" || exit 1
+    grep -qE "^URL=http://.*:$port/|Unable to initialize a temporary server" "$tmp/web.log" ||
+        ! echo "FAIL: #614: htsserver --port '$port' never reached the listener" || exit 1
 }
 
 # this used to listen on 42099
@@ -62,16 +81,16 @@ web_accepted 65535
 
 # --- proxytrack <proxy-addr:port> <ICP-addr:port> --------------------------
 # A bad argument falls through to the usage screen; it had no range check at
-# all, so 65616 quietly listened on port 80.
+# all, so 65616 quietly listened on port 80. A valid one binds and blocks.
 
 proxy_refused() {
-    timeout 5 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
+    run_with_timeout 3 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
     grep -q "^usage:" "$tmp/pt.log" ||
         ! echo "FAIL: #614: proxytrack port '$1' not refused" || exit 1
 }
 
 proxy_accepted() {
-    timeout 5 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
+    run_with_timeout 3 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
     ! grep -q "^usage:" "$tmp/pt.log" ||
         ! echo "FAIL: #614: proxytrack port '$1' wrongly refused" || exit 1
 }
@@ -90,7 +109,8 @@ ftp_port() {
     local out="$tmp/ftp"
 
     rm -rf "$out"
-    timeout 30 httrack "ftp://127.0.0.1:$1/x" -O "$out" --quiet -n >/dev/null 2>&1 || true
+    run_with_timeout 30 httrack "ftp://127.0.0.1:$1/x" -O "$out" --quiet -n \
+        >/dev/null 2>&1 || true
     grep -c "Invalid port: $1" "$out/hts-log.txt" 2>/dev/null || true
 }
 
