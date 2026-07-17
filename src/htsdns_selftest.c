@@ -407,15 +407,18 @@ int dns_selftests(httrackp *opt) {
      *addr_count is the discriminator: 0 only if the port was refused before the
      resolve, still 2 for one merely truncated or defaulted to 80. */
   {
-    static const char *const good[] = {"dual.test:1", "dual.test:80",
-                                       "dual.test:8080", "dual.test:65535"};
+    /* "dual.test:" is an empty port, which WHATWG and curl both accept as
+       meaning the default: it must keep resolving, not be refused as garbage */
+    static const char *const good[] = {"dual.test:1",    "dual.test:80",
+                                       "dual.test:8080", "dual.test:65535",
+                                       "dual.test:080",  "dual.test:"};
     /* 65616 and 4294967376 are load-bearing: both wrap to a plausible 80 */
     static const char *const bad[] = {
         "dual.test:0",          "dual.test:65536",      "dual.test:65616",
         "dual.test:99999",      "dual.test:2147483648", "dual.test:4294967296",
         "dual.test:4294967376", "dual.test:-1",         "dual.test:-23437",
-        "dual.test:80x",        "dual.test:",           "dual.test:+80",
-        "dual.test: 80",        "dual.test:0x50"};
+        "dual.test:80x",        "dual.test:+80",        "dual.test: 80",
+        "dual.test:0x50"};
     size_t k;
 
     for (k = 0; k < sizeof(good) / sizeof(good[0]); k++) {
