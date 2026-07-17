@@ -2167,9 +2167,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #endif
 
       if (a != NULL) {
-        // the link named a port: folding a nonsense one into 0..65535 would
-        // crawl a port neither the link nor a port filter named (#614). An
-        // empty "host:" is not nonsense, it means the default port.
+        // folding a nonsense port into 0..65535 crawls one neither the link nor
+        // a port filter named; an empty "host:" just means the default (#614)
         if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
           if (retour != NULL) {
             snprintf(retour->msg, sizeof(retour->msg), "Invalid port: %s",

@@ -402,13 +402,11 @@ int dns_selftests(httrackp *opt) {
       deletesoc(s);
   }
 
-  /* A URL's ":port" (port == -1, so newhttp_addr parses it) outside 1..65535
-     must refuse the link, not fold into range and connect elsewhere (#614).
-     *addr_count is the discriminator: 0 only if the port was refused before the
-     resolve, still 2 for one merely truncated or defaulted to 80. */
+  /* A URL port outside 1..65535 must refuse the link, not fold into range and
+     connect elsewhere (#614). *addr_count discriminates: 0 only if refused
+     before the resolve, still 2 for one merely truncated or defaulted. */
   {
-    /* "dual.test:" is an empty port, which WHATWG and curl both accept as
-       meaning the default: it must keep resolving, not be refused as garbage */
+    /* an empty "dual.test:" means the default port (WHATWG, curl): keep it */
     static const char *const good[] = {"dual.test:1",    "dual.test:80",
                                        "dual.test:8080", "dual.test:65535",
                                        "dual.test:080",  "dual.test:"};
