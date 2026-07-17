@@ -44,6 +44,7 @@ exp 'foo~bar' 'foo~bar'
 test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
 test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
 
-# a $HOME too long for the buffer is left alone: strcatbuff aborts, never truncates
-long=$(printf 'A%.0s' $(seq 1 70000))
+# a $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
+# rather than truncates. Stay well under Windows' 32767 environment limit.
+long=$(printf '%04096d' 0 | tr '0' 'A')
 test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
