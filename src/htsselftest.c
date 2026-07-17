@@ -2458,6 +2458,45 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// hts_buildtopindex takes a system-charset path but verif_backblue() below it
+// expects utf-8, so on Windows a non-ASCII project dir gets the gifs written to
+// a mangled twin (issues #216/#217). argv[0] is a writable dir.
+static int st_topindex(httrackp *opt, int argc, char **argv) {
+  char projdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 16]; /* projdir plus a basename */
+#ifdef _WIN32
+  /* the GUI hands hts_buildtopindex an ANSI path; mimic it. CP1252 'cafe' */
+  static const char *const projName = "caf\xE9";
+#else
+  /* POSIX system charset is UTF-8 */
+  static const char *const projName = "caf\xC3\xA9";
+#endif
+
+  assertf(argc >= 1);
+  snprintf(projdir, sizeof(projdir), "%s/%s", argv[0], projName);
+
+  /* structcheck(), not the utf-8 MKDIR family: same charset as buildtopindex */
+  snprintf(path, sizeof(path), "%s/", projdir);
+  assertf(structcheck(path) == 0);
+
+  /* returns 0 here: the dir holds no sub-project, only the gifs matter */
+  (void) hts_buildtopindex(opt, projdir, "");
+
+  /* the gifs must land in the project dir itself, not in a mangled sibling */
+  snprintf(path, sizeof(path), "%s/backblue.gif", projdir);
+  assertf(fexist(path));
+
+  /* raw unlink/rmdir: the UNLINK macro is utf-8 on Windows, these paths aren't */
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/fade.gif", projdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/index.html", projdir);
+  unlink(path);
+  rmdir(projdir);
+  printf("topindex self-test OK\n");
+  return 0;
+}
+
 /* Each inplace_escape_*() must equal escape_*() on a copy. */
 static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
   /* >255 bytes forces the helper's malloct path, not the stack buffer */
@@ -3165,6 +3204,9 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"topindex", "[dir]",
+     "hts_buildtopindex charset handling of a non-ASCII project dir",
+     st_topindex},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",
