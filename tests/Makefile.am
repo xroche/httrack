@@ -145,6 +145,7 @@ TESTS = \
 	61_webhttrack-locale.test \
 	62_lang-integrity.test \
 	63_webhttrack-home.test \
-	64_local-intl-outdir.test
+	64_local-intl-outdir.test \
+	65_port-siblings.test
 
 CLEANFILES = check-network_sh.cache

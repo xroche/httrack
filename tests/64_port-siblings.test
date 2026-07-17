@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+
+# Port parsing outside the crawled-URL path (#614): the htsserver --port listen
+# port, proxytrack's host:port listen arguments, and an ftp:// URL port. All
+# three took the port from sscanf("%d"), which range-checks nothing and wraps
+# past INT_MAX, so a value naming no real port silently became a plausible one.
+
+set -euo pipefail
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_portsib.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+# A port the old code accepted only by wrapping: 4295009395 = 2^32 + 42099 and
+# 4294967376 = 2^32 + 80 both fold to a plausible listen port. They are the
+# load-bearing cases, since a value that merely exceeds 65535 while still
+# fitting an int (65616) was already caught by the htsserver range check.
+overflowing="4295009395"
+
+# Values sscanf("%d") took as a port that no operator meant: a trailing
+# character, a sign, leading whitespace, a decimal point. Each silently listened
+# on the prefix it managed to scan.
+malformed=("80x" "+80" " 80" "8.0" "")
+
+# --- htsserver --port ------------------------------------------------------
+# Its argv[1] is the html root; the option pairs follow.
+
+# run htsserver with the given --port value, leaving its output in $tmp/web.log.
+# It blocks serving once a port is accepted, so cap it; we assert on the output,
+# not the exit status.
+websrv() {
+    timeout 5 htsserver "$tmp" --port "$1" >"$tmp/web.log" 2>&1 || true
+}
+
+web_refused() {
+    websrv "$1"
+    grep -q "couldn't set the port number" "$tmp/web.log" ||
+        ! echo "FAIL: #614: htsserver --port '$1' not refused" || exit 1
+    # it must not have reached the listen socket on some other port
+    ! grep -q "^URL=" "$tmp/web.log" ||
+        ! echo "FAIL: #614: htsserver --port '$1' listened anyway" || exit 1
+}
+
+web_accepted() {
+    websrv "$1"
+    ! grep -q "couldn't set the port number" "$tmp/web.log" ||
+        ! echo "FAIL: #614: htsserver --port '$1' wrongly refused" || exit 1
+    # the value must reach the listener: either it bound, or the bind failed --
+    # both prove the parser passed it through, whether or not the port is free
+    grep -qE "^URL=http://.*:$1/|Unable to initialize a temporary server" "$tmp/web.log" ||
+        ! echo "FAIL: #614: htsserver --port '$1' never reached the listener" || exit 1
+}
+
+# this used to listen on 42099
+web_refused "$overflowing"
+for p in "${malformed[@]}" 0 65536 99999 -1; do
+    web_refused "$p"
+done
+
+# 65535 is a valid port the old "< 65535" bound refused
+web_accepted 65535
+
+# --- proxytrack <proxy-addr:port> <ICP-addr:port> --------------------------
+# A bad argument falls through to the usage screen; it had no range check at
+# all, so 65616 quietly listened on port 80.
+
+proxy_refused() {
+    timeout 5 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
+    grep -q "^usage:" "$tmp/pt.log" ||
+        ! echo "FAIL: #614: proxytrack port '$1' not refused" || exit 1
+}
+
+proxy_accepted() {
+    timeout 5 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
+    ! grep -q "^usage:" "$tmp/pt.log" ||
+        ! echo "FAIL: #614: proxytrack port '$1' wrongly refused" || exit 1
+}
+
+for p in "${malformed[@]}" 65616 4294967376 "$overflowing" 0 -1; do
+    proxy_refused "$p"
+done
+proxy_accepted 45678
+
+# --- ftp:// URL port -------------------------------------------------------
+# A URL port, so it follows the crawled-URL policy: refuse the link rather than
+# fold it into range. An ftp:// link in scanned HTML is not followed, so the
+# seed has to come from the command line.
+
+ftp_port() {
+    local out="$tmp/ftp"
+
+    rm -rf "$out"
+    timeout 30 httrack "ftp://127.0.0.1:$1/x" -O "$out" --quiet -n >/dev/null 2>&1 || true
+    grep -c "Invalid port: $1" "$out/hts-log.txt" 2>/dev/null || true
+}
+
+# 65616 truncated to 80 and really did connect there
+for p in 65616 99999; do
+    test "$(ftp_port "$p")" -gt 0 ||
+        ! echo "FAIL: #614: ftp:// port $p not refused" || exit 1
+done
+
+# a valid port still reaches the connect attempt
+test "$(ftp_port 65535)" -eq 0 ||
+    ! echo "FAIL: #614: ftp:// port 65535 wrongly refused" || exit 1
+
+exit 0
