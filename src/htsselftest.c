@@ -2109,6 +2109,15 @@ static int st_dns(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
+  const int err = dns_timeout_selftests(opt);
+
+  (void) argc;
+  (void) argv;
+  printf("dns-timeout-selftest: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_cookies(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char hdr[1024];
@@ -3133,6 +3142,8 @@ static const struct selftest_entry {
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
+    {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
+     st_dnstimeout},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
