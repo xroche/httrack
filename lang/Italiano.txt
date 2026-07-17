@@ -374,7 +374,7 @@ Create error logging and report files
 Crea file di log per segnalare errori e informazioni
 Generate DOS 8-3 filenames ONLY
 Genera solo nomi di file in formato 8.3
-Generate ISO 9660 filenames ONLY for CDROM medias
+Generate ISO9660 filenames ONLY for CDROM medias
 Genera nomi di file in formato ISO9660 per i CDROM
 Do not create HTML error pages
 Non generare pagine d'errore HTML

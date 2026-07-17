@@ -140,6 +140,7 @@ TESTS = \
 	58_watchdog.test \
 	59_local-tls-stall.test \
 	60_crawl-log-salvage.test \
-	61_webhttrack-locale.test
+	61_webhttrack-locale.test \
+	62_lang-integrity.test
 
 CLEANFILES = check-network_sh.cache
