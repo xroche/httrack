@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A non-ASCII -O output dir must receive the mirror, not a double-encoded twin
+# (#621). argv is UTF-8 on Windows, so path_html was re-encoded as if it were
+# the ANSI codepage, prefixing every saved file with a mangled directory. Only
+# path_html is the non-ASCII "café"; path_log stays ASCII so the harness reads
+# hts-log.txt/hts-cache normally and this isolates the -O encoding path.
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --html-subdir 'café' --errors 0 --files 5 \
+    --found 'simple/basic.html' \
+    httrack 'BASEURL/simple/basic.html'

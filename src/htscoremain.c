@@ -425,25 +425,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       }                         // for
 
-      // Convert path to UTF-8
-#ifdef _WIN32
-      {
-        char *const path =
-          hts_convertStringSystemToUTF8(StringBuff(opt->path_html),
-                                        (int) StringLength(opt->path_html));
-        if (path != NULL) {
-          StringCopy(opt->path_html_utf8, path);
-          free(path);
-        } else {
-          StringCopyN(opt->path_html_utf8, StringBuff(opt->path_html),
-                      StringLength(opt->path_html));
-        }
-      }
-#else
-      // Assume UTF-8 filesystem.
+      // path_html is already UTF-8 (argv is UTF-8 on Windows via
+      // hts_argv_utf8), so no re-encoding.
       StringCopyN(opt->path_html_utf8, StringBuff(opt->path_html),
                   StringLength(opt->path_html));
-#endif
 
       /* if doit.log exists, or if new URL(s) defined, 
          then DO NOT load standard config files */
@@ -2486,9 +2471,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
          }
          } */
 
-      // vérifier existence de la structure
-      structcheck(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html), "/"));
-      structcheck(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "/"));
+      // vérifier existence de la structure (path_html/path_log are UTF-8, use
+      // the UTF-8 mkdir path)
+      structcheck_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_html), "/"));
+      structcheck_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "/"));
 
       // reprise/update
       if (opt->cache) {

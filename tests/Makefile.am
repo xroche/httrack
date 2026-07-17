@@ -144,6 +144,7 @@ TESTS = \
 	60_crawl-log-salvage.test \
 	61_webhttrack-locale.test \
 	62_lang-integrity.test \
-	63_webhttrack-home.test
+	63_webhttrack-home.test \
+	64_local-intl-outdir.test
 
 CLEANFILES = check-network_sh.cache
