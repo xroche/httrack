@@ -24,6 +24,7 @@ from proxytestlib import bind_ephemeral, pipe  # noqa: E402
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
 REMOTE_HOST = b"socks-origin.invalid"
+AUTH_VERSION = 0x01  # RFC 1929 sub-negotiation version
 # index links the subpages so an -r3 crawl reuses one keep-alive socket
 LINKS = "".join('<a href="/p%d.html">%d</a>' % (i, i) for i in range(1, 6))
 ORIGIN_BODY = ("<html><body>ORIGIN-PAGE-563 " + LINKS + "</body></html>").encode()
@@ -104,6 +105,12 @@ def negotiate_auth(conn, logdir):
     if 0x02 in methods:  # prefer user/pass so the auth test exercises RFC 1929
         conn.sendall(b"\x05\x02")
         (subver,) = recvn(conn, 1)
+        # RFC 1929's version byte is 0x01, not SOCKS5's 0x05: a real proxy
+        # rejects a mismatch instead of tunnelling anyway
+        if subver != AUTH_VERSION:
+            log(logdir, "AUTHVER-BAD %d" % subver)
+            conn.sendall(bytes([AUTH_VERSION, 0x01]))  # sub-negotiation failure
+            return False
         (ulen,) = recvn(conn, 1)
         uname = recvn(conn, ulen)
         (plen,) = recvn(conn, 1)
