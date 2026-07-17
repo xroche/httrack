@@ -1,3 +1,18 @@
+httrack (3.49.13-1) unstable; urgency=medium
+
+  * New upstream release: SOCKS5 and CONNECT proxy support, brotli and zstd
+    content decoding, --update data-loss fixes, and hardening of several
+    network-facing parsers; full list in history.txt.
+  * Add libbrotli-dev and libzstd-dev to Build-Depends for the new content
+    codings.
+  * libhttrack3 and libhttrack-dev no longer ship libhtsjava.so.3*: the
+    obsolete Java-applet parser was removed upstream. It was a dlopen plugin
+    with no reverse dependencies, so this is a plain file drop on upgrade;
+    libhttrack.so.3 itself is unchanged and needs no rename.
+  * Drop the htsjava attribution from debian/copyright.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 17 Jul 2026 10:49:52 +0200
+
 httrack (3.49.12-1) unstable; urgency=medium
 
   * New upstream release: security and crawl-correctness fixes (remote stack
