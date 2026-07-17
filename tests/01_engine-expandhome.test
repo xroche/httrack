@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+
+# SC2088: the literal, unexpanded '~' is the input under test.
+# shellcheck disable=SC2088
+
+set -euo pipefail
+
+# ~ expansion for the -O base path (expand_home). $HOME is pinned: the engine
+# reads it, so an inherited one would make these cases pass by accident.
+exp() {
+    test "$(HOME=/home/smith httrack -O /dev/null -#test=expandhome "$1")" == "expanded=$2" || exit 1
+}
+
+exp '~/foo' '/home/smith/foo'
+exp '~/foo/bar/#' '/home/smith/foo/bar/#'
+exp '~' '/home/smith'
+exp '~/' '/home/smith/'
+
+# ~user/ needs getpwnam: left alone rather than mangled into $HOME + "user/"
+exp '~smith/foo' '~smith/foo'
+exp '~root' '~root'
+exp '~/../x' '/home/smith/../x'
+
+# only a leading '~' expands; anything else is a literal path component
+exp 'a~/x' 'a~/x'
+exp './~/x' './~/x'
+exp '/tmp/~/x' '/tmp/~/x'
+exp 'foo~bar' 'foo~bar'
+exp '/plain/path' '/plain/path'
+
+# an unset or empty $HOME must not turn ~/foo into the absolute /foo
+test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
+test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
