@@ -44,7 +44,10 @@ exp 'foo~bar' 'foo~bar'
 test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
 test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
 
-# a $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
-# rather than truncates. Stay well under Windows' 32767 environment limit.
-long=$(printf '%04096d' 0 | tr '0' 'A')
-test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
+# A $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
+# rather than truncates. Only meaningful where the engine sees the value we set:
+# MSYS rewrites HOME into a path of its own choosing, long or not.
+if test "$home" = HTSHOME; then
+    long=$(printf '%04096d' 0 | tr '0' 'A')
+    test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
+fi
