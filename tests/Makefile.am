@@ -139,6 +139,7 @@ TESTS = \
 	57_local-proxy-connect.test \
 	58_watchdog.test \
 	59_local-tls-stall.test \
-	60_crawl-log-salvage.test
+	60_crawl-log-salvage.test \
+	61_webhttrack-locale.test
 
 CLEANFILES = check-network_sh.cache
