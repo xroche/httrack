@@ -2167,15 +2167,18 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #endif
 
       if (a != NULL) {
-        int i = -1;
-
-        iadr2[0] = '\0';
-        sscanf(a + 1, "%d", &i);
-        if (i != -1) {
-          port = (unsigned short int) i;
+        // folding a nonsense port into 0..65535 crawls one neither the link nor
+        // a port filter named; an empty "host:" just means the default (#614)
+        if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
+          if (retour != NULL) {
+            snprintf(retour->msg, sizeof(retour->msg), "Invalid port: %s",
+                     a + 1);
+          }
+          return INVALID_SOCKET;
         }
 
-        // adresse véritable (sans :xx)
+        iadr2[0] = '\0';
+        // the address itself, without the ":port"
         strncatbuff(iadr2, iadr, (int) (a - iadr));
         resolve_host = iadr2;
       }
@@ -3748,18 +3751,27 @@ static int proxy_default_port(const char *arg) {
   return hts_proxy_is_socks(arg) ? 1080 : 8080;
 }
 
-// port "a" of -P argument "arg": digits fitting TCP's 1..65535, else the scheme
-// default. Not sscanf("%d"): past INT_MAX it wraps to a garbage port (#602)
-static int parse_proxy_port(const char *a, const char *arg) {
+hts_boolean hts_parse_url_port(const char *a, int *port) {
   char *end;
   long p;
 
   if (!isdigit((unsigned char) *a)) // strtol would eat a sign or leading space
-    return proxy_default_port(arg);
+    return HTS_FALSE;
   p = strtol(a, &end, 10);
   if (*end != '\0' || p < 1 || p > 65535) // ERANGE lands out of range too
+    return HTS_FALSE;
+  *port = (int) p;
+  return HTS_TRUE;
+}
+
+// port "a" of -P argument "arg": digits fitting TCP's 1..65535, else the scheme
+// default. Not sscanf("%d"): past INT_MAX it wraps to a garbage port (#602)
+static int parse_proxy_port(const char *a, const char *arg) {
+  int port;
+
+  if (!hts_parse_url_port(a, &port))
     return proxy_default_port(arg);
-  return (int) p;
+  return port;
 }
 
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {

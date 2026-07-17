@@ -1469,6 +1469,25 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   assertf(socks5_handshake_scripted(opt, "origin.test:8443", proxy, &io) == 1);
   assertf(memcmp(io.sent + io.sent_len - 2, "\x20\xfb", 2) == 0);
 
+  /* a bad origin port is refused before any byte goes out (#614). 4294967376 is
+     the case the old range check could not see: it overflowed the sscanf("%d")
+     into a plausible 80 and passed. 65616 would not prove anything here, since
+     it fits an int and the old check already caught it. */
+  {
+    static const char *const bad[] = {"origin.test:4294967376",
+                                      "origin.test:80x", "origin.test:+80",
+                                      "origin.test: 80", "origin.test:8.0"};
+    size_t k;
+
+    for (k = 0; k < sizeof(bad) / sizeof(bad[0]); k++) {
+      len = socks5_reply(script, 0x01, v4, sizeof(v4));
+      io.reply = script;
+      io.reply_len = len;
+      assertf(socks5_handshake_scripted(opt, bad[k], proxy, &io) == 0);
+      assertf(io.sent_len == 0);
+    }
+  }
+
   /* credentials: split on the first colon of the escaped userinfo, so %3a stays
      inside the username and a colon in the password is not a delimiter */
   {

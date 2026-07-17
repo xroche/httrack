@@ -402,6 +402,50 @@ int dns_selftests(httrackp *opt) {
       deletesoc(s);
   }
 
+  /* A URL port outside 1..65535 must refuse the link, not fold into range and
+     connect elsewhere (#614). *addr_count discriminates: 0 only if refused
+     before the resolve, still 2 for one merely truncated or defaulted. */
+  {
+    /* an empty "dual.test:" means the default port (WHATWG, curl): keep it */
+    static const char *const good[] = {"dual.test:1",    "dual.test:80",
+                                       "dual.test:8080", "dual.test:65535",
+                                       "dual.test:080",  "dual.test:"};
+    /* 65616 and 4294967376 are load-bearing: both wrap to a plausible 80 */
+    static const char *const bad[] = {
+        "dual.test:0",          "dual.test:65536",      "dual.test:65616",
+        "dual.test:99999",      "dual.test:2147483648", "dual.test:4294967296",
+        "dual.test:4294967376", "dual.test:-1",         "dual.test:-23437",
+        "dual.test:80x",        "dual.test:+80",        "dual.test: 80",
+        "dual.test:0x50"};
+    size_t k;
+
+    for (k = 0; k < sizeof(good) / sizeof(good[0]); k++) {
+      htsblk r;
+      int count = -1;
+      T_SOC s;
+
+      hts_init_htsblk(&r);
+      s = newhttp_addr(opt, good[k], &r, -1, 0, 0, &count);
+      CHECK(count == 2); /* accepted: reached the resolve */
+      if (s != INVALID_SOCKET)
+        deletesoc(s);
+    }
+
+    for (k = 0; k < sizeof(bad) / sizeof(bad[0]); k++) {
+      htsblk r;
+      int count = -1;
+      T_SOC s;
+
+      hts_init_htsblk(&r);
+      s = newhttp_addr(opt, bad[k], &r, -1, 0, 0, &count);
+      CHECK(s == INVALID_SOCKET);
+      CHECK(count == 0); /* refused before resolving, not a failed connect */
+      CHECK(strstr(r.msg, "Invalid port") != NULL);
+      if (s != INVALID_SOCKET)
+        deletesoc(s);
+    }
+  }
+
   /* Connect-fallback decision (consumer of the multi-address list): when a
      stuck connect should abandon the current address for the next one. */
   {

@@ -491,14 +491,11 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
     if ((unsigned char) host[i] < ' ')
       return socks5_fail(msg, msgsize, "SOCKS5: invalid origin host");
   }
-  if (portsep != NULL) {
-    int p = -1;
-
-    sscanf(portsep + 1, "%d", &p);
-    if (p <= 0 || p > 65535)
-      return socks5_fail(msg, msgsize, "SOCKS5: invalid origin port");
-    port = p;
-  }
+  // the old range check ran after sscanf("%d") had wrapped a huge value into a
+  // plausible port (#614). An empty "host:" stays refused here, unlike the
+  // direct path, as it was before #614.
+  if (portsep != NULL && !hts_parse_url_port(portsep + 1, &port))
+    return socks5_fail(msg, msgsize, "SOCKS5: invalid origin port");
   if (link_has_authorization(proxy_name)) {
     if (!socks5_credentials(opt, proxy_name, user, sizeof(user), &userlen, pass,
                             sizeof(pass), &passlen, msg, msgsize))

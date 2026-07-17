@@ -288,6 +288,12 @@ const char *strrchr_limit(const char *s, char c, const char *limit);
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
 
+/* Parse a URL's port text "a" (after the ':', up to the end of the string):
+   TRUE and *port set for a bare decimal in 1..65535, else FALSE and *port left
+   alone. Not sscanf("%d"), which range-checks nothing and wraps past INT_MAX.
+ */
+hts_boolean hts_parse_url_port(const char *a, int *port);
+
 /* Split a -P proxy argument "[scheme://][user:pass@]host[:port]" into the proxy
    host string (scheme and any user:pass kept, for later stripping and auth),
    written NUL-terminated into name[name_size] (truncated to fit), and the port
