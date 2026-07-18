@@ -121,6 +121,7 @@
     <ClCompile Include="htshelp.c" />
     <ClCompile Include="htsindex.c" />
     <ClCompile Include="htslib.c" />
+    <ClCompile Include="htsurlport.c" />
     <ClCompile Include="htsmd5.c" />
     <ClCompile Include="htsmodules.c" />
     <ClCompile Include="htsname.c" />

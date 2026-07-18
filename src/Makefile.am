@@ -46,9 +46,11 @@ htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 
 lib_LTLIBRARIES = libhttrack.la
 
-htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h
+htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h \
+	htsurlport.c htsurlport.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
+	htsurlport.c htsurlport.h \
 	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
@@ -58,7 +60,7 @@ whttrackrun_SCRIPTS = webhttrack
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscache_selftest.c htsdns_selftest.c htsselftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
-	htshelp.c htslib.c htscoremain.c \
+	htshelp.c htslib.c htsurlport.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htsmd5.c htscodec.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
@@ -69,7 +71,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htsdns_selftest.h htsselftest.h htscatchurl.h  \
 	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
-	htshelp.h htsindex.h htslib.h htsmd5.h \
+	htshelp.h htsindex.h htslib.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h  \
 	htstools.h htswizard.h htswrap.h htscodec.h htsproxy.h htszlib.h  \

@@ -3751,19 +3751,6 @@ static int proxy_default_port(const char *arg) {
   return hts_proxy_is_socks(arg) ? 1080 : 8080;
 }
 
-hts_boolean hts_parse_url_port(const char *a, int *port) {
-  char *end;
-  long p;
-
-  if (!isdigit((unsigned char) *a)) // strtol would eat a sign or leading space
-    return HTS_FALSE;
-  p = strtol(a, &end, 10);
-  if (*end != '\0' || p < 1 || p > 65535) // ERANGE lands out of range too
-    return HTS_FALSE;
-  *port = (int) p;
-  return HTS_TRUE;
-}
-
 // port "a" of -P argument "arg": digits fitting TCP's 1..65535, else the scheme
 // default. Not sscanf("%d"): past INT_MAX it wraps to a garbage port (#602)
 static int parse_proxy_port(const char *a, const char *arg) {

@@ -248,7 +248,13 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // port
     a = strchr(adr, ':');       // port
     if (a) {
-      sscanf(a + 1, "%d", &port);
+      // folding a nonsense port into 1..65535 fetches one the link never named;
+      // an empty "host:" just means the default (#614)
+      if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
+        snprintf(back->r.msg, sizeof(back->r.msg), "Invalid port: %s", a + 1);
+        back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
+        _HALT_FTP return 0;
+      }
       strncatbuff(_adr, adr, (int) (a - adr));
     } else
       strcpybuff(_adr, adr);

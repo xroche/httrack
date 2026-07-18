@@ -47,7 +47,9 @@ static void sig_brpipe(int code) {
 }
 #endif
 
-static int scanHostPort(const char *str, char *host, int *port) {
+// split a "host:port" listen argument; FALSE sends the caller to the usage
+// screen. The port was unchecked, so a huge one wrapped into range (#614).
+static hts_boolean scanHostPort(const char *str, char *host, int *port) {
   char *pos = strrchr(str, ':');
 
   if (pos != NULL) {
@@ -56,12 +58,10 @@ static int scanHostPort(const char *str, char *host, int *port) {
     if (n < 256) {
       host[0] = '\0';
       strncat(host, str, n);
-      if (sscanf(pos + 1, "%d", port) == 1) {
-        return 1;
-      }
+      return hts_parse_url_port(pos + 1, port);
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 int main(int argc, char *argv[]) {

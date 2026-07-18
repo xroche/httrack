@@ -63,6 +63,7 @@ Please visit our Website: http://www.httrack.com
 #include "md5.c"
 
 #include "htsserver.h"
+#include "htsurlport.h"
 #include "htsweb.h"
 
 #if USE_BEGINTHREAD==0
@@ -257,8 +258,10 @@ int main(int argc, char *argv[]) {
   /* set commandline keys */
   for(i = 2; i < argc; i += 2) {
     if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
-      if (sscanf(argv[i + 1], "%d", &defaultPort) != 1 || defaultPort < 0
-          || defaultPort >= 65535) {
+      // the range check ran after sscanf("%d") had wrapped a huge value into a
+      // plausible port, and listened there (#614). 0 (was the auto-pick) and
+      // 65535 (was refused, off by one) now both mean what they say.
+      if (!hts_parse_url_port(argv[i + 1], &defaultPort)) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;
       }

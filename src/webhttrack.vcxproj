@@ -97,6 +97,7 @@
   <ItemGroup>
     <ClCompile Include="htsserver.c" />
     <ClCompile Include="htsweb.c" />
+    <ClCompile Include="htsurlport.c" />
   </ItemGroup>
 
   <ItemGroup>
