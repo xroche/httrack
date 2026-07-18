@@ -148,6 +148,7 @@ TESTS = \
 	64_local-intl-outdir.test \
 	65_port-siblings.test \
 	66_engine-port80-strip.test \
+	67_engine-delayed-truncate.test \
 	69_local-intl-logdir.test
 
 CLEANFILES = check-network_sh.cache
