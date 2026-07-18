@@ -17,8 +17,8 @@
 #endif
 
 VS_VERSION_INFO VERSIONINFO
-  FILEVERSION 3, 49, 12, 0
-  PRODUCTVERSION 3, 49, 12, 0
+  FILEVERSION 3, 49, 13, 0
+  PRODUCTVERSION 3, 49, 13, 0
   FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
 #ifdef _DEBUG
   FILEFLAGS VS_FF_DEBUG
@@ -35,12 +35,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Xavier Roche"
       VALUE "FileDescription", VER_FILE_DESCRIPTION
-      VALUE "FileVersion", "3.49.12"
+      VALUE "FileVersion", "3.49.13"
       VALUE "InternalName", VER_ORIGINAL_FILENAME
       VALUE "LegalCopyright", "Copyright (C) 1998-2026 Xavier Roche and other contributors. GNU GPL v3 or later."
       VALUE "OriginalFilename", VER_ORIGINAL_FILENAME
       VALUE "ProductName", "HTTrack Website Copier"
-      VALUE "ProductVersion", "3.49-12"
+      VALUE "ProductVersion", "3.49-13"
     END
   END
   BLOCK "VarFileInfo"
