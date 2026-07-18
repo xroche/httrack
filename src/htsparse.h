@@ -106,6 +106,10 @@ struct htsmoduleStructExtended {
 */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
 
+/* Strip a default ":80" (any spelling) from an absolute link's authority, in
+   place into a buffer of the given size. */
+void hts_strip_default_port(char *lien, size_t size);
+
 /*
   Check for 301,302.. errors ("moved") and handle them; re-isuue requests, make
   rediretc file, handle filters considerations..
