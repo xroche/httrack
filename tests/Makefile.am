@@ -150,6 +150,7 @@ TESTS = \
 	65_port-siblings.test \
 	66_engine-port80-strip.test \
 	67_engine-delayed-truncate.test \
+	68_webhttrack-outdir-charset.test \
 	69_local-intl-logdir.test \
 	71_local-crange-repaircache.test
 
