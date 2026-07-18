@@ -48,6 +48,7 @@ key="${testdir}/server.key"
 tls=
 verbose=
 html_subdir=
+outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
@@ -140,6 +141,13 @@ while test "$pos" -lt "$nargs"; do
         pos=$((pos + 1))
         html_subdir="${args[$pos]}"
         ;;
+    --outdir-intl)
+        # Single non-ASCII -O "$out/NAME": path_html AND path_log are NAME, so
+        # the logs (and the harness reads of them) go through the non-ASCII path
+        # (#630). Distinct from --html-subdir, which keeps path_log ASCII.
+        pos=$((pos + 1))
+        outdir_intl="${args[$pos]}"
+        ;;
     --errors | --errors-content | --files)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
@@ -216,13 +224,18 @@ test -n "$ver" || die "could not run httrack"
 out="${tmpdir}/crawl"
 mkdir "$out" || die "could not create $out"
 # path_html holds the mirror + index; path_log holds hts-cache/hts-log.txt.
-# Default: both are "$out". With --html-subdir, path_html becomes "$out/NAME"
-# (the mirror root the audits inspect) while path_log stays "$out".
+# Default: both are "$out". --html-subdir moves path_html to "$out/NAME" while
+# path_log (logroot) stays "$out"; --outdir-intl moves both to "$out/NAME".
 mirrorroot="$out"
+logroot="$out"
 odir="$out"
 if test -n "$html_subdir"; then
     mirrorroot="${out}/${html_subdir}"
     odir="${mirrorroot},${out}"
+elif test -n "$outdir_intl"; then
+    mirrorroot="${out}/${outdir_intl}"
+    logroot="$mirrorroot"
+    odir="$mirrorroot"
 fi
 # Localhost is fast; disable the rate/bandwidth safety limits but keep a
 # max-time backstop so a hang cannot wedge the suite.
@@ -241,7 +254,7 @@ test "$crawlres" -eq 0 || ! result "httrack exited $crawlres" || {
     exit 1
 }
 result "OK"
-grep -iE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt" >&2
+grep -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt" >&2
 
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
@@ -260,7 +273,7 @@ if test -n "$rerun"; then
     # The update summary reports "files updated"; a fresh crawl never does. Assert
     # it so a regression that bypasses the cache (re-crawls fresh) can't pass.
     info "checking update used the cache"
-    if grep -aqE "mirror complete in .*files updated" "${out}/hts-log.txt"; then
+    if grep -aqE "mirror complete in .*files updated" "${logroot}/hts-log.txt"; then
         result "OK"
     else
         result "update pass did not report cache activity"
@@ -292,7 +305,7 @@ if test -n "$rerun_dead"; then
     zip="${out}/hts-cache/new.zip"
     test -s "$zip" || die "no cache was written by the first pass"
     cp "$zip" "${tmpdir}/cache-before.zip"
-    cp "${out}/hts-log.txt" "${tmpdir}/log-before.txt"
+    cp "${logroot}/hts-log.txt" "${tmpdir}/log-before.txt"
     stop_server "$serverpid"
     serverpid=
     info "re-running httrack against the stopped server"
@@ -305,7 +318,7 @@ if test -n "$rerun_dead"; then
     # The dead pass must have gone through the no-data rollback, not bailed out
     # before the mirror loop (which would leave the cache trivially untouched).
     info "checking the dead pass hit the rollback"
-    if grep -aq "No data seems to have been transferred" "${out}/hts-log.txt"; then
+    if grep -aq "No data seems to have been transferred" "${logroot}/hts-log.txt"; then
         result "OK"
     else
         result "rollback notice not found in hts-log.txt"
@@ -320,7 +333,7 @@ if test -n "$rerun_dead"; then
         exit 1
     fi
     # Audits below describe the healthy crawl, not the dead pass.
-    cp "${tmpdir}/log-before.txt" "${out}/hts-log.txt"
+    cp "${tmpdir}/log-before.txt" "${logroot}/hts-log.txt"
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
@@ -350,19 +363,19 @@ while test "$i" -lt "${#audit[@]}"; do
     --errors)
         i=$((i + 1))
         assert_equals "checking errors" "${audit[$i]}" \
-            "$(grep -iEc "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt")"
+            "$(grep -iEc "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")"
         ;;
     --errors-content)
         i=$((i + 1))
-        total=$(grep -icE "^[0-9:]*[[:space:]]Error:" "${out}/hts-log.txt")
+        total=$(grep -icE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")
         # transient network failures (statuscode -2..-6) flake on busy loopback;
         # the code parens are followed by " at link" or " after N retries at link"
-        transient=$(grep -cE '\(-[2-6]\) (at link|after )' "${out}/hts-log.txt" || true)
+        transient=$(grep -cE '\(-[2-6]\) (at link|after )' "${logroot}/hts-log.txt" || true)
         assert_equals "checking content errors" "${audit[$i]}" "$((total - transient))"
         ;;
     --files)
         i=$((i + 1))
-        nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${out}/hts-log.txt" |
+        nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${logroot}/hts-log.txt" |
             sed -e 's/.*[[:space:]]\([^ ]*\)[[:space:]]files written.*/\1/g')
         assert_equals "checking files" "${audit[$i]}" "$nFiles"
         ;;
@@ -393,7 +406,7 @@ while test "$i" -lt "${#audit[@]}"; do
     --log-found)
         i=$((i + 1))
         info "checking log matches ${audit[$i]}"
-        if grep -aqE "${audit[$i]}" "${out}/hts-log.txt"; then result "OK"; else
+        if grep -aqE "${audit[$i]}" "${logroot}/hts-log.txt"; then result "OK"; else
             result "not in log"
             exit 1
         fi
@@ -401,7 +414,7 @@ while test "$i" -lt "${#audit[@]}"; do
     --log-not-found)
         i=$((i + 1))
         info "checking log lacks ${audit[$i]}"
-        if grep -aqE "${audit[$i]}" "${out}/hts-log.txt"; then
+        if grep -aqE "${audit[$i]}" "${logroot}/hts-log.txt"; then
             result "present in log"
             exit 1
         else result "OK"; fi
