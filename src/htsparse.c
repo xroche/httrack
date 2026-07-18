@@ -315,6 +315,43 @@ static void escape_url_parens(char *const s, const size_t size) {
   strlcpybuff(s, buff, size);
 }
 
+/* Strip a default ":80" from lien's authority in place. Any spelling that
+   range-parses to 80 (":80", ":080") is dropped by its matched length, not a
+   hardcoded 3 chars; a value that merely wraps to 80 as an int (#614) stays. */
+void hts_strip_default_port(char *lien, size_t size) {
+  char *a;
+
+  if (!link_has_authority(lien))
+    return;
+  a = strstr(lien, "//"); // "//" authority
+  if (a)
+    a += 2;
+  else
+    a = lien;
+  a = jump_toport(a);
+  if (a) { // port present
+    char *b = a + 1;
+    char saved;
+    int port;
+    hts_boolean is_default;
+
+    while (isdigit((unsigned char) *b))
+      b++;
+    saved = *b;
+    *b = '\0';
+    is_default = hts_parse_url_port(a + 1, &port) && port == 80;
+    *b = saved;
+    if (is_default) { // default port, strip it
+      char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+      tempo[0] = '\0';
+      strncatbuff(tempo, lien, a - lien);
+      strcatbuff(tempo, b); // skip the whole matched :port
+      strlcpybuff(lien, tempo, size);
+    }
+  }
+}
+
 /* Main parser */
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
@@ -2138,38 +2175,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     } while((b != a) && (b));
                   }
                 }
-                // éliminer les éventuels :80 (port par défaut!)
-                if (link_has_authority(lien)) {
-                  char *a;
-
-                  a = strstr(lien, "//");       // "//" authority
-                  if (a)
-                    a += 2;
-                  else
-                    a = lien;
-                  a = jump_toport(a);
-                  if (a) {      // port
-                    int port = 0;
-                    int defport = 80;
-                    char *b = a + 1;
-
-#if HTS_USEOPENSSL
-#endif
-                    while(isdigit((unsigned char) *b)) {
-                      port *= 10;
-                      port += (int) (*b - '0');
-                      b++;
-                    }
-                    if (port == defport) {      // port 80, default - c'est débile
-                      char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-                      tempo[0] = '\0';
-                      strncatbuff(tempo, lien, a - lien);
-                      strcatbuff(tempo, a + 3); // sauter :80
-                      strcpybuff(lien, tempo);
-                    }
-                  }
-                }
+                // drop a default :80 port from the authority
+                hts_strip_default_port(lien, sizeof(lien));
                 // filtrer les parazites (mailto & cie)
                 /*
                    if (strfield(lien,"mailto:")) {  // ne pas traiter

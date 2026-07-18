@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Stripping a default :80 from a crawled link used to skip a hardcoded 3 chars
+# (#627): ":080"/":0080" lost only ":80" and glued the rest onto the host
+# (127.0.0.1:080/x -> 127.0.0.10/x), and a value wrapping to 80 as a 32-bit int
+# (#614) was stripped as if it were the default. All assertions live in the
+# engine self-test.
+httrack -O /dev/null -#test=stripport | grep -q "stripport self-test OK"
