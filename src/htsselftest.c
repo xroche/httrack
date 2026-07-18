@@ -1589,6 +1589,41 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Default-port strip (#627): a genuine 80 (any spelling) is removed by its
+   matched length, host preserved; a non-80 port or one that only wraps to 80 as
+   a 32-bit int (#614) is left intact. Guards the old bug where ":080"/":0080"
+   dropped a hardcoded 3 chars and glued the leftover digits onto the host. */
+static int st_stripport(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *in, *out;
+  } cases[] = {
+      {"http://127.0.0.1:80/x", "http://127.0.0.1/x"},
+      {"http://127.0.0.1:080/x", "http://127.0.0.1/x"},
+      {"http://127.0.0.1:0080/x", "http://127.0.0.1/x"},
+      {"http://127.0.0.1:80", "http://127.0.0.1"},
+      {"http://127.0.0.1:0081/x", "http://127.0.0.1:0081/x"},
+      {"http://127.0.0.1:81/x", "http://127.0.0.1:81/x"},
+      {"http://127.0.0.1:8080/x", "http://127.0.0.1:8080/x"},
+      {"http://127.0.0.1:4294967376/x", "http://127.0.0.1:4294967376/x"},
+      {"http://127.0.0.1/x", "http://127.0.0.1/x"},
+  };
+
+  size_t k;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    char BIGSTK buff[HTS_URLMAXSIZE * 2];
+
+    strcpybuff(buff, cases[k].in);
+    hts_strip_default_port(buff, sizeof(buff));
+    assertf(strcmp(buff, cases[k].out) == 0);
+  }
+  printf("stripport self-test OK\n");
+  return 0;
+}
+
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
    no-www= no-slash= no-query= n83= type=, plus repeatable prior=adr|fil|sav
    registering an already-crawled link (dedup/collision paths). */
@@ -3189,6 +3224,8 @@ static const struct selftest_entry {
      st_socks5},
     {"identabs", "", "ident_url_absolute one-byte fil[] overflow self-test",
      st_identabs},
+    {"stripport", "", "default :80 port strip preserves host (#627)",
+     st_stripport},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
     {"headerlong", "[header-name:]",
