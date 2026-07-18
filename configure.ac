@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.12], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.13], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -29,11 +29,13 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:4:0: 3.49.12 tail-appends one field (why_url) to httrackp and otherwise only
-# deletes dead comments; no struct layout or exported signature broke vs 3.49.11,
-# so it stays soname .so.3; bump revision.
+# 3:5:0: 3.49.13 leaves every installed struct layout and the exported symbol set
+# untouched vs 3.49.12; the 2 GB (_stat64) and UTF-8 export widenings are _WIN32-only,
+# and INTsys widened on POSIX (#600) but sits in no installed struct. Stays soname
+# .so.3; bump revision. x32 alone changes layout (LLint was 4 bytes there, #524), and
+# is not a release architecture.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:4:0"
+VERSION_INFO="3:5:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
