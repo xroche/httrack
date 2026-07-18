@@ -2368,30 +2368,28 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       opt->errlog = stderr;
     } else if (httrack_logmode >= 2) {
       // deux fichiers log
-      structcheck(StringBuff(opt->path_log));
-      if (fexist
-          (fconcat
-           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-log.txt")))
-        remove(fconcat
-               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-log.txt"));
-      if (fexist
-          (fconcat
-           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-err.txt")))
-        remove(fconcat
-               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-err.txt"));
+      // path_log holds UTF-8 bytes (argv is UTF-8): the ANSI file calls would
+      // read them as the codepage and drop the logs into a mangled twin (#630).
+      structcheck_utf8(StringBuff(opt->path_log));
+      if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-log.txt")))
+        UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                       StringBuff(opt->path_log), "hts-log.txt"));
+      if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-err.txt")))
+        UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                       StringBuff(opt->path_log), "hts-err.txt"));
 
       /* Check FS directory structure created */
-      structcheck(StringBuff(opt->path_log));
+      structcheck_utf8(StringBuff(opt->path_log));
 
-      opt->log =
-        fopen(fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-log.txt"),
-              "w");
+      opt->log = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-log.txt"),
+                       "w");
       if (httrack_logmode == 2)
-        opt->errlog =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-err.txt"),
-                "w");
+        opt->errlog = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log), "hts-err.txt"),
+                            "w");
       else
         opt->errlog = opt->log;
       if (opt->log == NULL) {

@@ -2146,6 +2146,52 @@ static int st_cache_corrupt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Drives unzRepair over a damaged local file header whose CRC field's high
+   16-bit word has bit 15 set. Before the READ_32 fix that shifted an int and
+   overflowed, so UBSan aborts here; after it, repair recovers the one entry. */
+static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
+  static const unsigned char zip[] = {
+      0x50, 0x4b, 0x03, 0x04, /* local file header signature */
+      0x14, 0x00,             /* version needed */
+      0x00, 0x00,             /* general purpose flag */
+      0x00, 0x00,             /* method */
+      0x00, 0x00,             /* time */
+      0x00, 0x00,             /* date */
+      0x00, 0x00, 0xe8, 0x8a, /* crc: high word 0x8ae8, bit 15 set */
+      0x00, 0x00, 0x00, 0x00, /* compressed size */
+      0x00, 0x00, 0x00, 0x00, /* uncompressed size */
+      0x01, 0x00,             /* filename length */
+      0x00, 0x00,             /* extra field length */
+      0x61                    /* filename "a" */
+  };
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  uLong nrec = 0, bytes = 0;
+  FILE *fp;
+  int err;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-repair-shift: needs a directory\n");
+    return 1;
+  }
+  snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
+  snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+  snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+  fp = fopen(in, "wb");
+  if (fp == NULL || fwrite(zip, 1, sizeof(zip), fp) != sizeof(zip)) {
+    if (fp != NULL)
+      fclose(fp);
+    fprintf(stderr, "zip-repair-shift: cannot write %s\n", in);
+    return 1;
+  }
+  fclose(fp);
+  err = unzRepair(in, out, tmp, &nrec, &bytes);
+  printf("zip-repair-shift: %s (recovered %lu entr%s)\n",
+         (err == Z_OK && nrec == 1) ? "OK" : "FAIL", (unsigned long) nrec,
+         nrec == 1 ? "y" : "ies");
+  return (err == Z_OK && nrec == 1) ? 0 : 1;
+}
+
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -3253,6 +3299,9 @@ static const struct selftest_entry {
      st_cache_legacy},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
+    {"zip-repair-shift", "<dir>",
+     "cache zip-repair header read must not overflow a signed shift",
+     st_zip_repair_shift},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},

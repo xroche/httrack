@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# #623: url_savename enforces the 236-char path ceiling by cutting the tail of
+# the last segment, where the mandatory ".delayed" placeholder marker lives. A
+# cut marker fails IS_DELAYED_EXT, so back_delayed_rename never renames the file
+# to its final name and the download is lost. The marker must survive the cut.
+
+# statuscode=302 status=-1 = a redirect answer still downloading: no type is
+# resolved, so the name gets a ".<id>.delayed" placeholder (see 01_engine-savename).
+CEIL=236
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cd "$scratch"
+
+run() {
+    "$httrack_bin" -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
+}
+
+# A deep path ending in a long segment that overruns the ceiling.
+deep="/d1$(printf 'a%.0s' {1..40})/d2$(printf 'b%.0s' {1..40})"
+deep="$deep/d3$(printf 'c%.0s' {1..40})/d4$(printf 'd%.0s' {1..40})"
+long="$deep/$(printf 'z%.0s' {1..90})"
+
+out="$(run "$long" text/html statuscode=302 status=-1)"
+case "$out" in
+*.delayed) ;;
+*)
+    echo "FAIL: delayed marker cut by truncation: '$out'"
+    exit 1
+    ;;
+esac
+test "${#out}" -le "$CEIL" || {
+    echo "FAIL: truncated name ${#out} > $CEIL ceiling: '$out'"
+    exit 1
+}
+
+# #133-style hashed name: an all-hex last segment must keep the marker too (the
+# ".<id>." tag is not mistaken for part of the hash).
+hexseg=$(printf 'a1b2c3d4e5f60718%.0s' {1..8})
+hexpath="/d1$(printf 'x%.0s' {1..30})/d2$(printf 'y%.0s' {1..30})/$hexseg"
+out="$(run "$hexpath" text/html statuscode=302 status=-1)"
+case "$out" in
+*.delayed) ;;
+*)
+    echo "FAIL: hashed-name marker cut by truncation: '$out'"
+    exit 1
+    ;;
+esac
+test "${#out}" -le "$CEIL" || {
+    echo "FAIL: hashed name ${#out} > $CEIL ceiling: '$out'"
+    exit 1
+}
+
+# A non-delayed name of the same shape still truncates, with no marker to keep.
+out="$(run "$long.html" text/html)"
+test "${#out}" -le "$CEIL" || {
+    echo "FAIL: non-delayed name ${#out} > $CEIL ceiling: '$out'"
+    exit 1
+}
+case "$out" in
+*.delayed)
+    echo "FAIL: non-delayed name grew a .delayed marker: '$out'"
+    exit 1
+    ;;
+esac
+
+echo "delayed-truncate OK"
