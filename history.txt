@@ -4,6 +4,31 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-13
++ New: SOCKS5 proxy support, with scheme-aware -P URLs (socks5://, socks5h://, connect://) and plain HTTP tunneled through a CONNECT-only proxy (#563, #564)
++ New: decode brotli and zstd content codings, advertised over TLS only as browsers do (#556)
++ New: webhttrack exposes the engine options added since 3.49-2, among them --cookies-file, --pause and --strip-query (#587)
++ Fixed: files of 2 GB or more were mishandled on Windows and on every 32-bit build (#569)
++ Fixed: --update destroyed a good local copy when the re-fetch returned an HTTP error, was aborted by -M/-E, failed to decode, or came in short (#176, #521, #557, #562)
++ Fixed: a self-redirect cookie wall was dropped instead of being re-fetched with the cookie (#15)
++ Fixed: a stalled TLS handshake ignored --timeout, and synchronous DNS resolution could wedge a crawl past --max-time (#607, #613)
++ Fixed: -M metered saved bytes rather than received volume, and overshot its cap under a slow server (#77, #520)
++ Fixed: several network-facing overflows and denial-of-service paths in the Content-Range, chunked-transfer, cookie, filter and ProxyTrack cache parsers
++ Fixed: a failed connect did not fall back to the next address on Windows (#579)
++ Fixed: -P took an out-of-range port as a garbage port, and scanned past an IPv6 literal's closing bracket (#598, #602)
++ Fixed: reject a port outside 1..65535 wherever one is parsed (a crawled URL, the htsserver and proxytrack listen arguments, an ftp:// URL), instead of letting a bare sscanf wrap a huge value into a plausible port and silently use it (#614, #626)
++ Fixed: a configured proxy still resolved and dialed the origin itself (#592)
++ Fixed: ~/ in the -O base path was never expanded (#270)
++ Fixed: a non-ASCII -O output path was double-encoded on Windows once argv became UTF-8 (#621)
++ Fixed: files under a non-ASCII project path were saved to a mangled directory on Windows (#217)
++ Fixed: --build-top-index (-%i) and --protocol (-@i) were taken for the -i continue flag, wiping the URL list and exiting on the usage screen (#615)
++ Fixed: webhttrack ignored LC_ALL/LC_MESSAGES and picked the wrong Chinese and Portuguese (#95)
++ Fixed: webhttrack wrote its base path and httrack.ini to the filesystem root when $HOME was empty (#625)
++ Fixed: crawls on a non-default port were slowed by a per-request pre-resolve (#181)
++ Changed: Windows builds moved to Visual Studio 2022 and OpenSSL 3.x, the VS2008 project files are retired, and the binaries carry a version resource
++ Changed: removed the obsolete Java-applet (.class) parser and the dead SWF module remnants
++ Changed: multiple internal hardening, test and CI improvements (Windows and macOS crawl suites, HTML-parser fuzzing, parallel make check)
+
 3.49-12
 + New: --why explains which filter rule accepts or rejects a given URL, then exits (#505)
 + Fixed: links carrying raw UTF-8 bytes were fetched double-encoded and 404'd (#516)

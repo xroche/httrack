@@ -147,6 +147,7 @@ TESTS = \
 	63_webhttrack-home.test \
 	64_local-intl-outdir.test \
 	65_port-siblings.test \
+	66_engine-port80-strip.test \
 	69_local-intl-logdir.test
 
 CLEANFILES = check-network_sh.cache
