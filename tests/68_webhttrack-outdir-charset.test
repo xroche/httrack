@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# webhttrack's POST body arrives in the form's declared charset, not UTF-8, yet
+# the engine now assumes UTF-8 argv. A non-ASCII -O output dir submitted through
+# the web UI must land under the correct UTF-8 directory, not an ISO-8859-1 twin
+# (#629). Drives the real htsserver over HTTP; the default (English) form is
+# served ISO-8859-1, so 'café' travels as the single byte 0xE9.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_charset.XXXXXX") || fail "no tmpdir"
+origlog=$(mktemp)
+srvlog=$(mktemp)
+origpid=
+srvpid=
+cleanup() {
+    local pid
+    for pid in "${origpid}" "${srvpid}"; do
+        test -n "${pid}" || continue
+        kill -9 "${pid}" 2>/dev/null || true
+        wait "${pid}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    done
+    rm -rf "${work}" "${origlog}" "${srvlog}"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+# Origin server to mirror.
+"${python}" "${testdir}/local-server.py" --root "${testdir}/server-root" >"${origlog}" 2>&1 &
+origpid=$!
+for _ in $(seq 1 40); do
+    oport=$(sed -n 's/^PORT //p' "${origlog}") && test -n "${oport}" && break
+    kill -0 "${origpid}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${oport:-}" || fail "origin server did not start: $(cat "${origlog}")"
+
+# webhttrack server; an isolated HOME keeps a stray ~/.httrack.ini out of it.
+sport=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+(
+    trap '' TERM TTOU
+    export HOME="${work}"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+srvpid=$!
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
+    kill -0 "${srvpid}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+
+# Post a "start" command whose -O dir is 'café' in the form's ISO-8859-1 charset.
+"${python}" - "${url}" "${work}" "${oport}" <<'PY'
+import sys, urllib.parse, urllib.request
+
+url, work, oport = sys.argv[1], sys.argv[2], sys.argv[3]
+outdir = work + "/caf\xe9"  # 'café' as ISO-8859-1 (the byte the browser would send)
+cmd = ("httrack --quiet --robots=0 "
+       "http://127.0.0.1:%s/simple/basic.html -O %s" % (oport, outdir))
+fields = [("path", work), ("projname", "proj"), ("command_do", "start"),
+          ("winprofile", "x"), ("command", cmd)]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="", encoding="latin-1"))
+                for k, v in fields)
+req = urllib.request.Request(url + "step4.html", data=body.encode("latin-1"),
+                             method="POST")
+urllib.request.urlopen(req, timeout=20).read()
+PY
+
+utf8dir="${work}/café"
+latin1dir="${work}/caf"$'\xe9'
+
+found=
+for _ in $(seq 1 160); do
+    test -n "$(find "${utf8dir}" -name basic.html 2>/dev/null | head -n 1)" && {
+        found=1
+        break
+    }
+    kill -0 "${srvpid}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${found}" || fail "mirror never landed under UTF-8 café/: $(find "${work}" -maxdepth 3 2>/dev/null)"
+test ! -e "${latin1dir}" || fail "mirror also created the ISO-8859-1 twin dir"
+
+echo "PASS"

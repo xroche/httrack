@@ -373,7 +373,8 @@ char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
   return NULL;
 }
 
-char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
+HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
+                                         const char *charset) {
   const UINT cp = hts_getCodepage(charset);
 
   return hts_convertStringCPToUTF8(s, size, cp);
@@ -554,7 +555,8 @@ static char *hts_convertStringCharset(const char *s, size_t size,
   return NULL;
 }
 
-char *hts_convertStringToUTF8(const char *s, size_t size, const char *charset) {
+HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
+                                         const char *charset) {
   /* Empty string ? */
   if (size == 0) {
     return strdup("");
