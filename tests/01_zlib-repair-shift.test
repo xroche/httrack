@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
+# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
+# tool flags despite the #!/bin/bash above.
+
+# unzRepair header read must not overflow a signed shift (-#test=zip-repair-shift
+# <dir>). A damaged local file header whose CRC high word has bit 15 set made
+# READ_32 shift an int past INT_MAX; UBSan aborts before the fix casts to uLong.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+out=$(httrack -#test=zip-repair-shift "$dir")
+
+printf '%s\n' "$out" | grep -qx "zip-repair-shift: OK (recovered 1 entry)" || {
+    echo "expected 'zip-repair-shift: OK (recovered 1 entry)', got: $out" >&2
+    exit 1
+}

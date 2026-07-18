@@ -1532,8 +1532,30 @@ int url_savename(lien_adrfilsave *const afs,
       // last segment
       wsave[j++] = '/';
 #define MAX_UTF8_SEQ_CHARS 4
-      for(i = lastSeg; wsave[i] != '\0' && j < maxLen; i++) {
-        wsave[j++] = wsave[i];
+      {
+        // #623: the ".delayed" placeholder marker sits at the tail; cutting
+        // through it drops IS_DELAYED_EXT, so the file is never renamed to its
+        // final name. Reserve the trailing ".<id>.delayed" across the cut.
+        size_t markStart = wsaveLen;
+        if (IS_DELAYED_EXT(afs->save)) {
+          const size_t extDot = wsaveLen - strlen("." DELAYED_EXT);
+          size_t p = extDot; /* walk back over a dot-separated ".<hexid>" tag */
+
+          while (p > lastSeg && ((wsave[p - 1] >= '0' && wsave[p - 1] <= '9') ||
+                                 (wsave[p - 1] >= 'a' && wsave[p - 1] <= 'f')))
+            p--;
+          // keep the tag only if truly ".<hexid>.delayed"; else the bare marker
+          // (a wholly-hex base, e.g. a hashed #133 name, must not be absorbed)
+          markStart = (p > lastSeg && p < extDot && wsave[p - 1] == '.')
+                          ? p - 1
+                          : extDot;
+        }
+        // head, bounded so the marker still fits, then the marker itself
+        for (i = lastSeg; i < markStart && j + (wsaveLen - markStart) < maxLen;
+             i++)
+          wsave[j++] = wsave[i];
+        for (i = markStart; i < wsaveLen && j < maxLen; i++)
+          wsave[j++] = wsave[i];
       }
       // terminating \0
       wsave[j++] = '\0';

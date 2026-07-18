@@ -9,21 +9,23 @@ set -euo pipefail
 # drives both refusal paths and the accept path.
 
 out="$(httrack -O /dev/null -#test=xfread-limit)"
+# Match with here-strings, not `echo | grep -q`: under pipefail the early grep
+# exit SIGPIPEs echo and fails the pipeline even when the pattern matched.
 for case in bylen bygrow; do
-    echo "$out" | grep -q "${case}: refused=1 adr=null msg=In-memory content too large" || {
+    grep -q "${case}: refused=1 adr=null msg=In-memory content too large" <<<"$out" || {
         echo "FAIL ${case}: $out"
         exit 1
     }
 done
 
 # Exactly INT32_MAX must be refused too (the reallocs add 1).
-echo "$out" | grep -q 'boundary: msg=In-memory content too large' || {
+grep -q 'boundary: msg=In-memory content too large' <<<"$out" || {
     echo "FAIL boundary: $out"
     exit 1
 }
 
 # The guard must NOT fire for a legitimate small size.
-if echo "$out" | grep -q 'accept: msg=In-memory content too large'; then
+if grep -q 'accept: msg=In-memory content too large' <<<"$out"; then
     echo "FAIL accept (guard fired on a legit size): $out"
     exit 1
 fi

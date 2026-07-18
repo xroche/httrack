@@ -84,6 +84,7 @@ TESTS = \
 	01_zlib-cache-legacy.test \
 	01_zlib-cache-golden.test \
 	01_zlib-cache-writefail.test \
+	01_zlib-repair-shift.test \
 	01_zlib-savename-cached.test \
 	02_manpage-regen.test \
 	02_update-cache.test \
@@ -148,6 +149,8 @@ TESTS = \
 	64_local-intl-outdir.test \
 	65_port-siblings.test \
 	66_engine-port80-strip.test \
+	67_engine-delayed-truncate.test \
+	69_local-intl-logdir.test \
 	71_local-crange-repaircache.test
 
 CLEANFILES = check-network_sh.cache
