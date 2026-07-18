@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsnet.h"
 #include "htslib.h"
+#include "htscharset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -749,7 +750,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                            RUN THE SERVER
                          */
                         if (strcmp((char *) adrcd, "start") == 0) {
-                          webhttrack_main((char *) adr + p);
+                          /* POST body is in the form's charset, not the
+                             UTF-8 argv the engine now assumes (#629). */
+                          char *const cmdl = (char *) adr + p;
+                          char *cmdlUtf8 = hts_convertStringToUTF8(
+                              cmdl, strlen(cmdl), LANGSEL("LANGUAGE_CHARSET"));
+
+                          webhttrack_main(cmdlUtf8 != NULL ? cmdlUtf8 : cmdl);
+                          freet(cmdlUtf8);
                         } else {
                           commandRunning = 0;
                           commandEnd = 1;

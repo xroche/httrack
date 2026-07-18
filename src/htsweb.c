@@ -65,6 +65,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsserver.h"
 #include "htsurlport.h"
 #include "htsweb.h"
+#include "htscharset.h"
 
 #if USE_BEGINTHREAD==0
 #error fatal: no threads support
@@ -156,6 +157,7 @@ int main(int argc, char *argv[]) {
   printf("Initializing the server..\n");
 
 #ifdef _WIN32
+  hts_argv_utf8(&argc, &argv);
   {
     WORD wVersionRequested;     // requested version WinSock API
     WSADATA wsadata;            // Windows Sockets API data
