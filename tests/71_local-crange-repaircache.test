@@ -1,0 +1,134 @@
+#!/bin/bash
+# #581: an interrupted mirror can leave a truncated new.zip that pass 2 must
+# repair before resuming. The repaired-cache resume then hits the same hostile
+# 206 as test 48, so restart-whole must still drop the partial and refetch the
+# whole file. Pass 1 leaves a partial + temp-ref; we truncate new.zip past its
+# last local entry (dropping the central directory) so unzOpen fails and the
+# repair path runs; pass 2 resumes, rejects the range, and refetches whole.
+set -u
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+# On Windows the pass-1 interrupt is a hard kill (MSYS can't signal a native
+# exe) and the restart-whole path fails on the repaired cache (#581) -- the very
+# bug this exercises; skip until the engine fix lands.
+if is_windows; then
+    echo "Windows: restart-whole fails on a repaired cache (#581), skipping"
+    exit 77
+fi
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crangerep.XXXXXX") || exit 1
+serverpid=
+crawlpid=
+cleanup() {
+    test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+out="${tmpdir}/crawl"
+mkdir "$out"
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1)
+refdir="${out}/hts-cache/ref"
+newzip="${out}/hts-cache/new.zip"
+
+# --- pass 1: crawl, interrupt once the blob download is underway -------------
+printf '[pass 1: interrupt mid-download] ..\t'
+httrack "${common[@]}" "${base}/crange206mem/index.html" >"${tmpdir}/log1" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+sleep 0.3
+kill -TERM "$crawlpid" 2>/dev/null
+wait "$crawlpid" 2>/dev/null
+crawlpid=
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
+    echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
+    exit 1
+}
+echo "OK (temp-ref present)"
+
+# --- damage the cache: drop the central directory a hard kill never wrote ----
+printf '[damage new.zip -> forces repair] ..\t'
+"$python" - "$newzip" <<'PY' || exit 1
+import os, sys
+path = sys.argv[1]
+data = open(path, "rb").read()
+cut = data.find(b"PK\x01\x02")  # first central-directory header
+if cut <= 0:
+    sys.exit("no central directory to drop in %s" % path)
+os.truncate(path, cut)
+PY
+echo "OK"
+
+# --- pass 2: --continue -> repair -> resume -> hostile 206 -> refetch whole ---
+printf '[pass 2: repair, reject range, refetch] ..\t'
+rc=0
+httrack "${common[@]}" --continue "${base}/crange206mem/index.html" >"${tmpdir}/log2" 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: httrack exited $rc"
+    cat "${tmpdir}/log2" >&2
+    exit 1
+}
+echo "OK (terminated)"
+
+# The repair path must actually have run, else this is just a copy of test 48.
+printf '[cache repair fired] ..\t'
+grep -q 'damaged cache' "${out}/hts-log.txt" 2>/dev/null || {
+    echo "FAIL: repair path did not run; damage was ineffective"
+    exit 1
+}
+echo "OK"
+
+blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
+full=6008 # len(CRANGE206_BODY) = len("CR206DAT") + 6000
+
+printf '[file recovered whole] ..\t'
+test -s "$blob" || {
+    echo "FAIL: blob.bin missing after the repaired-cache resume"
+    exit 1
+}
+got=$(wc -c <"$blob")
+test "$got" -eq "$full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${full}"
+    exit 1
+}
+echo "OK (${got} bytes)"
