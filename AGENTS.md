@@ -19,6 +19,13 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
+- A `tests/NN_*.test` runs only if listed in `tests/Makefile.am`'s `TESTS`; an
+  unregistered file is silently skipped.
+- `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
+  not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
+  check`, or `PATH="<bld>/src:$PATH"` for a manual run.
+- Give new `.test` scripts `set -e`: the older ones predate the rule, so several
+  `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
@@ -31,14 +38,31 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - **Format only changed lines** with `git clang-format` (clang-format 19). Never
   reformat untouched code: the engine was formatted by an old tool and won't
   round-trip.
-- **Byte-safe edits.** Files with raw high bytes are ISO-8859-1 (French
-  comments). Edit them byte-wise (`perl -0pi`, `sed`), not through a tool that
-  re-encodes to UTF-8 and corrupts them.
+- **Byte-safe edits.** A few tracked files carry raw ISO-8859-1 high bytes
+  (French comments): `src/htsconcat.c`, `lang/*.txt`, `html/contact.html`, and
+  the `fuzz/corpus/*` vectors. Edit those byte-wise (`perl -0pi`, `sed`), not
+  through a tool that re-encodes to UTF-8 and corrupts them. The rest of the tree
+  is UTF-8 and safe to edit normally.
 
 ## Security (HTTrack parses hostile input off the network)
 - Bounds-check every copy. Overflow-safe form: put the untrusted value alone,
   `untrusted < limit - controlled` — never `controlled + untrusted < limit`,
   which can wrap and pass.
+
+## C conventions
+- **Use the `*t` allocator wrappers, never raw libc** (`htssafe.h`):
+  `malloct`/`calloct`/`realloct`/`freet`/`strdupt`, in test and selftest code
+  too. `freet` NULLs its (lvalue) argument and tolerates NULL; `calloct(n, sz)`
+  keeps calloc's arg order. Only exception: storing or calling a libc symbol
+  itself (e.g. a resolver-backend function pointer).
+- **Exported API is `HTSEXT_API`.** Everything else is hidden by
+  `-fvisibility=hidden` and free to change (check with `nm -D --defined-only
+  libhttrack.so`). Touching an installed-header struct (see `DevIncludes_DATA` in
+  `src/Makefile.am`) or an exported signature is an ABI break — flag and discuss,
+  bump the soname, and prefer keeping the old entry point beside a new one.
+- **Windows ABI is free to break, POSIX is not.** The Windows DLL ships next to
+  the exe with no soname contract, so a `_WIN32`-only ABI change needs no
+  deprecation dance; POSIX/ELF keeps the flag-discuss-bump rules.
 
 ## Code & prose
 - Be terse. Comment the why, in English; translate French comments you touch.
