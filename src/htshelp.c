@@ -489,13 +489,13 @@ void help(const char *app, int more) {
   infomsg("  MN maximum overall size that can be uploaded/scanned");
   infomsg("  EN maximum mirror time in seconds (60=1 minute, 3600=1 hour)");
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");
-  infomsg(" %cN maximum number of connections/seconds (*%c10)");
+  infomsg(" %cN maximum number of connections/seconds (*%c5)");
   infomsg(" %G  random pause of MIN[:MAX] seconds between files (e.g. %G5:10)");
   infomsg
     ("  GN pause transfer if N bytes reached, and wait until lock file is deleted");
   infomsg("");
   infomsg("Flow control:");
-  infomsg("  cN number of multiple connections (*c8)");
+  infomsg("  cN number of multiple connections (*c4)");
   infomsg("  TN timeout, number of seconds after a non-responding link is"
           " shutdown; also bounds host name resolution");
   infomsg
