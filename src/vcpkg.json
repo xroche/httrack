@@ -1,9 +1,8 @@
 {
-  "$schema":
-      "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "libhttrack",
   "version-string": "3.49",
-  "builtin-baseline": "4bca8fd8654e5ba76f92661db7bfe954768ad8ef",
+  "builtin-baseline": "cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3",
   "dependencies": [
     "brotli",
     "openssl",
