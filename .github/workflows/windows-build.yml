@@ -44,6 +44,20 @@ jobs:
         shell: pwsh
         run: vcpkg integrate install
 
+      # The runner image's vcpkg checkout is pinned to some commit; our manifest's
+      # builtin-baseline is usually newer, so `git show <baseline>:versions/...`
+      # fails until that commit is local. Fetch exactly the pinned baseline (read
+      # from the manifest, so Dependabot bumps need no workflow edit).
+      - name: Fetch the pinned vcpkg baseline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+          $baseline = (Get-Content src/vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          if (-not $baseline) { throw "no builtin-baseline in src/vcpkg.json" }
+          git -C $root fetch --no-tags origin $baseline
+          if ($LASTEXITCODE -ne 0) { throw "could not fetch vcpkg baseline $baseline" }
+
       # httrack and webhttrack carry a ProjectReference to libhttrack, so building
       # them builds it first; proxytrack is standalone.
       - name: Build
