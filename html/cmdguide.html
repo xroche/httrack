@@ -165,11 +165,11 @@ the index" problems disappear.</p>
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>-rN</tt></td><td>Maximum link depth. <b>The start page is level 1</b>, so one level of links out is <tt>-r2</tt>, not <tt>-r1</tt>.</td></tr>
-  <tr><td><tt>-a -d -l -e</tt></td><td>How far off the starting host the crawl may travel: same address, same directory down, same domain, everywhere. The default keeps you on the starting host.</td></tr>
-  <tr><td><tt>-D -U -S -B</tt></td><td>Directory travel: down only, up-and-down, stay strictly in the path, or anywhere on the site.</td></tr>
+  <tr><td><tt>-a -d -l -e</tt></td><td>How far off the starting host the crawl may travel: same address (host), same principal domain, same top-level domain (for example .com), or everywhere. The default keeps you on the starting host.</td></tr>
+  <tr><td><tt>-D -U -S -B</tt></td><td>Directory travel: down into subdirectories only, up to parent directories only, stay in the same directory, or both up and down.</td></tr>
   <tr><td><tt>-n</tt></td><td>Also fetch non-HTML files "near" a followed link, such as an image linked from a page you kept but hosted elsewhere.</td></tr>
   <tr><td><tt>-%eN</tt></td><td>How many levels of external links to follow once the crawl leaves your scope (default 0).</td></tr>
-  <tr><td><tt>-t</tt></td><td>Test links (send a HEAD) without downloading, useful to check what a scope would reach.</td></tr>
+  <tr><td><tt>-t</tt></td><td>Also HEAD-test links that fall outside the scope, which are normally refused, without downloading them: a way to see what scope is excluding.</td></tr>
 </table>
 
 <p>The single most common surprise is "only the home page came down." That is
@@ -295,7 +295,7 @@ ones it kept so the local copy browses offline. These options tune both halves.<
   <tr><td><tt>-x -o</tt></td><td>Replace external links with an error page, and generate an error page for links that failed.</td></tr>
   <tr><td><tt>-%p -%x</tt></td><td>Leave HTML untouched (no rewriting), and strip passwords out of saved links.</td></tr>
   <tr><td><tt>-%P -j</tt></td><td>Aggressive link discovery, and how much script content is parsed for links.</td></tr>
-  <tr><td><tt>-%M</tt></td><td>Save each page as a single self-contained <tt>.mht</tt> archive.</td></tr>
+  <tr><td><tt>-%M</tt></td><td>Save the whole mirror as a single MIME-encapsulated <tt>.mht</tt> archive (<tt>index.mht</tt>).</td></tr>
   <tr><td><tt>-I -%i -%I</tt></td><td>Build a per-mirror index, a top index across projects, and a searchable keyword index.</td></tr>
 </table>
 
