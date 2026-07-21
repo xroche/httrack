@@ -173,7 +173,7 @@ There are also specific issues regarding this format:
 <ul>
 <li>The data in the central directory (such as CD extra field, and CD comments) are not used</li>
 <li>The ZIP archive is allowed to contains more than 2^16 files (65535) ; in such case the total number of entries in the 32-bit central directory is 65536 (0xffff), but the presence of the 64-bit central directory is not mandatory</li>
-<li>The ZIP archive is allowed to contains more than 2^32 bytes (4GiB) ; in such case the 64-bit central directory must be present <b>(not currently supported)</b></li>
+<li>The ZIP archive is allowed to contains more than 2^32 bytes (4GiB) ; in such case the 64-bit central directory is emitted automatically (a single stored entry of 4GiB or more is not supported)</li>
 </ul>
 
 <br />
