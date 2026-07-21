@@ -3,6 +3,7 @@
       "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "libhttrack",
   "version-string": "3.49",
+  "builtin-baseline": "4bca8fd8654e5ba76f92661db7bfe954768ad8ef",
   "dependencies": [
     "brotli",
     "openssl",
