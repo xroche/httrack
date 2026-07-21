@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Bumps builtin-baseline in src/vcpkg.json so the pinned OpenSSL/zlib can't rot.
+  # windows-build.yml validates each bump; the pin makes what ships reproducible.
+  - package-ecosystem: vcpkg
+    directory: /src
+    schedule:
+      interval: weekly
