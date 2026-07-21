@@ -103,12 +103,12 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 
 <br>
 
-<p>The Android app runs the same mirroring engine as the desktop version behind a
-touch interface. It needs Android 7.0 or later, and is available on
+<p>HTTrack downloads a website to your device so you can read it offline. The
+Android app runs the same mirroring engine as the desktop version behind a touch
+interface. It needs Android 7.0 or later, and is available on
 <a href="https://play.google.com/store/apps/details?id=com.httrack.android">Google Play</a>.</p>
 
-<p>The steps below follow one mirror from start to finish. The crawl settings are
-the same as on the desktop, so the option screens are only summarized here.</p>
+<p>The steps below follow one mirror from start to finish.</p>
 
 <br>
 
@@ -148,10 +148,31 @@ the same as on the desktop, so the option screens are only summarized here.</p>
 <br><br>
 
   <li><b>Options (optional)</b></li>
-  <br><small>The <b>Options</b> screen groups the crawl settings across eleven
-  tabs, matching the desktop version. See the
-  <a href="step9.html">option reference</a> for what each one does.</small>
+  <br><small>The <b>Options</b> screen holds the crawl settings, grouped into
+  eleven tabs. It uses the same profile format as the desktop version, so a tab you
+  know from WinHTTrack behaves the same way here.</small>
   <br><br><center><img src="img/android_options.png" width="320" alt="Options tab list" border="0"></center>
+  <br><small>The tabs are:</small>
+  <ul>
+    <li><small><b>Scan Rules</b>: wildcard filters for the addresses to keep or skip.</small></li>
+    <li><small><b>Limits</b>: caps on depth, size, time, speed, and number of connections.</small></li>
+    <li><small><b>Flow Control</b>: simultaneous connections, timeouts, and retries.</small></li>
+    <li><small><b>Links</b>: how far to follow links, and which extra files to fetch.</small></li>
+    <li><small><b>Build</b>: how the saved files and folders are named.</small></li>
+    <li><small><b>Browser ID</b>: the user-agent, language, and headers sent to servers.</small></li>
+    <li><small><b>Spider</b>: cookies, robots.txt handling, and request behavior.</small></li>
+    <li><small><b>Proxy address</b>: proxy host and port.</small></li>
+    <li><small><b>Log, Index, Cache</b>: log files, the search index, and the update cache.</small></li>
+    <li><small><b>Type/MIME associations</b>: map file extensions to MIME types.</small></li>
+    <li><small><b>Experts Only</b>: scan mode, how far the crawl may travel, and link rewriting.</small></li>
+  </ul>
+  <br><center><img src="img/android_scanrules.png" width="320" alt="Scan Rules tab" border="0"></center>
+  <br><center><img src="img/android_experts.png" width="320" alt="Experts Only tab" border="0"></center>
+  <br><small>The <a href="step9.html">desktop option reference</a> describes every
+  setting in full. A few desktop options are missing or fixed on Android: the proxy
+  tab has a host and port but no login and password, the download folder is fixed
+  inside the app's storage so there is no output-path setting, and the MIME table
+  holds up to eight entries.</small>
 <br><br>
 
   <li><b>Run the mirror</b></li>
