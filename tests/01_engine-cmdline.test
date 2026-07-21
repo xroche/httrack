@@ -155,4 +155,22 @@ accepted "$tmp/pre-bti" "#615: -%i before the URL broke the crawl"
 run_only "$tmp/pre-proto" "-@i2" "file://$tmp/index.html"
 accepted "$tmp/pre-proto" "#615: -@i2 before the URL broke the crawl"
 
+# -K must not reset the -c socket count (its case fell through into 'c'). maxsoc
+# is only observable via the ">8, limited to 8" warning: -c16 trips it, and would
+# stop tripping it if a trailing -K reset the count back to the default 4.
+warned() {
+    grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
+        ! echo "FAIL: $2" || exit 1
+}
+not_warned() {
+    ! grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
+        ! echo "FAIL: $2" || exit 1
+}
+run "$tmp/soc-c16" -c16
+warned "$tmp/soc-c16" "-c16 did not trip the socket-count warning (probe blind)"
+run "$tmp/soc-c16k" -c16 -K
+warned "$tmp/soc-c16k" "-K reset the -c socket count (fell through into 'c')"
+run "$tmp/soc-c8k" -c8 -K
+not_warned "$tmp/soc-c8k" "-c8 -K spuriously warned"
+
 exit 0

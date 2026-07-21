@@ -1055,6 +1055,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             }
+            break;
           case 'c':
             if (isdigit((unsigned char) *(com + 1))) {
               sscanf(com + 1, "%d", &opt->maxsoc);
