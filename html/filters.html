@@ -189,7 +189,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     <br>
     Filters are analyzed by HTTrack from the first filter to the last one. The complete URL
     name is compared to filters defined by the user or added automatically by HTTrack. <br><br>
-    A scan rule has an higher priority is it is declared later - hierarchy is important: <br>
+    A scan rule has a higher priority if it is declared later - hierarchy is important: <br>
 
     <br>
     <table BORDER="1" CELLPADDING="2">
@@ -307,7 +307,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     <br>
     Filters are analyzed by HTTrack from the first filter to the last one. The sizes
     are compared against scan rules defined by the user.<br><br>
-    A scan rule has an higher priority is it is declared later - hierarchy is important.<br>
+    A scan rule has a higher priority if it is declared later - hierarchy is important.<br>
     
     Note: scan rules based on size can be mixed with regular URL patterns<br>
 
@@ -361,7 +361,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     <br>
     Filters are analyzed by HTTrack from the first filter to the last one. The complete MIME
     type is compared against scan rules defined by the user.<br><br>
-    A scan rule has an higher priority is it is declared later - hierarchy is important<br>
+    A scan rule has a higher priority if it is declared later - hierarchy is important<br>
 
     Note: scan rules based on MIME types can <b>NOT</b> be mixed with regular URL patterns or size patterns within the same rule, but you can use both of them in distinct ones<br>
 
@@ -387,12 +387,12 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       <tr>
         <td nowrap><tt>-mime:video/*</tt></td>
         <td>This will refuse all video links that were already scheduled for download
-        (i.e. all other 'application/' link download will be aborted)</td>
+        (i.e. the download will be aborted)</td>
       </tr>
       <tr>
         <td nowrap><tt>-mime:video/* -mime:audio/*</tt></td>
         <td>This will refuse all audio and video links that were already scheduled for download
-        (i.e. all other 'application/' link download will be aborted)</td>
+        (i.e. the download will be aborted)</td>
       </tr>
       <tr>
         <td nowrap><tt>-mime:*/* +mime:text/html +mime:image/*</tt></td>
