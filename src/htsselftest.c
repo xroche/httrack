@@ -1589,10 +1589,12 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Default-port strip (#627): a genuine 80 (any spelling) is removed by its
-   matched length, host preserved; a non-80 port or one that only wraps to 80 as
-   a 32-bit int (#614) is left intact. Guards the old bug where ":080"/":0080"
-   dropped a hardcoded 3 chars and glued the leftover digits onto the host. */
+/* Default-port strip: a genuine default (any spelling) is removed by its
+   matched length, host preserved; a non-default port or one that only wraps to
+   it as a 32-bit int (#614) stays. The default is scheme-aware (#638): 80 http,
+   443 https, 21 ftp, so :80 on https/ftp is a real port and stays. Guards the
+   old #627 bug where ":080" dropped a hardcoded 3 chars and glued the rest onto
+   the host. */
 static int st_stripport(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *in, *out;
@@ -1606,6 +1608,12 @@ static int st_stripport(httrackp *opt, int argc, char **argv) {
       {"http://127.0.0.1:8080/x", "http://127.0.0.1:8080/x"},
       {"http://127.0.0.1:4294967376/x", "http://127.0.0.1:4294967376/x"},
       {"http://127.0.0.1/x", "http://127.0.0.1/x"},
+      {"https://127.0.0.1:443/x", "https://127.0.0.1/x"},
+      {"https://127.0.0.1:80/x", "https://127.0.0.1:80/x"},
+      {"https://127.0.0.1:8443/x", "https://127.0.0.1:8443/x"},
+      {"ftp://127.0.0.1:21/x", "ftp://127.0.0.1/x"},
+      {"ftp://127.0.0.1:80/x", "ftp://127.0.0.1:80/x"},
+      {"http://127.0.0.1:443/x", "http://127.0.0.1:443/x"},
   };
 
   size_t k;
