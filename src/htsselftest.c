@@ -3389,7 +3389,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
     size_t rlen = 0;
     unsigned char *rec = warc_next_member(&p, end, &rlen);
     const char *sep, *cl;
-    long long block_len;
+    long long block_len = 0; /* 0 on a parse failure; err is already set */
     size_t hdr_len;
     if (rec == NULL) {
       if (rlen == 0)
