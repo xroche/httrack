@@ -58,6 +58,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-sN, \-\-robots[=N]\fR ]
 [ \fB\-%h, \-\-http\-10\fR ]
 [ \fB\-%k, \-\-keep\-alive\fR ]
+[ \fB\-%z, \-\-disable\-compression\fR ]
 [ \fB\-%B, \-\-tolerant\fR ]
 [ \fB\-%s, \-\-updatehack\fR ]
 [ \fB\-%u, \-\-urlhack\fR ]
@@ -98,6 +99,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%!, \-\-disable\-security\-limits\fR ]
 [ \fB\-V, \-\-userdef\-cmd\fR ]
 [ \fB\-%W, \-\-callback\fR ]
+[ \fB\-y, \-\-background\-on\-suspend\fR ]
 [ \fB\-K, \-\-keep\-links[=N]\fR ]
 .SH DESCRIPTION
 .B httrack
@@ -195,6 +197,8 @@ delayed type check, don't make any link test but wait for files download to star
 cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait) (\-\-cached\-delayed\-type\-check)
 .IP \-%M
 generate a RFC MIME\-encapsulated full\-archive (.mht) (\-\-mime\-html)
+.IP \-%t
+keep the original file extension, don't rewrite it from the MIME type (%t0 rewrite)
 .IP \-LN
 long names (L1 *long names / L0 8\-3 conversion / L2 ISO9660 compatible) (\-\-long\-names[=N])
 .IP \-KN
@@ -232,6 +236,8 @@ follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always, 3=always
 force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (\-\-http\-10)
 .IP \-%k
 use keep\-alive if possible, greately reducing latency for small files and test requests (%k0 don't use) (\-\-keep\-alive)
+.IP \-%z
+do not request compressed content (%z0 request) (\-\-disable\-compression)
 .IP \-%B
 tolerant requests (accept bogus responses on some servers, but not standard!) (\-\-tolerant)
 .IP \-%s
@@ -326,8 +332,6 @@ go everywhere on the web (\-\-go\-everywhere)
 .IP \-%H
 debug HTTP headers in logfile (\-\-debug\-headers)
 .SS Guru options: (do NOT use if possible)
-.IP \-#X
-*use optimized engine (limited memory boundary checks) (\-\-fast\-engine)
 .IP \-#test
 list engine self\-tests (run one with \-#test=NAME [args])
 .IP \-#C
@@ -352,8 +356,6 @@ maximum number of links (\-#L1000000) (\-\-advanced\-maxlinks[=N])
 display ugly progress information (\-\-advanced\-progressinfo)
 .IP \-#P
 catch URL (\-\-catch\-url)
-.IP \-#R
-old FTP routines (debug) (\-\-repair\-cache)
 .IP \-#T
 generate transfer ops. log every minutes (\-\-debug\-xfrstats)
 .IP \-#u
@@ -372,6 +374,8 @@ USE IT WITH EXTREME CARE
 execute system command after each files ($0 is the filename: \-V "rm \\$0") (\-\-userdef\-cmd <param>)
 .IP \-%W
 use an external library function as a wrapper (\-%W myfoo.so[,myparameters]) (\-\-callback <param>)
+.IP \-y
+go to background when suspended (y0 don't) (\-\-background\-on\-suspend)
 .SS Details: Option N
 .IP \-N0
 Site\-structure (default)

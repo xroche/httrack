@@ -100,28 +100,30 @@ offline browser : copy websites to a local directory</p>
 ] [ <b>-%Y, --why</b> ] [ <b>-u, --check-type[=N]</b> ] [
 <b>-j, --parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
 <b>-%h, --http-10</b> ] [ <b>-%k, --keep-alive</b> ] [
-<b>-%B, --tolerant</b> ] [ <b>-%s, --updatehack</b> ] [
-<b>-%u, --urlhack</b> ] [ <b>-%A, --assume</b> ] [ <b>-@iN,
---protocol[=N]</b> ] [ <b>-%w, --disable-module</b> ] [
-<b>-F, --user-agent</b> ] [ <b>-%R, --referer</b> ] [
-<b>-%E, --from</b> ] [ <b>-%F, --footer</b> ] [ <b>-%l,
---language</b> ] [ <b>-%a, --accept</b> ] [ <b>-%X,
---headers</b> ] [ <b>-C, --cache[=N]</b> ] [ <b>-k,
---store-all-in-cache</b> ] [ <b>-%n, --do-not-recatch</b> ]
-[ <b>-%v, --display</b> ] [ <b>-Q, --do-not-log</b> ] [
-<b>-q, --quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
---debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
---file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
---index</b> ] [ <b>-%i, --build-top-index</b> ] [ <b>-%I,
---search-index</b> ] [ <b>-pN, --priority[=N]</b> ] [ <b>-S,
---stay-on-same-dir</b> ] [ <b>-D, --can-go-down</b> ] [
-<b>-U, --can-go-up</b> ] [ <b>-B, --can-go-up-and-down</b> ]
-[ <b>-a, --stay-on-same-address</b> ] [ <b>-d,
+<b>-%z, --disable-compression</b> ] [ <b>-%B, --tolerant</b>
+] [ <b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
+<b>-%A, --assume</b> ] [ <b>-@iN, --protocol[=N]</b> ] [
+<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
+<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
+--footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
+--accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
+--cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
+<b>-%n, --do-not-recatch</b> ] [ <b>-%v, --display</b> ] [
+<b>-Q, --do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
+--extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
+--verbose</b> ] [ <b>-f, --file-log</b> ] [ <b>-f2,
+--single-log</b> ] [ <b>-I, --index</b> ] [ <b>-%i,
+--build-top-index</b> ] [ <b>-%I, --search-index</b> ] [
+<b>-pN, --priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b>
+] [ <b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
+<b>-B, --can-go-up-and-down</b> ] [ <b>-a,
+--stay-on-same-address</b> ] [ <b>-d,
 --stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
 ] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
 --debug-headers</b> ] [ <b>-%!,
 --disable-security-limits</b> ] [ <b>-V, --userdef-cmd</b> ]
-[ <b>-%W, --callback</b> ] [ <b>-K, --keep-links[=N]</b>
+[ <b>-%W, --callback</b> ] [ <b>-y,
+--background-on-suspend</b> ] [ <b>-K, --keep-links[=N]</b>
 ]</p>
 
 <h2>DESCRIPTION
@@ -646,6 +648,18 @@ don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
 <td width="4%">
 
 
+<p>-%t</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>keep the original file extension, don&rsquo;t rewrite it
+from the MIME type (%t0 rewrite)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
 <p>-LN</p></td>
 <td width="5%"></td>
 <td width="82%">
@@ -873,6 +887,18 @@ for old servers or proxies) (--http-10)</p></td></tr>
 <p>use keep-alive if possible, greately reducing latency
 for small files and test requests (%k0 don&rsquo;t use)
 (--keep-alive)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%z</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>do not request compressed content (%z0 request)
+(--disable-compression)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1383,25 +1409,13 @@ p7 get html files before, then treat other files</p>
 <td width="8%">
 
 
-<p style="margin-top: 1em">-#X</p></td>
+<p style="margin-top: 1em">-#test</p></td>
 <td width="1%"></td>
 <td width="82%">
 
 
-<p style="margin-top: 1em">*use optimized engine (limited
-memory boundary checks) (--fast-engine)</p></td></tr>
-<tr valign="top" align="left">
-<td width="9%"></td>
-<td width="8%">
-
-
-<p>-#test</p></td>
-<td width="1%"></td>
-<td width="82%">
-
-
-<p>list engine self-tests (run one with -#test=NAME
-[args])</p> </td></tr>
+<p style="margin-top: 1em">list engine self-tests (run one
+with -#test=NAME [args])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">
@@ -1532,17 +1546,6 @@ memory boundary checks) (--fast-engine)</p></td></tr>
 <td width="8%">
 
 
-<p>-#R</p></td>
-<td width="1%"></td>
-<td width="82%">
-
-
-<p>old FTP routines (debug) (--repair-cache)</p></td></tr>
-<tr valign="top" align="left">
-<td width="9%"></td>
-<td width="8%">
-
-
 <p>-#T</p></td>
 <td width="1%"></td>
 <td width="82%">
@@ -1633,6 +1636,18 @@ each files ($0 is the filename: -V &quot;rm \$0&quot;)
 
 <p>use an external library function as a wrapper (-%W
 myfoo.so[,myparameters]) (--callback &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-y</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>go to background when suspended (y0 don&rsquo;t)
+(--background-on-suspend)</p> </td></tr>
 </table>
 
 <h3>Details: Option N
