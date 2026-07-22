@@ -10,6 +10,13 @@
 
 set -eu
 
+# The overflow needs a path longer than Windows MAX_PATH (260), so both the
+# source tree and the mirror output blow past it there; run on POSIX only. The
+# fix itself is platform-independent and covered on Linux/macOS.
+case "$(uname -s 2>/dev/null)" in
+MINGW* | MSYS* | CYGWIN*) exit 77 ;;
+esac
+
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
