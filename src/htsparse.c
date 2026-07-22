@@ -792,17 +792,67 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   char gmttime[256];
                   char BIGSTK safe_adr[HTS_URLMAXSIZE * 3 + 4];
                   char BIGSTK safe_fil[HTS_URLMAXSIZE * 3 + 4];
+                  char BIGSTK safe_url[HTS_URLMAXSIZE * 6 + 16];
+                  char safe_lastmod[sizeof(r->lastmodified) * 3 + 4];
+                  char safe_ctype[sizeof(r->contenttype) * 3 + 4];
+                  char safe_charset[sizeof(r->charset) * 3 + 4];
+                  char status_str[16];
+                  char size_str[32];
+                  // {url} scheme: jump_identification_const strips it for
+                  // http/https/ftp, so re-add it (bare host is http); for any
+                  // other scheme the host keeps its "scheme://" and we add
+                  // none.
+                  const char *const url_host =
+                      jump_identification_const(urladr());
+                  const char *const url_scheme =
+                      strstr(url_host, "://") != NULL  ? ""
+                      : strfield(urladr(), "https://") ? "https://"
+                      : strfield(urladr(), "ftp://")   ? "ftp://"
+                                                       : "http://";
 
-                  tempo[0] = '\0';
+                  // {addr}/{path} are the escaped host and remote path; {url}
+                  // prepends the scheme to them (credentials already stripped
+                  // by jump_identification_const, and the scheme is a safe
+                  // literal, so no re-escaping is needed).
+                  html_inline_safe(url_host, safe_adr, sizeof(safe_adr));
+                  html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil));
+                  snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme,
+                           safe_adr, safe_fil);
+                  snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
+                  snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
                   time_gmt_rfc822(gmttime);
-                  strcatbuff(tempo, eol);
-                  hts_template_format_str(tempo + strlen(tempo), sizeof(tempo) - strlen(tempo),
-                          StringBuff(opt->footer),
-                          html_inline_safe(jump_identification_const(urladr()), safe_adr, sizeof(safe_adr)),
-                          html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil)), gmttime,
-                          HTTRACK_VERSIONID, /* EOF */ NULL);
-                  strcatbuff(tempo, eol);
-                  HT_ADD(tempo);
+
+                  {
+                    // Every network-derived string is html_inline_safe()'d: the
+                    // footer sits inside an HTML comment, so a value holding
+                    // "-->" would otherwise close it and inject markup (#165).
+                    // status/size are formatted integers and need no escaping.
+                    const hts_footer_field fields[] = {
+                        {"addr", safe_adr},
+                        {"path", safe_fil},
+                        {"url", safe_url},
+                        {"date", gmttime},
+                        {"lastmodified",
+                         html_inline_safe(r->lastmodified, safe_lastmod,
+                                          sizeof(safe_lastmod))},
+                        {"version", HTTRACK_VERSIONID},
+                        {"mime", html_inline_safe(r->contenttype, safe_ctype,
+                                                  sizeof(safe_ctype))},
+                        {"charset", html_inline_safe(r->charset, safe_charset,
+                                                     sizeof(safe_charset))},
+                        {"status", status_str},
+                        {"size", size_str},
+                    };
+
+                    tempo[0] = '\0';
+                    strcatbuff(tempo, eol);
+                    hts_footer_format(tempo + strlen(tempo),
+                                      sizeof(tempo) - strlen(tempo),
+                                      StringBuff(opt->footer), fields,
+                                      sizeof(fields) / sizeof(fields[0]));
+                    strcatbuff(tempo, eol);
+                    HT_ADD(tempo);
+                  }
                 }
                 // Emit charset ?
                 if (emited_footer == 1 && strnotempty(r->charset)) {

@@ -754,35 +754,48 @@ typedef struct hts_template_format_buf {
   size_t offset;
 } hts_template_format_buf;
 
+// Bounded append to a template buffer (or FILE); returns -1 on overflow/error.
+static int htsfmt_putc(hts_template_format_buf *buf, char c) {
+  if (buf->fp != NULL) {
+    assertf(buf->buffer == NULL);
+    if (fputc(c, buf->fp) < 0)
+      return -1;
+  } else {
+    assertf(buf->buffer != NULL);
+    if (buf->offset + 1 < buf->size)
+      buf->buffer[buf->offset++] = c;
+    else
+      return -1;
+  }
+  return 0;
+}
+
+static int htsfmt_puts(hts_template_format_buf *buf, const char *s) {
+  size_t i;
+  assertf(s != NULL);
+  for (i = 0; s[i] != '\0'; i++) {
+    if (htsfmt_putc(buf, s[i]) < 0)
+      return -1;
+  }
+  return 0;
+}
+
 // note: upstream arg list MUST be NULL-terminated for safety
 // returns a negative value upon error
-static int hts_template_formatv(hts_template_format_buf *buf, 
+static int hts_template_formatv(hts_template_format_buf *buf,
                                 const char *format, va_list args) {
 #undef FPUTC
 #undef FPUTS
-#define FPUTC(C) do { \
-  if (buf->fp != NULL) { \
-    assertf(buf->buffer == NULL); \
-    if (fputc(C, buf->fp) < 0) { \
-      return -1; \
-    } \
-  } else { \
-    assertf(buf->buffer != NULL); \
-    if (buf->offset + 1 < buf->size) { \
-      buf->buffer[buf->offset++] = (C); \
-    } else { \
-      return -1; \
-    } \
-  } \
-} while(0)
-#define FPUTS(S) do { \
-  size_t i; \
-  const char *const str_ = (S); \
-  assertf(str_ != NULL); \
-  for(i = 0 ; str_[i] != '\0' ; i++) { \
-    FPUTC(str_[i]); \
-  } \
-} while(0)
+#define FPUTC(C)                                                               \
+  do {                                                                         \
+    if (htsfmt_putc(buf, (C)) < 0)                                             \
+      return -1;                                                               \
+  } while (0)
+#define FPUTS(S)                                                               \
+  do {                                                                         \
+    if (htsfmt_puts(buf, (S)) < 0)                                             \
+      return -1;                                                               \
+  } while (0)
 
   if (buf != NULL && format != NULL) {
     const char *arg_expanded[32];
@@ -857,6 +870,74 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...) 
   success = hts_template_formatv(&buf, format, args);
   va_end(args);
   return success;
+}
+
+// Value of the named field, or "" if absent (never NULL, so callers can pass it
+// straight to a formatter).
+static const char *footer_field_value(const hts_footer_field *fields,
+                                      size_t nfields, const char *name) {
+  size_t j;
+  for (j = 0; j < nfields; j++) {
+    if (strcmp(fields[j].name, name) == 0)
+      return fields[j].value != NULL ? fields[j].value : "";
+  }
+  return "";
+}
+
+int hts_footer_format(char *buffer, size_t size, const char *footer,
+                      const hts_footer_field *fields, size_t nfields) {
+  hts_template_format_buf buf = {NULL, buffer, size, 0};
+  size_t i;
+
+  if (footer == NULL || buffer == NULL || size == 0)
+    return -1;
+  // %s keeps the legacy positional model, byte-for-byte for existing -%F
+  // strings: addr, path, date, version, looked up by name and
+  // order-independent.
+  if (strstr(footer, "%s") != NULL)
+    return hts_template_format_str(
+        buffer, size, footer, footer_field_value(fields, nfields, "addr"),
+        footer_field_value(fields, nfields, "path"),
+        footer_field_value(fields, nfields, "date"),
+        footer_field_value(fields, nfields, "version"), /* EOF */ NULL);
+  // "{{"/"}}" emit a literal brace; an unknown "{...}" is left verbatim so
+  // typos stay visible.
+  for (i = 0; footer[i] != '\0'; i++) {
+    const char c = footer[i];
+    if (c == '{' && footer[i + 1] == '{') {
+      if (htsfmt_putc(&buf, '{') < 0)
+        return -1;
+      i++;
+    } else if (c == '}' && footer[i + 1] == '}') {
+      if (htsfmt_putc(&buf, '}') < 0)
+        return -1;
+      i++;
+    } else if (c == '{') {
+      const char *const end = strchr(footer + i + 1, '}');
+      int matched = 0;
+      if (end != NULL) {
+        const size_t namelen = (size_t) (end - (footer + i + 1));
+        size_t j;
+        for (j = 0; j < nfields; j++) {
+          if (strlen(fields[j].name) == namelen &&
+              strncmp(fields[j].name, footer + i + 1, namelen) == 0) {
+            if (htsfmt_puts(&buf,
+                            fields[j].value != NULL ? fields[j].value : "") < 0)
+              return -1;
+            i += namelen + 1; // consume the name and its closing '}'
+            matched = 1;
+            break;
+          }
+        }
+      }
+      if (!matched && htsfmt_putc(&buf, '{') < 0)
+        return -1;
+    } else if (htsfmt_putc(&buf, c) < 0) {
+      return -1;
+    }
+  }
+  buffer[buf.offset] = '\0';
+  return 1;
 }
 
 /* Note: NOT utf-8 */

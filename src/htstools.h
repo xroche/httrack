@@ -73,6 +73,20 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 int hts_template_format(FILE *const out, const char *format, ...);
 int hts_template_format_str(char *buffer, size_t size, const char *format, ...);
 
+// A footer named field and its already-context-escaped value.
+typedef struct hts_footer_field {
+  const char *name;
+  const char *value;
+} hts_footer_field;
+
+// Expand a footer template. A "%s" in it selects the legacy positional model,
+// consuming the "addr"/"path"/"date"/"version" fields in that order; otherwise
+// "{name}" is substituted from fields by name ("{{"/"}}" emit a literal brace,
+// an unknown "{...}" is left verbatim). Values must already be escaped for the
+// target context by the caller. Returns <0 on overflow.
+int hts_footer_format(char *buffer, size_t size, const char *footer,
+                      const hts_footer_field *fields, size_t nfields);
+
 #define rech_tageq(adr,s) \
   ( \
     ( (*((adr)-1)=='<') || (is_space(*((adr)-1))) ) ? \
