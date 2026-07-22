@@ -63,7 +63,26 @@ struct warc_writer {
   uint64_t rng;     /* PRNG state for the UUID fallback */
   char info_id[64]; /* warcinfo WARC-Record-ID, referenced by every record */
   coucal seen;      /* base32 payload digest -> "uri\001date" (revisit dedup) */
+  /* --warc-max-size rotation: NAME-00000.warc.gz, -00001, ... (wget-style). */
+  uint64_t max_size;   /* rotate once a segment reaches this; 0: single file */
+  char *seg_base;      /* segment path without the .warc[.gz] suffix, or NULL */
+  const char *seg_ext; /* ".warc.gz" or ".warc" */
+  unsigned seg;        /* current segment number */
+  char *info_fields;   /* warcinfo body, re-emitted at each new segment */
 };
+
+const char *warc_truncated_reason(int code) {
+  switch (code) {
+  case WARC_TRUNC_LENGTH:
+    return "length";
+  case WARC_TRUNC_TIME:
+    return "time";
+  case WARC_TRUNC_DISCONNECT:
+    return "disconnect";
+  default:
+    return NULL;
+  }
+}
 
 /* ---- growable byte buffer (overflow-safe, project allocators) ---- */
 
@@ -421,21 +440,25 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
   return 0;
 }
 
+/* Close the current segment and open the next; writes its warcinfo. */
+static int warc_rotate(warc_writer *w);
+
 /* Emit one full WARC record. When http_section, the block carries an HTTP
    header block (http_hdr, possibly empty) + a CRLF separator; body follows when
    has_body. block_len is derived here (single source of truth: separator and
    payload are counted exactly as stream_block emits them), so a declared
    Content-Length can never desync from the written bytes. The payload digest
-   (body-only) is passed in when already known. On success the record id is
-   copied to out_id (may be NULL). */
+   (body-only) is passed in when already known. truncated is a WARC-Truncated
+   reason token or NULL. On success the record id is copied to out_id (may be
+   NULL). */
 static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *target_uri, const char *ip,
                      const char *concurrent_to, const char *refers_uri,
                      const char *refers_date, const char *profile,
-                     const char *payload_digest, int http_section,
-                     const char *http_hdr, size_t http_hdr_len, int has_body,
-                     const char *body, size_t body_len, const char *body_path,
-                     char out_id[64]) {
+                     const char *payload_digest, const char *truncated,
+                     int http_section, const char *http_hdr,
+                     size_t http_hdr_len, int has_body, const char *body,
+                     size_t body_len, const char *body_path, char out_id[64]) {
   wbuf hdr;
   member m;
   char id[64], date[32];
@@ -450,6 +473,14 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   char block_b32[33];
   int have_block_digest = 0;
 #endif
+
+  /* Rotate to the next segment before this record when the current one is full;
+     never split a record, and never rotate a warcinfo (it opens a segment). */
+  if (w->max_size > 0 && w->seg_base != NULL && w->offset >= w->max_size &&
+      strcmp(type, "warcinfo") != 0) {
+    if (warc_rotate(w) != 0)
+      return -1;
+  }
 
   /* F4: overflow-safe block length; http_hdr_len+sep is provably small. */
   if (payload > (size_t) -1 - http_hdr_len - sep)
@@ -516,6 +547,9 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
       wbuf_printf(&hdr, "WARC-Payload-Digest: sha1:%s\r\n", payload_digest) !=
           0)
     goto done;
+  if (truncated != NULL &&
+      wbuf_printf(&hdr, "WARC-Truncated: %s\r\n", truncated) != 0)
+    goto done;
   if (wbuf_puts(&hdr, "\r\n") != 0)
     goto done;
 
@@ -542,6 +576,34 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
 done:
   wbuf_free(&hdr);
   return rc;
+}
+
+/* ---- segment rotation (--warc-max-size) ---- */
+
+/* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
+static int warc_write_warcinfo_record(warc_writer *w) {
+  w->info_id[0] = '\0'; /* warcinfo itself carries no WARC-Warcinfo-ID */
+  return warc_emit(w, "warcinfo", "application/warc-fields", NULL, NULL, NULL,
+                   NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, w->info_fields,
+                   w->info_fields != NULL ? strlen(w->info_fields) : 0, NULL,
+                   w->info_id);
+}
+
+static int warc_rotate(warc_writer *w) {
+  char namebuf[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
+  if (w->f != NULL) {
+    fclose(w->f);
+    w->f = NULL;
+  }
+  w->seg++;
+  snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, w->seg,
+           w->seg_ext);
+  w->f = FOPEN(fconv(catbuff, sizeof(catbuff), namebuf), "wb");
+  if (w->f == NULL)
+    return -1;
+  w->offset = 0;
+  return warc_write_warcinfo_record(w);
 }
 
 /* ---- request stash (engine hooks) ---- */
@@ -631,15 +693,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   w->seen = coucal_new(0);
   if (w->seen != NULL)
     coucal_value_is_malloc(w->seen, 1);
+  w->max_size = (opt->warc_max_size > 0) ? (uint64_t) opt->warc_max_size : 0;
 
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
-  if (w->f == NULL) {
-    if (w->seen != NULL)
-      coucal_delete(&w->seen);
-    freet(w);
-    return NULL;
-  }
-
+  /* Build the warcinfo body once; each segment re-emits it. */
   robots = (opt->robots == HTS_ROBOTS_NEVER) ? "ignore" : "obey";
   memset(&info, 0, sizeof(info));
   if (wbuf_printf(&info,
@@ -651,20 +707,57 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
                   HTTRACK_VERSION, robots) != 0 ||
       (StringNotEmpty(opt->path_html) &&
        wbuf_printf(&info, "isPartOf: %s\r\n", StringBuff(opt->path_html)) !=
-           0)) {
+           0) ||
+      wbuf_add(&info, "", 1) != 0) { /* NUL-terminate for info_fields */
     wbuf_free(&info);
     warc_close(w);
     return NULL;
   }
-  w->info_id[0] = '\0'; /* not yet known: warcinfo omits WARC-Warcinfo-ID */
-  if (warc_emit(w, "warcinfo", "application/warc-fields", NULL, NULL, NULL,
-                NULL, NULL, NULL, NULL, 0, NULL, 0, 1, info.data, info.len,
-                NULL, w->info_id) != 0) {
-    wbuf_free(&info);
-    warc_close(w);
-    return NULL;
-  }
+  w->info_fields = strdupt(info.data);
   wbuf_free(&info);
+  if (w->info_fields == NULL) {
+    warc_close(w);
+    return NULL;
+  }
+
+  /* Rotation on: the first segment is <base>-00000<ext> (wget-style); split the
+     resolved path into base + suffix so later segments reuse the base. */
+  if (w->max_size > 0) {
+    size_t l = strlen(path);
+    size_t baselen;
+    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0) {
+      baselen = l - 8;
+      w->seg_ext = ".warc.gz";
+    } else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0) {
+      baselen = l - 5;
+      w->seg_ext = ".warc";
+    } else {
+      baselen = l;
+      w->seg_ext = w->gz ? ".warc.gz" : ".warc";
+    }
+    w->seg_base = malloct(baselen + 1);
+    if (w->seg_base == NULL) {
+      warc_close(w);
+      return NULL;
+    }
+    memcpy(w->seg_base, path, baselen);
+    w->seg_base[baselen] = '\0';
+    w->seg = 0;
+    snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, w->seg,
+             w->seg_ext);
+    path = namebuf;
+  }
+
+  w->f = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
+  if (w->f == NULL) {
+    warc_close(w);
+    return NULL;
+  }
+
+  if (warc_write_warcinfo_record(w) != 0) {
+    warc_close(w);
+    return NULL;
+  }
   return w;
 }
 
@@ -675,6 +768,8 @@ void warc_close(warc_writer *w) {
     fclose(w->f);
   if (w->seen != NULL)
     coucal_delete(&w->seen);
+  freet(w->seg_base);
+  freet(w->info_fields);
   freet(w);
 }
 
@@ -691,7 +786,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
-                           int statuscode, int is_update_unchanged) {
+                           int statuscode, int is_update_unchanged,
+                           int truncated) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -752,11 +848,14 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     return -1;
   }
 
-  /* Response first: its id links the request via WARC-Concurrent-To. */
+  /* Response first: its id links the request via WARC-Concurrent-To. A revisit
+     is a deliberate dedup, not a truncation, so tag WARC-Truncated only on a
+     full (body-carrying) response. */
   resp_id[0] = '\0';
   if (warc_emit(w, is_revisit ? "revisit" : "response",
                 "application/http;msgtype=response", target_uri, ip, NULL,
-                refers_uri, refers_date, profile, have_pdig ? pdig : NULL, 1,
+                refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
+                emit_body ? warc_truncated_reason(truncated) : NULL, 1,
                 http.data, http.len, emit_body, body, body_len, body_path,
                 resp_id) != 0) {
     wbuf_free(&http);
@@ -767,8 +866,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (req_hdr != NULL && req_hdr[0] != '\0') {
     size_t rlen = strlen(req_hdr);
     if (warc_emit(w, "request", "application/http;msgtype=request", target_uri,
-                  NULL, resp_id, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, req_hdr,
-                  rlen, NULL, NULL) != 0)
+                  NULL, resp_id, NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1,
+                  req_hdr, rlen, NULL, NULL) != 0)
       return -1;
   }
 
@@ -793,6 +892,26 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   return rc;
 }
 
+/* ---- one non-HTTP capture ---- */
+
+int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
+                        const char *content_type, const char *body,
+                        size_t body_len, const char *body_path, int truncated) {
+  char pdig[33];
+  int has_body = (body_len > 0 && (body != NULL || body_path != NULL));
+  int have_pdig =
+      has_body ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
+  /* resource: the block is the raw payload, its own MIME is the record's
+     Content-Type, and there is no HTTP request/response envelope. */
+  return warc_emit(w, "resource",
+                   (content_type != NULL && content_type[0] != '\0')
+                       ? content_type
+                       : "application/octet-stream",
+                   target_uri, ip, NULL, NULL, NULL, NULL,
+                   have_pdig ? pdig : NULL, warc_truncated_reason(truncated), 0,
+                   NULL, 0, has_body, body, body_len, body_path, NULL);
+}
+
 /* ---- engine emit hook ---- */
 
 void warc_write_backtransaction(httrackp *opt, lien_back *back) {
@@ -805,6 +924,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   const char *resp_hdr;
   char synth[512];
   int is_unchanged;
+  int is_ftp;
 
   if (opt->state.warc == WARC_DISABLED)
     return;
@@ -823,6 +943,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   if (back->r.statuscode <= 0)
     return;
 
+  is_ftp = strfield(back->url_adr, "ftp://") != 0;
   snprintf(uri, sizeof(uri), "%s%s%s",
            link_has_authority(back->url_adr) ? "" : "http://", back->url_adr,
            back->url_fil);
@@ -847,6 +968,13 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
       body_len = 0;
   }
 
+  /* FTP has no HTTP envelope: one resource record carrying the payload. */
+  if (is_ftp) {
+    warc_write_resource(w, uri, ip, back->r.contenttype, body, body_len,
+                        body_path, back->r.warc_truncated);
+    return;
+  }
+
   is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;
 
   /* Prefer the stashed raw headers; synthesize a minimal status line for the
@@ -862,5 +990,6 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   }
 
   warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
-                         body_len, body_path, back->r.statuscode, is_unchanged);
+                         body_len, body_path, back->r.statuscode, is_unchanged,
+                         back->r.warc_truncated);
 }

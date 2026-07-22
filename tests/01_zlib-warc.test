@@ -4,16 +4,19 @@
 set -euo pipefail
 
 # WARC/1.1 writer self-test: framing, Content-Length, gzip members, round-trip,
-# and identical-payload-digest revisit dedup, over synthetic transactions.
+# revisit dedup, plus v1.1 WARC-Truncated, ftp resource records, and
+# --warc-max-size rotation, over synthetic transactions.
 
 httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
-out=$("$httrack_bin" -O /dev/null -#test=warc "$scratch/")
-echo "$out"
-case "$out" in
-*": OK") ;;
-*) exit 1 ;;
-esac
+for t in warc warc-trunc warc-ftp warc-rotate; do
+    out=$("$httrack_bin" -O /dev/null "-#test=$t" "$scratch/")
+    echo "$out"
+    case "$out" in
+    *": OK") ;;
+    *) exit 1 ;;
+    esac
+done

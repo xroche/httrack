@@ -6019,6 +6019,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->strip_query, "");
   StringCopy(opt->cookies_file, "");
   StringCopy(opt->warc_file, "");
+  opt->warc_max_size = 0; /* no rotation unless --warc-max-size sets it */
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;

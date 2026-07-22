@@ -116,6 +116,8 @@ const char *hts_optalias[][4] = {
    "load extra cookies from a Netscape cookies.txt"},
   {"warc", "-%r", "single", "write an ISO-28500 WARC/1.1 archive of the crawl"},
   {"warc-file", "-%rf", "param1", "write a WARC archive to the given base name"},
+  {"warc-max-size", "-%rs", "param1",
+   "rotate the WARC archive once a segment passes N bytes (0: single file)"},
   {"why", "-%Y", "param1",
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",
