@@ -547,6 +547,8 @@ struct httrackp {
                                   as-received (strategy A). Tail: ABI */
   hts_boolean warc_cdx; /**< --warc-cdx: write a sorted CDXJ index next to the
                              archive. Tail: ABI */
+  hts_boolean warc_wacz; /**< --wacz: package archive+index+pages as a WACZ zip
+                              (implies --warc + --warc-cdx). Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

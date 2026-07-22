@@ -124,6 +124,8 @@ const char *hts_optalias[][4] = {
   {"warc-cdx", "-%rc", "single",
    "write a sorted CDXJ index next to the WARC archive"},
   {"warc-cdxj", "-%rc", "single", ""},
+  {"wacz", "-%rz", "single",
+   "package the WARC archive, CDXJ index and pages as a WACZ file"},
   {"why", "-%Y", "param1",
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",

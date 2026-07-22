@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# --wacz packaging over synthetic transactions: the WACZ unzips in-process to
+# the fixed layout, every entry is ZIP STORE, each datapackage sha256 recomputes
+# from the stored bytes, and the digest chains datapackage.json. WACZ needs the
+# OpenSSL SHA-256 digests, so the self-test is absent on non-OpenSSL builds.
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+if ! "$httrack_bin" -#test 2>&1 | grep -q '^  warc-wacz'; then
+    echo "warc-wacz self-test unavailable (build without OpenSSL); skipping"
+    exit 77
+fi
+
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+out=$("$httrack_bin" -O /dev/null -#test=warc-wacz "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac

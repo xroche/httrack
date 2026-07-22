@@ -64,6 +64,9 @@ Please visit our Website: http://www.httrack.com
 #if HTS_USEZSTD
 #include <zstd.h>
 #endif
+#if HTS_USEOPENSSL
+#include <openssl/evp.h>
+#endif
 #include "coucal/coucal.h"
 
 #include <ctype.h>
@@ -4033,6 +4036,232 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+#if HTS_USEOPENSSL
+/* Lowercase-hex SHA-256 of n bytes into out[65]; 1 on success. */
+static int wacz_test_sha256(const void *p, size_t n, char out[65]) {
+  EVP_MD_CTX *c = EVP_MD_CTX_new();
+  unsigned char md[EVP_MAX_MD_SIZE];
+  unsigned int mdlen = 0, i;
+  static const char hx[] = "0123456789abcdef";
+  int ok;
+  if (c == NULL)
+    return 0;
+  ok = EVP_DigestInit_ex(c, EVP_sha256(), NULL) == 1 &&
+       (n == 0 || EVP_DigestUpdate(c, p, n) == 1) &&
+       EVP_DigestFinal_ex(c, md, &mdlen) == 1 && mdlen == 32;
+  EVP_MD_CTX_free(c);
+  if (!ok)
+    return 0;
+  for (i = 0; i < 32; i++) {
+    out[i * 2] = hx[md[i] >> 4];
+    out[i * 2 + 1] = hx[md[i] & 0x0F];
+  }
+  out[64] = '\0';
+  return 1;
+}
+
+/* One unzipped WACZ member: name, raw bytes, and the ZIP compression method. */
+typedef struct {
+  char name[256];
+  unsigned char *data;
+  size_t len;
+  int method;
+} wacz_entry;
+
+/* Package a 2-record WARC as a WACZ, then unzip it in-process and assert the
+   fixed layout, STORE-mode entries, recomputing sha256 digests, the digest
+   chain, and the pages.jsonl header. */
+static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
+  char wpath[HTS_URLMAXSIZE], waczpath[HTS_URLMAXSIZE], cdxpath[HTS_URLMAXSIZE];
+  warc_writer *w;
+  hts_boolean saved_cdx, saved_wacz;
+  wacz_entry ent[16];
+  int nent = 0, err = 0, i;
+  unzFile uf;
+  const wacz_entry *dp = NULL, *dig = NULL, *pages = NULL;
+  int have_archive = 0, have_index = 0, all_store = 1;
+  LLint good_size;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-wacz: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(wpath, sizeof(wpath), argv[0], "warc-wacz.warc.gz");
+  fconcat(waczpath, sizeof(waczpath), argv[0], "warc-wacz.wacz");
+  fconcat(cdxpath, sizeof(cdxpath), argv[0], "warc-wacz.cdx");
+  saved_cdx = opt->warc_cdx;
+  saved_wacz = opt->warc_wacz;
+  opt->warc_cdx = 1;
+  opt->warc_wacz = 1;
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  warc_write_transaction(w, "http://www.example.com/", "127.0.0.1",
+                         "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+                         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                         "<html>home</html>\n", 18, NULL, 200, 0, 0, 0);
+  warc_write_transaction(
+      w, "http://www.example.com/data.bin", "127.0.0.1",
+      "GET /data.bin HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: application/octet-stream\r\n\r\n",
+      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0, 0);
+  warc_close(w);
+
+  /* Unzip every member in-process. */
+  uf = unzOpen(waczpath);
+  assertf(uf != NULL);
+  if (unzGoToFirstFile(uf) == UNZ_OK) {
+    do {
+      unz_file_info info;
+      wacz_entry *e;
+      if (nent >= (int) (sizeof(ent) / sizeof(ent[0]))) {
+        err = 1;
+        break;
+      }
+      e = &ent[nent];
+      if (unzGetCurrentFileInfo(uf, &info, e->name, sizeof(e->name), NULL, 0,
+                                NULL, 0) != UNZ_OK) {
+        err = 1;
+        break;
+      }
+      e->method = (int) info.compression_method;
+      e->len = (size_t) info.uncompressed_size;
+      e->data = malloct(e->len ? e->len : 1);
+      if (e->data == NULL || unzOpenCurrentFile(uf) != UNZ_OK) {
+        err = 1;
+        break;
+      }
+      if (e->len > 0 &&
+          unzReadCurrentFile(uf, e->data, (unsigned) e->len) != (int) e->len)
+        err = 1;
+      unzCloseCurrentFile(uf);
+      nent++;
+    } while (unzGoToNextFile(uf) == UNZ_OK);
+  }
+  unzClose(uf);
+
+  /* Classify members and assert STORE mode (WACZ spec requirement). */
+  for (i = 0; i < nent; i++) {
+    const wacz_entry *e = &ent[i];
+    if (e->method != 0)
+      all_store = 0;
+    if (strncmp(e->name, "archive/", 8) == 0)
+      have_archive = 1;
+    else if (strcmp(e->name, "indexes/index.cdx") == 0)
+      have_index = 1;
+    else if (strcmp(e->name, "pages/pages.jsonl") == 0)
+      pages = e;
+    else if (strcmp(e->name, "datapackage.json") == 0)
+      dp = e;
+    else if (strcmp(e->name, "datapackage-digest.json") == 0)
+      dig = e;
+  }
+  if (!have_archive || !have_index || pages == NULL || dp == NULL ||
+      dig == NULL || !all_store)
+    err = 1;
+
+  /* pages.jsonl: header line, then >= 1 body row carrying url + ts. */
+  if (pages != NULL) {
+    if (pages->len < 27 ||
+        memcmp(pages->data, "{\"format\": \"json-pages-1.0\"", 27) != 0)
+      err = 1;
+    else {
+      const char *nl = memchr(pages->data, '\n', pages->len);
+      const char *body = nl ? nl + 1 : NULL;
+      size_t blen =
+          body ? pages->len - (size_t) (body - (char *) pages->data) : 0;
+      if (body == NULL || blen == 0 ||
+          warc_memstr(body, "\"url\": ", blen, 7) == NULL ||
+          warc_memstr(body, "\"ts\": ", blen, 6) == NULL)
+        err = 1;
+    }
+  }
+
+  /* Every datapackage resource hash recomputes from the stored member bytes. */
+  if (dp != NULL) {
+    char *json = malloct(dp->len + 1);
+    if (json == NULL) {
+      err = 1;
+    } else {
+      const char *p;
+      memcpy(json, dp->data, dp->len);
+      json[dp->len] = '\0';
+      if (strstr(json, "\"profile\": \"data-package\"") == NULL ||
+          strstr(json, "\"wacz_version\": \"") == NULL)
+        err = 1;
+      p = json;
+      while ((p = strstr(p, "\"path\": \"")) != NULL) {
+        char path[256], want[80], got[65];
+        const char *pe, *h;
+        size_t plen;
+        p += 9;
+        pe = strchr(p, '"');
+        if (pe == NULL || (plen = (size_t) (pe - p)) >= sizeof(path)) {
+          err = 1;
+          break;
+        }
+        memcpy(path, p, plen);
+        path[plen] = '\0';
+        h = strstr(pe, "\"hash\": \"sha256:");
+        if (h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1) {
+          err = 1;
+          break;
+        }
+        for (i = 0; i < nent; i++)
+          if (strcmp(ent[i].name, path) == 0)
+            break;
+        if (i == nent || !wacz_test_sha256(ent[i].data, ent[i].len, got) ||
+            strcmp(got, want) != 0)
+          err = 1;
+        p = pe;
+      }
+      freet(json);
+    }
+  }
+
+  /* datapackage-digest.json chains sha256(datapackage.json). */
+  if (dp != NULL && dig != NULL) {
+    char dphex[65], *djson = malloct(dig->len + 1);
+    const char *h;
+    char want[80];
+    if (djson == NULL || !wacz_test_sha256(dp->data, dp->len, dphex)) {
+      err = 1;
+    } else {
+      memcpy(djson, dig->data, dig->len);
+      djson[dig->len] = '\0';
+      if (strstr(djson, "\"path\": \"datapackage.json\"") == NULL)
+        err = 1;
+      h = strstr(djson, "\"hash\": \"sha256:");
+      if (h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1 ||
+          strcmp(want, dphex) != 0)
+        err = 1;
+    }
+    freet(djson);
+  }
+
+  for (i = 0; i < nent; i++)
+    freet(ent[i].data);
+
+  /* #522-class: a failed re-package must leave the existing .wacz untouched.
+     Drop the .cdx and re-run empty so packaging fails on the missing index. */
+  good_size = fsize(waczpath);
+  if (good_size <= 0)
+    err = 1;
+  (void) UNLINK(cdxpath);
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  warc_close(w);
+  if (fsize(waczpath) != good_size) /* destroyed or rewritten = data loss */
+    err = 1;
+
+  opt->warc_cdx = saved_cdx;
+  opt->warc_wacz = saved_wacz;
+  printf("warc-wacz: %d members (store=%d): %s\n", nent, all_store,
+         err ? "FAIL" : "OK");
+  return err;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4166,6 +4395,10 @@ static const struct selftest_entry {
      st_warc_surt},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
+#if HTS_USEOPENSSL
+    {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
+     st_warc_wacz},
+#endif
 };
 
 static void list_selftests(void) {
