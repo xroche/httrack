@@ -796,11 +796,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   tempo[0] = '\0';
                   time_gmt_rfc822(gmttime);
                   strcatbuff(tempo, eol);
-                  hts_template_format_str(tempo + strlen(tempo), sizeof(tempo) - strlen(tempo),
-                          StringBuff(opt->footer),
-                          html_inline_safe(jump_identification_const(urladr()), safe_adr, sizeof(safe_adr)),
-                          html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil)), gmttime,
-                          HTTRACK_VERSIONID, /* EOF */ NULL);
+                  hts_footer_format(
+                      tempo + strlen(tempo), sizeof(tempo) - strlen(tempo),
+                      StringBuff(opt->footer),
+                      html_inline_safe(jump_identification_const(urladr()),
+                                       safe_adr, sizeof(safe_adr)),
+                      html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil)),
+                      gmttime, HTTRACK_VERSIONID);
                   strcatbuff(tempo, eol);
                   HT_ADD(tempo);
                 }

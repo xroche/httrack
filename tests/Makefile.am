@@ -38,6 +38,7 @@ TESTS = \
 	01_engine-dnstimeout.test \
 	01_engine-doitlog.test \
 	01_engine-entities.test \
+	01_engine-footerfmt.test \
 	01_engine-filelist.test \
 	01_engine-filter.test \
 	01_engine-filterdual.test \

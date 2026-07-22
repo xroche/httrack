@@ -971,6 +971,37 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=footerfmt <template>: expand a -%F footer with fixed fields (drives
+// tests/01_engine-footerfmt.test). Also asserts the overflow/zero-size returns
+// the CLI cap keeps out of reach.
+static int st_footerfmt(httrackp *opt, int argc, char **argv) {
+  char out[1024];
+  char tiny[4];
+
+  (void) opt;
+  // Overflow (named and legacy) and a zero-size buffer must return <0, never
+  // truncate silently or write out of bounds.
+  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", "host.example", "/p",
+                            "D", "V") < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", "host.example", "/p",
+                            "D", "V") < 0);
+  assertf(hts_footer_format(out, 0, "", "", "", "", "") < 0);
+  // An empty template yields an empty, terminated string.
+  assertf(hts_footer_format(out, sizeof(out), "", "", "", "", "") == 1 &&
+          out[0] == '\0');
+  if (argc < 1) {
+    fprintf(stderr, "footerfmt: needs a template\n");
+    return 1;
+  }
+  if (hts_footer_format(out, sizeof(out), argv[0], "host.example",
+                        "/dir/page.html", "DATE", "VER") < 0) {
+    fprintf(stderr, "footerfmt: overflow\n");
+    return 1;
+  }
+  printf("%s\n", out);
+  return 0;
+}
+
 /* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
    dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
    by ASan). Both unescapeEntities and unescapeUrl share the guard. */
@@ -3257,6 +3288,8 @@ static const struct selftest_entry {
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
+    {"footerfmt", "<template>", "-%F footer positional/named expansion",
+     st_footerfmt},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},

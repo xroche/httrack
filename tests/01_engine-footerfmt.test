@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# -%F footer expansion (hts_footer_format via -#test=footerfmt). Fixed fields:
+# addr=host.example path=/dir/page.html date=DATE version=VER.
+ftr() {
+    out="$(httrack -O /dev/null -#test=footerfmt "$1")"
+    test "$out" == "$2" || {
+        echo "FAIL: '$1' -> '$out' (want '$2')"
+        exit 1
+    }
+}
+
+# Legacy positional model: a template with %s keeps the historic addr/path/date
+# order byte-for-byte (backward compatibility).
+ftr '<!-- Mirrored from %s%s by X, %s -->' \
+    '<!-- Mirrored from host.example/dir/page.html by X, DATE -->'
+# Legacy arg overflow past the four fields yields the historic "???" marker.
+ftr 'a %s b %s c %s d %s e %s' 'a host.example b /dir/page.html c DATE d VER e ???'
+# Legacy %% is a literal percent; an unknown %x passes through verbatim.
+ftr '100%% %d %s' '100% %d host.example'
+
+# Named model (no %s): fields substitute by name, in any order or subset.
+ftr '{addr}{path} {version} {date}' 'host.example/dir/page.html VER DATE'
+ftr 'built {date}' 'built DATE'
+# A literal char abutting a field's '}' survives (guards the index advance).
+ftr '{date}!{addr}' 'DATE!host.example'
+# {{ and }} escape to a literal brace.
+ftr 'a {{ b }} {addr}' 'a { b } host.example'
+# Unknown, empty, or unterminated braces are emitted verbatim (typos stay visible).
+ftr '{bogus} {} {addr' '{bogus} {} {addr'
+# A literal percent is untouched in named mode (no positional interpretation).
+ftr '100% {path}' '100% /dir/page.html'
+# %s anywhere forces legacy mode, so a mixed template leaves {addr} literal.
+ftr '{addr} %s' '{addr} host.example'

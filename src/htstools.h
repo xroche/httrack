@@ -72,6 +72,12 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 
 int hts_template_format(FILE *const out, const char *format, ...);
 int hts_template_format_str(char *buffer, size_t size, const char *format, ...);
+// Expand a footer template: "%s" in it selects the legacy positional model
+// (addr, path, date, version); otherwise substitutes named {addr} {path} {date}
+// {version} fields ("{{"/"}}" for a literal brace). Returns <0 on overflow.
+int hts_footer_format(char *buffer, size_t size, const char *footer,
+                      const char *addr, const char *path, const char *date,
+                      const char *version);
 
 #define rech_tageq(adr,s) \
   ( \

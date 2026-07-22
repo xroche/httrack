@@ -1622,10 +1622,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF
                     ("Option %F needs to be followed by a blank space, and a footer string");
-                  printf
-                    ("Example: -%%F \"<!-- Mirrored from %%s by HTTrack Website Copier/"
-                     HTTRACK_AFF_VERSION " " HTTRACK_AFF_AUTHORS
-                     ", %%s -->\"\n");
+                  printf("Example: -%%F \"<!-- Mirrored from {addr}{path} by "
+                         "HTTrack Website Copier/"
+                         "{version} " HTTRACK_AFF_AUTHORS ", {date} -->\"\n");
                   htsmain_free();
                   return -1;
                 } else {
