@@ -524,6 +524,8 @@ void help(const char *app, int more) {
   infomsg
     (" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
+  infomsg(" %t  keep the original file extension, don't rewrite it from the "
+          "MIME type (%t0 rewrite)");
   infomsg
     ("  LN long names (L1 *long names / L0 8-3 conversion / L2 ISO9660 compatible)");
   infomsg
@@ -554,6 +556,7 @@ void help(const char *app, int more) {
     (" %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies)");
   infomsg
     (" %k  use keep-alive if possible, greately reducing latency for small files and test requests (%k0 don't use)");
+  infomsg(" %z  do not request compressed content (%z0 request)");
   infomsg
     (" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
   infomsg
@@ -620,7 +623,6 @@ void help(const char *app, int more) {
   infomsg(" %H  debug HTTP headers in logfile");
   infomsg("");
   infomsg("Guru options: (do NOT use if possible)");
-  infomsg(" #X *use optimized engine (limited memory boundary checks)");
   infomsg(" #test  list engine self-tests (run one with -#test=NAME [args])");
   infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
   infomsg(" #R  cache repair (damaged cache)");
@@ -633,7 +635,6 @@ void help(const char *app, int more) {
   infomsg(" #L  maximum number of links (-#L1000000)");
   infomsg(" #p  display ugly progress information");
   infomsg(" #P  catch URL");
-  infomsg(" #R  old FTP routines (debug)");
   infomsg(" #T  generate transfer ops. log every minutes");
   infomsg(" #u  wait time");
   infomsg(" #Z  generate transfer rate statistics every minutes");
@@ -650,6 +651,7 @@ void help(const char *app, int more) {
     ("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
   infomsg(" %W use an external library function as a wrapper (-%W "
           "myfoo.so[,myparameters])");
+  infomsg("  y  go to background when suspended (y0 don't)");
   infomsg("");
   infomsg("Details: Option N");
   infomsg("  N0 Site-structure (default)");
