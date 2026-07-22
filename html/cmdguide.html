@@ -32,7 +32,6 @@ body, td {
 #siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
 #siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
 
-
 a:link    { text-decoration: underline;  color: #00f; }
 a:visited { text-decoration: underline;  color: #000; }
 a:hover   { text-decoration: underline;  color: #c00; }
@@ -52,7 +51,6 @@ a:active  { text-decoration: underline; }
 	background-color: #ccd;
 	}
 
-
 .imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
 .imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
 
@@ -71,7 +69,6 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 .tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
 .tblHeaderColor, .tblHeaderColor td { background: #99c; }
 .tblNoBorder td   { border: 0; }
-
 
 // -->
 </style>
@@ -130,13 +127,11 @@ or filtered out. Read them first.</p>
   <li><a href="#recipes">11. Recipes</a></li>
 </ul>
 
-<hr>
-
 <h3 id="quickstart">1. Quick start</h3>
 
 <p>A mirror is one command: a start URL and an output directory.</p>
 
-<p><tt>httrack https://example.com/ -O mydir</tt></p>
+<p><tt>httrack https://example.com/ --path mydir</tt></p>
 
 <p>With no other options HTTrack mirrors that site, stays on the same host, follows
 links to any depth, rebuilds them to browse offline, and stores everything under
@@ -153,8 +148,6 @@ links to any depth, rebuilds them to browse offline, and stores everything under
   request. A site that blocks that behavior needs the levers in
   <a href="#identity">Identity</a>, not brute force.</li>
 </ul>
-
-<hr>
 
 <h3 id="scope">2. Scope: how far the crawl reaches</h3>
 
@@ -186,8 +179,6 @@ that its embedded-asset handling (following <tt>img</tt>, <tt>link</tt>,
 past the normal depth and filter limits) applies only when <tt>-n</tt> is on; it
 is not automatic. It can also over-fetch by dragging in a whole external host from
 a single link, in which case name the assets you want with a filter instead.</p>
-
-<hr>
 
 <h3 id="filters">3. Filters and scan rules</h3>
 
@@ -228,8 +219,6 @@ that a <tt>403 Forbidden</tt> is a server refusal, not a robots rule: robots
 options will not help there. That is an
 <a href="#identity">identity</a> problem.</p>
 
-<hr>
-
 <h3 id="limits">4. Limits and politeness</h3>
 
 <p>HTTrack ships cautious on purpose: it is easy to hammer a small site by
@@ -251,10 +240,10 @@ below let you go faster when you own the target, and slower when you do not.</p>
 <p><b>The security clamps.</b> To keep an accidental typo from turning into a flood,
 HTTrack silently caps a few values: at most 8 connections (<tt>-c</tt>), at most
 10 MB/s (<tt>-A</tt>), and at most 5 new connections per second (<tt>-%c</tt>).
-Ask for more and you get the ceiling, quietly. The single flag <tt>-%!</tt> lifts
-all three. Use it only against infrastructure you are allowed to load that hard.</p>
-
-<hr>
+Ask for more and you get the ceiling, quietly. The single flag
+<tt>--disable-security-limits</tt> lifts all three (the short form <tt>-%!</tt>
+also works, but the bare <tt>!</tt> is awkward to type safely in a shell). Use it
+only against infrastructure you are allowed to load that hard.</p>
 
 <h3 id="names">5. File names and types</h3>
 
@@ -282,8 +271,6 @@ the classic case: without help it can be saved with an extension a browser will
 not open locally. <tt>-%A php=text/html</tt> fixes both the extension and the
 naming.</p>
 
-<hr>
-
 <h3 id="links">6. Links and page building</h3>
 
 <p>After a page is downloaded, HTTrack parses it for more links and rewrites the
@@ -306,8 +293,6 @@ the mirror. There is no flag that fixes this; the asset has to appear in the
 static HTML or CSS to be found. <tt>-%P</tt> widens discovery for links that are
 present but awkwardly formatted, not for links that do not exist until script
 runs.</p>
-
-<hr>
 
 <h3 id="identity">7. Identity, cookies and login</h3>
 
@@ -337,8 +322,6 @@ to know: expiry is ignored, there is a silent cap of about 8 cookies sent per
 request, and <tt>-b0</tt> disables cookies and the reuse of Basic credentials
 across links at the same time.</p>
 
-<hr>
-
 <h3 id="proxy">8. Proxy and network</h3>
 
 <table class="tblRegular tableWidth" border="0">
@@ -356,8 +339,6 @@ host names at the proxy (remote DNS) for both <tt>socks5://</tt> and
 not verify TLS certificates: HTTPS gives you an encrypted transport, but not an
 authenticated one. That is a deliberate choice for a mirroring tool, not a bug,
 but it is worth knowing if you are relying on it for trust.</p>
-
-<hr>
 
 <h3 id="update">9. Update and cache</h3>
 
@@ -384,8 +365,6 @@ not complete cleanly, add <tt>-X0</tt> to protect the existing tree, and expect
 dynamic pages to look "changed" on every run. See the
 <a href="cache.html">cache page</a> for the details.</p>
 
-<hr>
-
 <h3 id="experts">10. Experts and scripting</h3>
 
 <p>HTTrack is also a scriptable fetch-and-scan tool. These options turn off the
@@ -403,68 +382,72 @@ mirror behavior and expose the engine.</p>
 <p>The <a href="dev.html">developer page</a> covers the callback API and batch use
 in more depth.</p>
 
-<hr>
-
 <h3 id="recipes">11. Recipes</h3>
 
 <p>Copy-ready command lines for the tasks people ask about most. Each has the one
 gotcha that trips it up.</p>
 
 <h4>Mirror one site, nothing off-host</h4>
-<p><tt>httrack https://example.com/ -O mydir</tt><br>
+<p><tt>httrack https://example.com/ --path mydir</tt><br>
 <small>Same-host is already the default. The usual failure is a
 <tt>www.</tt>-to-apex or <tt>http</tt>-to-<tt>https</tt> redirect that moves you off
 host and stops the crawl; start from the final URL, or add
 <tt>"+finalhost/*"</tt>.</small></p>
 
 <h4>One level of links only</h4>
-<p><tt>httrack https://example.com/ -r2 -O mydir</tt><br>
-<small>Depth counts the start page as level 1, so one level out is <tt>-r2</tt>.</small></p>
+<p><tt>httrack https://example.com/ --depth=2 --path mydir</tt><br>
+<small>Depth counts the start page as level 1, so one level out is <tt>--depth=2</tt>.</small></p>
 
 <h4>This site only, deny everything else</h4>
-<p><tt>httrack https://example.com/ "-*" "+example.com/*" -O mydir</tt><br>
+<p><tt>httrack https://example.com/ "-*" "+example.com/*" --path mydir</tt><br>
 <small>You must deny-all first; a lone <tt>+</tt> only adds, and the last matching
 rule wins.</small></p>
 
-<h4>Grab every PDF under a site</h4>
-<p><tt>httrack https://example.com/ "-*" "+example.com/*.pdf" -O mydir</tt><br>
-<small>Always scope the host. A bare <tt>+*.pdf</tt> invites the crawler onto the
-whole web.</small></p>
+<h4>Download the PDFs on a site</h4>
+<p><tt>httrack https://example.com/ --path mydir</tt><br>
+<small>There is no PDF-only crawl. HTTrack discovers PDF links by parsing the
+site's HTML pages, so a <tt>"-*" "+example.com/*.pdf"</tt> filter blocks the very
+pages that carry the links and grabs only the PDFs linked from the front page. Let
+it crawl the site: the HTML pages come along as the scaffolding, and every reachable
+PDF is saved with them. If some PDFs live on another host (a CDN or a docs
+subdomain), allow that host too, for example
+<tt>"+docs.example.com/*.pdf"</tt>.</small></p>
 
 <h4>Keep page requisites, including off-host images</h4>
-<p><tt>httrack https://example.com/blog/ -n -O mydir</tt><br>
-<small><tt>-n</tt> can over-fetch by pulling in an entire external host from one
+<p><tt>httrack https://example.com/blog/ --near --path mydir</tt><br>
+<small><tt>--near</tt> can over-fetch by pulling in an entire external host from one
 link; if it does, name the assets with <tt>"+cdn.example.com/*"</tt> instead.</small></p>
 
 <h4>Resume an interrupted crawl</h4>
-<p><tt>httrack --continue -O mydir</tt><br>
+<p><tt>httrack --continue --path mydir</tt><br>
 <small>Needs an intact <tt>hts-cache/</tt>. Deleting it loses the URL list and your
 options.</small></p>
 
 <h4>Update a mirror, downloading only what changed</h4>
-<p><tt>httrack --update -O mydir</tt><br>
+<p><tt>httrack --update --path mydir</tt><br>
 <small>Purge deletes any previously-mirrored file not seen this run; add
-<tt>-X0</tt> to protect the tree against a partial update.</small></p>
+<tt>--purge-old=0</tt> to protect the tree against a partial update.</small></p>
 
 <h4>Reach a section behind a login cookie</h4>
 <p><small>Export your browser's <tt>cookies.txt</tt> into the project directory,
 then:</small><br>
-<tt>httrack https://example.com/members/ -O mydir</tt><br>
+<tt>httrack https://example.com/members/ --path mydir</tt><br>
 <small>The file must be Netscape <tt>cookies.txt</tt> in the project folder;
-<tt>-b0</tt> would disable cookies and Basic-auth reuse together.</small></p>
+<tt>--cookies=0</tt> would disable cookies and Basic-auth reuse together.</small></p>
 
 <h4>Get past a crawler-UA block</h4>
-<p><tt>httrack https://example.com/ -F "Mozilla/5.0 (Windows NT 10.0)" -O mydir</tt><br>
+<p><tt>httrack https://example.com/ --user-agent "Mozilla/5.0 (Windows NT 10.0)" --path mydir</tt><br>
 <small>A 403 is server-side, not robots: change the User-Agent, and add
-<tt>-%h</tt> for fragile CGI. Do not reach for <tt>-s0</tt>.</small></p>
+<tt>--http-10</tt> for fragile CGI. Do not reach for <tt>--robots=0</tt>.</small></p>
 
 <h4>Full-speed mirror on your own server</h4>
-<p><tt>httrack https://example.com/ -A2000000 -c8 -%! -O mydir</tt><br>
-<small>The default throttles to about 100 KB/s. <tt>-%!</tt> lifts the built-in
-caps; use it only against infrastructure you are allowed to load.</small></p>
+<p><tt>httrack https://example.com/ --max-rate=2000000 --sockets=8 --disable-security-limits --path mydir</tt><br>
+<small>The default throttles to about 100 KB/s. <tt>--disable-security-limits</tt>
+lifts the built-in caps; use it only against infrastructure you are allowed to
+load.</small></p>
 
 <h4>HTTrack as a fetch tool</h4>
-<p><tt>httrack --get https://host/file.bin -O tmp</tt><br>
+<p><tt>httrack --get https://host/file.bin --path tmp</tt><br>
 <small><tt>--get</tt> fetches one file with cache, index, depth, cookies and robots
 all disabled.</small></p>
 
