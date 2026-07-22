@@ -975,26 +975,36 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
 // tests/01_engine-footerfmt.test). Also asserts the overflow/zero-size returns
 // the CLI cap keeps out of reach.
 static int st_footerfmt(httrackp *opt, int argc, char **argv) {
+  static const hts_footer_field fields[] = {
+      {"addr", "host.example"},
+      {"path", "/dir/page.html"},
+      {"url", "http://host.example/dir/page.html"},
+      {"date", "DATE"},
+      {"lastmodified", "LASTMOD"},
+      {"version", "VER"},
+      {"mime", "text/html"},
+      {"charset", "utf-8"},
+      {"status", "200"},
+      {"size", "1234"},
+  };
+  const size_t nfields = sizeof(fields) / sizeof(fields[0]);
   char out[1024];
   char tiny[4];
 
   (void) opt;
   // Overflow (named and legacy) and a zero-size buffer must return <0, never
   // truncate silently or write out of bounds.
-  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", "host.example", "/p",
-                            "D", "V") < 0);
-  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", "host.example", "/p",
-                            "D", "V") < 0);
-  assertf(hts_footer_format(out, 0, "", "", "", "", "") < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", fields, nfields) < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", fields, nfields) < 0);
+  assertf(hts_footer_format(out, 0, "", fields, nfields) < 0);
   // An empty template yields an empty, terminated string.
-  assertf(hts_footer_format(out, sizeof(out), "", "", "", "", "") == 1 &&
+  assertf(hts_footer_format(out, sizeof(out), "", fields, nfields) == 1 &&
           out[0] == '\0');
   if (argc < 1) {
     fprintf(stderr, "footerfmt: needs a template\n");
     return 1;
   }
-  if (hts_footer_format(out, sizeof(out), argv[0], "host.example",
-                        "/dir/page.html", "DATE", "VER") < 0) {
+  if (hts_footer_format(out, sizeof(out), argv[0], fields, nfields) < 0) {
     fprintf(stderr, "footerfmt: overflow\n");
     return 1;
   }

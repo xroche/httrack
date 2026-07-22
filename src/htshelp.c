@@ -581,8 +581,10 @@ void help(const char *app, int more) {
     ("  F  user-agent field sent in HTTP headers (-F \"user-agent name\")");
   infomsg(" %R  default referer field sent in HTTP headers");
   infomsg(" %E  from email address sent in HTTP headers");
-  infomsg(" %F  footer string in Html code (-%F \"Mirrored from {addr}{path} "
-          "on {date}\"; fields {addr} {path} {date} {version}, or legacy %s)");
+  infomsg(
+      " %F  footer string in Html code (-%F \"Mirrored from {url} on "
+      "{date}\"; fields {addr} {path} {url} {date} {lastmodified} {version} "
+      "{mime} {charset} {status} {size}, or legacy %s)");
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");

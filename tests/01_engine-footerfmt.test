@@ -35,3 +35,8 @@ ftr '{bogus} {} {addr' '{bogus} {} {addr'
 ftr '100% {path}' '100% /dir/page.html'
 # %s anywhere forces legacy mode, so a mixed template leaves {addr} literal.
 ftr '{addr} %s' '{addr} host.example'
+
+# The added named fields (url, lastmodified, mime, charset, status, size).
+ftr '{url}' 'http://host.example/dir/page.html'
+ftr 'src {lastmodified}, got {date}' 'src LASTMOD, got DATE'
+ftr '{mime}; {charset}; {status}; {size}' 'text/html; utf-8; 200; 1234'

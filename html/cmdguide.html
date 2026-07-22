@@ -323,9 +323,17 @@ options control what HTTrack says about itself.</p>
   <tr><td><tt>--user-agent (-F)</tt></td><td>The <tt>User-Agent</tt>. Set a browser string to get past crawler blocks; <tt>--user-agent ""</tt> sends none.</td></tr>
   <tr><td><tt>--referer (-%R), --from (-%E), --language (-%l), --accept (-%a)</tt></td><td>Referer, From, Accept-Language and Accept headers.</td></tr>
   <tr><td><tt>--headers (-%X)</tt></td><td>Add raw header lines to every request.</td></tr>
-  <tr><td><tt>--footer (-%F)</tt></td><td>A footer written into saved pages (on disk, not a network header).</td></tr>
+  <tr><td><tt>--footer (-%F)</tt></td><td>A footer written into saved pages (on disk, not a network header). See <b>Footer fields</b> below.</td></tr>
   <tr><td><tt>--cookies (-b), --cookies-file (-%K)</tt></td><td>Accept cookies, and preload a Netscape <tt>cookies.txt</tt>.</td></tr>
 </table>
+
+<p><b>Footer fields.</b> A footer with no <tt>%s</tt> may reference named fields:
+<tt>{addr}</tt>, <tt>{path}</tt>, <tt>{url}</tt>, <tt>{date}</tt> (mirror time),
+<tt>{lastmodified}</tt> (the page's Last-Modified), <tt>{version}</tt>,
+<tt>{mime}</tt>, <tt>{charset}</tt>, <tt>{status}</tt> and <tt>{size}</tt>; write
+<tt>{{</tt> or <tt>}}</tt> for a literal brace. A footer that contains <tt>%s</tt>
+keeps the older positional form (host, path, date in that order). Example:
+<tt>-%F "&lt;!-- Mirrored from {url} on {date} --&gt;"</tt>.</p>
 
 <p><b>Login.</b> For HTTP Basic auth, put the credentials in the URL:
 <tt>http://user:pass@host/</tt>. An <tt>@</tt> inside the username must be written

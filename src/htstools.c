@@ -872,25 +872,34 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...) 
   return success;
 }
 
-int hts_footer_format(char *buffer, size_t size, const char *footer,
-                      const char *addr, const char *path, const char *date,
-                      const char *version) {
-  const struct {
-    const char *name;
-    const char *value;
-  } fields[] = {
-      {"addr", addr}, {"path", path}, {"date", date}, {"version", version}};
+// Value of the named field, or "" if absent (never NULL, so callers can pass it
+// straight to a formatter).
+static const char *footer_field_value(const hts_footer_field *fields,
+                                      size_t nfields, const char *name) {
+  size_t j;
+  for (j = 0; j < nfields; j++) {
+    if (strcmp(fields[j].name, name) == 0)
+      return fields[j].value != NULL ? fields[j].value : "";
+  }
+  return "";
+}
 
+int hts_footer_format(char *buffer, size_t size, const char *footer,
+                      const hts_footer_field *fields, size_t nfields) {
   hts_template_format_buf buf = {NULL, buffer, size, 0};
   size_t i;
 
   if (footer == NULL || buffer == NULL || size == 0)
     return -1;
   // %s keeps the legacy positional model, byte-for-byte for existing -%F
-  // strings.
+  // strings: addr, path, date, version, looked up by name and
+  // order-independent.
   if (strstr(footer, "%s") != NULL)
-    return hts_template_format_str(buffer, size, footer, addr, path, date,
-                                   version, /* EOF */ NULL);
+    return hts_template_format_str(
+        buffer, size, footer, footer_field_value(fields, nfields, "addr"),
+        footer_field_value(fields, nfields, "path"),
+        footer_field_value(fields, nfields, "date"),
+        footer_field_value(fields, nfields, "version"), /* EOF */ NULL);
   // "{{"/"}}" emit a literal brace; an unknown "{...}" is left verbatim so
   // typos stay visible.
   for (i = 0; footer[i] != '\0'; i++) {
@@ -909,7 +918,7 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
       if (end != NULL) {
         const size_t namelen = (size_t) (end - (footer + i + 1));
         size_t j;
-        for (j = 0; j < sizeof(fields) / sizeof(fields[0]); j++) {
+        for (j = 0; j < nfields; j++) {
           if (strlen(fields[j].name) == namelen &&
               strncmp(fields[j].name, footer + i + 1, namelen) == 0) {
             if (htsfmt_puts(&buf,
