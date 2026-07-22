@@ -404,9 +404,8 @@ static int header_is(const char *line, size_t line_len, const char *name) {
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
    trailing CRLF terminator). Always drops Transfer-Encoding (hop-by-hop).
    When set_cl>=0, drops the original Content-Length and appends
-   "Content-Length: <set_cl>". Content-Encoding is dropped too unless keep_ce
-   (strategy A: the body is stored in its as-received coded form, so the
-   header must survive and set_cl is the compressed length). Returns 0. */
+   "Content-Length: <set_cl>". Content-Encoding is dropped too, unless keep_ce
+   (strategy A: set_cl is then the compressed length). Returns 0. */
 static int normalize_http_headers(const char *resp_hdr, long long set_cl,
                                   int keep_ce, wbuf *out) {
   const char *p = resp_hdr;
@@ -429,6 +428,8 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
       goto next;
     } else if (set_cl >= 0 && !keep_ce &&
                header_is(p, len, "Content-Encoding")) {
+      /* keep_ce keeps every Content-Encoding line verbatim, duplicates and all:
+         a faithful archive of what the server sent, as wget --warc. */
       goto next;
     }
     if (wbuf_add(out, p, len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
@@ -636,6 +637,19 @@ void warc_free_request(htsblk *r) {
       (void) UNLINK(r->warc_rawpath); /* owns the strategy-A spool file */
       freet(r->warc_rawpath);
       r->warc_rawpath = NULL;
+    }
+  }
+}
+
+void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path) {
+  if (r != NULL) {
+    LLint rawsize;
+    freet(r->warc_rawpath);
+    r->warc_rawpath = NULL;
+    r->warc_rawsize = 0;
+    if (strnotempty(tmpfile_path) && (rawsize = fsize_utf8(tmpfile_path)) > 0 &&
+        (r->warc_rawpath = strdupt(tmpfile_path)) != NULL) {
+      r->warc_rawsize = rawsize;
     }
   }
 }
@@ -848,9 +862,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
      only a full response carries the payload (F1). */
   emit_body = has_payload && !is_revisit;
 
-  /* Normalize headers: a full response rewrites Content-Length to the stored
-     body length; strategy B strips Content-Encoding, strategy A keeps it (the
-     stored body is the compressed length). A revisit keeps both (no body). */
+  /* Full response rewrites Content-Length; strategy A/B decide Content-Encoding
+     (see normalize_http_headers). Revisit keeps both. */
   memset(&http, 0, sizeof(http));
   if (normalize_http_headers(resp_hdr, emit_body ? (long long) body_len : -1,
                              keep_content_encoding, &http) != 0) {
@@ -986,9 +999,8 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     return;
   }
 
-  /* Strategy A (--warc-verbatim): a compressed body was spooled before decode;
-     store those verbatim coded bytes and keep Content-Encoding. The digest is
-     then over the coded payload, which is what the record carries. */
+  /* Strategy A: use the spooled coded body; the digest below is then over the
+     coded payload. */
   if (opt->warc_verbatim && back->r.warc_rawpath != NULL &&
       back->r.warc_rawsize > 0 &&
       (uint64_t) back->r.warc_rawsize <= (uint64_t) (size_t) -1) {

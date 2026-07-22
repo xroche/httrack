@@ -639,13 +639,27 @@ class Handler(SimpleHTTPRequestHandler):
     # the strategy-A differential (stored compressed bytes must inflate to this).
     WARCGZ_BODY = b"<html><body>verbatim gzip page for WARC strategy A</body></html>\n"
 
+    # A NON-html gzip-coded asset: HTTrack streams it straight to disk, so the
+    # strategy-A spool adoption runs on the is_write (direct-to-disk) branch of
+    # back_finalize, not the in-memory branch route_warcgz_page exercises.
+    WARCGZ_BIN_BODY = b"verbatim gzip octet-stream body for the WARC is_write path\n"
+
     def route_warcgz_index(self):
-        self.send_html('\t<a href="page.html">page</a>\n')
+        self.send_html(
+            '\t<a href="page.html">page</a>\n' '\t<a href="data.bin">data</a>\n'
+        )
 
     def route_warcgz_page(self):
         self.send_raw(
             gzip.compress(self.WARCGZ_BODY),
             "text/html",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    def route_warcgz_data(self):
+        self.send_raw(
+            gzip.compress(self.WARCGZ_BIN_BODY),
+            "application/octet-stream",
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
@@ -1558,6 +1572,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/robots.txt": route_robots,
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
+        "/warcgz/data.bin": route_warcgz_data,
         "/codec/index.html": route_codec_index,
         "/codec/br.html": route_codec_br,
         "/codec/zstd.html": route_codec_zstd,

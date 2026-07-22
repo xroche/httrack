@@ -3756,10 +3756,8 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* Strategy A (--warc-verbatim): a gzip-coded body is stored as-received. Assert
-   the response record keeps Content-Encoding: gzip, its HTTP Content-Length is
-   the compressed length, the stored block bytes equal the gzip input, and they
-   inflate back to the known plaintext. */
+/* Strategy A: assert the stored WARC record is byte-verbatim gzip with
+   Content-Encoding preserved. */
 static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -3818,9 +3816,8 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       freet(rec);
       continue;
     }
-    /* Content-Encoding kept exactly once; Transfer-Encoding dropped; the HTTP
-       Content-Length is the compressed length (not 999, not the decoded size).
-     */
+    /* Assert: one Content-Encoding, no Transfer-Encoding, Content-Length =
+       compressed size. */
     {
       const char *block = (char *) rec + hdr_len;
       const char *ce =

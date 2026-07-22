@@ -13,8 +13,9 @@
 #                             response may target it, and a revisit must
 #   --verbatim                strategy A: --expect-body-hex instead keeps
 #                             Content-Encoding, checks the HTTP Content-Length is
-#                             the stored (compressed) length, and asserts the
-#                             stored body inflates to HEX (the served plaintext)
+#                             the stored (compressed) length, asserts the stored
+#                             body inflates to HEX (the served plaintext), and
+#                             requires the payload digest when the file emits any
 import base64
 import hashlib
 import sys
@@ -65,7 +66,7 @@ def check_body(rec, http_hdr, body, sub, want):
             sys.exit("WARC-Payload-Digest mismatch for %s" % sub)
 
 
-def check_body_verbatim(rec, http_hdr, body, sub, want):
+def check_body_verbatim(rec, http_hdr, body, sub, want, digests_emitted):
     """Strategy A: the stored body is the coded octets, Content-Encoding is kept,
     the HTTP Content-Length equals the stored (compressed) length, inflating the
     body yields the served plaintext, and the payload digest is over the coded
@@ -87,6 +88,10 @@ def check_body_verbatim(rec, http_hdr, body, sub, want):
             % (sub, len(decoded), len(want))
         )
     pd = field(rec[: rec.find(b"\r\n\r\n")], b"WARC-Payload-Digest")
+    # Catch a regression that drops the digest on the verbatim path, but only
+    # when this file emits digests at all (an OpenSSL build; none otherwise).
+    if digests_emitted and pd is None:
+        sys.exit("verbatim record for %s: missing WARC-Payload-Digest" % sub)
     if pd is not None and pd.startswith(b"sha1:"):
         want_b32 = base64.b32encode(hashlib.sha1(body).digest()).decode("ascii")
         if pd[5:].decode("ascii") != want_b32:
@@ -101,6 +106,12 @@ def main():
     no_resp = opt_values(argv, "--no-response-for")
     path = [a for a in argv if not a.startswith("--") and "=" not in a][0]
     data = open(path, "rb").read()
+
+    # digests are emitted only on an OpenSSL build; detect it once so --verbatim
+    # can require the payload digest exactly when the file carries any.
+    digests_emitted = any(
+        b"WARC-Payload-Digest" in r[: r.find(b"\r\n\r\n")] for r in records(data)
+    )
 
     total = revisits = responses = infos = 0
     body_hits = {sub: False for sub, _ in body_specs}
@@ -139,8 +150,13 @@ def main():
             http_hdr, body = block[:bsep], block[bsep + 4 :]
             for sub, hexval in body_specs:
                 if sub.encode() in uri:
-                    checker = check_body_verbatim if verbatim else check_body
-                    checker(rec, http_hdr, body, sub, bytes.fromhex(hexval))
+                    want = bytes.fromhex(hexval)
+                    if verbatim:
+                        check_body_verbatim(
+                            rec, http_hdr, body, sub, want, digests_emitted
+                        )
+                    else:
+                        check_body(rec, http_hdr, body, sub, want)
                     body_hits[sub] = True
         elif wtype == b"revisit":
             revisits += 1

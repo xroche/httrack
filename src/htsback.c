@@ -750,19 +750,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     fexist_utf8(back[p].url_sav))
                   filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
-              /* Strategy A (--warc-verbatim): adopt the de-chunked compressed
-                 spool for a verbatim WARC record instead of discarding it; the
-                 decode above already consumed it, so this is O(1). */
+              /* Strategy A: keep the compressed spool for a verbatim record
+                 instead of unlinking it. */
               if (opt->warc_verbatim && StringNotEmpty(opt->warc_file)) {
-                LLint rawsize = fsize_utf8(back[p].tmpfile);
-                freet(back[p].r.warc_rawpath);
-                back[p].r.warc_rawpath = NULL;
-                if (rawsize > 0 && (back[p].r.warc_rawpath =
-                                        strdupt(back[p].tmpfile)) != NULL) {
-                  back[p].r.warc_rawsize = rawsize;
+                warc_adopt_rawspool(&back[p].r, back[p].tmpfile);
+                if (back[p].r.warc_rawpath != NULL)
                   back[p].tmpfile =
                       NULL; /* adopted: freed via warc_free_request */
-                }
               }
               /* ensure that no remaining temporary file exists */
               if (back[p].tmpfile != NULL) {

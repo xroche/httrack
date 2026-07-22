@@ -4,15 +4,19 @@
 # response record keeps Content-Encoding: gzip and its stored bytes inflate back
 # to the served page. The validator's --verbatim mode is the differential gate:
 # inflate(stored) must equal the decoded body strategy B would have stored.
+#
+# Two fixtures cover both adoption branches of back_finalize: page.html (text/html)
+# takes the in-memory branch; data.bin (application/octet-stream) is streamed to
+# disk, so it exercises the is_write direct-to-disk spool adoption.
 
 set -eu
 
 : "${top_srcdir:=..}"
 
-# decoded body served (gzip-coded) by route_warcgz_page.
-export WARC_VALIDATE_BODY="warcgz/page.html=3c68746d6c3e3c626f64793e766572626174696d20677a6970207061676520666f72205741524320737472617465677920413c2f626f64793e3c2f68746d6c3e0a"
+# decoded bodies served (gzip-coded) by route_warcgz_page and route_warcgz_data.
+export WARC_VALIDATE_BODY="warcgz/page.html=3c68746d6c3e3c626f64793e766572626174696d20677a6970207061676520666f72205741524320737472617465677920413c2f626f64793e3c2f68746d6c3e0a warcgz/data.bin=766572626174696d20677a6970206f637465742d73747265616d20626f647920666f722074686520574152432069735f777269746520706174680a"
 export WARC_VALIDATE_VERBATIM=1
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
-    --found 'warcgz/index.html' --found 'warcgz/page.html' \
+    --found 'warcgz/index.html' --found 'warcgz/page.html' --found 'warcgz/data.bin' \
     httrack 'BASEURL/warcgz/index.html' --warc-file warc-out --warc-verbatim

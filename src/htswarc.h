@@ -68,6 +68,12 @@ void warc_stash_response(htsblk *r, const char *resphdr);
 /* Free both stashed header blocks (idempotent, NULL-safe). */
 void warc_free_request(htsblk *r);
 
+/* Strategy A (--warc-verbatim): adopt the de-chunked compressed spool at
+   tmpfile_path onto r->warc_rawpath/warc_rawsize (strdupt; frees any prior).
+   No-op leaving warc_rawpath NULL when tmpfile_path is empty or the spool is
+   missing/empty, so the caller falls back to strategy B. */
+void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path);
+
 /* Emit the request + response (or revisit) records for one finished
    transaction. Lazily opens the writer into opt->state.warc; a no-op (logged
    once) if the archive cannot be created. */
