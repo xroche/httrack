@@ -1062,6 +1062,7 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
   dst->r.headers = NULL;
   dst->r.warc_reqhdr = NULL;
   dst->r.warc_resphdr = NULL;
+  dst->r.warc_truncated = 0;
   dst->r.out = NULL;
   dst->r.location = dst->location_buffer;
   dst->r.fp = NULL;
@@ -1127,6 +1128,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.out = NULL;
     (*dst)->r.warc_reqhdr = NULL;
     (*dst)->r.warc_resphdr = NULL;
+    (*dst)->r.warc_truncated = 0;
     (*dst)->r.location = (*dst)->location_buffer;
     (*dst)->r.fp = NULL;
     (*dst)->r.soc = INVALID_SOCKET;
@@ -2519,6 +2521,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     for (i = 0; i < (unsigned int) back_max; i++) {
       if (back[i].status > 0 && back[i].status < STATUS_FTP_TRANSFER) {
+        /* A cap-truncated body is deliberate, not broken: archive what arrived
+           with WARC-Truncated before the abort overwrites the slot's real 2xx
+           status. HTTrack still treats the slot as incomplete afterwards. */
+        if (StringNotEmpty(opt->warc_file) && back[i].r.statuscode > 0 &&
+            back[i].r.warc_resphdr != NULL && back[i].r.size > 0 &&
+            !(back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))) {
+          if (back[i].r.is_write && back[i].r.out != NULL)
+            fflush(back[i].r.out);
+          back[i].r.warc_truncated = (limit == HTS_MIRROR_LIMIT_SIZE)
+                                         ? WARC_TRUNC_LENGTH
+                                         : WARC_TRUNC_TIME;
+          warc_write_backtransaction(opt, &back[i]);
+        }
         if (back[i].r.soc != INVALID_SOCKET) {
           deletehttp(&back[i].r);
         }

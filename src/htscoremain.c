@@ -1806,6 +1806,25 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   StringCopy(opt->warc_file, argv[na]);
+                } else if (*(com + 1) == 's') { // --warc-max-size N: rotation
+                  com++;
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                    HTS_PANIC_PRINTF(
+                        "Option warc-max-size needs a blank space and a size");
+                    htsmain_free();
+                    return -1;
+                  }
+                  na++;
+                  { // reject non-numeric/negative/overflow; keep default 0
+                    // (single file)
+                    char *end;
+                    LLint v;
+                    errno = 0;
+                    v = strtoll(argv[na], &end, 10);
+                    if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
+                        errno != ERANGE)
+                      opt->warc_max_size = v;
+                  }
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }

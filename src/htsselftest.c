@@ -3381,14 +3381,14 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      a_body, sizeof(a_body) - 1, NULL, 200, 0);
+      a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
 
   /* 302 redirect: header-only, no body. */
   warc_write_transaction(
       w, "http://test.local/r", "127.0.0.1",
       "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
-      0, NULL, 302, 0);
+      0, NULL, 302, 0, 0);
 
   /* 200 binary, chunked coding on the wire (already de-chunked here). */
   warc_write_transaction(
@@ -3396,7 +3396,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
       "Transfer-Encoding: chunked\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
 
   /* 200 with a body shorter than the declared Content-Length (rewritten). */
   warc_write_transaction(
@@ -3404,20 +3404,20 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
       "100\r\n\r\n",
-      "short", 5, NULL, 200, 0);
+      "short", 5, NULL, 200, 0, 0);
 
   /* Same payload as a.html at a new URL: identical-payload-digest revisit
      (OpenSSL builds only; a plain build writes a second full response). */
   warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
                          "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         a_body, sizeof(a_body) - 1, NULL, 200, 0);
+                         a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
 
   /* 304 revisit with an EMPTY response-header block: the block is just the
      2-byte separator, so declared Content-Length must be exactly 2 (F3). */
   warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
                          "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
-                         NULL, 0, NULL, 304, 1);
+                         NULL, 0, NULL, 304, 1, 0);
 
   warc_close(w);
 
@@ -3531,6 +3531,228 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 
   printf("warc: %d records (%d response, %d request, %d revisit): %s\n", nrec,
          nresp, nreq, nrevisit, err ? "FAIL" : "OK");
+  return err;
+}
+
+/* Parse a record's header/block split; sets *hdr_len and *block_len, returns 0
+   when Content-Length matches the actual block bytes, -1 otherwise. */
+static int warc_rec_split(const unsigned char *rec, size_t rlen,
+                          size_t *hdr_len, long long *block_len) {
+  const char *sep = warc_memstr((const char *) rec, "\r\n\r\n", rlen, 4);
+  const char *cl;
+  *block_len = 0;
+  if (sep == NULL)
+    return -1;
+  *hdr_len = (size_t) ((const unsigned char *) sep - rec) + 4;
+  cl = warc_memstr((const char *) rec, "Content-Length:", *hdr_len, 15);
+  if (cl == NULL || sscanf(cl + 15, "%lld", block_len) != 1 ||
+      *hdr_len + (size_t) *block_len + 4 != rlen)
+    return -1;
+  return 0;
+}
+
+/* A cap-truncated body is still archived, tagged WARC-Truncated (v1.1). Assert
+   the sole response carries "WARC-Truncated: length" and every record parses.
+ */
+static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *data;
+  size_t data_len = 0;
+  const unsigned char *p, *end;
+  int err = 0, found_trunc = 0, nresp = 0;
+  static const char body[] = "partial body bytes\n";
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-trunc: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(path, sizeof(path), argv[0], "warc-trunc.warc.gz");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  warc_write_transaction(
+      w, "http://test.local/big.bin", "127.0.0.1",
+      "GET /big.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n", body,
+      sizeof(body) - 1, NULL, 200, 0, WARC_TRUNC_LENGTH);
+  warc_close(w);
+
+  data = warc_slurp(path, &data_len);
+  assertf(data != NULL);
+  p = data;
+  end = data + data_len;
+  while (p < end) {
+    size_t rlen = 0, hdr_len = 0;
+    long long block_len = 0;
+    unsigned char *rec = warc_next_member(&p, end, &rlen);
+    if (rec == NULL) {
+      if (rlen != 0)
+        err = 1;
+      break;
+    }
+    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
+      err = 1;
+    else if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) !=
+             NULL) {
+      nresp++;
+      if (warc_memstr((char *) rec, "WARC-Truncated: length", hdr_len, 22) !=
+          NULL)
+        found_trunc = 1;
+    }
+    freet(rec);
+  }
+  freet(data);
+  if (!found_trunc || nresp != 1)
+    err = 1;
+  printf("warc-trunc: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* An ftp:// capture is ONE resource record: WARC-Type: resource, the payload's
+   own Content-Type, block == payload, and no request/response pair. */
+static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *data;
+  size_t data_len = 0;
+  const unsigned char *p, *end;
+  int err = 0, nresource = 0, nresp = 0, nreq = 0;
+  static const char body[] = "\x00\x01"
+                             "FTP payload"
+                             "\x02\x03";
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-ftp: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(path, sizeof(path), argv[0], "warc-ftp.warc.gz");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  warc_write_resource(w, "ftp://ftp.local/file.bin", "127.0.0.1",
+                      "application/octet-stream", body, sizeof(body) - 1, NULL,
+                      0);
+  warc_close(w);
+
+  data = warc_slurp(path, &data_len);
+  assertf(data != NULL);
+  p = data;
+  end = data + data_len;
+  while (p < end) {
+    size_t rlen = 0, hdr_len = 0;
+    long long block_len = 0;
+    unsigned char *rec = warc_next_member(&p, end, &rlen);
+    if (rec == NULL) {
+      if (rlen != 0)
+        err = 1;
+      break;
+    }
+    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
+      err = 1;
+    if (warc_memstr((char *) rec, "WARC-Type: resource", hdr_len, 19) != NULL) {
+      nresource++;
+      if ((size_t) block_len != sizeof(body) - 1 ||
+          memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0)
+        err = 1; /* block is the raw payload, no HTTP envelope */
+      if (warc_memstr((char *) rec, "WARC-Target-URI: ftp://ftp.local/file.bin",
+                      hdr_len, 41) == NULL ||
+          warc_memstr((char *) rec, "Content-Type: application/octet-stream",
+                      hdr_len, 38) == NULL)
+        err = 1;
+    }
+    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL)
+      nresp++;
+    if (warc_memstr((char *) rec, "WARC-Type: request", hdr_len, 18) != NULL)
+      nreq++;
+    freet(rec);
+  }
+  freet(data);
+  if (nresource != 1 || nresp != 0 || nreq != 0)
+    err = 1;
+  printf("warc-ftp: resource=%d response=%d request=%d: %s\n", nresource, nresp,
+         nreq, err ? "FAIL" : "OK");
+  return err;
+}
+
+/* --warc-max-size rotates into <base>-00000.warc.gz, -00001, ...; each segment
+   is independently valid and begins with its own warcinfo. */
+static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  char seg[HTS_URLMAXSIZE];
+  warc_writer *w;
+  LLint saved_max;
+  unsigned char body[600];
+  unsigned int rng = 0x12345678u;
+  int err = 0, nseg = 0, i;
+  size_t j;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-rotate: needs a writable directory\n");
+    return 1;
+  }
+  for (j = 0; j < sizeof(body);
+       j++) { /* incompressible: gzip can't shrink it */
+    rng ^= rng << 13;
+    rng ^= rng >> 17;
+    rng ^= rng << 5;
+    body[j] = (unsigned char) (rng >> 24);
+  }
+  fconcat(path, sizeof(path), argv[0], "warc-rot.warc.gz");
+  saved_max = opt->warc_max_size;
+  opt->warc_max_size =
+      1000; /* a couple records per segment => several segments */
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  for (i = 0; i < 8; i++) {
+    char uri[64];
+    snprintf(uri, sizeof(uri), "http://test.local/f%d.bin", i);
+    warc_write_transaction(
+        w, uri, "127.0.0.1", "GET / HTTP/1.1\r\nHost: test.local\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
+        (const char *) body, sizeof(body), NULL, 200, 0, 0);
+  }
+  warc_close(w);
+  opt->warc_max_size = saved_max;
+
+  for (i = 0;; i++) {
+    char fname[64];
+    unsigned char *data;
+    size_t data_len = 0;
+    const unsigned char *p, *pend;
+    int first = 1;
+    snprintf(fname, sizeof(fname), "warc-rot-%05d.warc.gz", i);
+    fconcat(seg, sizeof(seg), argv[0], fname);
+    data = warc_slurp(seg, &data_len);
+    if (data == NULL)
+      break; /* past the last segment */
+    nseg++;
+    p = data;
+    pend = data + data_len;
+    while (p < pend) {
+      size_t rlen = 0, hdr_len = 0;
+      long long block_len = 0;
+      unsigned char *rec = warc_next_member(&p, pend, &rlen);
+      if (rec == NULL) {
+        if (rlen != 0)
+          err = 1;
+        break;
+      }
+      if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
+        err = 1;
+      if (first) { /* each segment leads with its own warcinfo */
+        if (warc_memstr((char *) rec, "WARC-Type: warcinfo", hdr_len, 19) ==
+            NULL)
+          err = 1;
+        first = 0;
+      }
+      freet(rec);
+    }
+    freet(data);
+    if (first) /* empty segment */
+      err = 1;
+  }
+  if (nseg < 2)
+    err = 1;
+  printf("warc-rotate: %d segments: %s\n", nseg, err ? "FAIL" : "OK");
   return err;
 }
 
@@ -3655,6 +3877,12 @@ static const struct selftest_entry {
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
     {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
      st_warc},
+    {"warc-trunc", "<dir>", "WARC-Truncated on a cap-truncated body",
+     st_warc_trunc},
+    {"warc-ftp", "<dir>", "ftp resource record (no HTTP envelope)",
+     st_warc_ftp},
+    {"warc-rotate", "<dir>", "--warc-max-size segment rotation",
+     st_warc_rotate},
 };
 
 static void list_selftests(void) {

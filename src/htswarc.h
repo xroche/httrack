@@ -45,6 +45,16 @@ extern "C" {
    under the project's output directory at open time. */
 #define WARC_AUTONAME "\001auto"
 
+/* htsblk.warc_truncated / WARC-Truncated reason tokens (ISO 28500 sec 5.13).
+   A cap-truncated body is still archived, tagged with why it was cut short. */
+#define WARC_TRUNC_NONE 0
+#define WARC_TRUNC_LENGTH 1     /* hit a size cap (-M mirror / -m per-file) */
+#define WARC_TRUNC_TIME 2       /* hit the mirror time cap (-E/--max-time) */
+#define WARC_TRUNC_DISCONNECT 3 /* connection dropped mid-body */
+
+/* WARC-Truncated token for a warc_truncated code, or NULL for none. */
+const char *warc_truncated_reason(int code);
+
 typedef struct warc_writer warc_writer;
 
 /* Stash the raw request header block (bstr.buffer) on r for the later WARC
@@ -84,12 +94,22 @@ void warc_close(warc_writer *w);
    body/body_len: decoded in-memory body, or NULL when on disk.
    body_path:   file re-read for the body when body==NULL (may be NULL).
    is_update_unchanged: nonzero for a 304 server-not-modified revisit.
+   truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
    Returns 0 on success, -1 on error. */
 int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
-                           int statuscode, int is_update_unchanged);
+                           int statuscode, int is_update_unchanged,
+                           int truncated);
+
+/* Write one non-HTTP capture as a single WARC 'resource' record: the block is
+   the raw payload (no HTTP envelope), Content-Type is the payload's own MIME.
+   Used for ftp:// transfers. truncated is a WARC_TRUNC_* reason or 0.
+   Returns 0 on success, -1 on error. */
+int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
+                        const char *content_type, const char *body,
+                        size_t body_len, const char *body_path, int truncated);
 
 #ifdef __cplusplus
 }
