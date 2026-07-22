@@ -316,7 +316,8 @@ static void escape_url_parens(char *const s, const size_t size) {
 }
 
 /* Default port for lien's scheme (case-insensitive); 80 when absent or
-   unrecognized, matching the historical http assumption. */
+   unrecognized, matching the historical http assumption. Schemeless and
+   protocol-relative links (//host) thus default to 80 (known limitation). */
 static int scheme_default_port(const char *lien) {
   if (strfield(lien, "https:"))
     return 443;

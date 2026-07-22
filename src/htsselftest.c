@@ -1610,7 +1610,8 @@ static int st_stripport(httrackp *opt, int argc, char **argv) {
       {"http://127.0.0.1/x", "http://127.0.0.1/x"},
       {"https://127.0.0.1:443/x", "https://127.0.0.1/x"},
       {"https://127.0.0.1:80/x", "https://127.0.0.1:80/x"},
-      {"https://127.0.0.1:8443/x", "https://127.0.0.1:8443/x"},
+      // Scheme match is case-insensitive: HTTPS' default is 443, so :80 stays.
+      {"HTTPS://127.0.0.1:80/x", "HTTPS://127.0.0.1:80/x"},
       {"ftp://127.0.0.1:21/x", "ftp://127.0.0.1/x"},
       {"ftp://127.0.0.1:80/x", "ftp://127.0.0.1:80/x"},
       {"http://127.0.0.1:443/x", "http://127.0.0.1:443/x"},
