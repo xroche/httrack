@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 // Fichier librairie .c
 
 #include "htscore.h"
-#include "warc.h"
+#include "htswarc.h"
 
 /* specific definitions */
 #include "htsbase.h"

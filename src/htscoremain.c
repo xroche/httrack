@@ -40,7 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsdefines.h"
 #include "htsalias.h"
-#include "warc.h"
+#include "htswarc.h"
 #include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"

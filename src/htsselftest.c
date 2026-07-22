@@ -57,7 +57,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
-#include "warc.h"
+#include "htswarc.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif

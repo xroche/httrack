@@ -39,7 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 /* File defs */
 #include "htscore.h"
-#include "warc.h"
+#include "htswarc.h"
 
 /* specific definitions */
 #include "htsbase.h"

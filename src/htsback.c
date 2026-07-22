@@ -37,7 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsnet.h"
 #include "htscore.h"
-#include "warc.h"
+#include "htswarc.h"
 #include "htsthread.h"
 #include <time.h>
 /* END specific definitions */

@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_INTERNAL_BYTECODE
 
-#include "warc.h"
+#include "htswarc.h"
 
 #include "htscore.h"
 #include "htslib.h"
