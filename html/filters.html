@@ -111,7 +111,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     starts links, the default mode is to mirror these links - i.e. if one of your start page is
     www.example.com/test/index.html, all links starting with www.example.com/test/ will be
     accepted. But links directly in www.example.com/.. will not be accepted, however, because
-    they are in a higher strcuture. This prevent HTTrack from mirroring the whole site. (All
+    they are in a higher structure. This prevent HTTrack from mirroring the whole site. (All
     files in structure levels equal or lower than the primary links will be retrieved.)<br>
     </i>
     <br>
@@ -127,12 +127,14 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     an authorization filter, like <b><tt>+*.gif</tt></b>. The pattern is a plus (this one: <b><tt>+</tt></b>),
     followed by a pattern composed of letters and wildcards (this one: <b><tt>*</tt></b>). 
     <br><br>
-    To forbide a family of links, define
+    To forbid a family of links, define
     an authorization filter, like <b><tt>-*.gif</tt></b>. The pattern is a dash (this one: <b><tt>-</tt></b>),
     followed by a the same kind of pattern as for the authorization filter.
     <br><br>
     Example: +*.gif will accept all files finished by .gif<br>
     Example: -*.gif will refuse all files finished by .gif<br>
+    <br>
+    To see which rule accepted or blocked a given URL, run HTTrack with the <b><tt>--why</tt></b> (<b><tt>-%Y</tt></b>) option, described in <a href="httrack.man.html#OPTIONS">the manual page</a>.<br>
     <br>
     
 <p>    
@@ -143,7 +145,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     size to ensure that you won't reach a defined limit.
     
     Example: You may want to accept all files on the domain www.example.com, using '+www.example.com/*', 
-    including gif files inside this domain and outside (eternal images), but not take to large images, 
+    including gif files inside this domain and outside (external images), but not take to large images, 
     or too small ones (thumbnails)<br>
     Excluding gif images smaller than 5KB and images larger than 100KB is therefore a good option;
     +www.example.com +*.gif -*.gif*[<5] -*.gif*[>100] 
