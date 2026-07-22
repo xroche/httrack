@@ -1617,14 +1617,15 @@ int back_add_if_not_exists(struct_back * sback, httrackp * opt,
   back_clean(opt, cache, sback);        /* first cleanup the backlog to ensure that we have some entry left */
   if (!back_exist(sback, opt, adr, fil, save)) {
     return back_add(sback, opt, cache, adr, fil, save, referer_adr, referer_fil,
-                    test);
+                    test, 0);
   }
   return 0;
 }
 
-int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char *adr,
-             const char *fil, const char *save, const char *referer_adr, const char *referer_fil,
-             int test) {
+int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
+             const char *adr, const char *fil, const char *save,
+             const char *referer_adr, const char *referer_fil, int test,
+             int refetch_whole) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int p = 0;
@@ -1700,6 +1701,12 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
       back[p].head_request = 1;
     else if (strcmp(back[p].url_sav, BACK_ADD_TEST2) == 0)      // test en GET
       back[p].head_request = 2; // test en get
+
+    /* Forced whole refetch (#581): drop the stale temp-ref and skip the resume
+       branches below, so a surviving partial can't Range-loop. */
+    if (refetch_whole) {
+      url_savename_refname_remove(opt, adr, fil);
+    }
 
     /* Stop requested - abort backing */
     /* For update mode: second check after cache lookup not to lose all previous cache data ! */
@@ -1956,8 +1963,9 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
         }
       }
       /* Not in cache ; maybe in temporary cache ? Warning: non-movable
-         "url_sav" */
-      else if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
+         "url_sav" (skipped on a forced whole refetch, #581) */
+      else if (!refetch_whole &&
+               back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
         const LLint file_size = fsize_utf8(itemback->url_sav);
 
         /* Found file on disk */
@@ -1991,8 +1999,9 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
         freet(itemback);        /* delete item */
         itemback = NULL;
       }
-      /* Not in cache or temporary cache ; found on disk ? (hack) */
-      else if (fexist_utf8(save)) {
+      /* Not in cache or temporary cache ; found on disk ? (hack)
+         (skipped on a forced whole refetch, #581) */
+      else if (!refetch_whole && fexist_utf8(save)) {
         const LLint sz = fsize_utf8(save);
 
         // Bon, là il est possible que le fichier ait été partiellement transféré
@@ -3847,6 +3856,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     deletehttp(&back[i].r);
                     back[i].r.soc = INVALID_SOCKET;
                     back[i].r.statuscode = STATUSCODE_NON_FATAL;
+                    back[i].r.refetch_wholefile =
+                        1; // retry whole, no Range (#581)
                     strcpybuff(back[i].r.msg,
                                "Bogus 304 on resume, restarting");
                     back[i].status = STATUS_READY;
@@ -4118,6 +4129,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         }
                         back[i].r.soc = INVALID_SOCKET;
                         back[i].r.statuscode = STATUSCODE_NON_FATAL;
+                        // the resume was rejected: the retry must GET the whole
+                        // file, never re-Range a surviving partial/ref (#581)
+                        back[i].r.refetch_wholefile = 1;
                         if (strnotempty(back[i].r.msg))
                           strcpybuff(back[i].r.msg,
                                      "Error attempting to solve status 206 (partial file)");

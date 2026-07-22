@@ -3746,6 +3746,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             heap_top()->retry = heap(ptr)->retry - 1;     // moins 1 retry!
             heap_top()->premier = heap(ptr)->premier;
             heap_top()->precedent = heap(ptr)->precedent;
+            // a rejected resume (unusable 206) must refetch whole, no Range
+            // (#581)
+            heap_top()->refetch_whole = r->refetch_wholefile;
           } else {              // oups erreur, plus de mémoire!!
             return 0;
           }
@@ -3977,18 +3980,17 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 #if BDEBUG==1
     printf("crash backing: %s%s\n", heap(ptr)->adr, heap(ptr)->fil);
 #endif
-    if (back_add
-        (sback, opt, cache, urladr(), urlfil(), savename(),
-         heap(heap(ptr)->precedent)->adr, heap(heap(ptr)->precedent)->fil,
-         heap(ptr)->testmode) == -1) {
+    if (back_add(sback, opt, cache, urladr(), urlfil(), savename(),
+                 heap(heap(ptr)->precedent)->adr,
+                 heap(heap(ptr)->precedent)->fil, heap(ptr)->testmode,
+                 heap(ptr)->refetch_whole) == -1) {
       printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
              __LINE__);
 #if BDEBUG==1
       printf("error while crash adding\n");
 #endif
-      hts_log_print(opt, LOG_ERROR, "Unexpected backing error for %s%s", urladr(),
-                    urlfil());
-
+      hts_log_print(opt, LOG_ERROR, "Unexpected backing error for %s%s",
+                    urladr(), urlfil());
     }
   }
 #if BDEBUG==1
