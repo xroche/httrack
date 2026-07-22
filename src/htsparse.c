@@ -315,9 +315,18 @@ static void escape_url_parens(char *const s, const size_t size) {
   strlcpybuff(s, buff, size);
 }
 
-/* Strip a default ":80" from lien's authority in place. Any spelling that
-   range-parses to 80 (":80", ":080") is dropped by its matched length, not a
-   hardcoded 3 chars; a value that merely wraps to 80 as an int (#614) stays. */
+/* Default port for lien's scheme (case-insensitive), 80 if absent/unknown; so
+   schemeless and protocol-relative //host links default to 80 (known gap). */
+static int scheme_default_port(const char *lien) {
+  if (strfield(lien, "https:"))
+    return 443;
+  if (strfield(lien, "ftp:"))
+    return 21;
+  return 80;
+}
+
+/* Strip the scheme's own default port (80 http, 443 https, 21 ftp) from lien's
+   authority in place; :80 on https/ftp stays as a real port (#638, #614). */
 void hts_strip_default_port(char *lien, size_t size) {
   char *a;
 
@@ -339,7 +348,8 @@ void hts_strip_default_port(char *lien, size_t size) {
       b++;
     saved = *b;
     *b = '\0';
-    is_default = hts_parse_url_port(a + 1, &port) && port == 80;
+    is_default =
+        hts_parse_url_port(a + 1, &port) && port == scheme_default_port(lien);
     *b = saved;
     if (is_default) { // default port, strip it
       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
