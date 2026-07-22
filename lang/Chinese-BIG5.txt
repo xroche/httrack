@@ -956,3 +956,11 @@ Strip query keys:
 移除查詢鍵:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 以逗號分隔的查詢鍵，將其從儲存檔案的命名中移除 (例如 sid,utm_source)。
+Write a WARC archive of the crawl
+寫入此次抓取的 WARC 封存檔
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+同時將每個已擷取的回應儲存為 ISO-28500 WARC/1.1 封存檔，置於鏡像網站旁。
+WARC archive name:
+WARC 封存檔名稱：
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+WARC 封存檔的選用基本名稱；留空則於輸出目錄中自動命名。

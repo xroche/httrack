@@ -958,3 +958,11 @@ Strip query keys:
 Ukloniti kljuèeve upita:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Zarezom odvojeni kljuèevi upita koji se izostavljaju iz naziva spremljenih datoteka (npr. sid,utm_source).
+Write a WARC archive of the crawl
+Zapi¹i WARC arhivu obilaska
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Spremi i svaki preuzeti odgovor u ISO-28500 WARC/1.1 arhivu, uz zrcalo.
+WARC archive name:
+Naziv WARC arhive:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Neobavezni osnovni naziv WARC arhive; ostavite prazno za automatsko imenovanje u izlaznom direktoriju.

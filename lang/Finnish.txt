@@ -958,3 +958,11 @@ Strip query keys:
 Poista kyselyavaimet:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Pilkuin erotellut kyselyavaimet, jotka jätetään pois tallennettujen tiedostojen nimeämisestä (esim. sid,utm_source).
+Write a WARC archive of the crawl
+Kirjoita imuroinnin WARC-arkisto
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Tallenna myös jokainen noudettu vastaus ISO-28500 WARC/1.1 -arkistoon peilin viereen.
+WARC archive name:
+WARC-arkiston nimi:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Valinnainen WARC-arkiston perusnimi; jätä tyhjäksi, jotta se nimetään automaattisesti tulostehakemistoon.

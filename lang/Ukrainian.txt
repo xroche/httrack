@@ -956,3 +956,11 @@ Strip query keys:
 Вилучати ключі запиту:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Ключі запиту через кому, які вилучаються з імені збереженого файлу (наприклад, sid,utm_source).
+Write a WARC archive of the crawl
+Записати WARC-архів обходу
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Зберігати кожну завантажену відповідь також у архів WARC/1.1 ISO-28500 поряд із дзеркалом.
+WARC archive name:
+Ім'я WARC-архіву:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Необов'язкова базова назва WARC-архіву; залиште порожнім для автоматичного найменування у вихідному каталозі.

@@ -958,3 +958,11 @@ Strip query keys:
 Αφαίρεση κλειδιών ερωτήματος:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Κλειδιά ερωτήματος χωρισμένα με κόμμα, που θα αφαιρεθούν από την ονομασία των αποθηκευμένων αρχείων (π.χ. sid,utm_source).
+Write a WARC archive of the crawl
+Εγγραφή αρχείου WARC της ανίχνευσης
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Αποθήκευση κάθε ληφθείσας απόκρισης και σε αρχείο WARC/1.1 ISO-28500, δίπλα στο είδωλο.
+WARC archive name:
+Όνομα αρχείου WARC:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Προαιρετικό βασικό όνομα για το αρχείο WARC. Αφήστε το κενό για αυτόματη ονομασία στον κατάλογο εξόδου.
