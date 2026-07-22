@@ -1004,3 +1004,11 @@ Strip query keys:
 Strip query keys:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Write a WARC archive of the crawl
+Write a WARC archive of the crawl
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+WARC archive name:
+WARC archive name:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
