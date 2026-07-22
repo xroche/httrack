@@ -1815,7 +1815,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   na++;
-                  sscanf(argv[na], LLintP, &opt->warc_max_size);
+                  { // reject non-numeric/negative/overflow; keep default 0
+                    // (single file)
+                    char *end;
+                    LLint v;
+                    errno = 0;
+                    v = strtoll(argv[na], &end, 10);
+                    if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
+                        errno != ERANGE)
+                      opt->warc_max_size = v;
+                  }
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }
