@@ -90,18 +90,19 @@ offline browser : copy websites to a local directory</p>
 ] [ <b>-NN, --structure[=N]</b> ] [ <b>-%N,
 --delayed-type-check</b> ] [ <b>-%D,
 --cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
-] [ <b>-LN, --long-names[=N]</b> ] [ <b>-KN,
---keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
-<b>-%x, --disable-passwords</b> ] [ <b>-%q,
---include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [
-<b>-o, --generate-errors</b> ] [ <b>-X, --purge-old[=N]</b>
-] [ <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion</b>
-] [ <b>-bN, --cookies[=N]</b> ] [ <b>-%K, --cookies-file</b>
-] [ <b>-%Y, --why</b> ] [ <b>-u, --check-type[=N]</b> ] [
-<b>-j, --parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
-<b>-%h, --http-10</b> ] [ <b>-%k, --keep-alive</b> ] [
-<b>-%z, --disable-compression</b> ] [ <b>-%B, --tolerant</b>
-] [ <b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
+] [ <b>-%r, --warc</b> ] [ <b>-LN, --long-names[=N]</b> ] [
+<b>-KN, --keep-links[=N]</b> ] [ <b>-x,
+--replace-external</b> ] [ <b>-%x, --disable-passwords</b> ]
+[ <b>-%q, --include-query-string</b> ] [ <b>-%g,
+--strip-query</b> ] [ <b>-o, --generate-errors</b> ] [
+<b>-X, --purge-old[=N]</b> ] [ <b>-%p, --preserve</b> ] [
+<b>-%T, --utf8-conversion</b> ] [ <b>-bN, --cookies[=N]</b>
+] [ <b>-%K, --cookies-file</b> ] [ <b>-%Y, --why</b> ] [
+<b>-u, --check-type[=N]</b> ] [ <b>-j, --parse-java[=N]</b>
+] [ <b>-sN, --robots[=N]</b> ] [ <b>-%h, --http-10</b> ] [
+<b>-%k, --keep-alive</b> ] [ <b>-%z,
+--disable-compression</b> ] [ <b>-%B, --tolerant</b> ] [
+<b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
 <b>-%A, --assume</b> ] [ <b>-@iN, --protocol[=N]</b> ] [
 <b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
 <b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
@@ -643,6 +644,18 @@ don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
 
 <p>generate a RFC MIME-encapsulated full-archive (.mht)
 (--mime-html)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%r</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>write an ISO-28500 WARC/1.1 archive; --warc-file NAME
+sets the output name (--warc)</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">

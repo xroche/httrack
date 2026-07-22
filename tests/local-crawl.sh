@@ -47,6 +47,7 @@ key="${testdir}/server.key"
 
 tls=
 verbose=
+warc_validate=
 html_subdir=
 outdir_intl=
 rerun=
@@ -114,6 +115,8 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
+    # validate the produced .warc.gz (see the validation block near the end)
+    --warc-validate) warc_validate=1 ;;
     --no-purge)
         nopurge=1
         audit+=("--no-purge")
@@ -259,6 +262,13 @@ test "$crawlres" -eq 0 || ! result "httrack exited $crawlres" || {
 result "OK"
 grep -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt" >&2
 
+# Snapshot the first-pass WARC before an update pass overwrites it: the fresh
+# crawl carries the full response bodies, the update pass only revisits.
+if test -n "$warc_validate"; then
+    w1=$(find "$mirrorroot" -maxdepth 2 -name '*.warc.gz' 2>/dev/null | sort | tail -n1)
+    test -z "$w1" || cp "$w1" "${tmpdir}/warc-pass1.gz"
+fi
+
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
@@ -349,6 +359,44 @@ for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
 done
 test -n "$hostroot" || die "could not find host root under $out"
 debug "host root: $hostroot"
+
+# --- optional WARC validation (stdlib validator, no warcio) ------------------
+# WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
+# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update.
+if test -n "$warc_validate"; then
+    validator=$(nativepath "${testdir}/warc-validate.py")
+    warc=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz' -o -name '*.warc' \) 2>/dev/null | sort | tail -n1)
+    test -n "$warc" || die "no WARC file produced under $mirrorroot"
+
+    # Fresh-crawl file (snapshot if an update pass overwrote it): full responses.
+    fresh="${tmpdir}/warc-pass1.gz"
+    test -f "$fresh" || fresh="$warc"
+    declare -a bodyargs=()
+    if test -n "${WARC_VALIDATE_BODY:-}"; then
+        bodyargs=(--expect-body-hex "$WARC_VALIDATE_BODY")
+    fi
+    info "validating fresh WARC (response bodies)"
+    "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
+        die "fresh WARC validation failed"
+    result "OK"
+
+    # Final file: after an update pass the unchanged assets must be revisits.
+    if test -n "$rerun"; then
+        declare -a revargs=(--expect-revisit)
+        for sub in ${WARC_VALIDATE_NORESP:-}; do
+            revargs+=(--no-response-for "$sub")
+        done
+        info "validating update WARC (revisits)"
+        "$python" "$validator" "$(nativepath "$warc")" "${revargs[@]}" >&2 ||
+            die "update WARC validation failed"
+        result "OK"
+    fi
+
+    if command -v warcio >/dev/null 2>&1; then
+        info "warcio check (optional)"
+        if warcio check -v "$warc" >&2; then result "OK"; else die "warcio check failed"; fi
+    fi
+fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
 # #483), or the .z/.u content-coding temps (#557).

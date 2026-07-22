@@ -40,6 +40,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%N, \-\-delayed\-type\-check\fR ]
 [ \fB\-%D, \-\-cached\-delayed\-type\-check\fR ]
 [ \fB\-%M, \-\-mime\-html\fR ]
+[ \fB\-%r, \-\-warc\fR ]
 [ \fB\-LN, \-\-long\-names[=N]\fR ]
 [ \fB\-KN, \-\-keep\-links[=N]\fR ]
 [ \fB\-x, \-\-replace\-external\fR ]
@@ -197,6 +198,8 @@ delayed type check, don't make any link test but wait for files download to star
 cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait) (\-\-cached\-delayed\-type\-check)
 .IP \-%M
 generate a RFC MIME\-encapsulated full\-archive (.mht) (\-\-mime\-html)
+.IP \-%r
+write an ISO\-28500 WARC/1.1 archive; \-\-warc\-file NAME sets the output name (\-\-warc)
 .IP \-%t
 keep the original file extension, don't rewrite it from the MIME type (%t0 rewrite)
 .IP \-LN
