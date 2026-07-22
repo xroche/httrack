@@ -859,10 +859,11 @@ static int hts_rename(httrackp * opt, const char *a, const char *b) {
   return RENAME(a, b);
 }
 
-/* minizip callbacks that open through hts_fopen_utf8, so the cache ZIP follows
-   a non-ASCII path_log instead of landing in an ANSI-mangled twin (#630). On
-   POSIX hts_fopen_utf8 is fopen, so this is a no-op off Windows. */
-static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const char *filename,
+/* minizip callback opening through hts_fopen_utf8, so the cache ZIP follows a
+   non-ASCII path_log instead of an ANSI-mangled twin (#630); a no-op off
+   Windows where hts_fopen_utf8 is fopen. 64-bit open/seek (fill_fopen64 +
+   unzOpen2_64) so multi-GB caches don't truncate on Windows LLP64. */
+static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
                                            int mode) {
   const char *mode_fopen = NULL;
 
@@ -875,23 +876,23 @@ static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const char *filename,
     mode_fopen = "wb";
   if (filename == NULL || mode_fopen == NULL)
     return NULL;
-  return (voidpf) FOPEN(filename, mode_fopen);
+  return (voidpf) FOPEN((const char *) filename, mode_fopen);
 }
 
 static unzFile hts_unzOpen_utf8(const char *path) {
-  zlib_filefunc_def ff;
+  zlib_filefunc64_def ff;
 
-  fill_fopen_filefunc(&ff);
-  ff.zopen_file = hts_zip_fopen_utf8;
-  return unzOpen2(path, &ff);
+  fill_fopen64_filefunc(&ff);
+  ff.zopen64_file = hts_zip_fopen_utf8;
+  return unzOpen2_64(path, &ff);
 }
 
 static zipFile hts_zipOpen_utf8(const char *path, int append) {
-  zlib_filefunc_def ff;
+  zlib_filefunc64_def ff;
 
-  fill_fopen_filefunc(&ff);
-  ff.zopen_file = hts_zip_fopen_utf8;
-  return zipOpen2(path, append, NULL, &ff);
+  fill_fopen64_filefunc(&ff);
+  ff.zopen64_file = hts_zip_fopen_utf8;
+  return zipOpen2_64(path, append, NULL, &ff);
 }
 
 /* Pathname of a file inside the mirror dir (rotating concat buffer). */
@@ -975,8 +976,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
     printf("cache init: ");
 #endif
     if (!cache->ro) {
+#ifdef _WIN32
+      /* Windows mkdir takes no mode; use the UTF-8 wrapper for #630. */
       MKDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                     StringBuff(opt->path_log), "hts-cache"));
+#else
+      /* keep the cache dir 0700, not MKDIR's 0755. */
+      mkdir(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache"),
+            HTS_PROTECT_FOLDER);
+#endif
       if ((fexist_utf8(fconcat(
               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
               StringBuff(opt->path_log),
