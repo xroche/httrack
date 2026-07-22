@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# SURT canonicalization of the CDXJ sort key (--warc-cdx). Pure string work,
+# so it runs under the MSan-instrumented 01_engine glob.
+httrack -O /dev/null -#test=warc-surt | grep -q "warc-surt: OK"

@@ -1825,6 +1825,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         errno != ERANGE)
                       opt->warc_max_size = v;
                   }
+                } else if (*(com + 1) == 'c') { // --warc-cdx: sorted CDXJ index
+                  com++;
+                  opt->warc_cdx = 1;
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }
