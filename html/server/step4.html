@@ -187,6 +187,8 @@ ${do:end-if}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
+	${test:warc:--warc}
+	${test:warcfile:--warc-file "}${html:warcfile}${test:warcfile:"}
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}
@@ -237,6 +239,8 @@ KeepSlashes=${ztest:keepslashes:0:1}
 KeepQueryOrder=${ztest:keepqueryorder:0:1}
 StripQuery=${stripquery}
 StoreAllInCache=${ztest:cache2:0:1}
+Warc=${ztest:warc:0:1}
+WarcFile=${warcfile}
 LogType=${logtype}
 UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
 ProxyType=${proxytype}

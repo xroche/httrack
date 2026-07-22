@@ -1004,3 +1004,11 @@ Strip query keys:
 Supprimer les clés de query string :
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Clés de query string à retirer du nommage des fichiers enregistrés, séparées par des virgules (par ex. sid,utm_source).
+Write a WARC archive of the crawl
+Écrire une archive WARC du crawl
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Enregistrer aussi chaque réponse téléchargée dans une archive WARC/1.1 (ISO-28500), à côté du miroir.
+WARC archive name:
+Nom de l'archive WARC :
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Nom de base optionnel pour l'archive WARC ; laissez vide pour le générer automatiquement dans le répertoire de sortie.

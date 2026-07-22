@@ -1004,3 +1004,11 @@ Strip query keys:
 Fjern forespørgselsnøgler:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Kommaseparerede forespørgselsnøgler, der udelades i navngivningen af gemte filer (f.eks. sid,utm_source).
+Write a WARC archive of the crawl
+Skriv et WARC-arkiv af gennemsøgningen
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Gem også hvert hentet svar i et ISO-28500 WARC/1.1-arkiv ved siden af spejlet.
+WARC archive name:
+Navn på WARC-arkiv:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Valgfrit basisnavn til WARC-arkivet; lad feltet stå tomt for automatisk navngivning i outputmappen.

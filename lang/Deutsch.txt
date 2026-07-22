@@ -956,3 +956,11 @@ Strip query keys:
 Query-Schlüssel entfernen:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Kommagetrennte Query-Schlüssel, die bei der Benennung gespeicherter Dateien entfallen (z. B. sid,utm_source).
+Write a WARC archive of the crawl
+WARC-Archiv des Crawls schreiben
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Jede heruntergeladene Antwort zusätzlich in einem ISO-28500-WARC/1.1-Archiv neben dem Spiegel speichern.
+WARC archive name:
+Name des WARC-Archivs:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Optionaler Basisname für das WARC-Archiv; leer lassen, um es automatisch im Ausgabeverzeichnis zu benennen.

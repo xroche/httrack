@@ -956,3 +956,11 @@ Strip query keys:
 Remover chaves da query string:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Chaves da query string, separadas por vírgulas, a remover da nomeação dos ficheiros guardados (por ex. sid,utm_source).
+Write a WARC archive of the crawl
+Escrever um arquivo WARC do rastreio
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Guardar também cada resposta transferida num arquivo WARC/1.1 ISO-28500, ao lado do espelho.
+WARC archive name:
+Nome do arquivo WARC:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Nome base opcional para o arquivo WARC; deixe em branco para o nomear automaticamente no diretório de saída.

@@ -103,6 +103,17 @@ ${do:end-if}
 > ${LANG_I61}
 <br><br>
 
+<input type="checkbox" name="warc" ${checked:warc}
+			title='${html:LANG_WARCTIP}' onMouseOver="info('${html:LANG_WARCTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_WARC}
+<br><br>
+
+${LANG_WARCFILE}
+<input name="warcfile" value="${warcfile}" size="40"
+			title='${html:LANG_WARCFILETIP}' onMouseOver="info('${html:LANG_WARCFILETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<br><br>
+
 <input type="checkbox" name="norecatch" ${checked:norecatch}
 			title='${html:LANG_I5b}' onMouseOver="info('${html:LANG_I5b}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I34b}

@@ -956,3 +956,11 @@ Strip query keys:
 Sorgu anahtarlarýný çýkar:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Kaydedilen dosya adlandýrmasýndan çýkarýlacak, virgülle ayrýlmýþ sorgu anahtarlarý (örn. sid,utm_source).
+Write a WARC archive of the crawl
+Taramanýn WARC arþivini yaz
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Ýndirilen her yanýtý ayrýca aynanýn yanýna bir ISO-28500 WARC/1.1 arþivine kaydet.
+WARC archive name:
+WARC arþivi adý:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+WARC arþivi için isteðe baðlý temel ad; çýktý dizininde otomatik adlandýrma için boþ býrakýn.
