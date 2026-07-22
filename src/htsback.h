@@ -88,7 +88,7 @@ int back_nsoc_overall(const struct_back * sback);
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
              const char *adr, const char *fil, const char *save,
              const char *referer_adr, const char *referer_fil, int test,
-             int refetch_whole);
+             hts_boolean refetch_whole);
 int back_add_if_not_exists(struct_back * sback, httrackp * opt,
                            cache_back * cache, const char *adr, const char *fil, const char *save,
                            const char *referer_adr, const char *referer_fil, int test);

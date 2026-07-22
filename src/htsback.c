@@ -1617,7 +1617,7 @@ int back_add_if_not_exists(struct_back * sback, httrackp * opt,
   back_clean(opt, cache, sback);        /* first cleanup the backlog to ensure that we have some entry left */
   if (!back_exist(sback, opt, adr, fil, save)) {
     return back_add(sback, opt, cache, adr, fil, save, referer_adr, referer_fil,
-                    test, 0);
+                    test, HTS_FALSE);
   }
   return 0;
 }
@@ -1625,7 +1625,7 @@ int back_add_if_not_exists(struct_back * sback, httrackp * opt,
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
              const char *adr, const char *fil, const char *save,
              const char *referer_adr, const char *referer_fil, int test,
-             int refetch_whole) {
+             hts_boolean refetch_whole) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int p = 0;
@@ -3857,7 +3857,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     back[i].r.soc = INVALID_SOCKET;
                     back[i].r.statuscode = STATUSCODE_NON_FATAL;
                     back[i].r.refetch_wholefile =
-                        1; // retry whole, no Range (#581)
+                        HTS_TRUE; // retry whole, no Range (#581)
                     strcpybuff(back[i].r.msg,
                                "Bogus 304 on resume, restarting");
                     back[i].status = STATUS_READY;
@@ -4131,7 +4131,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         back[i].r.statuscode = STATUSCODE_NON_FATAL;
                         // the resume was rejected: the retry must GET the whole
                         // file, never re-Range a surviving partial/ref (#581)
-                        back[i].r.refetch_wholefile = 1;
+                        back[i].r.refetch_wholefile = HTS_TRUE;
                         if (strnotempty(back[i].r.msg))
                           strcpybuff(back[i].r.msg,
                                      "Error attempting to solve status 206 (partial file)");

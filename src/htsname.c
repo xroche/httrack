@@ -616,7 +616,8 @@ int url_savename(lien_adrfilsave *const afs,
             // ajouter dans le backing le fichier en mode test
             // savename: rien car en mode test
             if (back_add(sback, opt, cache, current.adr, current.fil,
-                         BACK_ADD_TEST, referer_adr, referer_fil, 1, 0) != -1) {
+                         BACK_ADD_TEST, referer_adr, referer_fil, 1,
+                         HTS_FALSE) != -1) {
               int b;
 
               b = back_index(opt, sback, current.adr, current.fil, BACK_ADD_TEST);
@@ -707,7 +708,8 @@ int url_savename(lien_adrfilsave *const afs,
                                   return -1;
                                 if (back_add(sback, opt, cache, moved.adr,
                                              moved.fil, methode, referer_adr,
-                                             referer_fil, 1, 0) != -1) { // OK
+                                             referer_fil, 1,
+                                             HTS_FALSE) != -1) { // OK
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "(during prefetch) %s (%d) to link %s at %s%s",
                                                 back[b].r.msg,
