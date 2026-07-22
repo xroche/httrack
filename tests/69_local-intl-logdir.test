@@ -1,15 +1,17 @@
 #!/bin/bash
 #
 # A single non-ASCII -O sets both path_html and path_log to "café" (#630). The
-# logs (hts-log.txt/hts-err.txt) must land there, not in an ANSI-mangled twin:
-# on Windows path_log holds UTF-8 bytes the raw file calls read as the codepage.
-# The --errors/--files/--log-found audits all grep logroot=café/hts-log.txt, so
-# a log written to the twin fails them. POSIX has no twin, so this bites on the
-# Windows CI leg (like test 64). The cache twin is a separate, larger fix.
+# logs (hts-log.txt/hts-err.txt) and the hts-cache must land there, not in an
+# ANSI-mangled twin: on Windows path_log holds UTF-8 bytes the raw file calls
+# read as the codepage. The --log-found audit greps logroot=café/hts-log.txt and
+# --cache-under-logroot checks café/hts-cache/new.zip, so anything written to the
+# twin fails them. POSIX has no twin, so this bites on the Windows CI leg (test
+# 64), exercising only the code path elsewhere.
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'café' --errors 0 --files 5 \
     --found 'simple/basic.html' \
     --log-found 'mirror complete in' \
+    --cache-under-logroot \
     httrack 'BASEURL/simple/basic.html'

@@ -55,6 +55,9 @@ jobs:
             query-filters:
               - exclude:
                   id: cpp/world-writable-file-creation
+              # Models auth-bypass-by-spoofing; httrack has no auth surface, its +/- crawl filter is a mirror boundary, not a security one.
+              - exclude:
+                  id: cpp/user-controlled-bypass
 
       # Manual build: CodeQL traces the compiler, so build exactly what ships.
       - name: Build
