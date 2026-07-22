@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 
 struct warc_writer {
   FILE *f;
+  httrackp *opt;   /* kept for close-time logging (warc_wacz_package) */
   int gz;          /* 1: one gzip member per record; 0: raw */
   uint64_t offset; /* running byte offset (member starts, for a future index) */
   uint64_t counter; /* monotonic record counter */
@@ -979,10 +980,21 @@ static zipFile wacz_zip_open(const char *path) {
   return zipOpen2_64(path, 0 /*create*/, NULL, &ff);
 }
 
+/* Move src onto dst (UTF-8/Windows-safe); RENAME won't clobber on Windows, so
+   fall back to unlink+rename. Returns 0 on success. */
+static int wacz_rename_over(const char *src, const char *dst) {
+  char cs[CATBUFF_SIZE], cd[CATBUFF_SIZE];
+  if (RENAME(fconv(cs, sizeof(cs), src), fconv(cd, sizeof(cd), dst)) == 0)
+    return 0;
+  (void) UNLINK(fconv(cd, sizeof(cd), dst));
+  return RENAME(fconv(cs, sizeof(cs), src), fconv(cd, sizeof(cd), dst));
+}
+
 /* Package the segment(s) + .cdx + a generated pages.jsonl into <base>.wacz at
    crawl end (the archive file(s) and .cdx are already closed on disk). */
 static void warc_wacz_package(warc_writer *w) {
   char waczpath[HTS_URLMAXSIZE * 2];
+  char tmppath[HTS_URLMAXSIZE * 2];
   char segpath[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
   zipFile zf;
@@ -997,9 +1009,14 @@ static void warc_wacz_package(warc_writer *w) {
   if (w->base_path == NULL || w->cdx_path == NULL)
     return;
   snprintf(waczpath, sizeof(waczpath), "%s.wacz", w->base_path);
-  zf = wacz_zip_open(fconv(catbuff, sizeof(catbuff), waczpath));
-  if (zf == NULL)
+  snprintf(tmppath, sizeof(tmppath), "%s.wacz.tmp", w->base_path);
+  /* Build into a temp; only full success replaces <base>.wacz, so a zero-record
+     re-run can't destroy a good archive (#522). */
+  zf = wacz_zip_open(fconv(catbuff, sizeof(catbuff), tmppath));
+  if (zf == NULL) {
+    hts_log_print(w->opt, LOG_WARNING, "WACZ: could not create %s", tmppath);
     return;
+  }
   memset(&resources, 0, sizeof(resources));
 
   /* archive/<name>.warc.gz for every segment (single file, or 0..seg). */
@@ -1086,8 +1103,16 @@ static void warc_wacz_package(warc_writer *w) {
   wbuf_free(&resources);
 
   zipClose(zf, NULL);
-  if (err)
-    (void) UNLINK(fconv(catbuff, sizeof(catbuff), waczpath));
+  if (err) {
+    (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmppath));
+    hts_log_print(w->opt, LOG_WARNING,
+                  "WACZ: packaging failed, kept existing %s untouched",
+                  waczpath);
+  } else if (wacz_rename_over(tmppath, waczpath) != 0) {
+    (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmppath));
+    hts_log_print(w->opt, LOG_WARNING | LOG_ERRNO,
+                  "WACZ: could not finalize %s", waczpath);
+  }
 }
 #endif
 
@@ -1357,6 +1382,7 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   w = calloct(1, sizeof(*w));
   if (w == NULL)
     return NULL;
+  w->opt = opt;
   plen = strlen(path);
   w->gz = (plen >= 3 && strcasecmp(path + plen - 3, ".gz") == 0);
   w->rng = (uint64_t) time(NULL) ^ ((uint64_t) (uintptr_t) w << 16) ^

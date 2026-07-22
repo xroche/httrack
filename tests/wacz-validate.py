@@ -39,11 +39,19 @@ def main():
         if not ok:
             fail("missing %s (entries: %s)" % (req, names))
 
-    hdr = z.read("pages/pages.jsonl").split(b"\n")[0]
-    if json.loads(hdr).get("format") != "json-pages-1.0":
-        fail("pages.jsonl header is not json-pages-1.0: %r" % hdr)
+    lines = [ln for ln in z.read("pages/pages.jsonl").split(b"\n") if ln.strip()]
+    if not lines or json.loads(lines[0]).get("format") != "json-pages-1.0":
+        fail("pages.jsonl header is not json-pages-1.0: %r" % lines[:1])
+    body = [json.loads(ln) for ln in lines[1:]]
+    if not body:
+        fail("pages.jsonl has no page rows after the header")
+    for row in body:
+        if "url" not in row or "ts" not in row:
+            fail("pages.jsonl row missing url/ts: %r" % row)
 
     dp = json.loads(z.read("datapackage.json"))
+    if dp.get("profile") != "data-package":
+        fail("profile != data-package: %r" % dp.get("profile"))
     if dp.get("wacz_version") != "1.1.1":
         fail("wacz_version != 1.1.1: %r" % dp.get("wacz_version"))
     resources = dp.get("resources", [])

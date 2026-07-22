@@ -3954,7 +3954,7 @@ typedef struct {
    fixed layout, STORE-mode entries, recomputing sha256 digests, the digest
    chain, and the pages.jsonl header. */
 static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
-  char wpath[HTS_URLMAXSIZE], waczpath[HTS_URLMAXSIZE];
+  char wpath[HTS_URLMAXSIZE], waczpath[HTS_URLMAXSIZE], cdxpath[HTS_URLMAXSIZE];
   warc_writer *w;
   hts_boolean saved_cdx, saved_wacz;
   wacz_entry ent[16];
@@ -3962,6 +3962,7 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   unzFile uf;
   const wacz_entry *dp = NULL, *dig = NULL, *pages = NULL;
   int have_archive = 0, have_index = 0, all_store = 1;
+  LLint good_size;
 
   if (argc < 1) {
     fprintf(stderr, "warc-wacz: needs a writable directory\n");
@@ -3969,6 +3970,7 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-wacz.warc.gz");
   fconcat(waczpath, sizeof(waczpath), argv[0], "warc-wacz.wacz");
+  fconcat(cdxpath, sizeof(cdxpath), argv[0], "warc-wacz.cdx");
   saved_cdx = opt->warc_cdx;
   saved_wacz = opt->warc_wacz;
   opt->warc_cdx = 1;
@@ -3986,8 +3988,6 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       "Content-Type: application/octet-stream\r\n\r\n",
       "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
   warc_close(w);
-  opt->warc_cdx = saved_cdx;
-  opt->warc_wacz = saved_wacz;
 
   /* Unzip every member in-process. */
   uf = unzOpen(waczpath);
@@ -4042,11 +4042,22 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       dig == NULL || !all_store)
     err = 1;
 
-  /* pages.jsonl first line is the json-pages-1.0 header. */
-  if (pages != NULL &&
-      (pages->len < 20 ||
-       memcmp(pages->data, "{\"format\": \"json-pages-1.0\"", 27) != 0))
-    err = 1;
+  /* pages.jsonl: header line, then >= 1 body row carrying url + ts. */
+  if (pages != NULL) {
+    if (pages->len < 27 ||
+        memcmp(pages->data, "{\"format\": \"json-pages-1.0\"", 27) != 0)
+      err = 1;
+    else {
+      const char *nl = memchr(pages->data, '\n', pages->len);
+      const char *body = nl ? nl + 1 : NULL;
+      size_t blen =
+          body ? pages->len - (size_t) (body - (char *) pages->data) : 0;
+      if (body == NULL || blen == 0 ||
+          warc_memstr(body, "\"url\": ", blen, 7) == NULL ||
+          warc_memstr(body, "\"ts\": ", blen, 6) == NULL)
+        err = 1;
+    }
+  }
 
   /* Every datapackage resource hash recomputes from the stored member bytes. */
   if (dp != NULL) {
@@ -4057,6 +4068,9 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       const char *p;
       memcpy(json, dp->data, dp->len);
       json[dp->len] = '\0';
+      if (strstr(json, "\"profile\": \"data-package\"") == NULL ||
+          strstr(json, "\"wacz_version\": \"") == NULL)
+        err = 1;
       p = json;
       while ((p = strstr(p, "\"path\": \"")) != NULL) {
         char path[256], want[80], got[65];
@@ -4097,6 +4111,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
     } else {
       memcpy(djson, dig->data, dig->len);
       djson[dig->len] = '\0';
+      if (strstr(djson, "\"path\": \"datapackage.json\"") == NULL)
+        err = 1;
       h = strstr(djson, "\"hash\": \"sha256:");
       if (h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1 ||
           strcmp(want, dphex) != 0)
@@ -4107,6 +4123,21 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < nent; i++)
     freet(ent[i].data);
+
+  /* #522-class: a failed re-package must leave the existing .wacz untouched.
+     Drop the .cdx and re-run empty so packaging fails on the missing index. */
+  good_size = fsize(waczpath);
+  if (good_size <= 0)
+    err = 1;
+  (void) UNLINK(cdxpath);
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  warc_close(w);
+  if (fsize(waczpath) != good_size) /* destroyed or rewritten = data loss */
+    err = 1;
+
+  opt->warc_cdx = saved_cdx;
+  opt->warc_wacz = saved_wacz;
   printf("warc-wacz: %d members (store=%d): %s\n", nent, all_store,
          err ? "FAIL" : "OK");
   return err;
