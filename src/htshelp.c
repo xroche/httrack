@@ -79,7 +79,7 @@ void infomsg(const char *msg) {
               char cmd[32] = "-";
               int p;
 
-              sscanf(msg, "%s", cmd + strlen(cmd));
+              sscanf(msg, "%30s", cmd + strlen(cmd));
               /* try the flag as-is, then strip a trailing N as the numeric-arg
                  placeholder (cN -> c); this order keeps -%N from becoming -% */
               p = optreal_find(cmd);
