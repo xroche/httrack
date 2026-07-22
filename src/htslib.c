@@ -2120,6 +2120,8 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 #if HTS_DEBUG_CLOSESOCK
     DEBUG_W("http_test: deletehttp\n");
 #endif
+    // this probe's htsblk is discarded by callers, so free any WARC stash here
+    warc_free_request(&retour);
     deletehttp(&retour);
     retour.soc = INVALID_SOCKET;
   }

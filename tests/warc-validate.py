@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
-# Structural WARC/1.1 validator, Python stdlib only (no warcio): walks the
-# concatenated gzip members with zlib (gzip.decompress would fuse them and lose
-# per-record boundaries) and checks each record against the spec.
+# Structural + semantic WARC/1.1 validator, Python stdlib only (no warcio):
+# walks the concatenated gzip members with zlib (gzip.decompress would fuse them
+# and lose per-record boundaries) and checks each record against the spec.
+#
+# Options:
+#   --expect-revisit          at least one revisit record must be present
+#   --expect-body-hex SUB=HEX a response whose WARC-Target-URI contains SUB must
+#                             have an entity body byte-equal to bytes.fromhex(HEX),
+#                             no Content-Encoding/Transfer-Encoding header, and a
+#                             WARC-Payload-Digest matching sha1(body) when present
+#   --no-response-for SUB     the asset containing SUB must be a revisit: no
+#                             response may target it, and a revisit must
+import base64
+import hashlib
 import sys
 import zlib
 
@@ -27,12 +38,40 @@ def field(header, name):
     return None
 
 
+def opt_values(argv, name):
+    out = []
+    for i, a in enumerate(argv):
+        if a == name and i + 1 < len(argv):
+            out.append(argv[i + 1])
+    return out
+
+
+def check_body(rec, http_hdr, body, sub, want):
+    if b"Content-Encoding" in http_hdr or b"Transfer-Encoding" in http_hdr:
+        sys.exit("record for %s kept a content/transfer-encoding header" % sub)
+    if body != want:
+        sys.exit(
+            "body mismatch for %s: got %d bytes, expected %d"
+            % (sub, len(body), len(want))
+        )
+    pd = field(rec[: rec.find(b"\r\n\r\n")], b"WARC-Payload-Digest")
+    if pd is not None and pd.startswith(b"sha1:"):
+        want_b32 = base64.b32encode(hashlib.sha1(want).digest()).decode("ascii")
+        if pd[5:].decode("ascii") != want_b32:
+            sys.exit("WARC-Payload-Digest mismatch for %s" % sub)
+
+
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    expect_revisit = "--expect-revisit" in sys.argv[1:]
-    path = args[0]
+    argv = sys.argv[1:]
+    expect_revisit = "--expect-revisit" in argv
+    body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
+    no_resp = opt_values(argv, "--no-response-for")
+    path = [a for a in argv if not a.startswith("--") and "=" not in a][0]
     data = open(path, "rb").read()
+
     total = revisits = responses = infos = 0
+    body_hits = {sub: False for sub, _ in body_specs}
+    revisit_hits = {sub: False for sub in no_resp}
     for rec in records(data):
         total += 1
         if not rec.startswith(b"WARC/1."):
@@ -54,18 +93,39 @@ def main():
         if rec[hdr_end + block_len :] != b"\r\n\r\n":
             sys.exit("record %d: missing \\r\\n\\r\\n trailer" % total)
         wtype = field(header, b"WARC-Type")
+        uri = field(header, b"WARC-Target-URI") or b""
         if wtype == b"warcinfo":
             infos += 1
         elif wtype == b"response":
             responses += 1
+            for sub in no_resp:
+                if sub.encode() in uri:
+                    sys.exit("unexpected full response for %s (want revisit)" % sub)
+            block = rec[hdr_end : hdr_end + block_len]
+            bsep = block.find(b"\r\n\r\n")
+            http_hdr, body = block[:bsep], block[bsep + 4 :]
+            for sub, hexval in body_specs:
+                if sub.encode() in uri:
+                    check_body(rec, http_hdr, body, sub, bytes.fromhex(hexval))
+                    body_hits[sub] = True
         elif wtype == b"revisit":
             revisits += 1
+            for sub in no_resp:
+                if sub.encode() in uri:
+                    revisit_hits[sub] = True
+
     if total < 1:
         sys.exit("no records found")
     if infos != 1:
         sys.exit("expected exactly one warcinfo record, got %d" % infos)
     if expect_revisit and revisits < 1:
         sys.exit("expected at least one revisit record, found none")
+    for sub, hit in body_hits.items():
+        if not hit:
+            sys.exit("no response record found for --expect-body-hex %s" % sub)
+    for sub, hit in revisit_hits.items():
+        if not hit:
+            sys.exit("no revisit record found for unchanged asset %s" % sub)
     print(
         "warc-validate: %d records OK (%d response, %d revisit)"
         % (total, responses, revisits)

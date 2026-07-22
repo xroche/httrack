@@ -212,16 +212,33 @@ static void base32_20(const unsigned char in[20], char out[33]) {
 }
 #endif
 
-/* Stream a transaction body (memory or on-disk) to a sink; the http header
-   block and its terminating CRLF, when present, precede it. region 0=header,
-   1=body. Returns 0 on success. */
+/* Stream a block to a sink. When http_section, the HTTP header bytes (may be
+   empty) plus their terminating CRLF are emitted first; the separator is bound
+   to http_section, not to http_hdr being non-NULL, so an empty header still
+   emits (and is counted in) the 2-byte separator (F3). The on-disk body is
+   written as EXACTLY body_len octets — capped if the file grew, zero-padded if
+   it shrank — so the declared Content-Length always equals the bytes written
+   across every pass (F2). region 0=header, 1=body. Returns 0 on success. */
 typedef int (*warc_sink)(void *ctx, int region, const void *p, size_t n);
 
-static int stream_block(const char *http_hdr, size_t http_hdr_len, int has_body,
-                        const char *body, size_t body_len,
-                        const char *body_path, warc_sink sink, void *ctx) {
-  if (http_hdr != NULL) {
-    if (sink(ctx, 0, http_hdr, http_hdr_len) != 0)
+static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
+  static const char zeros[4096] = {0};
+  while (remaining > 0) {
+    size_t chunk = (remaining < sizeof(zeros)) ? remaining : sizeof(zeros);
+    if (sink(ctx, 1, zeros, chunk) != 0)
+      return -1;
+    remaining -= chunk;
+  }
+  return 0;
+}
+
+static int stream_block(int http_section, const char *http_hdr,
+                        size_t http_hdr_len, int has_body, const char *body,
+                        size_t body_len, const char *body_path, warc_sink sink,
+                        void *ctx) {
+  if (http_section) {
+    if (http_hdr != NULL && http_hdr_len > 0 &&
+        sink(ctx, 0, http_hdr, http_hdr_len) != 0)
       return -1;
     if (sink(ctx, 0, "\r\n", 2) != 0)
       return -1;
@@ -232,20 +249,25 @@ static int stream_block(const char *http_hdr, size_t http_hdr_len, int has_body,
         return -1;
     } else if (body_path != NULL) {
       char catbuff[CATBUFF_SIZE];
+      size_t remaining = body_len;
       FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), body_path), "rb");
       if (fp == NULL)
         return -1;
-      for (;;) {
+      while (remaining > 0) {
         char b[32768];
-        size_t nl = fread(b, 1, sizeof(b), fp);
+        size_t want = (remaining < sizeof(b)) ? remaining : sizeof(b);
+        size_t nl = fread(b, 1, want, fp);
         if (nl == 0)
-          break;
+          break; /* short file: pad below so written == declared */
         if (sink(ctx, 1, b, nl) != 0) {
           fclose(fp);
           return -1;
         }
+        remaining -= nl;
       }
       fclose(fp);
+      if (stream_body_pad(sink, ctx, remaining) != 0)
+        return -1;
     }
   }
   return 0;
@@ -285,8 +307,8 @@ static int payload_digest_b32(const char *body, size_t body_len,
     EVP_MD_CTX_free(d.payload);
     return 0;
   }
-  ok = stream_block(NULL, 0, 1, body, body_len, body_path, digest_sink, &d) ==
-           0 &&
+  ok = stream_block(0, NULL, 0, 1, body, body_len, body_path, digest_sink,
+                    &d) == 0 &&
        EVP_DigestFinal_ex(d.payload, md, &mdlen) == 1 && mdlen == 20;
   EVP_MD_CTX_free(d.payload);
   if (!ok)
@@ -397,21 +419,27 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
   return 0;
 }
 
-/* Emit one full WARC record. http_hdr (may be NULL) + body form the block;
-   block length must be computed by the caller and passed as block_len. The
-   payload digest (body-only) is passed in when already known. On success the
-   record id is copied to out_id (may be NULL). */
+/* Emit one full WARC record. When http_section, the block carries an HTTP
+   header block (http_hdr, possibly empty) + a CRLF separator; body follows when
+   has_body. block_len is derived here (single source of truth: separator and
+   payload are counted exactly as stream_block emits them), so a declared
+   Content-Length can never desync from the written bytes. The payload digest
+   (body-only) is passed in when already known. On success the record id is
+   copied to out_id (may be NULL). */
 static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *target_uri, const char *ip,
                      const char *concurrent_to, const char *refers_uri,
                      const char *refers_date, const char *profile,
-                     const char *payload_digest, const char *http_hdr,
-                     size_t http_hdr_len, int has_body, const char *body,
-                     size_t body_len, const char *body_path, size_t block_len,
+                     const char *payload_digest, int http_section,
+                     const char *http_hdr, size_t http_hdr_len, int has_body,
+                     const char *body, size_t body_len, const char *body_path,
                      char out_id[64]) {
   wbuf hdr;
   member m;
   char id[64], date[32];
+  size_t sep = http_section ? 2 : 0;
+  size_t payload = has_body ? body_len : 0;
+  size_t block_len;
   int rc = -1;
 #if HTS_USEOPENSSL
   digester d;
@@ -420,6 +448,11 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   char block_b32[33];
   int have_block_digest = 0;
 #endif
+
+  /* F4: overflow-safe block length; http_hdr_len+sep is provably small. */
+  if (payload > (size_t) -1 - http_hdr_len - sep)
+    return -1;
+  block_len = http_hdr_len + sep + payload;
 
   memset(&hdr, 0, sizeof(hdr));
   warc_make_id(w, id);
@@ -430,8 +463,8 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   d.block = EVP_MD_CTX_new();
   d.payload = NULL;
   if (d.block != NULL && EVP_DigestInit_ex(d.block, EVP_sha1(), NULL) == 1 &&
-      stream_block(http_hdr, http_hdr_len, has_body, body, body_len, body_path,
-                   digest_sink, &d) == 0 &&
+      stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
+                   body_len, body_path, digest_sink, &d) == 0 &&
       EVP_DigestFinal_ex(d.block, md, &mdlen) == 1 && mdlen == 20) {
     base32_20(md, block_b32);
     have_block_digest = 1;
@@ -487,8 +520,8 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   if (member_begin(&m, w) != 0)
     goto done;
   if (member_write(&m, hdr.data, hdr.len) != 0 ||
-      stream_block(http_hdr, http_hdr_len, has_body, body, body_len, body_path,
-                   write_sink, &m) != 0 ||
+      stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
+                   body_len, body_path, write_sink, &m) != 0 ||
       member_write(&m, "\r\n\r\n", 4) != 0) {
     member_end(&m);
     goto done;
@@ -623,8 +656,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   }
   w->info_id[0] = '\0'; /* not yet known: warcinfo omits WARC-Warcinfo-ID */
   if (warc_emit(w, "warcinfo", "application/warc-fields", NULL, NULL, NULL,
-                NULL, NULL, NULL, NULL, NULL, 0, 1, info.data, info.len, NULL,
-                info.len, w->info_id) != 0) {
+                NULL, NULL, NULL, NULL, 0, NULL, 0, 1, info.data, info.len,
+                NULL, w->info_id) != 0) {
     wbuf_free(&info);
     warc_close(w);
     return NULL;
@@ -666,19 +699,20 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   const char *refers_uri = NULL;
   const char *refers_date = NULL;
   char refers_buf[HTS_URLMAXSIZE * 2 + 64];
-  int has_body;
+  int has_payload;
+  int emit_body;
   int rc = -1;
-  size_t block_len;
 
   if (resp_hdr == NULL)
     return -1;
 
-  has_body = (body_len > 0 && (body != NULL || body_path != NULL) &&
-              !is_update_unchanged);
+  /* A payload exists (for digesting) unless this is a bodyless 304. */
+  has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
+                 !is_update_unchanged);
 
   /* Payload digest drives identical-payload-digest dedup (OpenSSL only). */
   have_pdig =
-      has_body ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
+      has_payload ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
 
   if (is_update_unchanged) {
     is_revisit = 1;
@@ -703,10 +737,14 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     }
   }
 
+  /* Both revisit kinds (server-304 and identical-payload-digest) are bodyless;
+     only a full response carries the payload (F1). */
+  emit_body = has_payload && !is_revisit;
+
   /* Normalize headers: full response rewrites Content-Length to the decoded
      body length and strips Content-Encoding; a revisit keeps them (no body). */
   memset(&http, 0, sizeof(http));
-  if (normalize_http_headers(resp_hdr, is_revisit ? -1 : (long long) body_len,
+  if (normalize_http_headers(resp_hdr, emit_body ? (long long) body_len : -1,
                              &http) != 0) {
     wbuf_free(&http);
     return -1;
@@ -714,14 +752,11 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
 
   /* Response first: its id links the request via WARC-Concurrent-To. */
   resp_id[0] = '\0';
-  block_len =
-      http.len + 2 /* header terminator CRLF */ + (has_body ? body_len : 0);
-
   if (warc_emit(w, is_revisit ? "revisit" : "response",
                 "application/http;msgtype=response", target_uri, ip, NULL,
-                refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
-                http.data, http.len, has_body, body, body_len, body_path,
-                block_len, resp_id) != 0) {
+                refers_uri, refers_date, profile, have_pdig ? pdig : NULL, 1,
+                http.data, http.len, emit_body, body, body_len, body_path,
+                resp_id) != 0) {
     wbuf_free(&http);
     return -1;
   }
@@ -730,8 +765,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (req_hdr != NULL && req_hdr[0] != '\0') {
     size_t rlen = strlen(req_hdr);
     if (warc_emit(w, "request", "application/http;msgtype=request", target_uri,
-                  NULL, resp_id, NULL, NULL, NULL, NULL, NULL, 0, 1, req_hdr,
-                  rlen, NULL, rlen, NULL) != 0)
+                  NULL, resp_id, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, req_hdr,
+                  rlen, NULL, NULL) != 0)
       return -1;
   }
 
@@ -802,7 +837,12 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     body = NULL;
     body_path = back->url_sav;
     fs = fsize_utf8(body_path);
-    body_len = (fs > 0) ? (size_t) fs : 0;
+    /* F4: an on-disk body past size_t (LLP32/ILP32, >4GB) would wrap the length
+       used as Content-Length; drop the body rather than desync the record. */
+    if (fs > 0 && (uint64_t) fs <= (uint64_t) (size_t) -1)
+      body_len = (size_t) fs;
+    else
+      body_len = 0;
   }
 
   is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;

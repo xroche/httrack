@@ -2,11 +2,18 @@
 #
 # A --warc crawl writes a standards-conformant WARC/1.1 archive, and an
 # --update re-crawl of an unchanged (all-304) site emits revisit records.
-# The stdlib validator (no warcio) is the real gate; warcio runs if present.
+# The stdlib validator (no warcio) is the real gate: it byte-compares the
+# fresh page.html response body against what the server served, asserts the
+# encoding headers were stripped and the payload digest matches, then checks
+# the update pass turned the unchanged assets into revisits (no full response).
 
 set -eu
 
 : "${top_srcdir:=..}"
+
+# page.html body served by tests/local-server.py (route_mini304_page).
+export WARC_VALIDATE_BODY="page.html=3c68746d6c3e3c626f64793e74696e7920636163686561626c6520706167653c2f626f64793e3c2f68746d6c3e0a"
+export WARC_VALIDATE_NORESP="index.html page.html"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun --warc-validate \
     --log-found 'no files updated' \

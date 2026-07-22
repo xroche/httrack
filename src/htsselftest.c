@@ -3321,7 +3321,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
   size_t data_len = 0;
   const unsigned char *p, *end;
   int err = 0, nrec = 0, nresp = 0, nreq = 0, nrevisit = 0, ninfo = 0;
-  int seen_a_body = 0;
+  int seen_a_body = 0, body_occurrences = 0, a2_bodyless = 0, nm_cl_ok = 0;
   static const char a_body[] = "Hello, WARC!\n";
 
   if (argc < 1) {
@@ -3372,6 +3372,12 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
                          a_body, sizeof(a_body) - 1, NULL, 200, 0);
 
+  /* 304 revisit with an EMPTY response-header block: the block is just the
+     2-byte separator, so declared Content-Length must be exactly 2 (F3). */
+  warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
+                         "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
+                         NULL, 0, NULL, 304, 1);
+
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -3421,6 +3427,23 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       nresp++;
     if (warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
       nrevisit++;
+    /* F1: the full body must appear exactly once across the whole file (a
+       revisit must not re-embed it). */
+    if (warc_memstr((char *) rec, a_body, rlen, sizeof(a_body) - 1) != NULL)
+      body_occurrences++;
+    /* F1: the a2.html identical-payload-digest revisit carries no body. */
+    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a2.html",
+                    hdr_len, 42) != NULL &&
+        warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+      a2_bodyless =
+          (warc_memstr((char *) rec, a_body, rlen, sizeof(a_body) - 1) == NULL);
+    /* F3: the empty-header 304 revisit block is exactly the 2-byte separator
+       (the request record shares this target URI, so match the revisit only).
+     */
+    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/nm",
+                    hdr_len, 37) != NULL &&
+        warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+      nm_cl_ok = (block_len == 2);
     /* a.html response body must round-trip and carry no encoding headers */
     if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a.html",
                     hdr_len, 41) != NULL &&
@@ -3447,14 +3470,22 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
   }
   freet(data);
 
-  if (ninfo != 1 || nreq != 5 || nrec != 11 || !seen_a_body)
+  /* warcinfo + 6 transactions (response/revisit + request each) = 13 records.
+   */
+  if (ninfo != 1 || nreq != 6 || nrec != 13 || !seen_a_body || !nm_cl_ok)
     err = 1;
 #if HTS_USEOPENSSL
-  if (nrevisit != 1 || nresp != 4)
-    err = 1; /* a2.html deduped to a revisit */
+  /* a.html + b.bin + trunc + 302 are full responses; a2.html deduped to a
+     revisit (bodyless), nm is the 304 revisit; the body appears exactly once.
+   */
+  if (nrevisit != 2 || nresp != 4 || !a2_bodyless || body_occurrences != 1)
+    err = 1;
 #else
-  if (nresp != 5)
-    err = 1; /* no digests: every fetch a full response */
+  /* No digests: a2.html is a second full response, so the body appears twice
+     and only the 304 nm is a revisit. */
+  if (nrevisit != 1 || nresp != 5 || body_occurrences != 2)
+    err = 1;
+  (void) a2_bodyless; /* only meaningful with digests */
 #endif
 
   printf("warc: %d records (%d response, %d request, %d revisit): %s\n", nrec,
