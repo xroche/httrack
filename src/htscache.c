@@ -859,10 +859,8 @@ static int hts_rename(httrackp * opt, const char *a, const char *b) {
   return RENAME(a, b);
 }
 
-/* minizip callback opening through hts_fopen_utf8, so the cache ZIP follows a
-   non-ASCII path_log instead of an ANSI-mangled twin (#630); a no-op off
-   Windows where hts_fopen_utf8 is fopen. 64-bit open/seek (fill_fopen64 +
-   unzOpen2_64) so multi-GB caches don't truncate on Windows LLP64. */
+/* Open the cache ZIP via hts_fopen_utf8 so a non-ASCII path_log isn't mangled
+   to ANSI (#630); 64-bit funcs keep multi-GB caches whole on Windows LLP64. */
 static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
                                            int mode) {
   const char *mode_fopen = NULL;
@@ -1059,9 +1057,8 @@ void cache_init(cache_back * cache, httrackp * opt) {
         }
         hts_log_print(opt, LOG_WARNING,
                       "Cache: damaged cache, trying to repair");
-        /* mztools has no UTF-8 hook: repairing a corrupt cache under a
-           non-ASCII path_log fails cleanly on Windows (re-crawl), it never
-           forks a twin. */
+        /* mztools has no UTF-8 hook, so repairing a corrupt cache under a
+           non-ASCII path_log fails cleanly (re-crawl), never forks a twin. */
         if (unzRepair
             (name,
              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
