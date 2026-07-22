@@ -979,8 +979,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    # Always-stall endpoint for 72_watchdog-crawl: promise a big body, send a few
-    # bytes, then sleep so the crawl wedges and the harness watchdog must reap it.
+    # Always-stall endpoint for 72_watchdog-crawl: never finishes, so the harness
+    # watchdog must reap it.
     def route_watchdog_stall(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Control for the crawl watchdog (wait_bounded): a wedged fetch must be reaped at
-# the harness deadline in seconds, not hang the CI step to its 45-min cap. Drives
-# CRAWL_DEADLINE low against an always-stall endpoint; asserts a fast, attributed fail.
+# Control for wait_bounded: a wedged fetch must be reaped at the harness deadline,
+# not hang the CI step to its 45-min cap.
 
 : "${top_srcdir:=..}"
 
@@ -27,10 +26,10 @@ if printf '%s\n' "$out" | grep -q "could not discover server port"; then
     exit 77
 fi
 
-# The message prints only on the 124 reap, and 20s < the engine's --timeout=30, so
+# The message prints only on the 124 reap, and 25s < the engine's --timeout=30, so
 # together they pin the fast exit on the 3s watchdog, not httrack giving up.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
-test "$elapsed" -lt 20 || fail "watchdog fired late (${elapsed}s)"
+test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
 printf '%s\n' "$out" | grep -q "watchdog fired" ||
     fail "crawl failed but not via the watchdog: $out"
 

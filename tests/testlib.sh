@@ -31,9 +31,9 @@ is_windows() {
     esac
 }
 
-# Stop a backgrounded server and reap it. On Windows MSYS can't signal a native
-# python.exe, so kill_tree ends the whole tree (a bare kill -9 leaves children).
-# "|| true" throughout: callers run under set -e and the reap makes wait return 143.
+# On Windows MSYS can't signal a native python.exe, so kill_tree ends the whole
+# tree (a bare kill -9 leaves children). "|| true" throughout: callers run under
+# set -e and the reap makes wait return 143.
 stop_server() {
     test -n "${1:-}" || return 0
     kill "$1" 2>/dev/null || true
@@ -108,9 +108,8 @@ run_with_timeout() {
     wait "$pid"
 }
 
-# Bound an already-backgrounded crawl (pid $1) at $2s, reaping it tree-and-all and
-# returning 124 on overrun: a wedge past --max-time would else block wait() forever
-# and hang the CI step. (The launchers keep the pid for their trap, hence not run_with_timeout.)
+# Bound an already-backgrounded crawl (pid $1) at $2s, reaping it and returning 124
+# on overrun: a wedge past --max-time would else block wait() forever and hang the CI step.
 wait_bounded() {
     local pid=$1 secs=$2 waited=0
     while kill -0 "$pid" 2>/dev/null; do
