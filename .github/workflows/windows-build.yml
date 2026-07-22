@@ -202,7 +202,8 @@ jobs:
 
           # Every gate here exits 77, so an all-skipped suite would report green having
           # tested nothing: pin the skips, and floor the passes in case the glob empties.
-          expected_skips=" 48_local-crange-memresume.test 71_local-crange-repaircache.test"  # pending #581
+          # footer-overflow skips on Windows (needs a path past MAX_PATH); crange pending #581.
+          expected_skips=" 01_engine-footer-overflow.test 48_local-crange-memresume.test 71_local-crange-repaircache.test"
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
           [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
