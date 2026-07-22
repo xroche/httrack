@@ -77,17 +77,17 @@ void infomsg(const char *msg) {
           if (msg[2] != ' ') {
             if ((msg[3] == ' ') || (msg[4] == ' ')) {
               char cmd[32] = "-";
-              int p = 0;
+              int p;
 
-              while(cmd[p] == ' ')
-                p++;
-              sscanf(msg + p, "%s", cmd + strlen(cmd));
-              /* clears cN -> c */
-              if ((p = (int) strlen(cmd)) > 2)
-                if (cmd[p - 1] == 'N')
-                  cmd[p - 1] = '\0';
-              /* finds alias (if any) */
+              sscanf(msg, "%s", cmd + strlen(cmd));
+              /* try the flag as-is, then strip a trailing N as the numeric-arg
+                 placeholder (cN -> c); this order keeps -%N from becoming -% */
               p = optreal_find(cmd);
+              if (p < 0 && (int) strlen(cmd) > 2 &&
+                  cmd[strlen(cmd) - 1] == 'N') {
+                cmd[strlen(cmd) - 1] = '\0';
+                p = optreal_find(cmd);
+              }
               if (p >= 0) {
                 /* fings type of parameter: number,param,param concatenated,single cmd */
                 if (strcmp(opttype_value(p), "param") == 0)
@@ -648,9 +648,8 @@ void help(const char *app, int more) {
   infomsg("Command-line specific options:");
   infomsg
     ("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
-  infomsg
-    (" %W use an external library function as a wrapper (-%W myfoo.so[,myparameters])");
-  /* infomsg(" %O do a chroot before setuid"); */
+  infomsg(" %W use an external library function as a wrapper (-%W "
+          "myfoo.so[,myparameters])");
   infomsg("");
   infomsg("Details: Option N");
   infomsg("  N0 Site-structure (default)");
