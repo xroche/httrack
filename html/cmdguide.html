@@ -157,12 +157,12 @@ the index" problems disappear.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-rN</tt></td><td>Maximum link depth. <b>The start page is level 1</b>, so one level of links out is <tt>-r2</tt>, not <tt>-r1</tt>.</td></tr>
-  <tr><td><tt>-a -d -l -e</tt></td><td>How far off the starting host the crawl may travel: same address (host), same principal domain, same top-level domain (for example .com), or everywhere. The default keeps you on the starting host.</td></tr>
-  <tr><td><tt>-D -U -S -B</tt></td><td>Directory travel: down into subdirectories only, up to parent directories only, stay in the same directory, or both up and down.</td></tr>
-  <tr><td><tt>-n</tt></td><td>Also fetch non-HTML files "near" a followed link, such as an image linked from a page you kept but hosted elsewhere.</td></tr>
-  <tr><td><tt>-%eN</tt></td><td>How many levels of external links to follow once the crawl leaves your scope (default 0).</td></tr>
-  <tr><td><tt>-t</tt></td><td>Also HEAD-test links that fall outside the scope, which are normally refused, without downloading them: a way to see what scope is excluding.</td></tr>
+  <tr><td><tt>--depth (-r)</tt></td><td>Maximum link depth. <b>The start page is level 1</b>, so one level of links out is <tt>-r2</tt>, not <tt>-r1</tt>.</td></tr>
+  <tr><td><tt>--stay-on-same-address (-a), --stay-on-same-domain (-d), --stay-on-same-tld (-l), --go-everywhere (-e)</tt></td><td>How far off the starting host the crawl may travel: same address (host), same principal domain, same top-level domain (for example .com), or everywhere. The default keeps you on the starting host.</td></tr>
+  <tr><td><tt>--can-go-down (-D), --can-go-up (-U), --stay-on-same-dir (-S), --can-go-up-and-down (-B)</tt></td><td>Directory travel: down into subdirectories only, up to parent directories only, stay in the same directory, or both up and down.</td></tr>
+  <tr><td><tt>--near (-n)</tt></td><td>Also fetch non-HTML files "near" a followed link, such as an image linked from a page you kept but hosted elsewhere.</td></tr>
+  <tr><td><tt>--ext-depth (-%e)</tt></td><td>How many levels of external links to follow once the crawl leaves your scope (default 0).</td></tr>
+  <tr><td><tt>--test (-t)</tt></td><td>Also HEAD-test links that fall outside the scope, which are normally refused, without downloading them: a way to see what scope is excluding.</td></tr>
 </table>
 
 <p>The single most common surprise is "only the home page came down." That is
@@ -227,14 +227,14 @@ below let you go faster when you own the target, and slower when you do not.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-AN</tt></td><td>Maximum transfer rate in bytes/sec. <b>The default is about 100 KB/s even without this flag.</b> Raise it to go faster.</td></tr>
-  <tr><td><tt>-cN</tt></td><td>Number of parallel connections (default 4). <tt>--tiny</tt>, <tt>--wide</tt> and <tt>--ultrawide</tt> are presets.</td></tr>
-  <tr><td><tt>-%cN</tt></td><td>New connections opened per second (default 5).</td></tr>
-  <tr><td><tt>-MN</tt></td><td>Stop after N bytes <b>received from the network</b> across the whole mirror (this counts what was transferred, not what was saved).</td></tr>
-  <tr><td><tt>-EN</tt></td><td>Stop after N seconds of wall-clock time.</td></tr>
-  <tr><td><tt>-mN</tt></td><td>Per-file size caps.</td></tr>
-  <tr><td><tt>-TN -RN -JN -HN</tt></td><td>Idle timeout, retry count, minimum acceptable rate, and host-ban behavior for slow or dead hosts.</td></tr>
-  <tr><td><tt>-GN -%GN</tt></td><td>Pause the mirror at N bytes, or pause between files, to spread the load.</td></tr>
+  <tr><td><tt>--max-rate (-A)</tt></td><td>Maximum transfer rate in bytes/sec. <b>The default is about 100 KB/s even without this flag.</b> Raise it to go faster.</td></tr>
+  <tr><td><tt>--sockets (-c)</tt></td><td>Number of parallel connections (default 4). <tt>--tiny</tt>, <tt>--wide</tt> and <tt>--ultrawide</tt> are presets.</td></tr>
+  <tr><td><tt>--connection-per-second (-%c)</tt></td><td>New connections opened per second (default 5).</td></tr>
+  <tr><td><tt>--max-size (-M)</tt></td><td>Stop after N bytes <b>received from the network</b> across the whole mirror (this counts what was transferred, not what was saved).</td></tr>
+  <tr><td><tt>--max-time (-E)</tt></td><td>Stop after N seconds of wall-clock time.</td></tr>
+  <tr><td><tt>--max-files (-m)</tt></td><td>Per-file size caps.</td></tr>
+  <tr><td><tt>--timeout (-T), --retries (-R), --min-rate (-J), --host-control (-H)</tt></td><td>Idle timeout, retry count, minimum acceptable rate, and host-ban behavior for slow or dead hosts.</td></tr>
+  <tr><td><tt>--max-pause (-G), -%G</tt></td><td>Pause the mirror at N bytes, or pause between files, to spread the load.</td></tr>
 </table>
 
 <p><b>The security clamps.</b> To keep an accidental typo from turning into a flood,
@@ -254,11 +254,11 @@ really HTML.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-NN</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>-N "%h%p/%n%q.%t"</tt>.</td></tr>
-  <tr><td><tt>-LN</tt></td><td>Long names, 8.3 names, or ISO9660 for CD masters.</td></tr>
-  <tr><td><tt>-%A ext=type</tt></td><td>Assume a MIME type for an extension, for example <tt>-%A php=text/html</tt>. This also skips the extra HEAD probe HTTrack would otherwise send to learn the type.</td></tr>
-  <tr><td><tt>-%N -%D -u -%t</tt></td><td>When and how the content type is checked, and whether the original extension is kept.</td></tr>
-  <tr><td><tt>-%q -%g</tt></td><td>Whether the query string appears in the local filename, and whether query keys are stripped when deciding if two URLs are the same file.</td></tr>
+  <tr><td><tt>--structure (-N)</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>--structure "%h%p/%n%q.%t"</tt>.</td></tr>
+  <tr><td><tt>--long-names (-L)</tt></td><td>Long names, 8.3 names, or ISO9660 for CD masters.</td></tr>
+  <tr><td><tt>--assume (-%A)</tt></td><td>Assume a MIME type for an extension, for example <tt>--assume php=text/html</tt>. This also skips the extra HEAD probe HTTrack would otherwise send to learn the type.</td></tr>
+  <tr><td><tt>-%N, --cached-delayed-type-check (-%D), --check-type (-u), -%t</tt></td><td>When and how the content type is checked, and whether the original extension is kept.</td></tr>
+  <tr><td><tt>--include-query-string (-%q), -%g</tt></td><td>Whether the query string appears in the local filename, and whether query keys are stripped when deciding if two URLs are the same file.</td></tr>
 </table>
 
 <p>The <tt>-N</tt> presets are built from modular arithmetic on the name fields, so
@@ -268,7 +268,7 @@ rather than a magic number, and check the result on a small crawl first.</p>
 
 <p>A dynamic page served as <tt>.php</tt> or <tt>.asp</tt> that is actually HTML is
 the classic case: without help it can be saved with an extension a browser will
-not open locally. <tt>-%A php=text/html</tt> fixes both the extension and the
+not open locally. <tt>--assume php=text/html</tt> fixes both the extension and the
 naming.</p>
 
 <h3 id="links">6. Links and page building</h3>
@@ -278,12 +278,12 @@ ones it kept so the local copy browses offline. These options tune both halves.<
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-KN</tt></td><td>How links are rewritten in saved pages. The numbering is inverted from what you might guess: bare <tt>-K</tt> keeps <b>absolute</b> URLs, and <tt>-K0</tt> is the <b>relative</b> default. <tt>-K3</tt> keeps absolute URIs, <tt>-K4</tt> keeps the original links.</td></tr>
-  <tr><td><tt>-x -o</tt></td><td>Replace external links with an error page, and generate an error page for links that failed.</td></tr>
-  <tr><td><tt>-%p -%x</tt></td><td>Leave HTML untouched (no rewriting), and strip passwords out of saved links.</td></tr>
-  <tr><td><tt>-%P -j</tt></td><td>Aggressive link discovery, and how much script content is parsed for links.</td></tr>
-  <tr><td><tt>-%M</tt></td><td>Save the whole mirror as a single MIME-encapsulated <tt>.mht</tt> archive (<tt>index.mht</tt>).</td></tr>
-  <tr><td><tt>-I -%i -%I</tt></td><td>Build a per-mirror index, a top index across projects, and a searchable keyword index.</td></tr>
+  <tr><td><tt>--keep-links (-K)</tt></td><td>How links are rewritten in saved pages. The numbering is inverted from what you might guess: bare <tt>-K</tt> keeps <b>absolute</b> URLs, and <tt>-K0</tt> is the <b>relative</b> default. <tt>-K3</tt> keeps absolute URIs, <tt>-K4</tt> keeps the original links.</td></tr>
+  <tr><td><tt>--replace-external (-x), --generate-errors (-o)</tt></td><td>Replace external links with an error page, and generate an error page for links that failed.</td></tr>
+  <tr><td><tt>--preserve (-%p), --disable-passwords (-%x)</tt></td><td>Leave HTML untouched (no rewriting), and strip passwords out of saved links.</td></tr>
+  <tr><td><tt>--extended-parsing (-%P), --parse-java (-j)</tt></td><td>Aggressive link discovery, and how much script content is parsed for links.</td></tr>
+  <tr><td><tt>--mime-html (-%M)</tt></td><td>Save the whole mirror as a single MIME-encapsulated <tt>.mht</tt> archive (<tt>index.mht</tt>).</td></tr>
+  <tr><td><tt>--index (-I), --build-top-index (-%i), --search-index (-%I)</tt></td><td>Build a per-mirror index, a top index across projects, and a searchable keyword index.</td></tr>
 </table>
 
 <p>HTTrack finds links by parsing HTML and CSS. It does not run JavaScript, so any
@@ -303,11 +303,11 @@ options control what HTTrack says about itself.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-F "string"</tt></td><td>The <tt>User-Agent</tt>. Set a browser string to get past crawler blocks; <tt>-F ""</tt> sends none.</td></tr>
-  <tr><td><tt>-%R -%E -%l -%a</tt></td><td>Referer, From, Accept-Language and Accept headers.</td></tr>
-  <tr><td><tt>-%X "line"</tt></td><td>Add raw header lines to every request.</td></tr>
-  <tr><td><tt>-%F</tt></td><td>A footer written into saved pages (on disk, not a network header).</td></tr>
-  <tr><td><tt>-b -%K file</tt></td><td>Accept cookies, and preload a Netscape <tt>cookies.txt</tt>.</td></tr>
+  <tr><td><tt>--user-agent (-F)</tt></td><td>The <tt>User-Agent</tt>. Set a browser string to get past crawler blocks; <tt>--user-agent ""</tt> sends none.</td></tr>
+  <tr><td><tt>--referer (-%R), --from (-%E), --language (-%l), --accept (-%a)</tt></td><td>Referer, From, Accept-Language and Accept headers.</td></tr>
+  <tr><td><tt>--headers (-%X)</tt></td><td>Add raw header lines to every request.</td></tr>
+  <tr><td><tt>--footer (-%F)</tt></td><td>A footer written into saved pages (on disk, not a network header).</td></tr>
+  <tr><td><tt>--cookies (-b), --cookies-file (-%K)</tt></td><td>Accept cookies, and preload a Netscape <tt>cookies.txt</tt>.</td></tr>
 </table>
 
 <p><b>Login.</b> For HTTP Basic auth, put the credentials in the URL:
@@ -326,11 +326,11 @@ across links at the same time.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>-P proxy:port</tt></td><td>Route through a proxy. HTTP, SOCKS5 and CONNECT are supported: <tt>-P host:8080</tt>, <tt>-P socks5://host:1080</tt>, <tt>-P connect://host:443</tt>, with optional <tt>user:pass@</tt>.</td></tr>
-  <tr><td><tt>-%f</tt></td><td>Send FTP requests through the HTTP proxy.</td></tr>
-  <tr><td><tt>-@iN</tt></td><td>Prefer IPv4 or IPv6.</td></tr>
-  <tr><td><tt>-%h -%k -%z</tt></td><td>Force HTTP/1.0 (drops keep-alive and compression, useful for fragile CGI), toggle keep-alive, and toggle compression.</td></tr>
-  <tr><td><tt>-%b -%B</tt></td><td>Bind to a local address, and accept technically-bogus responses some servers send.</td></tr>
+  <tr><td><tt>--proxy (-P)</tt></td><td>Route through a proxy. HTTP, SOCKS5 and CONNECT are supported: <tt>-P host:8080</tt>, <tt>-P socks5://host:1080</tt>, <tt>-P connect://host:443</tt>, with optional <tt>user:pass@</tt>.</td></tr>
+  <tr><td><tt>--httpproxy-ftp (-%f)</tt></td><td>Send FTP requests through the HTTP proxy.</td></tr>
+  <tr><td><tt>--protocol (-@i)</tt></td><td>Prefer IPv4 or IPv6.</td></tr>
+  <tr><td><tt>--http-10 (-%h), --keep-alive (-%k), -%z</tt></td><td>Force HTTP/1.0 (drops keep-alive and compression, useful for fragile CGI), toggle keep-alive, and toggle compression.</td></tr>
+  <tr><td><tt>--bind (-%b), --tolerant (-%B)</tt></td><td>Bind to a local address, and accept technically-bogus responses some servers send.</td></tr>
 </table>
 
 <p>Two network facts worth stating plainly. Over SOCKS5, HTTrack always resolves
@@ -351,10 +351,10 @@ away and you lose the ability to continue or update the mirror.</p>
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--continue</tt></td><td>Carry on an interrupted mirror, trusting the cache: it does not re-check pages already stored.</td></tr>
   <tr><td><tt>--update</tt></td><td>Re-run the mirror, revalidating each page with the server (If-Modified-Since / If-None-Match) and downloading only what changed.</td></tr>
-  <tr><td><tt>-X0</tt></td><td>Do not purge. By default an update deletes local files that are no longer part of the mirror; <tt>-X0</tt> keeps them.</td></tr>
-  <tr><td><tt>-C</tt></td><td>Cache mode. The default already does the right thing and switches to update-checking when it detects an existing mirror.</td></tr>
-  <tr><td><tt>-%u -%j -%o -%y -%n -%s -k</tt></td><td>URL-deduplication behavior and cache storage details.</td></tr>
-  <tr><td><tt>-#C -#R --clean</tt></td><td>Inspect the cache, repair its ZIP, and erase cache plus logs.</td></tr>
+  <tr><td><tt>--purge-old=0 (-X0)</tt></td><td>Do not purge. By default an update deletes local files that are no longer part of the mirror; <tt>--purge-old=0</tt> keeps them.</td></tr>
+  <tr><td><tt>--cache (-C)</tt></td><td>Cache mode. The default already does the right thing and switches to update-checking when it detects an existing mirror.</td></tr>
+  <tr><td><tt>--urlhack (-%u), -%j, -%o, -%y, --do-not-recatch (-%n), --updatehack (-%s), --store-all-in-cache (-k)</tt></td><td>URL-deduplication behavior and cache storage details.</td></tr>
+  <tr><td><tt>--debug-cache (-#C), --repair-cache (-#R), --clean</tt></td><td>Inspect the cache, repair its ZIP, and erase cache plus logs.</td></tr>
 </table>
 
 <p><b>The purge trap.</b> An <tt>--update</tt> run rebuilds the list of files the
@@ -374,9 +374,9 @@ mirror behavior and expose the engine.</p>
   <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--get URL</tt></td><td>Fetch a single file and stop. Cache, index, depth, cookies and robots are all off for this mode.</td></tr>
   <tr><td><tt>--spider --testlinks --skeleton</tt></td><td>Scan without saving, test links at depth 1, or keep HTML only. Handy for checking a site before a real crawl.</td></tr>
-  <tr><td><tt>-V "cmd"</tt></td><td>Run a shell command on each downloaded file; <tt>$0</tt> is the file path. Good for on-the-fly processing.</td></tr>
-  <tr><td><tt>-%W module</tt></td><td>Load an external callback module to hook the engine.</td></tr>
-  <tr><td><tt>-Q -q -v -f -z -Z</tt></td><td>Logging: quiet, no questions, verbose on screen, and the various log-to-file levels.</td></tr>
+  <tr><td><tt>--userdef-cmd (-V)</tt></td><td>Run a shell command on each downloaded file; <tt>$0</tt> is the file path. Good for on-the-fly processing.</td></tr>
+  <tr><td><tt>--callback (-%W)</tt></td><td>Load an external callback module to hook the engine.</td></tr>
+  <tr><td><tt>--do-not-log (-Q), --quiet (-q), --verbose (-v), --file-log (-f), --extra-log (-z), --debug-log (-Z)</tt></td><td>Logging: quiet, no questions, verbose on screen, and the various log-to-file levels.</td></tr>
 </table>
 
 <p>The <a href="dev.html">developer page</a> covers the callback API and batch use
