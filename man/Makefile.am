@@ -16,6 +16,11 @@ regen-man: makeman.sh $(top_builddir)/src/httrack$(EXEEXT)
 
 # Render html/httrack.man.html from httrack.1. Needs the groff html device
 # (Debian: full "groff" package, not "groff-base"). Run by hand: make -C man regen-man-html
+# Strip groff's version-stamp and creation-date comments so the committed file
+# doesn't churn across groff versions or rebuilds; the ci man-page-sync guard
+# only requires this file to change whenever httrack.1 does.
 regen-man-html: httrack.1
-	groff -t -man -Thtml $(srcdir)/httrack.1 > $(top_srcdir)/html/httrack.man.html
+	groff -t -man -Thtml $(srcdir)/httrack.1 \
+		| sed -e 's/groff version [0-9][0-9.]*/groff/' -e '/^<!-- CreationDate:/d' \
+		> $(top_srcdir)/html/httrack.man.html
 .PHONY: regen-man-html

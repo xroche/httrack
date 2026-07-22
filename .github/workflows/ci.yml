@@ -618,3 +618,31 @@ jobs:
               echo "Fix locally with: git clang-format --binary clang-format-19 $base"
               exit 1 ;;
           esac
+
+  man-page-sync:
+    name: man page / html in sync
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # html/httrack.man.html is groff-rendered from man/httrack.1 and committed.
+      # Rendering needs the full groff html device, so CI can't regenerate it;
+      # instead require the two to move together: a PR that touches httrack.1
+      # must also touch the html, catching the "regenerated roff, forgot html".
+      - name: httrack.1 changes must include html/httrack.man.html
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          base="origin/${{ github.base_ref }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          has() { printf '%s\n' "$changed" | grep -qx "$1"; }
+          if has man/httrack.1 && ! has html/httrack.man.html; then
+            echo "::error::man/httrack.1 changed but html/httrack.man.html did not."
+            echo "Regenerate it with: make -C man regen-man-html (needs the full groff package)."
+            exit 1
+          fi
+          echo "man/html sync OK."
