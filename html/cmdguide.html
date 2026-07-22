@@ -234,7 +234,7 @@ below let you go faster when you own the target, and slower when you do not.</p>
   <tr><td><tt>--max-time (-E)</tt></td><td>Stop after N seconds of wall-clock time.</td></tr>
   <tr><td><tt>--max-files (-m)</tt></td><td>Per-file size caps.</td></tr>
   <tr><td><tt>--timeout (-T), --retries (-R), --min-rate (-J), --host-control (-H)</tt></td><td>Idle timeout, retry count, minimum acceptable rate, and host-ban behavior for slow or dead hosts.</td></tr>
-  <tr><td><tt>--max-pause (-G), -%G</tt></td><td>Pause the mirror at N bytes, or pause between files, to spread the load.</td></tr>
+  <tr><td><tt>--max-pause (-G), --pause (-%G)</tt></td><td>Pause the mirror at N bytes, or pause between files, to spread the load.</td></tr>
 </table>
 
 <p><b>The security clamps.</b> To keep an accidental typo from turning into a flood,
@@ -257,8 +257,8 @@ really HTML.</p>
   <tr><td><tt>--structure (-N)</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>--structure "%h%p/%n%q.%t"</tt>.</td></tr>
   <tr><td><tt>--long-names (-L)</tt></td><td>Long names, 8.3 names, or ISO9660 for CD masters.</td></tr>
   <tr><td><tt>--assume (-%A)</tt></td><td>Assume a MIME type for an extension, for example <tt>--assume php=text/html</tt>. This also skips the extra HEAD probe HTTrack would otherwise send to learn the type.</td></tr>
-  <tr><td><tt>-%N, --cached-delayed-type-check (-%D), --check-type (-u), -%t</tt></td><td>When and how the content type is checked, and whether the original extension is kept.</td></tr>
-  <tr><td><tt>--include-query-string (-%q), -%g</tt></td><td>Whether the query string appears in the local filename, and whether query keys are stripped when deciding if two URLs are the same file.</td></tr>
+  <tr><td><tt>--delayed-type-check (-%N), --cached-delayed-type-check (-%D), --check-type (-u), -%t</tt></td><td>When and how the content type is checked, and whether the original extension is kept.</td></tr>
+  <tr><td><tt>--include-query-string (-%q), --strip-query (-%g)</tt></td><td>Whether the query string appears in the local filename, and whether query keys are stripped when deciding if two URLs are the same file.</td></tr>
 </table>
 
 <p>The <tt>-N</tt> presets are built from modular arithmetic on the name fields, so
@@ -329,7 +329,7 @@ across links at the same time.</p>
   <tr><td><tt>--proxy (-P)</tt></td><td>Route through a proxy. HTTP, SOCKS5 and CONNECT are supported: <tt>-P host:8080</tt>, <tt>-P socks5://host:1080</tt>, <tt>-P connect://host:443</tt>, with optional <tt>user:pass@</tt>.</td></tr>
   <tr><td><tt>--httpproxy-ftp (-%f)</tt></td><td>Send FTP requests through the HTTP proxy.</td></tr>
   <tr><td><tt>--protocol (-@i)</tt></td><td>Prefer IPv4 or IPv6.</td></tr>
-  <tr><td><tt>--http-10 (-%h), --keep-alive (-%k), -%z</tt></td><td>Force HTTP/1.0 (drops keep-alive and compression, useful for fragile CGI), toggle keep-alive, and toggle compression.</td></tr>
+  <tr><td><tt>--http-10 (-%h), --keep-alive (-%k), --disable-compression (-%z)</tt></td><td>Force HTTP/1.0 (drops keep-alive and compression, useful for fragile CGI), toggle keep-alive, and toggle compression.</td></tr>
   <tr><td><tt>--bind (-%b), --tolerant (-%B)</tt></td><td>Bind to a local address, and accept technically-bogus responses some servers send.</td></tr>
 </table>
 
@@ -353,7 +353,7 @@ away and you lose the ability to continue or update the mirror.</p>
   <tr><td><tt>--update</tt></td><td>Re-run the mirror, revalidating each page with the server (If-Modified-Since / If-None-Match) and downloading only what changed.</td></tr>
   <tr><td><tt>--purge-old=0 (-X0)</tt></td><td>Do not purge. By default an update deletes local files that are no longer part of the mirror; <tt>--purge-old=0</tt> keeps them.</td></tr>
   <tr><td><tt>--cache (-C)</tt></td><td>Cache mode. The default already does the right thing and switches to update-checking when it detects an existing mirror.</td></tr>
-  <tr><td><tt>--urlhack (-%u), -%j, -%o, -%y, --do-not-recatch (-%n), --updatehack (-%s), --store-all-in-cache (-k)</tt></td><td>URL-deduplication behavior and cache storage details.</td></tr>
+  <tr><td><tt>--urlhack (-%u), --keep-www-prefix (-%j), --keep-double-slashes (-%o), --keep-query-order (-%y), --do-not-recatch (-%n), --updatehack (-%s), --store-all-in-cache (-k)</tt></td><td>URL-deduplication behavior and cache storage details.</td></tr>
   <tr><td><tt>--debug-cache (-#C), --repair-cache (-#R), --clean</tt></td><td>Inspect the cache, repair its ZIP, and erase cache plus logs.</td></tr>
 </table>
 
