@@ -375,9 +375,13 @@ if test -n "$warc_validate"; then
     fresh="${tmpdir}/warc-pass1.gz"
     test -f "$fresh" || fresh="$warc"
     declare -a bodyargs=()
-    if test -n "${WARC_VALIDATE_BODY:-}"; then
-        bodyargs=(--expect-body-hex "$WARC_VALIDATE_BODY")
-    fi
+    # WARC_VALIDATE_BODY holds one or more whitespace-separated SUB=HEX specs.
+    for spec in ${WARC_VALIDATE_BODY:-}; do
+        bodyargs+=(--expect-body-hex "$spec")
+    done
+    # strategy A (--warc-verbatim): assert the stored body inflates to the served
+    # body instead of expecting the decoded body stored verbatim.
+    test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
     "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
         die "fresh WARC validation failed"

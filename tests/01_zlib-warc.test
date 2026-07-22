@@ -12,7 +12,7 @@ httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
-for t in warc warc-trunc warc-ftp warc-rotate; do
+for t in warc warc-trunc warc-ftp warc-rotate warc-verbatim; do
     out=$("$httrack_bin" -O /dev/null "-#test=$t" "$scratch/")
     echo "$out"
     case "$out" in

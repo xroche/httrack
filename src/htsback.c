@@ -750,9 +750,19 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     fexist_utf8(back[p].url_sav))
                   filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
+              /* Strategy A: keep the compressed spool for a verbatim record
+                 instead of unlinking it. */
+              if (opt->warc_verbatim && StringNotEmpty(opt->warc_file)) {
+                warc_adopt_rawspool(&back[p].r, back[p].tmpfile);
+                if (back[p].r.warc_rawpath != NULL)
+                  back[p].tmpfile =
+                      NULL; /* adopted: freed via warc_free_request */
+              }
               /* ensure that no remaining temporary file exists */
-              unlink(back[p].tmpfile);
-              back[p].tmpfile = NULL;
+              if (back[p].tmpfile != NULL) {
+                unlink(back[p].tmpfile);
+                back[p].tmpfile = NULL;
+              }
             }
             // stats
             HTS_STAT.total_packed += back[p].compressed_size;
@@ -1062,6 +1072,8 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
   dst->r.headers = NULL;
   dst->r.warc_reqhdr = NULL;
   dst->r.warc_resphdr = NULL;
+  dst->r.warc_rawpath =
+      NULL; /* the spool stays owned by src (no double-unlink) */
   dst->r.warc_truncated = 0;
   dst->r.out = NULL;
   dst->r.location = dst->location_buffer;
@@ -1128,6 +1140,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.out = NULL;
     (*dst)->r.warc_reqhdr = NULL;
     (*dst)->r.warc_resphdr = NULL;
+    (*dst)->r.warc_rawpath = NULL;
     (*dst)->r.warc_truncated = 0;
     (*dst)->r.location = (*dst)->location_buffer;
     (*dst)->r.fp = NULL;
