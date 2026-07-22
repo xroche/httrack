@@ -846,12 +846,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     tempo[0] = '\0';
                     strcatbuff(tempo, eol);
-                    hts_footer_format(tempo + strlen(tempo),
-                                      sizeof(tempo) - strlen(tempo),
-                                      StringBuff(opt->footer), fields,
-                                      sizeof(fields) / sizeof(fields[0]));
-                    strcatbuff(tempo, eol);
-                    HT_ADD(tempo);
+                    // hts_footer_format returns <0 on overflow, leaving tempo
+                    // unterminated; emitting it would abort in strcatbuff
+                    // below.
+                    if (hts_footer_format(tempo + strlen(tempo),
+                                          sizeof(tempo) - strlen(tempo),
+                                          StringBuff(opt->footer), fields,
+                                          sizeof(fields) / sizeof(fields[0])) >=
+                        0) {
+                      strcatbuff(tempo, eol);
+                      HT_ADD(tempo);
+                    }
                   }
                 }
                 // Emit charset ?
