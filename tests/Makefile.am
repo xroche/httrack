@@ -3,7 +3,7 @@
 # silently drop it from the dist tarball and break "make distcheck".
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
-	proxytestlib.py tls-stall-server.py \
+	proxytestlib.py tls-stall-server.py warc-validate.py \
 	local-crawl.sh local-server.py testlib.sh server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
@@ -44,6 +44,7 @@ TESTS = \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
 	01_engine-cacheindex.test \
+	01_engine-warc.test \
 	01_engine-hashtable.test \
 	01_engine-header.test \
 	01_engine-idna.test \
@@ -153,6 +154,7 @@ TESTS = \
 	68_webhttrack-outdir-charset.test \
 	69_local-intl-logdir.test \
 	71_local-crange-repaircache.test \
-	72_watchdog-crawl.test
+	72_watchdog-crawl.test \
+	73_local-warc.test
 
 CLEANFILES = check-network_sh.cache

@@ -47,6 +47,7 @@ key="${testdir}/server.key"
 
 tls=
 verbose=
+warc_validate=
 html_subdir=
 outdir_intl=
 rerun=
@@ -113,6 +114,7 @@ while test "$pos" -lt "$nargs"; do
     case "${args[$pos]}" in
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
+    --warc-validate) warc_validate=1 ;; # validate the .warc.gz output structurally
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     --no-purge)
         nopurge=1
@@ -353,6 +355,25 @@ for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
 done
 test -n "$hostroot" || die "could not find host root under $out"
 debug "host root: $hostroot"
+
+# --- optional WARC structural validation (stdlib validator, no warcio) -------
+if test -n "$warc_validate"; then
+    info "validating WARC output"
+    warc=$(find "$mirrorroot" -maxdepth 2 -name '*.warc.gz' -o -name '*.warc' 2>/dev/null | sort | tail -n1)
+    test -n "$warc" || die "no WARC file produced under $mirrorroot"
+    declare -a wexpect=()
+    test -n "$rerun" && wexpect=(--expect-revisit)
+    if "$python" "$(nativepath "${testdir}/warc-validate.py")" "$(nativepath "$warc")" "${wexpect[@]}" >&2; then
+        result "OK"
+    else
+        result "WARC validation failed"
+        exit 1
+    fi
+    if command -v warcio >/dev/null 2>&1; then
+        info "warcio check (optional)"
+        warcio check -v "$warc" >&2 && result "OK" || die "warcio check failed"
+    fi
+fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
 # #483), or the .z/.u content-coding temps (#557).

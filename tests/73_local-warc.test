@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# A --warc crawl writes a standards-conformant WARC/1.1 archive, and an
+# --update re-crawl of an unchanged (all-304) site emits revisit records.
+# The stdlib validator (no warcio) is the real gate; warcio runs if present.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --rerun --warc-validate \
+    --log-found 'no files updated' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html' --warc-file warc-out

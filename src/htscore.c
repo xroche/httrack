@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 /* File defs */
 #include "htscore.h"
+#include "warc.h"
 
 /* specific definitions */
 #include "htsbase.h"
@@ -2245,6 +2246,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
+  warc_close_opt(opt);
 
   // désallocation mémoire & buffers
   XH_uninit;
@@ -3627,6 +3629,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);
+
+  if (StringNotEmpty(from->warc_file))
+    StringCopyS(to->warc_file, from->warc_file);
 
   if (from->pause_max_ms > 0) {
     to->pause_min_ms = from->pause_min_ms;

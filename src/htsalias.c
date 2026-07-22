@@ -114,6 +114,8 @@ const char *hts_optalias[][4] = {
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
+  {"warc", "-%r", "single", "write an ISO-28500 WARC/1.1 archive of the crawl"},
+  {"warc-file", "-%rf", "param1", "write a WARC archive to the given base name"},
   {"why", "-%Y", "param1",
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",

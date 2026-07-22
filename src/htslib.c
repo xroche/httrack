@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 // Fichier librairie .c
 
 #include "htscore.h"
+#include "warc.h"
 
 /* specific definitions */
 #include "htsbase.h"
@@ -1200,6 +1201,11 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     }
   }                             // Fin test pas postfile
   //
+
+  // Stash the raw request for the WARC request record (freed at
+  // back_clear_entry)
+  if (StringNotEmpty(opt->warc_file))
+    warc_stash_request(retour, bstr.buffer);
 
   // Callback
   {
@@ -6010,6 +6016,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
   StringCopy(opt->strip_query, "");
   StringCopy(opt->cookies_file, "");
+  StringCopy(opt->warc_file, "");
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;
@@ -6161,6 +6168,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->strip_query);
     StringFree(opt->cookies_file);
     StringFree(opt->why_url);
+    StringFree(opt->warc_file);
 
     StringFree(opt->path_html);
     StringFree(opt->path_html_utf8);

@@ -57,6 +57,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "warc.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
@@ -1258,6 +1259,13 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   StringCopy(from->cookies_file, "");
   copy_htsopt(from, to);
   if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
+    err = 1;
+
+  /* warc_file: same String deep-copy path as cookies_file */
+  StringCopy(from->warc_file, "run.warc.gz");
+  StringCopy(to->warc_file, "");
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
     err = 1;
 
   /* #185 pause pair: copied when enabled (max>0), the 0 sentinel skips */
@@ -3215,6 +3223,245 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Bounded substring search (records carry NUL bytes; strstr won't do). */
+static const char *warc_memstr(const char *hay, const char *needle,
+                               size_t haylen, size_t nlen) {
+  if (nlen == 0 || haylen < nlen)
+    return NULL;
+  {
+    size_t i;
+    for (i = 0; i + nlen <= haylen; i++) {
+      if (memcmp(hay + i, needle, nlen) == 0)
+        return hay + i;
+    }
+  }
+  return NULL;
+}
+
+/* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
+static unsigned char *warc_slurp(const char *path, size_t *len) {
+  FILE *f = FOPEN(path, "rb");
+  unsigned char *buf;
+  long sz;
+  if (f == NULL)
+    return NULL;
+  if (fseek(f, 0, SEEK_END) != 0 || (sz = ftell(f)) < 0) {
+    fclose(f);
+    return NULL;
+  }
+  rewind(f);
+  buf = malloct((size_t) sz + 1);
+  if (buf == NULL) {
+    fclose(f);
+    return NULL;
+  }
+  *len = fread(buf, 1, (size_t) sz, f);
+  fclose(f);
+  return buf;
+}
+
+/* Inflate one gzip member at *in (limit end); returns the decompressed record
+   in a malloc'd buffer (*out_len), advancing *in past the member. NULL at end
+   or on error (*out_len distinguishes: 0 and NULL = clean end). */
+static unsigned char *warc_next_member(const unsigned char **in,
+                                       const unsigned char *end,
+                                       size_t *out_len) {
+  z_stream zs;
+  unsigned char *out = NULL;
+  size_t len = 0;
+  int zerr;
+  *out_len = 0;
+  if (*in >= end)
+    return NULL;
+  memset(&zs, 0, sizeof(zs));
+  if (inflateInit2(&zs, 15 + 32) != Z_OK)
+    return NULL;
+  zs.next_in = (const Bytef *) *in;
+  zs.avail_in = (uInt) (end - *in);
+  do {
+    unsigned char tmp[8192];
+    size_t got;
+    zs.next_out = tmp;
+    zs.avail_out = sizeof(tmp);
+    zerr = inflate(&zs, Z_NO_FLUSH);
+    if (zerr != Z_OK && zerr != Z_STREAM_END) {
+      freet(out);
+      inflateEnd(&zs);
+      return NULL;
+    }
+    got = sizeof(tmp) - zs.avail_out;
+    if (got > 0) {
+      unsigned char *n = realloct(out, len + got + 1);
+      if (n == NULL) {
+        freet(out);
+        inflateEnd(&zs);
+        return NULL;
+      }
+      out = n;
+      memcpy(out + len, tmp, got);
+      len += got;
+    }
+  } while (zerr != Z_STREAM_END);
+  *in = (const unsigned char *) zs.next_in; /* start of the next member */
+  inflateEnd(&zs);
+  if (out != NULL)
+    out[len] = '\0';
+  *out_len = len;
+  return out;
+}
+
+/* Feed a synthetic transaction and validate the resulting .warc.gz against the
+   WARC/1.1 spec: each record a self-standing gzip member starting WARC/1.,
+   Content-Length == block length, the \r\n\r\n trailer intact, the response
+   body round-trips, and the encoding headers are stripped (strategy B). */
+static int st_warc(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *data;
+  size_t data_len = 0;
+  const unsigned char *p, *end;
+  int err = 0, nrec = 0, nresp = 0, nreq = 0, nrevisit = 0, ninfo = 0;
+  int seen_a_body = 0;
+  static const char a_body[] = "Hello, WARC!\n";
+
+  if (argc < 1) {
+    fprintf(stderr, "warc: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(path, sizeof(path), argv[0], "warc-selftest.warc.gz");
+
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+
+  /* 200 HTML: bogus Content-Length + gzip/chunked encodings must be stripped.
+   */
+  warc_write_transaction(
+      w, "http://test.local/a.html", "127.0.0.1",
+      "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
+      "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
+      a_body, sizeof(a_body) - 1, NULL, 200, 0);
+
+  /* 302 redirect: header-only, no body. */
+  warc_write_transaction(
+      w, "http://test.local/r", "127.0.0.1",
+      "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
+      0, NULL, 302, 0);
+
+  /* 200 binary, chunked coding on the wire (already de-chunked here). */
+  warc_write_transaction(
+      w, "http://test.local/b.bin", "127.0.0.1",
+      "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+      "Transfer-Encoding: chunked\r\n\r\n",
+      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0);
+
+  /* 200 with a body shorter than the declared Content-Length (rewritten). */
+  warc_write_transaction(
+      w, "http://test.local/trunc", "127.0.0.1",
+      "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+      "100\r\n\r\n",
+      "short", 5, NULL, 200, 0);
+
+  /* Same payload as a.html at a new URL: identical-payload-digest revisit
+     (OpenSSL builds only; a plain build writes a second full response). */
+  warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
+                         "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
+                         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                         a_body, sizeof(a_body) - 1, NULL, 200, 0);
+
+  warc_close(w);
+
+  data = warc_slurp(path, &data_len);
+  assertf(data != NULL);
+  p = data;
+  end = data + data_len;
+
+  while (p < end) {
+    size_t rlen = 0;
+    unsigned char *rec = warc_next_member(&p, end, &rlen);
+    const char *sep, *cl;
+    long long block_len;
+    size_t hdr_len;
+    if (rec == NULL) {
+      if (rlen == 0)
+        break; /* clean end */
+      err = 1;
+      break;
+    }
+    nrec++;
+    /* magic */
+    if (rlen < 8 || memcmp(rec, "WARC/1.", 7) != 0)
+      err = 1;
+    /* record header ends at the first blank line */
+    sep = warc_memstr((char *) rec, "\r\n\r\n", rlen, 4);
+    if (sep == NULL) {
+      err = 1;
+      freet(rec);
+      continue;
+    }
+    hdr_len = (size_t) ((const unsigned char *) sep - rec) + 4;
+    /* Content-Length must equal the actual block length */
+    cl = warc_memstr((char *) rec, "Content-Length:", hdr_len, 15);
+    if (cl == NULL || sscanf(cl + 15, "%lld", &block_len) != 1)
+      err = 1;
+    else {
+      if (hdr_len + (size_t) block_len + 4 != rlen)
+        err = 1; /* header + block + trailing CRLFCRLF */
+      else if (memcmp(rec + hdr_len + block_len, "\r\n\r\n", 4) != 0)
+        err = 1; /* trailer intact */
+    }
+    if (warc_memstr((char *) rec, "WARC-Type: warcinfo", hdr_len, 19) != NULL)
+      ninfo++;
+    if (warc_memstr((char *) rec, "WARC-Type: request", hdr_len, 18) != NULL)
+      nreq++;
+    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL)
+      nresp++;
+    if (warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+      nrevisit++;
+    /* a.html response body must round-trip and carry no encoding headers */
+    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a.html",
+                    hdr_len, 41) != NULL &&
+        warc_memstr((char *) rec, "msgtype=response", hdr_len, 16) != NULL) {
+      const char *bsep = warc_memstr((char *) rec + hdr_len, "\r\n\r\n",
+                                     (size_t) block_len, 4);
+      if (bsep == NULL)
+        err = 1;
+      else {
+        size_t bodyoff = (size_t) (bsep - (char *) rec) + 4;
+        size_t got = rlen - 4 - bodyoff; /* minus record trailer */
+        if (got != sizeof(a_body) - 1 ||
+            memcmp(rec + bodyoff, a_body, got) != 0)
+          err = 1;
+        seen_a_body = 1;
+      }
+      if (warc_memstr((char *) rec, "Content-Encoding", hdr_len + block_len,
+                      16) != NULL ||
+          warc_memstr((char *) rec, "Transfer-Encoding", hdr_len + block_len,
+                      17) != NULL)
+        err = 1;
+    }
+    freet(rec);
+  }
+  freet(data);
+
+  if (ninfo != 1 || nreq != 5 || nrec != 11 || !seen_a_body)
+    err = 1;
+#if HTS_USEOPENSSL
+  if (nrevisit != 1 || nresp != 4)
+    err = 1; /* a2.html deduped to a revisit */
+#else
+  if (nresp != 5)
+    err = 1; /* no digests: every fetch a full response */
+#endif
+
+  printf("warc: %d records (%d response, %d request, %d revisit): %s\n", nrec,
+         nresp, nreq, nrevisit, err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -3332,6 +3579,8 @@ static const struct selftest_entry {
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
+     st_warc},
 };
 
 static void list_selftests(void) {

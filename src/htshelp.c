@@ -524,6 +524,8 @@ void help(const char *app, int more) {
   infomsg
     (" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
+  infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
+          "output name");
   infomsg(" %t  keep the original file extension, don't rewrite it from the "
           "MIME type (%t0 rewrite)");
   infomsg

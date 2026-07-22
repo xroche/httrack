@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsnet.h"
 #include "htscore.h"
+#include "warc.h"
 #include "htsthread.h"
 #include <time.h>
 /* END specific definitions */
@@ -979,6 +980,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         // status finished callback
         RUN_CALLBACK1(opt, xfrstatus, &back[p]);
 
+        // WARC archive of the transaction (request + response/revisit)
+        if (StringNotEmpty(opt->warc_file))
+          warc_write_backtransaction(opt, &back[p]);
+
         return 0;
       } else {                  // testmode
         if (back[p].r.statuscode / 100 >= 3) {  /* Store 3XX, 4XX, 5XX test response codes, but NOT 2XX */
@@ -1055,6 +1060,8 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
   dst->r.soc = INVALID_SOCKET;
   dst->r.adr = NULL;
   dst->r.headers = NULL;
+  dst->r.warc_reqhdr = NULL;
+  dst->r.warc_resphdr = NULL;
   dst->r.out = NULL;
   dst->r.location = dst->location_buffer;
   dst->r.fp = NULL;
@@ -1118,6 +1125,8 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->chunk_adr = NULL;
     (*dst)->r.adr = NULL;
     (*dst)->r.out = NULL;
+    (*dst)->r.warc_reqhdr = NULL;
+    (*dst)->r.warc_resphdr = NULL;
     (*dst)->r.location = (*dst)->location_buffer;
     (*dst)->r.fp = NULL;
     (*dst)->r.soc = INVALID_SOCKET;
@@ -1585,6 +1594,7 @@ int back_clear_entry(lien_back * back) {
       freet(back->r.headers);
       back->r.headers = NULL;
     }
+    warc_free_request(&back->r);
     // Tout nettoyer
     memset(back, 0, sizeof(lien_back));
     back->r.soc = INVALID_SOCKET;
@@ -3631,6 +3641,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     deleteaddr(&back[i].r);
                     back[i].r.headers = block;
                   }
+                  // Stash the raw response headers for WARC (deletehttp frees
+                  // r.headers when the socket closes, before back_finalize)
+                  if (StringNotEmpty(opt->warc_file))
+                    warc_stash_response(&back[i].r, back[i].r.headers);
 
                   /* 
                      Status code and header-response hacks

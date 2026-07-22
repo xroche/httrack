@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsdefines.h"
 #include "htsalias.h"
+#include "warc.h"
 #include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"
@@ -1788,6 +1789,26 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   StringCopy(opt->cookies_file, argv[na]);
+                }
+                break;
+              case 'r': // warc / warc-file: write an ISO-28500 WARC archive
+                if (*(com + 1) == 'f') { // --warc-file NAME: explicit basename
+                  com++;
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                    HTS_PANIC_PRINTF(
+                        "Option warc-file needs a blank space and a WARC name");
+                    htsmain_free();
+                    return -1;
+                  }
+                  na++;
+                  if (strlen(argv[na]) >= 1024) {
+                    HTS_PANIC_PRINTF("WARC file name too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCopy(opt->warc_file, argv[na]);
+                } else { // --warc: auto-named archive under the output dir
+                  StringCopy(opt->warc_file, WARC_AUTONAME);
                 }
                 break;
               case 'Y': // why: explain the filter verdict for a URL, no crawl
