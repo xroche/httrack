@@ -86,6 +86,10 @@ warc_writer *warc_open(httrackp *opt, const char *path);
 /* Flush, close and free the writer (NULL-safe). */
 void warc_close(warc_writer *w);
 
+/* SURT-canonicalize url into out[outsz] (the CDXJ sort key). Returns 0 on
+   success, -1 on error or truncation. Exposed for the -#test=warc-surt test. */
+int warc_surt(const char *url, char *out, size_t outsz);
+
 /* Write one transaction's request + response (or revisit) records.
    target_uri:  absolute URL fetched.
    ip:          numeric peer IP, or NULL/"" to omit.

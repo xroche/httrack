@@ -543,6 +543,8 @@ struct httrackp {
                          --warc-file basename (appended at the tail: ABI) */
   LLint warc_max_size; /**< --warc-max-size: rotate the archive past this many
                             bytes (<=0: single file). Tail: ABI */
+  hts_boolean warc_cdx; /**< --warc-cdx: write a sorted CDXJ index next to the
+                             archive. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

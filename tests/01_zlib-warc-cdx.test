@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# --warc-cdx CDXJ index over synthetic transactions: sorted, one line per
+# response/revisit/resource, each offset/length inflates to the right member.
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+out=$("$httrack_bin" -O /dev/null -#test=warc-cdx "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac
