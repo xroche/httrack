@@ -243,9 +243,8 @@ fi
 # Localhost is fast; disable the rate/bandwidth safety limits but keep a
 # max-time backstop so a hang cannot wedge the suite.
 declare -a moreargs=(--quiet --max-time=120 --timeout=30 --disable-security-limits --robots=0)
-# Harness watchdog above --max-time: the engine limit fires first on a healthy
-# crawl, so this only catches a genuine wedge the engine missed (a Windows socket
-# stall). CRAWL_DEADLINE lets 72_watchdog-crawl drive it low to prove fail-fast.
+# Watchdog above --max-time so the engine limit fires first when healthy; only a
+# genuine wedge trips it. CRAWL_DEADLINE lets 72_watchdog-crawl drive it low.
 crawl_deadline=${CRAWL_DEADLINE:-180}
 log="${tmpdir}/log"
 info "running httrack ${hts[*]}"

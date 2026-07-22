@@ -31,11 +31,9 @@ is_windows() {
     esac
 }
 
-# Stop a backgrounded server and reap it. MSYS cannot signal a native python.exe,
-# so on Windows we reap the whole native tree (kill_tree): a bare kill -9 leaves
-# the winpid's children behind, and a lingering server holds the CI step open.
-# Every step is "|| true": callers run under set -e, and reaping a server we just
-# signalled makes wait return 143.
+# Stop a backgrounded server and reap it. On Windows MSYS can't signal a native
+# python.exe, so kill_tree ends the whole tree (a bare kill -9 leaves children).
+# "|| true" throughout: callers run under set -e and the reap makes wait return 143.
 stop_server() {
     test -n "${1:-}" || return 0
     kill "$1" 2>/dev/null || true
@@ -110,13 +108,9 @@ run_with_timeout() {
     wait "$pid"
 }
 
-# Wait for an already-backgrounded crawl (pid $1) under a $2-second deadline,
-# returning its status or 124 if it overran and was reaped tree-and-all. The
-# crawl launchers background httrack themselves (they track the pid for their
-# EXIT trap), so they need a deadline attached to an existing pid rather than
-# run_with_timeout's own fork: a fetch that wedges past --max-time (a Windows
-# socket stall the engine can miss) would otherwise block wait(1) forever and
-# hang the CI step to its 45-minute cap, reading as "lost communication".
+# Bound an already-backgrounded crawl (pid $1) at $2s, reaping it tree-and-all and
+# returning 124 on overrun: a wedge past --max-time would else block wait() forever
+# and hang the CI step. (The launchers keep the pid for their trap, hence not run_with_timeout.)
 wait_bounded() {
     local pid=$1 secs=$2 waited=0
     while kill -0 "$pid" 2>/dev/null; do

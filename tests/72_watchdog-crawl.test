@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# Control for the crawl watchdog (wait_bounded in local-crawl.sh): a fetch that
-# wedges past the engine's own limits must be reaped at the harness deadline and
-# reported in seconds, never left to hang the CI step to its 45-minute cap (the
-# Windows x64/Win32 "lost communication" hangs). Drives CRAWL_DEADLINE low
-# against an always-stall endpoint and asserts a fast, watchdog-attributed fail.
+# Control for the crawl watchdog (wait_bounded): a wedged fetch must be reaped at
+# the harness deadline in seconds, not hang the CI step to its 45-min cap. Drives
+# CRAWL_DEADLINE low against an always-stall endpoint; asserts a fast, attributed fail.
 
 : "${top_srcdir:=..}"
 
@@ -18,8 +16,8 @@ out=$(CRAWL_DEADLINE=3 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     httrack 'BASEURL/watchdog/stall' 2>&1) && rc=0 || rc=$?
 elapsed=$((SECONDS - start))
 
-# Skip, don't fail, on causes unrelated to the watchdog: no python3/server (77),
-# or the ephemeral-port announce racing on a slow Windows runner (flaky-13).
+# Skip (not fail) on causes unrelated to the watchdog: no python3/server, or a
+# port-announce race (flaky-13).
 test "$rc" -ne 77 || {
     echo "SKIP: local crawl prerequisites missing" >&2
     exit 77
@@ -29,9 +27,8 @@ if printf '%s\n' "$out" | grep -q "could not discover server port"; then
     exit 77
 fi
 
-# The watchdog message only prints on the 124 reap, and 20s is below the engine's
-# own --timeout=30, so both together pin the fast exit on the 3s harness watchdog
-# rather than httrack eventually giving up on the stalled read.
+# The message prints only on the 124 reap, and 20s < the engine's --timeout=30, so
+# together they pin the fast exit on the 3s watchdog, not httrack giving up.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
 test "$elapsed" -lt 20 || fail "watchdog fired late (${elapsed}s)"
 printf '%s\n' "$out" | grep -q "watchdog fired" ||
