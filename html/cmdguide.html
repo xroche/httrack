@@ -219,6 +219,23 @@ that a <tt>403 Forbidden</tt> is a server refusal, not a robots rule: robots
 options will not help there. That is an
 <a href="#identity">identity</a> problem.</p>
 
+<h4>Filter wildcards</h4>
+<p>Inside a filter pattern, <tt>*</tt> matches any run of characters; a few
+bracket forms match narrower sets. The full table, with size and mime rules, is on
+<a href="filters.html">the filters page</a>.</p>
+<table class="tblRegular tableWidth" border="0">
+  <tr class="tblHeaderColor"><td><b>Wildcard</b></td><td><b>Matches</b></td><td><b>Example</b></td></tr>
+  <tr><td><tt>*</tt></td><td>any run of characters</td><td><tt>+*.pdf</tt> &mdash; any URL ending <tt>.pdf</tt></td></tr>
+  <tr><td><tt>*[file]</tt>, <tt>*[name]</tt></td><td>one path segment (any char but <tt>/</tt> and <tt>?</tt>)</td><td><tt>example.com/*[file]/</tt> &mdash; a directory-index page</td></tr>
+  <tr><td><tt>*[path]</tt></td><td>a path, slashes allowed (any char but <tt>?</tt>)</td><td><tt>example.com/*[path].zip</tt></td></tr>
+  <tr><td><tt>*[param]</tt></td><td>an optional query string</td><td><tt>page.html*[param]</tt> matches with or without <tt>?...</tt></td></tr>
+  <tr><td><tt>*[a,b,c]</tt></td><td>any one character in the set</td><td><tt>*[a,b,c].txt</tt></td></tr>
+  <tr><td><tt>*[a-z]</tt></td><td>any one character in the range</td><td><tt>img*[0-9].gif</tt></td></tr>
+  <tr><td><tt>*[\x]</tt></td><td>the literal character x (escapes <tt>* [ ] \</tt>)</td><td><tt>*[\*]</tt> matches a real <tt>*</tt></td></tr>
+  <tr><td><tt>*[&lt;NN]</tt>, <tt>*[&gt;NN]</tt></td><td>file size in KB below / above NN</td><td><tt>-*.gif*[&lt;5]</tt> skips GIFs under 5&nbsp;KB</td></tr>
+  <tr><td><tt>*[]</tt></td><td>end anchor: nothing may follow</td><td><tt>*.html*[]</tt> rejects <tt>i.html?p=1</tt></td></tr>
+</table>
+
 <h3 id="limits">4. Limits and politeness</h3>
 
 <p>HTTrack ships cautious on purpose: it is easy to hammer a small site by
