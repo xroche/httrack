@@ -979,6 +979,23 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # Always-stall endpoint for 72_watchdog-crawl: promise a body, deliver a
+    # prefix, then sleep past any deadline so the crawl wedges and the harness
+    # watchdog (not the engine) must reap it.
+    def route_watchdog_stall(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", "1000000")  # never delivered
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(b"STALL")
+            self.wfile.flush()
+            try:
+                while True:
+                    time.sleep(3600)
+            except OSError:
+                pass
+
     # C7: stall the first GET (partial + temp-ref), then answer the resume's
     # Range with a bogus 304; httrack must drop the partial and refetch.
     RESUME304_BODY = b"C7DATA--" + bytes((i * 7 + 3) % 256 for i in range(8192))
@@ -1563,6 +1580,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/types/gen.php": route_types,
         "/intl/index.html": route_intl_index,
         "/intl/" + INTL_NAME: route_intl_page,
+        "/watchdog/stall": route_watchdog_stall,
         "/resume/index.html": route_resume_index,
         "/resume/blob.txt": route_resume,
         "/resume304/index.html": route_resume304_index,

@@ -152,6 +152,7 @@ TESTS = \
 	67_engine-delayed-truncate.test \
 	68_webhttrack-outdir-charset.test \
 	69_local-intl-logdir.test \
-	71_local-crange-repaircache.test
+	71_local-crange-repaircache.test \
+	72_watchdog-crawl.test
 
 CLEANFILES = check-network_sh.cache
