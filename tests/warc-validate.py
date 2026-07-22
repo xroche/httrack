@@ -11,6 +11,10 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
+#   --verbatim                strategy A: --expect-body-hex instead keeps
+#                             Content-Encoding, checks the HTTP Content-Length is
+#                             the stored (compressed) length, and asserts the
+#                             stored body inflates to HEX (the served plaintext)
 import base64
 import hashlib
 import sys
@@ -61,9 +65,38 @@ def check_body(rec, http_hdr, body, sub, want):
             sys.exit("WARC-Payload-Digest mismatch for %s" % sub)
 
 
+def check_body_verbatim(rec, http_hdr, body, sub, want):
+    """Strategy A: the stored body is the coded octets, Content-Encoding is kept,
+    the HTTP Content-Length equals the stored (compressed) length, inflating the
+    body yields the served plaintext, and the payload digest is over the coded
+    body. This is the differential: inflate(stored) == strategy-B decoded body."""
+    if b"Content-Encoding" not in http_hdr:
+        sys.exit("verbatim record for %s dropped Content-Encoding" % sub)
+    if b"Transfer-Encoding" in http_hdr:
+        sys.exit("verbatim record for %s kept Transfer-Encoding" % sub)
+    hcl = field(http_hdr, b"Content-Length")
+    if hcl is None or int(hcl) != len(body):
+        sys.exit("verbatim record for %s: HTTP Content-Length != stored body" % sub)
+    try:
+        decoded = zlib.decompress(body, zlib.MAX_WBITS | 16)
+    except Exception as exc:
+        sys.exit("verbatim record for %s: body did not inflate: %s" % (sub, exc))
+    if decoded != want:
+        sys.exit(
+            "verbatim decoded mismatch for %s: got %d bytes, expected %d"
+            % (sub, len(decoded), len(want))
+        )
+    pd = field(rec[: rec.find(b"\r\n\r\n")], b"WARC-Payload-Digest")
+    if pd is not None and pd.startswith(b"sha1:"):
+        want_b32 = base64.b32encode(hashlib.sha1(body).digest()).decode("ascii")
+        if pd[5:].decode("ascii") != want_b32:
+            sys.exit("WARC-Payload-Digest (compressed) mismatch for %s" % sub)
+
+
 def main():
     argv = sys.argv[1:]
     expect_revisit = "--expect-revisit" in argv
+    verbatim = "--verbatim" in argv
     body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
     no_resp = opt_values(argv, "--no-response-for")
     path = [a for a in argv if not a.startswith("--") and "=" not in a][0]
@@ -106,7 +139,8 @@ def main():
             http_hdr, body = block[:bsep], block[bsep + 4 :]
             for sub, hexval in body_specs:
                 if sub.encode() in uri:
-                    check_body(rec, http_hdr, body, sub, bytes.fromhex(hexval))
+                    checker = check_body_verbatim if verbatim else check_body
+                    checker(rec, http_hdr, body, sub, bytes.fromhex(hexval))
                     body_hits[sub] = True
         elif wtype == b"revisit":
             revisits += 1

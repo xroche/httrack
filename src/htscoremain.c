@@ -1825,6 +1825,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         errno != ERANGE)
                       opt->warc_max_size = v;
                   }
+                } else if (*(com + 1) == 'v') { // --warc-verbatim: strategy A
+                  com++;
+                  opt->warc_verbatim = 1;
+                  if (!StringNotEmpty(opt->warc_file)) // implies --warc
+                    StringCopy(opt->warc_file, WARC_AUTONAME);
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }

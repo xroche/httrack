@@ -635,6 +635,20 @@ class Handler(SimpleHTTPRequestHandler):
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
+    # --warc-verbatim: a gzip-coded HTML page whose decoded body is known, for
+    # the strategy-A differential (stored compressed bytes must inflate to this).
+    WARCGZ_BODY = b"<html><body>verbatim gzip page for WARC strategy A</body></html>\n"
+
+    def route_warcgz_index(self):
+        self.send_html('\t<a href="page.html">page</a>\n')
+
+    def route_warcgz_page(self):
+        self.send_raw(
+            gzip.compress(self.WARCGZ_BODY),
+            "text/html",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
     # --- content codings ---------------------------------------------------
     # Canned br/zstd bodies (no brotli/zstd module in the stdlib): both decode
     # to CODEC_BODY. Regenerate with the brotli/zstd CLIs over that string.
@@ -1542,6 +1556,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/gated/index.php": route_gated_index,
         "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
+        "/warcgz/index.html": route_warcgz_index,
+        "/warcgz/page.html": route_warcgz_page,
         "/codec/index.html": route_codec_index,
         "/codec/br.html": route_codec_br,
         "/codec/zstd.html": route_codec_zstd,

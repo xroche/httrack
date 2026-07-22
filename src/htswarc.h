@@ -95,13 +95,15 @@ void warc_close(warc_writer *w);
    body_path:   file re-read for the body when body==NULL (may be NULL).
    is_update_unchanged: nonzero for a 304 server-not-modified revisit.
    truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
+   keep_content_encoding: strategy A: body/body_len are the as-received coded
+     bytes, so keep Content-Encoding and set Content-Length to body_len.
    Returns 0 on success, -1 on error. */
 int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
                            int statuscode, int is_update_unchanged,
-                           int truncated);
+                           int truncated, int keep_content_encoding);
 
 /* Write one non-HTTP capture as a single WARC 'resource' record: the block is
    the raw payload (no HTTP envelope), Content-Type is the payload's own MIME.

@@ -375,6 +375,9 @@ if test -n "$warc_validate"; then
     if test -n "${WARC_VALIDATE_BODY:-}"; then
         bodyargs=(--expect-body-hex "$WARC_VALIDATE_BODY")
     fi
+    # strategy A (--warc-verbatim): assert the stored body inflates to the served
+    # body instead of expecting the decoded body stored verbatim.
+    test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
     "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
         die "fresh WARC validation failed"

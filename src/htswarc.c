@@ -403,10 +403,12 @@ static int header_is(const char *line, size_t line_len, const char *name) {
 
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
    trailing CRLF terminator). Always drops Transfer-Encoding (hop-by-hop).
-   When set_cl>=0, also drops Content-Encoding and the original Content-Length
-   and appends "Content-Length: <set_cl>". Returns 0 on success. */
+   When set_cl>=0, drops the original Content-Length and appends
+   "Content-Length: <set_cl>". Content-Encoding is dropped too unless keep_ce
+   (strategy A: the body is stored in its as-received coded form, so the
+   header must survive and set_cl is the compressed length). Returns 0. */
 static int normalize_http_headers(const char *resp_hdr, long long set_cl,
-                                  wbuf *out) {
+                                  int keep_ce, wbuf *out) {
   const char *p = resp_hdr;
   int first = 1;
   if (resp_hdr == NULL)
@@ -423,8 +425,10 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
       first = 0; /* status line: keep verbatim */
     } else if (header_is(p, len, "Transfer-Encoding")) {
       goto next;
-    } else if (set_cl >= 0 && (header_is(p, len, "Content-Encoding") ||
-                               header_is(p, len, "Content-Length"))) {
+    } else if (set_cl >= 0 && header_is(p, len, "Content-Length")) {
+      goto next;
+    } else if (set_cl >= 0 && !keep_ce &&
+               header_is(p, len, "Content-Encoding")) {
       goto next;
     }
     if (wbuf_add(out, p, len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
@@ -628,6 +632,11 @@ void warc_free_request(htsblk *r) {
   if (r != NULL) {
     freet(r->warc_reqhdr);
     freet(r->warc_resphdr);
+    if (r->warc_rawpath != NULL) {
+      (void) UNLINK(r->warc_rawpath); /* owns the strategy-A spool file */
+      freet(r->warc_rawpath);
+      r->warc_rawpath = NULL;
+    }
   }
 }
 
@@ -787,7 +796,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
                            int statuscode, int is_update_unchanged,
-                           int truncated) {
+                           int truncated, int keep_content_encoding) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -839,11 +848,12 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
      only a full response carries the payload (F1). */
   emit_body = has_payload && !is_revisit;
 
-  /* Normalize headers: full response rewrites Content-Length to the decoded
-     body length and strips Content-Encoding; a revisit keeps them (no body). */
+  /* Normalize headers: a full response rewrites Content-Length to the stored
+     body length; strategy B strips Content-Encoding, strategy A keeps it (the
+     stored body is the compressed length). A revisit keeps both (no body). */
   memset(&http, 0, sizeof(http));
   if (normalize_http_headers(resp_hdr, emit_body ? (long long) body_len : -1,
-                             &http) != 0) {
+                             keep_content_encoding, &http) != 0) {
     wbuf_free(&http);
     return -1;
   }
@@ -925,6 +935,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   char synth[512];
   int is_unchanged;
   int is_ftp;
+  int keep_ce = 0;
 
   if (opt->state.warc == WARC_DISABLED)
     return;
@@ -975,6 +986,18 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     return;
   }
 
+  /* Strategy A (--warc-verbatim): a compressed body was spooled before decode;
+     store those verbatim coded bytes and keep Content-Encoding. The digest is
+     then over the coded payload, which is what the record carries. */
+  if (opt->warc_verbatim && back->r.warc_rawpath != NULL &&
+      back->r.warc_rawsize > 0 &&
+      (uint64_t) back->r.warc_rawsize <= (uint64_t) (size_t) -1) {
+    body = NULL;
+    body_path = back->r.warc_rawpath;
+    body_len = (size_t) back->r.warc_rawsize;
+    keep_ce = 1;
+  }
+
   is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;
 
   /* Prefer the stashed raw headers; synthesize a minimal status line for the
@@ -991,5 +1014,5 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
 
   warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
                          body_len, body_path, back->r.statuscode, is_unchanged,
-                         back->r.warc_truncated);
+                         back->r.warc_truncated, keep_ce);
 }

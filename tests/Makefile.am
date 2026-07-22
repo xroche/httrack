@@ -157,6 +157,7 @@ TESTS = \
 	69_local-intl-logdir.test \
 	71_local-crange-repaircache.test \
 	72_watchdog-crawl.test \
-	73_local-warc.test
+	73_local-warc.test \
+	74_local-warc-verbatim.test
 
 CLEANFILES = check-network_sh.cache

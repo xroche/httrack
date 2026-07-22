@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# --warc --warc-verbatim (strategy A) stores a gzip-coded body as received: the
+# response record keeps Content-Encoding: gzip and its stored bytes inflate back
+# to the served page. The validator's --verbatim mode is the differential gate:
+# inflate(stored) must equal the decoded body strategy B would have stored.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+# decoded body served (gzip-coded) by route_warcgz_page.
+export WARC_VALIDATE_BODY="warcgz/page.html=3c68746d6c3e3c626f64793e766572626174696d20677a6970207061676520666f72205741524320737472617465677920413c2f626f64793e3c2f68746d6c3e0a"
+export WARC_VALIDATE_VERBATIM=1
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
+    --found 'warcgz/index.html' --found 'warcgz/page.html' \
+    httrack 'BASEURL/warcgz/index.html' --warc-file warc-out --warc-verbatim
