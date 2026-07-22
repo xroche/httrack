@@ -105,6 +105,7 @@ static int wbuf_puts(wbuf *b, const char *s) {
   return wbuf_add(b, s, strlen(s));
 }
 
+static int wbuf_printf(wbuf *b, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
 static int wbuf_printf(wbuf *b, const char *fmt, ...) {
   char tmp[1024];
   int n;

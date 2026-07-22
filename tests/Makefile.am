@@ -44,7 +44,6 @@ TESTS = \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
 	01_engine-cacheindex.test \
-	01_engine-warc.test \
 	01_engine-hashtable.test \
 	01_engine-header.test \
 	01_engine-idna.test \
@@ -79,6 +78,7 @@ TESTS = \
 	01_engine-version-macros.test \
 	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
+	01_zlib-warc.test \
 	01_zlib-contentcodings.test \
 	01_zlib-cache.test \
 	01_zlib-cache-corrupt.test \
