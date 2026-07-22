@@ -3,7 +3,7 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
 	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
-	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows vista, windows seven, windows 8, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, linux, windows, macos, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
 	<title>HTTrack Website Copier - Offline Browser</title>
 
 	<style type="text/css">
@@ -135,9 +135,7 @@ clear language!
 
 <li><a href="#QG2">Where can I find French/other languages documentation?</a><br></li>
 
-<li><a href="#QG3b">Is HTTrack working on Windows Vista/Windows Seven/Windows 8 ?</a><br></li>
-
-<li><a href="#QG3">Is HTTrack working on Windows 95/98 ?</a><br></li>
+<li><a href="#QG3">Which systems does HTTrack run on?</a><br></li>
 
 <li><a href="#QG4">What's the difference between HTTrack, WinHTTrack and WebHTTrack?</a><br></li>
 
@@ -320,10 +318,10 @@ This can easily done by using filters: go to the Option panel, select the 'Scan 
 <tt>+www.example.com/gallery/trees/*<br>
 +www.example.com/photos/*</tt><br>
 <br>
-This means "accept all links begining with <tt>www.example.com/gallery/trees/</tt> and <tt>www.example.com/photos/</tt>" 
+This means "accept all links beginning with <tt>www.example.com/gallery/trees/</tt> and <tt>www.example.com/photos/</tt>" 
 - the <tt>+</tt> means "accept" and the final <tt>*</tt> means "any character will match after the previous ones".
 Remember the <tt>*.doc</tt> or <tt>*.zip</tt> encountered when you want to select all files from a certain type on your computer: 
-it is almost the same here, except the begining "+"<br>
+it is almost the same here, except the beginning "+"<br>
 <br>
 Now, we might want to exclude all links in <tt>www.example.com/gallery/trees/hugetrees/</tt>, because with the previous filter,
 we accepted too many files. Here again, you can add a filter rule to refuse these links. Modify the previous filters to:<br>
@@ -331,8 +329,8 @@ we accepted too many files. Here again, you can add a filter rule to refuse thes
 +www.example.com/photos/*<br>
 -www.example.com/gallery/trees/hugetrees/*</tt><br>
 <br>
-You have noticed the <tt>-</tt> in the begining of the third rule: this means "refuse links matching the rule" 
-; and the rule is "any files begining with <tt>www.example.com/gallery/trees/hugetrees/</tt><br>
+You have noticed the <tt>-</tt> in the beginning of the third rule: this means "refuse links matching the rule" 
+; and the rule is "any files beginning with <tt>www.example.com/gallery/trees/hugetrees/</tt><br>
 
 Voila! With these three rules, you have precisely defined what you wanted to capture.<br>
 <br>
@@ -361,12 +359,12 @@ You can freely download it, without paying any fees, copy it to your friends, an
 There are NO official/authorized resellers, because HTTrack is <b>NOT</b> a commercial product.
 But you can be charged for duplication fees, or any other services (example: software CDroms or shareware collections, or fees for maintenance), 
 but you should have been informed that the software was free software/GPL, and you <b><u>MUST</u></b> have received a copy of the GNU General Public License.
-Otherwise this is dishonnest and unfair (ie. selling httrack on ebay without telling that it was a free software is a scam).
+Otherwise this is dishonest and unfair (ie. selling httrack on ebay without telling that it was a free software is a scam).
 </em>
 
 <br><br><a NAME="QG0b">Q: <strong>Are there any risks of viruses with this software?</strong></a><br>
 A: <em>For the software itself: 
-All official releases (at httrack.com) are checked against all known viruses, and the packaging process is also checked. Archives are stored on Un*x servers, not really concerned by viruses. It has been reported, however, that some rogue freeware sites are embedding free softwares and freewares inside badware installers. Always download httrack from the main site (www.httrack.com), and never from an untrusted source!<br>
+All official releases (at httrack.com) are checked against all known viruses, and the packaging process is also checked. Archives are stored on Un*x servers, not really concerned by viruses. It has been reported, however, that some rogue freeware sites are embedding free software and freeware inside badware installers. Always download httrack from the main site (www.httrack.com), and never from an untrusted source!<br>
 For files you are downloading on the WWW using HTTrack: You may encounter websites which were corrupted by viruses, and downloading data on these websites might be dangerous if you execute downloaded executables, or if embedded pages contain infected material (as dangerous as if using a regular Browser). Always ensure that websites you are crawling are safe.
  (Note: remember that using an antivirus software is a good idea once you are connected to the Internet)</em>
 
@@ -376,11 +374,8 @@ A: <em>That's right. You can, however, install WinHTTrack on your own machine, a
 <br><br><a NAME="QG2">Q: <strong>Where can I find French/other languages documentation?</strong></a><br>
 A: <em>Windows interface is available on several languages, but not yet the documentation!</em>
 
-<br><br><a NAME="QG3b">Q: <strong>Is HTTrack working on Windows Vista/Windows Seven/Windows 8 ?</strong></a><br>
-A: <em>Yes, it does</em>
-
-<br><br><a NAME="QG3">Q: <strong>Is HTTrack working on Windows 95/98 ?</strong></a><br>
-A: <em>No, not anymore. You may try to pick an older release (such as 3.33)</em>
+<br><br><a NAME="QG3">Q: <strong>Which systems does HTTrack run on?</strong></a><br>
+A: <em>HTTrack runs on current Windows, Linux and other Unix-like systems, and macOS. Very old platforms such as Windows 95/98 are no longer supported; you may try an older release (such as 3.33) on those.</em>
 
 <br><br><a NAME="QG4">Q: <strong>What's the difference between HTTrack, WinHTTrack and WebHTTrack?</strong></a><br>
 A: <em>WinHTTrack is the Windows GUI release of HTTrack (with a native graphic shell) and WebHTTrack is the Linux/Posix release of HTTrack (with an html graphic shell)</em>
@@ -394,7 +389,7 @@ A: <em>It should. The <tt>configure.ac</tt> may be modified in some cases, howev
 <br><br><a NAME="QG7">Q: <strong>I use HTTrack for professional purpose. What about restrictions/license fee?</strong></a><br>
 A: <em>HTTrack is covered by the GNU General Public License (GPL). There is no restrictions using HTTrack for professional purpose, 
 except if you develop a software which uses HTTrack components (parts of the source, or any other component).
-See the <tt>license.txt</tt> file for more information</em>. See also the next question regarding copyright issues when reditributing downloaded material.
+See the <tt>license.txt</tt> file for more information</em>. See also the next question regarding copyright issues when redistributing downloaded material.
 
 <br><br><a NAME="QG7b">Q: <strong>Is there any license royalties for distributing a mirror made with HTTrack?</strong></a><br>
 A: <em>On the HTTrack side, no. However, sharing, publishing or reusing copyrighted material downloaded from a site requires the authorization of the copyright holders, and possibly paying royalty fees. Always ask the authorization before creating a mirror of a site, even if the site appears to be royalty-free and/or without copyright notice.</em>
@@ -415,7 +410,7 @@ There are several reasons (and solutions) for a mirror to fail. Reading the log 
 
 <ul>
  <li>Links within the site refers to external links, or links located in another (or upper) directories, not captured by default - the use of filters is generally THE solution, as this is one of the powerful option in HTTrack. <u>See the above questions/answers</u>.</li>
- <li>Website <a href="#Q1b1">'robots.txt' rules</a> forbide access to several website parts - you can disable them, but only with great care!</li>
+ <li>Website <a href="#Q1b1">'robots.txt' rules</a> forbid access to several website parts - you can disable them, but only with great care!</li>
  <li>HTTrack is filtered (by its default User-agent IDentity) - you can change the Browser User-Agent identity to an anonymous one (MSIE, Netscape..) - here again, use this option with care, as this measure might have been put to avoid some bandwidth abuse (see also the <a href="abuse.html">abuse faq</a>!)</li>
 </ul>
 
@@ -457,14 +452,14 @@ A: <em>Yes, HTTrack does support (since 3.20 release) ipv6 sites, using A/AAAA e
 A: <em>Check the build options (you may have selected user-defined structure with wrong parameters!)</em>
 
 <br><br><a NAME="QT5">Q: <strong>When capturing real audio/video links (.ram), I only get a shortcut!</a></strong></a></br>
-A: <em>Yes, but .ra/.rm associated file should be captured together - except if rtsp:// protocol is used (not supported by HTTrack yet), or if proper filters are needed</em>
+A: <em>The .ra/.rm associated file can be captured together with the shortcut, if proper filters are set. Streaming protocols such as rtsp:// are out of scope: HTTrack is an HTTP/FTP mirror and does not capture rtsp streams.</em>
 
 <br><br><a NAME="QT6">Q: <strong>Using user:password@address is not working!</a></strong></a></br>
 A: <em>Again, first check the <tt>hts-log.txt</tt> and <tt>hts-err.txt</tt> error log files - this can give you precious information<br>
 The site may have a different authentication scheme - form based authentication, for example.
 In this case, use the URL capture features of HTTrack, it might work.
 <br>Note: If your username and/or password contains a '<tt>@</tt>' character, you may have to replace all '<tt>@</tt>' 
-occurences by '<tt>%40</tt>' so that it can work, such as in <tt>user%40domain.com:foobar@www.foo.com/auth/. 
+occurrences by '<tt>%40</tt>' so that it can work, such as in <tt>user%40domain.com:foobar@www.foo.com/auth/. 
 You may have to do the same for all "special" characters like spaces (%20), quotes (%22)..</tt>
 </em>
 <br><br>
@@ -520,7 +515,7 @@ These rules, stored in a file called robots.txt, are given by the website, to sp
 - for example, /cgi-bin or large images files.
 They are followed by default by HTTrack, as it is advised. Therefore, you may miss some files that would have been downloaded without
 these rules - check in your logs if it is the case:<br>
-<tt>Info: Note: due to www.foobar.com remote robots.txt rules, links begining with these path will be forbidden: /cgi-bin/,/images/ (see in the options to disable this)
+<tt>Info: Note: due to www.foobar.com remote robots.txt rules, links beginning with these path will be forbidden: /cgi-bin/,/images/ (see in the options to disable this)
 </tt>
 <br>
 If you want to disable them, just change the corresponding option in the option list! (but only disable this option with great care, 
@@ -540,7 +535,7 @@ HTTrack must find one. Therefore, two index.html will be produced, one with the 
 <br>
 It might be a good idea to consider that http://www.foobar.com/ and http://www.foobar.com/index.html are the same links, to avoid
 duplicate files, isn't it?
-NO, because the top index (/) can refer to ANY filename, and if index.html is generally the default name, index.htm can be choosen,
+NO, because the top index (/) can refer to ANY filename, and if index.html is generally the default name, index.htm can be chosen,
 or index.php3, mydog.jpg, or anything you may imagine. (some webmasters are really crazy)
 <br>
 <br>
@@ -595,8 +590,7 @@ A: <em>Simply use the <tt>--assume dat=application/x-zip</tt> option
 A: <em>You may need cookies! Cookies are specific data (for example, your username or password) that are sent to your browser once
 you have logged in certain sites so that you only have to log-in once. For example, after having entered your username in a website, you can
 view pages and articles, and the next time you will go to this site, you will not have to re-enter your username/password.<br>
-To "merge" your personnal cookies to an HTTrack project, just copy the cookies.txt file from your Netscape folder (or the cookies located into the Temporary Internet Files folder for IE)
-into your project folder (or even the HTTrack folder)
+To supply your own cookies to an HTTrack project, put a Netscape-format <tt>cookies.txt</tt> file in your project folder, or point HTTrack at one with the <tt>--cookies-file</tt> option. You can export your browser's session cookies to that format with a browser extension.
 </em>
 <br>
 <br>
@@ -661,7 +655,7 @@ Shell version, skip some slow files, too.</em><br>
 
 </a><a NAME="Q3b">Q: <strong>I want to update a site, but it's taking too much time! What's happening?</strong><br>
 A: <em>First, HTTrack always tries to minimize the download flow by interrogating the server about the
-file changes. But, because HTTrack has to rescan all files from the begining to rebuild the local site structure, 
+file changes. But, because HTTrack has to rescan all files from the beginning to rebuild the local site structure, 
 it can take some time. 
 Besides, some servers are not very smart and always consider that they get newer files, forcing HTTrack to reload them,
 even if no changes have been made!
@@ -740,7 +734,7 @@ retransferred.</em><br>
 </a><a NAME="Q7">Q: <strong>I just want to retrieve all ZIP files or other files in a web
 site/in a page. How do I do it?</strong><br>
 A: <em>You can use different methods. You can use the 'get files near a link' option if
-files are in a foreign domain. You can use, too, a filter adress: adding <tt>+*.zip</tt>
+files are in a foreign domain. You can use, too, a filter address: adding <tt>+*.zip</tt>
 in the URL list (or in the filter list) will accept all ZIP files, even if these files are
 outside the address. <br>
 Example : <tt>httrack www.example.com/someaddress.html +*.zip</tt> will allow
