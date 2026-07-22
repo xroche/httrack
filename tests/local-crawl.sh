@@ -118,6 +118,9 @@ while test "$pos" -lt "$nargs"; do
         nopurge=1
         audit+=("--no-purge")
         ;;
+    --cache-under-logroot)
+        audit+=("--cache-under-logroot")
+        ;;
     --tls)
         tls=1
         scheme=https
@@ -378,6 +381,15 @@ while test "$i" -lt "${#audit[@]}"; do
         nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${logroot}/hts-log.txt" |
             sed -e 's/.*[[:space:]]\([^ ]*\)[[:space:]]files written.*/\1/g')
         assert_equals "checking files" "${audit[$i]}" "$nFiles"
+        ;;
+    --cache-under-logroot)
+        # The cache must sit under path_log (logroot), not an ANSI-mangled twin
+        # of a non-ASCII -O dir (#630 cache half). Bites only on the Windows leg.
+        info "checking cache under logroot"
+        if test -e "${logroot}/hts-cache/new.zip"; then result "OK"; else
+            result "cache not under logroot (mangled twin?)"
+            exit 1
+        fi
         ;;
     --found)
         i=$((i + 1))
