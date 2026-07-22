@@ -243,13 +243,17 @@ fi
 # Localhost is fast; disable the rate/bandwidth safety limits but keep a
 # max-time backstop so a hang cannot wedge the suite.
 declare -a moreargs=(--quiet --max-time=120 --timeout=30 --disable-security-limits --robots=0)
+# Watchdog above --max-time so the engine limit fires first when healthy; only a
+# genuine wedge trips it. CRAWL_DEADLINE lets 72_watchdog-crawl drive it low.
+crawl_deadline=${CRAWL_DEADLINE:-180}
 log="${tmpdir}/log"
 info "running httrack ${hts[*]}"
 httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
 crawlpid=$!
-wait "$crawlpid"
+wait_bounded "$crawlpid" "$crawl_deadline"
 crawlres=$?
 crawlpid=
+test "$crawlres" -ne 124 || warning "crawl watchdog fired after ${crawl_deadline}s"
 # httrack exits 0 even on hard connect/DNS errors, so this is a backstop only;
 # the real guard is the audit below (--errors 0 plus the host-root existence check).
 test "$crawlres" -eq 0 || ! result "httrack exited $crawlres" || {
@@ -265,7 +269,7 @@ if test -n "$rerun"; then
     httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
-    wait "$crawlpid"
+    wait_bounded "$crawlpid" "$crawl_deadline"
     crawlres=$?
     crawlpid=
     test "$crawlres" -eq 0 || ! result "update pass exited $crawlres" || {
@@ -293,7 +297,7 @@ if test -n "$rerun_args"; then
     httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" "${extra[@]}" >"${log}.2" 2>&1 &
     crawlpid=$!
-    wait "$crawlpid"
+    wait_bounded "$crawlpid" "$crawl_deadline"
     crawlres=$?
     crawlpid=
     test "$crawlres" -eq 0 || ! result "second pass exited $crawlres" || {
@@ -315,7 +319,7 @@ if test -n "$rerun_dead"; then
     httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &
     crawlpid=$!
-    wait "$crawlpid" || true
+    wait_bounded "$crawlpid" "$crawl_deadline" || true
     crawlpid=
     result "OK (dead pass ran)"
     # The dead pass must have gone through the no-data rollback, not bailed out
