@@ -1,6 +1,6 @@
 --- mztools.c.orig	2024-01-27 14:07:18.636193212 +0100
 +++ mztools.c	2024-01-27 14:09:55.356620093 +0100
-@@ -10,6 +10,7 @@
+@@ -10,10 +10,11 @@
  #include <string.h>
  #include "zlib.h"
  #include "unzip.h"
@@ -8,6 +8,11 @@
  
  #define READ_8(adr)  ((unsigned char)*(adr))
  #define READ_16(adr) ( READ_8(adr) | (READ_8(adr+1) << 8) )
+-#define READ_32(adr) ( READ_16(adr) | (READ_16((adr)+2) << 16) )
++#define READ_32(adr) ((uLong) READ_16(adr) | ((uLong) READ_16((adr) + 2) << 16))
+ 
+ #define WRITE_8(buff, n) do { \
+   *((unsigned char*)(buff)) = (unsigned char) ((n) & 0xff); \
 @@ -141,8 +142,8 @@
          /* Central directory entry */
          {

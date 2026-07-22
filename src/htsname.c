@@ -615,9 +615,9 @@ int url_savename(lien_adrfilsave *const afs,
             strcpybuff(current.fil, fil_complete);
             // ajouter dans le backing le fichier en mode test
             // savename: rien car en mode test
-            if (back_add
-                (sback, opt, cache, current.adr, current.fil, BACK_ADD_TEST,
-                 referer_adr, referer_fil, 1) != -1) {
+            if (back_add(sback, opt, cache, current.adr, current.fil,
+                         BACK_ADD_TEST, referer_adr, referer_fil, 1,
+                         HTS_FALSE) != -1) {
               int b;
 
               b = back_index(opt, sback, current.adr, current.fil, BACK_ADD_TEST);
@@ -706,7 +706,10 @@ int url_savename(lien_adrfilsave *const afs,
                                 if (!hts_wait_available_socket(sback, opt,
                                                                cache, ptr))
                                   return -1;
-                                if (back_add(sback, opt, cache, moved.adr, moved.fil, methode, referer_adr, referer_fil, 1) != -1) {        // OK
+                                if (back_add(sback, opt, cache, moved.adr,
+                                             moved.fil, methode, referer_adr,
+                                             referer_fil, 1,
+                                             HTS_FALSE) != -1) { // OK
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "(during prefetch) %s (%d) to link %s at %s%s",
                                                 back[b].r.msg,
@@ -725,7 +728,8 @@ int url_savename(lien_adrfilsave *const afs,
                                     has_been_moved = 1; // sinon ne pas forcer has_been_moved car non déplacé
                                   petits_tours++;
                                   //
-                                } else {        // sinon on fait rien et on s'en va.. (ftp etc)
+                                } else { // sinon on fait rien et on s'en va..
+                                         // (ftp etc)
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "Warning: Savename redirect backing error at %s%s",
                                                 moved.adr, moved.fil);
@@ -796,7 +800,6 @@ int url_savename(lien_adrfilsave *const afs,
               hts_log_print(opt, LOG_ERROR,
                             "Unexpected savename backing error at %s%s", adr,
                             fil_complete);
-
             }
             // restaurer
             opt->state._hts_in_html_parsing = hihp;
