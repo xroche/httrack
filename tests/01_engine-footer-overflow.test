@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
+# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms despite the
+# #!/bin/bash above.
+
+# A -%F footer whose expansion overflows the on-page buffer must be dropped, not
+# crash the crawl. Before the fix the unchecked hts_footer_format return left the
+# buffer unterminated and the next strcatbuff aborted (SIGABRT).
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# A few-hundred-char file path (kept well under the URL length limit) makes the
+# {path} field long.
+seg=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+deep="$dir"
+i=0
+while [ "$i" -lt 6 ]; do
+    deep="$deep/$seg"
+    i=$((i + 1))
+done
+mkdir -p "$deep"
+printf '<html><body>hi</body></html>' >"$deep/index.html"
+
+# 40 {path} references (~240 chars, under the 254-char -%F cap); expanded against
+# a few-hundred-char path this far exceeds the per-page footer buffer.
+footer=""
+i=0
+while [ "$i" -lt 40 ]; do
+    footer="$footer{path}"
+    i=$((i + 1))
+done
+
+mir="$dir/mir"
+httrack "file://$deep/index.html" -O "$mir" -%F "$footer" -q -s0 -%v0 \
+    >/dev/null 2>&1 || {
+    echo "crawl failed/aborted (exit $?) on an oversized footer" >&2
+    exit 1
+}
+
+# The crawled page must exist (proves the URL wasn't rejected for length, so the
+# footer path ran). Look under file/, not $mir, to skip the makeindex top index.
+find "$mir/file" -name index.html | grep -q . || {
+    echo "page not mirrored; the oversized-footer path was not exercised" >&2
+    exit 1
+}
