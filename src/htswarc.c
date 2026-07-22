@@ -79,6 +79,17 @@ struct warc_writer {
   char **cdx_lines; /* NUL-terminated CDXJ lines (no newline), owned */
   size_t cdx_count; /* lines in use */
   size_t cdx_cap;   /* lines allocated */
+  /* --wacz: at crawl end, package the segment(s) + .cdx + a generated
+     pages.jsonl into <base>.wacz (WACZ 1.1.1). SHA-256 needs OpenSSL. */
+  int wacz_on;          /* --wacz enabled (and OpenSSL present) */
+  char *base_path;      /* resolved archive path minus .warc[.gz] suffix */
+  const char *base_ext; /* ".warc.gz" or ".warc" (static) */
+  char *arc_path;    /* full single-file archive path (NULL under rotation) */
+  char **page_lines; /* one JSON page line per 200 text/html response, owned */
+  size_t page_count;
+  size_t page_cap;
+  char *main_url;  /* first captured page URL (datapackage mainPageUrl) */
+  char *main_date; /* its WARC-Date (mainPageDate) */
 };
 
 const char *warc_truncated_reason(int code) {
@@ -354,6 +365,71 @@ static int payload_digest_b32(const char *body, size_t body_len,
   return 0;
 #endif
 }
+
+/* ---- SHA-256 hex (WACZ digests; OpenSSL-only) ---- */
+
+#if HTS_USEOPENSSL
+static void md32_to_hex(const unsigned char md[32], char out[65]) {
+  static const char hx[] = "0123456789abcdef";
+  int i;
+  for (i = 0; i < 32; i++) {
+    out[i * 2] = hx[md[i] >> 4];
+    out[i * 2 + 1] = hx[md[i] & 0x0F];
+  }
+  out[64] = '\0';
+}
+
+/* Lowercase-hex SHA-256 of n bytes at p into out[65]. Returns 1 on success. */
+static int sha256_hex_mem(const void *p, size_t n, char out[65]) {
+  EVP_MD_CTX *c = EVP_MD_CTX_new();
+  unsigned char md[EVP_MAX_MD_SIZE];
+  unsigned int mdlen = 0;
+  int ok;
+  if (c == NULL)
+    return 0;
+  ok = EVP_DigestInit_ex(c, EVP_sha256(), NULL) == 1 &&
+       (n == 0 || EVP_DigestUpdate(c, p, n) == 1) &&
+       EVP_DigestFinal_ex(c, md, &mdlen) == 1 && mdlen == 32;
+  EVP_MD_CTX_free(c);
+  if (ok)
+    md32_to_hex(md, out);
+  return ok;
+}
+
+/* Lowercase-hex SHA-256 of the on-disk file at path into out[65]. */
+static int sha256_hex_file(const char *path, char out[65]) {
+  EVP_MD_CTX *c;
+  FILE *fp;
+  char catbuff[CATBUFF_SIZE];
+  unsigned char md[EVP_MAX_MD_SIZE];
+  unsigned int mdlen = 0;
+  int ok;
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
+  if (fp == NULL)
+    return 0;
+  c = EVP_MD_CTX_new();
+  if (c == NULL) {
+    fclose(fp);
+    return 0;
+  }
+  ok = EVP_DigestInit_ex(c, EVP_sha256(), NULL) == 1;
+  while (ok) {
+    unsigned char b[32768];
+    size_t nl = fread(b, 1, sizeof(b), fp);
+    if (nl > 0 && EVP_DigestUpdate(c, b, nl) != 1)
+      ok = 0;
+    if (nl < sizeof(b))
+      break;
+  }
+  ok = ok && !ferror(fp) && EVP_DigestFinal_ex(c, md, &mdlen) == 1 &&
+       mdlen == 32;
+  EVP_MD_CTX_free(c);
+  fclose(fp);
+  if (ok)
+    md32_to_hex(md, out);
+  return ok;
+}
+#endif
 
 /* ---- misc record helpers ---- */
 
@@ -769,6 +845,252 @@ static void warc_cdx_flush(warc_writer *w) {
   fclose(f);
 }
 
+/* ---- WACZ pages + packaging (--wacz) ---- */
+
+/* Record one pages.jsonl line for a top-level 200 text/html capture. First
+   page also seeds datapackage mainPageUrl/mainPageDate. Best-effort. */
+static void warc_page_add(warc_writer *w, const char *url, const char *date) {
+  wbuf line;
+  memset(&line, 0, sizeof(line));
+  if (wbuf_printf(&line, "{\"id\": \"p%llu\", \"url\": ",
+                  (unsigned long long) w->page_count) != 0 ||
+      cdx_json_str(&line, url) != 0 || wbuf_puts(&line, ", \"ts\": ") != 0 ||
+      cdx_json_str(&line, date) != 0 || wbuf_puts(&line, "}") != 0 ||
+      wbuf_add(&line, "", 1) != 0) {
+    wbuf_free(&line);
+    return;
+  }
+  if (w->page_count == w->page_cap) {
+    size_t ncap = w->page_cap ? w->page_cap * 2 : 32;
+    char **n;
+    if (ncap > (size_t) -1 / sizeof(char *)) {
+      wbuf_free(&line);
+      return;
+    }
+    n = realloct(w->page_lines, ncap * sizeof(char *));
+    if (n == NULL) {
+      wbuf_free(&line);
+      return;
+    }
+    w->page_lines = n;
+    w->page_cap = ncap;
+  }
+  w->page_lines[w->page_count++] = line.data;
+  if (w->main_url == NULL) {
+    w->main_url = strdupt(url);
+    w->main_date = strdupt(date);
+  }
+}
+
+#if HTS_USEOPENSSL
+/* WACZ requires every ZIP entry stored, not deflated (spec 1.1.1). */
+static int wacz_open_store(zipFile zf, const char *name) {
+  zip_fileinfo zi;
+  memset(&zi, 0, sizeof(zi));
+  return zipOpenNewFileInZip(zf, name, &zi, NULL, 0, NULL, 0, NULL, 0 /*store*/,
+                             0 /*level*/);
+}
+
+static int wacz_write_bytes(zipFile zf, const void *p, size_t n) {
+  while (n > 0) {
+    unsigned chunk = (n > 0x40000000u) ? 0x40000000u : (unsigned) n;
+    if (zipWriteInFileInZip(zf, p, chunk) != ZIP_OK)
+      return -1;
+    p = (const char *) p + chunk;
+    n -= chunk;
+  }
+  return 0;
+}
+
+/* Append one datapackage resource object; comma-prefixed unless first. */
+static int wacz_resource_add(wbuf *res, int first, const char *name,
+                             const char *path, const char *hex,
+                             uint64_t bytes) {
+  if (!first && wbuf_puts(res, ", ") != 0)
+    return -1;
+  if (wbuf_puts(res, "{\"name\": ") != 0 || cdx_json_str(res, name) != 0 ||
+      wbuf_puts(res, ", \"path\": ") != 0 || cdx_json_str(res, path) != 0 ||
+      wbuf_printf(res, ", \"hash\": \"sha256:%s\", \"bytes\": %llu}", hex,
+                  (unsigned long long) bytes) != 0)
+    return -1;
+  return 0;
+}
+
+/* Store an on-disk file as zipname, hash it, and list it in res. */
+static int wacz_add_disk(zipFile zf, const char *zipname, const char *diskpath,
+                         const char *resname, wbuf *res, int first) {
+  char hex[65];
+  char catbuff[CATBUFF_SIZE];
+  FILE *fp;
+  uint64_t bytes = 0;
+  int rc = -1;
+  if (!sha256_hex_file(diskpath, hex))
+    return -1;
+  if (wacz_open_store(zf, zipname) != ZIP_OK)
+    return -1;
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), diskpath), "rb");
+  if (fp != NULL) {
+    rc = 0;
+    for (;;) {
+      char b[32768];
+      size_t nl = fread(b, 1, sizeof(b), fp);
+      if (nl > 0 && wacz_write_bytes(zf, b, nl) != 0) {
+        rc = -1;
+        break;
+      }
+      bytes += nl;
+      if (nl < sizeof(b)) {
+        if (ferror(fp))
+          rc = -1;
+        break;
+      }
+    }
+    fclose(fp);
+  }
+  if (zipCloseFileInZip(zf) != ZIP_OK)
+    rc = -1;
+  if (rc == 0)
+    rc = wacz_resource_add(res, first, resname, zipname, hex, bytes);
+  return rc;
+}
+
+/* Store in-memory bytes as zipname; when res != NULL, hash and list them. */
+static int wacz_add_mem(zipFile zf, const char *zipname, const void *data,
+                        size_t n, const char *resname, wbuf *res, int first) {
+  char hex[65];
+  if (res != NULL && !sha256_hex_mem(data, n, hex))
+    return -1;
+  if (wacz_open_store(zf, zipname) != ZIP_OK)
+    return -1;
+  if (wacz_write_bytes(zf, data, n) != 0) {
+    zipCloseFileInZip(zf);
+    return -1;
+  }
+  if (zipCloseFileInZip(zf) != ZIP_OK)
+    return -1;
+  if (res != NULL)
+    return wacz_resource_add(res, first, resname, zipname, hex, n);
+  return 0;
+}
+
+static zipFile wacz_zip_open(const char *path) {
+  zlib_filefunc64_def ff;
+  fill_fopen64_filefunc(&ff);
+  return zipOpen2_64(path, 0 /*create*/, NULL, &ff);
+}
+
+/* Package the segment(s) + .cdx + a generated pages.jsonl into <base>.wacz at
+   crawl end (the archive file(s) and .cdx are already closed on disk). */
+static void warc_wacz_package(warc_writer *w) {
+  char waczpath[HTS_URLMAXSIZE * 2];
+  char segpath[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
+  zipFile zf;
+  wbuf pages, resources, dp, digest;
+  char *seg_name;
+  char dp_hex[65];
+  char created[32];
+  unsigned s, nseg;
+  int err = 0, first = 1;
+  size_t i;
+
+  if (w->base_path == NULL || w->cdx_path == NULL)
+    return;
+  snprintf(waczpath, sizeof(waczpath), "%s.wacz", w->base_path);
+  zf = wacz_zip_open(fconv(catbuff, sizeof(catbuff), waczpath));
+  if (zf == NULL)
+    return;
+  memset(&resources, 0, sizeof(resources));
+
+  /* archive/<name>.warc.gz for every segment (single file, or 0..seg). */
+  nseg = (w->max_size > 0) ? w->seg + 1 : 1;
+  for (s = 0; s < nseg && !err; s++) {
+    char zipname[HTS_URLMAXSIZE];
+    if (w->max_size > 0)
+      snprintf(segpath, sizeof(segpath), "%s-%05u%s", w->base_path, s,
+               w->base_ext);
+    else
+      strlcpybuff(segpath, w->arc_path != NULL ? w->arc_path : w->base_path,
+                  sizeof(segpath));
+    seg_name = path_basename_dup(segpath);
+    if (seg_name == NULL) {
+      err = 1;
+      break;
+    }
+    snprintf(zipname, sizeof(zipname), "archive/%s", seg_name);
+    if (wacz_add_disk(zf, zipname, segpath, seg_name, &resources, first) != 0)
+      err = 1;
+    freet(seg_name);
+    first = 0;
+  }
+
+  /* indexes/index.cdx */
+  if (!err && wacz_add_disk(zf, "indexes/index.cdx", w->cdx_path, "index.cdx",
+                            &resources, first) != 0)
+    err = 1;
+  first = 0;
+
+  /* pages/pages.jsonl: header line + one line per captured page. */
+  memset(&pages, 0, sizeof(pages));
+  if (!err &&
+      wbuf_puts(&pages, "{\"format\": \"json-pages-1.0\", \"id\": \"pages\", "
+                        "\"title\": \"All Pages\"}\n") != 0)
+    err = 1;
+  for (i = 0; i < w->page_count && !err; i++)
+    if (wbuf_puts(&pages, w->page_lines[i]) != 0 ||
+        wbuf_add(&pages, "\n", 1) != 0)
+      err = 1;
+  if (!err && wacz_add_mem(zf, "pages/pages.jsonl", pages.data, pages.len,
+                           "pages.jsonl", &resources, first) != 0)
+    err = 1;
+  wbuf_free(&pages);
+
+  /* datapackage.json listing every stored file with its sha256 + size. */
+  warc_now_iso8601(created);
+  memset(&dp, 0, sizeof(dp));
+  if (!err &&
+      (wbuf_printf(&dp,
+                   "{\"profile\": \"data-package\", \"wacz_version\": "
+                   "\"1.1.1\", \"software\": \"HTTrack/%s\", \"created\": ",
+                   HTTRACK_VERSION) != 0 ||
+       cdx_json_str(&dp, created) != 0))
+    err = 1;
+  if (!err && w->main_url != NULL &&
+      (wbuf_puts(&dp, ", \"mainPageUrl\": ") != 0 ||
+       cdx_json_str(&dp, w->main_url) != 0 ||
+       wbuf_puts(&dp, ", \"mainPageDate\": ") != 0 ||
+       cdx_json_str(&dp, w->main_date != NULL ? w->main_date : created) != 0))
+    err = 1;
+  if (!err && (wbuf_puts(&dp, ", \"resources\": [") != 0 ||
+               wbuf_add(&dp, resources.data, resources.len) != 0 ||
+               wbuf_puts(&dp, "]}") != 0))
+    err = 1;
+  if (!err &&
+      wacz_add_mem(zf, "datapackage.json", dp.data, dp.len, NULL, NULL, 0) != 0)
+    err = 1;
+
+  /* datapackage-digest.json chains the integrity of datapackage.json. */
+  memset(&digest, 0, sizeof(digest));
+  if (!err && sha256_hex_mem(dp.data, dp.len, dp_hex)) {
+    if (wbuf_printf(&digest,
+                    "{\"path\": \"datapackage.json\", \"hash\": \"sha256:%s\"}",
+                    dp_hex) != 0 ||
+        wacz_add_mem(zf, "datapackage-digest.json", digest.data, digest.len,
+                     NULL, NULL, 0) != 0)
+      err = 1;
+  } else {
+    err = 1;
+  }
+  wbuf_free(&digest);
+  wbuf_free(&dp);
+  wbuf_free(&resources);
+
+  zipClose(zf, NULL);
+  if (err)
+    (void) UNLINK(fconv(catbuff, sizeof(catbuff), waczpath));
+}
+#endif
+
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
@@ -908,6 +1230,12 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
          strcmp(type, "resource") == 0))
       warc_cdx_add(w, target_uri, date, cdx_status, cdx_mime, payload_digest,
                    rec_offset, w->offset - rec_offset);
+    /* WACZ pages: top-level 200 text/html captures. */
+    if (w->wacz_on && target_uri != NULL && target_uri[0] != '\0' &&
+        strcmp(type, "response") == 0 && cdx_status != NULL &&
+        strcmp(cdx_status, "200") == 0 && cdx_mime != NULL &&
+        strncasecmp(cdx_mime, "text/html", 9) == 0)
+      warc_page_add(w, target_uri, date);
   }
   if (out_id != NULL)
     strlcpybuff(out_id, id, 64);
@@ -1067,18 +1395,37 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   if (opt->warc_cdx) {
     size_t l = strlen(path);
     size_t baselen = l;
-    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0)
+    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0) {
       baselen = l - 8;
-    else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0)
+      w->base_ext = ".warc.gz";
+    } else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0) {
       baselen = l - 5;
+      w->base_ext = ".warc";
+    } else {
+      w->base_ext = w->gz ? ".warc.gz" : ".warc";
+    }
     w->cdx_on = 1;
     w->cdx_path = malloct(baselen + 5); /* ".cdx" + NUL */
-    if (w->cdx_path == NULL) {
+    w->base_path = malloct(baselen + 1);
+    if (w->cdx_path == NULL || w->base_path == NULL) {
       warc_close(w);
       return NULL;
     }
     memcpy(w->cdx_path, path, baselen);
     memcpy(w->cdx_path + baselen, ".cdx", 5);
+    memcpy(w->base_path, path, baselen);
+    w->base_path[baselen] = '\0';
+  }
+
+  /* --wacz packages archive+cdx+pages at close; SHA-256 needs OpenSSL. */
+  if (opt->warc_wacz) {
+#if HTS_USEOPENSSL
+    w->wacz_on = 1;
+#else
+    hts_log_print(opt, LOG_WARNING,
+                  "WACZ requires an OpenSSL-enabled build for SHA-256 digests; "
+                  "--wacz disabled (WARC and CDXJ still written)");
+#endif
   }
 
   /* Rotation on: the first segment is <base>-00000<ext> (wget-style); split the
@@ -1116,6 +1463,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   }
   if (w->cdx_on)
     w->cur_seg = path_basename_dup(path);
+  if (w->wacz_on && w->max_size == 0)
+    w->arc_path = strdupt(path); /* single-file: package this exact path */
 
   if (warc_write_warcinfo_record(w) != 0) {
     warc_close(w);
@@ -1131,12 +1480,24 @@ void warc_close(warc_writer *w) {
   warc_cdx_flush(w); /* sort + write <base>.cdx before tearing down */
   if (w->f != NULL)
     fclose(w->f);
+  w->f = NULL;
+#if HTS_USEOPENSSL
+  if (w->wacz_on) /* package once the segment(s) + .cdx are closed on disk */
+    warc_wacz_package(w);
+#endif
   if (w->seen != NULL)
     coucal_delete(&w->seen);
   for (i = 0; i < w->cdx_count; i++)
     freet(w->cdx_lines[i]);
   freet(w->cdx_lines);
   freet(w->cdx_path);
+  for (i = 0; i < w->page_count; i++)
+    freet(w->page_lines[i]);
+  freet(w->page_lines);
+  freet(w->base_path);
+  freet(w->arc_path);
+  freet(w->main_url);
+  freet(w->main_date);
   freet(w->cur_seg);
   freet(w->seg_base);
   freet(w->info_fields);

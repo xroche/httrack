@@ -48,6 +48,7 @@ key="${testdir}/server.key"
 tls=
 verbose=
 warc_validate=
+wacz_validate=
 html_subdir=
 outdir_intl=
 rerun=
@@ -117,6 +118,8 @@ while test "$pos" -lt "$nargs"; do
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     # validate the produced .warc.gz (see the validation block near the end)
     --warc-validate) warc_validate=1 ;;
+    # validate the produced .wacz package (stdlib, plus py-wacz/pywb if present)
+    --wacz-validate) wacz_validate=1 ;;
     --no-purge)
         nopurge=1
         audit+=("--no-purge")
@@ -396,6 +399,23 @@ if test -n "$warc_validate"; then
         info "warcio check (optional)"
         if warcio check -v "$warc" >&2; then result "OK"; else die "warcio check failed"; fi
     fi
+fi
+
+# --- optional WACZ validation (--wacz) --------------------------------------
+if test -n "$wacz_validate"; then
+    wacz=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
+    if test -z "$wacz"; then
+        # No package: only acceptable when the build lacks OpenSSL (SHA-256).
+        if grep -aqi "WACZ requires an OpenSSL" "${logroot}/hts-log.txt"; then
+            info "no .wacz produced (build without OpenSSL); skipping"
+            exit 77
+        fi
+        die "no .wacz file produced under $mirrorroot"
+    fi
+    validator=$(nativepath "${testdir}/wacz-validate.py")
+    info "validating WACZ package"
+    "$python" "$validator" "$(nativepath "$wacz")" >&2 || die "WACZ validation failed"
+    result "OK"
 fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,

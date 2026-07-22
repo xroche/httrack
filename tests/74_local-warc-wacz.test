@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A --wacz crawl packages the WARC archive, its CDXJ index and a generated
+# pages.jsonl into a single WACZ file at crawl end. The stdlib validator is the
+# real gate: STORE-mode entries, the fixed layout, recomputed sha256 digests and
+# the datapackage-digest chain (plus py-wacz/pywb when importable). The crawl
+# skips cleanly on a build without OpenSSL (no conformant SHA-256 -> no package).
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --wacz-validate \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html' --warc-file warc-out --wacz

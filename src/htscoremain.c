@@ -1828,6 +1828,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 } else if (*(com + 1) == 'c') { // --warc-cdx: sorted CDXJ index
                   com++;
                   opt->warc_cdx = 1;
+                } else if (*(com + 1) == 'z') { // --wacz: WACZ package
+                  com++;
+                  opt->warc_wacz = 1;
+                  opt->warc_cdx = 1; // WACZ embeds the CDXJ index
+                  if (!StringNotEmpty(opt->warc_file))
+                    StringCopy(opt->warc_file, WARC_AUTONAME);
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }
