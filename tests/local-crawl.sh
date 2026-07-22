@@ -183,16 +183,12 @@ debug "starting $python $server ${serverargs[*]}"
 "$python" "$(nativepath "$server")" "${serverargs[@]}" >"$serverlog" 2>&1 &
 serverpid=$!
 
-# Wait for the "PORT <n>" line (server prints it once bound).
+# Wait for the "PORT <n>" line (server prints it once bound). A cold Python
+# start under a parallel `make check -jN` can lag past a second on a loaded Windows runner.
 port=
-for _ in $(seq 1 50); do
-    if test -s "$serverlog"; then
-        line=$(head -n1 "$serverlog")
-        if test "${line%% *}" == "PORT"; then
-            port="${line#PORT }"
-            break
-        fi
-    fi
+for _ in $(seq 1 300); do
+    # Match anywhere: a startup warning merged via 2>&1 could precede the PORT line.
+    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
     kill -0 "$serverpid" 2>/dev/null || die "server exited early: $(cat "$serverlog")"
     sleep 0.1
 done
