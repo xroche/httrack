@@ -404,12 +404,13 @@ host and stops the crawl; start from the final URL, or add
 rule wins.</small></p>
 
 <h4>Download the PDFs on a site</h4>
-<p><tt>httrack https://example.com/ "-*" "+https://example.com/*.html" "+https://example.com/*[file]/" "+https://example.com/*.pdf" --path mydir</tt><br>
+<p><tt>httrack https://example.com/ "-*" "+https://example.com/*.html" "+https://example.com/*[path]/" "+https://example.com/*.pdf" --path mydir</tt><br>
 <small>HTTrack finds PDFs by parsing the site's HTML, so a plain
 <tt>"-*" "+example.com/*.pdf"</tt> is wrong: it prunes the pages that carry the
 links and keeps only PDFs reachable from the front page. Instead admit the HTML as
-scaffolding (<tt>*.html</tt> and <tt>*[file]/</tt> for directory-index pages like
-<tt>docs/</tt>), keep the PDFs, and let <tt>-*</tt> drop everything else (images,
+scaffolding (<tt>*.html</tt> and <tt>*[path]/</tt> for directory-index pages at any
+depth, e.g. <tt>docs/</tt> or <tt>a/b/deep/</tt>; <tt>*[file]/</tt> would stop at one
+level), keep the PDFs, and let <tt>-*</tt> drop everything else (images,
 archives, off-site assets). PDFs on another host (a CDN or docs subdomain) are not
 included by default; allow that host too, e.g. <tt>"+docs.example.com/*.pdf"</tt>,
 or widen to <tt>"+*.pdf"</tt> for PDFs anywhere.</small></p>
