@@ -83,9 +83,12 @@ HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
 int back_nsoc(const struct_back * sback);
 int back_nsoc_overall(const struct_back * sback);
-int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char *adr,
-             const char *fil, const char *save, const char *referer_adr, const char *referer_fil,
-             int test);
+/* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume
+   (set when a prior 206 was rejected as unusable, #581). */
+int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
+             const char *adr, const char *fil, const char *save,
+             const char *referer_adr, const char *referer_fil, int test,
+             hts_boolean refetch_whole);
 int back_add_if_not_exists(struct_back * sback, httrackp * opt,
                            cache_back * cache, const char *adr, const char *fil, const char *save,
                            const char *referer_adr, const char *referer_fil, int test);

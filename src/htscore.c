@@ -3293,10 +3293,10 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
       if (ok) {
         if (!back_exist
             (sback, opt, heap(p)->adr, heap(p)->fil, heap(p)->sav)) {
-          if (back_add
-              (sback, opt, cache, heap(p)->adr, heap(p)->fil, heap(p)->sav,
-               heap(heap(p)->precedent)->adr, heap(heap(p)->precedent)->fil,
-               heap(p)->testmode) == -1) {
+          if (back_add(sback, opt, cache, heap(p)->adr, heap(p)->fil,
+                       heap(p)->sav, heap(heap(p)->precedent)->adr,
+                       heap(heap(p)->precedent)->fil, heap(p)->testmode,
+                       heap(p)->refetch_whole) == -1) {
             hts_log_print(opt, LOG_DEBUG,
                           "error: unable to add more links through back_add for back_fill");
 #if BDEBUG==1

@@ -16,11 +16,12 @@ root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
-# On Windows the pass-1 interrupt is a hard kill (MSYS can't signal a native
-# exe) and the restart-whole path fails on the repaired cache (#581) -- the very
-# bug this exercises; skip until the engine fix lands.
+# Windows-only repro of #581 (a hard-killed pass 1 + repaired cache loses the
+# file). The engine now forces a no-Range whole refetch on the restart, but that
+# fix is unverified on Windows CI, and this test's pass-1 interrupt/port-race
+# behavior there is unconfirmed; lift this skip on a Windows runner to verify.
 if is_windows; then
-    echo "Windows: restart-whole fails on a repaired cache (#581), skipping"
+    echo "Windows: #581 fix unverified on CI, skipping"
     exit 77
 fi
 
