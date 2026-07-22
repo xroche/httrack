@@ -1589,12 +1589,8 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Default-port strip: a genuine default (any spelling) is removed by its
-   matched length, host preserved; a non-default port or one that only wraps to
-   it as a 32-bit int (#614) stays. The default is scheme-aware (#638): 80 http,
-   443 https, 21 ftp, so :80 on https/ftp is a real port and stays. Guards the
-   old #627 bug where ":080" dropped a hardcoded 3 chars and glued the rest onto
-   the host. */
+/* Default-port strip is scheme-aware (#638), overflow-safe (#614): a scheme's
+   own default (any spelling) is dropped, a real port stays; guards #627. */
 static int st_stripport(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *in, *out;
