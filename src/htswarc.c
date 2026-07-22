@@ -43,8 +43,10 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "coucal/coucal.h"
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <time.h>
 
 #if HTS_USEOPENSSL
@@ -69,6 +71,14 @@ struct warc_writer {
   const char *seg_ext; /* ".warc.gz" or ".warc" */
   unsigned seg;        /* current segment number */
   char *info_fields;   /* warcinfo body, re-emitted at each new segment */
+  /* --warc-cdx: accumulate one CDXJ line per response/revisit/resource record,
+     sorted (LC_ALL=C) and written to <base>.cdx at close. */
+  int cdx_on;       /* --warc-cdx enabled */
+  char *cdx_path;   /* <base>.cdx output path, or NULL */
+  char *cur_seg;    /* basename of the current segment file (CDXJ filename) */
+  char **cdx_lines; /* NUL-terminated CDXJ lines (no newline), owned */
+  size_t cdx_count; /* lines in use */
+  size_t cdx_cap;   /* lines allocated */
 };
 
 const char *warc_truncated_reason(int code) {
@@ -445,6 +455,325 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
   return 0;
 }
 
+/* ---- CDXJ index (--warc-cdx) ---- */
+
+/* Duplicate the last path component (basename), or NULL on OOM. */
+static char *path_basename_dup(const char *path) {
+  const char *b = path, *p;
+  for (p = path; *p != '\0'; p++)
+    if (*p == '/' || *p == '\\')
+      b = p + 1;
+  return strdupt(b);
+}
+
+/* A host made only of digits and dots is an IPv4 literal (never reversed). */
+static int surt_host_is_ip(const char *h, size_t n) {
+  size_t i;
+  int dots = 0;
+  for (i = 0; i < n; i++) {
+    if (h[i] == '.')
+      dots++;
+    else if (h[i] < '0' || h[i] > '9')
+      return 0;
+  }
+  return dots > 0;
+}
+
+/* SURT-canonicalize url into out (no newline): scheme and userinfo dropped,
+   host lowercased with a leading www[digits] label stripped and the scheme
+   default port removed, labels reversed and comma-joined then ')', path+query
+   appended verbatim (case preserved, fragment dropped). IPv4 and [IPv6]
+   literals keep their host form. A non-default port is kept as ":port" before
+   the ')'. Returns 0 on success. */
+static int surt_canon(const char *url, wbuf *out) {
+  const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
+  size_t portlen = 0, hlen, i;
+  int def_port = -1;
+  int is_ipv6 = 0, is_ip = 0;
+  char hostbuf[1024];
+
+  if (url == NULL)
+    return -1;
+
+  p = url;
+  scheme_end = strstr(url, "://");
+  if (scheme_end != NULL) {
+    size_t sl = (size_t) (scheme_end - url);
+    if (sl == 4 && strncasecmp(url, "http", 4) == 0)
+      def_port = 80;
+    else if (sl == 5 && strncasecmp(url, "https", 5) == 0)
+      def_port = 443;
+    p = scheme_end + 3;
+  }
+
+  authend = p;
+  while (*authend != '\0' && *authend != '/' && *authend != '?' &&
+         *authend != '#')
+    authend++;
+
+  { /* drop userinfo up to the last '@' inside the authority */
+    const char *q, *at = NULL;
+    for (q = p; q < authend; q++)
+      if (*q == '@')
+        at = q;
+    if (at != NULL)
+      p = at + 1;
+  }
+  host = p;
+
+  if (host < authend && host[0] == '[') { /* [IPv6] literal */
+    const char *rb = host;
+    is_ipv6 = 1;
+    while (rb < authend && *rb != ']')
+      rb++;
+    hostsep = (rb < authend) ? rb + 1 : authend;
+  } else {
+    const char *c = host;
+    while (c < authend && *c != ':')
+      c++;
+    hostsep = c;
+  }
+  hlen = (size_t) (hostsep - host);
+  if (hostsep < authend && *hostsep == ':') {
+    port = hostsep + 1;
+    portlen = (size_t) (authend - port);
+  }
+
+  if (hlen >= sizeof(hostbuf))
+    return -1;
+  for (i = 0; i < hlen; i++)
+    hostbuf[i] = (char) tolower((unsigned char) host[i]);
+  hostbuf[hlen] = '\0';
+
+  if (!is_ipv6)
+    is_ip = surt_host_is_ip(hostbuf, hlen);
+
+  if (!is_ipv6 && !is_ip && hlen >= 4 && hostbuf[0] == 'w' &&
+      hostbuf[1] == 'w' && hostbuf[2] == 'w') {
+    size_t k = 3;
+    while (k < hlen && hostbuf[k] >= '0' && hostbuf[k] <= '9')
+      k++;
+    if (k < hlen && hostbuf[k] == '.') {
+      memmove(hostbuf, hostbuf + k + 1, hlen - (k + 1));
+      hlen -= k + 1;
+      hostbuf[hlen] = '\0';
+    }
+  }
+
+  if (is_ipv6 || is_ip) {
+    if (wbuf_add(out, hostbuf, hlen) != 0)
+      return -1;
+  } else { /* reverse the dot-separated labels, comma-joined */
+    long idx;
+    size_t seg_end = hlen;
+    int first = 1;
+    for (idx = (long) hlen; idx >= 0; idx--) {
+      if (idx == 0 || hostbuf[idx - 1] == '.') {
+        size_t lstart = (size_t) idx;
+        size_t llen = seg_end - lstart;
+        if (llen > 0) {
+          if (!first && wbuf_add(out, ",", 1) != 0)
+            return -1;
+          if (wbuf_add(out, hostbuf + lstart, llen) != 0)
+            return -1;
+          first = 0;
+        }
+        seg_end = (idx > 0) ? (size_t) (idx - 1) : 0;
+      }
+    }
+  }
+
+  if (port != NULL && portlen > 0) { /* keep a non-default port */
+    int pv = 0, ok = 1;
+    size_t k;
+    for (k = 0; k < portlen; k++) {
+      if (port[k] < '0' || port[k] > '9') {
+        ok = 0;
+        break;
+      }
+      pv = pv * 10 + (port[k] - '0');
+    }
+    if (ok && pv != def_port &&
+        (wbuf_add(out, ":", 1) != 0 || wbuf_add(out, port, portlen) != 0))
+      return -1;
+  }
+
+  if (wbuf_add(out, ")", 1) != 0)
+    return -1;
+
+  { /* path + query, verbatim up to any fragment */
+    const char *frag = authend;
+    while (*frag != '\0' && *frag != '#')
+      frag++;
+    if (wbuf_add(out, authend, (size_t) (frag - authend)) != 0)
+      return -1;
+  }
+  return 0;
+}
+
+/* 14-digit YYYYMMDDhhmmss from a WARC-Date "YYYY-MM-DDThh:mm:ssZ" (digits
+ * only). */
+static void iso8601_to_cdx14(const char *iso, char out[15]) {
+  int o = 0;
+  const char *p;
+  for (p = iso; *p != '\0' && o < 14; p++)
+    if (*p >= '0' && *p <= '9')
+      out[o++] = *p;
+  while (o < 14)
+    out[o++] = '0';
+  out[14] = '\0';
+}
+
+/* Append s as a JSON string (quoted, with " \ and control chars escaped). */
+static int cdx_json_str(wbuf *b, const char *s) {
+  if (wbuf_add(b, "\"", 1) != 0)
+    return -1;
+  for (; *s != '\0'; s++) {
+    unsigned char c = (unsigned char) *s;
+    if (c == '"' || c == '\\') {
+      char e[2] = {'\\', (char) c};
+      if (wbuf_add(b, e, 2) != 0)
+        return -1;
+    } else if (c < 0x20) {
+      if (wbuf_printf(b, "\\u%04x", (unsigned) c) != 0)
+        return -1;
+    } else if (wbuf_add(b, s, 1) != 0) {
+      return -1;
+    }
+  }
+  return wbuf_add(b, "\"", 1);
+}
+
+/* Copy the media type of header "name" (up to ';'/space) from a raw HTTP header
+   block into out; out is "" if absent. */
+static void http_header_value(const char *hdr, const char *name, char *out,
+                              size_t outsz) {
+  size_t nl = strlen(name);
+  const char *p = hdr;
+  out[0] = '\0';
+  if (hdr == NULL)
+    return;
+  while (*p != '\0') {
+    const char *eol = strchr(p, '\n');
+    size_t len = (eol != NULL) ? (size_t) (eol - p) : strlen(p);
+    if (len > 0 && p[len - 1] == '\r')
+      len--;
+    if (len == 0)
+      break; /* end of headers */
+    if (len > nl && strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
+      const char *v = p + nl + 1;
+      size_t vlen, k;
+      while (v < p + len && (*v == ' ' || *v == '\t'))
+        v++;
+      vlen = (size_t) (p + len - v);
+      for (k = 0; k < vlen; k++)
+        if (v[k] == ';' || v[k] == ' ' || v[k] == '\t') {
+          vlen = k;
+          break;
+        }
+      if (vlen >= outsz)
+        vlen = outsz - 1;
+      memcpy(out, v, vlen);
+      out[vlen] = '\0';
+      return;
+    }
+    if (eol == NULL)
+      break;
+    p = eol + 1;
+  }
+}
+
+/* Take ownership of a CDXJ line; frees it and returns -1 on OOM. */
+static int cdx_lines_add(warc_writer *w, char *line) {
+  if (w->cdx_count == w->cdx_cap) {
+    size_t ncap = w->cdx_cap ? w->cdx_cap * 2 : 64;
+    char **n;
+    if (ncap > (size_t) -1 / sizeof(char *)) {
+      freet(line);
+      return -1;
+    }
+    n = realloct(w->cdx_lines, ncap * sizeof(char *));
+    if (n == NULL) {
+      freet(line);
+      return -1;
+    }
+    w->cdx_lines = n;
+    w->cdx_cap = ncap;
+  }
+  w->cdx_lines[w->cdx_count++] = line;
+  return 0;
+}
+
+/* Build and stash one CDXJ line for a record. Best-effort: an OOM drops the
+   line rather than failing the (already-written) record. */
+static void warc_cdx_add(warc_writer *w, const char *target_uri,
+                         const char *date_iso, const char *status,
+                         const char *mime, const char *payload_digest,
+                         uint64_t offset, uint64_t length) {
+  wbuf line;
+  char ts[15];
+  memset(&line, 0, sizeof(line));
+  iso8601_to_cdx14(date_iso, ts);
+  if (surt_canon(target_uri, &line) != 0 ||
+      wbuf_printf(&line, " %s {\"url\": ", ts) != 0 ||
+      cdx_json_str(&line, target_uri) != 0)
+    goto fail;
+  if (mime != NULL && mime[0] != '\0' &&
+      (wbuf_puts(&line, ", \"mime\": ") != 0 || cdx_json_str(&line, mime) != 0))
+    goto fail;
+  if (status != NULL && status[0] != '\0' &&
+      (wbuf_puts(&line, ", \"status\": ") != 0 ||
+       cdx_json_str(&line, status) != 0))
+    goto fail;
+  if (payload_digest != NULL && payload_digest[0] != '\0' &&
+      wbuf_printf(&line, ", \"digest\": \"sha1:%s\"", payload_digest) != 0)
+    goto fail;
+  if (wbuf_printf(&line, ", \"length\": \"%llu\", \"offset\": \"%llu\"",
+                  (unsigned long long) length,
+                  (unsigned long long) offset) != 0)
+    goto fail;
+  if (w->cur_seg != NULL && (wbuf_puts(&line, ", \"filename\": ") != 0 ||
+                             cdx_json_str(&line, w->cur_seg) != 0))
+    goto fail;
+  if (wbuf_puts(&line, "}") != 0 || wbuf_add(&line, "", 1) != 0) /* NUL */
+    goto fail;
+  if (cdx_lines_add(w, line.data) == 0)
+    return; /* ownership transferred */
+  return;   /* cdx_lines_add already freed on failure */
+fail:
+  wbuf_free(&line);
+}
+
+/* LC_ALL=C (unsigned byte) order over whole lines; the searchable key
+   "<surt> <ts>" is the line prefix, so this yields sorted CDXJ. */
+static int cdx_cmp(const void *a, const void *b) {
+  const unsigned char *x = *(const unsigned char *const *) a;
+  const unsigned char *y = *(const unsigned char *const *) b;
+  while (*x != '\0' && *x == *y) {
+    x++;
+    y++;
+  }
+  return (int) *x - (int) *y;
+}
+
+/* Sort and write the accumulated CDXJ lines to <base>.cdx. */
+static void warc_cdx_flush(warc_writer *w) {
+  FILE *f;
+  char catbuff[CATBUFF_SIZE];
+  size_t i;
+  if (!w->cdx_on || w->cdx_path == NULL || w->cdx_count == 0)
+    return;
+  qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
+  f = FOPEN(fconv(catbuff, sizeof(catbuff), w->cdx_path), "wb");
+  if (f == NULL)
+    return;
+  for (i = 0; i < w->cdx_count; i++) {
+    fputs(w->cdx_lines[i], f);
+    fputc('\n', f);
+  }
+  fclose(f);
+}
+
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
@@ -461,6 +790,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *concurrent_to, const char *refers_uri,
                      const char *refers_date, const char *profile,
                      const char *payload_digest, const char *truncated,
+                     const char *cdx_status, const char *cdx_mime,
                      int http_section, const char *http_hdr,
                      size_t http_hdr_len, int has_body, const char *body,
                      size_t body_len, const char *body_path, char out_id[64]) {
@@ -560,20 +890,29 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
 
   if (member_begin(&m, w) != 0)
     goto done;
-  if (member_write(&m, hdr.data, hdr.len) != 0 ||
-      stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
-                   body_len, body_path, write_sink, &m) != 0 ||
-      member_write(&m, "\r\n\r\n", 4) != 0) {
-    member_end(&m);
-    goto done;
-  }
-  if (member_end(&m) != 0)
-    goto done;
+  { /* member start (before writing): CDXJ offset for this record */
+    uint64_t rec_offset = w->offset;
+    if (member_write(&m, hdr.data, hdr.len) != 0 ||
+        stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
+                     body_len, body_path, write_sink, &m) != 0 ||
+        member_write(&m, "\r\n\r\n", 4) != 0) {
+      member_end(&m);
+      goto done;
+    }
+    if (member_end(&m) != 0)
+      goto done;
 
-  {
-    long pos = ftell(w->f);
-    if (pos >= 0)
-      w->offset = (uint64_t) pos;
+    {
+      long pos = ftell(w->f);
+      if (pos >= 0)
+        w->offset = (uint64_t) pos;
+    }
+    /* Index response/revisit/resource records only (not warcinfo/request). */
+    if (w->cdx_on && target_uri != NULL && target_uri[0] != '\0' &&
+        (strcmp(type, "response") == 0 || strcmp(type, "revisit") == 0 ||
+         strcmp(type, "resource") == 0))
+      warc_cdx_add(w, target_uri, date, cdx_status, cdx_mime, payload_digest,
+                   rec_offset, w->offset - rec_offset);
   }
   if (out_id != NULL)
     strlcpybuff(out_id, id, 64);
@@ -588,10 +927,10 @@ done:
 /* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
 static int warc_write_warcinfo_record(warc_writer *w) {
   w->info_id[0] = '\0'; /* warcinfo itself carries no WARC-Warcinfo-ID */
-  return warc_emit(w, "warcinfo", "application/warc-fields", NULL, NULL, NULL,
-                   NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, w->info_fields,
-                   w->info_fields != NULL ? strlen(w->info_fields) : 0, NULL,
-                   w->info_id);
+  return warc_emit(
+      w, "warcinfo", "application/warc-fields", NULL, NULL, NULL, NULL, NULL,
+      NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, w->info_fields,
+      w->info_fields != NULL ? strlen(w->info_fields) : 0, NULL, w->info_id);
 }
 
 static int warc_rotate(warc_writer *w) {
@@ -608,6 +947,10 @@ static int warc_rotate(warc_writer *w) {
   if (w->f == NULL)
     return -1;
   w->offset = 0;
+  if (w->cdx_on) {
+    freet(w->cur_seg);
+    w->cur_seg = path_basename_dup(namebuf);
+  }
   return warc_write_warcinfo_record(w);
 }
 
@@ -743,6 +1086,24 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     return NULL;
   }
 
+  /* --warc-cdx: <base>.cdx next to the resolved archive path (pre-rotation). */
+  if (opt->warc_cdx) {
+    size_t l = strlen(path);
+    size_t baselen = l;
+    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0)
+      baselen = l - 8;
+    else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0)
+      baselen = l - 5;
+    w->cdx_on = 1;
+    w->cdx_path = malloct(baselen + 5); /* ".cdx" + NUL */
+    if (w->cdx_path == NULL) {
+      warc_close(w);
+      return NULL;
+    }
+    memcpy(w->cdx_path, path, baselen);
+    memcpy(w->cdx_path + baselen, ".cdx", 5);
+  }
+
   /* Rotation on: the first segment is <base>-00000<ext> (wget-style); split the
      resolved path into base + suffix so later segments reuse the base. */
   if (w->max_size > 0) {
@@ -776,6 +1137,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     warc_close(w);
     return NULL;
   }
+  if (w->cdx_on)
+    w->cur_seg = path_basename_dup(path);
 
   if (warc_write_warcinfo_record(w) != 0) {
     warc_close(w);
@@ -785,15 +1148,34 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
 }
 
 void warc_close(warc_writer *w) {
+  size_t i;
   if (w == NULL)
     return;
+  warc_cdx_flush(w); /* sort + write <base>.cdx before tearing down */
   if (w->f != NULL)
     fclose(w->f);
   if (w->seen != NULL)
     coucal_delete(&w->seen);
+  for (i = 0; i < w->cdx_count; i++)
+    freet(w->cdx_lines[i]);
+  freet(w->cdx_lines);
+  freet(w->cdx_path);
+  freet(w->cur_seg);
   freet(w->seg_base);
   freet(w->info_fields);
   freet(w);
+}
+
+int warc_surt(const char *url, char *out, size_t outsz) {
+  wbuf b;
+  int rc = -1;
+  memset(&b, 0, sizeof(b));
+  if (surt_canon(url, &b) == 0 && wbuf_add(&b, "", 1) == 0 && b.len <= outsz) {
+    strlcpybuff(out, b.data, outsz);
+    rc = 0;
+  }
+  wbuf_free(&b);
+  return rc;
 }
 
 void warc_close_opt(httrackp *opt) {
@@ -823,9 +1205,16 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   int has_payload;
   int emit_body;
   int rc = -1;
+  char statusbuf[16];
+  char mimebuf[256];
 
   if (resp_hdr == NULL)
     return -1;
+
+  /* CDXJ status/mime (from the caller's status and the response Content-Type).
+   */
+  snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
+  http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
@@ -878,9 +1267,9 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (warc_emit(w, is_revisit ? "revisit" : "response",
                 "application/http;msgtype=response", target_uri, ip, NULL,
                 refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
-                emit_body ? warc_truncated_reason(truncated) : NULL, 1,
-                http.data, http.len, emit_body, body, body_len, body_path,
-                resp_id) != 0) {
+                emit_body ? warc_truncated_reason(truncated) : NULL, statusbuf,
+                mimebuf, 1, http.data, http.len, emit_body, body, body_len,
+                body_path, resp_id) != 0) {
     wbuf_free(&http);
     return -1;
   }
@@ -889,8 +1278,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (req_hdr != NULL && req_hdr[0] != '\0') {
     size_t rlen = strlen(req_hdr);
     if (warc_emit(w, "request", "application/http;msgtype=request", target_uri,
-                  NULL, resp_id, NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1,
-                  req_hdr, rlen, NULL, NULL) != 0)
+                  NULL, resp_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
+                  NULL, 0, 1, req_hdr, rlen, NULL, NULL) != 0)
       return -1;
   }
 
@@ -931,8 +1320,9 @@ int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
                        ? content_type
                        : "application/octet-stream",
                    target_uri, ip, NULL, NULL, NULL, NULL,
-                   have_pdig ? pdig : NULL, warc_truncated_reason(truncated), 0,
-                   NULL, 0, has_body, body, body_len, body_path, NULL);
+                   have_pdig ? pdig : NULL, warc_truncated_reason(truncated),
+                   NULL, content_type, 0, NULL, 0, has_body, body, body_len,
+                   body_path, NULL);
 }
 
 /* ---- engine emit hook ---- */

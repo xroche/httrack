@@ -1830,6 +1830,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   opt->warc_verbatim = 1;
                   if (!StringNotEmpty(opt->warc_file)) // implies --warc
                     StringCopy(opt->warc_file, WARC_AUTONAME);
+                } else if (*(com + 1) == 'c') { // --warc-cdx: sorted CDXJ index
+                  com++;
+                  opt->warc_cdx = 1;
                 } else { // --warc: auto-named archive under the output dir
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }

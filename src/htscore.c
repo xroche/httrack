@@ -3634,6 +3634,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
     StringCopyS(to->warc_file, from->warc_file);
   to->warc_max_size = from->warc_max_size;
   to->warc_verbatim = from->warc_verbatim;
+  to->warc_cdx = from->warc_cdx;
 
   if (from->pause_max_ms > 0) {
     to->pause_min_ms = from->pause_min_ms;

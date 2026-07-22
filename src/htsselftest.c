@@ -3874,6 +3874,165 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* SURT canonicalization vectors (the CDXJ sort key: www-strip, default-port
+   strip, host reversal, non-default port kept, IP/IPv6 verbatim). */
+static int st_warc_surt(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *url, *want;
+  } cases[] = {
+      {"http://www.example.com/", "com,example)/"},
+      {"http://example.com:80/a/b?q=1", "com,example)/a/b?q=1"},
+      {"https://www.EXAMPLE.com/Path", "com,example)/Path"},
+      {"https://example.com:443/", "com,example)/"},
+      {"http://www2.example.com/x", "com,example)/x"},
+      {"http://example.com:8080/p", "com,example:8080)/p"},
+      {"http://user:pass@www.example.com/y", "com,example)/y"},
+      {"http://192.168.0.1/z", "192.168.0.1)/z"},
+      {"http://[2001:db8::1]/w", "[2001:db8::1])/w"},
+      {"http://sub.a.example.co.uk/deep?x=1#frag",
+       "uk,co,example,a,sub)/deep?x=1"},
+  };
+
+  int err = 0;
+  size_t i;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    char out[512];
+    if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
+        strcmp(out, cases[i].want) != 0) {
+      fprintf(stderr, "warc-surt: %s -> %s (want %s)\n", cases[i].url, out,
+              cases[i].want);
+      err = 1;
+    }
+  }
+  printf("warc-surt: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
+   .cdx is sorted, has exactly one line per response/revisit/resource (none for
+   warcinfo/request), and each offset/length points at a gzip member that
+   independently inflates to a record whose WARC-Target-URI matches the line. */
+static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
+  char wpath[HTS_URLMAXSIZE], cpath[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *warc = NULL, *cdx = NULL;
+  size_t warc_len = 0, cdx_len = 0;
+  hts_boolean saved_cdx;
+  int err = 0, nlines = 0;
+  const char *lp, *cend;
+  char prev[2048];
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-cdx: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx.warc.gz");
+  fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx.cdx");
+  saved_cdx = opt->warc_cdx;
+  opt->warc_cdx = 1;
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  warc_write_transaction(w, "http://www.example.com/one", "127.0.0.1",
+                         "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+                         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                         "one body\n", 9, NULL, 200, 0, 0, 0);
+  warc_write_resource(w, "ftp://files.example.com/data.bin", "127.0.0.1",
+                      "application/octet-stream", "\x00\x01\x02\x03", 4, NULL,
+                      0);
+  warc_write_transaction(w, "http://alpha.example.com/two", "127.0.0.1",
+                         "GET /two HTTP/1.1\r\nHost: alpha.example.com\r\n\r\n",
+                         "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
+                         "two body\n", 9, NULL, 200, 0, 0, 0);
+  /* Same payload as /one at a new URL: identical-payload-digest revisit under
+     OpenSSL, a full response otherwise; either way one index line. */
+  warc_write_transaction(w, "http://zeta.example.com/dup", "127.0.0.1",
+                         "GET /dup HTTP/1.1\r\nHost: zeta.example.com\r\n\r\n",
+                         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                         "one body\n", 9, NULL, 200, 0, 0, 0);
+  warc_close(w);
+  opt->warc_cdx = saved_cdx;
+
+  warc = warc_slurp(wpath, &warc_len);
+  cdx = warc_slurp(cpath, &cdx_len);
+  assertf(warc != NULL);
+  assertf(cdx != NULL);
+
+  prev[0] = '\0';
+  lp = (const char *) cdx;
+  cend = (const char *) cdx + cdx_len;
+  while (lp < cend) {
+    const char *eol = memchr(lp, '\n', (size_t) (cend - lp));
+    size_t llen = eol ? (size_t) (eol - lp) : (size_t) (cend - lp);
+    char line[2048];
+    const char *j, *us, *ue, *o, *l;
+    char url[1024];
+    unsigned long long off = 0, len = 0;
+    const unsigned char *mp, *mend;
+    unsigned char *rec;
+    size_t rlen = 0, urllen;
+    if (llen == 0) {
+      lp = eol ? eol + 1 : cend;
+      continue;
+    }
+    if (llen >= sizeof(line)) {
+      err = 1;
+      break;
+    }
+    memcpy(line, lp, llen);
+    line[llen] = '\0';
+    nlines++;
+    if (prev[0] != '\0' && strcmp(prev, line) > 0)
+      err = 1; /* must be sorted */
+    strlcpybuff(prev, line, sizeof(prev));
+    j = strstr(line, "\"url\": \"");
+    o = strstr(line, "\"offset\": \"");
+    l = strstr(line, "\"length\": \"");
+    if (j == NULL || o == NULL || l == NULL ||
+        sscanf(o + 11, "%llu", &off) != 1 ||
+        sscanf(l + 11, "%llu", &len) != 1) {
+      err = 1;
+      goto nextline;
+    }
+    us = j + 8;
+    ue = strchr(us, '"');
+    if (ue == NULL || (urllen = (size_t) (ue - us)) >= sizeof(url)) {
+      err = 1;
+      goto nextline;
+    }
+    memcpy(url, us, urllen);
+    url[urllen] = '\0';
+    if (len == 0 || off > warc_len || len > warc_len - off) {
+      err = 1;
+      goto nextline;
+    }
+    mp = warc + off;
+    mend = warc + off + len;
+    rec = warc_next_member(&mp, mend, &rlen);
+    if (rec == NULL) {
+      err = 1;
+      goto nextline;
+    }
+    {
+      char needle[1100];
+      snprintf(needle, sizeof(needle), "WARC-Target-URI: %s\r\n", url);
+      if (warc_memstr((char *) rec, needle, rlen, strlen(needle)) == NULL)
+        err = 1;
+    }
+    freet(rec);
+  nextline:
+    lp = eol ? eol + 1 : cend;
+  }
+  freet(warc);
+  freet(cdx);
+  if (nlines != 4)
+    err = 1; /* 3 responses/revisits + 1 resource; no warcinfo/request */
+  printf("warc-cdx: %d index lines: %s\n", nlines, err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4003,6 +4162,10 @@ static const struct selftest_entry {
      st_warc_rotate},
     {"warc-verbatim", "<dir>", "--warc-verbatim strategy-A compressed body",
      st_warc_verbatim},
+    {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
+     st_warc_surt},
+    {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
+     st_warc_cdx},
 };
 
 static void list_selftests(void) {

@@ -545,6 +545,8 @@ struct httrackp {
                             bytes (<=0: single file). Tail: ABI */
   hts_boolean warc_verbatim; /**< --warc-verbatim: store compressed bodies
                                   as-received (strategy A). Tail: ABI */
+  hts_boolean warc_cdx; /**< --warc-cdx: write a sorted CDXJ index next to the
+                             archive. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

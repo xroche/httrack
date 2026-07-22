@@ -121,6 +121,9 @@ const char *hts_optalias[][4] = {
   {"warc-verbatim", "-%rv", "single",
    "store compressed bodies as received, keeping Content-Encoding (implies "
    "--warc)"},
+  {"warc-cdx", "-%rc", "single",
+   "write a sorted CDXJ index next to the WARC archive"},
+  {"warc-cdxj", "-%rc", "single", ""},
   {"why", "-%Y", "param1",
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",
