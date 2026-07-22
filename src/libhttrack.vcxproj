@@ -135,6 +135,7 @@
     <ClCompile Include="htswizard.c" />
     <ClCompile Include="htswrap.c" />
     <ClCompile Include="htszlib.c" />
+    <ClCompile Include="warc.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="minizip\ioapi.c" />
     <ClCompile Include="minizip\iowin32.c" />
