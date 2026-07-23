@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=direnum: enumerate a long+non-ASCII directory through the
+# opendir/readdir wrappers, checking each child round-trips as UTF-8 (#133,#630).
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=direnum "$dir" | grep -q "direnum:.*OK"

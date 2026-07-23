@@ -609,7 +609,9 @@ static HTS_UNUSED size_t llint_to_size_t(LLint o) {
 
 /* dirent() compatibility */
 #ifdef _WIN32
-#define HTS_DIRENT_SIZE 256
+/* Holds a UTF-8 d_name: MAX_PATH (260) UTF-16 units expand to <=3 bytes each.
+   Windows-only struct, ABI free to break. */
+#define HTS_DIRENT_SIZE 1024
 struct dirent {
   ino_t d_ino;                  /* ignored */
   off_t d_off;                  /* ignored */
