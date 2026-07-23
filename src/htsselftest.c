@@ -4326,6 +4326,67 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
+// -#test=longpath <dir>: round-trip a file whose full path exceeds the Windows
+// MAX_PATH (260) through the MKDIR/FOPEN/STAT/UNLINK wrappers. On POSIX this is
+// a positive control (long paths are always legal); on Windows it fails without
+// the \\?\ prefixing in hts_pathToUCS2 and passes with it (#133).
+static int st_longpath(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "longpath: needs a writable base dir\n");
+    return 1;
+  }
+  char path[HTS_URLMAXSIZE * 2];
+  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+
+  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
+    path[--n] = '\0';
+  }
+  // Descend through 40-char segments (under the 255 per-component limit \\?\
+  // does not lift) until the path clears MAX_PATH (260).
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  while (n + sizeof(seg) - 1 < 300) {
+    memcpybuff(path + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (MKDIR(path) != 0 && errno != EEXIST) {
+      fprintf(stderr, "longpath: mkdir failed at %u chars: %s\n", (unsigned) n,
+              strerror(errno));
+      return 1;
+    }
+  }
+  memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
+  n += sizeof("/leaf.bin") - 1;
+  assertf(n > 260); /* the point: a path Windows rejects sans \\?\ */
+
+  static const char payload[] = "longpath-ok";
+  FILE *fp = FOPEN(path, "wb");
+
+  if (fp == NULL) {
+    fprintf(stderr, "longpath: create failed (%u chars): %s\n", (unsigned) n,
+            strerror(errno));
+    return 1;
+  }
+  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  fclose(fp);
+
+  STRUCT_STAT st;
+
+  assertf(STAT(path, &st) == 0);
+  assertf((size_t) st.st_size == sizeof(payload));
+
+  char buf[64];
+
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(fread(buf, 1, sizeof(payload), fp) == sizeof(payload));
+  fclose(fp);
+  assertf(memcmp(buf, payload, sizeof(payload)) == 0);
+  assertf(UNLINK(path) == 0);
+
+  printf("longpath: round-tripped a %u-char path: OK\n", (unsigned) n);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4457,6 +4518,10 @@ static const struct selftest_entry {
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
+    {"longpath", "<dir>",
+     "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
+     "Windows)",
+     st_longpath},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
 #if HTS_USEOPENSSL

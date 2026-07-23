@@ -163,6 +163,7 @@ TESTS = \
 	73_local-warc.test \
 	74_local-warc-wacz.test \
 	74_local-warc-verbatim.test \
-	75_engine-longpath-posix.test
+	75_engine-longpath-posix.test \
+	76_engine-longpath-io.test
 
 CLEANFILES = check-network_sh.cache
