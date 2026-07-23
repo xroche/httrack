@@ -40,7 +40,6 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%N, \-\-delayed\-type\-check\fR ]
 [ \fB\-%D, \-\-cached\-delayed\-type\-check\fR ]
 [ \fB\-%M, \-\-mime\-html\fR ]
-[ \fB\-%r, \-\-warc\fR ]
 [ \fB\-LN, \-\-long\-names[=N]\fR ]
 [ \fB\-KN, \-\-keep\-links[=N]\fR ]
 [ \fB\-x, \-\-replace\-external\fR ]
@@ -75,6 +74,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%X, \-\-headers\fR ]
 [ \fB\-C, \-\-cache[=N]\fR ]
 [ \fB\-k, \-\-store\-all\-in\-cache\fR ]
+[ \fB\-%r, \-\-warc\fR ]
 [ \fB\-%n, \-\-do\-not\-recatch\fR ]
 [ \fB\-%v, \-\-display\fR ]
 [ \fB\-Q, \-\-do\-not\-log\fR ]
@@ -198,8 +198,6 @@ delayed type check, don't make any link test but wait for files download to star
 cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait) (\-\-cached\-delayed\-type\-check)
 .IP \-%M
 generate a RFC MIME\-encapsulated full\-archive (.mht) (\-\-mime\-html)
-.IP \-%r
-write an ISO\-28500 WARC/1.1 archive; \-\-warc\-file NAME sets the output name, \-\-warc\-max\-size N rotates segments past N bytes, \-\-warc\-cdx also writes a sorted CDXJ index, \-\-wacz packages it all as a WACZ file (\-\-warc)
 .IP \-%t
 keep the original file extension, don't rewrite it from the MIME type (%t0 rewrite)
 .IP \-LN
@@ -279,6 +277,8 @@ additional HTTP header line (\-%X "X\-Magic: 42" (\-\-headers <param>)
 create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) (\-\-cache[=N])
 .IP \-k
 store all files in cache (not useful if files on disk) (\-\-store\-all\-in\-cache)
+.IP \-%r
+write an ISO\-28500 WARC/1.1 archive; \-\-warc\-file NAME sets the output name, \-\-warc\-max\-size N rotates segments past N bytes, \-\-warc\-cdx also writes a sorted CDXJ index, \-\-wacz packages it all as a WACZ file (\-\-warc)
 .IP \-%n
 do not re\-download locally erased files (\-\-do\-not\-recatch)
 .IP \-%v

@@ -90,35 +90,34 @@ offline browser : copy websites to a local directory</p>
 ] [ <b>-NN, --structure[=N]</b> ] [ <b>-%N,
 --delayed-type-check</b> ] [ <b>-%D,
 --cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
-] [ <b>-%r, --warc</b> ] [ <b>-LN, --long-names[=N]</b> ] [
-<b>-KN, --keep-links[=N]</b> ] [ <b>-x,
---replace-external</b> ] [ <b>-%x, --disable-passwords</b> ]
-[ <b>-%q, --include-query-string</b> ] [ <b>-%g,
---strip-query</b> ] [ <b>-o, --generate-errors</b> ] [
-<b>-X, --purge-old[=N]</b> ] [ <b>-%p, --preserve</b> ] [
-<b>-%T, --utf8-conversion</b> ] [ <b>-bN, --cookies[=N]</b>
-] [ <b>-%K, --cookies-file</b> ] [ <b>-%Y, --why</b> ] [
-<b>-u, --check-type[=N]</b> ] [ <b>-j, --parse-java[=N]</b>
-] [ <b>-sN, --robots[=N]</b> ] [ <b>-%h, --http-10</b> ] [
-<b>-%k, --keep-alive</b> ] [ <b>-%z,
---disable-compression</b> ] [ <b>-%B, --tolerant</b> ] [
-<b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
+] [ <b>-LN, --long-names[=N]</b> ] [ <b>-KN,
+--keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
+<b>-%x, --disable-passwords</b> ] [ <b>-%q,
+--include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [
+<b>-o, --generate-errors</b> ] [ <b>-X, --purge-old[=N]</b>
+] [ <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion</b>
+] [ <b>-bN, --cookies[=N]</b> ] [ <b>-%K, --cookies-file</b>
+] [ <b>-%Y, --why</b> ] [ <b>-u, --check-type[=N]</b> ] [
+<b>-j, --parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
+<b>-%h, --http-10</b> ] [ <b>-%k, --keep-alive</b> ] [
+<b>-%z, --disable-compression</b> ] [ <b>-%B, --tolerant</b>
+] [ <b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
 <b>-%A, --assume</b> ] [ <b>-@iN, --protocol[=N]</b> ] [
 <b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
 <b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
 --accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
 --cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
-<b>-%n, --do-not-recatch</b> ] [ <b>-%v, --display</b> ] [
-<b>-Q, --do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
---extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
---verbose</b> ] [ <b>-f, --file-log</b> ] [ <b>-f2,
---single-log</b> ] [ <b>-I, --index</b> ] [ <b>-%i,
---build-top-index</b> ] [ <b>-%I, --search-index</b> ] [
-<b>-pN, --priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b>
-] [ <b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
-<b>-B, --can-go-up-and-down</b> ] [ <b>-a,
---stay-on-same-address</b> ] [ <b>-d,
+<b>-%r, --warc</b> ] [ <b>-%n, --do-not-recatch</b> ] [
+<b>-%v, --display</b> ] [ <b>-Q, --do-not-log</b> ] [ <b>-q,
+--quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
+--debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
+--file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
+--index</b> ] [ <b>-%i, --build-top-index</b> ] [ <b>-%I,
+--search-index</b> ] [ <b>-pN, --priority[=N]</b> ] [ <b>-S,
+--stay-on-same-dir</b> ] [ <b>-D, --can-go-down</b> ] [
+<b>-U, --can-go-up</b> ] [ <b>-B, --can-go-up-and-down</b> ]
+[ <b>-a, --stay-on-same-address</b> ] [ <b>-d,
 --stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
 ] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
 --debug-headers</b> ] [ <b>-%!,
@@ -649,20 +648,6 @@ don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
 <td width="4%">
 
 
-<p>-%r</p></td>
-<td width="5%"></td>
-<td width="82%">
-
-
-<p>write an ISO-28500 WARC/1.1 archive; --warc-file NAME
-sets the output name, --warc-max-size N rotates segments
-past N bytes, --warc-cdx also writes a sorted CDXJ index,
---wacz packages it all as a WACZ file (--warc)</p></td></tr>
-<tr valign="top" align="left">
-<td width="9%"></td>
-<td width="4%">
-
-
 <p>-%t</p></td>
 <td width="5%"></td>
 <td width="82%">
@@ -1139,6 +1124,20 @@ update before) (--cache[=N])</p></td></tr>
 
 <p>store all files in cache (not useful if files on disk)
 (--store-all-in-cache)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%r</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>write an ISO-28500 WARC/1.1 archive; --warc-file NAME
+sets the output name, --warc-max-size N rotates segments
+past N bytes, --warc-cdx also writes a sorted CDXJ index,
+--wacz packages it all as a WACZ file (--warc)</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">

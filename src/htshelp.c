@@ -524,10 +524,6 @@ void help(const char *app, int more) {
   infomsg
     (" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
-  infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
-          "output name, --warc-max-size N rotates segments past N bytes, "
-          "--warc-cdx also writes a sorted CDXJ index, --wacz packages it all "
-          "as a WACZ file");
   infomsg(" %t  keep the original file extension, don't rewrite it from the "
           "MIME type (%t0 rewrite)");
   infomsg
@@ -597,6 +593,10 @@ void help(const char *app, int more) {
   infomsg
     ("  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
+  infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
+          "output name, --warc-max-size N rotates segments past N bytes, "
+          "--warc-cdx also writes a sorted CDXJ index, --wacz packages it all "
+          "as a WACZ file");
   infomsg(" %n  do not re-download locally erased files");
   infomsg
     (" %v  display on screen filenames downloaded (in realtime) - * %v1 short version - %v2 full animation");
