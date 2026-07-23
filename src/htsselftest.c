@@ -2672,7 +2672,6 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
-  /* #216: the category from winprofile.ini is utf-8, not mojibake */
   assertf(strstr(buf, catUTF8) != NULL);
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
