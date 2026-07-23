@@ -1889,8 +1889,7 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "fsize: cannot extend '%s' to " LLintP ": %s\n", path,
             expected, strerror(err));
     UNLINK(path);
-    /* A filesystem that caps size below 5GB (e.g. GNU/Hurd ext2fs) can't host
-       the probe; skip (77), don't fail: the wrap is untestable there. */
+    /* EFBIG: file-size cap below 5GB (GNU/Hurd ext2fs); skip, don't fail. */
     return err == EFBIG ? 77 : 1;
   }
 
