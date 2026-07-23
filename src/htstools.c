@@ -1044,7 +1044,18 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                   oldchain->next = chain;
                 }
                 chain->next = NULL;
+#ifdef _WIN32
+                /* name is ANSI-codepage, doc is utf-8: convert (#216) */
+                {
+                  const char *const name = hts_findgetname(h);
+                  char *name_utf8 =
+                      hts_convertStringSystemToUTF8(name, strlen(name));
+                  strcpybuff(chain->name, name_utf8 != NULL ? name_utf8 : name);
+                  freet(name_utf8);
+                }
+#else
                 strcpybuff(chain->name, hts_findgetname(h));
+#endif
                 chain->category = category;
                 chain->level = level;
               }
