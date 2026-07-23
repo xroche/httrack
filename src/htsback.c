@@ -750,9 +750,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     fexist_utf8(back[p].url_sav))
                   filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
-              /* Strategy A: keep the compressed spool for a verbatim record
-                 instead of unlinking it. */
-              if (opt->warc_verbatim && StringNotEmpty(opt->warc_file)) {
+              /* Keep the compressed spool so the WARC record stores the body
+                 verbatim (Content-Encoding preserved) instead of unlinking it.
+               */
+              if (StringNotEmpty(opt->warc_file)) {
                 warc_adopt_rawspool(&back[p].r, back[p].tmpfile);
                 if (back[p].r.warc_rawpath != NULL)
                   back[p].tmpfile =

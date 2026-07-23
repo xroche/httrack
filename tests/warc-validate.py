@@ -11,7 +11,7 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
-#   --verbatim                strategy A: --expect-body-hex instead keeps
+#   --verbatim                compressed asset: --expect-body-hex instead keeps
 #                             Content-Encoding, checks the HTTP Content-Length is
 #                             the stored (compressed) length, asserts the stored
 #                             body inflates to HEX (the served plaintext), and
@@ -67,10 +67,10 @@ def check_body(rec, http_hdr, body, sub, want):
 
 
 def check_body_verbatim(rec, http_hdr, body, sub, want, digests_emitted):
-    """Strategy A: the stored body is the coded octets, Content-Encoding is kept,
+    """Verbatim: the stored body is the coded octets, Content-Encoding is kept,
     the HTTP Content-Length equals the stored (compressed) length, inflating the
     body yields the served plaintext, and the payload digest is over the coded
-    body. This is the differential: inflate(stored) == strategy-B decoded body."""
+    body. The differential: inflate(stored) == the body the server compressed."""
     if b"Content-Encoding" not in http_hdr:
         sys.exit("verbatim record for %s dropped Content-Encoding" % sub)
     if b"Transfer-Encoding" in http_hdr:

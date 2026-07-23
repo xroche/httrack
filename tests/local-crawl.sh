@@ -379,8 +379,8 @@ if test -n "$warc_validate"; then
     for spec in ${WARC_VALIDATE_BODY:-}; do
         bodyargs+=(--expect-body-hex "$spec")
     done
-    # strategy A (--warc-verbatim): assert the stored body inflates to the served
-    # body instead of expecting the decoded body stored verbatim.
+    # compressed asset: assert the stored (verbatim) body inflates to the served
+    # body and keeps Content-Encoding, instead of expecting a decoded body.
     test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
     "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
