@@ -8,8 +8,13 @@ set -euo pipefail
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-out=$(httrack -#test=fsize "$dir")
+rc=0
+out=$(httrack -#test=fsize "$dir") || rc=$?
 echo "$out"
+
+# 77 = platform can't host the 5GB probe (EFBIG); skip, don't fail.
+[ "$rc" = 77 ] && exit 77
+[ "$rc" = 0 ] || exit "$rc"
 
 want="fsize: width=8,8 size=5368709120,5368709120 psize=5368709120 absent=-1"
 test "$out" == "$want" || {
