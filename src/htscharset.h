@@ -173,7 +173,7 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
 
 /**
  * UTF-8 path to UCS-2 for the wide file/FindFirst APIs, \\?\-prefixed above
- * MAX_PATH (#133). Defined in htslib.c; internal (not exported). Caller frees.
+ * MAX_PATH (#133). Internal, not exported; caller frees.
  * This function is WIN32 specific.
  **/
 extern LPWSTR hts_pathToUCS2(const char *path);

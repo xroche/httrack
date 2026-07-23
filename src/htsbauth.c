@@ -203,8 +203,7 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
-// Read cookies.txt, plus (Windows only) any copied IE cookies *@*.txt.
-// Returns !=0 on error.
+// Read cookies.txt (+ copied IE cookies *@*.txt on Windows); !=0 on error.
 int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
   char catbuff[CATBUFF_SIZE];
   char buffer[8192];
@@ -228,8 +227,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
         if (!(find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
           if (!(find.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)) {
             // cFileName is UTF-16: convert to UTF-8 so the mirror path and
-            // hts_fopen_utf8/_unlink stay UTF-8 end to end (no CP_ACP
-            // mojibake).
+            // file wrappers stay UTF-8 (no CP_ACP mojibake).
             char *u = hts_convertUCS2StringToUTF8(find.cFileName, -1);
             FILE *fp =
                 u != NULL

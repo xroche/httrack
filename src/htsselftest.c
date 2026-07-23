@@ -4596,11 +4596,9 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* cookie_load reads its jar, and on Windows also imports copied IE cookies
-   (*@*.txt), through the UTF-8/long-path file wrappers. Drive it against a
-   long, non-ASCII cookie folder end to end (#133). POSIX compiles out the
-   IE-scan block, so there the merge only proves the cookies.txt read; the wide
-   FindFirstFileW glob and the IE import are exercised on the Windows legs. */
+/* -#test=cookieimport <dir>: load a jar (and, on Windows, copied IE cookies
+   *@*.txt) from a long, non-ASCII folder via the UTF-8/long-path wrappers
+   (#133). POSIX compiles the IE block out; there it is a positive control. */
 static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
