@@ -349,9 +349,13 @@ void index_finish(const char *indexpath, int mode) {
 
             // Write new file
             if (mode == 1)      // TEXT
-              fp = fopen(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"), "wb");
+              fp = FOPEN(
+                  concat(catbuff, sizeof(catbuff), indexpath, "index.txt"),
+                  "wb");
             else                // HTML
-              fp = fopen(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"), "wb");
+              fp = FOPEN(
+                  concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"),
+                  "wb");
             if (fp) {
               char current_word[KEYW_LEN + 32];
               char word[KEYW_LEN + 32];

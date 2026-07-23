@@ -699,7 +699,7 @@ int httpmirror(char *url1, httrackp * opt) {
     int primary_len = 8192;
 
     if (StringNotEmpty(opt->filelist)) {
-      primary_len += max(0, fsize(StringBuff(opt->filelist)) * 2);
+      primary_len += max(0, fsize_utf8(StringBuff(opt->filelist)) * 2);
     }
     primary_len += (int) strlen(url1) * 2;
 
@@ -856,19 +856,19 @@ int httpmirror(char *url1, httrackp * opt) {
       char *filelist_buff = NULL;
       size_t filelist_sz = 0;
       const char *filelist_err = NULL; /* failure reason, NULL on success */
-      const LLint fs = fsize(StringBuff(opt->filelist));
+      const LLint fs = fsize_utf8(StringBuff(opt->filelist));
 
       if (fs < 0) {
         /* fsize() hides the cause; redo stat() for a precise errno (#49) */
-        struct stat st;
-        filelist_err = stat(StringBuff(opt->filelist), &st) != 0
+        STRUCT_STAT st;
+        filelist_err = STAT(StringBuff(opt->filelist), &st) != 0
                            ? strerror(errno)
                            : "not a regular file";
       } else if ((filelist_sz = llint_to_size_t(fs)) == (size_t) -1) {
         filelist_err = "file too large";
         filelist_sz = 0;
       } else {
-        FILE *fp = fopen(StringBuff(opt->filelist), "rb");
+        FILE *fp = FOPEN(StringBuff(opt->filelist), "rb");
 
         if (fp == NULL) {
           filelist_err = strerror(errno);
@@ -976,10 +976,9 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   // statistiques
   if (opt->makestat) {
-    makestat_fp =
-      fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-stats.txt"),
-            "wb");
+    makestat_fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                StringBuff(opt->path_log), "hts-stats.txt"),
+                        "wb");
     if (makestat_fp != NULL) {
       fprintf(makestat_fp, "HTTrack statistics report, every minutes" LF LF);
       fflush(makestat_fp);
@@ -987,10 +986,9 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   // tracking -- débuggage
   if (opt->maketrack) {
-    maketrack_fp =
-      fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-track.txt"),
-            "wb");
+    maketrack_fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log), "hts-track.txt"),
+                         "wb");
     if (maketrack_fp != NULL) {
       fprintf(maketrack_fp, "HTTrack tracking report, every minutes" LF LF);
       fflush(maketrack_fp);
@@ -1639,7 +1637,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
           /* Remove file if being processed */
           if (is_loaded_from_file) {
-            (void) unlink(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), savename()));
+            (void) UNLINK(
+                fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), savename()));
             is_loaded_from_file = 0;
           }
 
@@ -1952,8 +1951,8 @@ int httpmirror(char *url1, httrackp * opt) {
            } else */
 
         /* External modules */
-        if (opt->parsejava && (opt->parsejava & HTSPARSE_NO_CLASS) == 0
-            && fexist(savename())) {
+        if (opt->parsejava && (opt->parsejava & HTSPARSE_NO_CLASS) == 0 &&
+            fexist_utf8(savename())) {
           char BIGSTK buff_err_msg[1024];
           htsmoduleStruct BIGSTK str;
 
@@ -1994,7 +1993,7 @@ int httpmirror(char *url1, httrackp * opt) {
       }                         // text/html ou autre
 
       /* Post-processing */
-      if (fexist(savename())) {
+      if (fexist_utf8(savename())) {
         usercommand(opt, 0, NULL, savename(), urladr(), urlfil());
       }
 
@@ -2085,18 +2084,16 @@ int httpmirror(char *url1, httrackp * opt) {
       //
       opt->state._hts_in_html_parsing = 3;
       //
-      old_lst =
-        fopen(fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-               "hts-cache/old.lst"), "rb");
+      old_lst = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-cache/old.lst"),
+                      "rb");
       if (old_lst) {
-        const size_t sz = llint_to_size_t(
-            fsize(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), "hts-cache/new.lst")));
-        new_lst =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                 "hts-cache/new.lst"), "rb");
+        const size_t sz = llint_to_size_t(fsize_utf8(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/new.lst")));
+        new_lst = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                StringBuff(opt->path_log), "hts-cache/new.lst"),
+                        "rb");
         if (new_lst != NULL && sz != (size_t) -1) {
           /* +1 for the NUL below: new.lst is read raw, and the strstr()
              that follows needs a terminated C string. */
@@ -2116,9 +2113,9 @@ int httpmirror(char *url1, httrackp * opt) {
                   strcpybuff(file, StringBuff(opt->path_html));
                   strcatbuff(file, line + 1);
                   file[strlen(file) - 1] = '\0';
-                  if (fexist(file)) {   // toujours sur disque: virer
+                  if (fexist_utf8(file)) { // toujours sur disque: virer
                     hts_log_print(opt, LOG_INFO, "Purging %s", file);
-                    remove(file);
+                    UNLINK(file);
                     purge = 1;
                   }
                 }
@@ -2139,7 +2136,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
                       strcpybuff(file, StringBuff(opt->path_html));
                       strcatbuff(file, line + 1);
-                      while((strnotempty(file)) && (rmdir(file) == 0)) {        // ok, éliminé (existait)
+                      while ((strnotempty(file)) &&
+                             (RMDIR(file) == 0)) { // ok, éliminé (existait)
                         purge = 1;
                         if (opt->log) {
                           hts_log_print(opt, LOG_INFO, "Purging directory %s/",
@@ -2962,8 +2960,8 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
     if (adr != NULL && strcmp(adr, "primary") == 0) {
       adr = NULL;
     }
-    if (save != NULL && opt != NULL && adr != NULL && adr[0]
-        && strnotempty(save) && fexist(save)) {
+    if (save != NULL && opt != NULL && adr != NULL && adr[0] &&
+        strnotempty(save) && fexist_utf8(save)) {
       const char *rsc_save = save;
       const char *rsc_fil = strrchr(fil, '/');
       int n;
@@ -2985,13 +2983,11 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
 
       if (!opt->state.mimehtml_created) {
         opt->state.mimefp =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                StringBuff(opt->path_html), "index.mht"),
-                "wb");
-        (void) unlink(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-          StringBuff(opt->path_html),
-                              "index.eml"));
+            FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_html), "index.mht"),
+                  "wb");
+        (void) UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_html), "index.eml"));
 #ifndef _WIN32
         if (symlink("index.mht",
                     fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html),
