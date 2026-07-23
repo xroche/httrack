@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=mirrorio: rounds a file through a path that is both long
+# (>MAX_PATH) and non-ASCII, exercising the mirror I/O wrappers the engine's
+# raw file ops now route to on Windows (#133, #630). Positive control on POSIX.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=mirrorio "$dir" | grep -q "mirrorio:.*OK"

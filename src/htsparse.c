@@ -3656,7 +3656,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           !ref_existed;
       if (fexist_utf8(heap(ptr)->sav)) {
         had_partial = 1;
-        remove(heap(ptr)->sav);
+        UNLINK(heap(ptr)->sav);
       }
 
       // Re-get once, only if a partial existed and both Range triggers are
@@ -3862,18 +3862,13 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
     int do_pause = 0;
 
     // user pause lockfile : create hts-paused.lock --> HTTrack will be paused
-    if (fexist
-        (fconcat
-         (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-         StringBuff(opt->path_log), "hts-stop.lock"))) {
+    if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                            StringBuff(opt->path_log), "hts-stop.lock"))) {
       // remove lockfile
-      remove(fconcat
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-             StringBuff(opt->path_log), "hts-stop.lock"));
-      if (!fexist
-          (fconcat
-           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-           StringBuff(opt->path_log), "hts-stop.lock"))) {
+      UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                     StringBuff(opt->path_log), "hts-stop.lock"));
+      if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-stop.lock"))) {
         do_pause = 1;
       }
     }
@@ -3902,11 +3897,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         }
       }
       {
-        FILE *fp =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                StringBuff(opt->path_log),
-                 "hts-paused.lock"), "wb");
+        FILE *fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log), "hts-paused.lock"),
+                         "wb");
         if (fp) {
           fspc(NULL, fp, "info");       // dater
           fprintf(fp,
@@ -4222,18 +4215,17 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             int a = 0;
 
             *stre->last_info_shell_ = tl;
-            if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log), "hts-autopsy"))) { // débuggage: teste si le robot est vivant
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-autopsy"))) { // débuggage: teste si le
+                                                       // robot est vivant
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                     StringBuff(opt->path_log),
-                      "hts-autopsy"));
-              fp =
-                fopen(fconcat
-                      (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                      StringBuff(opt->path_log),
-                       "hts-isalive"), "wb");
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-autopsy"));
+              fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log), "hts-isalive"),
+                         "wb");
               a = 1;
             }
             if ((*stre->info_shell_) || a) {

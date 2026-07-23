@@ -412,9 +412,9 @@ void help_catchurl(const char *dest_path) {
       do {
         snprintf(dest, sizeof(dest), "%s%s%d", dest_path, "hts-post", i);
         i++;
-      } while(fexist(dest));
+      } while (fexist_utf8(dest));
       {
-        FILE *fp = fopen(dest, "wb");
+        FILE *fp = FOPEN(dest, "wb");
 
         if (fp) {
           fwrite(data, strlen(data), 1, fp);
