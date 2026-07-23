@@ -8,8 +8,14 @@ set -euo pipefail
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-out=$(httrack -#test=fsize "$dir")
+rc=0
+out=$(httrack -#test=fsize "$dir") || rc=$?
 echo "$out"
+
+# 77: the platform caps file size below 5GB (e.g. GNU/Hurd ext2fs, EFBIG) and
+# can't host the sparse probe. Nothing to exercise there; skip, don't fail.
+[ "$rc" = 77 ] && exit 77
+[ "$rc" = 0 ] || exit "$rc"
 
 want="fsize: width=8,8 size=5368709120,5368709120 psize=5368709120 absent=-1"
 test "$out" == "$want" || {
