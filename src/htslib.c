@@ -6510,12 +6510,9 @@ static void copyWchar(LPWSTR dest, const char *src) {
   dest[i] = '\0';
 }
 
-/* UTF-8 path -> the UCS-2 string handed to the _w* file APIs. Short paths are
-   just hts_convertUTF8StringToUCS2 (unchanged behavior); at/above the threshold
-   the path is absolutized + normalized (GetFullPathNameW) and "\\?\"-prefixed
-   ("\\?\UNC\" for UNC) to clear the MAX_PATH 260 limit (#133). A prefixing
-   failure never fails the call: it falls back to the plain converted path.
-   Returns malloc'd memory the caller frees; NULL only if conversion fails. */
+/* UTF-8 path -> UCS-2 for the _w* file APIs. At/above HTS_WIN_LONGPATH_MIN,
+   \\?\-prefix it via GetFullPathNameW to clear MAX_PATH (#133); else unchanged.
+   Any prefixing failure falls back to the plain converted path. */
 #define HTS_WIN_LONGPATH_MIN 240 /* stay clear of MAX_PATH (260) */
 
 static LPWSTR hts_pathToUCS2(const char *path) {
@@ -6525,7 +6522,7 @@ static LPWSTR hts_pathToUCS2(const char *path) {
     return NULL;
   }
   const size_t len = wcslen(wpath);
-  // Already device/verbatim ("\\?\" or "\\.\"): must not be re-prefixed.
+  // Already "\\?\" or "\\.\": don't re-prefix.
   const int verbatim = len >= 4 && wpath[0] == L'\\' && wpath[1] == L'\\' &&
                        (wpath[2] == L'?' || wpath[2] == L'.') &&
                        wpath[3] == L'\\';
@@ -6534,12 +6531,11 @@ static LPWSTR hts_pathToUCS2(const char *path) {
     return wpath;
   }
 
-  // Long path: absolutize + normalize, then compose the verbatim prefix.
   const DWORD need = GetFullPathNameW(wpath, 0, NULL, NULL); /* incl NUL */
   LPWSTR full = need != 0 ? malloct((size_t) need * sizeof(WCHAR)) : NULL;
 
   if (full == NULL) {
-    return wpath;
+    return wpath; /* fall back to the plain path */
   }
   const DWORD written = GetFullPathNameW(wpath, need, full, NULL);
 

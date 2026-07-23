@@ -4326,10 +4326,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
-// -#test=longpath <dir>: round-trip a file whose full path exceeds the Windows
-// MAX_PATH (260) through the MKDIR/FOPEN/STAT/UNLINK wrappers. On POSIX this is
-// a positive control (long paths are always legal); on Windows it fails without
-// the \\?\ prefixing in hts_pathToUCS2 and passes with it (#133).
+// -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
+// wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -4342,8 +4340,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
   while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
     path[--n] = '\0';
   }
-  // Descend through 40-char segments (under the 255 per-component limit \\?\
-  // does not lift) until the path clears MAX_PATH (260).
+  // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
   static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
   while (n + sizeof(seg) - 1 < 300) {
     memcpybuff(path + n, seg, sizeof(seg));
@@ -4356,7 +4353,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
   }
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(n > 260); /* the point: a path Windows rejects sans \\?\ */
+  assertf(n > 260); /* must exceed the limit \\?\ lifts */
 
   static const char payload[] = "longpath-ok";
   FILE *fp = FOPEN(path, "wb");

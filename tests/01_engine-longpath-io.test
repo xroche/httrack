@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=longpath: a >MAX_PATH round trip exercising hts_pathToUCS2's
+# \\?\ prefixing on Windows (#133); a positive control on POSIX.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=longpath "$dir" | grep -q "longpath:.*OK"
