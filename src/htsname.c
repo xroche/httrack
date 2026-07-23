@@ -1518,17 +1518,10 @@ int url_savename(lien_adrfilsave *const afs,
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
       // parent path length is not insane (otherwise, ignore and pick 200 as
       // suffix length)
-      size_t maxLen =
+      const size_t maxLen =
         parentLen <
         HTS_MAX_PATH_LEN - HTS_MAX_PATH_LEN / 4
         ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
-      // the branch above can pick maxLen ignoring parentLen; keep the total
-      // inside the abort-on-overflow buffer even for an oversized parent.
-      if (parentLen + maxLen > HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE) {
-        maxLen = parentLen < HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE
-                     ? HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE - parentLen
-                     : MIN_LAST_SEG_RESERVE;
-      }
       size_t i, j, lastSeg, lastSegSize, dirSize;
       char *saveFinal;
 
@@ -1613,6 +1606,21 @@ int url_savename(lien_adrfilsave *const afs,
 
     // Re-check again ending space or dot after cut (see bug #5)
     cleanEndingSpaceOrDot(afs->save);
+  }
+  // The cut above counts UTF-8 codepoints, but parent+name lands in a fixed
+  // byte buffer that aborts() on overflow (htssafe.h). A multibyte name can
+  // pass the codepoint cap yet overflow in bytes, so hard-cut on a codepoint
+  // boundary to keep parent+name inside the buffer regardless (#133).
+  {
+    const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
+    const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
+    size_t budget = parentBytes < cap ? cap - parentBytes : 0;
+    if (strlen(afs->save) > budget) {
+      while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
+        budget--; // back off a trailing continuation byte, never split a char
+      afs->save[budget] = '\0';
+      cleanEndingSpaceOrDot(afs->save);
+    }
   }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE

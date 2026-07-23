@@ -43,6 +43,21 @@ MINGW* | MSYS* | CYGWIN*)
             echo "FAIL: POSIX name not longer than the old ceiling: '$out'"
             exit 1
         }
+
+    # byte-safety: a multibyte name whose codepoint count is under the ceiling
+    # but whose bytes plus a long -O dir overflow the save buffer must be cut to
+    # fit, not abort the crawl (SIGABRT before the byte-cut guard).
+    bigdir="/x/$(printf 'D%.0s' $(seq 1 1015))"      # ~1020 bytes
+    cjk="/$(printf '\xe4\xb8\xad%.0s' $(seq 1 339))" # 1018 bytes, 339 codepoints
+    if ! mb="$("$httrack_bin" -O "$bigdir" -#test=savename "$cjk" text/html 2>/dev/null)"; then
+        echo "FAIL: aborted on a multibyte over-buffer name"
+        exit 1
+    fi
+    mb="${mb#savename: }"
+    if [ -z "$mb" ] || [ "${#mb}" -ge 2048 ]; then
+        echo "FAIL: multibyte name not bounded (len=${#mb})"
+        exit 1
+    fi
     ;;
 esac
 
