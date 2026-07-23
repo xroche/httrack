@@ -3357,7 +3357,8 @@ static unsigned char *warc_next_member(const unsigned char **in,
 /* Feed a synthetic transaction and validate the resulting .warc.gz against the
    WARC/1.1 spec: each record a self-standing gzip member starting WARC/1.,
    Content-Length == block length, the \r\n\r\n trailer intact, the response
-   body round-trips, and the encoding headers are stripped (strategy B). */
+   body round-trips, and the hop-by-hop Transfer-Encoding is dropped (a real
+   Content-Encoding is kept verbatim; see warc-verbatim). */
 static int st_warc(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -3377,21 +3378,22 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
   w = warc_open(opt, path);
   assertf(w != NULL);
 
-  /* 200 HTML: bogus Content-Length + gzip/chunked encodings must be stripped.
-   */
+  /* 200 HTML, plaintext body: bogus Content-Length rewritten, hop-by-hop
+     Transfer-Encoding dropped. The whitespace before its ':' exercises
+     header_is tolerating "Name : value". */
   warc_write_transaction(
       w, "http://test.local/a.html", "127.0.0.1",
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
-      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
-      "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      a_body, sizeof(a_body) - 1, NULL, 200, 0, 0, 0);
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
+      "Transfer-Encoding : chunked\r\nContent-Length: 999\r\n\r\n",
+      a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
 
   /* 302 redirect: header-only, no body. */
   warc_write_transaction(
       w, "http://test.local/r", "127.0.0.1",
       "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
-      0, NULL, 302, 0, 0, 0);
+      0, NULL, 302, 0, 0);
 
   /* 200 binary, chunked coding on the wire (already de-chunked here). */
   warc_write_transaction(
@@ -3399,7 +3401,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
       "Transfer-Encoding: chunked\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
 
   /* 200 with a body shorter than the declared Content-Length (rewritten). */
   warc_write_transaction(
@@ -3407,20 +3409,20 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
       "100\r\n\r\n",
-      "short", 5, NULL, 200, 0, 0, 0);
+      "short", 5, NULL, 200, 0, 0);
 
   /* Same payload as a.html at a new URL: identical-payload-digest revisit
      (OpenSSL builds only; a plain build writes a second full response). */
   warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
                          "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         a_body, sizeof(a_body) - 1, NULL, 200, 0, 0, 0);
+                         a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
 
   /* 304 revisit with an EMPTY response-header block: the block is just the
      2-byte separator, so declared Content-Length must be exactly 2 (F3). */
   warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
                          "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
-                         NULL, 0, NULL, 304, 1, 0, 0);
+                         NULL, 0, NULL, 304, 1, 0);
 
   warc_close(w);
 
@@ -3488,7 +3490,8 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
                     hdr_len, 37) != NULL &&
         warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
       nm_cl_ok = (block_len == 2);
-    /* a.html response body must round-trip and carry no encoding headers */
+    /* a.html response body round-trips; no Content-Encoding (plaintext) and the
+       whitespaced Transfer-Encoding was dropped (header_is robustness). */
     if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a.html",
                     hdr_len, 41) != NULL &&
         warc_memstr((char *) rec, "msgtype=response", hdr_len, 16) != NULL) {
@@ -3554,17 +3557,30 @@ static int warc_rec_split(const unsigned char *rec, size_t rlen,
   return 0;
 }
 
-/* A cap-truncated body is still archived, tagged WARC-Truncated (v1.1). Assert
-   the sole response carries "WARC-Truncated: length" and every record parses.
- */
+/* A cap-truncated body is still archived, tagged WARC-Truncated (v1.1). A
+   compressed body cut short by a cap keeps its Content-Encoding (the stored
+   bytes are the coded partial), so the record's label matches its body: assert
+   the plaintext response carries "WARC-Truncated: length", and the gzip-coded
+   one carries "WARC-Truncated: time", keeps Content-Encoding, and stores the
+   coded bytes verbatim. */
 static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
   unsigned char *data;
   size_t data_len = 0;
   const unsigned char *p, *end;
-  int err = 0, found_trunc = 0, nresp = 0;
+  int err = 0, trunc_len = 0, trunc_gz = 0, nresp = 0;
   static const char body[] = "partial body bytes\n";
+  /* a valid gzip member (inflates to a known plaintext), as the coded partial
+   */
+  static const unsigned char gz[] = {
+      0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x0b, 0x2e,
+      0x29, 0x4a, 0x2c, 0x49, 0x4d, 0xaf, 0xd4, 0x75, 0x54, 0x28, 0x4b, 0x2d,
+      0x4a, 0x4a, 0x2c, 0xc9, 0xcc, 0x55, 0x08, 0x77, 0x0c, 0x72, 0x56, 0x48,
+      0xca, 0x4f, 0xa9, 0xb4, 0x52, 0x28, 0xc9, 0x48, 0x55, 0x28, 0x2c, 0xcd,
+      0x4c, 0xce, 0x56, 0x48, 0x2a, 0xca, 0x2f, 0xcf, 0x53, 0x48, 0xcb, 0xaf,
+      0x50, 0xc8, 0x2a, 0xcd, 0x2d, 0x28, 0xd6, 0xe3, 0x02, 0x00, 0x5e, 0xb8,
+      0xe7, 0x66, 0x3a, 0x00, 0x00, 0x00};
 
   if (argc < 1) {
     fprintf(stderr, "warc-trunc: needs a writable directory\n");
@@ -3577,7 +3593,13 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       w, "http://test.local/big.bin", "127.0.0.1",
       "GET /big.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n", body,
-      sizeof(body) - 1, NULL, 200, 0, WARC_TRUNC_LENGTH, 0);
+      sizeof(body) - 1, NULL, 200, 0, WARC_TRUNC_LENGTH);
+  warc_write_transaction(
+      w, "http://test.local/big.gz", "127.0.0.1",
+      "GET /big.gz HTTP/1.1\r\nHost: test.local\r\n\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
+      "gzip\r\n\r\n",
+      (const char *) gz, sizeof(gz), NULL, 200, 0, WARC_TRUNC_TIME);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -3593,19 +3615,39 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
         err = 1;
       break;
     }
-    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
+    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0) {
       err = 1;
-    else if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) !=
-             NULL) {
+      freet(rec);
+      continue;
+    }
+    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL) {
       nresp++;
-      if (warc_memstr((char *) rec, "WARC-Truncated: length", hdr_len, 22) !=
-          NULL)
-        found_trunc = 1;
+      if (warc_memstr((char *) rec,
+                      "WARC-Target-URI: http://test.local/big.bin", hdr_len,
+                      42) != NULL &&
+          warc_memstr((char *) rec, "WARC-Truncated: length", hdr_len, 22) !=
+              NULL)
+        trunc_len = 1;
+      if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/big.gz",
+                      hdr_len, 41) != NULL) {
+        const char *bsep = warc_memstr((char *) rec + hdr_len, "\r\n\r\n",
+                                       (size_t) block_len, 4);
+        size_t bodyoff = bsep ? (size_t) (bsep - (char *) rec) + 4 : 0;
+        size_t got = bsep ? rlen - 4 - bodyoff : 0;
+        /* WARC-Truncated: time, Content-Encoding kept, stored body == coded. */
+        if (bsep != NULL &&
+            warc_memstr((char *) rec, "WARC-Truncated: time", hdr_len, 20) !=
+                NULL &&
+            warc_memstr((char *) rec + hdr_len,
+                        "Content-Encoding:", (size_t) block_len, 17) != NULL &&
+            got == sizeof(gz) && memcmp(rec + bodyoff, gz, sizeof(gz)) == 0)
+          trunc_gz = 1;
+      }
     }
     freet(rec);
   }
   freet(data);
-  if (!found_trunc || nresp != 1)
+  if (!trunc_len || !trunc_gz || nresp != 2)
     err = 1;
   printf("warc-trunc: %s\n", err ? "FAIL" : "OK");
   return err;
@@ -3711,7 +3753,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     warc_write_transaction(
         w, uri, "127.0.0.1", "GET / HTTP/1.1\r\nHost: test.local\r\n\r\n",
         "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
-        (const char *) body, sizeof(body), NULL, 200, 0, 0, 0);
+        (const char *) body, sizeof(body), NULL, 200, 0, 0);
   }
   warc_close(w);
   opt->warc_max_size = saved_max;
@@ -3759,8 +3801,8 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* Strategy A: assert the stored WARC record is byte-verbatim gzip with
-   Content-Encoding preserved. */
+/* The default body storage: assert the stored WARC record is byte-verbatim gzip
+   with Content-Encoding preserved and Content-Length = the coded length. */
 static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -3787,13 +3829,13 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
 
   w = warc_open(opt, path);
   assertf(w != NULL);
-  /* keep_content_encoding=1: the body is the coded (gzip) octets. */
+  /* the body is the coded (gzip) octets, stored verbatim. */
   warc_write_transaction(
       w, "http://test.local/z.html", "127.0.0.1",
       "GET /z.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      (const char *) a_gz, sizeof(a_gz), NULL, 200, 0, 0, 1);
+      (const char *) a_gz, sizeof(a_gz), NULL, 200, 0, 0);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -3941,20 +3983,20 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/one", "127.0.0.1",
                          "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0, 0);
+                         "one body\n", 9, NULL, 200, 0, 0);
   warc_write_resource(w, "ftp://files.example.com/data.bin", "127.0.0.1",
                       "application/octet-stream", "\x00\x01\x02\x03", 4, NULL,
                       0);
   warc_write_transaction(w, "http://alpha.example.com/two", "127.0.0.1",
                          "GET /two HTTP/1.1\r\nHost: alpha.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
-                         "two body\n", 9, NULL, 200, 0, 0, 0);
+                         "two body\n", 9, NULL, 200, 0, 0);
   /* Same payload as /one at a new URL: identical-payload-digest revisit under
      OpenSSL, a full response otherwise; either way one index line. */
   warc_write_transaction(w, "http://zeta.example.com/dup", "127.0.0.1",
                          "GET /dup HTTP/1.1\r\nHost: zeta.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0, 0);
+                         "one body\n", 9, NULL, 200, 0, 0);
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
@@ -4098,13 +4140,13 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/", "127.0.0.1",
                          "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "<html>home</html>\n", 18, NULL, 200, 0, 0, 0);
+                         "<html>home</html>\n", 18, NULL, 200, 0, 0);
   warc_write_transaction(
       w, "http://www.example.com/data.bin", "127.0.0.1",
       "GET /data.bin HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
       "HTTP/1.1 200 OK\r\n"
       "Content-Type: application/octet-stream\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
   warc_close(w);
 
   /* Unzip every member in-process. */
@@ -4389,7 +4431,7 @@ static const struct selftest_entry {
      st_warc_ftp},
     {"warc-rotate", "<dir>", "--warc-max-size segment rotation",
      st_warc_rotate},
-    {"warc-verbatim", "<dir>", "--warc-verbatim strategy-A compressed body",
+    {"warc-verbatim", "<dir>", "verbatim compressed response body (default)",
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},

@@ -68,10 +68,11 @@ void warc_stash_response(htsblk *r, const char *resphdr);
 /* Free both stashed header blocks (idempotent, NULL-safe). */
 void warc_free_request(htsblk *r);
 
-/* Strategy A (--warc-verbatim): adopt the de-chunked compressed spool at
-   tmpfile_path onto r->warc_rawpath/warc_rawsize (strdupt; frees any prior).
-   No-op leaving warc_rawpath NULL when tmpfile_path is empty or the spool is
-   missing/empty, so the caller falls back to strategy B. */
+/* Adopt the de-chunked compressed spool at tmpfile_path onto
+   r->warc_rawpath/warc_rawsize (strdupt; frees any prior) so the WARC record
+   stores the body verbatim. No-op leaving warc_rawpath NULL when tmpfile_path
+   is empty or the spool is missing/empty (the record then stores the decoded
+   in-memory/on-disk body instead). */
 void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path);
 
 /* Emit the request + response (or revisit) records for one finished
@@ -105,15 +106,15 @@ int warc_surt(const char *url, char *out, size_t outsz);
    body_path:   file re-read for the body when body==NULL (may be NULL).
    is_update_unchanged: nonzero for a 304 server-not-modified revisit.
    truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
-   keep_content_encoding: strategy A: body/body_len are the as-received coded
-     bytes, so keep Content-Encoding and set Content-Length to body_len.
+   The body is stored verbatim: Content-Encoding is kept and Content-Length set
+   to body_len, so body/body_len must be the as-received (coded) bytes.
    Returns 0 on success, -1 on error. */
 int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
                            int statuscode, int is_update_unchanged,
-                           int truncated, int keep_content_encoding);
+                           int truncated);
 
 /* Write one non-HTTP capture as a single WARC 'resource' record: the block is
    the raw payload (no HTTP envelope), Content-Type is the payload's own MIME.

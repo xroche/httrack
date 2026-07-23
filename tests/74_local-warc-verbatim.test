@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# --warc --warc-verbatim (strategy A) stores a gzip-coded body as received: the
-# response record keeps Content-Encoding: gzip and its stored bytes inflate back
-# to the served page. The validator's --verbatim mode is the differential gate:
-# inflate(stored) must equal the decoded body strategy B would have stored.
+# A --warc crawl stores compressed bodies verbatim (the default): the response
+# record keeps Content-Encoding: gzip and its stored bytes inflate back to the
+# served page. The validator's --verbatim mode is the differential gate:
+# inflate(stored) must equal the decoded body the server compressed.
 #
 # Two fixtures cover both adoption branches of back_finalize: page.html (text/html)
 # takes the in-memory branch; data.bin (application/octet-stream) is streamed to
@@ -19,4 +19,4 @@ export WARC_VALIDATE_VERBATIM=1
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
     --found 'warcgz/index.html' --found 'warcgz/page.html' --found 'warcgz/data.bin' \
-    httrack 'BASEURL/warcgz/index.html' --warc-file warc-out --warc-verbatim
+    httrack 'BASEURL/warcgz/index.html' --warc-file warc-out

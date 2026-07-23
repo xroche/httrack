@@ -118,9 +118,6 @@ const char *hts_optalias[][4] = {
   {"warc-file", "-%rf", "param1", "write a WARC archive to the given base name"},
   {"warc-max-size", "-%rs", "param1",
    "rotate the WARC archive once a segment passes N bytes (0: single file)"},
-  {"warc-verbatim", "-%rv", "single",
-   "store compressed bodies as received, keeping Content-Encoding (implies "
-   "--warc)"},
   {"warc-cdx", "-%rc", "single",
    "write a sorted CDXJ index next to the WARC archive"},
   {"warc-cdxj", "-%rc", "single", ""},

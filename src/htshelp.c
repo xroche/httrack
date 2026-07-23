@@ -526,7 +526,6 @@ void help(const char *app, int more) {
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
   infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
           "output name, --warc-max-size N rotates segments past N bytes, "
-          "--warc-verbatim stores compressed bodies as received, "
           "--warc-cdx also writes a sorted CDXJ index, --wacz packages it all "
           "as a WACZ file");
   infomsg(" %t  keep the original file extension, don't rewrite it from the "

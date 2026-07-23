@@ -635,12 +635,12 @@ class Handler(SimpleHTTPRequestHandler):
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
-    # --warc-verbatim: a gzip-coded HTML page whose decoded body is known, for
-    # the strategy-A differential (stored compressed bytes must inflate to this).
+    # A gzip-coded HTML page whose decoded body is known, for the verbatim-WARC
+    # differential (stored compressed bytes must inflate to this).
     WARCGZ_BODY = b"<html><body>verbatim gzip page for WARC strategy A</body></html>\n"
 
     # A NON-html gzip-coded asset: HTTrack streams it straight to disk, so the
-    # strategy-A spool adoption runs on the is_write (direct-to-disk) branch of
+    # verbatim spool adoption runs on the is_write (direct-to-disk) branch of
     # back_finalize, not the in-memory branch route_warcgz_page exercises.
     WARCGZ_BIN_BODY = b"verbatim gzip octet-stream body for the WARC is_write path\n"
 
