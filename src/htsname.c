@@ -1614,12 +1614,17 @@ int url_savename(lien_adrfilsave *const afs,
   {
     const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
     const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
-    size_t budget = parentBytes < cap ? cap - parentBytes : 0;
-    if (strlen(afs->save) > budget) {
-      while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
-        budget--; // back off a trailing continuation byte, never split a char
-      afs->save[budget] = '\0';
-      cleanEndingSpaceOrDot(afs->save);
+    // Shrink only the name. A parent that alone fills the buffer is left to the
+    // existing prepend abort, not collapsed to an empty name that would collide
+    // across URLs and overrun the unbounded collision-suffix sprintf.
+    if (parentBytes < cap) {
+      size_t budget = cap - parentBytes;
+      if (strlen(afs->save) > budget) {
+        while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
+          budget--; // back off a continuation byte, never split a char
+        afs->save[budget] = '\0';
+        cleanEndingSpaceOrDot(afs->save);
+      }
     }
   }
 #undef MAX_UTF8_SEQ_CHARS
