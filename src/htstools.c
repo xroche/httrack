@@ -1027,6 +1027,17 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                     freet(category);
                     category = NULL;
                   }
+#ifdef _WIN32
+                  /* category is ANSI-codepage, doc is utf-8: convert (#216) */
+                  else {
+                    char *cat_utf8 = hts_convertStringSystemToUTF8(
+                        category, strlen(category));
+                    if (cat_utf8 != NULL) {
+                      freet(category);
+                      category = cat_utf8;
+                    }
+                  }
+#endif
                 }
               }
               if (category == NULL) {

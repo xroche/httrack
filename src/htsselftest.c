@@ -2628,14 +2628,17 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   size_t n;
 #ifdef _WIN32
-  /* the GUI hands hts_buildtopindex ANSI paths; mimic it. CP1252 'cafe' */
+  /* GUI writes ANSI paths and winprofile.ini; mimic it (CP1252) */
   static const char *const projName = "caf\xE9";
+  static const char *const catName = "th\xE9";
 #else
   /* POSIX system charset is already utf-8 */
   static const char *const projName = "caf\xC3\xA9";
+  static const char *const catName = "th\xC3\xA9";
 #endif
-  /* utf-8 form the index must carry whatever the input charset was */
+  /* utf-8 forms the index must carry whatever the input charset was */
   static const char *const projUTF8 = "caf\xC3\xA9";
+  static const char *const catUTF8 = "th\xC3\xA9";
 
   assertf(argc >= 1);
   /* a non-ASCII top dir (#217) holding a non-ASCII sub-project (#216) */
@@ -2647,6 +2650,15 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   snprintf(path, sizeof(path), "%s/%s/index.html", topdir, projName);
   fp = fopen(path, "wb");
   assertf(fp != NULL);
+  fclose(fp);
+  /* a non-ASCII category exercises the winprofile.ini charset path (#216) */
+  snprintf(path, sizeof(path), "%s/%s/hts-cache/", topdir, projName);
+  assertf(structcheck(path) == 0);
+  snprintf(path, sizeof(path), "%s/%s/hts-cache/winprofile.ini", topdir,
+           projName);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fprintf(fp, "category=%s\n", catName);
   fclose(fp);
 
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
@@ -2663,6 +2675,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
+  assertf(strstr(buf, catUTF8) != NULL);
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   unlink(path);
@@ -2670,6 +2683,11 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   unlink(path);
   snprintf(path, sizeof(path), "%s/fade.gif", topdir);
   unlink(path);
+  snprintf(path, sizeof(path), "%s/%s/hts-cache/winprofile.ini", topdir,
+           projName);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/%s/hts-cache", topdir, projName);
+  rmdir(path);
   snprintf(path, sizeof(path), "%s/%s/index.html", topdir, projName);
   unlink(path);
   snprintf(path, sizeof(path), "%s/%s", topdir, projName);
