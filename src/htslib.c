@@ -6626,6 +6626,20 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
   }
 }
 
+int hts_rmdir_utf8(const char *path) {
+  LPWSTR wpath = hts_pathToUCS2(path);
+
+  if (wpath != NULL) {
+    const int result = _wrmdir(wpath);
+
+    free(wpath);
+    return result;
+  } else {
+    // Fallback on conversion error.
+    return _rmdir(path);
+  }
+}
+
 int hts_mkdir_utf8(const char *path) {
   LPWSTR wpath = hts_pathToUCS2(path);
 

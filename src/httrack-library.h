@@ -758,6 +758,9 @@ HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
 
 HTSEXT_API int hts_mkdir_utf8(const char *pathname);
 
+#define RMDIR hts_rmdir_utf8
+HTSEXT_API int hts_rmdir_utf8(const char *pathname);
+
 #define UTIME(A, B) hts_utime_utf8(A, B)
 
 typedef struct _utimbuf STRUCT_UTIMBUF;
@@ -772,6 +775,7 @@ typedef struct stat STRUCT_STAT;
 #define UNLINK unlink
 #define RENAME rename
 #define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
+#define RMDIR rmdir
 
 typedef struct utimbuf STRUCT_UTIMBUF;
 

@@ -4384,6 +4384,86 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=mirrorio <dir>: round-trip a file through a long AND non-ASCII path
+// via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/UNLINK, and the
+// new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
+static int st_mirrorio(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "mirrorio: needs a writable base dir\n");
+    return 1;
+  }
+  char path[HTS_URLMAXSIZE * 2];
+  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+
+  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
+    path[--n] = '\0';
+  }
+  const size_t base = n; /* the caller's base dir; teardown stops here */
+  // First segment carries non-ASCII UTF-8 (é 中) to drive the charset axis
+  // (#630); ASCII 40-char segments then push the total past MAX_PATH (#133).
+  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  memcpybuff(path + n, nseg, sizeof(nseg));
+  n += sizeof(nseg) - 1;
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "mirrorio: mkdir failed (non-ascii): %s\n",
+            strerror(errno));
+    return 1;
+  }
+  while (n + sizeof(seg) - 1 < 300) {
+    memcpybuff(path + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (MKDIR(path) != 0 && errno != EEXIST) {
+      fprintf(stderr, "mirrorio: mkdir failed at %u chars: %s\n", (unsigned) n,
+              strerror(errno));
+      return 1;
+    }
+  }
+  const size_t leafdir = n;
+
+  memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
+  n += sizeof("/leaf.bin") - 1;
+  assertf(n > 260); /* must exceed the limit \\?\ lifts */
+
+  static const char payload[] = "mirrorio-ok";
+
+  assertf(!fexist_utf8(path)); /* absent before creation, through the guard */
+  FILE *fp = FOPEN(path, "wb");
+
+  if (fp == NULL) {
+    fprintf(stderr, "mirrorio: create failed (%u chars): %s\n", (unsigned) n,
+            strerror(errno));
+    return 1;
+  }
+  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  fclose(fp);
+  assertf(fexist_utf8(path));
+  assertf(fsize_utf8(path) == (LLint) sizeof(payload));
+  assertf(UNLINK(path) == 0);
+  assertf(!fexist_utf8(path));
+
+  // Tear the directory chain down through the UTF-8/long-path rmdir wrapper.
+  path[leafdir] = '\0';
+  while (strlen(path) > base) {
+    char *const slash = strrchr(path, '/');
+
+    if (RMDIR(path) != 0) {
+      fprintf(stderr, "mirrorio: rmdir failed: %s\n", strerror(errno));
+      return 1;
+    }
+    if (slash == NULL || (size_t) (slash - path) < base) {
+      break;
+    }
+    *slash = '\0';
+  }
+
+  printf("mirrorio: round-tripped a %u-char non-ASCII path: OK\n",
+         (unsigned) n);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4519,6 +4599,9 @@ static const struct selftest_entry {
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",
      st_longpath},
+    {"mirrorio", "<dir>",
+     "round-trip a long+non-ASCII path through the mirror I/O wrappers",
+     st_mirrorio},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
 #if HTS_USEOPENSSL

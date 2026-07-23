@@ -442,11 +442,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           || (strnotempty(StringBuff(opt->path_html))))
         loops++;                // do not loop once again and do not include rc file (O option exists)
       else {
-        if ((!fexist
-             (fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-              StringBuff(opt->path_log),
-               "hts-cache/doit.log"))) || (argv_url > 0)) {
+        if ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                  StringBuff(opt->path_log),
+                                  "hts-cache/doit.log"))) ||
+            (argv_url > 0)) {
           if (!optinclude_file(
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                           StringBuff(opt->path_log), HTS_HTTRACKRC),
@@ -473,16 +472,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }                             // traiter -O
 
   /* load doit.log and insert in current command line */
-  if (fexist
-      (fconcat
-       (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-       StringBuff(opt->path_log), "hts-cache/doit.log"))
-      && (argv_url <= 0)) {
-    FILE *fp =
-      fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-            StringBuff(opt->path_log),
-             "hts-cache/doit.log"), "rb");
+  if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-cache/doit.log")) &&
+      (argv_url <= 0)) {
+    FILE *fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/doit.log"),
+                     "rb");
     if (fp) {
       int insert_after = 1;     /* insérer après nom au début */
 
@@ -531,23 +526,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
   /* Interrupted mirror detected */
   if (!opt->quiet) {
-    if (fexist
-        (fconcat
-         (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-         StringBuff(opt->path_log),
-          "hts-in_progress.lock"))) {
+    if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                            StringBuff(opt->path_log),
+                            "hts-in_progress.lock"))) {
       /* Old cache */
-      if ((fexist
-           (fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-            StringBuff(opt->path_log),
-             "hts-cache/old.dat")))
-          &&
-          (fexist
-           (fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-            StringBuff(opt->path_log),
-             "hts-cache/old.ndx")))) {
+      if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log),
+                               "hts-cache/old.dat"))) &&
+          (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log),
+                               "hts-cache/old.ndx")))) {
         if (opt->log != NULL) {
           fprintf(opt->log, "Warning!\n");
           fprintf(opt->log,
@@ -576,111 +564,82 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (argv[i][1] == '-') {        // --xxx
           if ((strfield2(argv[i] + 2, "clean")) || (strfield2(argv[i] + 2, "tide"))) {  // nettoyer
             argv[i][1] = '\0';
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-log.txt")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-log.txt"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-err.txt")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-err.txt"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html), "index.html")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_html),
-                      "index.html"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log), "hts-log.txt")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-log.txt"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log), "hts-err.txt")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-err.txt"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_html), "index.html")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_html), "index.html"));
             /* */
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/new.zip")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/new.zip"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.zip")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/old.zip"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/new.dat")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/new.dat"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/new.ndx")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/new.ndx"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.dat")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/old.dat"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.ndx")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/old.ndx"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/new.lst")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/new.lst"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.lst")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/old.lst"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/new.txt")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/new.txt"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/old.txt")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/old.txt"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-cache/doit.log")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-cache/doit.log"));
-            if (fexist
-                (fconcat
-                 (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                  "hts-in_progress.lock")))
-              remove(fconcat
-                     (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                      "hts-in_progress.lock"));
-            rmdir(fconcat
-                  (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/new.zip")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.zip"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/old.zip")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/old.zip"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/new.dat")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.dat"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/new.ndx")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.ndx"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/old.dat")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/old.dat"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/old.ndx")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/old.ndx"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/new.lst")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.lst"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/old.lst")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/old.lst"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/new.txt")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.txt"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/old.txt")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/old.txt"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-cache/doit.log")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/doit.log"));
+            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log),
+                                    "hts-in_progress.lock")))
+              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log),
+                             "hts-in_progress.lock"));
+            RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-cache"));
             //
           } else if (strfield2(argv[i] + 2, "catchurl")) {      // capture d'URL via proxy temporaire!
             argv_url = 1;       // forcer a passer les parametres
@@ -737,29 +696,27 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
   if (argv_url == 0) {
     // Présence d'un cache, que faire?..
-    if ((fexist
-         (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-          StringBuff(opt->path_log), "hts-cache/new.zip")))
-        ||
-        (fexist
-         (fconcat
-          (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-          StringBuff(opt->path_log), "hts-cache/new.dat"))
-         &&
-         fexist(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                StringBuff(opt->path_log),
-                 "hts-cache/new.ndx")))
-      ) {                       // il existe déja un cache précédent.. renommer
-      if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-        StringBuff(opt->path_log), "hts-cache/doit.log"))) {        // un cache est présent
+    if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log),
+                             "hts-cache/new.zip"))) ||
+        (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-cache/new.dat")) &&
+         fexist_utf8(
+             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                     StringBuff(opt->path_log),
+                     "hts-cache/new.ndx")))) { // il existe déja un cache
+                                               // précédent.. renommer
+      if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log),
+                              "hts-cache/doit.log"))) { // un cache est présent
         if (x_argvblk != NULL) {
           int m;
 
           // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
-          if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-            StringBuff(opt->path_log), "hts-in_progress.lock"))) {  // cache prioritaire
+          if (fexist_utf8(
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log),
+                          "hts-in_progress.lock"))) { // cache prioritaire
             m = 1;
           } else {
             m = 2;
@@ -794,7 +751,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           htsmain_free();
           return -1;
         }
-      } else {                  // log existe pas
+      } else { // log existe pas
         HTS_PANIC_PRINTF("A cache has been found, but no command line");
         printf
           ("Please launch httrack with proper parameters to reuse the cache\n");
@@ -802,7 +759,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         return -1;
       }
 
-    } else {                    // aucune URL définie et pas de cache
+    } else { // aucune URL définie et pas de cache
       if (opt->quiet) {
         help(argv[0], !opt->quiet);
         htsmain_free();
@@ -817,26 +774,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
   } else {                      // plus de 2 paramètres
     // un fichier log existe?
-    if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                       StringBuff(opt->path_log),
-                       "hts-in_progress.lock"))) { // fichier lock?
+    if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                            StringBuff(opt->path_log),
+                            "hts-in_progress.lock"))) { // fichier lock?
 
       opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
       if (opt->quiet == 0) {
-        if ((fexist
-             (fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-               "hts-cache/new.zip")))
-            ||
-            (fexist
-             (fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-               "hts-cache/new.dat"))
-             &&
-             fexist(fconcat
-                    (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/new.ndx")))
-          ) {
+        if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.zip"))) ||
+            (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.dat")) &&
+             fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.ndx")))) {
           HT_REQUEST_START;
           HT_PRINT("There is a lock-file in the directory ");
           HT_PRINT(StringBuff(opt->path_log));
@@ -850,24 +802,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           }
         }
       }
-    } else if (fexist(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_html), "index.html"))) {
+    } else if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                   StringBuff(opt->path_html), "index.html"))) {
       opt->cache = HTS_CACHE_TEST_UPDATE;
       if (opt->quiet == 0) {
-        if ((fexist
-             (fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-               "hts-cache/new.zip")))
-            ||
-            (fexist
-             (fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-               "hts-cache/new.dat"))
-             &&
-             fexist(fconcat
-                    (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/new.ndx")))
-          ) {
+        if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.zip"))) ||
+            (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.dat")) &&
+             fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                 StringBuff(opt->path_log),
+                                 "hts-cache/new.ndx")))) {
           HT_REQUEST_START;
           HT_PRINT
             ("There is an index.html and a hts-cache folder in the directory ");
@@ -1500,13 +1447,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   LLint fz;
 
                   na++;
-                  fz = fsize(argv[na]);
+                  fz = fsize_utf8(argv[na]);
                   if (fz < 0) {
                     HTS_PANIC_PRINTF("File url list could not be opened");
                     htsmain_free();
                     return -1;
                   } else {
-                    FILE *fp = fopen(argv[na], "rb");
+                    FILE *fp = FOPEN(argv[na], "rb");
 
                     if (fp != NULL) {
                       int cl = (int) strlen(url);
@@ -2050,7 +1997,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                      /*cache */ &cache, /*hash */ NULL, /*ptr */
                                      0, /*numero_passe */ 0, /*mime_type */
                                      NULL) != -1) {
-                                  if (fexist(afs.save)) {
+                                  if (fexist_utf8(afs.save)) {
                                     fprintf(stdout, "Content-location: %s\r\n",
                                             afs.save);
                                   }
@@ -2148,18 +2095,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   uLong repaired = 0;
                   uLong repairedBytes = 0;
 
-                  if (fexist
-                      (fconcat
-                       (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                        "hts-cache/new.zip"))) {
+                  if (fexist_utf8(fconcat(
+                          OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-cache/new.zip"))) {
                     name =
                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                               "hts-cache/new.zip");
-                  } else
-                    if (fexist
-                        (fconcat
-                         (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                          "hts-cache/old.zip"))) {
+                  } else if (fexist_utf8(fconcat(OPT_GET_BUFF(opt),
+                                                 OPT_GET_BUFF_SIZE(opt),
+                                                 StringBuff(opt->path_log),
+                                                 "hts-cache/old.zip"))) {
                     name =
                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                               "hts-cache/old.zip");
@@ -2178,10 +2123,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                                "hts-cache/repair.tmp"), &repaired,
                        &repairedBytes) == Z_OK) {
-                    unlink(name);
-                    rename(fconcat
-                           (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                            "hts-cache/repair.zip"), name);
+                    UNLINK(name);
+                    RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                   StringBuff(opt->path_log),
+                                   "hts-cache/repair.zip"),
+                           name);
                     fprintf(stderr,
                             "Cache: %d bytes successfully recovered in %d entries\n",
                             (int) repairedBytes, (int) repaired);
@@ -2399,10 +2345,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   // Débuggage des en têtes
   if (_DEBUG_HEAD) {
-    ioinfo =
-      fopen(fconcat
-            (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-ioinfo.txt"),
-            "wb");
+    ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                           StringBuff(opt->path_log), "hts-ioinfo.txt"),
+                   "wb");
   }
 
   {
@@ -2477,9 +2422,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* readme for information purpose */
       {
         FILE *fp =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                 "hts-cache/readme.txt"), "wb");
+            FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-cache/readme.txt"),
+                  "wb");
         if (fp) {
           fprintf(fp, "What's in this folder?" LF);
           fprintf(fp, "" LF);
@@ -2531,17 +2476,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         int i;
 
 #ifdef _WIN32
-        mkdir(fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"));
+        hts_mkdir_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache"));
 #else
         mkdir(fconcat
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"),
               HTS_PROTECT_FOLDER);
 #endif
-        fp =
-          fopen(fconcat
-                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                 "hts-cache/doit.log"), "wb");
+        fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                           StringBuff(opt->path_log), "hts-cache/doit.log"),
+                   "wb");
         if (fp) {
           for(i = 0 + 1; i < argc; i++) {
             if (((strchr(argv[i], ' ') != NULL)
@@ -2586,7 +2530,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         }
       }
       // petit message dans le lock
-      if ((fp = fopen(n_lock, "wb")) != NULL) {
+      if ((fp = FOPEN(n_lock, "wb")) != NULL) {
         int i;
 
         fprintf(fp, "Mirror in progress since %s .. please wait!" LF, t);
@@ -2746,16 +2690,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           char *f = OPT_GET_BUFF(opt);
 
           sprintf(f, "%s/%s", CACHE_REFNAME, entry->d_name);
-          (void)
-            unlink(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), f));
+          (void) UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                StringBuff(opt->path_log), f));
         }
       }
       if (dir != NULL) {
         (void) closedir(dir);
       }
-      (void)
-        rmdir(fconcat
-              (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME));
+      (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                           StringBuff(opt->path_log), CACHE_REFNAME));
     }
 
     /* Info for wrappers */
@@ -2783,7 +2726,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
     }
     // supprimer lock
-    remove(n_lock);
+    UNLINK(n_lock);
   }
 
   if (x_argvblk)

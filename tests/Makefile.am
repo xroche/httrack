@@ -65,6 +65,7 @@ TESTS = \
 	01_engine-fsize.test \
 	01_engine-redirect.test \
 	01_engine-longpath-io.test \
+	01_engine-mirror-io.test \
 	01_engine-relative.test \
 	01_engine-robots.test \
 	01_engine-savename.test \
