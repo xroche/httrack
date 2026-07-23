@@ -1050,7 +1050,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                    is mojibake (#216). */
                 {
                   const char *const name = hts_findgetname(h);
-                  char *const name_utf8 =
+                  char *name_utf8 =
                       hts_convertStringSystemToUTF8(name, strlen(name));
                   strcpybuff(chain->name, name_utf8 != NULL ? name_utf8 : name);
                   freet(name_utf8);
