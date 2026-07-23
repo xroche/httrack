@@ -3,9 +3,8 @@
 
 set -euo pipefail
 
-# Drives -#test=direnum: enumerates a directory that is both long (>MAX_PATH)
-# and non-ASCII through the opendir/readdir wrappers the Windows build supplies,
-# checking each non-ASCII child comes back as UTF-8 (#133, #630). POSIX control.
+# Drives -#test=direnum: enumerate a long+non-ASCII directory through the
+# opendir/readdir wrappers, checking each child round-trips as UTF-8 (#133,#630).
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 

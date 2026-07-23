@@ -4496,9 +4496,8 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// -#test=direnum <dir>: enumerate a long AND non-ASCII directory through the
-// opendir/readdir wrappers, asserting each non-ASCII child round-trips as UTF-8
-// (Windows FindFirstFileW + \\?\; positive control on POSIX libc) (#133, #630).
+// -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
+// opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {

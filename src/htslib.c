@@ -6444,9 +6444,7 @@ DIR *opendir(const char *name) {
     errno = ENOENT;
     return NULL;
   }
-  // Existence/type check through the \\?\-aware wide path: a long or non-ASCII
-  // directory is otherwise MAX_PATH-capped or mis-decoded as CP_ACP
-  // (#133,#630).
+  // Wide \\?\ path: no MAX_PATH cap, no CP_ACP mis-decode (#133,#630).
   wname = hts_pathToUCS2(name);
   if (wname == NULL ||
       !GetFileAttributesExW(wname, GetFileExInfoStandard, &st) ||
@@ -6478,8 +6476,7 @@ struct dirent *readdir(DIR * dir) {
   WIN32_FIND_DATAW find;
 
   if (dir->h == INVALID_HANDLE_VALUE) {
-    // dir->name already carries the "\\*" wildcard, all-backslash; \\?\-prefix
-    // it so a long/non-ASCII directory enumerates instead of failing ENOENT.
+    // \\?\-prefix so a long/non-ASCII directory enumerates instead of ENOENT.
     LPWSTR wname = hts_pathToUCS2(dir->name);
 
     dir->h =
