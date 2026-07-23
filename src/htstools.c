@@ -1045,9 +1045,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                 }
                 chain->next = NULL;
 #ifdef _WIN32
-                /* FindFirstFileA hands back the ANSI-codepage name; the
-                   template is charset=utf-8, so convert or a non-ASCII name
-                   is mojibake (#216). */
+                /* name is ANSI-codepage, doc is utf-8: convert (#216) */
                 {
                   const char *const name = hts_findgetname(h);
                   char *name_utf8 =

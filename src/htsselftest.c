@@ -2615,11 +2615,9 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// hts_buildtopindex takes a system-charset path but writes a charset=utf-8
-// document, so on Windows a non-ASCII name leaks through two ways:
-// verif_backblue puts the gifs in a mangled twin dir (#217), and a listed
-// sub-project's name renders as mojibake (#216). Both must come out as utf-8.
-// argv[0] is writable.
+// hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
+// Windows the gifs land in a mangled twin dir (#217) and a listed name renders
+// as mojibake (#216). Both must come out utf-8. argv[0] is writable.
 static int st_topindex(httrackp *opt, int argc, char **argv) {
   char topdir[HTS_URLMAXSIZE];
   char path[HTS_URLMAXSIZE + 32];
