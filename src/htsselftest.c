@@ -4385,8 +4385,8 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 }
 
 // -#test=mirrorio <dir>: round-trip a file through a long AND non-ASCII path
-// via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/UNLINK, and the
-// new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
+// via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK,
+// and the new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -4441,8 +4441,19 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   assertf(fexist_utf8(path));
   assertf(fsize_utf8(path) == (LLint) sizeof(payload));
-  assertf(UNLINK(path) == 0);
+
+  // Rename to a non-ASCII sibling to exercise RENAME on the long path.
+  char path2[HTS_URLMAXSIZE * 2];
+
+  memcpybuff(path2, path, leafdir);
+  memcpybuff(path2 + leafdir, "/\xC3\xA9-leaf.bin",
+             sizeof("/\xC3\xA9-leaf.bin"));
+  assertf(RENAME(path, path2) == 0);
   assertf(!fexist_utf8(path));
+  assertf(fexist_utf8(path2));
+  assertf(fsize_utf8(path2) == (LLint) sizeof(payload));
+  assertf(UNLINK(path2) == 0);
+  assertf(!fexist_utf8(path2));
 
   // Tear the directory chain down through the UTF-8/long-path rmdir wrapper.
   path[leafdir] = '\0';
