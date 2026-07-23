@@ -473,6 +473,15 @@ then:</small><br>
 lifts the built-in caps; use it only against infrastructure you are allowed to
 load.</small></p>
 
+<h4>Save a WARC archive of the crawl</h4>
+<p><tt>httrack https://example.com/ --warc --path mydir</tt><br>
+<small>Writes a standard WARC/1.1 file (<tt>httrack-&lt;timestamp&gt;.warc.gz</tt>) in
+the project folder alongside the browsable mirror, not instead of it. Set the name
+with <tt>--warc-file NAME</tt> and split a large crawl with <tt>--warc-max-size N</tt>;
+add <tt>--warc-cdx</tt> for a sorted CDXJ index, or <tt>--wacz</tt> to bundle the
+archive, index and pages into one WACZ for replay tools such as
+replayweb.page.</small></p>
+
 <h4>HTTrack as a fetch tool</h4>
 <p><tt>httrack --get https://host/file.bin --path tmp</tt><br>
 <small><tt>--get</tt> fetches one file with cache, index, depth, cookies and robots
