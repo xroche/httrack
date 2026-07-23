@@ -6431,7 +6431,6 @@ HTSEXT_API int hts_resetvar(void) {
 #ifdef _WIN32
 
 typedef struct dirent dirent;
-static LPWSTR hts_pathToUCS2(const char *path);
 
 DIR *opendir(const char *name) {
   WIN32_FILE_ATTRIBUTE_DATA st;
@@ -6533,7 +6532,7 @@ static void copyWchar(LPWSTR dest, const char *src) {
    Any prefixing failure falls back to the plain converted path. */
 #define HTS_WIN_LONGPATH_MIN 240 /* stay clear of MAX_PATH (260) */
 
-static LPWSTR hts_pathToUCS2(const char *path) {
+LPWSTR hts_pathToUCS2(const char *path) {
   LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
 
   if (wpath == NULL) {

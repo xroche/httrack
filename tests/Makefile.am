@@ -67,6 +67,7 @@ TESTS = \
 	01_engine-longpath-io.test \
 	01_engine-mirror-io.test \
 	01_engine-direnum.test \
+	01_engine-cookieimport.test \
 	01_engine-relative.test \
 	01_engine-robots.test \
 	01_engine-savename.test \

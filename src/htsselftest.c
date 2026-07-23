@@ -4596,6 +4596,108 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=cookieimport <dir>: load a jar (and, on Windows, copied IE cookies
+   *@*.txt) from a long, non-ASCII folder via the UTF-8/long-path wrappers
+   (#133). POSIX compiles the IE block out; there it is a positive control. */
+static int st_cookieimport(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "cookieimport: needs a writable base dir\n");
+    return 1;
+  }
+  char dir[HTS_URLMAXSIZE * 2];
+  size_t n = (size_t) snprintf(dir, sizeof(dir), "%s", argv[0]);
+
+  while (n > 0 && (dir[n - 1] == '/' || dir[n - 1] == '\\')) {
+    dir[--n] = '\0';
+  }
+  const size_t base = n;
+  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-cookie-seg";
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  memcpybuff(dir + n, nseg, sizeof(nseg));
+  n += sizeof(nseg) - 1;
+  if (MKDIR(dir) != 0 && errno != EEXIST) {
+    fprintf(stderr, "cookieimport: mkdir failed: %s\n", strerror(errno));
+    return 1;
+  }
+  while (n + sizeof(seg) - 1 < 300) {
+    memcpybuff(dir + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (MKDIR(dir) != 0 && errno != EEXIST) {
+      fprintf(stderr, "cookieimport: mkdir failed at %u: %s\n", (unsigned) n,
+              strerror(errno));
+      return 1;
+    }
+  }
+  const size_t dirlen = n;
+
+  assertf(dirlen > 260); /* the cookie folder itself exceeds MAX_PATH */
+
+  char fpath[HTS_URLMAXSIZE * 2];
+  char file[HTS_URLMAXSIZE * 2];
+
+  snprintf(fpath, sizeof(fpath), "%s/", dir); /* IE glob wants a trailing sep */
+
+  /* cookies.txt: one Netscape record (host, _, path, _, _, name, value). */
+  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  {
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "www.example.com\tFALSE\t/\tFALSE\t0\tJARCOOK\tjarval\n");
+    fclose(fp);
+  }
+
+  /* A copied IE cookie u@v.txt: name, value, url, then 6 unused fields. */
+  snprintf(file, sizeof(file), "%su@v.txt", fpath);
+  {
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "IECOOK\nieval\nwww.example.com/\n0\n0\n0\n0\n0\n*\n");
+    fclose(fp);
+  }
+
+  static t_cookie ck;
+
+  ck.max_len = (int) sizeof(ck.data);
+  ck.data[0] = '\0';
+  assertf(cookie_load(&ck, fpath, "cookies.txt") == 0);
+  assertf(strstr(ck.data, "JARCOOK") != NULL); /* jar read on a long path */
+#ifdef _WIN32
+  /* the IE scan merged the cookie and unlinked the consumed file */
+  assertf(strstr(ck.data, "IECOOK") != NULL);
+  assertf(FOPEN(file, "rb") == NULL);
+#endif
+
+  (void) UNLINK(file); /* u@v.txt (already gone on Windows) */
+  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  (void) UNLINK(file);
+  dir[dirlen] = '\0';
+  while (strlen(dir) > base) {
+    char *const slash = strrchr(dir, '/');
+
+    if (RMDIR(dir) != 0) {
+      fprintf(stderr, "cookieimport: rmdir failed: %s\n", strerror(errno));
+      return 1;
+    }
+    if (slash == NULL || (size_t) (slash - dir) < base) {
+      break;
+    }
+    *slash = '\0';
+  }
+
+  printf("cookieimport: merged jar%s under a %u-char non-ASCII dir: OK\n",
+#ifdef _WIN32
+         " + IE cookie",
+#else
+         "",
+#endif
+         (unsigned) dirlen);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4737,6 +4839,9 @@ static const struct selftest_entry {
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},
+    {"cookieimport", "<dir>",
+     "load a jar (and Windows IE cookies) from a long+non-ASCII folder",
+     st_cookieimport},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
 #if HTS_USEOPENSSL
