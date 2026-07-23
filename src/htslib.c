@@ -6510,9 +6510,61 @@ static void copyWchar(LPWSTR dest, const char *src) {
   dest[i] = '\0';
 }
 
+/* UTF-8 path -> UCS-2 for the _w* file APIs. At/above HTS_WIN_LONGPATH_MIN,
+   \\?\-prefix it via GetFullPathNameW to clear MAX_PATH (#133); else unchanged.
+   Any prefixing failure falls back to the plain converted path. */
+#define HTS_WIN_LONGPATH_MIN 240 /* stay clear of MAX_PATH (260) */
+
+static LPWSTR hts_pathToUCS2(const char *path) {
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+
+  if (wpath == NULL) {
+    return NULL;
+  }
+  const size_t len = wcslen(wpath);
+  // Already "\\?\" or "\\.\": don't re-prefix.
+  const int verbatim = len >= 4 && wpath[0] == L'\\' && wpath[1] == L'\\' &&
+                       (wpath[2] == L'?' || wpath[2] == L'.') &&
+                       wpath[3] == L'\\';
+
+  if (len < HTS_WIN_LONGPATH_MIN || verbatim) {
+    return wpath;
+  }
+
+  const DWORD need = GetFullPathNameW(wpath, 0, NULL, NULL); /* incl NUL */
+  LPWSTR full = need != 0 ? malloct((size_t) need * sizeof(WCHAR)) : NULL;
+
+  if (full == NULL) {
+    return wpath; /* fall back to the plain path */
+  }
+  const DWORD written = GetFullPathNameW(wpath, need, full, NULL);
+
+  if (written == 0 || written >= need || full[0] == L'\0') {
+    freet(full);
+    return wpath;
+  }
+
+  const int isUNC = full[0] == L'\\' && full[1] == L'\\';
+  // UNC "\\srv\share" -> "\\?\UNC\srv\share": the prefix subsumes the "\\".
+  const WCHAR *const pfx = isUNC ? L"\\\\?\\UNC\\" : L"\\\\?\\";
+  const WCHAR *const body = isUNC ? full + 2 : full;
+  const size_t pfxLen = wcslen(pfx), bodyLen = wcslen(body);
+  LPWSTR out = malloct((pfxLen + bodyLen + 1) * sizeof(WCHAR));
+
+  if (out == NULL) {
+    freet(full);
+    return wpath;
+  }
+  memcpybuff(out, pfx, pfxLen * sizeof(WCHAR));
+  memcpybuff(out + pfxLen, body, (bodyLen + 1) * sizeof(WCHAR));
+  freet(full);
+  freet(wpath);
+  return out;
+}
+
 FILE *hts_fopen_utf8(const char *path, const char *mode) {
   WCHAR wmode[32];
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_pathToUCS2(path);
 
   assertf(strlen(mode) < sizeof(wmode) / sizeof(WCHAR));
   copyWchar(wmode, mode);
@@ -6528,7 +6580,7 @@ FILE *hts_fopen_utf8(const char *path, const char *mode) {
 }
 
 int hts_stat_utf8(const char *path, STRUCT_STAT * buf) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_pathToUCS2(path);
 
   if (wpath != NULL) {
     const int result = _wstat64(wpath, buf);
@@ -6542,7 +6594,7 @@ int hts_stat_utf8(const char *path, STRUCT_STAT * buf) {
 }
 
 int hts_unlink_utf8(const char *path) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_pathToUCS2(path);
 
   if (wpath != NULL) {
     const int result = _wunlink(wpath);
@@ -6556,10 +6608,8 @@ int hts_unlink_utf8(const char *path) {
 }
 
 int hts_rename_utf8(const char *oldpath, const char *newpath) {
-  LPWSTR woldpath =
-    hts_convertUTF8StringToUCS2(oldpath, (int) strlen(oldpath), NULL);
-  LPWSTR wnewpath =
-    hts_convertUTF8StringToUCS2(newpath, (int) strlen(newpath), NULL);
+  LPWSTR woldpath = hts_pathToUCS2(oldpath);
+  LPWSTR wnewpath = hts_pathToUCS2(newpath);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
 
@@ -6577,7 +6627,7 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
 }
 
 int hts_mkdir_utf8(const char *path) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_pathToUCS2(path);
 
   if (wpath != NULL) {
     const int result = _wmkdir(wpath);
@@ -6592,7 +6642,7 @@ int hts_mkdir_utf8(const char *path) {
 
 HTSEXT_API int hts_utime_utf8(const char *path, const STRUCT_UTIMBUF * times) {
   STRUCT_UTIMBUF mtimes = *times;
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_pathToUCS2(path);
 
   if (wpath != NULL) {
     const int result = _wutime(wpath, &mtimes);
