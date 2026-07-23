@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# #133: the save-path ceiling used to be the Windows MAX_PATH (236 usable) on
+# every platform, needlessly hashing long names on Linux/macOS/Android. Off
+# Windows a name well under the platform PATH_MAX must now be kept whole.
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cd "$scratch"
+
+# ~300 chars: over the old 236 ceiling, well under any POSIX PATH_MAX. The
+# distinctive 90-char last segment lets us tell "kept whole" from "hashed".
+seg="$(printf 'Z%.0s' {1..90})"
+deep="/a/$(printf 'b%.0s' {1..100})/c/$(printf 'd%.0s' {1..100})"
+out="$("$httrack_bin" -O /dev/null -#test=savename "$deep/$seg.html" text/html |
+    sed -n 's/^savename: //p')"
+
+case "$(uname -s 2>/dev/null)" in
+MINGW* | MSYS* | CYGWIN*)
+    # Windows still caps at MAX_PATH: the distinctive tail is cut
+    case "$out" in
+    *"$seg"*)
+        echo "FAIL: Windows should have shortened the long name: '$out'"
+        exit 1
+        ;;
+    esac
+    ;;
+*)
+    # POSIX: the full name survives, no hashing
+    case "$out" in
+    *"$seg"*) ;;
+    *)
+        echo "FAIL: long POSIX name was truncated: '$out'"
+        exit 1
+        ;;
+    esac
+    test "${#out}" -gt 236 ||
+        {
+            echo "FAIL: POSIX name not longer than the old ceiling: '$out'"
+            exit 1
+        }
+
+    # byte-safety: a multibyte name whose codepoint count is under the ceiling
+    # but whose bytes plus a long -O dir overflow the save buffer must be cut to
+    # fit, not abort the crawl (SIGABRT before the byte-cut guard).
+    bigdir="/x/$(printf 'D%.0s' $(seq 1 1015))"      # ~1020 bytes
+    cjk="/$(printf '\xe4\xb8\xad%.0s' $(seq 1 339))" # 1018 bytes, 339 codepoints
+    if ! mb="$("$httrack_bin" -O "$bigdir" -#test=savename "$cjk" text/html 2>/dev/null)"; then
+        echo "FAIL: aborted on a multibyte over-buffer name"
+        exit 1
+    fi
+    mb="${mb#savename: }"
+    if [ -z "$mb" ] || [ "${#mb}" -ge 2048 ]; then
+        echo "FAIL: multibyte name not bounded (len=${#mb})"
+        exit 1
+    fi
+    ;;
+esac
+
+echo "longpath-posix OK"

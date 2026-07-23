@@ -3,30 +3,68 @@
 
 set -euo pipefail
 
-# #623: url_savename enforces the 236-char path ceiling by cutting the tail of
-# the last segment, where the mandatory ".delayed" placeholder marker lives. A
-# cut marker fails IS_DELAYED_EXT, so back_delayed_rename never renames the file
-# to its final name and the download is lost. The marker must survive the cut.
-
-# statuscode=302 status=-1 = a redirect answer still downloading: no type is
-# resolved, so the name gets a ".<id>.delayed" placeholder (see 01_engine-savename).
-CEIL=236
+# #623: url_savename shortens an over-ceiling path by cutting the tail of the
+# last segment, where the mandatory ".<id>.delayed" placeholder lives. A cut
+# marker fails IS_DELAYED_EXT, so back_delayed_rename never renames the file and
+# the download is lost. The marker must survive the cut.
+#
+# The ceiling is the Windows MAX_PATH on Windows but the (far larger) save
+# buffer elsewhere (#133). Each CLI arg is capped at HTS_CDLMAXSIZE (1024), so
+# on POSIX we lengthen the output dir as well to overrun the ceiling.
 
 httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 cd "$scratch"
 
+hexseg=$(printf 'a1b2c3d4e5f60718%.0s' {1..8}) # 128 hex chars
+
+# engine ceiling is the Windows MAX_PATH on Windows, the save buffer elsewhere
+case "$(uname -s 2>/dev/null)" in
+MINGW* | MSYS* | CYGWIN*)
+    ceil=236
+    outdir=/dev/null
+    deep="/d1$(printf 'a%.0s' {1..40})/d2$(printf 'b%.0s' {1..40})"
+    deep="$deep/d3$(printf 'c%.0s' {1..40})/d4$(printf 'd%.0s' {1..40})"
+    long="$deep/$(printf 'z%.0s' {1..90})"
+    hexpath="$deep/$hexseg"
+    ;;
+*)
+    # overrun the save-buffer ceiling with a long dir + long name
+    ceil=$((1024 * 2 - 64)) # HTS_URLMAXSIZE*2 - HTS_PATH_TAIL_RESERVE
+    outdir="$scratch/$(printf 'D%.0s' $(seq 1 $((1000 - ${#scratch}))))"
+    long="/d1/$(printf 'z%.0s' $(seq 1 985))"
+    hexpath="/d1/$(printf 'y%.0s' $(seq 1 850))/$hexseg"
+    ;;
+esac
+
 run() {
-    "$httrack_bin" -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
+    "$httrack_bin" -O "$outdir" -#test=savename "$@" | sed -n 's/^savename: //p'
 }
 
-# A deep path ending in a long segment that overruns the ceiling.
-deep="/d1$(printf 'a%.0s' {1..40})/d2$(printf 'b%.0s' {1..40})"
-deep="$deep/d3$(printf 'c%.0s' {1..40})/d4$(printf 'd%.0s' {1..40})"
-long="$deep/$(printf 'z%.0s' {1..90})"
+# untruncated "outdir/host/name" is longer than the ceiling, so truncation must
+# fire; out then sits at or under it. Together these keep the marker check below
+# non-vacuous.
+check_truncated() {
+    local out=$1 fil=$2
+    local untrunc=$((${#outdir} + 1 + 15 + ${#fil})) # host = www.example.com
+    test "$untrunc" -gt "$ceil" ||
+        {
+            echo "FAIL: input too short to truncate ($untrunc <= $ceil)"
+            exit 1
+        }
+    test "${#out}" -le "$ceil" ||
+        {
+            echo "FAIL: truncated name ${#out} > $ceil ceiling: '$out'"
+            exit 1
+        }
+}
 
-out="$(run "$long" text/html statuscode=302 status=-1)"
+# statuscode=302 status=-1 = a redirect still downloading: no type is resolved,
+# so the name gets a ".<id>.delayed" placeholder (see 01_engine-savename).
+long_delayed="$long.ext"
+out="$(run "$long_delayed" text/html statuscode=302 status=-1)"
+check_truncated "$out" "$long_delayed"
 case "$out" in
 *.delayed) ;;
 *)
@@ -34,16 +72,11 @@ case "$out" in
     exit 1
     ;;
 esac
-test "${#out}" -le "$CEIL" || {
-    echo "FAIL: truncated name ${#out} > $CEIL ceiling: '$out'"
-    exit 1
-}
 
 # #133-style hashed name: an all-hex last segment must keep the marker too (the
 # ".<id>." tag is not mistaken for part of the hash).
-hexseg=$(printf 'a1b2c3d4e5f60718%.0s' {1..8})
-hexpath="/d1$(printf 'x%.0s' {1..30})/d2$(printf 'y%.0s' {1..30})/$hexseg"
 out="$(run "$hexpath" text/html statuscode=302 status=-1)"
+check_truncated "$out" "$hexpath"
 case "$out" in
 *.delayed) ;;
 *)
@@ -51,17 +84,10 @@ case "$out" in
     exit 1
     ;;
 esac
-test "${#out}" -le "$CEIL" || {
-    echo "FAIL: hashed name ${#out} > $CEIL ceiling: '$out'"
-    exit 1
-}
 
 # A non-delayed name of the same shape still truncates, with no marker to keep.
-out="$(run "$long.html" text/html)"
-test "${#out}" -le "$CEIL" || {
-    echo "FAIL: non-delayed name ${#out} > $CEIL ceiling: '$out'"
-    exit 1
-}
+out="$(run "$long_delayed.html" text/html)"
+check_truncated "$out" "$long_delayed.html"
 case "$out" in
 *.delayed)
     echo "FAIL: non-delayed name grew a .delayed marker: '$out'"

@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #endif
 #include <ctype.h>
+#include <limits.h>
 
 #define ADD_STANDARD_PATH \
     {  /* ajout nom */\
@@ -1475,15 +1476,37 @@ int url_savename(lien_adrfilsave *const afs,
                   sizeof(afs->save) - (size_t) (lastDot - afs->save));
     }
   }
-  // enforce 260-character path limit before inserting destination path
-  // note: 12 characters at least for WIN32, and 12 for ".99.delayed"
-  // (MSDN) "When using an API to create a directory, the specified path 
-  // cannot be so long that you cannot append an 8.3 file name 
-  // (that is, the directory name cannot exceed MAX_PATH minus 12)."
-#define HTS_MAX_PATH_LEN ( 260 - 12 - 12 )
+  // Cap the save path: the final parent+name is copied into a fixed buffer that
+  // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
+#define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
+#define HTS_PATH_TAIL_RESERVE 64 /* collision suffix + ".delayed" + NUL */
+#ifdef _WIN32
+  // MAX_PATH minus 8.3 headroom (MSDN) minus the ".delayed" marker; raising it
+  // needs the engine to "\\?\"-prefix its paths, which is separate work.
+#define HTS_MAX_PATH_LEN (260 - 12 - 12)
+#define MAX_SEG_LEN 48
+#else
+  // #133: use the platform's own PATH_MAX/NAME_MAX (Linux/Android 4096, macOS
+  // 1024) rather than the far smaller Windows MAX_PATH.
+#ifdef PATH_MAX
+#define HTS_PATH_MAX_ PATH_MAX
+#else
+#define HTS_PATH_MAX_ 1024
+#endif
+#ifdef NAME_MAX
+#define HTS_NAME_MAX_ NAME_MAX
+#else
+#define HTS_NAME_MAX_ 255
+#endif
+#define HTS_MAX_PATH_LEN                                                       \
+  ((HTS_PATH_MAX_ - HTS_PATH_TAIL_RESERVE) <                                   \
+           (HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE)                          \
+       ? (HTS_PATH_MAX_ - HTS_PATH_TAIL_RESERVE)                               \
+       : (HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE))
+#define MAX_SEG_LEN (HTS_NAME_MAX_ > 64 ? HTS_NAME_MAX_ - 16 : HTS_NAME_MAX_)
+#endif
 #define MIN_LAST_SEG_RESERVE 12
 #define MAX_LAST_SEG_RESERVE 24
-#define MAX_SEG_LEN 48
   if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
@@ -1493,7 +1516,7 @@ int url_savename(lien_adrfilsave *const afs,
     if (wsave != NULL) {
       const size_t parentLen =
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
-      // parent path length is not insane (otherwise, ignore and pick 200 as 
+      // parent path length is not insane (otherwise, ignore and pick 200 as
       // suffix length)
       const size_t maxLen =
         parentLen <
@@ -1584,9 +1607,37 @@ int url_savename(lien_adrfilsave *const afs,
     // Re-check again ending space or dot after cut (see bug #5)
     cleanEndingSpaceOrDot(afs->save);
   }
+  // The cut above counts UTF-8 codepoints, but parent+name lands in a fixed
+  // byte buffer that aborts() on overflow (htssafe.h). A multibyte name can
+  // pass the codepoint cap yet overflow in bytes, so hard-cut on a codepoint
+  // boundary to keep parent+name inside the buffer regardless (#133).
+  {
+    const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
+    const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
+    // Shrink only the name. A parent that alone fills the buffer is left to the
+    // existing prepend abort, not collapsed to an empty name that would collide
+    // across URLs and overrun the unbounded collision-suffix sprintf.
+    if (parentBytes < cap) {
+      size_t budget = cap - parentBytes;
+      if (strlen(afs->save) > budget) {
+        while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
+          budget--; // back off a continuation byte, never split a char
+        afs->save[budget] = '\0';
+        cleanEndingSpaceOrDot(afs->save);
+      }
+    }
+  }
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
+#undef MAX_LAST_SEG_RESERVE
+#undef MAX_SEG_LEN
 #undef HTS_MAX_PATH_LEN
+#undef HTS_PATH_TAIL_RESERVE
+#undef HTS_SAVE_BUFSIZE
+#ifndef _WIN32
+#undef HTS_PATH_MAX_
+#undef HTS_NAME_MAX_
+#endif
 
   // chemin primaire éventuel A METTRE AVANT
   if (strnotempty(StringBuff(opt->path_html_utf8))) {

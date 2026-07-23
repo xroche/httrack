@@ -149,10 +149,19 @@ full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.htm
     strip=sid 'prior=www.example.com|/page.php?id=4|/dev/null/www.example.com/PAGE-PRIOR.html'
 
 # Hostile fils stay rooted under the mirror: ../ (raw or %2e-encoded) drops out,
-# control characters become spaces, oversized names cap at 210 chars (the cap
-# can chop the extension off entirely).
+# control characters become spaces.
 full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/x.php' 'application/pdf' '/dev/null/www.example.com///evil.exe' 'cdispo=../../evil.exe'
 name $'/evil\rname\t.php' 'text/html' 'evil name .html'
-name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..210})"
+
+# #133: oversized names are capped only on Windows (MAX_PATH, chopping the
+# extension); elsewhere the platform PATH_MAX leaves a 300-char name whole.
+case "$(uname -s 2>/dev/null)" in
+MINGW* | MSYS* | CYGWIN*)
+    name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..210})"
+    ;;
+*)
+    name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..300}).html"
+    ;;
+esac
