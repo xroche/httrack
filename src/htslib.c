@@ -6431,21 +6431,31 @@ HTSEXT_API int hts_resetvar(void) {
 #ifdef _WIN32
 
 typedef struct dirent dirent;
+static LPWSTR hts_pathToUCS2(const char *path);
+
 DIR *opendir(const char *name) {
   WIN32_FILE_ATTRIBUTE_DATA st;
   DIR *dir;
   size_t len;
   int i;
+  LPWSTR wname;
 
   if (name == NULL || *name == '\0') {
     errno = ENOENT;
     return NULL;
   }
-  if (!GetFileAttributesEx(name, GetFileExInfoStandard, &st)
-      || (st.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+  // Existence/type check through the \\?\-aware wide path: a long or non-ASCII
+  // directory is otherwise MAX_PATH-capped or mis-decoded as CP_ACP
+  // (#133,#630).
+  wname = hts_pathToUCS2(name);
+  if (wname == NULL ||
+      !GetFileAttributesExW(wname, GetFileExInfoStandard, &st) ||
+      (st.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+    freet(wname);
     errno = ENOENT;
     return NULL;
   }
+  freet(wname);
   dir = calloc(sizeof(DIR), 1);
   if (dir == NULL) {
     errno = ENOMEM;
@@ -6465,19 +6475,30 @@ DIR *opendir(const char *name) {
 }
 
 struct dirent *readdir(DIR * dir) {
-  WIN32_FIND_DATAA find;
+  WIN32_FIND_DATAW find;
 
   if (dir->h == INVALID_HANDLE_VALUE) {
-    dir->h = FindFirstFileA(dir->name, &find);
+    // dir->name already carries the "\\*" wildcard, all-backslash; \\?\-prefix
+    // it so a long/non-ASCII directory enumerates instead of failing ENOENT.
+    LPWSTR wname = hts_pathToUCS2(dir->name);
+
+    dir->h =
+        wname != NULL ? FindFirstFileW(wname, &find) : INVALID_HANDLE_VALUE;
+    freet(wname);
   } else {
-    if (!FindNextFile(dir->h, &find)) {
+    if (!FindNextFileW(dir->h, &find)) {
       FindClose(dir->h);
       dir->h = INVALID_HANDLE_VALUE;
     }
   }
   if (dir->h != INVALID_HANDLE_VALUE) {
+    char *u = hts_convertUCS2StringToUTF8(find.cFileName, -1);
+
     dir->entry.d_name[0] = 0;
-    strncat(dir->entry.d_name, find.cFileName, HTS_DIRENT_SIZE - 1);
+    if (u != NULL) {
+      strncat(dir->entry.d_name, u, HTS_DIRENT_SIZE - 1);
+      freet(u);
+    }
     return &dir->entry;
   }
   errno = ENOENT;

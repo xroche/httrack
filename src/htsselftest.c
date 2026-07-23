@@ -4496,6 +4496,107 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=direnum <dir>: enumerate a long AND non-ASCII directory through the
+// opendir/readdir wrappers, asserting each non-ASCII child round-trips as UTF-8
+// (Windows FindFirstFileW + \\?\; positive control on POSIX libc) (#133, #630).
+static int st_direnum(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "direnum: needs a writable base dir\n");
+    return 1;
+  }
+  char path[HTS_URLMAXSIZE * 2];
+  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+
+  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
+    path[--n] = '\0';
+  }
+  const size_t base = n;
+  // Non-ASCII first segment + 40-char ASCII segments push the dir past
+  // MAX_PATH.
+  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  memcpybuff(path + n, nseg, sizeof(nseg));
+  n += sizeof(nseg) - 1;
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "direnum: mkdir failed (non-ascii): %s\n", strerror(errno));
+    return 1;
+  }
+  while (n + sizeof(seg) - 1 < 300) {
+    memcpybuff(path + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (MKDIR(path) != 0 && errno != EEXIST) {
+      fprintf(stderr, "direnum: mkdir failed at %u chars: %s\n", (unsigned) n,
+              strerror(errno));
+      return 1;
+    }
+  }
+  const size_t dirlen = n;
+
+  assertf(dirlen > 260); /* the enumerated directory itself exceeds MAX_PATH */
+
+  // Two non-ASCII leaf files to read back by name.
+  static const char *const leaves[] = {"/\xC3\xA9-un.bin",
+                                       "/\xE4\xB8\xAD-deux.bin"};
+  for (size_t i = 0; i < 2; i++) {
+    memcpybuff(path + dirlen, leaves[i], strlen(leaves[i]) + 1);
+    FILE *fp = FOPEN(path, "wb");
+
+    if (fp == NULL) {
+      fprintf(stderr, "direnum: create failed: %s\n", strerror(errno));
+      return 1;
+    }
+    fclose(fp);
+  }
+  path[dirlen] = '\0';
+
+  int found = 0;
+  DIR *d = opendir(path);
+
+  if (d == NULL) {
+    fprintf(stderr, "direnum: opendir failed: %s\n", strerror(errno));
+    return 1;
+  }
+  struct dirent *e;
+
+  while ((e = readdir(d)) != NULL) {
+    for (size_t i = 0; i < 2; i++) {
+      if (strcmp(e->d_name, leaves[i] + 1) == 0) { /* +1: drop the '/' */
+        found |= 1 << i;
+      }
+    }
+  }
+  closedir(d);
+  if (found != 0x3) {
+    fprintf(stderr, "direnum: missing entries (found mask 0x%x)\n", found);
+    return 1;
+  }
+
+  // Teardown: leaves then the directory chain, via the long-path wrappers.
+  for (size_t i = 0; i < 2; i++) {
+    memcpybuff(path + dirlen, leaves[i], strlen(leaves[i]) + 1);
+    assertf(UNLINK(path) == 0);
+  }
+  path[dirlen] = '\0';
+  while (strlen(path) > base) {
+    char *const slash = strrchr(path, '/');
+
+    if (RMDIR(path) != 0) {
+      fprintf(stderr, "direnum: rmdir failed: %s\n", strerror(errno));
+      return 1;
+    }
+    if (slash == NULL || (size_t) (slash - path) < base) {
+      break;
+    }
+    *slash = '\0';
+  }
+
+  printf("direnum: enumerated 2 non-ASCII leaves under a %u-char dir: OK\n",
+         (unsigned) dirlen);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -4634,6 +4735,9 @@ static const struct selftest_entry {
     {"mirrorio", "<dir>",
      "round-trip a long+non-ASCII path through the mirror I/O wrappers",
      st_mirrorio},
+    {"direnum", "<dir>",
+     "enumerate a long+non-ASCII directory through opendir/readdir",
+     st_direnum},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
 #if HTS_USEOPENSSL

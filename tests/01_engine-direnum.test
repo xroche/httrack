@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=direnum: enumerates a directory that is both long (>MAX_PATH)
+# and non-ASCII through the opendir/readdir wrappers the Windows build supplies,
+# checking each non-ASCII child comes back as UTF-8 (#133, #630). POSIX control.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=direnum "$dir" | grep -q "direnum:.*OK"
