@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=cookieimport: load a cookie jar (and, on Windows, copied IE
+# cookies *@*.txt) from a long, non-ASCII folder through the UTF-8/long-path
+# file wrappers (#133,#630).
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=cookieimport "$dir" | grep -q "cookieimport:.*OK"

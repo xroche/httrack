@@ -39,6 +39,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htslib.h"
 #include "htscore.h"
+#ifdef _WIN32
+#include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
+#endif
 
 /* END specific definitions */
 
@@ -200,28 +203,38 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
-// lire cookies.txt
-// lire également (Windows seulement) les *@*.txt (cookies IE copiés)
-// !=0 : erreur
+// Read cookies.txt, plus (Windows only) any copied IE cookies *@*.txt.
+// Returns !=0 on error.
 int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
   char catbuff[CATBUFF_SIZE];
   char buffer[8192];
 
-  // Fusionner d'abord les éventuels cookies IE
+  // Merge any IE cookies first
 #ifdef _WIN32
   {
-    WIN32_FIND_DATAA find;
+    WIN32_FIND_DATAW find;
     HANDLE h;
-    char pth[MAX_PATH + 32];
+    char pth[HTS_URLMAXSIZE];
+    LPWSTR wpth;
 
     strcpybuff(pth, fpath);
     strcatbuff(pth, "*@*.txt");
-    h = FindFirstFileA((char *) pth, &find);
+    // Wide glob so a long or non-ASCII IE-cookie folder is scanned (#133).
+    wpth = hts_pathToUCS2(pth);
+    h = wpth != NULL ? FindFirstFileW(wpth, &find) : INVALID_HANDLE_VALUE;
+    freet(wpth);
     if (h != INVALID_HANDLE_VALUE) {
       do {
         if (!(find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
           if (!(find.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)) {
-            FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), fpath, find.cFileName), "rb");
+            // cFileName is UTF-16: convert to UTF-8 so the mirror path and
+            // hts_fopen_utf8/_unlink stay UTF-8 end to end (no CP_ACP
+            // mojibake).
+            char *u = hts_convertUCS2StringToUTF8(find.cFileName, -1);
+            FILE *fp =
+                u != NULL
+                    ? FOPEN(fconcat(catbuff, sizeof(catbuff), fpath, u), "rb")
+                    : NULL;
 
             if (fp) {
               char cook_name[256];
@@ -229,11 +242,9 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
               char domainpathpath[512];
               char dummy[512];
 
-              //
-              lien_adrfil af;   // chemin (/)
+              lien_adrfil af; // host + path (/)
               int cookie_merged = 0;
 
-              //
               // Read all cookies
               while(!feof(fp)) {
                 cook_name[0] = cook_value[0] = domainpathpath[0]
@@ -262,10 +273,11 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
               }
               fclose(fp);
               if (cookie_merged)
-                remove(fconcat(catbuff, sizeof(catbuff), fpath, find.cFileName));
+                UNLINK(fconcat(catbuff, sizeof(catbuff), fpath, u));
             }                   // if fp
+            freet(u);
           }
-      } while(FindNextFileA(h, &find));
+      } while (FindNextFileW(h, &find));
       FindClose(h);
     }
   }
@@ -273,7 +285,7 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
 
   // Ensuite, cookies.txt
   {
-    FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), fpath, name), "rb");
+    FILE *fp = FOPEN(fconcat(catbuff, sizeof(catbuff), fpath, name), "rb");
 
     if (fp) {
       char BIGSTK line[8192];
@@ -315,7 +327,7 @@ int cookie_save(t_cookie * cookie, const char *name) {
   if (strnotempty(cookie->data)) {
     char BIGSTK line[8192];
 #ifdef _WIN32
-    FILE *fp = fopen(fconv(catbuff, sizeof(catbuff), name), "wb");
+    FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), name), "wb");
 #else
     const int fd = open(fconv(catbuff, sizeof(catbuff), name),
                         O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
