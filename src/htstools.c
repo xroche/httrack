@@ -1044,7 +1044,20 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                   oldchain->next = chain;
                 }
                 chain->next = NULL;
+#ifdef _WIN32
+                /* FindFirstFileA hands back the ANSI-codepage name; the
+                   template is charset=utf-8, so convert or a non-ASCII name
+                   is mojibake (#216). */
+                {
+                  const char *const name = hts_findgetname(h);
+                  char *const name_utf8 =
+                      hts_convertStringSystemToUTF8(name, strlen(name));
+                  strcpybuff(chain->name, name_utf8 != NULL ? name_utf8 : name);
+                  freet(name_utf8);
+                }
+#else
                 strcpybuff(chain->name, hts_findgetname(h));
+#endif
                 chain->category = category;
                 chain->level = level;
               }

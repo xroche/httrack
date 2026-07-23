@@ -2615,41 +2615,65 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// hts_buildtopindex takes a system-charset path but verif_backblue() below it
-// expects utf-8, so on Windows a non-ASCII project dir gets the gifs written to
-// a mangled twin (issues #216/#217). argv[0] is a writable dir.
+// hts_buildtopindex takes a system-charset path but writes a charset=utf-8
+// document, so on Windows a non-ASCII name leaks through two ways:
+// verif_backblue puts the gifs in a mangled twin dir (#217), and a listed
+// sub-project's name renders as mojibake (#216). Both must come out as utf-8.
+// argv[0] is writable.
 static int st_topindex(httrackp *opt, int argc, char **argv) {
-  char projdir[HTS_URLMAXSIZE];
-  char path[HTS_URLMAXSIZE + 16]; /* projdir plus a basename */
+  char topdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 32];
+  char buf[16384]; /* the listing sits after the whole header template */
+  FILE *fp;
+  size_t n;
 #ifdef _WIN32
-  /* the GUI hands hts_buildtopindex an ANSI path; mimic it. CP1252 'cafe' */
+  /* the GUI hands hts_buildtopindex ANSI paths; mimic it. CP1252 'cafe' */
   static const char *const projName = "caf\xE9";
 #else
-  /* POSIX system charset is UTF-8 */
+  /* POSIX system charset is already utf-8 */
   static const char *const projName = "caf\xC3\xA9";
 #endif
+  /* utf-8 form the index must carry whatever the input charset was */
+  static const char *const projUTF8 = "caf\xC3\xA9";
 
   assertf(argc >= 1);
-  snprintf(projdir, sizeof(projdir), "%s/%s", argv[0], projName);
-
+  /* a non-ASCII top dir (#217) holding a non-ASCII sub-project (#216) */
+  snprintf(topdir, sizeof(topdir), "%s/%s", argv[0], projName);
+  snprintf(path, sizeof(path), "%s/%s/", topdir, projName);
   /* structcheck(), not the utf-8 MKDIR family: same charset as buildtopindex */
-  snprintf(path, sizeof(path), "%s/", projdir);
   assertf(structcheck(path) == 0);
+  /* the sub-project is listed only if it holds an index.html */
+  snprintf(path, sizeof(path), "%s/%s/index.html", topdir, projName);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
 
-  /* returns 0 here: the dir holds no sub-project, only the gifs matter */
-  (void) hts_buildtopindex(opt, projdir, "");
+  assertf(hts_buildtopindex(opt, topdir, "") != 0);
 
-  /* the gifs must land in the project dir itself, not in a mangled sibling */
-  snprintf(path, sizeof(path), "%s/backblue.gif", projdir);
+  /* #217: gifs land in the top dir itself, not in a mangled sibling */
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
   assertf(fexist(path));
+
+  /* #216: the listed name is utf-8, not raw system-charset mojibake */
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  fp = fopen(path, "rb");
+  assertf(fp != NULL);
+  n = fread(buf, 1, sizeof(buf) - 1, fp);
+  fclose(fp);
+  buf[n] = '\0';
+  assertf(strstr(buf, projUTF8) != NULL);
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   unlink(path);
-  snprintf(path, sizeof(path), "%s/fade.gif", projdir);
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
   unlink(path);
-  snprintf(path, sizeof(path), "%s/index.html", projdir);
+  snprintf(path, sizeof(path), "%s/fade.gif", topdir);
   unlink(path);
-  rmdir(projdir);
+  snprintf(path, sizeof(path), "%s/%s/index.html", topdir, projName);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/%s", topdir, projName);
+  rmdir(path);
+  rmdir(topdir);
   printf("topindex self-test OK\n");
   return 0;
 }
