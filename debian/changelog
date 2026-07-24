@@ -1,3 +1,11 @@
+httrack (3.49.14-1) unstable; urgency=medium
+
+  * New upstream release: WARC/WACZ archive output, Windows long-path support,
+    named -%F footer fields, and encoding fixes for non-ASCII project paths;
+    full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 24 Jul 2026 08:01:43 +0200
+
 httrack (3.49.13-1) unstable; urgency=medium
 
   * New upstream release: SOCKS5 and CONNECT proxy support, brotli and zstd
