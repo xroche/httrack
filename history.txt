@@ -4,6 +4,23 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-14
++ New: WARC/1.1 archive output (--warc), with a sorted CDXJ index (--warc-cdx) and WACZ packaging (--wacz), also available from webhttrack (#668)
++ New: -%F takes named footer fields such as {url}, {lastmodified}, {mime}, {charset} and {status} instead of a fixed layout (#667)
++ New: a command-line guide organized by task ships with the offline documentation (#649)
++ Fixed: on Windows, paths beyond MAX_PATH truncated files, and mirroring into a long or non-ASCII directory silently failed (#133)
++ Fixed: the top index showed mojibake for non-ASCII project names and categories on Windows (#216)
++ Fixed: webhttrack handed the engine the web form's charset rather than UTF-8, so a non-ASCII path mirrored into a mojibake directory (#629)
++ Fixed: a non-ASCII single -O left the logs and the cache in a mangled twin directory on Windows (#630)
++ Fixed: a path-ceiling truncation dropped the .delayed marker, losing the file (#623)
++ Fixed: an oversized -%F footer aborted the crawl instead of being skipped (#669)
++ Fixed: a rejected 206 resume could loop and lose the file rather than refetch it whole (#581)
++ Fixed: default-port stripping was scheme-blind and dropped explicit ports from https and ftp URLs, and a :80 written with leading zeros mangled the host (#627, #638)
++ Fixed: -K silently reset the -c socket count (#650)
++ Fixed: signed-shift undefined behaviour in the zip-repair local-header read (#639)
++ Changed: the offline documentation drops stale facts, gains an Android help page, and documents the filter wildcards and the real long option forms
++ Changed: multiple internal hardening, test and CI improvements
+
 3.49-13
 + New: SOCKS5 proxy support, with scheme-aware -P URLs (socks5://, socks5h://, connect://) and plain HTTP tunneled through a CONNECT-only proxy (#563, #564)
 + New: decode brotli and zstd content codings, advertised over TLS only as browsers do (#556)

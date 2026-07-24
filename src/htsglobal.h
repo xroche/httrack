@@ -43,8 +43,8 @@ Please visit our Website: http://www.httrack.com
    configure.ac, decoupled from these). VERSION is the display form, VERSIONID
    the dotted numeric form, AFF_VERSION the short form shown in footers,
    LIB_VERSION the data/cache format generation. */
-#define HTTRACK_VERSION "3.49-13"
-#define HTTRACK_VERSIONID "3.49.13"
+#define HTTRACK_VERSION "3.49-14"
+#define HTTRACK_VERSIONID "3.49.14"
 #define HTTRACK_AFF_VERSION "3.x"
 #define HTTRACK_LIB_VERSION "2.0"
 
