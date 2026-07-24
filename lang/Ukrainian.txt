@@ -635,7 +635,7 @@ Disconnect when finished
 Disconnect modem on completion
 Від'єднати при завершенні
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Повідомите нам будь ласка про помічені проблеми і помилки)\r\n\r\nразработка:\r\nинтерфейс (Windows): Xavier Roche\r\nкачалка (spider): Xavier Roche\r\nпарсер java-класів: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Ukrainian translations to:\r\nAndrij Shevchuk (andrijsh@mail.lviv.ua) http://programy.com.ua, http://vic-info.com.ua
+\r\n(Повідомите нам будь ласка про помічені проблеми і помилки)\r\n\r\nразработка:\r\nинтерфейс (Windows): Xavier Roche\r\nкачалка (spider): Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Ukrainian translations to:\r\nAndrij Shevchuk (andrijsh@mail.lviv.ua) http://programy.com.ua, http://vic-info.com.ua
 About WinHTTrack Website Copier
 Про програму WinHTTrack Website Copier
 Please visit our Web page

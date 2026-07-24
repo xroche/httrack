@@ -635,7 +635,7 @@ Disconnect when finished
 Disconnect modem on completion
 След края на операцията разкачи модема
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Моля уведомете ни за всяка грешка или проблем)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nПаяк: Xavier Roche\r\nJava Разборни Класове: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche и други сътрудници\r\nМНОГО БЛАГОДАРНОСТИ за Българският превод на:\r\nИлия Линдов (ilia@infomat-bg.com)
+\r\n(Моля уведомете ни за всяка грешка или проблем)\r\n\r\nРазработка:\r\nИнтерфейс (Windows): Xavier Roche\r\nПаяк: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други сътрудници\r\nМНОГО БЛАГОДАРНОСТИ за Българският превод на:\r\nИлия Линдов (ilia@infomat-bg.com)
 About WinHTTrack Website Copier
 За WinHTTrack Website Copier
 Please visit our Web page
