@@ -636,8 +636,8 @@ Disconnect when finished
 Prekinuti vezu kada bude gotovo
 Disconnect modem on completion
 Po dovršetku odvojiti modemsku vezu
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Molimo da nas obavijestite o svim pogreškama i poteškoæama)\r\n\r\nRazvoj:\r\nSuèelje (Windows): Xavier Roche\r\nPauk: Xavier Roche\r\nRazrediRašèlanjivaèaJave: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche i drugi suradnici\r\nPUNO HVALA za prijevodne preporuke upuæujemo:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Molimo da nas obavijestite o svim pogreškama i poteškoæama)\r\n\r\nRazvoj:\r\nSuèelje (Windows): Xavier Roche\r\nPauk: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche i drugi suradnici\r\nPUNO HVALA za prijevodne preporuke upuæujemo:\r\nRobert Lagadec (rlagadec@yahoo.fr)
 About WinHTTrack Website Copier
 O programu WinHTTrack Website Copier
 Please visit our Web page

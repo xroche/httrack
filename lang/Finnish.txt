@@ -636,8 +636,8 @@ Disconnect when finished
 Katkaise yhteys, kun on valmista
 Disconnect modem on completion
 Katkaise modeemiyhteys, kun on valmista
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Kerro meille bugeista ja ongelmista)\r\n\r\nKehitys:\r\nKäyttöliittymä (Windows): Xavier Roche\r\nNettirobotti: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C) 1998-2003 Xavier Roche ja muut avustajat\r\nSuomentanut Mika Kähkönen 22.-24.7.2005\r\nmika.kahkonen@mbnet.fi\r\nhttp://koti.mbnet.fi/kahoset
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Kerro meille bugeista ja ongelmista)\r\n\r\nKehitys:\r\nKäyttöliittymä (Windows): Xavier Roche\r\nNettirobotti: Xavier Roche\r\n\r\n(C) 1998-2003 Xavier Roche ja muut avustajat\r\nSuomentanut Mika Kähkönen 22.-24.7.2005\r\nmika.kahkonen@mbnet.fi\r\nhttp://koti.mbnet.fi/kahoset
 About WinHTTrack Website Copier
 Tietoja WinHTTrack Website Copier
 Please visit our Web page

@@ -634,8 +634,8 @@ Disconnect when finished
 Desconectar al terminar la operación
 Disconnect modem on completion
 Desconectar el modem al terminar
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(notifíquenos fallos o problemas)\r\n\r\nDesarrollo:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Spanish translations to:\r\nJuan Pablo Barrio Lera (Universidad de León)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(notifíquenos fallos o problemas)\r\n\r\nDesarrollo:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Spanish translations to:\r\nJuan Pablo Barrio Lera (Universidad de León)
 About WinHTTrack Website Copier
 Acerca de...
 Please visit our Web page

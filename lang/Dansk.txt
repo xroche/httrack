@@ -652,8 +652,8 @@ Disconnect when finished
 Afbryd forbindelsen når overførslen er færdig
 Disconnect modem on completion
 Afbryd modem når overførslen er færdig
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(finder du fejl eller opstår der problemer så kontakt os venligst)\r\n\r\nUdvikling:\r\nBrugerflade (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche og andre bidragydere\r\nMange tak for dansk oversættelse til:\r\nJesper Bramm (bramm@get2net.dk)\r\nscootergrisen
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(finder du fejl eller opstår der problemer så kontakt os venligst)\r\n\r\nUdvikling:\r\nBrugerflade (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche og andre bidragydere\r\nMange tak for dansk oversættelse til:\r\nJesper Bramm (bramm@get2net.dk)\r\nscootergrisen
 About WinHTTrack Website Copier
 Om WinHTTrack Website Copier
 Please visit our Web page

@@ -634,8 +634,8 @@ Disconnect when finished
 完成時切斷連線
 Disconnect modem on completion
 完成時切斷數據機
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(有任何程序錯誤或問題請聯絡我們)\r\n\r\n開發:\r\n界面設計 (Windows): Xavier Roche\r\n分析引擎: Xavier Roche\r\nJava分析引擎: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\n感謝:\r\nDavid Hing Cheong Hung (DAVEHUNG@mtr.com.hk) 提供翻譯
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(有任何程序錯誤或問題請聯絡我們)\r\n\r\n開發:\r\n界面設計 (Windows): Xavier Roche\r\n分析引擎: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\n感謝:\r\nDavid Hing Cheong Hung (DAVEHUNG@mtr.com.hk) 提供翻譯
 About WinHTTrack Website Copier
 關於WinHTTrack Website Copier
 Please visit our Web page

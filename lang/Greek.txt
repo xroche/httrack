@@ -636,8 +636,8 @@ Disconnect when finished
 Αποσύνδεση στο τέλος
 Disconnect modem on completion
 Αποσύνδεση του modem στο τέλος
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Παρακαλώ να μας ενημερώσετε για κάθε πρόβλημα ή bug)\r\n\r\nΑνάπτυξη:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Greek translations to:\r\nMichael Papadakis (mikepap at freemail dot gr)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Παρακαλώ να μας ενημερώσετε για κάθε πρόβλημα ή bug)\r\n\r\nΑνάπτυξη:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Greek translations to:\r\nMichael Papadakis (mikepap at freemail dot gr)
 About WinHTTrack Website Copier
 Σχετικά με το WinHTTrack Website Copier
 Please visit our Web page

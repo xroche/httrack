@@ -634,8 +634,8 @@ Disconnect when finished
 Vonalbontás, ha kész
 Disconnect modem on completion
 Modem leválasztása, ha kész
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Kérjük, jelezzen nekünk bármilyen hibát vagy problémát)\r\n\r\nFejlesztés:\r\nKezelõfelület (Windows): Xavier Roche\r\nIndexelés: Xavier Roche\r\nJavaElemzõOsztályok: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nEZER KÖSZÖNET a magyar fordításért:\r\nHerczeg József Tamásnak (hdodi@freemail.hu)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Kérjük, jelezzen nekünk bármilyen hibát vagy problémát)\r\n\r\nFejlesztés:\r\nKezelõfelület (Windows): Xavier Roche\r\nIndexelés: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nEZER KÖSZÖNET a magyar fordításért:\r\nHerczeg József Tamásnak (hdodi@freemail.hu)
 About WinHTTrack Website Copier
 WinHTTrack webhely másoló névjegye
 Please visit our Web page

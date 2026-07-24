@@ -5,7 +5,7 @@ Xavier Roche (xroche at httrack.com)
   project leader
   core engine, Windows/Linux GUI
 Yann Philippot (yphilippot at lemel.fr)
-  for the java binary .class parser
+  past contributor (java binary .class parser)
 
 With the help of:
 Leto Kauler (molotov at tasmail.com)
