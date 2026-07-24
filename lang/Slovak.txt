@@ -634,7 +634,7 @@ Disconnect when finished
 Odpoji, ak je kopírovanie ukonèené
 Disconnect modem on completion
 Odpoji modem po dokonèení
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
 \r\n(Oznám nám akúko¾vek chybu alebo problém)\r\n\r\nVıvoj:\r\nProstredie (Windows): Xavier Roche\r\nPavúk: Xavier Roche\r\nKontrolór Javy: Yann Philippot\r\n\r\n(C)1998-2001 Xavier Roche a ostatní pomocníci\r\nVE¼KÉ POÏAKOVANIE za preklady:\r\nDr. Martin Sereday (sereday@slovanet.sk)
 About WinHTTrack Website Copier
 O WinHTTrack Website Copier...

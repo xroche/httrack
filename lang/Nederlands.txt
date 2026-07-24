@@ -634,8 +634,8 @@ Disconnect when finished
 Indien gedaan verbinding verbreken
 Disconnect modem on completion
 Indien gedaan modemverbinding verbreken
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Ons fouten en problemen mede te delen)\r\n\r\nOntwikkeling:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Dutch translations to:\r\nRudi Ferrari (Wyando@netcologne.de)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Ons fouten en problemen mede te delen)\r\n\r\nOntwikkeling:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Dutch translations to:\r\nRudi Ferrari (Wyando@netcologne.de)
 About WinHTTrack Website Copier
 Over WinHTTrack Website Copier
 Please visit our Web page

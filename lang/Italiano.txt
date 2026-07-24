@@ -634,8 +634,8 @@ Disconnect when finished
 Disconnetti alla fine
 Disconnect modem on completion
 Disconnetti il modem quando il mirror è finito
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(informateci degli errori o problemi)\r\n\rSviluppo:\r\nInterfacccia: Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Italian translations to:\r\nWitold Krakowski (wkrakowski@libero.it)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(informateci degli errori o problemi)\r\n\rSviluppo:\r\nInterfacccia: Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for Italian translations to:\r\nWitold Krakowski (wkrakowski@libero.it)
 About WinHTTrack Website Copier
 Informazioni su WinHTTrack Website Copier
 Please visit our Web page

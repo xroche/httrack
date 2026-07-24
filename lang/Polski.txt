@@ -634,8 +634,8 @@ Disconnect when finished
 Zakoñcz po³¹czenie z us³ugodawc¹ po pobraniu
 Disconnect modem on completion
 Po pobraniu roz³¹cz modem
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(proszê poinformowaæ nas o jakichkolwiek b³êdach w dzia³aniu programu)\r\n\r\nTwórcy:\r\nInterfejs(Windows): Xavier Roche\r\nMotor: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nPolska wersja jêzykowa: £ukasz Jokiel (Opole University of Technology, Lukasz.Jokiel@po.opole.pl)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(proszê poinformowaæ nas o jakichkolwiek b³êdach w dzia³aniu programu)\r\n\r\nTwórcy:\r\nInterfejs(Windows): Xavier Roche\r\nMotor: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nPolska wersja jêzykowa: £ukasz Jokiel (Opole University of Technology, Lukasz.Jokiel@po.opole.pl)
 About WinHTTrack Website Copier
 O... WinHTTrack Website Copier
 Please visit our Web page

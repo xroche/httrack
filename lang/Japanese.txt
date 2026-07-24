@@ -634,8 +634,8 @@ Disconnect when finished
 終了したら接続を切断する
 Disconnect modem on completion
 完了したらモデムとの接続を切断する
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(バグまたは問題についてわれわれに知らせてください)\r\n\r\nDevelopment:\r\nInterface(Windows): Xavier Roche\r\nSpider: Xavier Roche\r\nJavaParserClasses: Yann Philippot\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nJapanese translation :TAPKAL(nakataka@mars.dti.ne.jp)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(バグまたは問題についてわれわれに知らせてください)\r\n\r\nDevelopment:\r\nInterface(Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nJapanese translation :TAPKAL(nakataka@mars.dti.ne.jp)
 About WinHTTrack Website Copier
 WinHTTrackについて
 Please visit our Web page
