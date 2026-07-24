@@ -4286,10 +4286,10 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
     } else if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
       if (b >= 0) {
         if (back[b].r.statuscode == HTTP_OK)
-          printf("%d/%d: %s%s (" LLintP " bytes) - OK\33[K\r", ptr, opt->lien_tot,
+          printf("\r%d/%d: %s%s (" LLintP " bytes) - OK\33[K\n", ptr, opt->lien_tot,
                  back[b].url_adr, back[b].url_fil, (LLint) back[b].r.size);
         else
-          printf("%d/%d: %s%s (" LLintP " bytes) - %d\33[K\r", ptr, opt->lien_tot,
+          printf("\r%d/%d: %s%s (" LLintP " bytes) - %d\33[K\n", ptr, opt->lien_tot,
                  back[b].url_adr, back[b].url_fil, (LLint) back[b].r.size,
                  back[b].r.statuscode);
       } else {
