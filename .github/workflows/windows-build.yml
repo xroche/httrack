@@ -60,7 +60,7 @@ jobs:
       # carries the builtin-baseline, so a Dependabot bump busts it; restore-keys
       # still seeds the unchanged ports' archives, so only the bumped one rebuilds.
       - name: Cache vcpkg binary archives
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}\vcpkg_cache
           key: vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}
