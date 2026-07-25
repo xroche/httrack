@@ -6,3 +6,9 @@ updates:
     directory: /src
     schedule:
       interval: weekly
+
+  # Keep the workflow action pins current (they only rot manually otherwise).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

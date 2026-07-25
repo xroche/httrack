@@ -24,7 +24,7 @@ jobs:
         platform: [x64, Win32]
         configuration: [Release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive   # coucal lives in src/coucal
 
