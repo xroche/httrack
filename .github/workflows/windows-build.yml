@@ -23,6 +23,11 @@ jobs:
       matrix:
         platform: [x64, Win32]
         configuration: [Release]
+    # Redirect vcpkg's default `files` binary cache into the workspace so
+    # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
+    # source otherwise, several minutes every run.
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +48,24 @@ jobs:
       - name: Enable vcpkg MSBuild integration
         shell: pwsh
         run: vcpkg integrate install
+
+      # vcpkg errors if VCPKG_DEFAULT_BINARY_CACHE points at a missing dir, and
+      # actions/cache does not create it on a miss.
+      - name: Create the vcpkg binary cache directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+
+      # x-gha is gone (vcpkg-tool #1662 dropped it after GitHub changed the cache
+      # API), so cache the binary archives directly. Keyed on the manifest, which
+      # carries the builtin-baseline, so a Dependabot bump busts it; restore-keys
+      # still seeds the unchanged ports' archives, so only the bumped one rebuilds.
+      - name: Cache vcpkg binary archives
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\vcpkg_cache
+          key: vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ matrix.platform }}-
 
       # The runner image's vcpkg checkout is pinned to some commit; our manifest's
       # builtin-baseline is usually newer, so `git show <baseline>:versions/...`
