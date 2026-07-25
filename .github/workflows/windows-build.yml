@@ -233,7 +233,7 @@ jobs:
 
       - name: Upload the test logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: engine-tests-${{ matrix.platform }}-${{ matrix.configuration }}
           path: tests/*.log
@@ -241,7 +241,7 @@ jobs:
 
       - name: Upload MSBuild logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
           path: msbuild-*.log
