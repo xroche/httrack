@@ -866,10 +866,9 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
-/* refvalue_size is mandatory: value comes off the cache file bounded only by
-   the line buffer, which dwarfs most destinations. Clipped rather than
-   rejected, since an engine-written cache carries fields wider than ours
-   (contenttype is 128 there, 64 here). */
+/* refvalue_size is mandatory: the cache line is bounded only by the line
+   buffer, not by the destination. Clip rather than reject, since an
+   engine-written field can be wider than ours. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
@@ -2147,12 +2146,15 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
+#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -2221,11 +2223,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
               HTTP_READFIELD_INT(line, value, "Content-Length", r->size);       // size
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);       // contenttype
-              HTTP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);     // last-modified
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag);      // Etag
-              HTTP_READFIELD_STRING(line, value, "Location", r->location);      // 'location' pour moved
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition", r->cdispo);     // Content-disposition
+              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                    sizeof(r->contenttype));
+              HTTP_READFIELD_STRING(line, value, "Last-Modified",
+                                    r->lastmodified, sizeof(r->lastmodified));
+              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                    sizeof(r->etag));
+              HTTP_READFIELD_STRING(line, value, "Location", r->location,
+                                    sizeof(location_default));
+              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
+                                    r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =
