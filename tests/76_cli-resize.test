@@ -1,0 +1,70 @@
+#!/bin/bash
+# #97: a terminal resize must repaint the whole screen, and the frame must
+# follow the new geometry instead of the hardcoded 80x24 one.
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+driver=$(nativepath "${testdir}/pty-resize.py")
+
+if is_windows; then
+    echo "no pty on Windows; skipping" >&2
+    exit 77
+fi
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resize.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+# Trickled pages under a long path: the display keeps animating while the pty is
+# resized under it, and the URL is truncated at 80 columns but not at 200.
+deep="127.0.0.1:${port}/trickle/deep/a-long-directory-segment/another-long-segment"
+out="${tmpdir}/crawl"
+mkdir "$out"
+rc=0
+# The in-progress rows show host:port, not the scheme.
+"$python" "$driver" "${tmpdir}/pty.raw" "${deep}/p" -- \
+    httrack "http://${deep}/index.html" \
+    -O "$out" -%v --robots=0 --disable-security-limits \
+    --timeout=30 --retries=1 -c4 --max-time 60 || rc=$?
+test "$rc" -eq 0 || {
+    echo "pty capture tail:"
+    tail -c 600 "${tmpdir}/pty.raw" | cat -v
+    exit 1
+}

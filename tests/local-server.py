@@ -457,6 +457,9 @@ def _big_sitemap(port):
     ).encode()
 
 
+DEEPDIR = "/trickle/deep/a-long-directory-segment/another-long-segment"
+
+
 class Handler(SimpleHTTPRequestHandler):
     # Quieter logging; the launcher captures httrack's own log anyway.
     def log_message(self, fmt, *args):
@@ -1461,6 +1464,11 @@ class Handler(SimpleHTTPRequestHandler):
     def route_trickle_index(self):
         self.send_bin_index()
 
+    # #97: a path long enough that the CLI in-progress column truncates it at 80
+    # columns but not at 200. Its own index: /trickle/ is asserted on elsewhere.
+    def route_deeptrickle_index(self):
+        self.send_html('\t<a href="p0.bin">p0</a>\n\t<a href="p1.bin">p1</a>\n')
+
     def route_trickle_page(self):
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
@@ -1646,6 +1654,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/trickle/p5.bin": route_trickle_page,
         "/trickle/p6.bin": route_trickle_page,
         "/trickle/p7.bin": route_trickle_page,
+        DEEPDIR + "/index.html": route_deeptrickle_index,
+        DEEPDIR + "/p0.bin": route_trickle_page,
+        DEEPDIR + "/p1.bin": route_trickle_page,
         "/dcancel/index.html": route_dcancel_index,
         "/dcancel/p0.bin": route_dcancel_page,
         "/dcancel/p1.bin": route_dcancel_page,

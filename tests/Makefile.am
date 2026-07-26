@@ -4,6 +4,7 @@
 EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
+	pty-resize.py \
 	local-crawl.sh local-server.py testlib.sh server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
@@ -168,6 +169,7 @@ TESTS = \
 	73_local-warc.test \
 	74_local-warc-wacz.test \
 	74_local-warc-verbatim.test \
-	75_engine-longpath-posix.test
+	75_engine-longpath-posix.test \
+	76_cli-resize.test
 
 CLEANFILES = check-network_sh.cache
