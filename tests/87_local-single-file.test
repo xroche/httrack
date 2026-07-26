@@ -245,12 +245,27 @@ if grep -q 'src="big.svg"' "$badpage"; then
 fi
 echo OK
 
-# --- the web GUI must emit the same options ---------------------------------
-printf '[webhttrack renders the options] ..\t'
-command -v htsserver >/dev/null || {
-    echo "no htsserver in PATH"
+# --- the rewriter in isolation, over a hand-built mirror --------------------
+# After the crawl assertions, so a failure here cannot hide them: the two cover
+# different ground (this one reaches media, anchors and the mirror-root clamp).
+printf '[engine self-test] ..\t'
+st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
+case "$st" in
+*": OK") echo OK ;;
+*)
+    echo "FAIL: $st"
     exit 1
-}
+    ;;
+esac
+
+# --- the web GUI must emit the same options ---------------------------------
+# The Windows job builds httrack.exe only and reaches this file through its
+# *_local-*.test glob, so the GUI half has to stand down there rather than fail.
+printf '[webhttrack renders the options] ..\t'
+if ! command -v htsserver >/dev/null; then
+    echo "SKIP (no htsserver in PATH)"
+    exit 0
+fi
 distdir=$(cd "${top_srcdir}" && pwd)
 sport=$("$python" -c 'import socket
 s = socket.socket()
@@ -319,16 +334,3 @@ grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.
     exit 1
 }
 echo OK
-
-# --- the rewriter in isolation, over a hand-built mirror --------------------
-# Last, so a failure here cannot hide the crawl assertions above: the two cover
-# different ground (this one reaches media, anchors and the mirror-root clamp).
-printf '[engine self-test] ..\t'
-st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
-case "$st" in
-*": OK") echo OK ;;
-*)
-    echo "FAIL: $st"
-    exit 1
-    ;;
-esac
