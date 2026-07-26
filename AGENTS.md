@@ -26,6 +26,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
 - Give new `.test` scripts `set -e`: the older ones predate the rule, so several
   `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
+- Never assert with `cmd | grep -q MARKER && fail`: under `pipefail` a failing
+  `cmd` makes the `&&` short-circuit, so a probe that never ran reads as "marker
+  absent" and the check passes without looking. Capture the reply first, fail if
+  it did not arrive, then match it.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
