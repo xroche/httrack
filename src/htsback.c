@@ -125,6 +125,22 @@ void back_free(struct_back ** sback) {
    above a normal handshake. The last candidate still gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
+void back_read_ftp_result(FILE *fp, htsblk *r) {
+  size_t j = 0;
+
+  if (fscanf(fp, "%d ", &r->statuscode) != 1)
+    r->statuscode = STATUSCODE_INVALID;
+  // an external helper writes this file: stop at capacity, not at EOF
+  while (j + 1 < sizeof(r->msg)) {
+    const int c = fgetc(fp);
+
+    if (c == EOF)
+      break;
+    r->msg[j++] = (char) c;
+  }
+  r->msg[j] = '\0';
+}
+
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                               int timeout) {
   int deadline;
@@ -2960,7 +2976,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.msg[0] = '\0';
               strncatbuff(back[i].r.msg, tmp, sizeof(back[i].r.msg) - 2);
               if (!strnotempty(back[i].r.msg)) {
-                sprintf(back[i].r.msg, "SSL/TLS error %d", err_code);
+                htsblk_failf(&back[i].r, "SSL/TLS error %d", err_code);
               }
               deletehttp(&back[i].r);
               back[i].r.soc = INVALID_SOCKET;
@@ -3033,16 +3049,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
                   "rb");
           if (fp) {
-            int j = 0;
-
-            fscanf(fp, "%d ", &(back[i].r.statuscode));
-            while(!feof(fp)) {
-              int c = fgetc(fp);
-
-              if (c != EOF)
-                back[i].r.msg[j++] = c;
-            }
-            back[i].r.msg[j++] = '\0';
+            back_read_ftp_result(fp, &back[i].r);
             fclose(fp);
             UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
             strcpybuff(fconcat
@@ -3343,10 +3350,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   deleteaddr(&back[i].r);
                   if (back[i].r.size < back[i].r.totalsize)
                     back[i].r.statuscode = STATUSCODE_CONNERROR;        // recatch
-                  sprintf(back[i].r.msg,
-                          "Incorrect length (" LLintP " Bytes, " LLintP
-                          " expected)", (LLint) back[i].r.size,
-                          (LLint) back[i].r.totalsize);
+                  htsblk_failf(&back[i].r,
+                               "Incorrect length (" LLintP " Bytes, " LLintP
+                               " expected)",
+                               (LLint) back[i].r.size,
+                               (LLint) back[i].r.totalsize);
                 } else {
                   // Un warning suffira..
                   hts_log_print(opt, LOG_WARNING,

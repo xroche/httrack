@@ -688,7 +688,7 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     PT_Element elt = PT_ElementNew();
 
     elt->statuscode = 405;
-    strcpy(elt->msg, "Method Not Allowed");
+    strcpybuff(elt->msg, "Method Not Allowed");
     return elt;
   }
 
@@ -822,7 +822,7 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     elt->statuscode = 207;      /* Multi-Status */
     strcpy(elt->charset, "utf-8");
     strcpy(elt->contenttype, "text/xml");
-    strcpy(elt->msg, "Multi-Status");
+    strcpybuff(elt->msg, "Multi-Status");
     StringFree(response);
 
     fprintf(stderr, "RESPONSE:\n%s\n", elt->adr);
@@ -879,7 +879,7 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
     elt->statuscode = HTTP_OK;
     strcpy(elt->charset, "iso-8859-1");
     strcpy(elt->contenttype, "text/html");
-    strcpy(elt->msg, "OK");
+    strcpybuff(elt->msg, "OK");
     StringFree(html);
     return elt;
   }

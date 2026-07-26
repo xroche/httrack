@@ -42,7 +42,7 @@ Please visit our Website: http://www.httrack.com
 typedef struct t_StatsBuffer {
   char name[1024];
   char file[1024];
-  char state[256];
+  char state[288];                      // a short label plus back->info[256]
   char url_sav[HTS_URLMAXSIZE * 2];     // pour cancel
   char url_adr[HTS_URLMAXSIZE * 2];
   char url_fil[HTS_URLMAXSIZE * 2];

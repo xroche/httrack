@@ -407,7 +407,7 @@ PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes) {
     elt->statuscode = HTTP_OK;
     strcpy(elt->charset, "iso-8859-1");
     strcpy(elt->contenttype, "text/html");
-    strcpy(elt->msg, "OK");
+    strcpybuff(elt->msg, "OK");
     StringFree(html);
     return elt;
   }
@@ -828,6 +828,18 @@ PT_Element PT_ElementNew(void) {
   return r;
 }
 
+/* ProxyTrack's htsblk_failf(): a clipped, diagnostic-only failure reason. */
+static void PT_Element_failf(PT_Element r, const char *fmt, ...)
+    HTS_PRINTF_FUN(2, 3);
+
+static void PT_Element_failf(PT_Element r, const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  (void) vslprintfbuff(r->msg, sizeof(r->msg), fmt, args);
+  va_end(args);
+}
+
 PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
   if (index != NULL && SAFE_INDEX(index)) {
     return _IndexFuncts[index->type].PT_ReadCache(index, url, flags);
@@ -866,12 +878,17 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* refvalue_size is mandatory: the cache line is bounded only by the line
+   buffer, not by the destination. Clip rather than reject, since an
+   engine-written field can be wider than ours. */
+#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -1074,16 +1091,23 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 value++;
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg);     // msg
+              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                   sizeof(r->msg));
               ZIP_READFIELD_INT(line, value, "X-Size", r->size);        // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);        // contenttype
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset);       // contenttype
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);      // last-modified
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag);       // Etag
-              ZIP_READFIELD_STRING(line, value, "Location", r->location);       // 'location' pour moved
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                   sizeof(r->contenttype));
+              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                   sizeof(r->charset));
+              ZIP_READFIELD_STRING(line, value, "Last-Modified",
+                                   r->lastmodified, sizeof(r->lastmodified));
+              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                   sizeof(r->etag));
+              ZIP_READFIELD_STRING(line, value, "Location", r->location,
+                                   sizeof(location_default));
               ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo); // Content-disposition
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);      // Original save filename
+                                   r->cdispo, sizeof(r->cdispo));
+              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                   sizeof(previous_save_));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =
@@ -1139,8 +1163,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   snprintf(previous_save, sizeof(previous_save), "%s%s",
                            index->path, previous_save_ + index->fixedPath);
                 } else {
-                  snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
-                          previous_save_, (int) index->fixedPath);
+                  PT_Element_failf(
+                      r, "Bogus fixePath prefix for %s (prefixLen=%d)",
+                      previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
                 }
               } else {
@@ -1159,7 +1184,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             // Peut-on stocker le fichier directement sur disque?
             if (ok) {
               if (r->msg[0] == '\0') {
-                strcpy(r->msg, "Cache Read Error : Unexpected error");
+                strcpybuff(r->msg, "Cache Read Error : Unexpected error");
               }
             } else {            // lire en mémoire
 
@@ -1177,24 +1202,27 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                           int last_errno = errno;
 
                           r->statuscode = STATUSCODE_INVALID;
-                          sprintf(r->msg, "Read error in cache disk data: %s",
-                                  strerror(last_errno));
+                          PT_Element_failf(r,
+                                           "Read error in cache disk data: %s",
+                                           strerror(last_errno));
                         }
                         r->adr[r->size] = '\0';
                       } else {
                         r->statuscode = STATUSCODE_INVALID;
-                        strcpy(r->msg,
-                               "Read error (memory exhausted) from cache");
+                        strcpybuff(r->msg,
+                                   "Read error (memory exhausted) from cache");
                       }
                       fclose(fp);
                     } else {
                       r->statuscode = STATUSCODE_INVALID;
-                      snprintf(r->msg, sizeof(r->msg), "Read error (can't open '%s') from cache",
-                              file_convert(catbuff, sizeof(catbuff), previous_save));
+                      PT_Element_failf(
+                          r, "Read error (can't open '%s') from cache",
+                          file_convert(catbuff, sizeof(catbuff),
+                                       previous_save));
                     }
                   } else {
                     r->statuscode = STATUSCODE_INVALID;
-                    strcpy(r->msg, "Cached file name is invalid");
+                    strcpybuff(r->msg, "Cached file name is invalid");
                   }
                 }
               } else {
@@ -1206,12 +1234,12 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                       free(r->adr);
                       r->adr = NULL;
                       r->statuscode = STATUSCODE_INVALID;
-                      strcpy(r->msg, "Cache Read Error : Read Data");
+                      strcpybuff(r->msg, "Cache Read Error : Read Data");
                     } else
                       *(r->adr + r->size) = '\0';
                   } else {      // erreur
                     r->statuscode = STATUSCODE_INVALID;
-                    strcpy(r->msg, "Cache Memory Error");
+                    strcpybuff(r->msg, "Cache Memory Error");
                   }
                 }
               }
@@ -1219,21 +1247,21 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
           }                     // si save==null, ne rien charger (juste en tête)
         } else {
           r->statuscode = STATUSCODE_INVALID;
-          strcpy(r->msg, "Cache Read Error : Read Header Data");
+          strcpybuff(r->msg, "Cache Read Error : Read Header Data");
         }
         unzCloseCurrentFile(index->zFile);
       } else {
         r->statuscode = STATUSCODE_INVALID;
-        strcpy(r->msg, "Cache Read Error : Open File");
+        strcpybuff(r->msg, "Cache Read Error : Open File");
       }
 
     } else {
       r->statuscode = STATUSCODE_INVALID;
-      strcpy(r->msg, "Cache Read Error : Bad Offset");
+      strcpybuff(r->msg, "Cache Read Error : Bad Offset");
     }
   } else {
     r->statuscode = STATUSCODE_INVALID;
-    strcpy(r->msg, "File Cache Entry Not Found");
+    strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
     r->location = strdup(r->location);
@@ -1799,8 +1827,9 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                 snprintf(previous_save, sizeof(previous_save), "%s%s",
                          index->path, previous_save_ + index->fixedPath);
               } else {
-                snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
-                        previous_save_, (int) index->fixedPath);
+                PT_Element_failf(r,
+                                 "Bogus fixePath prefix for %s (prefixLen=%d)",
+                                 previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
               }
             } else {
@@ -1826,17 +1855,18 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                 if (r->adr != NULL) {
                   if (r->size > 0 && fread(r->adr, 1, r->size, fp) != r->size) {
                     r->statuscode = STATUSCODE_INVALID;
-                    strcpy(r->msg, "Read error in cache disk data");
+                    strcpybuff(r->msg, "Read error in cache disk data");
                   }
                   r->adr[r->size] = '\0';
                 } else {
                   r->statuscode = STATUSCODE_INVALID;
-                  strcpy(r->msg, "Read error (memory exhausted) from cache");
+                  strcpybuff(r->msg,
+                             "Read error (memory exhausted) from cache");
                 }
                 fclose(fp);
               } else {
                 r->statuscode = STATUSCODE_INVALID;
-                strcpy(r->msg, "Previous cache file not found (2)");
+                strcpybuff(r->msg, "Previous cache file not found (2)");
               }
             }
           } else {
@@ -1848,30 +1878,30 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                   free(r->adr);
                   r->adr = NULL;
                   r->statuscode = STATUSCODE_INVALID;
-                  strcpy(r->msg, "Cache Read Error : Read Data");
+                  strcpybuff(r->msg, "Cache Read Error : Read Data");
                 } else
                   r->adr[r->size] = '\0';
               } else {          // erreur
                 r->statuscode = STATUSCODE_INVALID;
-                strcpy(r->msg, "Cache Memory Error");
+                strcpybuff(r->msg, "Cache Memory Error");
               }
             }
           }
         } else {
           r->statuscode = STATUSCODE_INVALID;
-          strcpy(r->msg, "Cache Read Error : Bad Data");
+          strcpybuff(r->msg, "Cache Read Error : Bad Data");
         }
       } else {                  // erreur
         r->statuscode = STATUSCODE_INVALID;
-        strcpy(r->msg, "Cache Read Error : Read Header");
+        strcpybuff(r->msg, "Cache Read Error : Read Header");
       }
     } else {
       r->statuscode = STATUSCODE_INVALID;
-      strcpy(r->msg, "Cache Read Error : Seek Failed");
+      strcpybuff(r->msg, "Cache Read Error : Seek Failed");
     }
   } else {
     r->statuscode = STATUSCODE_INVALID;
-    strcpy(r->msg, "File Cache Entry Not Found");
+    strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
     r->location = strdup(r->location);
@@ -2134,12 +2164,15 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
+#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -2208,11 +2241,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
               HTTP_READFIELD_INT(line, value, "Content-Length", r->size);       // size
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);       // contenttype
-              HTTP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);     // last-modified
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag);      // Etag
-              HTTP_READFIELD_STRING(line, value, "Location", r->location);      // 'location' pour moved
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition", r->cdispo);     // Content-disposition
+              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                    sizeof(r->contenttype));
+              HTTP_READFIELD_STRING(line, value, "Last-Modified",
+                                    r->lastmodified, sizeof(r->lastmodified));
+              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                    sizeof(r->etag));
+              HTTP_READFIELD_STRING(line, value, "Location", r->location,
+                                    sizeof(location_default));
+              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
+                                    r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =
@@ -2252,7 +2290,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
                 fetchSize = dataLength - metaSize;
               } else if (fetchSize > dataLength - metaSize) {
                 r->statuscode = STATUSCODE_INVALID;
-                strcpy(r->msg, "Cache Read Error : Truncated Data");
+                strcpybuff(r->msg, "Cache Read Error : Truncated Data");
               }
               r->size = 0;
               if (r->statuscode != STATUSCODE_INVALID) {
@@ -2265,12 +2303,13 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
                     int last_errno = errno;
 
                     r->statuscode = STATUSCODE_INVALID;
-                    sprintf(r->msg, "Read error in cache disk data: %s",
-                            strerror(last_errno));
+                    PT_Element_failf(r, "Read error in cache disk data: %s",
+                                     strerror(last_errno));
                   }
                 } else {
                   r->statuscode = STATUSCODE_INVALID;
-                  strcpy(r->msg, "Read error (memory exhausted) from cache");
+                  strcpybuff(r->msg,
+                             "Read error (memory exhausted) from cache");
                 }
               }
             }
@@ -2278,21 +2317,21 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
 
         } else {
           r->statuscode = STATUSCODE_INVALID;
-          strcpy(r->msg, "Cache Read Error : Read Header Error");
+          strcpybuff(r->msg, "Cache Read Error : Read Header Error");
         }
 
       } else {
         r->statuscode = STATUSCODE_INVALID;
-        strcpy(r->msg, "Cache Read Error : Read Header Error");
+        strcpybuff(r->msg, "Cache Read Error : Read Header Error");
       }
     } else {
       r->statuscode = STATUSCODE_INVALID;
-      strcpy(r->msg, "Cache Read Error : Seek Error");
+      strcpybuff(r->msg, "Cache Read Error : Seek Error");
     }
 
   } else {
     r->statuscode = STATUSCODE_INVALID;
-    strcpy(r->msg, "File Cache Entry Not Found");
+    strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
     r->location = strdup(r->location);
