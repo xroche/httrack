@@ -173,6 +173,7 @@ TESTS = \
 	76_cli-resize.test \
 	77_webhttrack-redirect.test \
 	78_webhttrack-sid.test \
+	79_webhttrack-mirror-verbatim.test \
 	80_webhttrack-projpath.test
 
 CLEANFILES = check-network_sh.cache
