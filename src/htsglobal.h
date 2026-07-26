@@ -72,7 +72,8 @@ Please visit our Website: http://www.httrack.com
    HTS_UNUSED: suppress unused-symbol warnings. HTS_STATIC: an unused-safe
    static. HTS_PRINTF_FUN(fmt, arg): mark a printf-like function so the
    compiler type-checks the format string at argument index fmt against the
-   varargs starting at arg. */
+   varargs starting at arg. HTS_CHECK_RESULT: the return value carries the only
+   error signal, so dropping it is a bug; a (void) cast does not silence it. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__((unused))
@@ -80,10 +81,13 @@ Please visit our Website: http://www.httrack.com
 #define HTS_STATIC static __attribute__((unused))
 
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__((format(printf, fmt, arg)))
+
+#define HTS_CHECK_RESULT __attribute__((warn_unused_result))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
 #define HTS_PRINTF_FUN(fmt, arg)
+#define HTS_CHECK_RESULT
 #endif
 #endif
 

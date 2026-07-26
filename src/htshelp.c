@@ -124,7 +124,9 @@ typedef struct help_wizard_buffers {
   char stropt[2048];        // options
   char stropt2[2048];       // options longues
   char strwild[2048];       // wildcards
-  char cmd[4096];
+  /* holds all four of the above plus separators: at 4096 a long answer set
+     clipped the filters off the command line */
+  char cmd[HTS_URLMAXSIZE * 2 + 3 * 2048 + 4];
   char str[256];
   char *argv[256];
 } help_wizard_buffers;

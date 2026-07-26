@@ -462,12 +462,11 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 
 /**
  * Formatted print into dest (capacity size, NUL included), truncating to fit
- * and always NUL-terminating. Returns HTS_TRUE if the whole output fit.
- * The third contract beside the abort-on-overflow strcpybuff() family: abort
- * is wrong where the source is a remote peer's banner. Discard the result with
- * (void) only where a clipped one is the intended behavior.
+ * and always NUL-terminating. Returns HTS_TRUE if the whole output fit; the
+ * result is the only truncation signal, so it must be acted on. Unlike
+ * strcpybuff() it never aborts, so it suits text built from remote input.
  */
-static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
     slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
   va_list args;
   int ret;

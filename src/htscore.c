@@ -447,7 +447,9 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *fil) {
   if (!*makeindex_done) {
     if (*makeindex_fp) {
-      char BIGSTK tempo[1024];
+      /* sized off link_escaped below: at the old flat 1024 a long first link
+         produced a redirect to a clipped URL */
+      char BIGSTK tempo[HTS_URLMAXSIZE * 2 + 64];
       if (makeindex_links == 1) {
         char BIGSTK link_escaped[HTS_URLMAXSIZE * 2];
         escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped));

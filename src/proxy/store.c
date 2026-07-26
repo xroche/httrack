@@ -973,8 +973,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                     const char *scheme =
                         link_has_authority(filenameIndex) ? "" : "http://";
 
-                    /* dropped rather than truncated; keep looking at later
-                     * entries */
+                    /* dropped rather than truncated; try the next entry */
                     if (sprintfbuff(index->startUrl, "%s%s", scheme,
                                     filenameIndex))
                       firstSeen = 1;
@@ -1575,8 +1574,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
                   const char *scheme =
                       link_has_authority(line) ? "" : "http://";
 
-                  /* dropped rather than truncated; keep looking at later
-                   * entries */
+                  /* dropped rather than truncated; try the next entry */
                   if (sprintfbuff(index->startUrl, "%s%s", scheme, line))
                     firstSeen = 1;
                   else
