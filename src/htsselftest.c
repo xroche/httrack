@@ -568,6 +568,44 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* sprintfbuff: truncate-and-report. Must never abort (its callers format
+     remote banners) nor write past the array, which the canary catches. */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    const char *const big = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+    memset(&s, '#', sizeof(s));
+    if (!sprintfbuff(s.dst, "%s-%d", "ab", 42) || strcmp(s.dst, "ab-42") != 0)
+      return 1;
+
+    /* exact fit: 7 characters plus the NUL */
+    if (!sprintfbuff(s.dst, "%s", "1234567") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+
+    /* one over, then far over: truncated, terminated, reported */
+    if (sprintfbuff(s.dst, "%s", "12345678") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+    if (sprintfbuff(s.dst, "%s", big) || strlen(s.dst) != sizeof(s.dst) - 1)
+      return 1;
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
+      return 1;
+
+    /* explicit-capacity form, down to the degenerate size 1 */
+    {
+      char *const p = s.dst;
+
+      if (slprintfbuff(p, 1, "%s", "x") || p[0] != '\0')
+        return 1;
+      if (!slprintfbuff(p, sizeof(s.dst), "%s", "ok") || strcmp(p, "ok") != 0)
+        return 1;
+    }
+  }
+
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
      n_eval == 2 on a double-eval macro. */
   {

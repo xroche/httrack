@@ -308,7 +308,14 @@ void help_wizard(httrackp * opt) {
       printf("\n");
       if (strlen(stropt) == 1)
         stropt[0] = '\0';       // aucune
-      snprintf(cmd, sizeof(cmd), "%s %s %s %s", urls, stropt, stropt2, strwild);
+      /* the tail is the filter list, and cmd is split into the argv handed to
+         hts_main() below: a clipped line would silently widen the crawl */
+      if (!sprintfbuff(cmd, "%s %s %s %s", urls, stropt, stropt2, strwild)) {
+        printf("* command line too long (%d bytes max)\n",
+               (int) sizeof(cmd) - 1);
+        freet(buffers);
+        return;
+      }
       printf("---> Wizard command line: httrack %s\n\n", cmd);
       printf("Ready to launch the mirror? (Y/n) :");
       fflush(stdout);
