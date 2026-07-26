@@ -7,10 +7,14 @@ set -euo pipefail
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-# entry 1 has no Last-Modified at all, entry 2 has one that cannot parse
+# $1 Last-Modified value (empty = omit the header), $2 expected archive date,
+# $3 label. The date is asserted exactly: a guard that fires unconditionally
+# would clobber the valid case, and one that skips the year/day would emit a
+# month and day of 00.
 run_case() {
     lastmod=$1
-    what=$2
+    wantdate=$2
+    what=$3
 
     {
         printf 'HTTP/1.1 200 OK\r\n'
@@ -32,11 +36,16 @@ run_case() {
         echo "FAIL: proxytrack crashed on $what" >&2
         exit 1
     }
-    grep -aq 'http://example.com/p.html' "$dir/out.arc" || {
-        echo "FAIL: entry dropped on $what" >&2
+    grep -aq "^http://example.com/p.html 0.0.0.0 ${wantdate} " "$dir/out.arc" || {
+        echo "FAIL: $what: expected archive date ${wantdate}, got:" >&2
+        grep -a '^http://example.com/' "$dir/out.arc" >&2 || echo "(entry dropped)" >&2
         exit 1
     }
 }
 
-run_case '' 'a missing Last-Modified'
-run_case 'not a date at all' 'an unparseable Last-Modified'
+# the epoch stands in for "date unknown"
+run_case '' 19700101000000 'a missing Last-Modified'
+run_case 'not a date at all' 19700101000000 'an unparseable Last-Modified'
+run_case '0' 19700101000000 'a bare 0 Last-Modified'
+# a parseable date must still come through untouched
+run_case 'Sun, 06 Nov 1994 08:49:37 GMT' 19941106084937 'a valid Last-Modified'
