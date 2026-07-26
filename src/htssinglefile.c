@@ -170,8 +170,8 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
       common = i + 1;
     i++;
   }
-  /* from_dir is an ancestor of to_path: nothing to climb. Handled here rather
-     than by advancing common, which would index past from_dir's terminator. */
+  /* from_dir is an ancestor of to_path: nothing to climb, and common must not
+     advance past from_dir's terminator. */
   if (from_dir[i] == '\0' && to_path[i] == '/') {
     StringCat(*out, to_path + i + 1);
     return;
@@ -315,7 +315,7 @@ static int sf_mime_class(httrackp *opt, const char *path, char *mime,
   return 0;
 }
 
-/* readfile2_utf8() refusing anything code64() could not size. */
+/* readfile2_utf8() with the base64 size limit applied. */
 static char *sf_readfile(const char *path, size_t *size) {
   LLint len = 0;
   char *adr;
