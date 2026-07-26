@@ -208,6 +208,9 @@ rather than on <tt>url</tt> when a mirror is known to carry legacy-charset URLs.
 <li>A file listed under <tt>gone</tt> is only deleted when <tt>--purge-old</tt> is
 on. Left in place it drops out of the mirror's index, so it is reported once and
 not again.</li>
+<li>A run that transfers no data at all is rolled back: HTTrack restores the
+previous cache generation and leaves the previous report in place, so a lost
+connection does not overwrite a good report with an empty one.</li>
 <li>Content diffs, and keeping the previous copy of a changed page, are out of
 scope: both change what a mirror directory contains.</li>
 </ul>

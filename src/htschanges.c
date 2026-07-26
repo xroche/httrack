@@ -512,7 +512,10 @@ void hts_changes_report(httrackp *opt, String *out) {
 }
 
 void hts_changes_close_opt(httrackp *opt) {
-  hts_changes *changes = (hts_changes *) opt->changes_state;
+  /* changes_get(), not the raw field: a crawl that mirrored nothing still owes
+     the user a report, and a stale one from the previous run must not survive
+     on disk as if it described this one. */
+  hts_changes *changes = changes_get(opt);
   char catbuff[CATBUFF_SIZE];
   const char *path;
   String report = STRING_EMPTY;
