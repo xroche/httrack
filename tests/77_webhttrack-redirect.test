@@ -61,10 +61,28 @@ stop() {
     srv=
 }
 
-# POST redirect=$1 to 127.0.0.1:$2, print the raw response headers.
+# The session id gates the request body, so a POST has to carry one. The server
+# renders it into every form, which is where a browser picks it up too.
+scrape_sid() {
+    python3 -c 'import socket, sys
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+s.sendall(b"GET /server/index.html HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+out = b""
+while True:
+    b = s.recv(65536)
+    if not b:
+        break
+    out += b
+s.close()
+sys.stdout.write(out.decode("latin-1"))' "$1" |
+        sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' | head -1
+}
+
+# POST redirect=$1 to 127.0.0.1:$2 with session id $3, print the raw headers.
 post_redirect() {
     python3 -c 'import socket, sys, urllib.parse
-body = "redirect=" + urllib.parse.quote(sys.argv[1], safe="")
+body = ("sid=" + sys.argv[3] + "&redirect="
+        + urllib.parse.quote(sys.argv[1], safe=""))
 req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
        "Content-type: application/x-www-form-urlencoded\r\n"
        "Content-length: %d\r\n\r\n%s" % (len(body), body))
@@ -77,7 +95,7 @@ while True:
         break
     out += b
 s.close()
-sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2"
+sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2" "$3"
 }
 
 portof() { echo "${1##*:}" | tr -d /; }
@@ -102,7 +120,10 @@ finally:
 # interior byte all stay visible.
 long=$(python3 -c 'print("".join(chr(33 + i % 90) for i in range(4097)))')
 url=$(start)
-resp=$(post_redirect "${long}" "$(portof "${url}")") ||
+port=$(portof "${url}")
+sid=$(scrape_sid "${port}")
+test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid (got '${sid}')"
+resp=$(post_redirect "${long}" "${port}" "${sid}") ||
     fail "no response to an oversized redirect value"
 stop
 loc=$(printf '%s' "${resp}" | sed -n 's/^Location: //p' | tr -d '\r')
@@ -112,8 +133,10 @@ test "${loc}" = "${long}" ||
 # CR/LF must suppress the header outright. Sanitising it instead would keep the
 # grep for an injected header quiet while still emitting a mangled Location.
 url=$(start)
+port=$(portof "${url}")
+sid=$(scrape_sid "${port}")
 resp=$(post_redirect '/foo
-X-Injected: pwned' "$(portof "${url}")") || fail "no response to a CRLF redirect value"
+X-Injected: pwned' "${port}" "${sid}") || fail "no response to a CRLF redirect value"
 stop
 printf '%s' "${resp}" | grep -qi 'X-Injected' &&
     fail "CRLF in the redirect value reached the response"
