@@ -27,11 +27,9 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file asset inliner. See htssinglefile.h.
-   The pass runs on the finished tree, so every reference it sees has already
-   been made relative by the engine and resolving one is path arithmetic
-   against the page's own directory, clamped to the mirror root. Anything it
-   cannot resolve that way (absolute, scheme-bearing, already data:) is left
-   untouched, which is also what makes a second --update run a no-op. */
+   Runs on the finished tree, so resolving a reference is path arithmetic
+   clamped to the mirror root; anything else (absolute, scheme-bearing, already
+   data:) is left alone, which is what makes a second --update run a no-op. */
 /* ------------------------------------------------------------ */
 
 #define HTS_INTERNAL_BYTECODE
@@ -191,8 +189,9 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
    '/'-separated path under ctx->root naming an existing regular file. Returns
    HTS_FALSE for anything not resolvable that way: a fragment, an absolute or
    scheme-bearing URL (which covers data:), a reference climbing out of the
-   mirror, or a missing target. The containment is lexical, so a symlink the
-   mirror already holds is followed (the engine never writes one). */
+   mirror, or a missing target. Containment is lexical, so a symlink planted in
+   the output directory beforehand is followed; no fetched content can create
+   one. */
 static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
                               const char *ref, size_t reflen, String *out) {
   char raw[SF_MAX_REF];
@@ -389,9 +388,9 @@ static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
 /* Replace the reference [ref,ref+reflen), resolved against base_dir, with its
    data: URI appended to out. classes gates the acceptable MIME classes;
    fallback_mime types an asset whose class cannot be guessed (NULL: give up).
-   rebase_dir, when set, makes an asset that could not be inlined fall back to
-   its path relative to that directory instead of to the caller's text, which
-   is what keeps a reference inside an inlined stylesheet resolvable.
+   rebase_dir re-expresses an un-inlinable asset relative to that directory.
+   A data: URL's path is opaque, so nothing relative inside an inlined
+   stylesheet resolves anyway; this only aims it at a lenient resolver's base.
    Returns HTS_TRUE if out received a replacement. */
 static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
                              size_t reflen, int classes,
@@ -429,6 +428,9 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   body = sf_readfile(StringBuff(path), &body_len);
   if (body == NULL)
     goto fallback;
+  /* Charged before the nested rewrite: an @import chain otherwise spends what
+     its ancestors already claimed, and the budget ends up negative. */
+  ctx->budget -= size;
   /* Encode into a scratch String: a failed encode must leave out untouched,
      not a truncated "data:...;base64," with no payload. */
   {
@@ -460,11 +462,11 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   }
   freet(body);
   if (done) {
-    ctx->budget -= size;
     ctx->inlined++;
     StringFree(path);
     return HTS_TRUE;
   }
+  ctx->budget += size;
 
 fallback:
   if (rebase_dir != NULL) {
@@ -679,9 +681,11 @@ static void sf_rewrite_srcset(sf_ctx *ctx, const char *v, size_t len,
 }
 
 /* (tag, attribute) pairs naming an inlinable asset; a NULL tag matches any.
-   <a href> and <iframe src> are absent and <source src> is gated on an image
-   type, so pages and media keep ordinary links. <link href> is decided from
-   its rel instead (sf_link_classes). */
+   Deliberately absent though hts_detect[] downloads them: a@href, iframe@src
+   and longdesc name pages, dynsrc and non-image source@src name media,
+   track@src has no inlinable MIME class, usemap is a same-document fragment,
+   archive lists applet jars. link@href is decided from its rel
+   (sf_link_classes); base@href needs no rule, htsparse drops it when saving. */
 static const struct sf_attr_rule {
   const char *tag;
   const char *attr;
@@ -696,7 +700,14 @@ static const struct sf_attr_rule {
     {"video", "poster", SF_C_IMAGE, SF_V_URL},
     {"image", "href", SF_C_IMAGE, SF_V_URL},
     {"image", "xlink:href", SF_C_IMAGE, SF_V_URL},
+    {"object", "data", SF_C_IMAGE, SF_V_URL},
+    {"embed", "src", SF_C_IMAGE, SF_V_URL},
     {"script", "src", SF_C_JS, SF_V_URL},
+    /* Lazy loading: src is a placeholder and the real image rides one of
+       these. The image class keeps a lazy <iframe> or <script> a link. */
+    {NULL, "data-src", SF_C_IMAGE, SF_V_URL},
+    {NULL, "data-srcset", SF_C_IMAGE, SF_V_SRCSET},
+    {NULL, "lowsrc", SF_C_IMAGE, SF_V_URL},
     {NULL, "background", SF_C_IMAGE, SF_V_URL},
     {NULL, "style", 0, SF_V_CSS},
 };
@@ -1022,7 +1033,8 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
 
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
                                     const char *page_path, const char *html,
-                                    size_t html_len, String *out) {
+                                    size_t html_len, LLint page_budget,
+                                    String *out) {
   String nroot = STRING_EMPTY;
   String npage = STRING_EMPTY;
   String dir = STRING_EMPTY;
@@ -1037,7 +1049,7 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   ctx.root_len = StringLength(nroot);
   ctx.page_dir = StringBuff(dir);
   ctx.warn_budget = &budget;
-  ctx.budget = SINGLEFILE_MAX_PAGE_SIZE;
+  ctx.budget = page_budget;
   ctx.inlined = 0;
   /* A UTF-16/32 page is not ASCII-delimited, so byte scanning would corrupt
      it; every ASCII-compatible charset is safe. */
@@ -1067,7 +1079,8 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
   if (html == NULL)
     return HTS_FALSE;
   StringClear(out);
-  ok = singlefile_rewrite_html(opt, root, page_path, html, len, &out);
+  ok = singlefile_rewrite_html(opt, root, page_path, html, len,
+                               SINGLEFILE_MAX_PAGE_SIZE, &out);
   freet(html);
   if (!ok) {
     StringFree(out);
@@ -1088,6 +1101,13 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
       ok = HTS_FALSE;
     if (fclose(fp) != 0)
       ok = HTS_FALSE;
+#ifndef _WIN32
+    /* The spool bypassed filecreate(), which is what chmods every other
+       mirrored file; without this the page keeps the umask's mode. */
+    if (ok)
+      (void) chmod(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)),
+                   HTS_ACCESS_FILE);
+#endif
     if (ok) {
       /* RENAME does not clobber an existing target on Windows. */
       if (RENAME(StringBuff(tmp), page_path) != 0) {

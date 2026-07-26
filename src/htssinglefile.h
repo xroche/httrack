@@ -28,8 +28,11 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 /* --single-file: post-mirror pass embedding each page's assets as data: URIs.
    Internal, not installed. Unlike -%M (one MHT archive for the whole mirror)
-   this rewrites the saved pages in place and keeps page-to-page links
-   relative, so the mirror stays browsable and every page also stands alone. */
+   it rewrites the saved pages in place and keeps page-to-page links relative,
+   so the mirror stays browsable and every page also stands alone.
+   Limitation: an inlined stylesheet becomes a data: URL, whose path is opaque,
+   so an asset inside it that stayed a link (over the cap) no longer resolves.
+   Raise --single-file-max-size past it to inline it too. */
 /* ------------------------------------------------------------ */
 
 #ifndef HTS_SINGLEFILE_DEFH
@@ -59,12 +62,15 @@ void singlefile_process_mirror(httrackp *opt);
 /* Rewrite one HTML document held in memory, appending the result to out.
    root is the mirror directory that references may not escape; page_path is
    the document's own path under it (both UTF-8, '/' or native separators).
+   page_budget caps the total inlined bytes, since nested @import fans out
+   multiplicatively; the mirror pass passes SINGLEFILE_MAX_PAGE_SIZE.
    Returns HTS_TRUE if at least one reference was replaced; out may still
    differ from the input when that is HTS_FALSE, since a style or srcset value
    is re-serialized in place. */
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
                                     const char *page_path, const char *html,
-                                    size_t html_len, String *out);
+                                    size_t html_len, LLint page_budget,
+                                    String *out);
 
 /* singlefile_rewrite_html() over the file at page_path, rewritten in place.
    Returns HTS_TRUE if the file changed. */

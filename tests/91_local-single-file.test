@@ -1,7 +1,6 @@
 #!/bin/bash
-# Issue #713: --single-file rewrites the mirrored pages so their assets ride
-# along as data: URIs. End to end over a real crawl, with the payloads decoded
-# and compared against what the server actually served.
+# Issue #713: --single-file inlines each page's assets as data: URIs. End to
+# end over a real crawl, decoding the payloads against what the server served.
 set -e
 
 : "${top_srcdir:=..}"
@@ -35,6 +34,7 @@ cat >"${doc}/index.html" <<'EOF'
 </head><body>
 <img src="pixel.svg" alt="p">
 <img src="big.svg" alt="b">
+<img src="pixel.svg" data-src="lazy.svg" alt="l">
 <script src="app.js"></script>
 <a href="other.html">other</a>
 </body></html>
@@ -52,6 +52,8 @@ EOF
 printf 'var app = 1;\n' >"${doc}/app.js"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
     >"${doc}/pixel.svg"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n' \
+    >"${doc}/lazy.svg"
 {
     printf '<svg xmlns="http://www.w3.org/2000/svg"><!--'
     head -c 20000 /dev/zero | tr '\0' 'x'
@@ -133,6 +135,22 @@ extract "$page" "application/x-javascript" "${tmpdir}/got.js" || {
 }
 cmp -s "${doc}/app.js" "${tmpdir}/got.js" || {
     echo "FAIL: inlined script differs from the served file"
+    exit 1
+}
+echo OK
+
+printf '[lazy-loaded image inlined] ..\t'
+# src is the placeholder a real page ships; the asset rides data-src.
+grep -q 'data-src="data:image/svg+xml;base64,' "$page" || {
+    echo "FAIL: data-src was not inlined"
+    exit 1
+}
+if grep -q 'data-src="lazy.svg"' "$page"; then
+    echo "FAIL: data-src kept its link"
+    exit 1
+fi
+test -f "${out}/127.0.0.1_${port}/lazy.svg" || {
+    echo "FAIL: the lazy image was never downloaded, so nothing was proven"
     exit 1
 }
 echo OK
@@ -245,6 +263,31 @@ if grep -q 'src="big.svg"' "$badpage"; then
 fi
 echo OK
 
+printf '[the rewritten page keeps the mirror file mode] ..\t'
+# The rewrite spools to a temp and renames, bypassing the engine's chmod.
+if is_windows; then
+    echo "SKIP (no POSIX file modes)"
+else
+    umaskdir="${tmpdir}/umask"
+    mkdir "$umaskdir"
+    (
+        umask 077
+        httrack -O "$umaskdir" --quiet --disable-security-limits --robots=0 \
+            --timeout=30 --retries=0 --single-file "${base}/index.html" \
+            >"${tmpdir}/log5" 2>&1
+    )
+    umaskroot="${umaskdir}/127.0.0.1_${port}"
+    mode() { "$python" -c 'import os,sys
+print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
+    pagemode=$(mode "${umaskroot}/index.html")
+    assetmode=$(mode "${umaskroot}/big.svg")
+    test "$pagemode" = "$assetmode" || {
+        echo "FAIL: page is $pagemode, the asset beside it is $assetmode"
+        exit 1
+    }
+    echo OK
+fi
+
 # --- the rewriter in isolation, over a hand-built mirror --------------------
 # After the crawl assertions, so a failure here cannot hide them: the two cover
 # different ground (this one reaches media, anchors and the mirror-root clamp).
@@ -261,12 +304,23 @@ esac
 # --- the web GUI must emit the same options ---------------------------------
 # The Windows job builds httrack.exe only and reaches this file through its
 # *_local-*.test glob, so the GUI half has to stand down there rather than fail.
+distdir=$(cd "${top_srcdir}" && pwd)
+printf '[project reload maps the keys back] ..\t'
+grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || {
+    echo "FAIL: step2.html does not restore SingleFile"
+    exit 1
+}
+grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.html" || {
+    echo "FAIL: step2.html does not restore SingleFileMaxSize"
+    exit 1
+}
+echo OK
+
 printf '[webhttrack renders the options] ..\t'
 if ! command -v htsserver >/dev/null; then
     echo "SKIP (no htsserver in PATH)"
-    exit 0
+    exit 77
 fi
-distdir=$(cd "${top_srcdir}" && pwd)
 sport=$("$python" -c 'import socket
 s = socket.socket()
 s.bind(("127.0.0.1", 0))
@@ -322,15 +376,4 @@ for want in ("\nSingleFile=1\n", "\nSingleFileMaxSize=5000\n"):
     if want not in ini:
         sys.exit("FAIL: %r missing from winprofile.ini\n%s" % (want, ini))
 PY
-echo OK
-
-printf '[project reload maps the keys back] ..\t'
-grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || {
-    echo "FAIL: step2.html does not restore SingleFile"
-    exit 1
-}
-grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.html" || {
-    echo "FAIL: step2.html does not restore SingleFileMaxSize"
-    exit 1
-}
 echo OK
