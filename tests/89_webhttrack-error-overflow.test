@@ -20,6 +20,9 @@ command -v python3 >/dev/null || {
     exit 77
 }
 
+# ERROR_MESSAGE_MAX - 1 in htsserver.c.
+msgmax=1023
+
 srv=
 log=$(mktemp)
 base=$(mktemp -d)
@@ -45,9 +48,12 @@ start() {
     port=$(freeport)
     : >"${log}"
     (
-        trap '' TERM TTOU
-        exec htsserver "${distdir}/" --port "${port}" >"${log}" 2>&1
-    ) &
+        trap '' TERM TTOU XFSZ
+        # Caps regular-file writes, which is how the failing-write branch below
+        # is reached without /dev/full; the announce rides a pipe, exempt.
+        ulimit -f 8
+        exec htsserver "${distdir}/" --port "${port}" 2>&1
+    ) | cat >"${log}" &
     for _ in $(seq 1 40); do
         url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
         sleep 0.25
@@ -100,8 +106,18 @@ padpath() {
     printf '%s/%0*d' "${p}" "${last}" 0
 }
 
-# Text of the error page, which renders whichever message the save left behind.
-errorpage() { get "$1" /server/error.html; }
+# Fail unless the error page renders the message opening with $1 about project
+# path $2, clipped to msgmax. error.html puts ${error} alone on its own line.
+check_clipped() {
+    local prefix=$1 full=$((${#1} + ${#2})) page line
+    test "${full}" -gt "${msgmax}" ||
+        fail "a ${full}-byte message fits in ${msgmax}: it cannot show a clip"
+    page=$(get "${port}" /server/error.html | tr -d '\r')
+    line=$(printf '%s\n' "${page}" | grep "^${prefix}") ||
+        fail "the error page does not report: ${prefix}"
+    test "${#line}" -eq "${msgmax}" ||
+        fail "the message rendered ${#line} bytes, want ${full} clipped to ${msgmax}"
+}
 
 url=$(start)
 port=$(portof "${url}")
@@ -117,40 +133,30 @@ save() {
     post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=$2&path=$1&projname=$3"
 }
 
-# structcheck() refuses a path over HTS_URLMAXSIZE, and reporting it costs 44
-# bytes more. The marker rides the path: the page prints projname regardless.
-tail_marker=ENDMARKER
-path=$(padpath "${base}/nodir" $((1100 - 2 - ${#tail_marker})))${tail_marker}
+# A project path too long to be created at all.
+path=$(padpath "${base}/nodir" 1098)
 save "${path}" x p >/dev/null
 alive "${srv}" ||
     fail "an over-long project path crashed the server: $(cat "${log}")"
-page=$(errorpage "${port}")
-echo "${page}" | grep -q 'Unable to create the directory structure' ||
-    fail "the refused save did not report the directory structure failure"
-echo "${page}" | grep -q "${tail_marker}" &&
-    fail "the whole path reached the error page, so it was never clipped"
+check_clipped "Unable to create the directory structure in " "${path}/p"
 
-# Same overflow one branch down: structcheck() lets a non-directory hts-cache
-# through, and opening winprofile.ini under it then fails with ENOTDIR.
-path=$(padpath "${base}/isdir" $((995 - 2)))
+# A creatable project path whose hts-cache is not a directory, so the init file
+# under it cannot be opened.
+path=$(padpath "${base}/isdir" 993)
 mkdir -p "${path}/p"
 ln -s /dev/null "${path}/p/hts-cache"
 save "${path}" x p >/dev/null
 alive "${srv}" || fail "an unwritable init file crashed the server: $(cat "${log}")"
-errorpage "${port}" | grep -q 'Unable to create the init file' ||
-    fail "the refused save did not report the init file failure"
+check_clipped "Unable to create the init file " "${path}/p"
 
-# Third message, needing a write that fails after a successful open.
-if test -c /dev/full; then
-    path=$(padpath "${base}/full" $((995 - 2)))
-    mkdir -p "${path}/p/hts-cache"
-    ln -s /dev/full "${path}/p/hts-cache/winprofile.ini"
-    # Over stdio's buffer, so the failing write happens inside fwrite().
-    save "${path}" "$(printf '%08192d' 0)" p >/dev/null
-    alive "${srv}" || fail "a short init file write crashed the server: $(cat "${log}")"
-    errorpage "${port}" | grep -q 'Unable to write' ||
-        fail "the short write did not report the init file write failure"
-fi
+# A profile too large for the server's file-size limit, so the init file opens
+# and the write then fails.
+path=$(padpath "${base}/full" 993)
+mkdir -p "${path}/p/hts-cache"
+profile=$(printf '%016384d' 0)
+save "${path}" "${profile}" p >/dev/null
+alive "${srv}" || fail "a short init file write crashed the server: $(cat "${log}")"
+check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
 
 get "${port}" /server/index.html | grep -q '200 OK' ||
     fail "the server stopped answering after the refused saves"
