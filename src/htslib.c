@@ -2587,13 +2587,15 @@ void deletesoc(T_SOC soc) {
     if (closesocket(soc) != 0) {
       int err = WSAGetLastError();
 
-      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+      fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
+              strerror(err));
     }
 #else
     if (close(soc) != 0) {
       const int err = errno;
 
-      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+      fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
+              strerror(err));
     }
 #endif
 #if HTS_WIDE_DEBUG

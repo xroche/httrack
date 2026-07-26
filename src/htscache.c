@@ -629,8 +629,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                 // File exists on disk with declared cache name (this is expected!)
                 if (fexist_utf8(fconv(catbuff, sizeof(catbuff), previous_save))) {       // un fichier existe déja
                   // Expected size ?
-                  const size_t fsize =
-                    fsize_utf8(fconv(catbuff, sizeof(catbuff), previous_save));
+                  const LLint fsize = fsize_utf8(
+                      fconv(catbuff, sizeof(catbuff), previous_save));
                   if (fsize == r.size) {
                     // Target name is the previous name, and the file looks good: nothing to do!
                     if (strcmp(previous_save, target_save) == 0) {
@@ -666,7 +666,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                 // Suppose a broken mirror, with a file being renamed: OK
                 else if (fexist_utf8(fconv(catbuff, sizeof(catbuff), target_save))) {
                   // Expected size ?
-                  const size_t fsize = fsize_utf8(fconv(catbuff, sizeof(catbuff), target_save));
+                  const LLint fsize =
+                      fsize_utf8(fconv(catbuff, sizeof(catbuff), target_save));
 
                   if (fsize == r.size) {
                     // So far so good

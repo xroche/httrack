@@ -336,16 +336,20 @@ typedef int INTsys;
 #endif
 
 /* Socket-handle type. An unsigned integer wide enough for a Windows SOCKET;
-   a plain int file descriptor on POSIX. */
+   a plain int file descriptor on POSIX. T_SOCP is its printf conversion,
+   '%' included: unsigned __int64 on Win64 must not be printed with "%d". */
 #ifdef _WIN32
 #if defined(_WIN64)
 
 typedef unsigned __int64 T_SOC;
+#define T_SOCP "%" PRIu64
 #else
 typedef unsigned __int32 T_SOC;
+#define T_SOCP "%" PRIu32
 #endif
 #else
 typedef int T_SOC;
+#define T_SOCP "%d"
 #endif
 
 /* Buffer size for a printed network address (IPv4 or IPv6, NUL included). */

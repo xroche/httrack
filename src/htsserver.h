@@ -43,8 +43,11 @@ Please visit our Website: http://www.httrack.com
 
 // Fonctions
 void socinput(T_SOC soc, char *s, int max);
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort);
-T_SOC smallserver_init(int *port, char *adr);
+/* Listen on bindAddr, or every interface if NULL/empty; adr (>= 258 bytes) gets
+   the address to advertise. INVALID_SOCKET on error. */
+T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
+                           const char *bindAddr);
+T_SOC smallserver_init(int *port, char *adr, const char *bindAddr);
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path);
 
 #define CATCH_RESPONSE \

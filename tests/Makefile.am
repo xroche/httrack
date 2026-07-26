@@ -64,6 +64,7 @@ TESTS = \
 	01_engine-reconcile.test \
 	01_engine-expandhome.test \
 	01_engine-fsize.test \
+	01_engine-growsize.test \
 	01_engine-redirect.test \
 	01_engine-longpath-io.test \
 	01_engine-mirror-io.test \
@@ -172,6 +173,8 @@ TESTS = \
 	74_local-warc-verbatim.test \
 	75_engine-longpath-posix.test \
 	76_cli-resize.test \
-	77_local-proxytrack-webdav-mime.test
+	77_webhttrack-redirect.test \
+	78_webhttrack-sid.test \
+	79_local-proxytrack-webdav-mime.test
 
 CLEANFILES = check-network_sh.cache

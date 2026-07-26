@@ -607,6 +607,21 @@ static HTS_UNUSED size_t llint_to_size_t(LLint o) {
   }
 }
 
+/* Capacity for @p used bytes plus @p extra more plus @p slack spare;
+   (size_t) -1 if the total exceeds (size_t) -2 or @p extra is negative
+   (llint_to_size_t() would map that to a huge valid-looking size). */
+static HTS_UNUSED size_t llint_grow_size_t(size_t used, LLint extra,
+                                           size_t slack) {
+  const size_t max = (size_t) -2; /* (size_t) -1 is the error value */
+  const size_t e = extra >= 0 ? llint_to_size_t(extra) : (size_t) -1;
+
+  if (e == (size_t) -1 || used > max || slack > max - used ||
+      e > max - used - slack) {
+    return (size_t) -1;
+  }
+  return used + e + slack;
+}
+
 /* dirent() compatibility */
 #ifdef _WIN32
 /* Holds a UTF-8 d_name: MAX_PATH (260) UTF-16 units expand to <=3 bytes each.
