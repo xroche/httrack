@@ -1440,7 +1440,7 @@ int cache_brstr(char *adr, char *s, size_t s_size) {
 
 /* binput bounded to a NUL-terminated buffer: refuse to start a read at or
    past `end`, so a prior over-advance can't walk a cache-index parse OOB. */
-int cache_binput(char *adr, const char *end, char *s, int max) {
+int cache_binput(const char *adr, const char *end, char *s, int max) {
   if (adr >= end) {
     s[0] = '\0';
     return 0;

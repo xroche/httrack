@@ -3006,7 +3006,7 @@ int finput(T_SOC fd, char *s, int max) {
 }
 
 // Like linput, but in memory (optimized)
-int binput(char *buff, char *s, int max) {
+int binput(const char *buff, char *s, int max) {
   int count = 0;
   int destCount = 0;
 

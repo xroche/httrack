@@ -262,7 +262,7 @@ HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 int finput(T_SOC fd, char *s, int max);
-int binput(char *buff, char *s, int max);
+int binput(const char *buff, char *s, int max);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);
 int linputsoc_t(T_SOC soc, char *s, int max, int timeout);

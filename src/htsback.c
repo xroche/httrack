@@ -2854,7 +2854,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                const char* hostname = jump_protocol_const(back[i].url_adr);
+                /* non-const twin: the OpenSSL macro casts the qualifier away */
+                char *hostname = jump_protocol(back[i].url_adr);
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
                 SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
