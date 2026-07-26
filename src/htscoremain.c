@@ -145,7 +145,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
   char *argv_firsturl = NULL;   // utilisé pour nommage par défaut
   char *url = NULL;             // URLS séparées par un espace
-  int url_sz = 65535;
+  size_t url_sz = 65535;
 
   // the parametres
   int httrack_logmode = 3;      // ONE log file
@@ -224,21 +224,22 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
   /* create x_argvblk buffer for transformed command line */
   {
-    int current_size = 0;
-    int size;
+    size_t current_size = 0;
+    const LLint size = fsize("config");
+    size_t blk_size;
     int na;
 
     for(na = 0; na < argc; na++)
-      current_size += (int) (strlen(argv[na]) + 1);
-    if ((size = fsize("config")) > 0)
-      current_size += size;
-    x_argvblk = (char *) malloct(current_size + 32768);
+      current_size += strlen(argv[na]) + 1;
+    /* a huge file named "config" must saturate, not wrap, the capacity */
+    blk_size = llint_grow_size_t(current_size, size > 0 ? size : 0, 32768);
+    x_argvblk = blk_size != (size_t) -1 ? (char *) malloct(blk_size) : NULL;
     if (x_argvblk == NULL) {
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
       return -1;
     }
-    x_argvblk_size = (size_t) (current_size + 32768);
+    x_argvblk_size = blk_size;
     x_argvblk[0] = '\0';
     x_ptr = 0;
 
@@ -1456,20 +1457,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     FILE *fp = FOPEN(argv[na], "rb");
 
                     if (fp != NULL) {
-                      int cl = (int) strlen(url);
+                      size_t cl = strlen(url);
+                      const size_t fzs = llint_to_size_t(fz);
+                      const size_t capa = llint_grow_size_t(cl, fz, 8192);
 
-                      ensureUrlCapacity(url, url_sz, cl + fz + 8192);
+                      if (capa == (size_t) -1) {
+                        fclose(fp);
+                        HTS_PANIC_PRINTF("File url list too large");
+                        htsmain_free();
+                        return -1;
+                      }
+                      ensureUrlCapacity(url, url_sz, capa);
                       if (cl > 0) {     /* don't stick! (3.43) */
                         url[cl] = ' ';
                         cl++;
                       }
-                      if (fread(url + cl, 1, fz, fp) != fz) {
+                      if (fread(url + cl, 1, fzs, fp) != fzs) {
+                        fclose(fp);
                         HTS_PANIC_PRINTF("File url list could not be read");
                         htsmain_free();
                         return -1;
                       }
                       fclose(fp);
-                      *(url + cl + fz) = '\0';
+                      *(url + cl + fzs) = '\0';
                     }
                   }
                 }
@@ -2296,8 +2306,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       } else {                  // URL/filters
         char catbuff[CATBUFF_SIZE];
-        const int urlSize = (int) strlen(argv[na]);
-        const int capa = (int) (strlen(url) + urlSize + 32);
+        const size_t urlSize = strlen(argv[na]);
+        const size_t capa = strlen(url) + urlSize + 32;
 
         assertf(urlSize < HTS_URLMAXSIZE);
         if (urlSize < HTS_URLMAXSIZE) {

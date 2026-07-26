@@ -116,6 +116,15 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))
 
+/* Source capacity for the buff() family, (size_t)-1 when unknown; sizeof of the
+   TYPE keeps a decayed operand ("buf + 1") off -Wsizeof-array-decay. */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define HTS_SIZEOF_SRC_(B)                                                     \
+  (HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(__typeof__(B)))
+#else
+#define HTS_SIZEOF_SRC_(B) (HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B))
+#endif
+
 /* Compile-time checks. */
 static HTS_UNUSED void htssafe_compile_time_check_(void) {
   char array[32];
@@ -205,19 +214,17 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 #define strncatbuff(A, B, N)                                                   \
-  __builtin_choose_expr(                                                       \
-      HTS_IS_CHAR_BUFFER(A),                                                   \
-      strncat_safe_(A, sizeof(A), B,                                           \
-                    HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N,    \
-                    "overflow while appending '" #B "' to '" #A "'", __FILE__, \
-                    __LINE__),                                                 \
-      strncatbuff_ptr_((A), (B), (N)))
+  __builtin_choose_expr(HTS_IS_CHAR_BUFFER(A),                                 \
+                        strncat_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B), N,  \
+                                      "overflow while appending '" #B          \
+                                      "' to '" #A "'",                         \
+                                      __FILE__, __LINE__),                     \
+                        strncatbuff_ptr_((A), (B), (N)))
 #else
 #define strncatbuff(A, B, N)                                                   \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
        ? strncat(A, B, N)                                                      \
-       : strncat_safe_(A, sizeof(A), B,                                        \
-                       HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
+       : strncat_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B), N,                 \
                        "overflow while appending '" #B "' to '" #A "'",        \
                        __FILE__, __LINE__))
 #endif
@@ -232,9 +239,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #define strcatbuff(A, B)                                                       \
   __builtin_choose_expr(                                                       \
       HTS_IS_CHAR_BUFFER(A),                                                   \
-      strncat_safe_(A, sizeof(A), B,                                           \
-                    HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),       \
-                    (size_t) -1,                                               \
+      strncat_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B), (size_t) -1,          \
                     "overflow while appending '" #B "' to '" #A "'", __FILE__, \
                     __LINE__),                                                 \
       strcatbuff_ptr_((A), (B)))
@@ -242,9 +247,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #define strcatbuff(A, B)                                                       \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
        ? strcat(A, B)                                                          \
-       : strncat_safe_(A, sizeof(A), B,                                        \
-                       HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),    \
-                       (size_t) -1,                                            \
+       : strncat_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B), (size_t) -1,       \
                        "overflow while appending '" #B "' to '" #A "'",        \
                        __FILE__, __LINE__))
 #endif
@@ -257,19 +260,17 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 #define strcpybuff(A, B)                                                       \
-  __builtin_choose_expr(                                                       \
-      HTS_IS_CHAR_BUFFER(A),                                                   \
-      strcpy_safe_(A, sizeof(A), B,                                            \
-                   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),        \
-                   "overflow while copying '" #B "' to '" #A "'", __FILE__,    \
-                   __LINE__),                                                  \
-      strcpybuff_ptr_((A), (B)))
+  __builtin_choose_expr(HTS_IS_CHAR_BUFFER(A),                                 \
+                        strcpy_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B),      \
+                                     "overflow while copying '" #B "' to '" #A \
+                                     "'",                                      \
+                                     __FILE__, __LINE__),                      \
+                        strcpybuff_ptr_((A), (B)))
 #else
 #define strcpybuff(A, B)                                                       \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
        ? strcpy(A, B)                                                          \
-       : strcpy_safe_(A, sizeof(A), B,                                         \
-                      HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),     \
+       : strcpy_safe_(A, sizeof(A), B, HTS_SIZEOF_SRC_(B),                     \
                       "overflow while copying '" #B "' to '" #A "'", __FILE__, \
                       __LINE__))
 #endif
@@ -286,24 +287,24 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * Append characters of "B" to "A", "A" having a maximum capacity of "S".
  */
 #define strlcatbuff(A, B, S)                                                   \
-  strncat_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),  \
-                (size_t) -1, "overflow while appending '" #B "' to '" #A "'",  \
-                __FILE__, __LINE__)
+  strncat_safe_(A, S, B, HTS_SIZEOF_SRC_(B), (size_t) -1,                      \
+                "overflow while appending '" #B "' to '" #A "'", __FILE__,     \
+                __LINE__)
 
 /**
  * Append at most "N" characters of "B" to "A", "A" having a maximum capacity
  * of "S".
  */
 #define strlncatbuff(A, B, S, N)                                               \
-  strncat_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),  \
-                N, "overflow while appending '" #B "' to '" #A "'", __FILE__,  \
+  strncat_safe_(A, S, B, HTS_SIZEOF_SRC_(B), N,                                \
+                "overflow while appending '" #B "' to '" #A "'", __FILE__,     \
                 __LINE__)
 
 /**
  * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
  */
 #define strlcpybuff(A, B, S)                                                   \
-  strcpy_safe_(A, S, B, HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B),   \
+  strcpy_safe_(A, S, B, HTS_SIZEOF_SRC_(B),                                    \
                "overflow while copying '" #B "' to '" #A "'", __FILE__,        \
                __LINE__)
 
@@ -422,7 +423,9 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
  */
 static HTS_INLINE HTS_UNUSED void htsbuff_catn(htsbuff *b, const char *s,
                                                size_t n) {
-  const size_t add = strnlen(s, n);
+  /* the (size_t)-1 "no limit" sentinel would reach strnlen as a bound past
+     PTRDIFF_MAX */
+  const size_t add = n != (size_t) -1 ? strnlen(s, n) : strlen(s);
   /* Overflow-safe: keep the (potentially huge) 'add' alone on one side. The
      maintained invariant len < cap makes 'cap - len' >= 1 (no underflow), so
      'add < cap - len' cannot wrap the way 'len + add < cap' could. */

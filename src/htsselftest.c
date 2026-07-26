@@ -482,6 +482,28 @@ static int string_safety_selftests(void) {
   if (strcmp(buf, "abcd") != 0)
     return 1;
 
+  /* A decayed source has no known capacity, so the whole tail must land; a
+     sizeof(char*) capacity would abort here instead. */
+  {
+    char src[32] = "0123456789abcdefghij";
+    char dst[32];
+
+    strcpybuff(dst, src + 1);
+    if (strcmp(dst, "123456789abcdefghij") != 0)
+      return 1;
+  }
+
+  /* Truncating append: stops at N without aborting, what the status-message
+     call sites rely on. */
+  {
+    char dst[10]; /* never sizeof(char*), or MSVC reads it as a pointer */
+
+    dst[0] = '\0';
+    strncatbuff(dst, "abcdefghijkl", sizeof(dst) - 1);
+    if (strcmp(dst, "abcdefghi") != 0)
+      return 1;
+  }
+
   /* strlcpybuff: explicit-capacity copy into a pointer destination, the form
      the migration moves toward */
   {
@@ -1406,6 +1428,14 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
       htsbuff b = htsbuff_array(small);
 
       htsbuff_cat(&b, src);
+    } else if (strcmp(argv[0], "overflow-src") == 0) {
+      /* Array source with no NUL: its capacity still comes from sizeof(), so
+         the bounded strlen aborts rather than running off the array. */
+      char nonul[6]; /* never sizeof(char*), per the note above */
+      char big[64];
+
+      memset(nonul, src[0], sizeof(nonul));
+      strcpybuff(big, nonul);
     } else {
       strcpybuff(small, src);
     }
@@ -2097,6 +2127,77 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "fsize: absent file is " LLintP ", expected -1\n", gone);
     rc = 1;
   }
+  return rc;
+}
+
+/* 4GB+100KB wraps to ~108KB through an int, and needs 33 unsigned bits. A
+   macro, not a static const: MSVC's C mode (/TC) rejects a const object
+   used inside another object's static initializer below (C2099). */
+#define HTS_ST_GROWSIZE_OVER32 (4LL * 1024 * 1024 * 1024 + 100 * 1024)
+
+/* llint_grow_size_t() sizes the buffer holding a whole -%S list file: the
+   result must be the exact 64-bit sum or a clean refusal, never a short one. */
+static int st_growsize(httrackp *opt, int argc, char **argv) {
+  enum { REFUSE, ACCEPT, WIDTH };
+
+  static const struct {
+    size_t used;
+    LLint extra;
+    size_t slack;
+    int want;
+  } cases[] = {
+      {0, 0, 0, ACCEPT},
+      {10, 100, 8192, ACCEPT},
+      {(size_t) -2 - 8, 4, 4, ACCEPT}, /* exact fit, no room to spare */
+      {(size_t) -2, 0, 0, ACCEPT},     /* largest representable capacity */
+      {0, -1, 0, REFUSE},              /* fsize() failure */
+      /* -1 already maps to SIZE_MAX; only this exercises the negative guard */
+      {0, -4096, 0, REFUSE},
+      {(size_t) -1, 1, 0, REFUSE},
+      {(size_t) -2, 0, 1, REFUSE},     /* slack alone overruns */
+      {(size_t) -1 - 8, 4, 4, REFUSE}, /* total would be the error value */
+      {(size_t) -1 - 8, 4, 8, REFUSE},
+      {0, HTS_ST_GROWSIZE_OVER32, 8192,
+       WIDTH}, /* 32-bit size_t can't hold these */
+      {10, HTS_ST_GROWSIZE_OVER32, 8192, WIDTH},
+  };
+
+  size_t k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const size_t used = cases[k].used, slack = cases[k].slack;
+    const LLint extra = cases[k].extra;
+    const size_t got = llint_grow_size_t(used, extra, slack);
+    const hts_boolean refused = got == (size_t) -1 ? HTS_TRUE : HTS_FALSE;
+    const hts_boolean exact =
+        !refused && extra >= 0 && got - used - slack == (size_t) extra;
+    hts_boolean ok;
+
+    switch (cases[k].want) {
+    case ACCEPT:
+      ok = exact;
+      break;
+    case REFUSE:
+      ok = refused;
+      break;
+    default:
+      ok = sizeof(size_t) >= sizeof(LLint) ? exact : refused;
+      break;
+    }
+    if (!ok) {
+      fprintf(stderr,
+              "growsize: grow(" LLintP ", " LLintP ", " LLintP ") = " LLintP
+              " (want %s)\n",
+              (LLint) used, extra, (LLint) slack, (LLint) got,
+              cases[k].want == REFUSE ? "refusal" : "exact sum");
+      rc = 1;
+    }
+  }
+  printf("growsize self-test %s\n", rc == 0 ? "OK" : "FAILED");
   return rc;
 }
 
@@ -4917,8 +5018,8 @@ static const struct selftest_entry {
      "webhttrack command-line to argv split (bounds, quoting)",
      st_cmdlinesplit},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
-    {"strsafe", "[overflow|overflow-buff [str]]", "bounded string-op self-test",
-     st_strsafe},
+    {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
+     "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
@@ -4948,6 +5049,8 @@ static const struct selftest_entry {
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
+    {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
+     st_growsize},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},

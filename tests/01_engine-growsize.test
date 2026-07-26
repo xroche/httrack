@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# Buffer capacity for a 64-bit file size ('httrack -#test=growsize'): a -%S list
+# file past 4GB must size its buffer exactly or be refused, never wrap.
+
+set -euo pipefail
+
+out=$(httrack -#test=growsize)
+echo "$out"
+test "$out" == "growsize self-test OK"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_growsize.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+
+echo '<html><body>hi</body></html>' >"$tmp/index.html"
+printf -- '-*/zzmarker*\n' >"$tmp/rules.txt"
+
+# the rules file lands in the URL/filter string, echoed back by the banner
+run=$(httrack -O "$tmp/out" --quiet -n "-%S" "$tmp/rules.txt" \
+    "file://$tmp/index.html" 2>&1) || true
+printf '%s\n' "$run" | grep -q 'zzmarker' || {
+    echo "FAIL: -%S rules file was not loaded"
+    printf '%s\n' "$run"
+    exit 1
+}

@@ -65,6 +65,7 @@ TESTS = \
 	01_engine-reconcile.test \
 	01_engine-expandhome.test \
 	01_engine-fsize.test \
+	01_engine-growsize.test \
 	01_engine-redirect.test \
 	01_engine-longpath-io.test \
 	01_engine-mirror-io.test \
@@ -148,6 +149,7 @@ TESTS = \
 	50_local-contentcodings.test \
 	51_local-update-codec.test \
 	52_local-socks5.test \
+	53_local-proxytrack-arc-reason.test \
 	53_local-proxytrack-cache-corrupt.test \
 	54_local-update-truncate-purge.test \
 	55_local-chunked.test \
@@ -174,6 +176,6 @@ TESTS = \
 	76_cli-resize.test \
 	77_webhttrack-redirect.test \
 	78_webhttrack-sid.test \
-	79_webhttrack-argescape.test
+	83_webhttrack-argescape.test
 
 CLEANFILES = check-network_sh.cache
