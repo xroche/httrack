@@ -8,6 +8,9 @@ set -euo pipefail
 testdir=$(cd "$(dirname "$0")" && pwd)
 distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
 distdir=$(cd "${distdir}" && pwd)
+# run_with_timeout/kill_tree: timeout(1) is absent on macOS
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -69,9 +72,12 @@ req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
        "Content-type: application/x-www-form-urlencoded\r\n"
        "Content-length: %d\r\n\r\n%s" % (len(body), body))
 s = socket.create_connection(("127.0.0.1", int(sys.argv[2])), 10)
+s.settimeout(20)
 s.sendall(req.encode())
 out = b""
-while True:
+# stop at the end of the header block: the server need not close the connection,
+# and an unbounded recv() hung the macOS runner for over an hour.
+while b"\r\n\r\n" not in out:
     b = s.recv(65536)
     if not b:
         break
@@ -145,9 +151,10 @@ else
         fail "--bind 0.0.0.0 did not take the wildcard (127.0.0.2:${port} ${alias_state})"
 fi
 
-# An empty --bind must not quietly fall back to every interface.
-out=$(htsserver "${distdir}/" --bind "" 2>&1 || true)
-printf '%s' "${out}" | grep -q -- "--bind needs an address" ||
-    fail "empty --bind not refused"
+# An empty --bind must not quietly fall back to every interface. Bounded: if it
+# were accepted the server would listen instead of exiting.
+run_with_timeout 15 htsserver "${distdir}/" --bind "" >"${log}" 2>&1 || true
+grep -q -- "--bind needs an address" "${log}" ||
+    fail "empty --bind not refused: $(cat "${log}")"
 
 echo "PASS"
