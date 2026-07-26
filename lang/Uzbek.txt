@@ -964,3 +964,7 @@ WARC archive name:
 WARC arxivi nomi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC arxivi uchun ixtiyoriy asosiy nom; chiqish katalogida avtomatik nomlash uchun bo'sh qoldiring.
+Report what changed since the previous mirror
+Oldingi nusxadan beri nima o’zgarganini xabar qilish
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+hts-changes.json ham yoziladi: unda ushbu yig’ish oldingi nusxaga nisbatan nimani yangi, o’zgargan, o’zgarmagan yoki yo’qolgan holda qoldirgani ro’yxati bo’ladi.

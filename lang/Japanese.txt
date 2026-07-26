@@ -964,3 +964,7 @@ WARC archive name:
 WARC アーカイブ名:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC アーカイブの任意のベース名。空欄にすると出力ディレクトリ内で自動的に名前が付けられます。
+Report what changed since the previous mirror
+前回のミラーからの変更点を報告する
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+hts-changes.json も書き出し、前回のミラーと比べて新規、変更、変更なし、消滅となったものを一覧にします。

@@ -964,3 +964,7 @@ WARC archive name:
 Име на WARC архивата:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Изборно основно име за WARC архивата; оставете празно за автоматско именување во излезниот директориум.
+Report what changed since the previous mirror
+Извести што е променето од претходното огледало
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Запиши и hts-changes.json со список на тоа што е ново, променето, непроменето или исчезнато во однос на претходното огледало.
