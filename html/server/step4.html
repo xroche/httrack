@@ -122,8 +122,8 @@ httrack \
 	--build-top-index \
 	${test:todo:--mirror:--mirror:--mirror-wizard:--get:--mirrorlinks:--testlinks:--continue:--update}
 	${urls}
-	${test:filelist:-%L "}${filelist}${test:filelist:"}
-	--path "${html:path}/${html:projname}" 
+	${test:filelist:-%L "}${arg:filelist}${test:filelist:"}
+	--path "${arg:path}/${arg:projname}" 
 \
 	${test:parseall:--near}
 	${test:link:--test}
@@ -131,7 +131,7 @@ httrack \
 	${test:htmlfirst::--priority=7}
 \
 ${do:if-not-empty:BuildString}
-	--structure "${BuildString}"
+	--structure "${arg:BuildString}"
 ${do:end-if}
 	${test:build:-N0:-N0:-N1:-N2:-N3:-N4:-N5:-N100:-N101:-N102:-N103:-N104:-N105:-N99:-N199:}
 \
@@ -169,8 +169,8 @@ ${do:end-if}
 	${test:maxconn:--connection-per-second=}${maxconn}
 	${test:maxlinks:--advanced-maxlinks=}${maxlinks}
 \
-	--user-agent "${html:user}"
-	--footer "${html:footer}"
+	--user-agent "${arg:user}"
+	--footer "${arg:footer}"
 \
 	${url2}
 \
@@ -181,20 +181,20 @@ ${do:end-if}
 	${test:keepwww:--keep-www-prefix}
 	${test:keepslashes:--keep-double-slashes}
 	${test:keepqueryorder:--keep-query-order}
-	${test:cookiesfile:--cookies-file "}${html:cookiesfile}${test:cookiesfile:"}
-	${test:pausefiles:--pause "}${pausefiles}${test:pausefiles:"}
-	${test:stripquery:--strip-query "}${html:stripquery}${test:stripquery:"}
+	${test:cookiesfile:--cookies-file "}${arg:cookiesfile}${test:cookiesfile:"}
+	${test:pausefiles:--pause "}${arg:pausefiles}${test:pausefiles:"}
+	${test:stripquery:--strip-query "}${arg:stripquery}${test:stripquery:"}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
 	${test:warc:--warc}
-	${test:warcfile:--warc-file "}${html:warcfile}${test:warcfile:"}
+	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}
 	${test:index:--index=0:}
 	${test:index2:--search-index=0:--search-index}
-	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${prox}${test:prox:\3A}${portprox}${test:prox:"}
+	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${arg:prox}${test:prox:\3A}${arg:portprox}${test:prox:"}
 	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
 </textarea>
 

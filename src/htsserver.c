@@ -363,6 +363,30 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   return seen;
 }
 
+/* Append the value of a double-quoted command-line argument: escaped for HTML,
+   which the browser undoes when it posts the command line back, and for the
+   argv splitter, which does not. */
+static void cat_cmdline_arg(String *output, const char *value) {
+  const char *a;
+
+  for (a = value; *a != '\0'; a++) {
+    if (*a == '\\' || *a == '\"') {
+      StringCat(*output, "\\");
+    }
+    if (*a == '<') {
+      StringCat(*output, "&lt;");
+    } else if (*a == '>') {
+      StringCat(*output, "&gt;");
+    } else if (*a == '&') {
+      StringCat(*output, "&amp;");
+    } else if (*a == '\'') {
+      StringCat(*output, "&#39;");
+    } else {
+      StringMemcat(*output, a, 1);
+    }
+  }
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
@@ -1002,6 +1026,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "html:"))) {
                       name += p;
                       format = 1;
+                    } else if ((p = strfield(name, "arg:"))) {
+                      name += p;
+                      format = 5;
                     } else if ((p = strfield(name, "list:"))) {
                       name += p;
                       format = 2;
@@ -1138,8 +1165,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                        test:<if ==0>:<if ==1>:<if == 2>..
                        ztest:<if == 0 || !exist>:<if == 1>:<if == 2>..
                      */
-                    else if ((p = strfield(name, "test:"))
-                             || (p = strfield(name, "ztest:"))) {
+                    else if ((p = strfield(name, "test:")) ||
+                             (p = strfield(name, "ztest:"))) {
                       intptr_t adr = 0;
                       char *pos2;
                       int ztest = (name[0] == 'z');
@@ -1241,6 +1268,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           }
                         }
                       }
+                    }
+                    /* consumed here: it shares nothing with the list and
+                       option formats below */
+                    if (format == 5 && langstr != NULL && outputmode != -1) {
+                      cat_cmdline_arg(&output, langstr);
+                      langstr = NULL;
                     }
                     if (langstr && outputmode != -1) {
                       switch (format) {

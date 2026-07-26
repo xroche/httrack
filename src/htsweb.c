@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.c"
 #include "md5.c"
 
+#include "htscmdline.h"
 #include "htsserver.h"
 #include "htsurlport.h"
 #include "htsweb.h"
@@ -319,10 +320,8 @@ int main(int argc, char *argv[]) {
 static int webhttrack_runmain(httrackp * opt, int argc, char **argv);
 static void back_launch_cmd(void *pP) {
   char *cmd = (char *) pP;
-  char **argv = (char **) malloct(1024 * sizeof(char *));
+  char **argv;
   int argc = 0;
-  int i = 0;
-  int g = 0;
 
   //
   httrackp *opt;
@@ -333,28 +332,19 @@ static void back_launch_cmd(void *pP) {
   commandReturnCmdl = strdup(cmd);
 
   /* split */
-  argv[0] = strdup("webhttrack");
-  argv[1] = cmd;
-  argc++;
-  i = 0;
-  while(cmd[i]) {
-    if (cmd[i] == '\t' || cmd[i] == '\r' || cmd[i] == '\n') {
-      cmd[i] = ' ';
-    }
-    i++;
+  argv = hts_split_cmdline(cmd, &argc);
+  if (argv == NULL) {
+    if (commandReturnMsg)
+      free(commandReturnMsg);
+    commandReturnMsg = strdup("could not parse the command line");
+    commandReturn = -1;
+    commandRunning = 0;
+    commandEnd = 1;
+    free(cmd);
+    return;
   }
-  i = 0;
-  while(cmd[i]) {
-    if (cmd[i] == '\"')
-      g = !g;
-    if (cmd[i] == ' ') {
-      if (!g) {
-        cmd[i] = '\0';
-        argv[argc++] = cmd + i + 1;
-      }
-    }
-    i++;
-  }
+  /* drop the program name the posted command line carries */
+  argv[0] = strdupt("webhttrack");
 
   /* init */
   hts_init();
@@ -383,6 +373,7 @@ static void back_launch_cmd(void *pP) {
 
   /* free */
   free(cmd);
+  freet(argv[0]);
   freet(argv);
   return;
 }
