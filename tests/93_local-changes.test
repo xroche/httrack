@@ -94,6 +94,10 @@ expect_counts_match() {
     echo "OK"
 }
 lines() { printf '%s\n' "$@" | sort; }
+# A connection killed before the status line surfaces differently per platform
+# (macOS truncates the file, #748; Linux leaves it), so reset.bin is asserted on
+# its own and kept out of the exact lists.
+listed_but_reset() { listed "$1" | grep -v '/reset\.bin$' | sort; }
 
 # --- pass 1: nothing to compare against --------------------------------------
 httrack "${common[@]}" -O "$out" --purge-old=0 "${base}/changes/index.html" \
@@ -140,19 +144,21 @@ expect "gone is doomed.html and the old redirect target" \
 expect "changed is exactly the four moved resources" \
     "$(lines "${host}/changes/coded.bin" "${host}/changes/index.html" \
         "${host}/changes/moved.bin" "${host}/changes/moved.html")" \
-    "$(listed changed | sort)"
+    "$(listed_but_reset changed)"
 # Re-served byte for byte, 200, no Last-Modified, no ETag. flaky.bin gets there
 # through a failed transfer and a retry, so its file is notified twice;
 # redirtarget.html arrives behind a 302. sized.html has a byte-identical
 # payload, but the rewritten link to the renamed redirect target makes the file
-# on disk change length. reset.bin never completes a transfer at all, so it
-# reaches none of the lists the engine writes, and its copy is untouched.
-expect "unchanged is exactly the seven stable resources" \
+# on disk change length.
+expect "unchanged is exactly the six stable resources" \
     "$(lines "${host}/changes/codedstable.bin" "${host}/changes/flaky.bin" \
-        "${host}/changes/reset.bin" "${host}/changes/redirtarget.html" \
-        "${host}/changes/sized.html" "${host}/changes/stable.bin" \
-        "${host}/changes/stable.html")" \
-    "$(listed unchanged | sort)"
+        "${host}/changes/redirtarget.html" "${host}/changes/sized.html" \
+        "${host}/changes/stable.bin" "${host}/changes/stable.html")" \
+    "$(listed_but_reset unchanged)"
+# reset.bin never completes a transfer, so it drops out of new.lst with its
+# mirrored copy still there. Whatever else it is, it is not a deletion.
+expect "a failed re-fetch is never reported gone" "" \
+    "$(listed gone | grep '/reset\.bin$' || true)"
 expect_counts_match "pass 2 counts match its lists"
 
 # Every mirrored file appears once and only once, across all four buckets.
@@ -198,7 +204,7 @@ httrack "${common[@]}" -O "$out" --update "${base}/changes/index.html" \
     >"${tmpdir}/log3" 2>&1
 expect "the report says files were purged" "true" "$(field purged)"
 expect "gone is the page that only pass 2 linked" \
-    "${host}/changes/transient.html" "$(listed gone)"
+    "${host}/changes/transient.html" "$(listed_but_reset gone)"
 printf '[a purged file is off disk] ..\t'
 test ! -f "${out}/${host}/changes/transient.html" || {
     echo "FAIL: transient.html survived --purge-old"
