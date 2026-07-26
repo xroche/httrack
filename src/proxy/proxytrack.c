@@ -820,8 +820,8 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     elt->size = StringLength(response);
     elt->adr = StringAcquire(&response);
     elt->statuscode = 207;      /* Multi-Status */
-    strcpy(elt->charset, "utf-8");
-    strcpy(elt->contenttype, "text/xml");
+    strcpybuff(elt->charset, "utf-8");
+    strcpybuff(elt->contenttype, "text/xml");
     strcpybuff(elt->msg, "Multi-Status");
     StringFree(response);
 
@@ -877,8 +877,8 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
     elt->size = StringLength(html);
     elt->adr = StringAcquire(&html);
     elt->statuscode = HTTP_OK;
-    strcpy(elt->charset, "iso-8859-1");
-    strcpy(elt->contenttype, "text/html");
+    strcpybuff(elt->charset, "iso-8859-1");
+    strcpybuff(elt->contenttype, "text/html");
     strcpybuff(elt->msg, "OK");
     StringFree(html);
     return elt;
