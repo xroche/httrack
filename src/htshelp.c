@@ -156,9 +156,7 @@ void help_wizard(httrackp * opt) {
   char *a;
 
   //
-  if (urls == NULL || mainpath == NULL || projname == NULL || stropt == NULL
-      || stropt2 == NULL || strwild == NULL || cmd == NULL || str == NULL
-      || argv == NULL) {
+  if (buffers == NULL) {
     fprintf(stderr, "* memory exhausted in %s, line %d\n", __FILE__, __LINE__);
     return;
   }
@@ -251,6 +249,7 @@ void help_wizard(httrackp * opt) {
       strcatbuff(stropt2, "--update ");
       break;
     case 0:
+      freet(buffers);
       return;
       break;
     }
@@ -315,8 +314,10 @@ void help_wizard(httrackp * opt) {
       fflush(stdout);
       linput(stdin, str, 250);
       if (strnotempty(str)) {
-        if (!((str[0] == 'y') || (str[0] == 'Y')))
+        if (!((str[0] == 'y') || (str[0] == 'Y'))) {
+          freet(buffers);
           return;
+        }
       }
       printf("\n");
 
@@ -340,7 +341,7 @@ void help_wizard(httrackp * opt) {
   }
 
   /* Free buffers */
-  free(buffers);
+  freet(buffers);
 #undef urls
 #undef mainpath
 #undef projname

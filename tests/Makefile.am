@@ -175,6 +175,7 @@ TESTS = \
 	76_cli-resize.test \
 	77_webhttrack-redirect.test \
 	78_webhttrack-sid.test \
-	79_webhttrack-mirror-verbatim.test
+	79_local-proxytrack-webdav-mime.test \
+	84_webhttrack-mirror-verbatim.test
 
 CLEANFILES = check-network_sh.cache
