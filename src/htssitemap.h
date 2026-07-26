@@ -50,6 +50,15 @@ extern "C" {
 #define HTS_SITEMAP_MAX_LEVEL 4                  /* sitemapindex nesting */
 #define HTS_SITEMAP_MAX_BYTES (64 * 1024 * 1024) /* decompressed document */
 
+/* Who asked for a sitemap document, which decides how far its fetch is gated.
+   The user naming one is the same intent as a start URL; a site declaring one
+   invites the fetch; the well-known location is only ever our guess. */
+typedef enum {
+  HTS_SITEMAP_SRC_USER,     /**< --sitemap-url */
+  HTS_SITEMAP_SRC_DECLARED, /**< a Sitemap: line or a sitemapindex entry */
+  HTS_SITEMAP_SRC_GUESSED   /**< the /sitemap.xml fallback */
+} hts_sitemap_source;
+
 /* Per-URL handler; returning HTS_FALSE stops the scan. */
 typedef hts_boolean (*hts_sitemap_handler)(void *arg, const char *url);
 
@@ -62,17 +71,17 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
                      hts_boolean *is_index, hts_sitemap_handler handler,
                      void *arg);
 
-/* Same, over a robots.txt body: hands out the "Sitemap:" URLs (a
-   group-independent record in RFC 9309, so no user-agent grouping). */
-int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
-                            hts_sitemap_handler handler, void *arg);
-
 /* --- Engine glue (needs a live httrackp). --- */
 
 /* Queue the first sitemap document of the mirror: the explicit --sitemap-url,
    or the start host's /robots.txt probe for --sitemap. `starturl` is the first
    command-line seed. No-op when neither option is set. */
 void hts_sitemap_seed(httrackp *opt, const char *starturl);
+
+/* Act on the start host's robots.txt once its rules are installed: queue the
+   Sitemap: URLs it names (newline-separated, from robots_parse), or the
+   well-known /sitemap.xml when it names none. No-op unless --sitemap. */
+void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps);
 
 /* Carry the sitemap marking of (adr,fil) over to the target of a redirect the
    engine has already queued, so a moved sitemap is still ingested. */

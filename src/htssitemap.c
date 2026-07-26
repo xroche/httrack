@@ -37,23 +37,24 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 #include "htscodec.h"
+#include "htsencoding.h"
 #include "htsfilters.h"
+#include "htshash.h"
+#include "htsmodules.h"
 #include "htslib.h"
 #include "htsrobots.h"
 #include "htssafe.h"
 #include "htstools.h"
-#include "htszlib.h"
 
 #include <ctype.h>
 #include <string.h>
 
-/* One queued sitemap document. `is_robots` marks the robots.txt probe, whose
-   Sitemap: lines feed this same list. */
+/* One queued sitemap document awaiting ingestion. */
 typedef struct sitemap_doc {
   char adr[HTS_URLMAXSIZE];
   char fil[HTS_URLMAXSIZE];
   int level;
-  hts_boolean is_robots;
+  hts_sitemap_source src;
   hts_boolean done;
   struct sitemap_doc *next;
 } sitemap_doc;
@@ -62,88 +63,18 @@ struct hts_sitemap_state {
   sitemap_doc *docs;
   int ndocs; /* documents queued, capped by HTS_SITEMAP_MAX_DOCS */
   int nurls; /* URLs seeded, capped by HTS_SITEMAP_MAX_URLS_TOTAL */
+  hts_boolean probe_done;    /* the robots.txt probe has been answered */
   hts_boolean fallback_done; /* the /sitemap.xml fallback was already queued */
+  /* The crawl's own start URL. Seeded URLs are judged against it, so a site
+     cannot widen a subtree crawl by putting its sitemap at the root. */
+  char anchor_adr[HTS_URLMAXSIZE];
+  char anchor_fil[HTS_URLMAXSIZE];
 };
 typedef struct hts_sitemap_state hts_sitemap_state;
 
 /* --------------------------------------------------------------------- */
 /* Document parsing (no engine state: fuzzable and self-testable)         */
 /* --------------------------------------------------------------------- */
-
-/* Decode the five XML predefined entities and numeric character references
-   in-place, never growing the string. Returns HTS_FALSE when a reference
-   decodes outside printable ASCII: the value is then not a URL the site can
-   have published, and decoding it would smuggle a control byte into the
-   crawl. An unrecognized "&..." run is left verbatim ('&' is legal in a URL).
- */
-static hts_boolean sitemap_unescape(char *s) {
-  char *r = s, *w = s;
-  hts_boolean ok = HTS_TRUE;
-
-  while (*r != '\0') {
-    if (*r != '&') {
-      *w++ = *r++;
-      continue;
-    }
-    {
-      char *const semi = strchr(r + 1, ';');
-      const size_t len = semi != NULL ? (size_t) (semi - (r + 1)) : 0;
-      int c = -1;
-
-      if (len == 0 || len > 8) {
-        *w++ = *r++;
-        continue;
-      }
-      if (len == 3 && strncmp(r + 1, "amp", 3) == 0)
-        c = '&';
-      else if (len == 2 && strncmp(r + 1, "lt", 2) == 0)
-        c = '<';
-      else if (len == 2 && strncmp(r + 1, "gt", 2) == 0)
-        c = '>';
-      else if (len == 4 && strncmp(r + 1, "quot", 4) == 0)
-        c = '"';
-      else if (len == 4 && strncmp(r + 1, "apos", 4) == 0)
-        c = '\'';
-      else if (r[1] == '#') {
-        const int hex = (r[2] == 'x' || r[2] == 'X');
-        const char *p = r + (hex ? 3 : 2);
-        long v = 0;
-
-        if (p < semi) {
-          for (; p < semi; p++) {
-            const int d =
-                hex ? (isxdigit((unsigned char) *p)
-                           ? (isdigit((unsigned char) *p)
-                                  ? *p - '0'
-                                  : (tolower((unsigned char) *p) - 'a' + 10))
-                           : -1)
-                    : (isdigit((unsigned char) *p) ? *p - '0' : -1);
-
-            if (d < 0) {
-              v = -1;
-              break;
-            }
-            v = v * (hex ? 16 : 10) + d;
-            if (v > 0x7e)
-              break;
-          }
-          if (v >= 0x20 && v <= 0x7e)
-            c = (int) v;
-          else if (v >= 0)
-            ok = HTS_FALSE; /* a well-formed reference to a byte no URL holds */
-        }
-      }
-      if (c < 0) {
-        *w++ = *r++;
-      } else {
-        *w++ = (char) c;
-        r = semi + 1;
-      }
-    }
-  }
-  *w = '\0';
-  return ok;
-}
 
 /* Accept only an absolute http(s) URL with no space or control byte. */
 static hts_boolean sitemap_url_ok(const char *url) {
@@ -165,20 +96,6 @@ static const char *sitemap_tag_end(const char *p, const char *end) {
   return p < end ? p + 1 : NULL;
 }
 
-/* Bounded substring search: the document may hold NUL bytes. */
-static const char *sitemap_memstr(const char *p, size_t len,
-                                  const char *needle) {
-  const size_t nlen = strlen(needle);
-
-  if (nlen == 0 || len < nlen)
-    return NULL;
-  for (; len >= nlen; p++, len--) {
-    if (*p == *needle && memcmp(p, needle, nlen) == 0)
-      return p;
-  }
-  return NULL;
-}
-
 /* HTS_TRUE when the document's root element is `name`. Skips the XML
    declaration, comments and processing instructions first, so a comment
    mentioning the other root element cannot decide the document type. */
@@ -195,7 +112,7 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
     } else if (doc[i] != '<') {
       return HTS_FALSE; /* character data before any element: not XML */
     } else if (i + 4 <= size && memcmp(doc + i, "<!--", 4) == 0) {
-      const char *const e = sitemap_memstr(doc + i, size - i, "-->");
+      const char *const e = hts_memstr(doc + i, size - i, "-->", 3);
 
       if (e == NULL)
         return HTS_FALSE;
@@ -242,7 +159,7 @@ static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   out = malloct(cap + 1);
   if (out == NULL)
     return NULL;
-  n = hts_zhead(body, size, out, cap);
+  n = hts_codec_head(HTS_CODEC_DEFLATE, body, size, out, cap);
   if (n == 0) {
     freet(out);
     return NULL;
@@ -266,8 +183,7 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
   if (body == NULL || size < 2 || handler == NULL)
     return 0;
 
-  /* A .xml.gz body arrives raw here: Content-Encoding gzip was already undone
-     upstream, so only the gzip container is left to peel. */
+  /* Content-Encoding gzip is undone upstream; only the container is left. */
   if ((unsigned char) body[0] == 0x1f && (unsigned char) body[1] == 0x8b) {
     unpacked = sitemap_gunzip(body, size, &size);
     if (unpacked == NULL)
@@ -280,13 +196,12 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
   }
   end = doc + size;
 
-  /* The root element classifies the document; the handler reads the verdict
-     before the first URL, so it must be set up front. */
+  /* Set before the first callback: the handler reads the verdict. */
   if (is_index != NULL)
     *is_index = sitemap_root_is(doc, size, "sitemapindex");
 
   for (p = doc; n < maxurls;) {
-    const char *loc = sitemap_memstr(p, (size_t) (end - p), "<loc");
+    const char *loc = hts_memstr(p, (size_t) (end - p), "<loc", 4);
     const char *val;
     const char *stop;
     size_t len;
@@ -304,8 +219,7 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
       break;
     for (stop = val; stop < end && *stop != '<'; stop++)
       ;
-    /* No closing tag: the document is truncated (cut short, or clipped by the
-       decompression cap), so the last value may be a partial URL. Drop it. */
+    /* No closing tag: truncated document, so the value may be a partial URL. */
     if (stop == end)
       break;
     p = stop;
@@ -319,7 +233,11 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
       continue;
     memcpy(url, val, len);
     url[len] = '\0';
-    if (!sitemap_unescape(url) || !sitemap_url_ok(url))
+    /* hts_unescapeEntities decodes in place and tolerates src == dest; a
+       reference to a control byte survives as one and sitemap_url_ok drops it.
+     */
+    if (hts_unescapeEntities(url, url, sizeof(url)) != 0 ||
+        !sitemap_url_ok(url))
       continue;
     n++;
     if (!handler(arg, url))
@@ -331,71 +249,19 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
   return n;
 }
 
-/* Copy one CR-stripped line into `line`, truncating an over-long one, and
-   return how far to advance. Unlike binput() this stops at `size`, so a body
-   that is not NUL-terminated cannot be read past its end. */
-static size_t sitemap_line(const char *body, size_t size, char *line,
-                           size_t linesize) {
-  size_t i = 0, w = 0;
-
-  while (i < size && body[i] != '\n') {
-    if (body[i] != '\r' && w < linesize - 1)
-      line[w++] = body[i];
-    i++;
-  }
-  line[w] = '\0';
-  return i < size ? i + 1 : i;
-}
-
-int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
-                            hts_sitemap_handler handler, void *arg) {
-  size_t bptr = 0;
-  int n = 0;
-
-  if (body == NULL || handler == NULL)
-    return 0;
-  while (bptr < size && n < maxurls) {
-    char BIGSTK line[HTS_URLMAXSIZE];
-    char *comm;
-    char *a;
-
-    bptr += sitemap_line(body + bptr, size - bptr, line, sizeof(line));
-    comm = strchr(line, '#');
-    if (comm != NULL)
-      *comm = '\0';
-    if (!strfield(line, "sitemap:"))
-      continue;
-    a = line + 8;
-    while (is_realspace(*a))
-      a++;
-    {
-      size_t l = strlen(a);
-
-      while (l > 0 && is_realspace(a[l - 1]))
-        a[--l] = '\0';
-    }
-    if (!sitemap_url_ok(a))
-      continue;
-    n++;
-    if (!handler(arg, a))
-      break;
-  }
-  return n;
-}
-
 /* --------------------------------------------------------------------- */
 /* Engine glue                                                           */
 /* --------------------------------------------------------------------- */
 
 static hts_sitemap_state *sitemap_state(httrackp *opt) {
-  if (opt->sitemap_state == NULL)
-    opt->sitemap_state = calloct(1, sizeof(hts_sitemap_state));
-  return (hts_sitemap_state *) opt->sitemap_state;
+  if (opt->state.sitemap == NULL)
+    opt->state.sitemap = calloct(1, sizeof(hts_sitemap_state));
+  return (hts_sitemap_state *) opt->state.sitemap;
 }
 
 static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
                                  const char *fil) {
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
   sitemap_doc *d;
 
   if (st == NULL)
@@ -407,21 +273,23 @@ static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
   return NULL;
 }
 
-/* A sitemap document is fetched like any other resource, so the user's filters
-   and robots.txt decide whether it may be. The wizard proper is not usable
-   here: it wants a referring link, and its up/down travel rules would judge a
-   child sitemap against the parent sitemap's directory. */
+/* Who asked for this document decides how far it is gated. The wizard proper
+   is not usable here: it wants a referring link, and its up/down travel rules
+   would judge a child sitemap against the parent sitemap's directory. */
 static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
-                                         const char *fil) {
-  char BIGSTK l[HTS_URLMAXSIZE * 2], lfull[HTS_URLMAXSIZE * 2];
-  int jokdepth = 0;
+                                         const char *fil,
+                                         hts_sitemap_source src) {
+  /* adr and fil are each capped just under HTS_URLMAXSIZE, and lfull prefixes
+     a scheme and a slash on top of both: 2 * HTS_URLMAXSIZE does not fit. */
+  char BIGSTK l[HTS_URLMAXSIZE * 2 + 16], lfull[HTS_URLMAXSIZE * 2 + 16];
+  int jokdepth = 0, jok;
 
-  if (opt->robots && opt->robotsptr != NULL &&
-      checkrobots((robots_wizard *) opt->robotsptr, adr, fil) == -1) {
-    hts_log_print(opt, LOG_NOTICE, "Sitemap: robots.txt forbids %s%s", adr,
-                  fil);
-    return HTS_FALSE;
-  }
+  hts_boolean refused;
+
+  /* The user naming a sitemap is the same intent as naming a start URL, which
+     the wizard admits unconditionally. */
+  if (src == HTS_SITEMAP_SRC_USER)
+    return HTS_TRUE;
   strcpybuff(l, jump_identification_const(adr));
   if (*fil != '/')
     strcatbuff(l, "/");
@@ -431,21 +299,32 @@ static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
   if (*fil != '/')
     strcatbuff(lfull, "/");
   strcatbuff(lfull, fil);
-  if (fa_strjoker_dual(0, *opt->filters.filters, *opt->filters.filptr, lfull, l,
-                       NULL, NULL, &jokdepth) == -1) {
+  jok = fa_strjoker_dual(0, *opt->filters.filters, *opt->filters.filptr, lfull,
+                         l, NULL, NULL, &jokdepth);
+  refused = (jok == -1) ? HTS_TRUE : HTS_FALSE;
+  if (refused) {
     hts_log_print(opt, LOG_NOTICE, "Sitemap: filter rule #%d refuses %s%s",
                   jokdepth + 1, adr, fil);
+    return HTS_FALSE;
+  }
+  /* A Sitemap: line, or a sitemapindex entry, is the site inviting the fetch;
+     a Disallow elsewhere in the same file does not retract it. The well-known
+     location is only ever a guess, so there a Disallow wins. */
+  if (src == HTS_SITEMAP_SRC_GUESSED &&
+      hts_robots_forbids(opt, adr, fil, (jok != 0) ? HTS_TRUE : HTS_FALSE,
+                         refused)) {
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: robots.txt forbids %s%s", adr,
+                  fil);
     return HTS_FALSE;
   }
   return HTS_TRUE;
 }
 
-/* Queue a document and record its link with save="" so the body stays in
-   memory: a sitemap is ingested, never mirrored. Top priority so its URLs get
-   the full depth budget through htsAddLink. */
+/* Record the link with save="" so the body stays in memory: a sitemap is
+   ingested, never mirrored. */
 static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
                                   const char *fil, int level,
-                                  hts_boolean is_robots, hts_boolean link_it) {
+                                  hts_sitemap_source src, hts_boolean link_it) {
   hts_sitemap_state *const st = sitemap_state(opt);
   sitemap_doc *d;
 
@@ -460,9 +339,7 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
     return HTS_FALSE;
   if (sitemap_find(opt, adr, fil) != NULL)
     return HTS_FALSE;
-  /* The robots.txt probe is the request that fetches the rules, so it cannot be
-     judged by them; everything else can. */
-  if (!is_robots && !sitemap_fetch_allowed(opt, adr, fil))
+  if (!sitemap_fetch_allowed(opt, adr, fil, src))
     return HTS_FALSE;
   d = calloct(1, sizeof(sitemap_doc));
   if (d == NULL)
@@ -470,7 +347,7 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
   strcpybuff(d->adr, adr);
   strcpybuff(d->fil, fil);
   d->level = level;
-  d->is_robots = is_robots;
+  d->src = src;
   d->next = st->docs;
   st->docs = d;
   st->ndocs++;
@@ -492,8 +369,8 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
 
 static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
                                  const char *fil, int level,
-                                 hts_boolean is_robots) {
-  return sitemap_queue_(opt, adr, fil, level, is_robots, HTS_TRUE);
+                                 hts_sitemap_source src) {
+  return sitemap_queue_(opt, adr, fil, level, src, HTS_TRUE);
 }
 
 void hts_sitemap_redirect(httrackp *opt, const char *adr, const char *fil,
@@ -504,7 +381,7 @@ void hts_sitemap_redirect(httrackp *opt, const char *adr, const char *fil,
     return;
   d->done = HTS_TRUE; /* the body lives at the target now */
   /* The engine already queued the target link, so only the marking moves. */
-  (void) sitemap_queue_(opt, newadr, newfil, d->level, d->is_robots, HTS_FALSE);
+  (void) sitemap_queue_(opt, newadr, newfil, d->level, d->src, HTS_FALSE);
   hts_log_print(opt, LOG_NOTICE, "Sitemap: %s%s redirects to %s%s", adr, fil,
                 newadr, newfil);
 }
@@ -521,22 +398,79 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
       if (strstr(url, ":/") == NULL)
         hts_log_print(opt, LOG_ERROR, "Sitemap URL must be absolute: %s", url);
       else if (ident_url_absolute(url, &af) >= 0)
-        (void) sitemap_queue(opt, af.adr, af.fil, 0, HTS_FALSE);
+        (void) sitemap_queue(opt, af.adr, af.fil, 0, HTS_SITEMAP_SRC_USER);
     }
   }
-  /* --sitemap: probe the start host's robots.txt, whose Sitemap: lines decide
-     whether the /sitemap.xml fallback is needed. */
-  if (!opt->sitemap || starturl == NULL || starturl[0] == '\0' ||
+  if (starturl == NULL || starturl[0] == '\0' ||
       strlen(starturl) >= sizeof(url))
     return;
   strcpybuff(url, starturl);
   if (ident_url_absolute(url, &af) < 0)
     return;
-  if (sitemap_queue(opt, af.adr, "/robots.txt", 0, HTS_TRUE)) {
+  {
+    hts_sitemap_state *const st = sitemap_state(opt);
+
+    if (st != NULL && strlen(af.adr) < sizeof(st->anchor_adr) &&
+        strlen(af.fil) < sizeof(st->anchor_fil)) {
+      strcpybuff(st->anchor_adr, af.adr);
+      strcpybuff(st->anchor_fil, af.fil);
+    }
+  }
+  if (!opt->sitemap)
+    return;
+  /* Answered in hts_sitemap_robots, once the parsed rules are installed. */
+  if (hts_record_link(opt, af.adr, "/robots.txt", "", "", "", NULL)) {
+    heap_top()->testmode = 0;
+    heap_top()->link_import = 0;
+    heap_top()->depth = 0;
+    heap_top()->pass2 = 0;
+    heap_top()->retry = opt->retry;
+    heap_top()->premier = heap_top_index();
+    heap_top()->precedent = heap_top_index();
     /* Claim the host so the parser does not queue robots.txt a second time. */
     if (opt->robotsptr != NULL)
       (void) checkrobots_set((robots_wizard *) opt->robotsptr, af.adr, "");
   }
+}
+
+void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
+  int queued = 0;
+
+  if (st == NULL || !opt->sitemap || st->probe_done ||
+      !strfield2(st->anchor_adr, adr))
+    return;
+  st->probe_done = HTS_TRUE;
+  if (sitemaps != NULL) {
+    const char *p = sitemaps;
+
+    while (*p != '\0') {
+      const char *const eol = strchr(p, '\n');
+      const size_t len = eol != NULL ? (size_t) (eol - p) : strlen(p);
+      char BIGSTK line[HTS_URLMAXSIZE];
+      lien_adrfil af;
+
+      if (len > 0 && len < sizeof(line)) {
+        memcpy(line, p, len);
+        line[len] = '\0';
+        /* Same host: a Sitemap: line must not aim the fetcher elsewhere. */
+        if (sitemap_url_ok(line) && ident_url_absolute(line, &af) >= 0 &&
+            strfield2(af.adr, adr) &&
+            sitemap_queue(opt, af.adr, af.fil, 0, HTS_SITEMAP_SRC_DECLARED))
+          queued++;
+      }
+      if (eol == NULL)
+        break;
+      p = eol + 1;
+    }
+  }
+  if (queued == 0 && !st->fallback_done) {
+    st->fallback_done = HTS_TRUE;
+    if (sitemap_queue(opt, adr, "/sitemap.xml", 0, HTS_SITEMAP_SRC_GUESSED))
+      queued++;
+  }
+  hts_log_print(opt, LOG_NOTICE, "Sitemap: %d sitemap(s) queued for %s", queued,
+                adr);
 }
 
 hts_boolean hts_sitemap_pending(httrackp *opt, const char *adr,
@@ -556,32 +490,38 @@ typedef struct sitemap_ingest_ctx {
   int accepted; /* URLs seeded or documents queued, not merely parsed */
 } sitemap_ingest_ctx;
 
-/* A <loc> of a <urlset>: hand it to the wizard as a top-level seed. */
+/* A <loc> of a <urlset>: hand it to the wizard as a top-level seed.
+   The wizard is pointed at the crawl's own start URL, not at the sitemap: the
+   site picks where its sitemap lives, so anchoring travel there would let a
+   root sitemap widen a subtree crawl to the whole host. The URL then becomes
+   its own anchor, exactly as a command-line seed does. */
 static hts_boolean sitemap_seed_url(void *arg, const char *url) {
   sitemap_ingest_ctx *const c = (sitemap_ingest_ctx *) arg;
-  hts_sitemap_state *const st = sitemap_state(c->opt);
+  httrackp *const opt = c->opt;
+  hts_sitemap_state *const st = sitemap_state(opt);
   char BIGSTK buff[HTS_URLMAXSIZE];
+  int before;
 
   if (st == NULL || st->nurls >= HTS_SITEMAP_MAX_URLS_TOTAL) {
-    hts_log_print(c->opt, LOG_WARNING,
+    hts_log_print(opt, LOG_WARNING,
                   "Sitemap: URL cap reached, ignoring the rest");
     return HTS_FALSE;
   }
-  /* Both scanners bound the URL below this, but strcpybuff aborts rather than
-     truncating, so never let hostile input reach it unchecked. */
+  /* strcpybuff aborts rather than truncating: never feed it unchecked input. */
   if (strlen(url) >= sizeof(buff))
     return HTS_TRUE;
   st->nurls++;
   strcpybuff(buff, url);
-  /* htsAddLink reports the wizard's verdict; only count what it took. */
+  before = opt->lien_tot;
   if (htsAddLink(c->str, buff))
     c->accepted++;
+  if (opt->lien_tot > before)
+    heap_top()->premier = heap_top_index(); /* a seed anchors on itself */
   return HTS_TRUE;
 }
 
-/* A <loc> of a <sitemapindex>, or a robots.txt Sitemap: line. Cross-host
-   children are dropped: a hostile sitemap must not aim the fetcher elsewhere.
- */
+/* A <loc> of a <sitemapindex>: cross-host children are dropped, so a hostile
+   sitemap cannot aim the fetcher elsewhere. */
 static hts_boolean sitemap_seed_child(void *arg, const char *url) {
   sitemap_ingest_ctx *const c = (sitemap_ingest_ctx *) arg;
   char BIGSTK buff[HTS_URLMAXSIZE];
@@ -598,13 +538,13 @@ static hts_boolean sitemap_seed_child(void *arg, const char *url) {
                   af.fil);
     return HTS_TRUE;
   }
-  if (sitemap_queue(c->opt, af.adr, af.fil, c->level + 1, HTS_FALSE))
+  if (sitemap_queue(c->opt, af.adr, af.fil, c->level + 1,
+                    HTS_SITEMAP_SRC_DECLARED))
     c->accepted++;
   return HTS_TRUE;
 }
 
-/* hts_sitemap_scan classifies the document before the first callback, so the
-   urlset/sitemapindex split can be decided here. */
+/* The scan classifies the document before the first callback. */
 static hts_boolean sitemap_seed_any(void *arg, const char *url) {
   sitemap_ingest_ctx *const c = (sitemap_ingest_ctx *) arg;
 
@@ -615,12 +555,26 @@ static hts_boolean sitemap_seed_any(void *arg, const char *url) {
 void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
                         const char *fil, const char *body, size_t size) {
   sitemap_doc *const d = sitemap_find(opt, adr, fil);
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
   sitemap_ingest_ctx ctx;
-  int n;
+  int n, anchor, saved_depth;
 
   if (d == NULL || d->done)
     return;
   d->done = HTS_TRUE;
+  /* str->ptr_ is a scratch int owned by the caller, so nothing else moves. */
+  anchor = *str->ptr_;
+  if (st != NULL && st->anchor_adr[0] != '\0' && opt->hash != NULL) {
+    const int i = hash_read((const hash_struct *) opt->hash, st->anchor_adr,
+                            st->anchor_fil, 1);
+
+    if (i >= 0)
+      anchor = i;
+  }
+  *str->ptr_ = anchor;
+  /* Borrow the anchor's position but keep a seed's full depth budget. */
+  saved_depth = heap(anchor)->depth;
+  heap(anchor)->depth = opt->depth + 1;
   ctx.opt = opt;
   ctx.str = str;
   ctx.adr = adr;
@@ -628,27 +582,9 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
   ctx.is_index = HTS_FALSE;
   ctx.accepted = 0;
 
-  if (d->is_robots) {
-    hts_sitemap_state *const st = sitemap_state(opt);
-
-    n = body != NULL ? hts_sitemap_scan_robots(body, size, HTS_SITEMAP_MAX_DOCS,
-                                               sitemap_seed_child, &ctx)
-                     : 0;
-    /* Fall back to the well-known location when robots.txt queued nothing: a
-     lone off-host or filtered Sitemap: line leaves us with no sitemap at all.
-   */
-    if (ctx.accepted == 0 && st != NULL && !st->fallback_done) {
-      st->fallback_done = HTS_TRUE;
-      (void) sitemap_queue(opt, adr, "/sitemap.xml", 0, HTS_FALSE);
-    }
-    hts_log_print(opt, LOG_INFO,
-                  "Sitemap: %d of %d sitemap(s) declared in %s%s", ctx.accepted,
-                  n, adr, fil);
-    return;
-  }
-
   n = hts_sitemap_scan(body, size, HTS_SITEMAP_MAX_URLS_DOC, &ctx.is_index,
                        sitemap_seed_any, &ctx);
+  heap(anchor)->depth = saved_depth;
   if (n < 0) {
     hts_log_print(opt, LOG_ERROR, "Sitemap: could not decompress %s%s", adr,
                   fil);
@@ -664,7 +600,7 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
 }
 
 void hts_sitemap_free(httrackp *opt) {
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
 
   if (st == NULL)
     return;
@@ -674,6 +610,6 @@ void hts_sitemap_free(httrackp *opt) {
     freet(st->docs);
     st->docs = next;
   }
-  freet(opt->sitemap_state);
-  opt->sitemap_state = NULL;
+  freet(opt->state.sitemap);
+  opt->state.sitemap = NULL;
 }

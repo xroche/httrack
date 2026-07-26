@@ -587,7 +587,10 @@ file (one scan rule per line) (--urllist &lt;param&gt;)</p></td></tr>
 
 <p>seed the crawl from the site&rsquo;s sitemap (robots.txt
 Sitemap:, then /sitemap.xml); --sitemap-url URL names one
-explicitly (--sitemap)</p></td></tr>
+explicitly. A sitemap you name, or one the site declares, is
+fetched even under robots.txt Disallow; only the guessed
+/sitemap.xml obeys it. The URLs found still pass every
+filter and scope rule (--sitemap)</p></td></tr>
 </table>
 
 <h3>Build options:

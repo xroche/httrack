@@ -546,12 +546,32 @@ class Handler(SimpleHTTPRequestHandler):
     # A User-Agent carrying NO_SITEMAP_UA gets a robots.txt with no Sitemap:
     # record, so a test can drive the /sitemap.xml fallback instead.
     NO_SITEMAP_UA = "nositemap"
+    # ... and one that additionally Disallows the well-known location, so the
+    # fallback has to be refused by the rules this very body carries.
+    DENY_SITEMAP_UA = "denysitemap"
+    # ... the same Disallow, but with the sitemap also declared: the
+    # declaration is the site inviting the fetch and must win.
+    DENY_DECLARED_UA = "denydeclared"
+    # ... and one that points the sitemap at the site root, to check a subtree
+    # crawl is not widened by where the site chooses to put its sitemap.
+    SCOPE_SITEMAP_UA = "scopesitemap"
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
+        ua = self.headers.get("User-Agent") or ""
+        host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"
-        if self.NO_SITEMAP_UA not in (self.headers.get("User-Agent") or ""):
-            body += f"Sitemap: http://{self.headers.get('Host')}/sitemapdir/index.xml\n"
+        if self.DENY_DECLARED_UA in ua:
+            body = (
+                "User-agent: *\nDisallow: /sitemap.xml\n"
+                f"Sitemap: http://{host}/sitemap.xml\n"
+            )
+        elif self.DENY_SITEMAP_UA in ua:
+            body = "User-agent: *\nDisallow: /sitemap.xml\n"
+        elif self.SCOPE_SITEMAP_UA in ua:
+            body += f"Sitemap: http://{host}/scopesitemap.xml\n"
+        elif self.NO_SITEMAP_UA not in ua:
+            body += f"Sitemap: http://{host}/sitemapdir/index.xml\n"
         body = body.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -585,8 +605,8 @@ class Handler(SimpleHTTPRequestHandler):
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
             f"<url><loc>http://{host}/sitemapdir/orphan1.html</loc></url>"
-            f"<url><loc>http://{host}/sitemapdir/orphan2.html</loc></url>"
             "<url><loc>http://sitemap-offhost.invalid/x.html</loc></url>"
+            f"<url><loc>http://{host}/sitemapdir/orphan2.html</loc></url>"
             "</urlset>\n"
         ).encode()
         self.send_raw(gzip.compress(xml), "application/x-gzip")
@@ -603,30 +623,40 @@ class Handler(SimpleHTTPRequestHandler):
     def route_sitemap_deep1(self):
         self.send_html("\tOne level below an orphan.")
 
-    # chain0..chain5 nest one sitemapindex per level; chain6 is the urlset the
-    # nesting cap must keep out of reach.
+    # chainN is a sitemapindex at nesting level N, listing chain(N+1) and a
+    # urlset capN.xml whose single page is capN.html. Levels up to
+    # HTS_SITEMAP_MAX_LEVEL are followed, so capN.html appears for N below the
+    # cap and stops appearing at it: the pair pins the boundary, which a cap
+    # mutated either way would break.
     def route_sitemap_chain(self):
         host = self.headers.get("Host")
         level = int(self.path.rsplit("/", 1)[-1][len("chain") : -len(".xml")])
-        if level < 6:
-            body = (
+        self.send_raw(
+            (
                 '<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex>'
                 f"<sitemap><loc>http://{host}/sitemapdir/chain{level + 1}.xml"
+                "</loc></sitemap>"
+                f"<sitemap><loc>http://{host}/sitemapdir/cap{level}.xml"
                 "</loc></sitemap></sitemapindex>\n"
-            )
-        else:
-            body = (
+            ).encode(),
+            "application/xml",
+        )
+
+    def route_sitemap_capset(self):
+        host = self.headers.get("Host")
+        level = self.path.rsplit("/", 1)[-1][len("cap") : -len(".xml")]
+        self.send_raw(
+            (
                 '<?xml version="1.0" encoding="UTF-8"?>\n<urlset>'
-                f"<url><loc>http://{host}/sitemapdir/deepcap.html</loc></url>"
+                f"<url><loc>http://{host}/sitemapdir/cap{level}.html</loc></url>"
                 "</urlset>\n"
-            )
-        self.send_raw(body.encode(), "application/xml")
+            ).encode(),
+            "application/xml",
+        )
 
-    def route_sitemap_deepcap(self):
-        self.send_html("\tReachable only past the sitemapindex nesting cap.")
+    def route_sitemap_cappage(self):
+        self.send_html("\tReached through a nested sitemapindex.")
 
-    # An index naming a child that filters (or robots.txt) must be able to
-    # refuse: filtered.xml would list gated.html if it were ever fetched.
     def route_sitemap_gatedindex(self):
         host = self.headers.get("Host")
         self.send_raw(
@@ -649,6 +679,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_html("\tListed only by the filtered child sitemap.")
 
     # A moved sitemap: the marking has to follow the redirect.
+    # A root sitemap naming a page below the crawl's start directory and one
+    # above it. Only the first may be seeded when the crawl started at /deep/dir/.
+    def route_sitemap_scope(self):
+        host = self.headers.get("Host")
+        self.send_raw(
+            '<?xml version="1.0" encoding="UTF-8"?><urlset>'
+            f"<url><loc>http://{host}/deep/dir/below.html</loc></url>"
+            f"<url><loc>http://{host}/elsewhere/updir.html</loc></url>"
+            "</urlset>\n".encode(),
+            "application/xml",
+        )
+
+    def route_sitemap_deepstart(self):
+        self.send_html("\tA start page in a subdirectory, linking nothing.")
+
+    def route_sitemap_below(self):
+        self.send_html("\tBelow the start directory.")
+
+    def route_sitemap_updir(self):
+        self.send_html("\tAbove the start directory.")
+
     def route_sitemap_moved(self):
         self.send_response(301)
         self.send_header("Location", "/sitemapdir/pages.xml.gz")
@@ -1689,11 +1740,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/sitemapdir/orphan1.html": route_sitemap_orphan1,
         "/sitemapdir/orphan2.html": route_sitemap_orphan2,
         "/sitemapdir/deep1.html": route_sitemap_deep1,
-        "/sitemapdir/deepcap.html": route_sitemap_deepcap,
         "/sitemapdir/gatedindex.xml": route_sitemap_gatedindex,
         "/sitemapdir/filtered.xml": route_sitemap_filtered,
         "/sitemapdir/gated.html": route_sitemap_gated,
         "/sitemapdir/moved.xml": route_sitemap_moved,
+        "/scopesitemap.xml": route_sitemap_scope,
+        "/deep/dir/start.html": route_sitemap_deepstart,
+        "/deep/dir/below.html": route_sitemap_below,
+        "/elsewhere/updir.html": route_sitemap_updir,
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
@@ -2018,8 +2072,13 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
-        if handler is None and re.fullmatch(r"/sitemapdir/chain\d+\.xml", path):
-            handler = type(self).route_sitemap_chain
+        if handler is None:
+            if re.fullmatch(r"/sitemapdir/chain\d+\.xml", path):
+                handler = type(self).route_sitemap_chain
+            elif re.fullmatch(r"/sitemapdir/cap\d+\.xml", path):
+                handler = type(self).route_sitemap_capset
+            elif re.fullmatch(r"/sitemapdir/cap\d+\.html", path):
+                handler = type(self).route_sitemap_cappage
         if handler is not None:
             handler(self)
             return True

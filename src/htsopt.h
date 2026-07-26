@@ -257,6 +257,7 @@ struct htsoptstate {
   unsigned int tmpnameid; /**< counter for temporary file names */
   int is_ended;           /**< mirror has finished */
   void *warc;             /**< open WARC writer (warc_writer*), or NULL */
+  void *sitemap;          /**< sitemap ingestion state, or NULL */
 };
 
 /* Library handles */
@@ -550,7 +551,6 @@ struct httrackp {
   hts_boolean sitemap;   /**< --sitemap: probe the start host's robots.txt for
                               Sitemap: lines, else /sitemap.xml. Tail: ABI */
   String sitemap_url;    /**< --sitemap-url: sitemap to ingest. Tail: ABI */
-  void *sitemap_state; /**< live sitemap ingestion state, or NULL. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

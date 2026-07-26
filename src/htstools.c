@@ -276,6 +276,21 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   return ok;
 }
 
+/* Bounded substring search: bodies and archive records carry NUL bytes, so
+   strstr() would stop at the first one. */
+const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
+                       size_t nlen) {
+  size_t i;
+
+  if (nlen == 0 || haylen < nlen)
+    return NULL;
+  for (i = 0; i + nlen <= haylen; i++) {
+    if (hay[i] == *needle && memcmp(hay + i, needle, nlen) == 0)
+      return hay + i;
+  }
+  return NULL;
+}
+
 // créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
 // un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
 int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
@@ -308,9 +323,8 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   // copy only the current path
   curr = _curr;
   strlcpybuff(curr, curr_fil, sizeof(_curr));
-  if ((a = strchr(curr, '?')) == NULL) { // couper au ? (params)
-    // an empty path has no last character to walk back from: curr-1 reads
-    // before the buffer
+  if ((a = strchr(curr, '?')) == NULL) { // cut at the ? (query parameters)
+    // an empty path has no last character: curr-1 would read before the buffer
     a = curr[0] != '\0' ? curr + strlen(curr) - 1 : curr;
   }
   while((*a != '/') && (a > curr))

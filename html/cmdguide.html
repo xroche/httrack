@@ -177,6 +177,12 @@ scope rules, so a sitemap cannot widen a crawl you deliberately narrowed. It is
 off by default because a sitemap can list thousands of pages nothing links
 to.</p>
 
+<p>One surprise worth knowing: a sitemap you name with <tt>--sitemap-url</tt>,
+and one the site itself declares in <tt>robots.txt</tt>, are fetched even when
+<tt>robots.txt</tt> disallows that path, because naming or declaring a sitemap
+is an invitation to read it. Only the guessed <tt>/sitemap.xml</tt> obeys a
+<tt>Disallow</tt>. The URLs listed inside are gated normally either way.</p>
+
 <p>The single most common surprise is "only the home page came down." That is
 usually not a scope option at all: it is an off-host redirect. A start URL of
 <tt>http://example.com/</tt> that redirects to <tt>https://www.example.com/</tt>

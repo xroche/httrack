@@ -1613,7 +1613,7 @@ int httpmirror(char *url1, httrackp * opt) {
           }
           /* A redirect re-queues the target as a fresh link; without carrying
              the marking over, a moved sitemap is fetched and then ignored. */
-          if (opt->sitemap_state != NULL && opt->lien_tot > nlinks &&
+          if (opt->state.sitemap != NULL && opt->lien_tot > nlinks &&
               hts_sitemap_pending(opt, urladr(), urlfil())) {
             hts_sitemap_redirect(opt, urladr(), urlfil(), heap_top()->adr,
                                  heap_top()->fil);
@@ -1639,9 +1639,10 @@ int httpmirror(char *url1, httrackp * opt) {
       /* Sitemap document: turn its <loc> URLs into top-level seeds. They go
          through htsAddLink, so the wizard's filters and scope rules decide, and
          this link's max depth leaves them the full budget. */
-      if (opt->sitemap_state != NULL &&
+      if (opt->state.sitemap != NULL &&
           hts_sitemap_pending(opt, urladr(), urlfil())) {
         htsmoduleStruct BIGSTK smstr;
+        int smptr = ptr;
 
         memset(&smstr, 0, sizeof(smstr));
         smstr.opt = opt;
@@ -1649,7 +1650,7 @@ int httpmirror(char *url1, httrackp * opt) {
         smstr.cache = &cache;
         smstr.hashptr = hashptr;
         smstr.numero_passe = numero_passe;
-        smstr.ptr_ = &ptr;
+        smstr.ptr_ = &smptr; /* scratch: the ingester retargets the wizard */
         smstr.addLink = htsAddLink;
         smstr.url_host = urladr();
         smstr.url_file = urlfil();
@@ -1868,6 +1869,9 @@ int httpmirror(char *url1, httrackp * opt) {
 
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
+            char BIGSTK sitemaps[8192];
+
+            sitemaps[0] = '\0';
             if (r.adr) {
               char BIGSTK infobuff[8192];
 #ifdef IGNORE_RESTRICTIVE_ROBOTS
@@ -1879,7 +1883,8 @@ int httpmirror(char *url1, httrackp * opt) {
 #endif
 
               robots_parse(&robots, urladr(), r.adr, r.size, infobuff,
-                           sizeof(infobuff), keep_root);
+                           sizeof(infobuff), keep_root, sitemaps,
+                           sizeof(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
@@ -1889,6 +1894,10 @@ int httpmirror(char *url1, httrackp * opt) {
                               urladr(), infobuff);
               }
             }
+            /* After robots_parse, so the rules this very body carries already
+               gate the sitemap fetch. Runs even on a failed probe, which is
+               what falls back to the well-known location. */
+            hts_sitemap_robots(opt, urladr(), sitemaps);
           }
         } else if (r.is_write) {        // déja sauvé sur disque
           /*

@@ -3618,7 +3618,7 @@ static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   char host[64];
 
   snprintf(host, sizeof(host), "h%d.example", n++);
-  robots_parse(r, host, txt, strlen(txt), NULL, 0, HTS_TRUE);
+  robots_parse(r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
   return checkrobots(r, host, path);
 }
 
@@ -3760,13 +3760,16 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                   100, &idx, &c) == 1);
   assertf(strcmp(c.url[0], "http://h.test/a?b=c") == 0);
 
-  /* A reference to a byte no URL can hold drops the whole value: decoding it
-     would smuggle a control character in, keeping it verbatim would seed a URL
-     the site never published. */
+  /* A reference decoding to a control byte is dropped: the shared decoder
+     writes the real character and the URL check refuses it. A reference the
+     decoder cannot represent (&#0;) stays verbatim, like an unknown entity. */
   assertf(sm_scan("<urlset><loc>http://h.test/a&#10;b</loc></urlset>", 100,
                   &idx, &c) == 0);
-  assertf(sm_scan("<urlset><loc>http://h.test/a&#0;b</loc></urlset>", 100, &idx,
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#9;b</loc></urlset>", 100, &idx,
                   &c) == 0);
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#0;b</loc></urlset>", 100, &idx,
+                  &c) == 1);
+  assertf(strcmp(c.url[0], "http://h.test/a&#0;b") == 0);
 
   /* A comment naming the other root element must not flip the verdict. */
   assertf(sm_scan("<!-- <sitemapindex> --><urlset><url>"
@@ -3829,8 +3832,57 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     memset(&c, 0, sizeof(c));
     assertf(hts_sitemap_scan(big, off, HTS_SITEMAP_MAX_URLS_DOC, &idx, sm_take,
                              &c) == HTS_SITEMAP_MAX_URLS_DOC);
+    /* The handler count, not just the return: a call site hardcoding a smaller
+       cap would still return its own argument. */
+    assertf(c.n == HTS_SITEMAP_MAX_URLS_DOC);
     freet(big);
   }
+
+#if HTS_USEZLIB
+  /* A highly compressible document decodes without running away: the ratio
+     budget cannot bind (deflate tops out near 1032:1), so this pins the
+     decompression path itself rather than the 64 MiB ceiling. */
+  {
+    const char *const one = "<url><loc>http://h.test/bomb</loc></url>";
+    const size_t reps = 40000;
+    size_t xlen = 8 + reps * strlen(one) + 10, i;
+    char *x = malloct(xlen + 1);
+    uLongf zlen;
+    char *z;
+    z_stream zs;
+
+    assertf(x != NULL);
+    {
+      size_t w = (size_t) snprintf(x, xlen, "<urlset>");
+
+      for (i = 0; i < reps; i++)
+        w += (size_t) snprintf(x + w, xlen - w, "%s", one);
+      w += (size_t) snprintf(x + w, xlen - w, "</urlset>");
+      xlen = w;
+    }
+    zlen = compressBound((uLong) xlen) + 32;
+    z = malloct((size_t) zlen);
+    assertf(z != NULL);
+    memset(&zs, 0, sizeof(zs));
+    assertf(deflateInit2(&zs, 9, Z_DEFLATED, 16 + MAX_WBITS, 8,
+                         Z_DEFAULT_STRATEGY) == Z_OK);
+    zs.next_in = (const Bytef *) x;
+    zs.avail_in = (uInt) xlen;
+    zs.next_out = (Bytef *) z;
+    zs.avail_out = (uInt) zlen;
+    assertf(deflate(&zs, Z_FINISH) == Z_STREAM_END);
+    zlen = (uLongf) zs.total_out;
+    deflateEnd(&zs);
+    /* well over the 4096:1 budget's 1 MiB floor, and far under the 64 MiB cap
+     */
+    assertf(xlen > 1024 * 1024 && (size_t) zlen < xlen / 100);
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, (size_t) zlen, 10, &idx, sm_take, &c) == 10);
+    assertf(strcmp(c.url[0], "http://h.test/bomb") == 0);
+    freet(z);
+    freet(x);
+  }
+#endif
 
   /* An unterminated <loc> at end of buffer must not read past it. */
   assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
@@ -3870,23 +3922,22 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
 
   /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
      and group-independent (no User-agent line needed). */
-  memset(&c, 0, sizeof(c));
+  /* robots_parse collects Sitemap: whatever the user-agent group, strips the
+     comment and keeps the rules working alongside it. */
   {
     const char *const txt = "User-agent: *\nDisallow: /x\n"
                             "SITEMAP:  http://h.test/s1.xml  # first\n"
-                            "Sitemap: /relative.xml\n"
                             "Sitemapper: http://h.test/no.xml\n"
                             "Sitemap:\thttps://h.test/s2.xml\n";
+    char BIGSTK maps[1024];
+    robots_wizard rb;
 
-    const size_t len = strlen(txt);
-    char *raw = malloct(len);
-
-    assertf(raw != NULL);
-    memcpy(raw, txt, len);
-    assertf(hts_sitemap_scan_robots(raw, len, 100, sm_take, &c) == 2);
-    assertf(strcmp(c.url[0], "http://h.test/s1.xml") == 0);
-    assertf(strcmp(c.url[1], "https://h.test/s2.xml") == 0);
-    freet(raw);
+    memset(&rb, 0, sizeof(rb));
+    robots_parse(&rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
+                 sizeof(maps));
+    assertf(strcmp(maps, "http://h.test/s1.xml\nhttps://h.test/s2.xml\n") == 0);
+    assertf(checkrobots(&rb, "h.test", "/x") == -1);
+    checkrobots_free(&rb);
   }
 
   printf("sitemap self-test OK\n");
@@ -3990,21 +4041,6 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Bounded substring search (records carry NUL bytes; strstr won't do). */
-static const char *warc_memstr(const char *hay, const char *needle,
-                               size_t haylen, size_t nlen) {
-  if (nlen == 0 || haylen < nlen)
-    return NULL;
-  {
-    size_t i;
-    for (i = 0; i + nlen <= haylen; i++) {
-      if (memcmp(hay + i, needle, nlen) == 0)
-        return hay + i;
-    }
-  }
-  return NULL;
-}
-
 /* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
 static unsigned char *warc_slurp(const char *path, size_t *len) {
   FILE *f = FOPEN(path, "rb");
@@ -4082,6 +4118,13 @@ static unsigned char *warc_next_member(const unsigned char **in,
    Content-Length == block length, the \r\n\r\n trailer intact, the response
    body round-trips, and the hop-by-hop Transfer-Encoding is dropped (a real
    Content-Encoding is kept verbatim; see warc-verbatim). */
+/* Argument order kept for the existing call sites; the search itself is the
+   shared hts_memstr. */
+static const char *warc_memstr(const char *hay, const char *needle,
+                               size_t haylen, size_t nlen) {
+  return hts_memstr(hay, haylen, needle, nlen);
+}
+
 static int st_warc(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
