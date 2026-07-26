@@ -78,8 +78,7 @@ DEFAULT_LDFLAGS=""
 AC_SUBST(DEFAULT_LDFLAGS)
 
 ### Additional flags (if supported)
-# Probes carry -Werror: AX_CHECK_COMPILE_FLAG only checks the exit status, and
-# clang merely warns on an unknown -W name, so a bare probe accepts it.
+# -Werror on probes: exit-status-only checks let clang's warn-on-unknown-flag through.
 AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Winit-self], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wunused-but-set-parameter], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wunused-but-set-parameter"], [], [-Werror])
@@ -128,8 +127,7 @@ AX_CHECK_LINK_FLAG([-pie], [LDFLAGS_PIE="-pie"])
 AC_SUBST([CFLAGS_PIE])
 AC_SUBST([LDFLAGS_PIE])
 
-## Name executable frames in the crash-path backtrace; as a compile flag it
-## never reached the linker (DEFAULT_CFLAGS is AM_CPPFLAGS).
+## -rdynamic must be a link flag; DEFAULT_CFLAGS (AM_CPPFLAGS) never reaches the linker.
 AX_CHECK_LINK_FLAG([-rdynamic], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -rdynamic"])
 
 ### Check for -fvisibility=hidden support
