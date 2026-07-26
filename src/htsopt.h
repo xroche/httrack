@@ -547,6 +547,12 @@ struct httrackp {
                              archive. Tail: ABI */
   hts_boolean warc_wacz; /**< --wacz: package archive+index+pages as a WACZ zip
                               (implies --warc + --warc-cdx). Tail: ABI */
+  hts_boolean single_file; /**< --single-file: once the mirror is done, rewrite
+                                each saved page with its assets inlined as
+                                data: URIs. Tail: ABI */
+  LLint single_file_max_size; /**< --single-file-max-size: per-asset cap in
+                                   bytes; a bigger asset stays a link.
+                                   Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

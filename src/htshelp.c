@@ -534,6 +534,11 @@ void help(const char *app, int more) {
   infomsg
     (" %D  cached delayed type check, don't wait for remote type during updates, to speedup them (%D0 wait, * %D1 don't wait)");
   infomsg(" %M  generate a RFC MIME-encapsulated full-archive (.mht)");
+  infomsg(" %Z  after the mirror, rewrite each saved page with its "
+          "stylesheets, scripts, images and fonts inlined as data: URIs, so "
+          "any page also opens on its own (links between pages stay relative; "
+          "audio and video stay links); --single-file-max-size N caps each "
+          "asset (default 10485760 bytes)");
   infomsg(" %t  keep the original file extension, don't rewrite it from the "
           "MIME type (%t0 rewrite)");
   infomsg

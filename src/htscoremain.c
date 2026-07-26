@@ -1795,6 +1795,36 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCopy(opt->warc_file, WARC_AUTONAME);
                 }
                 break;
+              case 'Z': // single-file: inline each page's assets as data: URIs
+                if (*(com + 1) == 's') { // --single-file-max-size N: per-asset
+                  com++;
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                    HTS_PANIC_PRINTF(
+                        "Option single-file-max-size needs a blank "
+                        "space and a size");
+                    htsmain_free();
+                    return -1;
+                  }
+                  na++;
+                  { // reject non-numeric/negative/overflow; keep the default
+                    char *end;
+                    LLint v;
+
+                    errno = 0;
+                    v = strtoll(argv[na], &end, 10);
+                    if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
+                        errno != ERANGE && v > 0)
+                      opt->single_file_max_size = v;
+                  }
+                  opt->single_file = HTS_TRUE;
+                } else {
+                  opt->single_file = HTS_TRUE;
+                  if (*(com + 1) == '0') {
+                    opt->single_file = HTS_FALSE;
+                    com++;
+                  }
+                }
+                break;
               case 'Y': // why: explain the filter verdict for a URL, no crawl
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF("Option why needs a blank space and a URL");

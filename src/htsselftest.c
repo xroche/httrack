@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htsproxy.h"
 #include "htswarc.h"
+#include "htssinglefile.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
@@ -4708,6 +4709,297 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
+/* ------------------------------------------------------------ */
+/* --single-file                                                 */
+/* ------------------------------------------------------------ */
+
+static int sf_err = 0;
+
+static void sf_check(int ok, const char *what) {
+  if (!ok) {
+    fprintf(stderr, "singlefile: %s\n", what);
+    sf_err++;
+  }
+}
+
+/* Write rel (a '/'-separated path under dir), creating the directories. */
+static void sf_put(const char *dir, const char *rel, const void *data,
+                   size_t len) {
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
+  FILE *fp;
+
+  fconcat(path, sizeof(path), dir, rel);
+  structcheck_utf8(path);
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
+  assertf(fp != NULL);
+  assertf(len == 0 || fwrite(data, 1, len, fp) == len);
+  fclose(fp);
+}
+
+/* Number of times needle occurs in hay. */
+static int sf_count(const char *hay, const char *needle) {
+  const size_t l = strlen(needle);
+  int n = 0;
+  const char *p = hay;
+
+  while ((p = strstr(p, needle)) != NULL) {
+    n++;
+    p += l;
+  }
+  return n;
+}
+
+/* The base64 payload following the first occurrence of prefix, up to the first
+   byte outside the base64 alphabet. NULL if prefix is absent. */
+static const char *sf_payload(const char *hay, const char *prefix,
+                              size_t *len) {
+  const char *p = strstr(hay, prefix);
+  size_t n = 0;
+
+  if (p == NULL)
+    return NULL;
+  p += strlen(prefix);
+  while (p[n] != '\0' && (isalnum((unsigned char) p[n]) || p[n] == '+' ||
+                          p[n] == '/' || p[n] == '='))
+    n++;
+  *len = n;
+  return p;
+}
+
+/* Independent base64 decoder: the round-trip check must not lean on code64().
+ */
+static unsigned char *sf_unb64(const char *s, size_t len, size_t *outlen) {
+  static const char alpha[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  unsigned char *out = (unsigned char *) malloct(len / 4 * 3 + 4);
+  unsigned int acc = 0;
+  size_t i, n = 0;
+  int bits = 0;
+
+  if (out == NULL)
+    return NULL;
+  for (i = 0; i < len; i++) {
+    const char *const p = s[i] != '\0' ? strchr(alpha, s[i]) : NULL;
+
+    if (s[i] == '=')
+      break;
+    if (p == NULL) {
+      freet(out);
+      return NULL;
+    }
+    acc = (acc << 6) | (unsigned int) (p - alpha);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[n++] = (unsigned char) ((acc >> bits) & 0xff);
+    }
+  }
+  *outlen = n;
+  return out;
+}
+
+/* Decoded payload of the first data: URI with that MIME, as a NUL-terminated
+   buffer the caller freet()s. NULL when absent or undecodable. */
+static char *sf_decode(const char *hay, const char *mime, size_t *outlen) {
+  char prefix[128];
+  size_t len = 0, dlen = 0;
+  const char *b64;
+  unsigned char *raw;
+
+  snprintf(prefix, sizeof(prefix), "data:%s;base64,", mime);
+  b64 = sf_payload(hay, prefix, &len);
+  if (b64 == NULL)
+    return NULL;
+  raw = sf_unb64(b64, len, &dlen);
+  if (raw == NULL)
+    return NULL;
+  raw[dlen] = '\0';
+  if (outlen != NULL)
+    *outlen = dlen;
+  return (char *) raw;
+}
+
+/* The 12-byte asset: high bytes and an embedded NUL, so a text-shaped copy
+   would be caught. */
+static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
+#define SF_PNG_LEN 12
+
+static const char sf_page[] =
+    "<html><head>\n"
+    "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
+    "<link rel=\"canonical\" href=\"other.html\">\n"
+    "<title>t</title>\n"
+    "<style>body { background: url(\"img/a%20b.png\"); }</style>\n"
+    "</head><body>\n"
+    "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
+    "<img src=\"data:image/gif;base64,QUJD\">\n"
+    "<img src=\"http://example.com/x.png\">\n"
+    /* Two shapes of climbing out of the mirror, each aimed at a real image so
+       a missing clamp inlines rather than merely failing to find a file: one
+       resolves outside the root, one lands back inside it if a leading ".."
+       is silently dropped. */
+    "<img src=\"../escape.png\">\n"
+    "<img src=\"../img/a%20b.png\">\n"
+    "<a href=\"img/a%20b.png\">link</a>\n"
+    "<video controls><source src=\"v.mp4\" type=\"video/mp4\"></video>\n"
+    "<script src=\"js/app.js\"></script>\n"
+    "<script>var s = \"<img src='img/a%20b.png'>\";</script>\n"
+    "<div style=\"background:url(img/a%20b.png)\"></div>\n"
+    "<div style='content:\"x\"; background:url(img/a%20b.png)'></div>\n"
+    "</body></html>\n";
+
+/* Lay a small mirror down under root and return the page path in page. */
+static void sf_fixture(const char *root, char *page, size_t pagesize) {
+  static const char css[] = "@import \"sub/nested.css\";\n"
+                            "body { background: url(../img/a b.png); }\n"
+                            "/* url(../img/never.png) */\n";
+  static const char nested[] = "div { background: url(../../img/a b.png); }\n";
+  static const char js[] = "var app = 1;\n";
+  char big[4096];
+
+  memset(big, 'B', sizeof(big));
+  sf_put(root, "page.html", sf_page, sizeof(sf_page) - 1);
+  sf_put(root, "other.html", "<html>o</html>", 14);
+  sf_put(root, "css/main.css", css, sizeof(css) - 1);
+  sf_put(root, "css/sub/nested.css", nested, sizeof(nested) - 1);
+  sf_put(root, "js/app.js", js, sizeof(js) - 1);
+  sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "img/big.png", big, sizeof(big));
+  sf_put(root, "v.mp4",
+         "\x00\x00\x00\x18"
+         "ftypisom",
+         12);
+  fconcat(page, pagesize, root, "page.html");
+}
+
+/* -#test=singlefile <dir>: rewrite a hand-built mirror and check what gets
+   inlined, what must keep its link, the per-asset cap, and idempotence. */
+static int st_singlefile(httrackp *opt, int argc, char **argv) {
+  char BIGSTK root[HTS_URLMAXSIZE];
+  char BIGSTK page[HTS_URLMAXSIZE * 2];
+  const LLint saved_cap = opt->single_file_max_size;
+  char *out, *css, *nested;
+  size_t outlen = 0, len = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "singlefile: needs a writable directory\n");
+    return 1;
+  }
+  sf_err = 0;
+  sf_put(argv[0], "escape.png", sf_png,
+         SF_PNG_LEN); /* just outside the mirror */
+  fconcat(root, sizeof(root), argv[0], "mirror/");
+  sf_fixture(root, page, sizeof(page));
+
+  /* Cap between the small assets and big.png. */
+  opt->single_file_max_size = 1024;
+  sf_check(singlefile_rewrite_file(opt, root, page),
+           "first pass changed nothing");
+  out = readfile_utf8(page);
+  assertf(out != NULL);
+
+  /* Inlined, and the payload is the file's exact bytes. */
+  {
+    char *img = sf_decode(out, "image/png", &len);
+
+    sf_check(img != NULL && len == SF_PNG_LEN &&
+                 memcmp(img, sf_png, SF_PNG_LEN) == 0,
+             "image payload does not round-trip");
+    freet(img);
+  }
+  sf_check(strstr(out, "data:application/x-javascript;base64,") != NULL,
+           "script not inlined");
+  sf_check(strstr(out, "href=\"css/main.css\"") == NULL,
+           "stylesheet not inlined");
+
+  /* Left alone: a page link, a navigational <link>, media, an absolute URL, an
+     existing data: URI, and a reference climbing out of the mirror. */
+  sf_check(strstr(out, "<a href=\"img/a%20b.png\">") != NULL, "anchor inlined");
+  sf_check(strstr(out, "href=\"other.html\"") != NULL, "rel=canonical inlined");
+  sf_check(strstr(out, "src=\"v.mp4\"") != NULL, "video source inlined");
+  sf_check(strstr(out, "src=\"http://example.com/x.png\"") != NULL,
+           "absolute URL rewritten");
+  sf_check(sf_count(out, "QUJD") == 1, "existing data: URI not preserved");
+  sf_check(strstr(out, "src=\"../escape.png\"") != NULL,
+           "a reference outside the mirror was resolved");
+  sf_check(strstr(out, "src=\"../img/a%20b.png\"") != NULL,
+           "a leading .. was dropped instead of rejected");
+  sf_check(strstr(out, "var s = \"<img src='img/a%20b.png'>\";") != NULL,
+           "script body rewritten");
+
+  /* Nothing an attribute value cannot hold: url() stays unquoted, and a quote
+     that was already in the CSS is escaped. */
+  sf_check(strstr(out, "url(\"data:") == NULL,
+           "a quoted url() would end a style attribute");
+  sf_check(strstr(out, "style=\"content:&quot;x&quot;; background:url(data:") !=
+               NULL,
+           "quote inside a rewritten style attribute not escaped");
+
+  /* The over-cap srcset candidate keeps its link, the small one does not. */
+  sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
+  sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
+  sf_check(sf_count(out, "img/a%20b.png") ==
+               3, /* anchor, script, the ".." one */
+           "an inlinable reference was left as a link");
+
+  /* The inlined stylesheet carries its own @import and url() inlined. */
+  css = sf_decode(out, "text/css", NULL);
+  sf_check(css != NULL, "stylesheet payload undecodable");
+  if (css != NULL) {
+    sf_check(strstr(css, "@import \"data:text/css;base64,") != NULL,
+             "@import not inlined");
+    sf_check(strstr(css, "url(data:image/png;base64,") != NULL,
+             "url() in stylesheet not inlined");
+    sf_check(strstr(css, "url(../img/never.png)") != NULL,
+             "url() inside a CSS comment was rewritten");
+    nested = sf_decode(css, "text/css", NULL);
+    sf_check(nested != NULL &&
+                 strstr(nested, "url(data:image/png;base64,") != NULL,
+             "url() in the @import'ed stylesheet not inlined");
+    freet(nested);
+    freet(css);
+  }
+
+  /* Idempotence: a second pass must find nothing and leave the bytes alone. */
+  sf_check(!singlefile_rewrite_file(opt, root, page), "second pass rewrote");
+  {
+    char *again = readfile_utf8(page);
+
+    sf_check(again != NULL && strcmp(again, out) == 0,
+             "second pass changed the page");
+    freet(again);
+  }
+  freet(out);
+
+  /* Same page, a cap above big.png: it now inlines. */
+  fconcat(root, sizeof(root), argv[0], "mirror2/");
+  sf_fixture(root, page, sizeof(page));
+  opt->single_file_max_size = 1024 * 1024;
+  sf_check(singlefile_rewrite_file(opt, root, page),
+           "raised-cap pass changed nothing");
+  out = readfile_utf8(page);
+  assertf(out != NULL);
+  sf_check(strstr(out, "img/big.png 2x") == NULL,
+           "asset under the raised cap still a link");
+  freet(out);
+
+  /* A cap of one byte inlines nothing at all. */
+  fconcat(root, sizeof(root), argv[0], "mirror3/");
+  sf_fixture(root, page, sizeof(page));
+  opt->single_file_max_size = 1;
+  sf_check(!singlefile_rewrite_file(opt, root, page), "one-byte cap inlined");
+  out = readfile_utf8(page);
+  assertf(out != NULL);
+  sf_check(strcmp(out, sf_page) == 0, "one-byte cap altered the page");
+  freet(out);
+  (void) outlen;
+
+  opt->single_file_max_size = saved_cap;
+  printf("singlefile: %s\n", sf_err ? "FAIL" : "OK");
+  return sf_err;
+}
+
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
@@ -5216,6 +5508,9 @@ static const struct selftest_entry {
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
 #endif
+    {"singlefile", "<dir>",
+     "--single-file: what is inlined, the per-asset cap, idempotence",
+     st_singlefile},
 };
 
 static void list_selftests(void) {
