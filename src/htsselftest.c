@@ -3819,16 +3819,21 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
   /* The per-document cap at the value the engine actually uses. */
   {
     const int many = HTS_SITEMAP_MAX_URLS_DOC + 10;
-    const size_t per = 32;
-    char *big = malloct((size_t) many * per + 32);
+    const size_t cap = (size_t) many * 40 + 32;
+    char *big = malloct(cap);
     size_t off;
     int i;
 
     assertf(big != NULL);
-    off = (size_t) snprintf(big, 32, "<urlset>");
-    for (i = 0; i < many; i++)
-      off += (size_t) snprintf(big + off, per + 1,
-                               "<loc>http://h.test/%d</loc>", i);
+    off = (size_t) snprintf(big, cap, "<urlset>");
+    assertf(off < cap);
+    for (i = 0; i < many; i++) {
+      const int len =
+          snprintf(big + off, cap - off, "<loc>http://h.test/%d</loc>", i);
+
+      assertf(len > 0 && (size_t) len < cap - off);
+      off += (size_t) len;
+    }
     memset(&c, 0, sizeof(c));
     assertf(hts_sitemap_scan(big, off, HTS_SITEMAP_MAX_URLS_DOC, &idx, sm_take,
                              &c) == HTS_SITEMAP_MAX_URLS_DOC);
@@ -3854,10 +3859,17 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     assertf(x != NULL);
     {
       size_t w = (size_t) snprintf(x, xlen, "<urlset>");
+      int len;
 
-      for (i = 0; i < reps; i++)
-        w += (size_t) snprintf(x + w, xlen - w, "%s", one);
-      w += (size_t) snprintf(x + w, xlen - w, "</urlset>");
+      assertf(w < xlen);
+      for (i = 0; i < reps; i++) {
+        len = snprintf(x + w, xlen - w, "%s", one);
+        assertf(len > 0 && (size_t) len < xlen - w);
+        w += (size_t) len;
+      }
+      len = snprintf(x + w, xlen - w, "</urlset>");
+      assertf(len > 0 && (size_t) len < xlen - w);
+      w += (size_t) len;
       xlen = w;
     }
     zlen = compressBound((uLong) xlen) + 32;
