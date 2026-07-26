@@ -230,8 +230,7 @@ static hts_boolean vt_size_refresh(void) {
 */
 #define STYLE_STATVALUES VT_BOLD
 #define STYLE_STATTEXT   VT_UNBOLD
-#define STYLE_STATRESET  VT_UNBOLD
-#define NStatsBuffer     14
+#define STYLE_STATRESET VT_UNBOLD
 /* Rows the stats block and "Current job" take above the in-progress list. */
 #define NStatsHeaderRows 7
 

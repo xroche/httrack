@@ -2380,7 +2380,17 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   PT_SaveCache__Arc_t *st = (PT_SaveCache__Arc_t *) arg;
   FILE *const fp = st->fp;
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
+  struct tm unknown_date;
   int size_headers;
+
+  /* a cached entry with no parseable Last-Modified must not take the writer
+     down; the epoch is the conventional "date unknown" */
+  if (tm == NULL) {
+    memset(&unknown_date, 0, sizeof(unknown_date));
+    unknown_date.tm_year = 70;
+    unknown_date.tm_mday = 1;
+    tm = &unknown_date;
+  }
 
   sprintf(st->headers,
           "HTTP/1.0 %d %s"
