@@ -866,12 +866,18 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* refvalue_size is mandatory: value comes off the cache file bounded only by
+   the line buffer, which dwarfs most destinations. Clipped rather than
+   rejected, since an engine-written cache carries fields wider than ours
+   (contenttype is 128 there, 64 here). */
+#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -1074,16 +1080,23 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 value++;
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg);     // msg
+              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                   sizeof(r->msg));
               ZIP_READFIELD_INT(line, value, "X-Size", r->size);        // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);        // contenttype
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset);       // contenttype
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);      // last-modified
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag);       // Etag
-              ZIP_READFIELD_STRING(line, value, "Location", r->location);       // 'location' pour moved
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                   sizeof(r->contenttype));
+              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                   sizeof(r->charset));
+              ZIP_READFIELD_STRING(line, value, "Last-Modified",
+                                   r->lastmodified, sizeof(r->lastmodified));
+              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                   sizeof(r->etag));
+              ZIP_READFIELD_STRING(line, value, "Location", r->location,
+                                   sizeof(location_default));
               ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo); // Content-disposition
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);      // Original save filename
+                                   r->cdispo, sizeof(r->cdispo));
+              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                   sizeof(previous_save_));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =

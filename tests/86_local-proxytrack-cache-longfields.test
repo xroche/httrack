@@ -1,0 +1,61 @@
+#!/bin/bash
+# A cached header longer than proxytrack's field must be clipped, not copied
+# raw: contenttype[64] sits just before the location pointer, so an unbounded
+# copy smashed it and the next Location line wrote through the wreckage.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# proxytrack reads its metadata from each entry's ZIP local extra field
+"$python" - "$dir/in.zip" <<'EOF'
+import sys, zipfile
+
+body = b"hello world"
+ct = "text/html" + "A" * 400
+meta = (
+    "X-In-Cache: 1\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: OK\r\n"
+    "X-Size: %d\r\n"
+    "Content-Type: %s\r\n"
+    "X-Charset: iso-8859-1\r\n"
+    # a parseable date is required: the ARC writer dereferences it unchecked
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "Location: http://example.com/%s\r\n"
+    "X-Save: out/page.html\r\n" % (len(body), ct, "B" * 400)
+).encode()
+
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, body)
+EOF
+
+proxytrack --convert "$dir/out.arc" "$dir/in.zip" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack crashed on a cache with over-long header fields" >&2
+    exit 1
+}
+
+test -s "$dir/out.arc" || {
+    echo "FAIL: entry dropped instead of clipped" >&2
+    exit 1
+}
+
+# clipped to contenttype[64], so 63 characters survive: "text/html" plus 54 A's
+longest=$(grep -ao 'A\+' "$dir/out.arc" | awk '{ print length($0) }' | sort -rn | head -n1)
+test "$longest" = 54 || {
+    echo "FAIL: expected the content-type clipped to 63 chars (54 A's), got ${longest:-none}" >&2
+    exit 1
+}
