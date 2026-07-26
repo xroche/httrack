@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run a command on a pty, resize the pty mid-run, check the display repaints.
+"""Drive httrack on a pty and check the animated display follows the terminal.
 
-Usage: pty-resize.py <resize-after-s> <deadline-s> <capture-file> <cmd> [args...]
+Usage: pty-resize.py <capture-file> <long-url-prefix> -- <cmd> [args...]
 """
 import fcntl
 import os
@@ -15,69 +15,115 @@ import termios
 import time
 
 CLEAR = b"\033[2J"
-RUNNING = b"Bytes saved"
+FRAME = b"\033[1;1f"  # every refresh homes here before painting the stats
+LIVE = b"Bytes saved"
 
 
-def set_size(fd, rows, cols):
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+class Term:
+    def __init__(self, argv, capture):
+        self.capture = capture
+        self.buf = bytearray()
+        self.master, slave = pty.openpty()
+        self.resize(24, 80)
+        self.proc = subprocess.Popen(
+            argv, stdin=slave, stdout=slave, stderr=slave, start_new_session=True
+        )
+        os.close(slave)
+
+    def resize(self, rows, cols):
+        fcntl.ioctl(
+            self.master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0)
+        )
+
+    def _read(self, timeout):
+        ready, _, _ = select.select([self.master], [], [], timeout)
+        if not ready:
+            return b""
+        try:
+            return os.read(self.master, 65536)
+        except OSError:
+            return b""
+
+    def pump(self, seconds):
+        """Read for the given window; return only the bytes read during it."""
+        mark = len(self.buf)
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            self.buf += self._read(0.1)
+        return bytes(self.buf[mark:])
+
+    def wait_for(self, pattern, timeout):
+        mark = len(self.buf)
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            self.buf += self._read(0.1)
+            if pattern in bytes(self.buf[mark:]):
+                return True
+            if self.proc.poll() is not None:
+                break
+        return False
+
+    def alive(self):
+        return self.proc.poll() is None
+
+    def close(self):
+        if self.alive():
+            os.killpg(self.proc.pid, signal.SIGKILL)
+        self.proc.wait()
+        os.close(self.master)
+        with open(self.capture, "wb") as fp:
+            fp.write(self.buf)
+
+
+def frame_heights(chunk):
+    """Newline count of each complete frame in the chunk."""
+    return [f.count(b"\n") for f in chunk.split(FRAME)[1:-1]]
 
 
 def main():
-    resize_after = float(sys.argv[1])
-    deadline = float(sys.argv[2])
-    capture = sys.argv[3]
-    argv = sys.argv[4:]
+    capture, long_url = sys.argv[1], sys.argv[2].encode()
+    argv = sys.argv[sys.argv.index("--") + 1 :]
+    term = Term(argv, capture)
+    failures = []
 
-    master, slave = pty.openpty()
-    set_size(master, 24, 80)
-    proc = subprocess.Popen(
-        argv, stdin=slave, stdout=slave, stderr=slave, start_new_session=True
-    )
-    os.close(slave)
+    def check(cond, msg):
+        if not cond:
+            failures.append(msg)
+        return cond
 
-    buf = bytearray()
-    resized_at = None
-    start = time.monotonic()
-    while True:
-        now = time.monotonic() - start
-        if now > deadline:
-            break
-        if resized_at is None and now >= resize_after:
-            set_size(master, 40, 100)
-            resized_at = len(buf)
-        ready, _, _ = select.select([master], [], [], 0.2)
-        if ready:
-            try:
-                data = os.read(master, 65536)
-            except OSError:
-                break
-            if not data:
-                break
-            buf += data
-        elif proc.poll() is not None:
-            break
+    try:
+        if not check(term.wait_for(LIVE, 15), "the display never started"):
+            return 1
 
-    if proc.poll() is None:
-        os.killpg(proc.pid, signal.SIGKILL)
-    proc.wait()
-    os.close(master)
+        # Steady state: a repaint here would mask any resize-driven one below.
+        idle = term.pump(1.0)
+        check(CLEAR not in idle, "repaint without a resize")
+        check(long_url not in idle, "long URL not truncated at 80 columns")
 
-    with open(capture, "wb") as fp:
-        fp.write(buf)
+        term.resize(24, 120)
+        check(term.wait_for(CLEAR, 3), "no repaint after a width-only resize")
+        check(CLEAR not in term.pump(1.0), "repaint kept firing after the resize")
 
-    if resized_at is None:
-        print("FAIL: process ended before the resize")
-        return 1
-    before, after = bytes(buf[:resized_at]), bytes(buf[resized_at:])
-    # Control: without a live display the redraw check would pass vacuously.
-    if RUNNING not in before:
-        print("FAIL: no progress display before the resize (%d bytes)" % len(before))
-        return 1
-    if CLEAR not in after:
-        print("FAIL: no full redraw after the resize (%d bytes)" % len(after))
-        return 1
-    print("ok: redraw seen %d bytes after the resize" % after.index(CLEAR))
-    return 0
+        term.resize(10, 120)
+        check(term.wait_for(CLEAR, 3), "no repaint after a height-only resize")
+        heights = frame_heights(term.pump(1.0))
+        check(heights, "no frame after the height change")
+        check(
+            all(h <= 9 for h in heights),
+            "frame overflows a 10-row terminal: %s" % heights,
+        )
+
+        term.resize(24, 200)
+        check(term.wait_for(CLEAR, 3), "no repaint after growing the terminal")
+        check(long_url in term.pump(1.0), "long URL still truncated at 200 columns")
+
+        check(term.alive(), "httrack died mid-run (exit %s)" % term.proc.poll())
+    finally:
+        term.close()
+
+    for msg in failures:
+        print("FAIL: %s" % msg)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

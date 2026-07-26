@@ -1,7 +1,7 @@
 #!/bin/bash
-# #97: the animated CLI display must repaint the whole screen when the terminal
-# is resized, otherwise stale wrapped text stays on screen.
-set -u
+# #97: a terminal resize must repaint the whole screen, and the frame must
+# follow the new geometry instead of the hardcoded 80x24 one.
+set -eu
 
 : "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
@@ -52,16 +52,19 @@ which httrack >/dev/null || {
     exit 1
 }
 
-# The trickled pages keep the display animating long enough to resize under it.
+# Trickled pages under a long path: the display keeps animating while the pty is
+# resized under it, and the URL is truncated at 80 columns but not at 200.
+deep="127.0.0.1:${port}/trickle/deep/a-long-directory-segment/another-long-segment"
 out="${tmpdir}/crawl"
 mkdir "$out"
-"$python" "$driver" 2 8 "${tmpdir}/pty.raw" \
-    httrack "http://127.0.0.1:${port}/trickle/index.html" \
+rc=0
+# The in-progress rows show host:port, not the scheme.
+"$python" "$driver" "${tmpdir}/pty.raw" "${deep}/p" -- \
+    httrack "http://${deep}/index.html" \
     -O "$out" -%v --robots=0 --disable-security-limits \
-    --timeout=30 --retries=1 -c4 --max-time 6
-rc=$?
-test $rc -eq 0 || {
-    echo "pty capture head:"
-    head -c 400 "${tmpdir}/pty.raw" | cat -v
+    --timeout=30 --retries=1 -c4 --max-time 60 || rc=$?
+test "$rc" -eq 0 || {
+    echo "pty capture tail:"
+    tail -c 600 "${tmpdir}/pty.raw" | cat -v
     exit 1
 }

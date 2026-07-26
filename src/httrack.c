@@ -192,7 +192,7 @@ static void vt_home(void) {
 static int term_cols = 80;
 static int term_rows = 24;
 
-/* Refresh term_cols/term_rows, and tell whether they moved since last call. */
+/* Returns HTS_TRUE if the terminal size changed since the last call. */
 static hts_boolean vt_size_refresh(void) {
   int cols = 0;
   int rows = 0;
