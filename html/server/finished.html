@@ -97,9 +97,8 @@ ${do:end-if}
 </pre>
 
 ${LANG_G8} : 
-${do:output-mode:html-urlescaped}
-<a href="file://${path}/${projname}/" target="_new">
-${do:output-mode:}
+${/* an http: page cannot navigate to file:, so the mirror is reached through the server */}
+<a href="/website/index.html" target="_new">
 ${path}/${projname}
 </a></li>
 <ul>
