@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# The web UI's three size fields must reach the engine as distinct limits: "Max
-# site size" (sizemax) is the overall -M cap, while the per-file HTML (maxhtml)
-# and non-HTML (othermax) caps share -m. step4.html emitted --max-files for all
-# three, so the site cap became a per-file one and overwrote othermax. Part 1
-# audits the command line and winprofile.ini the wizard renders; part 2 pins the
-# -m ordering it relies on, since a bare -m<n> clears the html limit.
+# The wizard's size fields must render as distinct caps: sizemax is -M, othermax
+# then maxhtml share -m.
 
 set -euo pipefail
 
@@ -58,28 +54,28 @@ for _ in $(seq 1 40); do
 done
 test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
 
-# Post the size fields, then audit what step4.html renders back. No command_do,
-# so nothing is launched.
+# Audit what step4.html renders back; without command_do nothing is launched.
 "${python}" - "${url}" <<'PY' || fail "wizard rendered the wrong options (see above)"
 import re, sys, urllib.parse, urllib.request
 
 url = sys.argv[1]
 html, other, site = "111111", "222222", "333333"
-# The body is refused without the session id the server renders into each form.
-form = urllib.request.urlopen(url + "server/index.html", timeout=20).read()
-m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
-if not m:
-    raise SystemExit("no session id in server/index.html")
-fields = [("sid", m.group(1).decode()),
-          ("maxhtml", html), ("othermax", other), ("sizemax", site),
-          ("dos", "2")]
-body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-req = urllib.request.Request(url + "server/step4.html",
-                             data=body.encode("latin-1"), method="POST")
-page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
 
 
-def textarea(name):
+def post(fields):
+    # The body is refused without the session id the server puts in each form.
+    form = urllib.request.urlopen(url + "server/index.html", timeout=20).read()
+    m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+    if not m:
+        raise SystemExit("no session id in server/index.html")
+    fields = [("sid", m.group(1).decode())] + fields
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+    req = urllib.request.Request(url + "server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
     m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
     if m is None:
         sys.exit("no %s textarea in the rendered step4.html" % name)
@@ -91,7 +87,9 @@ def want(ok, msg, ctx):
         sys.exit("%s\nrendered:%s" % (msg, ctx))
 
 
-cmd = textarea("command")
+page = post([("maxhtml", html), ("othermax", other), ("sizemax", site),
+             ("dos", "2")])
+cmd = textarea(page, "command")
 want("--max-size=" + site in cmd, "site cap not emitted as --max-size", cmd)
 want("--max-files=" + site not in cmd, "site cap still an --max-files", cmd)
 # Positive controls: both per-file caps still ride -m, one option each.
@@ -103,21 +101,34 @@ want(cmd.count("--max-files=") == 2, "unexpected --max-files count", cmd)
 want(cmd.index("--max-files=" + other) < cmd.index("--max-files=," + html),
      "the bare --max-files must precede the --max-files=, form", cmd)
 
-# winprofile.ini: the Dos key used to be written from an unterminated ${dos.
-ini = textarea("winprofile")
+# winprofile.ini feeds the same three caps to the Windows GUI, one key each.
+ini = textarea(page, "winprofile").replace("\r\n", "\n")  # the ini is CRLF
 want("\nDos=2" in ini, "Dos not written from the dos field", ini)
+want("\nMaxHtml=" + html + "\n" in ini, "MaxHtml not written from maxhtml", ini)
+want("\nMaxOther=" + other + "\n" in ini, "MaxOther not written from othermax",
+     ini)
+want("\nMaxAll=" + site + "\n" in ini, "MaxAll not written from sizemax", ini)
 
-# A ${LANG_OK] typo rendered the key's own name into the button label.
+# A bare --max-files= (an unguarded empty field) parses as -m with no digits,
+# silently clearing the html cap.
+page = post([("maxhtml", ""), ("othermax", ""), ("sizemax", ""), ("dos", "2")])
+cmd = textarea(page, "command")
+want("--max-rate=" in cmd, "empty size fields rendered no command line", cmd)
+want("--max-files" not in cmd and "--max-size" not in cmd,
+     "empty size fields still rendered a size option", cmd)
+
+# A mistyped ${LANG_OK] key renders the OK button's label empty.
 opts = urllib.request.urlopen(url + "server/option2b.html",
                               timeout=20).read().decode("latin-1")
 want("LANG_OK" not in opts, "unexpanded LANG_OK in option2b.html", "")
+want('<input type="submit" value="OK"' in opts, "no OK label in option2b.html",
+     "")
 PY
 
 cleanup
 
-# The -m ordering the template depends on: a bare -m<n> resets the html limit,
-# so only the bare-then-comma order keeps both caps live. basic.html is 487
-# bytes, well past the 10-byte html cap that refuses it as "File too big".
+# A bare -m<n> resets the html limit, so only the bare-then-comma order keeps
+# both caps live. basic.html is 487 bytes, well past the 10-byte html cap.
 crawl() {
     bash "${distdir}/tests/local-crawl.sh" "$@"
 }
