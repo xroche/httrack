@@ -878,12 +878,17 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* refvalue_size is mandatory: the cache line is bounded only by the line
+   buffer, not by the destination. Clip rather than reject, since an
+   engine-written field can be wider than ours. */
+#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -1086,16 +1091,23 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 value++;
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg);     // msg
+              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                   sizeof(r->msg));
               ZIP_READFIELD_INT(line, value, "X-Size", r->size);        // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);        // contenttype
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset);       // contenttype
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);      // last-modified
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag);       // Etag
-              ZIP_READFIELD_STRING(line, value, "Location", r->location);       // 'location' pour moved
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                   sizeof(r->contenttype));
+              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                   sizeof(r->charset));
+              ZIP_READFIELD_STRING(line, value, "Last-Modified",
+                                   r->lastmodified, sizeof(r->lastmodified));
+              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                   sizeof(r->etag));
+              ZIP_READFIELD_STRING(line, value, "Location", r->location,
+                                   sizeof(location_default));
               ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo); // Content-disposition
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_);      // Original save filename
+                                   r->cdispo, sizeof(r->cdispo));
+              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                   sizeof(previous_save_));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =
@@ -2152,12 +2164,15 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    strcpy(refvalue, value); \
-    line[0] = '\0'; \
-	} \
-} while(0)
+/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
+#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 #define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -2226,11 +2241,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
               HTTP_READFIELD_INT(line, value, "Content-Length", r->size);       // size
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype);       // contenttype
-              HTTP_READFIELD_STRING(line, value, "Last-Modified", r->lastmodified);     // last-modified
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag);      // Etag
-              HTTP_READFIELD_STRING(line, value, "Location", r->location);      // 'location' pour moved
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition", r->cdispo);     // Content-disposition
+              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                    sizeof(r->contenttype));
+              HTTP_READFIELD_STRING(line, value, "Last-Modified",
+                                    r->lastmodified, sizeof(r->lastmodified));
+              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                    sizeof(r->etag));
+              HTTP_READFIELD_STRING(line, value, "Location", r->location,
+                                    sizeof(location_default));
+              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
+                                    r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 int len = r->headers ? ((int) strlen(r->headers)) : 0;
                 int nlen =
@@ -2360,7 +2380,17 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   PT_SaveCache__Arc_t *st = (PT_SaveCache__Arc_t *) arg;
   FILE *const fp = st->fp;
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
+  struct tm unknown_date;
   int size_headers;
+
+  /* a cached entry with no parseable Last-Modified must not take the writer
+     down; the epoch is the conventional "date unknown" */
+  if (tm == NULL) {
+    memset(&unknown_date, 0, sizeof(unknown_date));
+    unknown_date.tm_year = 70;
+    unknown_date.tm_mday = 1;
+    tm = &unknown_date;
+  }
 
   sprintf(st->headers,
           "HTTP/1.0 %d %s"
