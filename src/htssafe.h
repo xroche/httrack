@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSSAFE_DEFH
 #define HTSSAFE_DEFH
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -458,6 +459,37 @@ static HTS_INLINE HTS_UNUSED void htsbuff_cpy(htsbuff *b, const char *s) {
 static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
   return b->buf;
 }
+
+/**
+ * Formatted print into dest (capacity size, NUL included), truncating to fit
+ * and always NUL-terminating. Returns HTS_TRUE if the whole output fit; the
+ * result is the only truncation signal, so it must be acted on. Unlike
+ * strcpybuff() it never aborts, so it suits text built from remote input.
+ */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
+    slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
+  va_list args;
+  int ret;
+
+  assertf(dest != NULL && size != 0);
+  va_start(args, fmt);
+  ret = vsnprintf(dest, size, fmt, args);
+  va_end(args);
+  /* pre-C99 runtimes (msvcrt _vsnprintf) return -1 and do not terminate */
+  dest[size - 1] = '\0';
+  return ret >= 0 && (size_t) ret < size ? HTS_TRUE : HTS_FALSE;
+}
+
+/**
+ * slprintfbuff() over the in-scope array ARR (capacity = sizeof(ARR)).
+ * On GCC/Clang a pointer is a compile error; use slprintfbuff() for those.
+ */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define sprintfbuff(ARR, ...)                                                  \
+  slprintfbuff((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR), __VA_ARGS__)
+#else
+#define sprintfbuff(ARR, ...) slprintfbuff((ARR), sizeof(ARR), __VA_ARGS__)
+#endif
 
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates

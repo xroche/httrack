@@ -542,8 +542,14 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav[0] != '\0') {
-    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s.%s",
-             back->url_sav, ext);
+    /* same capacity as url_sav, so truncation drops the extension and aliases
+       the temp name onto the live file that back_finalize_backup() UNLINKs */
+    if (!sprintfbuff(back->tmpfile_buffer, "%s.%s", back->url_sav, ext)) {
+      hts_log_print(opt, LOG_WARNING, "temporary filename too long for %s",
+                    back->url_sav);
+      back->tmpfile_buffer[0] = '\0';
+      return -1;
+    }
     back->tmpfile = back->tmpfile_buffer;
     if (structcheck(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
@@ -551,8 +557,15 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
   } else {
-    snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s/tmp%d.%s",
-             StringBuff(opt->path_html_utf8), opt->state.tmpnameid++, ext);
+    /* truncation here would collide distinct tmpnameid's onto one name */
+    if (!sprintfbuff(back->tmpfile_buffer, "%s/tmp%d.%s",
+                     StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,
+                     ext)) {
+      hts_log_print(opt, LOG_WARNING, "temporary filename too long in %s",
+                    StringBuff(opt->path_html_utf8));
+      back->tmpfile_buffer[0] = '\0';
+      return -1;
+    }
     back->tmpfile = back->tmpfile_buffer;
   }
   /* OK */
