@@ -704,18 +704,16 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
   /* Check for errors */
   if (soc == INVALID_SOCKET) {
     if (retour) {
-      if (retour->msg) {
-        if (!strnotempty(retour->msg)) {
+      if (!strnotempty(retour->msg)) {
 #ifdef _WIN32
-          int last_errno = WSAGetLastError();
+        int last_errno = WSAGetLastError();
 
-          sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+        sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
 #else
-          int last_errno = errno;
+        int last_errno = errno;
 
-          sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+        sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
 #endif
-        }
       }
     }
   }
@@ -2207,7 +2205,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if DEBUG
       printf("erreur gethostbyname\n");
 #endif
-      if (retour && retour->msg) {
+      if (retour != NULL) {
 #ifdef _WIN32
         snprintf(retour->msg, sizeof(retour->msg),
                  "Unable to get server's address: %s", error);
@@ -2238,7 +2236,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     DEBUG_W("socket()=%d\n" _(int) soc);
 #endif
     if (soc == INVALID_SOCKET) {
-      if (retour && retour->msg) {
+      if (retour != NULL) {
 #ifdef _WIN32
         int last_errno = WSAGetLastError();
 
@@ -2262,17 +2260,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
                              &bind_addr, &error) == NULL
           || bind(soc, &SOCaddr_sockaddr(bind_addr), 
                   SOCaddr_size(bind_addr)) != 0) {
-        if (retour && retour->msg) {
-#ifdef _WIN32
-          snprintf(retour->msg, sizeof(retour->msg),
-                   "Unable to bind the specificied server address: %s",
-                   error);
-#else
-          snprintf(retour->msg, sizeof(retour->msg),
-                   "Unable to bind the specificied server address: %s",
-                   error);
-#endif
-        }
+        snprintf(retour->msg, sizeof(retour->msg),
+                 "Unable to bind the specificied server address: %s", error);
         deletesoc(soc);
         return INVALID_SOCKET;
       }
@@ -2319,7 +2308,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HDEBUG
         printf("unable to connect!\n");
 #endif
-        if (retour != NULL && retour->msg) {
+        if (retour != NULL) {
 #ifdef _WIN32
           const int last_errno = WSAGetLastError();
 
