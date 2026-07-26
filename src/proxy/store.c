@@ -405,8 +405,8 @@ PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes) {
     elt->size = StringLength(html);
     elt->adr = StringAcquire(&html);
     elt->statuscode = HTTP_OK;
-    strcpy(elt->charset, "iso-8859-1");
-    strcpy(elt->contenttype, "text/html");
+    strcpybuff(elt->charset, "iso-8859-1");
+    strcpybuff(elt->contenttype, "text/html");
     strcpybuff(elt->msg, "OK");
     StringFree(html);
     return elt;
@@ -871,13 +871,11 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
 /* refvalue_size is mandatory: the cache line is bounded only by the line
-   buffer, not by the destination. Clip rather than reject, since an
-   engine-written field can be wider than ours. */
+   buffer, not by the destination. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (refvalue)[0] = '\0';                                                    \
-      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
@@ -1034,7 +1032,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
   previous_save[0] = previous_save_[0] = '\0';
   memset(r, 0, sizeof(_PT_Element));
   r->location = location_default;
-  strcpy(r->location, "");
+  r->location[0] = '\0';
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
   hash_pos_return = coucal_read(index->hash, url, &hash_pos);
@@ -1119,7 +1117,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             int pathLen = (int) strlen(index->path);
 
             if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {    // old (<3.40) buggy format
-              strcpy(previous_save, previous_save_);
+              strcpybuff(previous_save, previous_save_);
             }
             // relative ? (hack)
             else if (index->safeCache || (previous_save_[0] != '/'      // /home/foo/bar.gif
@@ -1546,7 +1544,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
             cache->version = (int) (firstline[8] - '0');        // cache 1.x
             if (cache->version <= 5) {
               a += cache_brstr(a, firstline, sizeof(firstline));
-              strcpy(cache->lastmodified, firstline);
+              strcpybuff(cache->lastmodified, firstline);
             } else {
               fclose(cache->dat);
               cache->dat = NULL;
@@ -1563,7 +1561,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
         } else {                // Vieille version du cache
           /* */
           cache->version = 0;   // cache 1.0
-          strcpy(cache->lastmodified, firstline);
+          strcpybuff(cache->lastmodified, firstline);
         }
 
         /* Create hash table for the cache (MUCH FASTER!) */
@@ -1683,7 +1681,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
   previous_save[0] = previous_save_[0] = '\0';
   memset(r, 0, sizeof(_PT_Element));
   r->location = location_default;
-  strcpy(r->location, "");
+  r->location[0] = '\0';
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
   hash_pos_return = coucal_read(cache->hash, url, &hash_pos);
@@ -1790,7 +1788,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           int pathLen = (int) strlen(index->path);
 
           if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {      // old (<3.40) buggy format
-            strcpy(previous_save, previous_save_);
+            strcpybuff(previous_save, previous_save_);
           }
           // relative ? (hack)
           else if (index->safeCache || (previous_save_[0] != '/'        // /home/foo/bar.gif
@@ -2167,8 +2165,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
 #define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (refvalue)[0] = '\0';                                                    \
-      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
@@ -2207,7 +2204,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
   location_default[0] = '\0';
   memset(r, 0, sizeof(_PT_Element));
   r->location = location_default;
-  strcpy(r->location, "");
+  r->location[0] = '\0';
   if (strncmp(url, "http://", 7) == 0)
     url += 7;
   hash_pos_return = coucal_read(index->hash, url, &hash_pos);
@@ -2426,7 +2423,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   if (element->adr != NULL) {
     domd5mem(element->adr, element->size, st->md5, 1);
   } else {
-    strcpy(st->md5, "-");
+    strcpybuff(st->md5, "-");
   }
   fprintf(fp,
           /* nl */

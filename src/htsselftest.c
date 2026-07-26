@@ -624,6 +624,66 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* strclipbuff: truncate-and-report, never abort. Same canary shape; the
+     destination is poisoned before every call so a case cannot pass on the
+     previous one's bytes. */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    memset(&s, '#', sizeof(s));
+#define POISON_DST() memset(s.dst, '#', sizeof(s.dst))
+
+    /* well under capacity: no padding, nothing eaten off the end */
+    POISON_DST();
+    if (!strclipbuff(s.dst, sizeof(s.dst), "abc") || strcmp(s.dst, "abc") != 0)
+      return 1;
+
+    /* exact fit: capacity - 1 characters plus the NUL */
+    POISON_DST();
+    if (!strclipbuff(s.dst, sizeof(s.dst), "1234567") ||
+        strcmp(s.dst, "1234567") != 0)
+      return 1;
+
+    /* one over, then far over: clipped, terminated, reported. The expected
+       bytes differ from the case above, so a write-nothing implementation
+       cannot pass on the leftovers. */
+    POISON_DST();
+    if (strclipbuff(s.dst, sizeof(s.dst), "abcdefgh") ||
+        strcmp(s.dst, "abcdefg") != 0)
+      return 1;
+    POISON_DST();
+    if (strclipbuff(s.dst, sizeof(s.dst), "0123456789abcdef") ||
+        strcmp(s.dst, "0123456") != 0)
+      return 1;
+
+    /* degenerate capacity 1: only the NUL fits. Capacity 2 pins the boundary
+       between that and the sizes above: one character plus the NUL. */
+    POISON_DST();
+    if (strclipbuff(s.dst, 1, "x") || s.dst[0] != '\0')
+      return 1;
+    POISON_DST();
+    if (strclipbuff(s.dst, 2, "yz") || strcmp(s.dst, "y") != 0)
+      return 1;
+
+    /* the empty string fits any non-zero capacity */
+    POISON_DST();
+    if (!strclipbuff(s.dst, sizeof(s.dst), "") || s.dst[0] != '\0')
+      return 1;
+
+    /* a byte over 0x7f must not end the copy early */
+    POISON_DST();
+    if (!strclipbuff(s.dst, sizeof(s.dst), "\xff\xfe") ||
+        strcmp(s.dst, "\xff\xfe") != 0)
+      return 1;
+#undef POISON_DST
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
+      return 1;
+  }
+
   /* htsblk_failf: clips a reason quoted from a remote reply into msg[] and
      touches nothing else in the block */
   {
