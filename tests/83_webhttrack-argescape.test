@@ -107,7 +107,7 @@ test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '$
 # backslash (which must survive the escape round trip), the project name a plain
 # value.
 body=$(formencode "sid=${sid}" 'user=Moz" -V "touch /tmp/pwn' 'footer=a\b"c' \
-    "path=/tmp/p" "projname=plain proj")
+    "path=/tmp/p" "projname=plain proj" 'urls=http://x/a"b' 'url2=+*.png"')
 request "${port}" "${body}" >/dev/null
 cmdline=$(request "${port}" "" step4 |
     sed -n '/<textarea name="command"/,/<\/textarea>/p')
@@ -134,5 +134,15 @@ grep -qF -- '--user-agent "Moz" -V "touch' <<<"${cmdline}" &&
 # that follows.
 grep -qF -- '--footer "a\\b\"c"' <<<"${cmdline}" ||
     fail "the backslash in the footer was not escaped: ${cmdline}"
+
+# The url and filter fields sit outside quotes, where a backslash cannot escape
+# anything: one quote there flips the parity of every quote after it, so the
+# escaping above would protect nothing. They must not emit a raw quote at all.
+grep -qF -- 'http://x/a%22b' <<<"${cmdline}" ||
+    fail "the quote in the url field was not neutralised: ${cmdline}"
+grep -qF -- '+*.png%22' <<<"${cmdline}" ||
+    fail "the quote in the filter field was not neutralised: ${cmdline}"
+grep -qF -- 'http://x/a"b' <<<"${cmdline}" &&
+    fail "the url field still emits a raw quote: ${cmdline}"
 
 echo "PASS"

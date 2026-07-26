@@ -1127,12 +1127,8 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// hts_split_cmdline(): the webhttrack wizard posts its command line as a single
-// string, which this turns back into argv. Two properties a wizard run depends
-// on: the vector grows with the argument count (a large mirror easily passes
-// the 1024 entries the vector used to hold), and a double quote inside a value
-// stays part of the value instead of ending the argument and handing the rest
-// to the option parser as flags (-V alone reaches system()).
+// hts_split_cmdline(): the vector must grow with the argument count, and a
+// quote inside a value must not end the argument and hand -V to the parser.
 static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   char line[512];
   char **args;
@@ -1146,6 +1142,7 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   strcpybuff(line, "httrack http://x/ --quiet\t-c8\n-O out");
   args = hts_split_cmdline(line, &nargs);
   assertf(args != NULL && nargs == 6);
+  assertf(args[nargs] == NULL); // callers may walk to the terminator
   assertf(strcmp(args[0], "httrack") == 0);
   assertf(strcmp(args[1], "http://x/") == 0);
   assertf(strcmp(args[2], "--quiet") == 0);
@@ -1170,9 +1167,8 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(args[3], "-c8") == 0);
   freet(args);
 
-  // an escaped quote is a literal quote, not the end of the argument: the value
-  // keeps the injected text (the engine strips only the outer pair) and -V
-  // never becomes an option
+  // an escaped quote is a literal quote, not the end of the argument: the
+  // engine strips only the outer pair
   strcpybuff(line, "httrack --user-agent \"x\\\" -V \\\"touch /tmp/pwn\" -c8");
   args = hts_split_cmdline(line, &nargs);
   assertf(nargs == 4);
@@ -1194,6 +1190,19 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   assertf(nargs == 3);
   assertf(strcmp(args[1], "-*\\**") == 0);
   assertf(strcmp(args[2], "+*.png") == 0);
+  freet(args);
+
+  // a quoted run leaves slots unused, so the terminator has to be written and
+  // not inherited: size the vector from a full line first, so freeing it hands
+  // the same chunk back with stale pointers in those slots
+  strcpybuff(line, "httrack a b c d e");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 6);
+  freet(args);
+  strcpybuff(line, "httrack \"a b c d e\"");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 2);
+  assertf(args[nargs] == NULL);
   freet(args);
 
   // an unterminated quote protects the rest of the line, as one argument
@@ -1219,6 +1228,7 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
     }
     args = hts_split_cmdline(big, &nargs);
     assertf(args != NULL && nargs == n + 1);
+    assertf(args[nargs] == NULL);
     for (i = 0; i < n; i++) {
       char expect[16];
 

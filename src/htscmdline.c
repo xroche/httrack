@@ -59,11 +59,11 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
     }
   }
 
-  /* at most one argument per separator, plus the leading one */
-  if (nsep > (size_t) INT_MAX - 1 || nsep > SIZE_MAX / sizeof(char *) - 1) {
+  /* at most one argument per separator, plus the leading one and the NULL */
+  if (nsep > (size_t) INT_MAX - 1 || nsep > SIZE_MAX / sizeof(char *) - 2) {
     return NULL;
   }
-  capacity = nsep + 1;
+  capacity = nsep + 2;
   argv = (char **) malloct(capacity * sizeof(char *));
   if (argv == NULL) {
     return NULL;
@@ -80,7 +80,7 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
       cmd[w++] = cmd[r++];
     } else if (cmd[r] == ' ' && !quoted) {
       cmd[w++] = '\0';
-      assertf((size_t) argc < capacity);
+      assertf((size_t) argc < capacity - 1); /* the last slot holds the NULL */
       argv[argc++] = cmd + w;
       r++;
     } else {
@@ -88,6 +88,7 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
     }
   }
   cmd[w] = '\0';
+  argv[argc] = NULL; /* callers may rely on argv[argc] == NULL */
 
   *nargs = argc;
   return argv;

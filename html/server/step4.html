@@ -121,7 +121,7 @@ httrack \
 	--quiet \
 	--build-top-index \
 	${test:todo:--mirror:--mirror:--mirror-wizard:--get:--mirrorlinks:--testlinks:--continue:--update}
-	${urls}
+	${unquoted:urls}
 	${test:filelist:-%L "}${arg:filelist}${test:filelist:"}
 	--path "${arg:path}/${arg:projname}" 
 \
@@ -150,29 +150,29 @@ ${do:end-if}
 	${test:travel3::--keep-links=0:--keep-links:--keep-links=3:--keep-links=4}
 	${test:windebug:--debug-headers}
 \
-	${test:connexion:--sockets=}${connexion}
+	${test:connexion:--sockets=}${unquoted:connexion}
 	${test:ka:--keep-alive}
-	${test:timeout:--timeout=}${timeout}
+	${test:timeout:--timeout=}${unquoted:timeout}
 	${test:remt:--host-control=1}
-	${test:retry:--retries=}${retry}
-	${test:rate:--min-rate=}${rate}
+	${test:retry:--retries=}${unquoted:retry}
+	${test:rate:--min-rate=}${unquoted:rate}
 	${test:rems:--host-control=2}
 \
-	${test:depth:--depth=}${depth}
-	${test:depth2:--ext-depth=}${depth2}
-	${test:maxhtml:--max-files=,}${maxhtml}
-	${test:othermax:--max-files=}${othermax}
-	${test:sizemax:--max-files=}${sizemax}
-	${test:pausebytes:--max-pause=}${pausebytes}
-	${test:maxtime:--max-time=}${maxtime}
-	${test:maxrate:--max-rate=}${maxrate}
-	${test:maxconn:--connection-per-second=}${maxconn}
-	${test:maxlinks:--advanced-maxlinks=}${maxlinks}
+	${test:depth:--depth=}${unquoted:depth}
+	${test:depth2:--ext-depth=}${unquoted:depth2}
+	${test:maxhtml:--max-files=,}${unquoted:maxhtml}
+	${test:othermax:--max-files=}${unquoted:othermax}
+	${test:sizemax:--max-files=}${unquoted:sizemax}
+	${test:pausebytes:--max-pause=}${unquoted:pausebytes}
+	${test:maxtime:--max-time=}${unquoted:maxtime}
+	${test:maxrate:--max-rate=}${unquoted:maxrate}
+	${test:maxconn:--connection-per-second=}${unquoted:maxconn}
+	${test:maxlinks:--advanced-maxlinks=}${unquoted:maxlinks}
 \
 	--user-agent "${arg:user}"
 	--footer "${arg:footer}"
 \
-	${url2}
+	${unquoted:url2}
 \
 	${test:cookies:--cookies=0:}
 	${test:parsejava:--parse-java=0:}

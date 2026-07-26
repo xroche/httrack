@@ -363,6 +363,27 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   return seen;
 }
 
+/* Append c to dst as an HTML entity, or return HTS_FALSE if it needs none. */
+static hts_boolean cat_html_escaped(String *dst, char c) {
+  switch (c) {
+  case '<':
+    StringCat(*dst, "&lt;");
+    break;
+  case '>':
+    StringCat(*dst, "&gt;");
+    break;
+  case '&':
+    StringCat(*dst, "&amp;");
+    break;
+  case '\'':
+    StringCat(*dst, "&#39;");
+    break;
+  default:
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 /* Append the value of a double-quoted command-line argument: escaped for HTML,
    which the browser undoes when it posts the command line back, and for the
    argv splitter, which does not. */
@@ -373,15 +394,7 @@ static void cat_cmdline_arg(String *output, const char *value) {
     if (*a == '\\' || *a == '\"') {
       StringCat(*output, "\\");
     }
-    if (*a == '<') {
-      StringCat(*output, "&lt;");
-    } else if (*a == '>') {
-      StringCat(*output, "&gt;");
-    } else if (*a == '&') {
-      StringCat(*output, "&amp;");
-    } else if (*a == '\'') {
-      StringCat(*output, "&#39;");
-    } else {
+    if (!cat_html_escaped(output, *a)) {
       StringMemcat(*output, a, 1);
     }
   }
@@ -1017,6 +1030,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int p;
                     int format = 0;
                     int listDefault = 0;
+                    hts_boolean unquoted = HTS_FALSE;
 
                     name[0] = '\0';
                     strlncatbuff(name, str, sizeof(name_), n);
@@ -1026,6 +1040,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "html:"))) {
                       name += p;
                       format = 1;
+                    } else if ((p = strfield(name, "unquoted:"))) {
+                      name += p;
+                      unquoted = HTS_TRUE;
                     } else if ((p = strfield(name, "arg:"))) {
                       name += p;
                       format = 5;
@@ -1292,18 +1309,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringMemcat(output, &c, 1);
                               }
                               a += 2;
-                            } else if (outputmode && a[0] == '<') {
-                              StringCat(output, "&lt;");
-                            } else if (outputmode && a[0] == '>') {
-                              StringCat(output, "&gt;");
-                            } else if (outputmode && a[0] == '&') {
-                              StringCat(output, "&amp;");
-                            } else if (outputmode && a[0] == '\'') {
-                              StringCat(output, "&#39;");
+                            } else if (unquoted && a[0] == '\"') {
+                              /* the browser posts an entity back as a raw
+                                 quote, which would open a quoted run in the
+                                 argv splitter; a URI cannot hold one anyway */
+                              StringCat(output, "%22");
+                            } else if (outputmode &&
+                                       cat_html_escaped(&output, a[0])) {
+                              /* appended as an entity */
                             } else if (outputmode == 3 && a[0] == ' ') {
                               StringCat(output, "%20");
-                            } else if (outputmode >= 2
-                                       && ((unsigned char) a[0]) < 32) {
+                            } else if (outputmode >= 2 &&
+                                       ((unsigned char) a[0]) < 32) {
                               char tmp[32];
 
                               sprintf(tmp, "%%%02x", (unsigned char) a[0]);
@@ -1364,20 +1381,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               }
                               StringClear(tmpbuff);
                               break;
-                            case '<':
-                              StringCat(tmpbuff, "&lt;");
-                              break;
-                            case '>':
-                              StringCat(tmpbuff, "&gt;");
-                              break;
-                            case '&':
-                              StringCat(tmpbuff, "&amp;");
-                              break;
-                            case '\'':
-                              StringCat(tmpbuff, "&#39;");
-                              break;
                             default:
-                              StringMemcat(tmpbuff, fstr, 1);
+                              if (!cat_html_escaped(&tmpbuff, *fstr)) {
+                                StringMemcat(tmpbuff, fstr, 1);
+                              }
                               break;
                             }
                             fstr++;

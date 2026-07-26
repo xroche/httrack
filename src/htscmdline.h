@@ -36,13 +36,10 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-/* Split the command line "cmd" in place into an argv vector of *nargs entries,
-   argv[0] being the program name: a space, tab, CR or LF separates arguments, a
-   double quote protects a run of them, and inside a quoted run \" and \\ stand
-   for a literal " and \, so a quote in a value can no longer end the argument
-   and turn the rest into flags. Quotes are kept, the engine unquotes each
-   argument itself. Returns a malloct'ed vector of pointers into cmd (freet the
-   vector, never its entries), or NULL when it cannot be sized or allocated. */
+/* Split "cmd" in place into a NULL-terminated argv vector of *nargs entries,
+   argv[0] being the program name and quotes left for the engine to strip.
+   Returns a malloct'ed vector of pointers into cmd (freet the vector, never its
+   entries), or NULL when it cannot be sized or allocated. */
 char **hts_split_cmdline(char *cmd, int *nargs);
 
 #endif
