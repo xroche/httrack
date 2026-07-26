@@ -44,8 +44,7 @@ print(s.getsockname()[1])
 s.close()'
 }
 
-# Echo the announced URL. Extra args become key/value pairs in the server store,
-# which is how the project path gets set here; the GUI posts it from step4.
+# Echo the announced URL.
 start() {
     local port url
     port=$(freeport)
@@ -106,7 +105,7 @@ hdr="${work}/hdr"
 body="${work}/body"
 
 # The server merges $HOME/.httrack.ini into the same store on the first request;
-# point it somewhere empty so a developer's own file cannot shadow projpath.
+# point it somewhere empty so a developer's own file cannot shadow the fields.
 export HOME="${work}"
 
 url=$(start)
