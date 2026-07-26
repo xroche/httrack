@@ -146,11 +146,13 @@ sid=$(scrape_sid "${port}")
 resp=$(post_redirect '/foo
 X-Injected: pwned' "${port}" "${sid}") || fail "no response to a CRLF redirect value"
 stop
-printf '%s' "${resp}" | grep -qi 'X-Injected' &&
+# Here-string, not a pipe: grep -q SIGPIPEs the producer on the first match, and
+# pipefail then turns the hit into a silent pass.
+grep -qi 'X-Injected' <<<"${resp}" &&
     fail "CRLF in the redirect value reached the response"
-test "$(printf '%s' "${resp}" | grep -ci '^Location:')" -eq 0 ||
+test "$(grep -ci '^Location:' <<<"${resp}")" -eq 0 ||
     fail "CRLF redirect still emitted a Location header"
-test "$(printf '%s' "${resp}" | grep -c '^HTTP/1\.')" -eq 1 ||
+test "$(grep -c '^HTTP/1\.' <<<"${resp}")" -eq 1 ||
     fail "CRLF redirect did not yield exactly one status line"
 
 # Loopback unless asked otherwise. Assert the socket, not the announcement.
