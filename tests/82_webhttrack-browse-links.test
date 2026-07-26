@@ -67,10 +67,10 @@ test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
 srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
 
 # htsserver resolves the posted paths itself, so hand it native ones.
-"${python}" - "${url}" "$(nativepath "${work}/websites")" "$(nativepath "${proj}")" <<'PY' || fail "browse-link checks failed"
+"${python}" - "${url}" "$(nativepath "${work}/websites")" <<'PY' || fail "browse-link checks failed"
 import re, sys, urllib.error, urllib.parse, urllib.request
 
-url, base, proj = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3]
+url, base = sys.argv[1].rstrip("/"), sys.argv[2]
 rc = 0
 
 
