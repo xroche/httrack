@@ -302,8 +302,6 @@ case "$st" in
 esac
 
 # --- the web GUI must emit the same options ---------------------------------
-# The Windows job builds httrack.exe only and reaches this file through its
-# *_local-*.test glob, so the GUI half has to stand down there rather than fail.
 distdir=$(cd "${top_srcdir}" && pwd)
 printf '[project reload maps the keys back] ..\t'
 grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || {
@@ -317,6 +315,8 @@ grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.
 echo OK
 
 printf '[webhttrack renders the options] ..\t'
+# The Windows job builds httrack.exe only and reaches this file through its
+# *_local-*.test glob, so report a skip there rather than a pass.
 if ! command -v htsserver >/dev/null; then
     echo "SKIP (no htsserver in PATH)"
     exit 77
