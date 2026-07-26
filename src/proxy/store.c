@@ -1577,7 +1577,14 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
               a++;
               /* read "host/file" */
               a += binput(a, line, HTS_URLMAXSIZE);
-              a += binput(a, line + strlen(line), HTS_URLMAXSIZE);
+              {
+                /* binput writes its NUL at s[max], so the second field must be
+                   bounded by what is left of line[], not by the same constant
+                 */
+                const size_t used = strlen(line);
+
+                a += binput(a, line + used, (int) (sizeof(line) - used - 1));
+              }
               /* read position */
               a += binput(a, linepos, 200);
               sscanf(linepos, "%d", &pos);

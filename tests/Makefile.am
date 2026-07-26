@@ -188,6 +188,7 @@ TESTS = \
 	88_local-proxytrack-badmtime.test \
 	89_webhttrack-error-overflow.test \
 	90_webhttrack-checkbox-clear.test \
-	91_webhttrack-directory.test
+	91_webhttrack-directory.test \
+	92_local-proxytrack-ndx-fields.test
 
 CLEANFILES = check-network_sh.cache
