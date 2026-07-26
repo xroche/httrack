@@ -1222,9 +1222,15 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
     int i;
 
     assertf(big != NULL);
-    pos += (size_t) snprintf(big, size, "httrack");
+    pos = (size_t) snprintf(big, size, "httrack");
+    assertf(pos < size);
     for (i = 0; i < n; i++) {
-      pos += (size_t) snprintf(big + pos, size - pos, " a%d", i);
+      // snprintf returns what it wanted to write, so accumulating it blind
+      // would let the next size argument wrap
+      const int len = snprintf(big + pos, size - pos, " a%d", i);
+
+      assertf(len > 0 && (size_t) len < size - pos);
+      pos += (size_t) len;
     }
     args = hts_split_cmdline(big, &nargs);
     assertf(args != NULL && nargs == n + 1);
