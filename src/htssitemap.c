@@ -524,8 +524,12 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
                   fil);
     return;
   }
-  hts_log_print(opt, LOG_NOTICE, "Sitemap: %d URL(s) added from %s%s", n, adr,
-                fil);
+  if (ctx.is_index)
+    hts_log_print(opt, LOG_NOTICE,
+                  "Sitemap: %d child sitemap(s) listed by %s%s", n, adr, fil);
+  else
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: %d URL(s) added from %s%s", n, adr,
+                  fil);
 }
 
 void hts_sitemap_free(httrackp *opt) {
