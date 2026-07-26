@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998 Xavier Roche and other contributors
+Copyright (C) 2026 Xavier Roche and other contributors
 
 SPDX-License-Identifier: GPL-3.0-or-later
 
