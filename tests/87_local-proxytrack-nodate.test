@@ -1,0 +1,42 @@
+#!/bin/bash
+# A cached entry whose Last-Modified is missing or unparseable must still
+# convert: the ARC writer used to dereference the parsed date unchecked.
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# entry 1 has no Last-Modified at all, entry 2 has one that cannot parse
+run_case() {
+    lastmod=$1
+    what=$2
+
+    {
+        printf 'HTTP/1.1 200 OK\r\n'
+        printf 'Content-Type: text/html\r\n'
+        test -z "$lastmod" || printf 'Last-Modified: %s\r\n' "$lastmod"
+        printf 'Content-Length: 5\r\n\r\n'
+    } >"$dir/hdr"
+    printf 'hello' >"$dir/body"
+    alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+    {
+        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+        printf '2 0 test\n'
+        printf '\n\n'
+        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+        cat "$dir/hdr" "$dir/body"
+    } >"$dir/in.arc"
+
+    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || {
+        echo "FAIL: proxytrack crashed on $what" >&2
+        exit 1
+    }
+    grep -aq 'http://example.com/p.html' "$dir/out.arc" || {
+        echo "FAIL: entry dropped on $what" >&2
+        exit 1
+    }
+}
+
+run_case '' 'a missing Last-Modified'
+run_case 'not a date at all' 'an unparseable Last-Modified'
