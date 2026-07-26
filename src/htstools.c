@@ -1318,19 +1318,19 @@ HTSEXT_API hts_boolean hts_findnext(find_handle find) {
   if (find) {
 #ifdef _WIN32
     if ((FindNextFileA(find->handle, &find->hdata)))
-      return 1;
+      return HTS_TRUE;
 #else
     char catbuff[CATBUFF_SIZE];
 
     memset(&(find->filestat), 0, sizeof(find->filestat));
     if ((find->dirp = readdir(find->hdir)))
-      if (find->dirp->d_name)
-        if (!STAT
-            (concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name), &find->filestat))
-          return 1;
+      if (!STAT(
+              concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name),
+              &find->filestat))
+        return HTS_TRUE;
 #endif
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 HTSEXT_API int hts_findclose(find_handle find) {
