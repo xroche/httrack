@@ -169,7 +169,7 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 
 # check for various headers
-AC_CHECK_HEADERS([execinfo.h])
+AC_CHECK_HEADERS([execinfo.h sys/ioctl.h])
 
 ### zlib
 CHECK_ZLIB()
