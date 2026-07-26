@@ -2042,9 +2042,12 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
       {0, 0, 0, ACCEPT},
       {10, 100, 8192, ACCEPT},
       {(size_t) -2 - 8, 4, 4, ACCEPT}, /* exact fit, no room to spare */
+      {(size_t) -2, 0, 0, ACCEPT},     /* largest representable capacity */
       {0, -1, 0, REFUSE},              /* fsize() failure */
+      /* -1 already maps to SIZE_MAX; only this exercises the negative guard */
       {0, -4096, 0, REFUSE},
       {(size_t) -1, 1, 0, REFUSE},
+      {(size_t) -2, 0, 1, REFUSE},     /* slack alone overruns */
       {(size_t) -1 - 8, 4, 4, REFUSE}, /* total would be the error value */
       {(size_t) -1 - 8, 4, 8, REFUSE},
       {0, HTS_ST_GROWSIZE_OVER32, 8192,
