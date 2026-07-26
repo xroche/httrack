@@ -49,7 +49,7 @@ start() {
     : >"${log}"
     (
         trap '' TERM TTOU
-        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
+        exec htsserver "${distdir}/" --port "${port}" >"${log}" 2>&1
     ) &
     for _ in $(seq 1 40); do
         url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
@@ -60,6 +60,21 @@ start() {
 }
 
 portof() { echo "${1##*:}" | tr -d /; }
+
+# POST body $2 to 127.0.0.1:$1, reply discarded.
+post() {
+    python3 -c 'import socket, sys
+body = sys.argv[2]
+req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+       "Content-type: application/x-www-form-urlencoded\r\n"
+       "Content-length: %d\r\n\r\n%s" % (len(body), body))
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+s.settimeout(20)
+s.sendall(req.encode())
+while s.recv(65536):
+    pass
+s.close()' "$1" "$2"
+}
 
 # GET $2 from 127.0.0.1:$1, headers into $3 and the body, byte for byte, into $4.
 fetch() {
@@ -81,11 +96,7 @@ open(sys.argv[4], "wb").write(body)' "$1" "$2" "$3" "$4"
 
 # LF-only, and a line ending in a backslash: the expander rewrites both, so a
 # mangled reply fails the byte comparison even where no directive is present.
-mirror="${work}/hostile.html"
-# shellcheck disable=SC2016 # the directives are the payload, not shell expansions
-printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\n' \
-    >"${mirror}"
-
+mirror="${work}/proj/hostile.html"
 hdr="${work}/hdr"
 body="${work}/body"
 
@@ -93,7 +104,7 @@ body="${work}/body"
 # point it somewhere empty so a developer's own file cannot shadow projpath.
 export HOME="${work}"
 
-url=$(start projpath "${work}/")
+url=$(start)
 port=$(portof "${url}")
 
 # Positive control: the GUI's own templates must still expand. This is also
@@ -101,6 +112,16 @@ port=$(portof "${url}")
 fetch "${port}" /server/index.html "${hdr}" "${body}"
 sid=$(sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' "${body}" | head -1)
 test "${#sid}" -eq 32 || fail "GUI page did not expand \${sid} (got '${sid}')"
+
+# /website/ serves only the root the server itself recorded, so save a profile
+# (no command_do=start, so nothing crawls) to create it, then plant the file.
+post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${work}&projname=proj"
+test -f "${work}/proj/hts-cache/winprofile.ini" ||
+    fail "profile save did not create the project: $(cat "${log}")"
+mkdir -p "$(dirname "${mirror}")"
+# shellcheck disable=SC2016 # the directives are the payload, not shell expansions
+printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\n' \
+    >"${mirror}"
 
 fetch "${port}" /website/hostile.html "${hdr}" "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" || fail "mirrored page not served: $(head -1 "${hdr}")"
