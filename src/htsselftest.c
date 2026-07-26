@@ -887,19 +887,17 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* hts_convertStringUTF8ToSystem: the UTF-8 -> ANSI leg an MBCS GUI needs at the
-   Win32 ANSI entry points. Oracle is the raw two-step Win32 dance it replaces,
-   so a mis-wired direction or a plain copy fails whatever the machine's ACP. */
+/* Oracle is the raw Win32 two-step this replaces, so a mis-wired direction or
+   a plain copy fails whatever the machine's ACP. */
 static int st_syscharset(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
   static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
   const UINT cp = GetACP();
   const int len = (int) strlen(utf8);
-  WCHAR wide[64];
+  WCHAR wide[64], round[64];
   char want[64];
-  char *sys, *back;
-  BOOL lossy = FALSE;
-  int wn, n;
+  char *sys, *back, *part;
+  int wn, n, lossless;
 
   (void) opt;
   (void) argc;
@@ -907,17 +905,31 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn > 0);
-  /* lpUsedDefaultChar is rejected for CP_UTF8, and pointless there anyway */
   n = WideCharToMultiByte(cp, 0, wide, wn, want, (int) sizeof(want) - 1, NULL,
-                          cp == CP_UTF8 ? NULL : &lossy);
+                          NULL);
   assertf(n > 0);
   want[n] = '\0';
+  /* the ACP holds the string only if its bytes decode back to the same UTF-16;
+     lpUsedDefaultChar would miss a best-fit mapping (é to a bare e) */
+  lossless =
+      MultiByteToWideChar(cp, 0, want, n, round,
+                          (int) (sizeof(round) / sizeof(round[0]))) == wn &&
+      memcmp(round, wide, (size_t) wn * sizeof(WCHAR)) == 0;
 
   sys = hts_convertStringUTF8ToSystem(utf8, (size_t) len);
   assertf(sys != NULL);
   assertf(strcmp(sys, want) == 0);
-  /* only round-trips when the ACP could hold é and € without substitution */
-  if (!lossy) {
+  assertf(strlen(sys) == (size_t) n); /* NUL-terminated, nothing past it */
+  /* the copy the ASCII fast path returns is a pass on a UTF-8 ACP only */
+  assertf(cp == CP_UTF8 || strcmp(sys, utf8) != 0);
+  /* size bounds the read: a caller-given length, not strlen() */
+  part = hts_convertStringUTF8ToSystem(utf8, 3);
+  assertf(part != NULL && strcmp(part, "caf") == 0);
+  freet(part);
+  part = hts_convertStringUTF8ToSystem(utf8, 0);
+  assertf(part != NULL && *part == '\0');
+  freet(part);
+  if (lossless) {
     back = hts_convertStringSystemToUTF8(sys, strlen(sys));
     assertf(back != NULL);
     assertf(strcmp(back, utf8) == 0);
@@ -925,7 +937,7 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   }
   freet(sys);
   printf("syscharset: acp=%u %s: OK\n", (unsigned) cp,
-         lossy ? "one-way" : "round-trip");
+         lossless ? "round-trip" : "one-way");
   return 0;
 #else
   (void) opt;
