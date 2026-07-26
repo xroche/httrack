@@ -461,6 +461,25 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 }
 
 /**
+ * Copy src into dest (capacity size, NUL included), truncating to fit and
+ * always NUL-terminating. Unlike strlcpybuff() it never aborts, so it suits a
+ * value read back from a cache, a header or the wire, where refusing the whole
+ * record is worse than keeping a clipped one. Returns HTS_TRUE if it all fit;
+ * callers that clip on purpose ignore that, so it is not HTS_CHECK_RESULT.
+ */
+static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
+                                                     const char *src) {
+  size_t len, copy;
+
+  assertf(dest != NULL && src != NULL && size != 0);
+  len = strlen(src);
+  copy = len < size ? len : size - 1;
+  memcpy(dest, src, copy);
+  dest[copy] = '\0';
+  return copy == len ? HTS_TRUE : HTS_FALSE;
+}
+
+/**
  * Callers that deliberately ignore truncation use this instead of
  * slprintfbuff(), so it is not HTS_CHECK_RESULT.
  */
