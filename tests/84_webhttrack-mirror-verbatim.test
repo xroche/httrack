@@ -22,6 +22,7 @@ command -v python3 >/dev/null || {
 
 log=$(mktemp)
 work=$(mktemp -d)
+csrv=
 # start() runs in a command substitution, so its $! never reaches this shell. A
 # missed kill leaves an orphan holding the CI job open long after a green suite.
 srvpid() { sed -n 's/^PID=//p' "${log}" 2>/dev/null | head -1; }
@@ -29,6 +30,8 @@ cleanup() {
     local pid
     pid=$(srvpid)
     test -z "${pid}" || kill -9 "${pid}" 2>/dev/null || true
+    test -z "${csrv}" || kill -9 "${csrv}" 2>/dev/null || true
+    wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
     rm -rf "${log}" "${work}"
 }
 trap cleanup EXIT HUP INT QUIT PIPE TERM
@@ -79,6 +82,23 @@ open(sys.argv[3], "wb").write(head)
 open(sys.argv[4], "wb").write(body)' "$1" "$2" "$3" "$4"
 }
 
+# POST the remaining args as urlencoded key=value fields to 127.0.0.1:$1.
+post() {
+    local port=$1
+    shift
+    python3 -c 'import socket, sys, urllib.parse
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe=""))
+                for k, v in (a.split("=", 1) for a in sys.argv[2:])).encode()
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+s.settimeout(30)
+s.sendall(b"POST /step4.html HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+          b"Content-type: application/x-www-form-urlencoded\r\n"
+          b"Content-length: %d\r\n\r\n" % len(body) + body)
+while s.recv(65536):
+    pass
+s.close()' "${port}" "$@" >/dev/null
+}
+
 # LF-only, and a line ending in a backslash: the expander rewrites both, so a
 # mangled reply fails the byte comparison even where no directive is present.
 mirror="${work}/hostile.html"
@@ -114,5 +134,28 @@ cmp -s "${mirror}" "${body}" || fail "mirrored file not served byte for byte"
 # The mirror stays browsable: verbatim must not mean served as a download.
 grep -qi '^Content-type: text/html' "${hdr}" ||
     fail "mirrored page lost its text/html type: $(cat "${hdr}")"
+
+# The other direction: while a crawl runs, every .html request is overridden to
+# the GUI's own refresh page, so a /website/ URL stops naming mirrored content.
+# /trickle/ dribbles for a minute, which holds the crawl open for the probe.
+clog="${work}/content.log"
+python3 "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+for _ in $(seq 1 40); do
+    cport=$(sed -n 's/^PORT //p' "${clog}") && test -n "${cport}" && break
+    kill -0 "${csrv}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${cport:-}" || fail "content server did not come up: $(cat "${clog}")"
+
+post "${port}" "sid=${sid}" "path=${work}" projname=crawl winprofile=x \
+    command_do=start \
+    "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl"
+
+fetch "${port}" /website/hostile.html "${hdr}" "${body}"
+grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
+    fail "running crawl: /website/ was not overridden to the GUI page: $(head -1 "${hdr}")"
+grep -qF "'crawl' - HTTrack Website Copier" "${body}" ||
+    fail "the overridden GUI page was not the expanded refresh page"
 
 echo "PASS"
