@@ -1,0 +1,97 @@
+#!/bin/bash
+# A fatal signal prints the raw backtrace, then names the frames
+# backtrace_symbols_fd() leaves as module+offset (-fvisibility=hidden hides them).
+set -eu
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+if is_windows; then
+    echo "no backtrace() on Windows; skipping" >&2
+    exit 77
+fi
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
+trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
+out="${tmpdir}/trace"
+raw="${tmpdir}/trace-optout"
+overflow="this string is far too long for the buffer"
+# A frame glibc could not name. Stop at the offset: it prints the trailing
+# "[0xADDR]" with or without a leading space depending on its version.
+rawframe='(+0x[0-9a-f][0-9a-f]*)'
+
+# The strsafe selftest aborts on purpose, which lands in sig_fatal.
+rc=0
+run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$out" 2>&1 || rc=$?
+test "$rc" -ne 124 || {
+    echo "the crash handler did not finish within the deadline" >&2
+    exit 1
+}
+
+grep -q '^Caught signal ' "$out" || {
+    echo "no 'Caught signal' line:" >&2
+    cat "$out" >&2
+    exit 1
+}
+if grep -q 'No stack trace available on this OS' "$out"; then
+    echo "no backtrace() on this platform; skipping" >&2
+    exit 77
+fi
+# Unconditional and first: symbolizing must never cost the raw trace.
+grep -q "$rawframe" "$out" || {
+    echo "raw module+offset frames are gone:" >&2
+    cat "$out" >&2
+    exit 1
+}
+
+command -v addr2line >/dev/null || {
+    echo "addr2line not installed; skipping" >&2
+    exit 77
+}
+
+# Control: resolve the same frames ourselves, so a stripped build cannot turn
+# the assertion below into a vacuous pass.
+oracle="${tmpdir}/oracle"
+sed -n 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' "$out" |
+    while read -r mod off; do
+        test -f "$mod" || continue
+        addr2line -Cfip -e "$mod" "$off" 2>/dev/null || true
+    done >"$oracle"
+grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || {
+    echo "addr2line names no hidden symbol in this build; skipping" >&2
+    exit 77
+}
+
+# The payload. Dropping the raw frames first is what makes it specific: both
+# names are static, so .dynsym could never have carried them. Not anchored on
+# the "0xOFF:" line, the inline chain puts the name on either half.
+grep -v "$rawframe" "$out" | grep -qE 'st_strsafe|strcpy_safe_' || {
+    echo "the handler did not name the hidden frames:" >&2
+    cat "$out" >&2
+    exit 1
+}
+
+# Opt-out: raw trace kept, nothing spawned.
+export HTTRACK_NO_SYMBOLIZE=1
+rc=0
+run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$raw" 2>&1 || rc=$?
+unset HTTRACK_NO_SYMBOLIZE
+test "$rc" -ne 124 || {
+    echo "the opt-out run did not finish within the deadline" >&2
+    exit 1
+}
+grep -q "$rawframe" "$raw" || {
+    echo "the opt-out lost the raw trace:" >&2
+    cat "$raw" >&2
+    exit 1
+}
+! grep -q '^0x[0-9a-f]*: ' "$raw" || {
+    echo "the opt-out still symbolized:" >&2
+    cat "$raw" >&2
+    exit 1
+}

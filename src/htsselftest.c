@@ -2605,17 +2605,20 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     static t_cookie ck2;
     htsblk r;
     char host[600];
+    char line[64]; /* treathead NUL-cuts the header in place: never a literal */
 
     memset(&r, 0, sizeof(r));
     memset(host, 'a', sizeof(host) - 1);
     host[sizeof(host) - 1] = '\0';
     ck2.max_len = (int) sizeof(ck2.data);
     ck2.data[0] = '\0';
-    treathead(&ck2, host, "/", &r, "Set-Cookie: SID=1; path=/");
+    strcpybuff(line, "Set-Cookie: SID=1; path=/");
+    treathead(&ck2, host, "/", &r, line);
     if (strnotempty(ck2.data)) // oversize-host cookie was not dropped
       err = 1;
     /* control: a normal host still yields a cookie through treathead */
-    treathead(&ck2, dom, "/", &r, "Set-Cookie: SID=1; path=/");
+    strcpybuff(line, "Set-Cookie: SID=1; path=/");
+    treathead(&ck2, dom, "/", &r, line);
     if (strstr(ck2.data, "SID") == NULL) // guard wrongly dropped a valid cookie
       err = 1;
   }
@@ -3105,7 +3108,7 @@ static int ae_write_packed(const char *path, int windowBits,
     deflateEnd(&strm);
     return 1;
   }
-  strm.next_in = (Bytef *) src;
+  strm.next_in = (const Bytef *) src;
   strm.avail_in = (uInt) len;
   do {
     size_t n;
