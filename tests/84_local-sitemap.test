@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# --sitemap seeds the crawl from robots.txt -> sitemapindex -> gzipped urlset.
+# start.html links to nothing, so orphan*.html can only arrive through the
+# sitemap; deep1.html proves the seeds keep a full depth budget under -r2, and
+# the off-host page and child sitemap must both be refused (--errors 0).
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+
+# robots.txt Sitemap: -> index -> .xml.gz, and the seeds behave like -r2 seeds.
+# --rerun also walks the update path over a mirror holding sitemap seeds.
+crawl --errors 0 --rerun \
+    --found 'sitemapdir/orphan1.html' \
+    --found 'sitemapdir/orphan2.html' \
+    --found 'sitemapdir/deep1.html' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2
+
+# Negative control: without the option nothing but the start page is reached.
+crawl --errors 0 \
+    --found 'sitemapdir/start.html' \
+    --not-found 'sitemapdir/orphan1.html' \
+    --not-found 'sitemapdir/orphan2.html' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2
+
+# Sitemap URLs are not a filter bypass: a -*orphan2* rule still rejects one.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --not-found 'sitemapdir/orphan2.html' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 '-*orphan2*'
+
+# A robots.txt naming no sitemap falls back to the well-known /sitemap.xml.
+# The test server drops its Sitemap: record for this User-Agent.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-not-found 'sitemapdir/index.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -F 'nositemap-agent'
+
+# --sitemap-url names the document directly, skipping the robots.txt probe.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --found 'sitemapdir/orphan2.html' \
+    --log-not-found 'sitemapdir/index.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/pages.xml.gz'
+
+# An unfetchable sitemap is not fatal: the crawl still completes.
+crawl --found 'sitemapdir/start.html' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/missing.xml'

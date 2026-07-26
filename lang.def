@@ -1042,3 +1042,11 @@ LANG_WARCFILE
 WARC archive name:
 LANG_WARCFILETIP
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+LANG_SITEMAP
+Seed the crawl from the site's sitemap
+LANG_SITEMAPTIP
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+LANG_SITEMAPURL
+Sitemap address:
+LANG_SITEMAPURLTIP
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.

@@ -132,6 +132,17 @@ ${listid:robots:LISTDEF_8}
 </select>
 <br><br>
 
+<input type="checkbox" name="sitemap" ${checked:sitemap}
+			title='${html:LANG_SITEMAPTIP}' onMouseOver="info('${html:LANG_SITEMAPTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_SITEMAP}
+<br><br>
+
+${LANG_SITEMAPURL}
+<input name="sitemapurl" value="${sitemapurl}" size="40"
+			title='${html:LANG_SITEMAPURLTIP}' onMouseOver="info('${html:LANG_SITEMAPURLTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<br><br>
+
 <input type="checkbox" name="updhack" ${checked:updhack}
 			title='${html:LANG_I1k}' onMouseOver="info('${html:LANG_I1k}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I62b}

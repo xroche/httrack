@@ -542,14 +542,65 @@ class Handler(SimpleHTTPRequestHandler):
             return self.fail_cookie(name)
         self.send_html("\tThis is the secret.")
 
+    # A User-Agent carrying NO_SITEMAP_UA gets a robots.txt with no Sitemap:
+    # record, so a test can drive the /sitemap.xml fallback instead.
+    NO_SITEMAP_UA = "nositemap"
+
     def route_robots(self):
-        body = b"User-agent: *\nDisallow:\n"
+        # The Sitemap: record is group-independent; only --sitemap acts on it.
+        body = "User-agent: *\nDisallow:\n"
+        if self.NO_SITEMAP_UA not in (self.headers.get("User-Agent") or ""):
+            body += f"Sitemap: http://{self.headers.get('Host')}/sitemapdir/index.xml\n"
+        body = body.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
+
+    # --- sitemap ingestion (issue #712) ------------------------------------
+    # start.html links to nothing, so orphan*.html are reachable only through
+    # the sitemap. deep1.html proves the seeds keep a full depth budget; the
+    # off-host page <loc> must be dropped by the travel scope, and the off-host
+    # child sitemap by the ingester's same-host rule. The index is served both
+    # from /sitemapdir/ (named by robots.txt) and from the well-known
+    # /sitemap.xml (the fallback).
+
+    def route_sitemap_index(self):
+        host = self.headers.get("Host")
+        self.send_raw(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"<sitemap><loc>http://{host}/sitemapdir/pages.xml.gz</loc></sitemap>"
+            "<sitemap><loc>http://sitemap-offhost.invalid/s.xml</loc></sitemap>"
+            "</sitemapindex>\n".encode(),
+            "application/xml",
+        )
+
+    def route_sitemap_pages(self):
+        host = self.headers.get("Host")
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"<url><loc>http://{host}/sitemapdir/orphan1.html</loc></url>"
+            f"<url><loc>http://{host}/sitemapdir/orphan2.html</loc></url>"
+            "<url><loc>http://sitemap-offhost.invalid/x.html</loc></url>"
+            "</urlset>\n"
+        ).encode()
+        self.send_raw(gzip.compress(xml), "application/x-gzip")
+
+    def route_sitemap_start(self):
+        self.send_html("\tNothing links to the sitemap pages.")
+
+    def route_sitemap_orphan1(self):
+        self.send_html('\t<a href="deep1.html">deeper</a>')
+
+    def route_sitemap_orphan2(self):
+        self.send_html("\tSecond orphan.")
+
+    def route_sitemap_deep1(self):
+        self.send_html("\tOne level below an orphan.")
 
     # --- type/extension matrix (issue #267 family) -------------------------
 
@@ -1578,6 +1629,13 @@ class Handler(SimpleHTTPRequestHandler):
         "/gated/index.php": route_gated_index,
         "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
+        "/sitemapdir/index.xml": route_sitemap_index,
+        "/sitemap.xml": route_sitemap_index,
+        "/sitemapdir/pages.xml.gz": route_sitemap_pages,
+        "/sitemapdir/start.html": route_sitemap_start,
+        "/sitemapdir/orphan1.html": route_sitemap_orphan1,
+        "/sitemapdir/orphan2.html": route_sitemap_orphan2,
+        "/sitemapdir/deep1.html": route_sitemap_deep1,
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,

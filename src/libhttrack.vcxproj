@@ -138,6 +138,7 @@
     <ClCompile Include="htswrap.c" />
     <ClCompile Include="htszlib.c" />
     <ClCompile Include="htswarc.c" />
+    <ClCompile Include="htssitemap.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="minizip\ioapi.c" />
     <ClCompile Include="minizip\iowin32.c" />

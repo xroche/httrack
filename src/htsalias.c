@@ -114,6 +114,10 @@ const char *hts_optalias[][4] = {
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
+  {"sitemap", "-%m", "single",
+   "seed the crawl from the start host's sitemap (robots.txt, then "
+   "/sitemap.xml)"},
+  {"sitemap-url", "-%mu", "param1", "seed the crawl from this sitemap URL"},
   {"warc", "-%r", "single", "write an ISO-28500 WARC/1.1 archive of the crawl"},
   {"warc-file", "-%rf", "param1", "write a WARC archive to the given base name"},
   {"warc-max-size", "-%rs", "param1",

@@ -89,6 +89,7 @@ TESTS = \
 	01_engine-warc-surt.test \
 	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
+	01_engine-sitemap.test \
 	01_zlib-warc.test \
 	01_zlib-warc-cdx.test \
 	01_zlib-warc-wacz.test \
@@ -179,6 +180,7 @@ TESTS = \
 	79_local-proxytrack-webdav-mime.test \
 	80_engine-crash-symbolize.test \
 	81_webhttrack-maxsize.test \
-	83_webhttrack-argescape.test
+	83_webhttrack-argescape.test \
+	84_local-sitemap.test
 
 CLEANFILES = check-network_sh.cache

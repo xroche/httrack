@@ -547,6 +547,10 @@ struct httrackp {
                              archive. Tail: ABI */
   hts_boolean warc_wacz; /**< --wacz: package archive+index+pages as a WACZ zip
                               (implies --warc + --warc-cdx). Tail: ABI */
+  hts_boolean sitemap;   /**< --sitemap: probe the start host's robots.txt for
+                              Sitemap: lines, else /sitemap.xml. Tail: ABI */
+  String sitemap_url;    /**< --sitemap-url: sitemap to ingest. Tail: ABI */
+  void *sitemap_state; /**< live sitemap ingestion state, or NULL. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

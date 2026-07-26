@@ -525,6 +525,8 @@ void help(const char *app, int more) {
     (" %L <file> add all URL located in this text file (one URL per line)");
   infomsg
     (" %S <file> add all scan rules located in this text file (one scan rule per line)");
+  infomsg(" %m  seed the crawl from the site's sitemap (robots.txt Sitemap:, "
+          "then /sitemap.xml); --sitemap-url URL names one explicitly");
   infomsg("");
   infomsg("Build options:");
   infomsg("  NN structure type (0 *original structure, 1+: see below)");

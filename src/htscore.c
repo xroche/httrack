@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 /* File defs */
 #include "htscore.h"
+#include "htssitemap.h"
 #include "htswarc.h"
 
 /* specific definitions */
@@ -943,6 +944,21 @@ int httpmirror(char *url1, httrackp * opt) {
     heap_top()->premier = heap_top_index();        // premier lien, objet-père=objet              
     heap_top()->precedent = heap_top_index();      // lien précédent
 
+    /* --sitemap: queue the sitemap probe just after the seeds, so its URLs are
+       injected before the crawl gets far. */
+    if (opt->sitemap || StringNotEmpty(opt->sitemap_url)) {
+      char BIGSTK first[HTS_URLMAXSIZE * 2];
+      const char *const eol = strchr(primary, '\n');
+      const size_t len = eol != NULL ? (size_t) (eol - primary) : 0;
+
+      first[0] = '\0';
+      if (len > 0 && len < sizeof(first)) {
+        memcpy(first, primary, len);
+        first[len] = '\0';
+      }
+      hts_sitemap_seed(opt, first);
+    }
+
     // Initialiser cache
     {
       opt->state._hts_in_html_parsing = 4;
@@ -1609,6 +1625,28 @@ int httpmirror(char *url1, httrackp * opt) {
       /* Load file and decode if necessary, after redirect check. */
       LOAD_IN_MEMORY_IF_NECESSARY();
 
+      /* Sitemap document: turn its <loc> URLs into top-level seeds. They go
+         through htsAddLink, so the wizard's filters and scope rules decide, and
+         this link's max depth leaves them the full budget. */
+      if (opt->sitemap_state != NULL &&
+          hts_sitemap_pending(opt, urladr(), urlfil())) {
+        htsmoduleStruct BIGSTK smstr;
+
+        memset(&smstr, 0, sizeof(smstr));
+        smstr.opt = opt;
+        smstr.sback = sback;
+        smstr.cache = &cache;
+        smstr.hashptr = hashptr;
+        smstr.numero_passe = numero_passe;
+        smstr.ptr_ = &ptr;
+        smstr.addLink = htsAddLink;
+        smstr.url_host = urladr();
+        smstr.url_file = urlfil();
+        smstr.mime = r.contenttype;
+        hts_sitemap_ingest(opt, &smstr, urladr(), urlfil(), r.adr,
+                           r.adr != NULL && r.size > 0 ? (size_t) r.size : 0);
+      }
+
       // ------------------------------------------------------
       // ok, fichier chargé localement
       // ------------------------------------------------------
@@ -2256,6 +2294,7 @@ int httpmirror(char *url1, httrackp * opt) {
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
   warc_close_opt(opt);
+  hts_sitemap_free(opt);
 
   // désallocation mémoire & buffers
   XH_uninit;
@@ -3642,6 +3681,11 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   to->warc_max_size = from->warc_max_size;
   to->warc_cdx = from->warc_cdx;
   to->warc_wacz = from->warc_wacz;
+
+  if (from->sitemap)
+    to->sitemap = from->sitemap;
+  if (StringNotEmpty(from->sitemap_url))
+    StringCopyS(to->sitemap_url, from->sitemap_url);
 
   if (from->pause_max_ms > 0) {
     to->pause_min_ms = from->pause_min_ms;

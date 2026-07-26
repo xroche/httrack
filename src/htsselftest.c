@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "htssitemap.h"
 #include "htswarc.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
@@ -3574,6 +3575,166 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Collect the URLs a sitemap scan hands out. */
+typedef struct sm_collect {
+  int n;
+  char url[8][HTS_URLMAXSIZE];
+} sm_collect;
+
+static hts_boolean sm_take(void *arg, const char *url) {
+  sm_collect *const c = (sm_collect *) arg;
+
+  if (c->n < (int) (sizeof(c->url) / sizeof(c->url[0])))
+    strcpybuff(c->url[c->n], url);
+  c->n++;
+  return HTS_TRUE;
+}
+
+/* Scan `doc` off a heap buffer with no NUL terminator, so a read past the
+   declared size is an ASan error rather than a silent pass. */
+static int sm_scan(const char *doc, int maxurls, hts_boolean *is_index,
+                   sm_collect *out) {
+  const size_t len = strlen(doc);
+  char *raw = malloct(len);
+  int n;
+
+  memset(out, 0, sizeof(*out));
+  assertf(raw != NULL);
+  memcpy(raw, doc, len);
+  n = hts_sitemap_scan(raw, len, maxurls, is_index, sm_take, out);
+  freet(raw);
+  return n;
+}
+
+static int st_sitemap(httrackp *opt, int argc, char **argv) {
+  sm_collect c;
+  hts_boolean idx;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A urlset yields its <loc> URLs, in order, unescaped. */
+  assertf(sm_scan("<?xml version=\"1.0\"?><urlset>"
+                  "<url><loc>http://h.test/a.html</loc></url>"
+                  "<url><loc>  https://h.test/b?x=1&amp;y=2\n  </loc></url>"
+                  "</urlset>",
+                  100, &idx, &c) == 2);
+  assertf(!idx);
+  assertf(strcmp(c.url[0], "http://h.test/a.html") == 0);
+  assertf(strcmp(c.url[1], "https://h.test/b?x=1&y=2") == 0);
+
+  /* A sitemapindex is flagged: its URLs are child sitemaps, not pages. */
+  assertf(sm_scan("<sitemapindex><sitemap><loc>http://h.test/s2.xml.gz</loc>"
+                  "</sitemap></sitemapindex>",
+                  100, &idx, &c) == 1);
+  assertf(idx);
+
+  /* Root element decides even when the other name appears later as text. */
+  assertf(sm_scan("<urlset><url><loc>http://h.test/a</loc></url>"
+                  "<!-- sitemapindex --></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(!idx);
+
+  /* Numeric character references, decimal and hex, decode to ASCII. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#63;b&#x3D;c</loc></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(strcmp(c.url[0], "http://h.test/a?b=c") == 0);
+
+  /* A reference outside printable ASCII stays verbatim, not a control byte. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#10;b</loc></urlset>", 100,
+                  &idx, &c) == 1);
+  assertf(strcmp(c.url[0], "http://h.test/a&#10;b") == 0);
+
+  /* <location> is not <loc>. */
+  assertf(sm_scan("<urlset><location>http://h.test/a</location></urlset>", 100,
+                  &idx, &c) == 0);
+
+  /* Rejected: relative, non-http scheme, embedded space, empty. */
+  assertf(sm_scan("<urlset><loc>/a.html</loc><loc>ftp://h.test/a</loc>"
+                  "<loc>javascript:alert(1)</loc>"
+                  "<loc>http://h.test/a b</loc><loc></loc></urlset>",
+                  100, &idx, &c) == 0);
+
+  /* The URL length bound: one under fits, exactly at it is dropped rather than
+     truncated into a different URL. */
+  {
+    char BIGSTK doc[HTS_URLMAXSIZE * 2];
+    char BIGSTK url[HTS_URLMAXSIZE + 1];
+    size_t i;
+
+    strcpybuff(url, "http://h.test/");
+    for (i = strlen(url); i < HTS_URLMAXSIZE - 1; i++)
+      url[i] = 'a';
+    url[i] = '\0';
+    snprintf(doc, sizeof(doc), "<urlset><loc>%s</loc></urlset>", url);
+    assertf(sm_scan(doc, 100, &idx, &c) == 1);
+
+    url[i] = 'a';
+    url[i + 1] = '\0';
+    snprintf(doc, sizeof(doc), "<urlset><loc>%s</loc></urlset>", url);
+    assertf(sm_scan(doc, 100, &idx, &c) == 0);
+  }
+
+  /* The URL cap stops the scan. */
+  assertf(sm_scan("<urlset><loc>http://h.test/1</loc><loc>http://h.test/2</loc>"
+                  "<loc>http://h.test/3</loc></urlset>",
+                  2, &idx, &c) == 2);
+
+  /* An unterminated <loc> at end of buffer must not read past it. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
+  assertf(sm_scan("<urlset><lo", 100, &idx, &c) == 0);
+
+#if HTS_USEZLIB
+  /* A gzip-framed document is decompressed before scanning. */
+  {
+    const char *const xml =
+        "<urlset><url><loc>http://h.test/gz.html</loc></url></urlset>";
+    uLongf zlen = compressBound((uLong) strlen(xml)) + 32;
+    char *z = malloct((size_t) zlen);
+    z_stream zs;
+
+    assertf(z != NULL);
+    memset(&zs, 0, sizeof(zs));
+    assertf(deflateInit2(&zs, 9, Z_DEFLATED, 16 + MAX_WBITS, 8,
+                         Z_DEFAULT_STRATEGY) == Z_OK);
+    zs.next_in = (const Bytef *) xml;
+    zs.avail_in = (uInt) strlen(xml);
+    zs.next_out = (Bytef *) z;
+    zs.avail_out = (uInt) zlen;
+    assertf(deflate(&zs, Z_FINISH) == Z_STREAM_END);
+    zlen = (uLongf) zs.total_out;
+    deflateEnd(&zs);
+
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, (size_t) zlen, 100, &idx, sm_take, &c) == 1);
+    assertf(strcmp(c.url[0], "http://h.test/gz.html") == 0);
+
+    /* Truncated gzip: refused, not scanned as plain text. */
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
+    freet(z);
+  }
+#endif
+
+  /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
+     and group-independent (no User-agent line needed). */
+  memset(&c, 0, sizeof(c));
+  {
+    const char *const txt = "User-agent: *\nDisallow: /x\n"
+                            "SITEMAP:  http://h.test/s1.xml  # first\n"
+                            "Sitemap: /relative.xml\n"
+                            "Sitemapper: http://h.test/no.xml\n"
+                            "Sitemap:\thttps://h.test/s2.xml\n";
+
+    assertf(hts_sitemap_scan_robots(txt, strlen(txt), 100, sm_take, &c) == 2);
+    assertf(strcmp(c.url[0], "http://h.test/s1.xml") == 0);
+    assertf(strcmp(c.url[1], "https://h.test/s2.xml") == 0);
+  }
+
+  printf("sitemap self-test OK\n");
+  return 0;
+}
+
 /* Connected stream pair over loopback; Windows has no socketpair(). */
 static int st_socketpair(T_SOC sv[2]) {
   struct sockaddr_in sa;
@@ -5182,6 +5343,8 @@ static const struct selftest_entry {
      st_contentcodings},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
+    {"sitemap", "",
+     "sitemap <loc> extraction, caps and robots.txt Sitemap:", st_sitemap},
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
