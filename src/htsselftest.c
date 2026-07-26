@@ -659,9 +659,13 @@ static int string_safety_selftests(void) {
         strcmp(s.dst, "0123456") != 0)
       return 1;
 
-    /* degenerate capacity 1: only the NUL fits */
+    /* degenerate capacity 1: only the NUL fits. Capacity 2 pins the boundary
+       between that and the sizes above: one character plus the NUL. */
     POISON_DST();
     if (strclipbuff(s.dst, 1, "x") || s.dst[0] != '\0')
+      return 1;
+    POISON_DST();
+    if (strclipbuff(s.dst, 2, "yz") || strcmp(s.dst, "y") != 0)
       return 1;
 
     /* the empty string fits any non-zero capacity */
