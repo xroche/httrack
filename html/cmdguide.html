@@ -491,7 +491,10 @@ browsable tree, with links between pages relative and the assets still on disk,
 but any single <tt>.html</tt> file can now be mailed or archived on its own.
 Raise or lower the 10&nbsp;MB per-asset limit with
 <tt>--single-file-max-size N</tt>; anything over it, plus audio and video, keeps
-its link.<br>
+its link. One caveat if you raise it: an inlined stylesheet becomes a
+<tt>data:</tt> URL, whose path is opaque, so an asset it referenced that stayed
+over the cap no longer resolves from inside it. Raising the cap past that asset
+embeds it too and the question goes away.<br>
 Reach for this when the file has to open for someone you cannot make assumptions
 about: it is plain HTML and needs no add-on. Reach for <tt>--mime-html</tt>
 instead when a Chromium-family browser is a given and the mirror is large: MIME
