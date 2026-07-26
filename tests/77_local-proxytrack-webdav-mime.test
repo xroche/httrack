@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# proxytrack's WebDAV PROPFIND listing must fall back to the same
-# Content-Type/timestamp defaults whether or not a cache entry carries an
-# empty Content-Type/Last-Modified. (#701 changed `if (file->contenttype)`,
-# always-true on an inline array, to an empty-string check; the fallback
-# below already normalized an empty value, so this proves the output is
-# unchanged, not a bug fix.)
+# proxytrack's WebDAV PROPFIND fallback must behave identically whether or not
+# the cache entry supplies Content-Type and Last-Modified.
 
 set -euo pipefail
 
@@ -70,7 +66,9 @@ grep -q "HTTP Proxy installed on" "$dir/pt.log" || {
     exit 1
 }
 
-curl -s -X PROPFIND -H "Depth: 1" "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
+# --max-time: an unbounded read here would wedge the runner rather than fail
+curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
 
 grep -q '<getcontenttype>application/octet-stream</getcontenttype>' "$dir/resp.xml" || {
     echo "FAIL: missing Content-Type did not fall back to application/octet-stream"
