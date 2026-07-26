@@ -88,7 +88,7 @@ Please visit our Website: http://www.httrack.com
 
 static htsmutex refreshMutex = HTSMUTEX_INIT;
 
-static int help_server(char *dest_path, int defaultPort);
+static int help_server(char *dest_path, int defaultPort, const char *bindAddr);
 extern int commandRunning;
 extern int commandEnd;
 extern int commandReturn;
@@ -153,6 +153,8 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   int defaultPort = 0;
   int parentPid = 0;
+  /* loopback by default: the handler trusts its input; --bind widens it */
+  const char *bindAddr = "127.0.0.1";
 
   printf("Initializing the server..\n");
 
@@ -267,6 +269,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;
       }
+    } else if (strcmp(argv[i], "--bind") == 0 && i + 1 < argc) {
+      bindAddr = argv[i + 1];
     } else if (strcmp(argv[i], "--ppid") == 0 && i + 1 < argc) {
       if (sscanf(argv[i + 1], "%u", &parentPid) != 1) {
         fprintf(stderr, "couldn't set the parent PID to %s\n", argv[i + 1]);
@@ -293,7 +297,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* launch */
-  ret = help_server(argv[1], defaultPort);
+  ret = help_server(argv[1], defaultPort, bindAddr);
 
   htsthread_wait_n(background_threads - 1);
   hts_uninit();
@@ -427,11 +431,11 @@ static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   return ret;
 }
 
-static int help_server(char *dest_path, int defaultPort) {
+static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
   int returncode = 0;
   char adr_prox[HTS_URLMAXSIZE * 2];
   int port_prox;
-  T_SOC soc = smallserver_init_std(&port_prox, adr_prox, defaultPort);
+  T_SOC soc = smallserver_init_std(&port_prox, adr_prox, defaultPort, bindAddr);
 
   if (soc != INVALID_SOCKET) {
     char url[HTS_URLMAXSIZE * 2];

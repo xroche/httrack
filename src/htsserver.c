@@ -147,7 +147,8 @@ HTS_UNUSED static int LANG_LIST(const char *path, char *buffer, size_t size);
 // 0- Init the URL catcher with standard port
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
+T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
+                           const char *bindAddr) {
   T_SOC soc;
 
   if (defaultPort <= 0) {
@@ -160,12 +161,12 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
     int i = 0;
 
     do {
-      soc = smallserver_init(&try_to_listen_to[i], adr_prox);
+      soc = smallserver_init(&try_to_listen_to[i], adr_prox, bindAddr);
       *port_prox = try_to_listen_to[i];
       i++;
     } while((soc == INVALID_SOCKET) && (try_to_listen_to[i] >= 0));
   } else {
-    soc = smallserver_init(&defaultPort, adr_prox);
+    soc = smallserver_init(&defaultPort, adr_prox, bindAddr);
     *port_prox = defaultPort;
   }
   return soc;
@@ -243,9 +244,10 @@ static int my_gethostname(char *h_loc, size_t size) {
 }
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init(int *port, char *adr) {
+T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
+  SOCaddr server;
 
   commandRunning = commandEnd = commandReturn = commandReturnSet =
     commandEndRequested = 0;
@@ -256,25 +258,23 @@ T_SOC smallserver_init(int *port, char *adr) {
     free(commandReturnCmdl);
   commandReturnCmdl = NULL;
 
-  if (my_gethostname(h_loc, 256) == 0) {   // host name
-    SOCaddr server;
+  SOCaddr_initany(server);
+  if (bindAddr != NULL && *bindAddr != '\0') {
+    /* advertise the bound address, else the URL we print is unreachable */
+    if (strlen(bindAddr) >= sizeof(h_loc) || !gethost(bindAddr, &server)) {
+      return INVALID_SOCKET;
+    }
+    strcpybuff(h_loc, bindAddr);
+  } else if (my_gethostname(h_loc, 256) != 0) { // host name
+    return INVALID_SOCKET;
+  }
 
-    SOCaddr_initany(server);
-    if ((soc =
-         (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
-                        0)) != INVALID_SOCKET) {
-      SOCaddr_initport(server, *port);
-      if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-        if (listen(soc, 10) >= 0) {
-          strcpy(adr, h_loc);
-        } else {
-#ifdef _WIN32
-          closesocket(soc);
-#else
-          close(soc);
-#endif
-          soc = INVALID_SOCKET;
-        }
+  if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
+      INVALID_SOCKET) {
+    SOCaddr_initport(server, *port);
+    if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
+      if (listen(soc, 10) >= 0) {
+        strcpy(adr, h_loc);
       } else {
 #ifdef _WIN32
         closesocket(soc);
@@ -283,6 +283,13 @@ T_SOC smallserver_init(int *port, char *adr) {
 #endif
         soc = INVALID_SOCKET;
       }
+    } else {
+#ifdef _WIN32
+      closesocket(soc);
+#else
+      close(soc);
+#endif
+      soc = INVALID_SOCKET;
     }
   }
   return soc;
@@ -903,13 +910,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 }
               }
               StringMemcat(headers, redir, strlen(redir));
-              {
-                char tmp[256];
-
-                if (strlen(file) < sizeof(tmp) - 32) {
-                  sprintf(tmp, "Location: %s\r\n", newfile);
-                  StringMemcat(headers, tmp, strlen(tmp));
-                }
+              /* client-supplied: a CR/LF here would split the response */
+              if (newfile[strcspn(newfile, "\r\n")] == '\0') {
+                StringCat(headers, "Location: ");
+                StringCat(headers, newfile);
+                StringCat(headers, "\r\n");
               }
               coucal_write(NewLangList, "redirect", (intptr_t) NULL);
             } else if (is_html(file)) {

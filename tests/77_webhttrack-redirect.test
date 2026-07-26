@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# htsserver's POST redirect: the Location header is built from a client-supplied
+# value, and the listen address is loopback unless --bind widens it.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+command -v python3 >/dev/null || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+srv=
+log=$(mktemp)
+cleanup() {
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    rm -f "${log}"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+freeport() {
+    python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()'
+}
+
+# Start htsserver, echo the announced URL. Extra args are passed through.
+start() {
+    local port url
+    port=$(freeport)
+    : >"${log}"
+    (
+        trap '' TERM TTOU
+        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
+    ) &
+    srv=$!
+    for _ in $(seq 1 40); do
+        url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
+        kill -0 "${srv}" 2>/dev/null || break
+        sleep 0.25
+    done
+    test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
+    echo "${url}"
+}
+
+stop() {
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    wait "${srv}" 2>/dev/null || true
+    srv=
+}
+
+# POST redirect=$1 to 127.0.0.1:$2, print the raw response headers.
+post_redirect() {
+    python3 -c 'import socket, sys, urllib.parse
+body = "redirect=" + urllib.parse.quote(sys.argv[1], safe="")
+req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+       "Content-type: application/x-www-form-urlencoded\r\n"
+       "Content-length: %d\r\n\r\n%s" % (len(body), body))
+s = socket.create_connection(("127.0.0.1", int(sys.argv[2])), 10)
+s.sendall(req.encode())
+out = b""
+while True:
+    b = s.recv(65536)
+    if not b:
+        break
+    out += b
+s.close()
+sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2"
+}
+
+portof() { echo "${1##*:}" | tr -d /; }
+
+# A value longer than the 256-byte buffer the header used to be built in. The
+# unfixed server smashed its stack here rather than emitting anything.
+url=$(start)
+long=$(python3 -c 'print("A" * 4096)')
+resp=$(post_redirect "${long}" "$(portof "${url}")") ||
+    fail "no response to an oversized redirect value"
+stop
+loc=$(printf '%s' "${resp}" | sed -n 's/^Location: //p' | tr -d '\r')
+test "${loc}" = "${long}" ||
+    fail "oversized redirect not echoed whole (got ${#loc} bytes, want ${#long})"
+
+# CR/LF in the value must not reach the header, or the response splits.
+url=$(start)
+resp=$(post_redirect '/foo
+X-Injected: pwned' "$(portof "${url}")") || fail "no response to a CRLF redirect value"
+stop
+printf '%s' "${resp}" | grep -qi '^X-Injected:' &&
+    fail "CRLF in the redirect value injected a header"
+printf '%s' "${resp}" | grep -q '^HTTP/1.0 302' ||
+    fail "CRLF redirect did not yield a 302"
+
+# Loopback unless asked otherwise.
+url=$(start)
+stop
+case "${url}" in
+    http://127.0.0.1:*) ;;
+    *) fail "default listen address is not loopback: ${url}" ;;
+esac
+
+url=$(start --bind 0.0.0.0)
+stop
+case "${url}" in
+    http://0.0.0.0:*) ;;
+    *) fail "--bind 0.0.0.0 not honoured: ${url}" ;;
+esac
+
+exit 0
