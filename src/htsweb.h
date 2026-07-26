@@ -35,25 +35,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsstats.h"
 
-#define NStatsBuffer     14
 #define MAX_LEN_INPROGRESS 40
-
-typedef struct t_StatsBuffer {
-  char name[1024];
-  char file[1024];
-  char state[288];                      // a short label plus back->info[256]
-  char url_sav[HTS_URLMAXSIZE * 2];     // pour cancel
-  char url_adr[HTS_URLMAXSIZE * 2];
-  char url_fil[HTS_URLMAXSIZE * 2];
-  LLint size;
-  LLint sizetot;
-  int offset;
-  //
-  int back;
-  //
-  int actived;                  // pour disabled
-} t_StatsBuffer;
 
 typedef struct t_InpInfo {
   int ask_refresh;
