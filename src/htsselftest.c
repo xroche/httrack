@@ -5027,7 +5027,7 @@ static void sf_fixture(const char *root) {
     for (n = 0; n <= SF_ST_MAX_ATTRS; n++) {
       char one[32];
 
-      sprintfbuff(one, " a%d=1", n);
+      assertf(sprintfbuff(one, " a%d=1", n));
       StringCat(wide, one);
     }
     StringCat(wide,
