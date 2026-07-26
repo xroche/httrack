@@ -1012,3 +1012,7 @@ WARC archive name:
 Navn på WARC-arkiv:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valgfrit basisnavn til WARC-arkivet; lad feltet stå tomt for automatisk navngivning i outputmappen.
+Report what changed since the previous mirror
+Rapportér hvad der er ændret siden den forrige spejling
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Skriv også hts-changes.json med en liste over, hvad denne gennemgang efterlader som nyt, ændret, uændret eller forsvundet i forhold til den forrige spejling.

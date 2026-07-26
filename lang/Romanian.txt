@@ -964,3 +964,7 @@ WARC archive name:
 Numele arhivei WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nume de baza optional pentru arhiva WARC; lasati gol pentru a-l denumi automat in directorul de iesire.
+Report what changed since the previous mirror
+Raporteaza ce s-a schimbat fata de copia anterioara
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Scrie si hts-changes.json, care listeaza ce este nou, modificat, nemodificat sau disparut fata de copia anterioara.
