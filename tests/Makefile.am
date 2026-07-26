@@ -180,6 +180,7 @@ TESTS = \
 	80_engine-crash-symbolize.test \
 	81_webhttrack-maxsize.test \
 	82_webhttrack-browse-links.test \
-	83_webhttrack-argescape.test
+	83_webhttrack-argescape.test \
+	84_webhttrack-mirror-verbatim.test
 
 CLEANFILES = check-network_sh.cache
