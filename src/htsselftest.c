@@ -618,22 +618,35 @@ static int string_safety_selftests(void) {
   }
 
   /* htsblk_failf: clips a reason quoted from a remote reply into msg[] and
-     leaves statuscode to the caller */
+     touches nothing else in the block */
   {
     htsblk r;
     char expect[sizeof(r.msg)];
     char big[4 * sizeof(r.msg)];
+
+    /* contenttype abuts msg, so a one-past-the-end store lands in it rather
+       than in padding; checking it is this block's canary */
+#define NEIGHBOURS_INTACT() (r.contenttype[0] == '\0' && r.statuscode == 1234)
 
     memset(&r, 0, sizeof(r));
     r.statuscode = 1234;
 
     memset(r.msg, '#', sizeof(r.msg));
     htsblk_failf(&r, "PASV incorrect: %s", "220 ok");
-    if (strcmp(r.msg, "PASV incorrect: 220 ok") != 0 || r.statuscode != 1234)
+    if (strcmp(r.msg, "PASV incorrect: 220 ok") != 0 || !NEIGHBOURS_INTACT())
       return 1;
 
-    /* clipped to capacity and terminated; the expected bytes differ from the
-       case above, so writing nothing cannot pass on the leftovers */
+    /* exact fit: capacity - 1 characters plus the NUL */
+    memset(expect, 'y', sizeof(expect) - 1);
+    expect[sizeof(expect) - 1] = '\0';
+    memcpy(expect, "Bad password: ", sizeof("Bad password: ") - 1);
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "%s", expect);
+    if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
+      return 1;
+
+    /* far over: the expected bytes differ from the cases above, so writing
+       nothing cannot pass on the leftovers */
     memset(big, 'z', sizeof(big) - 1);
     big[sizeof(big) - 1] = '\0';
     memset(expect, 'z', sizeof(expect) - 1);
@@ -642,8 +655,9 @@ static int string_safety_selftests(void) {
 
     memset(r.msg, '#', sizeof(r.msg));
     htsblk_failf(&r, "Bad user name: %s", big);
-    if (strcmp(r.msg, expect) != 0 || r.statuscode != 1234)
+    if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
       return 1;
+#undef NEIGHBOURS_INTACT
   }
 
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves

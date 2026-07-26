@@ -2541,7 +2541,7 @@ void htsblk_failf(htsblk *r, const char *fmt, ...) {
   va_list args;
 
   va_start(args, fmt);
-  // discarding the fit flag is the point: clipping a diagnostic is intended
+  // deliberate clip: the reason is quoted from a remote reply
   (void) vslprintfbuff(r->msg, sizeof(r->msg), fmt, args);
   va_end(args);
 }

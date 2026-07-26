@@ -461,12 +461,11 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 }
 
 /**
- * va_list form of slprintfbuff(). Callers that deliberately ignore truncation
- * use this one, so it is not HTS_CHECK_RESULT.
+ * Callers that deliberately ignore truncation use this instead of
+ * slprintfbuff(), so it is not HTS_CHECK_RESULT.
  */
-static HTS_INLINE HTS_UNUSED hts_boolean vslprintfbuff(char *dest, size_t size,
-                                                       const char *fmt,
-                                                       va_list args) {
+static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
+    vslprintfbuff(char *dest, size_t size, const char *fmt, va_list args) {
   int ret;
 
   assertf(dest != NULL && size != 0);
