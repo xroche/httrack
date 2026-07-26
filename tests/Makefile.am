@@ -186,6 +186,7 @@ TESTS = \
 	85_webhttrack-projpath.test \
 	86_local-proxytrack-cache-longfields.test \
 	87_local-proxytrack-nodate.test \
-	88_local-sitemap.test
+	88_local-sitemap.test \
+	90_webhttrack-checkbox-clear.test
 
 CLEANFILES = check-network_sh.cache

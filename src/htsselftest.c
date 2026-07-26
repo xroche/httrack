@@ -458,8 +458,11 @@ static void basic_selftests(void) {
     // link one level up -> a "../" prefix
     assertf(lienrelatif(s, sizeof(s), "a.html", "dir/index.html") == 0);
     assertf(strcmp(s, "../a.html") == 0);
-    // empty current path: the trim used to walk back off the front of it
+    // an empty current path: the trim used to walk off the front of it, which
+    // "?x" reaches too because the query pre-pass hands on the part before it
     assertf(lienrelatif(s, sizeof(s), "dir/page.html", "") == 0);
+    assertf(strcmp(s, "dir/page.html") == 0);
+    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "?x") == 0);
     assertf(strcmp(s, "dir/page.html") == 0);
   }
 }
@@ -1523,7 +1526,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
       size_t i;
       for (i = bench[loop].offset; i < (size_t) count;
            i += bench[loop].modulus) {
-        int result;
+        int result = 0; /* no final else: an unknown type reports failure */
         FMT();
         if (bench[loop].type == DO_ADD || bench[loop].type == DO_DRY_ADD) {
           size_t k;
