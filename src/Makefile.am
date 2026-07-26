@@ -32,7 +32,8 @@ AM_LDFLAGS = \
 
 bin_PROGRAMS = proxytrack httrack htsserver
 
-httrack_LDADD = $(THREADS_LIBS) libhttrack.la
+# $(DL_LIBS): dladdr() in the crash handler, still in libdl on pre-2.34 glibc.
+httrack_LDADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 

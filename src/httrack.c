@@ -37,6 +37,11 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+/* Before every header: glibc gates dladdr(), used by the crash handler. */
+#if defined(__linux) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include "httrack-library.h"
 
 #include "htsglobal.h"
@@ -74,6 +79,10 @@ static int linput(FILE * fp, char *s, int max);
 #include <ctype.h>
 #if (defined(__linux) && defined(HAVE_EXECINFO_H))
 #include <execinfo.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/wait.h>
 #define USES_BACKTRACE
 #endif
 /* END specific definitions */
@@ -880,12 +889,159 @@ static void sig_doback(int blind) {     // mettre en backing
 #undef FD_ERR
 #define FD_ERR 2
 
+#ifdef USES_BACKTRACE
+#define BT_MAX_FRAMES 64     /* frames we try to name */
+#define BT_MAX_MODULES 8     /* distinct modules, one child each */
+#define BT_HEX_SIZE 19       /* "0x" + 16 nibbles + NUL */
+#define BT_PATH_SIZE 1024    /* module path; longer is skipped */
+#define BT_WAIT_TICKS 300    /* 10ms ticks, shared: cap a slow child */
+#define BT_NO_SYMBOLIZER 127 /* child exit: execvp() found none */
+
+static hts_boolean symbolize_crash = HTS_TRUE;
+
+/* "0x"-prefixed hex: the handler must stay stdio-free. */
+static void print_hex(char *buffer, uintptr_t value) {
+  static const char digits[] = "0123456789abcdef";
+  size_t i = 2, a, b;
+
+  buffer[0] = '0';
+  buffer[1] = 'x';
+  do {
+    buffer[i++] = digits[value & 0xf];
+    value >>= 4;
+  } while (value != 0);
+  buffer[i] = '\0';
+  for (a = 2, b = i - 1; a < b; a++, b--) {
+    const char c = buffer[a];
+
+    buffer[a] = buffer[b];
+    buffer[b] = c;
+  }
+}
+
+/* HTS_FALSE if src does not fit: a truncated module path would point the
+   symbolizer at the wrong file. */
+static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
+  size_t i;
+
+  for (i = 0; i < size - 1 && src[i] != '\0'; i++) {
+    dest[i] = src[i];
+  }
+  dest[i] = '\0';
+  return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Run the symbolizer on argv, output on stderr, within *budget ticks. HTS_FALSE
+   only if none could be run at all; otherwise silent, the raw trace stands. */
+static hts_boolean spawn_symbolizer(char **argv, int *budget) {
+  const pid_t pid = fork();
+  int status = 0;
+
+  if (pid == -1)
+    return HTS_FALSE;
+  if (pid == 0) {
+    static char llvm_prog[] = "llvm-symbolizer";
+    static char llvm_opts[] = "-p";
+
+    dup2(FD_ERR, 1); /* both symbolizers write on stdout */
+    execvp(argv[0], argv);
+    argv[0] = llvm_prog; /* an LLVM-only install ships no addr2line */
+    argv[1] = llvm_opts;
+    execvp(argv[0], argv);
+    _exit(BT_NO_SYMBOLIZER);
+  }
+  for (; *budget > 0; (*budget)--) {
+    const struct timespec tick = {0, 10 * 1000 * 1000};
+    const pid_t reaped = waitpid(pid, &status, WNOHANG);
+
+    if (reaped == pid)
+      return WIFEXITED(status) && WEXITSTATUS(status) == BT_NO_SYMBOLIZER
+                 ? HTS_FALSE
+                 : HTS_TRUE;
+    if (reaped == -1 && errno != EINTR)
+      return HTS_TRUE;
+    nanosleep(&tick, NULL);
+  }
+  kill(pid, SIGKILL);
+  waitpid(pid, NULL, 0);
+  return HTS_TRUE;
+}
+
+/* Name the frames backtrace_symbols_fd() leaves as module+offset:
+   -fvisibility=hidden keeps them out of .dynsym, but DWARF has them. dladdr()
+   is not formally async-signal-safe; accepted, this path is already fatal. */
+static void symbolize_backtrace(void *const *stack, int size) {
+  static char prog[] = "addr2line";
+  static char opts[] = "-Cfipa";
+  static char dashe[] = "-e";
+  char hex[BT_MAX_FRAMES][BT_HEX_SIZE];
+  const void *base[BT_MAX_FRAMES];
+  const char *name[BT_MAX_FRAMES];
+  hts_boolean grouped[BT_MAX_FRAMES];
+  char module[BT_PATH_SIZE];
+  char *argv[4 + BT_MAX_FRAMES + 1];
+  int budget = BT_WAIT_TICKS;
+  int i, spawned;
+
+  if (size > BT_MAX_FRAMES)
+    size = BT_MAX_FRAMES;
+
+  for (i = 0; i < size; i++) {
+    Dl_info info;
+
+    grouped[i] = HTS_TRUE; /* skipped unless dladdr() places the frame */
+    if (dladdr(stack[i], &info) == 0 || info.dli_fname == NULL ||
+        info.dli_fname[0] == '\0')
+      continue;
+    base[i] = info.dli_fbase;
+    name[i] = info.dli_fname;
+    print_hex(hex[i], (uintptr_t) ((const char *) stack[i] -
+                                   (const char *) info.dli_fbase));
+    grouped[i] = HTS_FALSE;
+  }
+
+  /* One child per module: addr2line takes a single -e. Each frame is claimed
+     once, so argc cannot exceed argv[]. */
+  for (spawned = 0; spawned < BT_MAX_MODULES; spawned++) {
+    int first, j, argc = 0;
+
+    for (first = 0; first < size && grouped[first]; first++)
+      ;
+    if (first >= size)
+      break;
+    argv[argc++] = prog;
+    argv[argc++] = opts;
+    argv[argc++] = dashe;
+    argv[argc++] = module;
+    for (j = first; j < size; j++) {
+      if (grouped[j] || base[j] != base[first])
+        continue;
+      grouped[j] = HTS_TRUE;
+      argv[argc++] = hex[j];
+    }
+    argv[argc] = NULL;
+    if (copy_bounded(module, sizeof(module), name[first])) {
+      const size_t len = strlen(module);
+
+      /* addr2line -a prints offsets only: say which module they are in. */
+      (void) (write(FD_ERR, module, len) == (ssize_t) len);
+      (void) (write(FD_ERR, ":\n", 2) == 2);
+      if (!spawn_symbolizer(argv, &budget))
+        break; /* no symbolizer: stop at one header */
+    }
+  }
+}
+#endif
+
 static void print_backtrace(void) {
 #ifdef USES_BACKTRACE
   void *stack[256];
   const int size = backtrace(stack, sizeof(stack)/sizeof(stack[0]));
   if (size != 0) {
     backtrace_symbols_fd(stack, size, FD_ERR);
+    if (symbolize_crash) {
+      symbolize_backtrace(stack, size);
+    }
   }
 #else
   const char msg[] = "No stack trace available on this OS :(\n";
@@ -951,6 +1107,11 @@ static void sig_leave(int code) {
 }
 
 static void signal_handlers(void) {
+#ifdef USES_BACKTRACE
+  /* getenv() is not signal-safe: sample the opt-out now. */
+  symbolize_crash =
+      getenv("HTTRACK_NO_SYMBOLIZE") == NULL ? HTS_TRUE : HTS_FALSE;
+#endif
 #ifdef _WIN32
   signal(SIGINT, sig_leave);    // ^C
   signal(SIGTERM, sig_finish);  // kill <process>

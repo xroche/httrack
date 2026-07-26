@@ -127,8 +127,8 @@ AX_CHECK_LINK_FLAG([-pie], [LDFLAGS_PIE="-pie"])
 AC_SUBST([CFLAGS_PIE])
 AC_SUBST([LDFLAGS_PIE])
 
-## -rdynamic must be a link flag; DEFAULT_CFLAGS (AM_CPPFLAGS) never reaches the linker.
-AX_CHECK_LINK_FLAG([-rdynamic], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -rdynamic"])
+# Ties a crash trace from a stripped build back to its separate debug symbols.
+AX_CHECK_LINK_FLAG([-Wl,--build-id], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--build-id"])
 
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
