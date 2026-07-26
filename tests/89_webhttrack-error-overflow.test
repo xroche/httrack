@@ -109,12 +109,14 @@ padpath() {
 # Fail unless the error page renders the message opening with $1 about project
 # path $2, clipped to msgmax. error.html puts ${error} alone on its own line.
 check_clipped() {
-    local prefix=$1 full=$((${#1} + ${#2})) page line
+    local prefix=$1 full=$((${#1} + ${#2})) page line shown
     test "${full}" -gt "${msgmax}" ||
         fail "a ${full}-byte message fits in ${msgmax}: it cannot show a clip"
     page=$(get "${port}" /server/error.html | tr -d '\r')
-    line=$(printf '%s\n' "${page}" | grep "^${prefix}") ||
-        fail "the error page does not report: ${prefix}"
+    line=$(printf '%s\n' "${page}" | grep "^${prefix}") || {
+        shown=$(printf '%s\n' "${page}" | grep '^Unable to ' | cut -c1-80 || true)
+        fail "the error page reports '${shown:-nothing}', want: ${prefix}"
+    }
     test "${#line}" -eq "${msgmax}" ||
         fail "the message rendered ${#line} bytes, want ${full} clipped to ${msgmax}"
 }
@@ -149,13 +151,19 @@ save "${path}" x p >/dev/null
 alive "${srv}" || fail "an unwritable init file crashed the server: $(cat "${log}")"
 check_clipped "Unable to create the init file " "${path}/p"
 
-# A profile too large for the server's file-size limit, so the init file opens
-# and the write then fails.
+# The init file opens, then the write fails: the profile is past both stdio's
+# buffer, so fwrite() reaches the descriptor, and the server's file-size limit.
 path=$(padpath "${base}/full" 993)
 mkdir -p "${path}/p/hts-cache"
-profile=$(printf '%016384d' 0)
+profile=$(printf '%01024d' 0)
+profile=${profile}${profile}${profile}${profile}
+profile=${profile}${profile}${profile}${profile}
+test "${#profile}" -eq 16384 || fail "built a ${#profile}-byte profile, want 16384"
 save "${path}" "${profile}" p >/dev/null
 alive "${srv}" || fail "a short init file write crashed the server: $(cat "${log}")"
+written=$(wc -c <"${path}/p/hts-cache/winprofile.ini" | tr -d ' ')
+test "${written}" -lt "${#profile}" ||
+    fail "the file-size limit did not stop the write (${written} bytes landed)"
 check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
 
 get "${port}" /server/index.html | grep -q '200 OK' ||
