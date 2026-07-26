@@ -390,6 +390,10 @@ HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
   return hts_convertStringCPToUTF8(s, size, GetACP());
 }
 
+HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size) {
+  return hts_convertStringCPFromUTF8(s, size, GetACP());
+}
+
 HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv) {
   int wargc = 0;
   LPWSTR *const wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);

@@ -887,6 +887,66 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Oracle is the raw Win32 two-step this replaces, so a mis-wired direction or
+   a plain copy fails whatever the machine's ACP. */
+static int st_syscharset(httrackp *opt, int argc, char **argv) {
+#ifdef _WIN32
+  static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
+  const UINT cp = GetACP();
+  const int len = (int) strlen(utf8);
+  WCHAR wide[64], round[64];
+  char want[64];
+  char *sys, *back, *part;
+  int wn, n, lossless;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn > 0);
+  n = WideCharToMultiByte(cp, 0, wide, wn, want, (int) sizeof(want) - 1, NULL,
+                          NULL);
+  assertf(n > 0);
+  want[n] = '\0';
+  /* the ACP holds the string only if its bytes decode back to the same UTF-16;
+     lpUsedDefaultChar would miss a best-fit mapping (é to a bare e) */
+  lossless =
+      MultiByteToWideChar(cp, 0, want, n, round,
+                          (int) (sizeof(round) / sizeof(round[0]))) == wn &&
+      memcmp(round, wide, (size_t) wn * sizeof(WCHAR)) == 0;
+
+  sys = hts_convertStringUTF8ToSystem(utf8, (size_t) len);
+  assertf(sys != NULL);
+  assertf(strcmp(sys, want) == 0);
+  assertf(strlen(sys) == (size_t) n); /* NUL-terminated, nothing past it */
+  /* the copy the ASCII fast path returns is a pass on a UTF-8 ACP only */
+  assertf(cp == CP_UTF8 || strcmp(sys, utf8) != 0);
+  /* size bounds the read: a caller-given length, not strlen() */
+  part = hts_convertStringUTF8ToSystem(utf8, 3);
+  assertf(part != NULL && strcmp(part, "caf") == 0);
+  freet(part);
+  part = hts_convertStringUTF8ToSystem(utf8, 0);
+  assertf(part != NULL && *part == '\0');
+  freet(part);
+  if (lossless) {
+    back = hts_convertStringSystemToUTF8(sys, strlen(sys));
+    assertf(back != NULL);
+    assertf(strcmp(back, utf8) == 0);
+    freet(back);
+  }
+  freet(sys);
+  printf("syscharset: acp=%u %s: OK\n", (unsigned) cp,
+         lossless ? "round-trip" : "one-way");
+  return 0;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return 77; /* WIN32-only entry point */
+#endif
+}
+
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
@@ -4732,6 +4792,8 @@ static const struct selftest_entry {
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
+    {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
+     st_syscharset},
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
