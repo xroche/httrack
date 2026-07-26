@@ -160,9 +160,10 @@ ${do:end-if}
 \
 	${test:depth:--depth=}${depth}
 	${test:depth2:--ext-depth=}${depth2}
-	${test:maxhtml:--max-files=,}${maxhtml}
+${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one */}
 	${test:othermax:--max-files=}${othermax}
-	${test:sizemax:--max-files=}${sizemax}
+	${test:maxhtml:--max-files=,}${maxhtml}
+	${test:sizemax:--max-size=}${sizemax}
 	${test:pausebytes:--max-pause=}${pausebytes}
 	${test:maxtime:--max-time=}${maxtime}
 	${test:maxrate:--max-rate=}${maxrate}
@@ -213,7 +214,7 @@ ParseAll=${ztest:parseall:0:1}
 HTMLFirst=${ztest:htmlfirst:0:1}
 Cache=${ztest:cache:0:1}
 NoRecatch=${ztest:norecatch:0:1}
-Dos=${dos
+Dos=${dos}
 Index=${ztest:index:0:1}
 WordIndex=${ztest:index2:0:1}
 Log=${ztest:logf:0:1:2}
