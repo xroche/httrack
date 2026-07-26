@@ -709,11 +709,11 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
 #ifdef _WIN32
         int last_errno = WSAGetLastError();
 
-        sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+        htsblk_failf(retour, "Connect error: %s", strerror(last_errno));
 #else
         int last_errno = errno;
 
-        sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+        htsblk_failf(retour, "Connect error: %s", strerror(last_errno));
 #endif
       }
     }
@@ -2241,13 +2241,13 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #ifdef _WIN32
         int last_errno = WSAGetLastError();
 
-        sprintf(retour->msg, "Unable to create a socket: %s",
-                strerror(last_errno));
+        htsblk_failf(retour, "Unable to create a socket: %s",
+                     strerror(last_errno));
 #else
         int last_errno = errno;
 
-        sprintf(retour->msg, "Unable to create a socket: %s",
-                strerror(last_errno));
+        htsblk_failf(retour, "Unable to create a socket: %s",
+                     strerror(last_errno));
 #endif
       }
       return INVALID_SOCKET;    // erreur création socket impossible
@@ -2313,13 +2313,13 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #ifdef _WIN32
           const int last_errno = WSAGetLastError();
 
-          sprintf(retour->msg, "Unable to connect to the server: %s",
-                  strerror(last_errno));
+          htsblk_failf(retour, "Unable to connect to the server: %s",
+                       strerror(last_errno));
 #else
           const int last_errno = errno;
 
-          sprintf(retour->msg, "Unable to connect to the server: %s",
-                  strerror(last_errno));
+          htsblk_failf(retour, "Unable to connect to the server: %s",
+                       strerror(last_errno));
 #endif
         }
         /* Close the socket and notify the error!!! */

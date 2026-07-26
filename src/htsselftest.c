@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsalias.h"
@@ -626,10 +627,12 @@ static int string_safety_selftests(void) {
     char big[4 * sizeof(r.msg)];
 
     /* contenttype abuts msg, so a one-past-the-end store lands in it rather
-       than in padding; checking it is this block's canary */
-#define NEIGHBOURS_INTACT() (r.contenttype[0] == '\0' && r.statuscode == 1234)
+       than in padding. Poison it: a stray NUL is invisible against zeroes,
+       and a stray NUL is exactly what an off-by-one terminator writes. */
+#define NEIGHBOURS_INTACT() (r.contenttype[0] == '#' && r.statuscode == 1234)
 
     memset(&r, 0, sizeof(r));
+    memset(r.contenttype, '#', sizeof(r.contenttype));
     r.statuscode = 1234;
 
     memset(r.msg, '#', sizeof(r.msg));
@@ -659,6 +662,61 @@ static int string_safety_selftests(void) {
     if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
       return 1;
 #undef NEIGHBOURS_INTACT
+  }
+
+  /* back_read_ftp_result: the helper's result file is external input, so an
+     over-long message must stop at msg[]'s capacity */
+  {
+    htsblk r;
+    size_t k;
+
+    /* poisoned so a short message cannot pass on leftovers, and so a stray
+       NUL past msg[] is visible in the neighbour */
+#define FTP_RESULT_CASE(BODY)                                                  \
+  do {                                                                         \
+    FILE *fp_ = tmpfile();                                                     \
+                                                                               \
+    if (fp_ == NULL)                                                           \
+      return 1;                                                                \
+    BODY;                                                                      \
+    rewind(fp_);                                                               \
+    memset(&r, 0, sizeof(r));                                                  \
+    memset(r.msg, '#', sizeof(r.msg));                                         \
+    memset(r.contenttype, '#', sizeof(r.contenttype));                         \
+    back_read_ftp_result(fp_, &r);                                             \
+    fclose(fp_);                                                               \
+    if (r.contenttype[0] != '#')                                               \
+      return 1;                                                                \
+  } while (0)
+
+    /* over capacity: clipped to 79 payload bytes plus the NUL */
+    FTP_RESULT_CASE({
+      fprintf(fp_, "226 ");
+      for (k = 0; k < 4 * sizeof(r.msg); k++)
+        fputc('q', fp_);
+    });
+    if (r.statuscode != 226 || strlen(r.msg) != sizeof(r.msg) - 1)
+      return 1;
+    for (k = 0; k < sizeof(r.msg) - 1; k++) {
+      if (r.msg[k] != 'q')
+        return 1;
+    }
+
+    /* well under capacity: nothing padded, nothing eaten off the end */
+    FTP_RESULT_CASE(fprintf(fp_, "550 no such file"));
+    if (r.statuscode != 550 || strcmp(r.msg, "no such file") != 0)
+      return 1;
+
+    /* a byte over 0x7f must not read as EOF and cut the message short */
+    FTP_RESULT_CASE(fprintf(fp_, "226 \xff ok"));
+    if (r.statuscode != 226 || strcmp(r.msg, "\xff ok") != 0)
+      return 1;
+
+    /* unparseable status: the message still loads, the code reports failure */
+    FTP_RESULT_CASE(fprintf(fp_, "not-a-number here"));
+    if (r.statuscode != STATUSCODE_INVALID)
+      return 1;
+#undef FTP_RESULT_CASE
   }
 
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves

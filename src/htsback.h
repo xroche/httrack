@@ -74,6 +74,10 @@ void back_free(struct_back ** sback);
 // backing
 #define BACK_ADD_TEST "(dummy)"
 #define BACK_ADD_TEST2 "(dummy2)"
+/* Parse an external FTP helper's "<statuscode> <message>" result file into r,
+   clipping the message to r->msg. */
+void back_read_ftp_result(FILE *fp, htsblk *r);
+
 int back_index(httrackp * opt, struct_back * sback, const char *adr, const char *fil,
                const char *sav);
 int back_available(const struct_back * sback);
