@@ -1,8 +1,8 @@
 #!/bin/bash
-# --changes (#714): the report must match the mirror's real deltas. The routes
-# answer 200 with no validators on both passes, so the transfer signal alone
-# would call everything changed; stable.html/stable.bin land in "unchanged"
-# only if the payload is actually compared.
+# --changes (#714): the report must match the mirror's real deltas. Every route
+# answers 200 with no validators on both passes, so the transfer signal alone
+# would call the whole site changed; the stable resources land in "unchanged"
+# only if payloads are really compared.
 set -eu
 
 : "${top_srcdir:=..}"
@@ -52,8 +52,8 @@ which httrack >/dev/null || {
 out="${tmpdir}/crawl"
 mkdir "$out"
 report="${out}/hts-changes.json"
-# Purging stays off until the last pass: the deleted set must be computed even
-# when nothing acts on it.
+# Purging off throughout: the deleted set must be computed with nothing acting
+# on it.
 common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --changes --purge-old=0 --retries=2)
 
 # Report field extractor: bucket counts, and the files listed under a bucket.
