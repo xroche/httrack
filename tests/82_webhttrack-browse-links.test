@@ -100,13 +100,14 @@ except urllib.error.HTTPError as e:
     check(e.code == 404, "/website/ is bound to a project (got %d)" % e.code)
 
 # Point the server at the mirror the way step4.html does; a body without the
-# session id is refused outright.
+# session id is refused outright. Only a profile save records the served root,
+# so post one; command_do=save runs no crawl.
 sid = re.search(r'name="sid" value="([0-9a-f]+)"', finished)
 if sid is None:
     print("FAIL: no sid in the rendered form")
     sys.exit(1)
 fields = [("sid", sid.group(1)), ("path", base), ("projname", "proj"),
-          ("projpath", proj + "/")]
+          ("command", "httrack"), ("command_do", "save"), ("winprofile", "x")]
 body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="")) for k, v in fields)
 urllib.request.urlopen(urllib.request.Request(
     url + "/server/step4.html", data=body.encode("latin-1"), method="POST"),
