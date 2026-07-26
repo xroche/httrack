@@ -964,3 +964,11 @@ WARC archive name:
 WARC 归档名称：
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC 归档的可选基本名称；留空则在输出目录中自动命名。
+Inline assets as data: URIs (self-contained pages)
+将资源内嵌为 data: URI（独立网页）
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+镜像完成后，重写每个已保存的网页，将样式表、脚本、图片和字体内嵌其中，使网页也能单独打开。
+Largest inlined asset (bytes):
+内嵌资源大小上限（字节）：
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+超过此大小的资源会保留普通链接；留空则使用默认的 10485760 字节。

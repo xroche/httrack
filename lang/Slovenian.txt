@@ -964,3 +964,11 @@ WARC archive name:
 Ime arhiva WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Neobvezno osnovno ime arhiva WARC; pustite prazno za samodejno poimenovanje v izhodni mapi.
+Inline assets as data: URIs (self-contained pages)
+Vgradi vire kot data: URI (samostojne strani)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Ko je zrcaljenje koncano, se vsaka shranjena stran prepise z vgrajenimi slogovnimi listi, skripti, slikami in pisavami, tako da jo je mogoce odpreti tudi samostojno.
+Largest inlined asset (bytes):
+Najvecji vgrajeni vir (bajti):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Vir, vecji od te velikosti, ohrani obicajno povezavo; pustite prazno za privzetih 10485760 bajtov.

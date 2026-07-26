@@ -966,3 +966,11 @@ WARC archive name:
 WARC-arkiston nimi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valinnainen WARC-arkiston perusnimi; j‰t‰ tyhj‰ksi, jotta se nimet‰‰n automaattisesti tulostehakemistoon.
+Inline assets as data: URIs (self-contained pages)
+Upota resurssit data:-URI-osoitteina (itsen‰iset sivut)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Kun peilaus on valmis, kirjoita jokainen tallennettu sivu uudelleen niin, ett‰ sen tyylitiedostot, komentosarjat, kuvat ja fontit upotetaan, jolloin sivun voi avata myˆs yksin‰‰n.
+Largest inlined asset (bytes):
+Suurin upotettu resurssi (tavua):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+T‰t‰ suurempi resurssi s‰ilytt‰‰ tavallisen linkin; j‰t‰ tyhj‰ksi, jolloin k‰ytet‰‰n oletusarvoa 10485760 tavua.
