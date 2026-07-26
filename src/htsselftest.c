@@ -2023,12 +2023,14 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* 4GB+100KB wraps to ~108KB through an int, and needs 33 unsigned bits. A
+   macro, not a static const: MSVC's C mode (/TC) rejects a const object
+   used inside another object's static initializer below (C2099). */
+#define HTS_ST_GROWSIZE_OVER32 (4LL * 1024 * 1024 * 1024 + 100 * 1024)
+
 /* llint_grow_size_t() sizes the buffer holding a whole -%S list file: the
    result must be the exact 64-bit sum or a clean refusal, never a short one. */
 static int st_growsize(httrackp *opt, int argc, char **argv) {
-  /* 4GB+100KB wraps to ~108KB through an int, and needs 33 unsigned bits */
-  static const LLint over32 = 4LL * 1024 * 1024 * 1024 + 100 * 1024;
-
   enum { REFUSE, ACCEPT, WIDTH };
 
   static const struct {
@@ -2045,8 +2047,9 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
       {(size_t) -1, 1, 0, REFUSE},
       {(size_t) -1 - 8, 4, 4, REFUSE}, /* total would be the error value */
       {(size_t) -1 - 8, 4, 8, REFUSE},
-      {0, over32, 8192, WIDTH}, /* a 32-bit size_t cannot hold these */
-      {10, over32, 8192, WIDTH},
+      {0, HTS_ST_GROWSIZE_OVER32, 8192,
+       WIDTH}, /* 32-bit size_t can't hold these */
+      {10, HTS_ST_GROWSIZE_OVER32, 8192, WIDTH},
   };
 
   size_t k;
