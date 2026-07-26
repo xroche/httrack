@@ -82,8 +82,7 @@ sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2"
 
 portof() { echo "${1##*:}" | tr -d /; }
 
-# A value longer than the 256-byte buffer the header used to be built in. The
-# unfixed server smashed its stack here rather than emitting anything.
+# Larger than any fixed-size header buffer, to exercise the overflow path.
 url=$(start)
 long=$(python3 -c 'print("A" * 4096)')
 resp=$(post_redirect "${long}" "$(portof "${url}")") ||
