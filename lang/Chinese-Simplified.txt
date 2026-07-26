@@ -964,3 +964,11 @@ WARC archive name:
 WARC 归档名称：
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC 归档的可选基本名称；留空则在输出目录中自动命名。
+Seed the crawl from the site's sitemap
+从网站的 Sitemap 开始抓取
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+读取网站的 Sitemap（robots.txt 中的 Sitemap: 行，然后 /sitemap.xml），并将其中列出的每个网址添加为起始网址。
+Sitemap address:
+Sitemap 地址：
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+要读取的 Sitemap 地址，用来代替自动探测；留空则先探测 robots.txt 再探测 /sitemap.xml。

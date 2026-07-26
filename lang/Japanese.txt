@@ -964,3 +964,11 @@ WARC archive name:
 WARC アーカイブ名:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC アーカイブの任意のベース名。空欄にすると出力ディレクトリ内で自動的に名前が付けられます。
+Seed the crawl from the site's sitemap
+サイトマップからミラーリングを開始する
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+サイトマップ (robots.txt の Sitemap: 行、次に /sitemap.xml) を読み込み、記載されているすべての URL を開始アドレスとして追加します。
+Sitemap address:
+サイトマップのアドレス:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+サイトを探索する代わりに読み込むサイトマップのアドレス。空欄にすると robots.txt、次に /sitemap.xml を探索します。

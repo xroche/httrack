@@ -964,3 +964,11 @@ WARC archive name:
 »м€ WARC-архива:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Ќеоб€зательное базовое им€ WARC-архива; оставьте пустым дл€ автоматического именовани€ в выходном каталоге.
+Seed the crawl from the site's sitemap
+Ќачинать обход с карты сайта
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+ѕрочитать карту сайта (строки Sitemap: в robots.txt, затем /sitemap.xml) и добавить каждый указанный в ней URL как начальный адрес.
+Sitemap address:
+јдрес карты сайта:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+јдрес карты сайта, которую нужно прочитать вместо опроса сайта; оставьте пустым, чтобы проверить robots.txt, затем /sitemap.xml.

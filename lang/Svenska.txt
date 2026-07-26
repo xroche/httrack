@@ -964,3 +964,11 @@ WARC archive name:
 WARC-arkivets namn:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valfritt basnamn för WARC-arkivet; lämna tomt för att namnge det automatiskt i utdatakatalogen.
+Seed the crawl from the site's sitemap
+Starta insamlingen från webbplatsens webbplatskarta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Läs webbplatsens webbplatskarta (Sitemap:-rader i robots.txt, sedan /sitemap.xml) och lägg till varje angiven URL som startadress.
+Sitemap address:
+Webbplatskartans adress:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adress till en webbplatskarta som ska läsas i stället för att söka på webbplatsen; lämna tomt för att kontrollera robots.txt och sedan /sitemap.xml.

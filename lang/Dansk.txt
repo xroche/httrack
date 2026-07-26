@@ -1012,3 +1012,11 @@ WARC archive name:
 Navn på WARC-arkiv:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valgfrit basisnavn til WARC-arkivet; lad feltet stå tomt for automatisk navngivning i outputmappen.
+Seed the crawl from the site's sitemap
+Start gennemgangen fra webstedets sitemap
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Læs webstedets sitemap (Sitemap:-linjer i robots.txt, derefter /sitemap.xml) og tilføj hver angivet URL som startadresse.
+Sitemap address:
+Sitemap-adresse:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adressen på et sitemap, der skal læses i stedet for at undersøge webstedet; lad feltet stå tomt for at undersøge robots.txt og derefter /sitemap.xml.

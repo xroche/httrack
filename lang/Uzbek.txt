@@ -964,3 +964,11 @@ WARC archive name:
 WARC arxivi nomi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC arxivi uchun ixtiyoriy asosiy nom; chiqish katalogida avtomatik nomlash uchun bo'sh qoldiring.
+Seed the crawl from the site's sitemap
+Yig’ishni saytning sayt xaritasidan boshlash
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Saytning sayt xaritasini o’qish (robots.txt dagi Sitemap: qatorlari, so’ngra /sitemap.xml) va unda ko’rsatilgan har bir URL manzilni boshlang’ich manzil sifatida qo’shish.
+Sitemap address:
+Sayt xaritasi manzili:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Saytni tekshirish o’rniga o’qiladigan sayt xaritasi manzili; robots.txt, so’ngra /sitemap.xml ni tekshirish uchun bo’sh qoldiring.

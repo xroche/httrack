@@ -964,3 +964,11 @@ WARC archive name:
 WARC archívum neve:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 A WARC archívum opcionális alapneve; hagyja üresen az automatikus elnevezéshez a kimeneti könyvtárban.
+Seed the crawl from the site's sitemap
+A letöltés indítása a webhely webhelytérképérõl
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+A webhely webhelytérképének beolvasása (a robots.txt Sitemap: sorai, majd a /sitemap.xml), és a benne felsorolt összes URL felvétele kiindulási címként.
+Sitemap address:
+Webhelytérkép címe:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+A webhely vizsgálata helyett beolvasandó webhelytérkép címe; hagyja üresen a robots.txt, majd a /sitemap.xml vizsgálatához.

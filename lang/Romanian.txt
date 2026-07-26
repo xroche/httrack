@@ -964,3 +964,11 @@ WARC archive name:
 Numele arhivei WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nume de baza optional pentru arhiva WARC; lasati gol pentru a-l denumi automat in directorul de iesire.
+Seed the crawl from the site's sitemap
+Porneste explorarea de la harta sitului
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Citeste harta sitului (liniile Sitemap: din robots.txt, apoi /sitemap.xml) si adauga fiecare URL listat ca adresa de pornire.
+Sitemap address:
+Adresa hartii sitului:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adresa unei harti a sitului care sa fie citita în loc de sondarea sitului; lasati gol pentru a sonda robots.txt, apoi /sitemap.xml.

@@ -964,3 +964,11 @@ WARC archive name:
 WARC-arhiivi nimi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC-arhiivi valikuline põhinimi; jäta tühjaks, et see väljundkataloogis automaatselt nimetada.
+Seed the crawl from the site's sitemap
+Alusta kogumist saidi saidikaardist
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Loe saidi saidikaarti (robots.txt-i Sitemap:-read, seejärel /sitemap.xml) ja lisa iga seal loetletud URL alguslingina.
+Sitemap address:
+Saidikaardi aadress:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Saidikaardi aadress, mida lugeda saidi sondeerimise asemel; jäta tühjaks, et kontrollida robots.txt-i ja seejärel /sitemap.xml-i.

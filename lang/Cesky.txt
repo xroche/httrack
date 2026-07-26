@@ -964,3 +964,11 @@ WARC archive name:
 Název archivu WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Volitelnı základní název archivu WARC; ponechte prázdné pro automatické pojmenování ve vıstupním adresáøi.
+Seed the crawl from the site's sitemap
+Zahájit procházení z mapy webu
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Naèíst mapu webu (øádky Sitemap: v souboru robots.txt, poté /sitemap.xml) a pøidat kadou uvedenou adresu URL jako vıchozí.
+Sitemap address:
+Adresa mapy webu:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adresa mapy webu, která se má naèíst místo zjišování na webu; ponechte prázdné pro zjištìní z robots.txt a poté /sitemap.xml.

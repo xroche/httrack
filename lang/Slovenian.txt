@@ -964,3 +964,11 @@ WARC archive name:
 Ime arhiva WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Neobvezno osnovno ime arhiva WARC; pustite prazno za samodejno poimenovanje v izhodni mapi.
+Seed the crawl from the site's sitemap
+Zacni zajem z zemljevidom spletnega mesta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Preberi zemljevid spletnega mesta (vrstice Sitemap: v robots.txt, nato /sitemap.xml) in dodaj vsak navedeni URL kot zacetni naslov.
+Sitemap address:
+Naslov zemljevida spletnega mesta:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Naslov zemljevida spletnega mesta, ki naj se prebere namesto preverjanja mesta; pustite prazno za preverjanje robots.txt in nato /sitemap.xml.

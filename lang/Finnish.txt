@@ -966,3 +966,11 @@ WARC archive name:
 WARC-arkiston nimi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valinnainen WARC-arkiston perusnimi; j‰t‰ tyhj‰ksi, jotta se nimet‰‰n automaattisesti tulostehakemistoon.
+Seed the crawl from the site's sitemap
+Aloita haku sivuston sivukartasta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Lue sivuston sivukartta (robots.txt-tiedoston Sitemap:-rivit, sitten /sitemap.xml) ja lis‰‰ jokainen siin‰ lueteltu URL-osoite aloitusosoitteeksi.
+Sitemap address:
+Sivukartan osoite:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Luettavan sivukartan osoite sivuston luotaamisen sijaan; j‰t‰ tyhj‰ksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.

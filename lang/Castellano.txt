@@ -964,3 +964,11 @@ WARC archive name:
 Nombre del archivo WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nombre base opcional para el archivo WARC; déjelo en blanco para nombrarlo automáticamente en el directorio de salida.
+Seed the crawl from the site's sitemap
+Iniciar el rastreo desde el mapa del sitio
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Leer el mapa del sitio (líneas Sitemap: de robots.txt, luego /sitemap.xml) y añadir como dirección inicial cada URL que incluya.
+Sitemap address:
+Dirección del mapa del sitio:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Dirección de un mapa del sitio que leer en lugar de sondear el sitio; déjelo vacío para sondear robots.txt y luego /sitemap.xml.
