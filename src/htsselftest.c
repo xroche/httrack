@@ -617,6 +617,35 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* htsblk_failf: clips a reason quoted from a remote reply into msg[] and
+     leaves statuscode to the caller */
+  {
+    htsblk r;
+    char expect[sizeof(r.msg)];
+    char big[4 * sizeof(r.msg)];
+
+    memset(&r, 0, sizeof(r));
+    r.statuscode = 1234;
+
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "PASV incorrect: %s", "220 ok");
+    if (strcmp(r.msg, "PASV incorrect: 220 ok") != 0 || r.statuscode != 1234)
+      return 1;
+
+    /* clipped to capacity and terminated; the expected bytes differ from the
+       case above, so writing nothing cannot pass on the leftovers */
+    memset(big, 'z', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\0';
+    memset(expect, 'z', sizeof(expect) - 1);
+    expect[sizeof(expect) - 1] = '\0';
+    memcpy(expect, "Bad user name: ", sizeof("Bad user name: ") - 1);
+
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "Bad user name: %s", big);
+    if (strcmp(r.msg, expect) != 0 || r.statuscode != 1234)
+      return 1;
+  }
+
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
      n_eval == 2 on a double-eval macro. */
   {
@@ -4998,10 +5027,10 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
 
-  snprintf(fpath, sizeof(fpath), "%s/", dir); /* IE glob wants a trailing sep */
+  assertf(sprintfbuff(fpath, "%s/", dir)); /* IE glob wants a trailing sep */
 
   /* cookies.txt: one Netscape record (host, _, path, _, _, name, value). */
-  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
   {
     FILE *fp = FOPEN(file, "wb");
 
@@ -5011,7 +5040,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   }
 
   /* A copied IE cookie u@v.txt: name, value, url, then 6 unused fields. */
-  snprintf(file, sizeof(file), "%su@v.txt", fpath);
+  assertf(sprintfbuff(file, "%su@v.txt", fpath));
   {
     FILE *fp = FOPEN(file, "wb");
 
@@ -5033,7 +5062,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 #endif
 
   (void) UNLINK(file); /* u@v.txt (already gone on Windows) */
-  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
   (void) UNLINK(file);
   dir[dirlen] = '\0';
   while (strlen(dir) > base) {

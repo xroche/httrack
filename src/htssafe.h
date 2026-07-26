@@ -461,6 +461,22 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 }
 
 /**
+ * va_list form of slprintfbuff(). Callers that deliberately ignore truncation
+ * use this one, so it is not HTS_CHECK_RESULT.
+ */
+static HTS_INLINE HTS_UNUSED hts_boolean vslprintfbuff(char *dest, size_t size,
+                                                       const char *fmt,
+                                                       va_list args) {
+  int ret;
+
+  assertf(dest != NULL && size != 0);
+  ret = vsnprintf(dest, size, fmt, args);
+  /* pre-C99 runtimes (msvcrt _vsnprintf) return -1 and do not terminate */
+  dest[size - 1] = '\0';
+  return ret >= 0 && (size_t) ret < size ? HTS_TRUE : HTS_FALSE;
+}
+
+/**
  * Formatted print into dest (capacity size, NUL included), truncating to fit
  * and always NUL-terminating. Returns HTS_TRUE if the whole output fit; the
  * result is the only truncation signal, so it must be acted on. Unlike
@@ -469,15 +485,12 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
     slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
   va_list args;
-  int ret;
+  hts_boolean ret;
 
-  assertf(dest != NULL && size != 0);
   va_start(args, fmt);
-  ret = vsnprintf(dest, size, fmt, args);
+  ret = vslprintfbuff(dest, size, fmt, args);
   va_end(args);
-  /* pre-C99 runtimes (msvcrt _vsnprintf) return -1 and do not terminate */
-  dest[size - 1] = '\0';
-  return ret >= 0 && (size_t) ret < size ? HTS_TRUE : HTS_FALSE;
+  return ret;
 }
 
 /**

@@ -2537,6 +2537,15 @@ void fil_simplifie(char *f) {
   }
 }
 
+void htsblk_failf(htsblk *r, const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  // discarding the fit flag is the point: clipping a diagnostic is intended
+  (void) vslprintfbuff(r->msg, sizeof(r->msg), fmt, args);
+  va_end(args);
+}
+
 // fermer liaison fichier ou socket
 void deletehttp(htsblk * r) {
 #if HTS_DEBUG_CLOSESOCK

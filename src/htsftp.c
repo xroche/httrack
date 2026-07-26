@@ -251,7 +251,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       // folding a nonsense port into 1..65535 fetches one the link never named;
       // an empty "host:" just means the default (#614)
       if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
-        snprintf(back->r.msg, sizeof(back->r.msg), "Invalid port: %s", a + 1);
+        htsblk_failf(&back->r, "Invalid port: %s", a + 1);
         back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
         _HALT_FTP return 0;
       }
@@ -262,8 +262,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
     if (hts_dns_resolve2(opt, _adr, &server, &error) == NULL) {
-      snprintf(back->r.msg, sizeof(back->r.msg),
-               "Unable to get server's address: %s", error);
+      htsblk_failf(&back->r, "Unable to get server's address: %s", error);
       back->r.statuscode = STATUSCODE_NON_FATAL;
       _HALT_FTP return 0;
     }
@@ -332,18 +331,15 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             }
 
           } else {
-            snprintf(back->r.msg, sizeof(back->r.msg), "Bad password: %s",
-                     linejmp(line));
+            htsblk_failf(&back->r, "Bad password: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }
         } else {
-          snprintf(back->r.msg, sizeof(back->r.msg), "Bad user name: %s",
-                   linejmp(line));
+          htsblk_failf(&back->r, "Bad user name: %s", linejmp(line));
           back->r.statuscode = STATUSCODE_INVALID;
         }
       } else {
-        snprintf(back->r.msg, sizeof(back->r.msg), "Connection refused: %s",
-                 linejmp(line));
+        htsblk_failf(&back->r, "Connection refused: %s", linejmp(line));
         back->r.statuscode = STATUSCODE_INVALID;
       }
 
@@ -410,8 +406,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             }
             // -- fin analyse de l'adresse IP et du port --
           } else {
-            snprintf(back->r.msg, sizeof(back->r.msg), "PASV incorrect: %s",
-                     linejmp(line));
+            htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
         } else {
@@ -442,13 +437,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 }
               }
             } else {
-              snprintf(back->r.msg, sizeof(back->r.msg), "EPSV incorrect: %s",
-                       linejmp(line));
+              htsblk_failf(&back->r, "EPSV incorrect: %s", linejmp(line));
               back->r.statuscode = STATUSCODE_INVALID;
             }
           } else {
-            snprintf(back->r.msg, sizeof(back->r.msg), "PASV/EPSV error: %s",
-                     linejmp(line));
+            htsblk_failf(&back->r, "PASV/EPSV error: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
         }
@@ -554,8 +547,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   deletesoc(soc_dat);
                   soc_dat = INVALID_SOCKET;
                   //
-                  snprintf(back->r.msg, sizeof(back->r.msg),
-                           "RETR command error: %s", linejmp(line));
+                  htsblk_failf(&back->r, "RETR command error: %s",
+                               linejmp(line));
                   back->r.statuscode = STATUSCODE_INVALID;
                 }               // sinon on est prêts
               } else {
@@ -573,13 +566,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               back->r.statuscode = STATUSCODE_INVALID;
             }                   // sinon on est prêts
           } else {
-            snprintf(back->r.msg, sizeof(back->r.msg),
-                     "Unable to resolve IP %s: %s", adr_ip, error);
+            htsblk_failf(&back->r, "Unable to resolve IP %s: %s", adr_ip,
+                         error);
             back->r.statuscode = STATUSCODE_INVALID;
           }                     // sinon on est prêts
         } else {
-          snprintf(back->r.msg, sizeof(back->r.msg), "PASV incorrect: %s",
-                   linejmp(line));
+          htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
           back->r.statuscode = STATUSCODE_INVALID;
         }                       // sinon on est prêts
 #else
@@ -603,13 +595,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 back->r.statuscode = STATUSCODE_INVALID;
               }
             } else {
-              snprintf(back->r.msg, sizeof(back->r.msg),
-                       "RETR command error: %s", linejmp(line));
+              htsblk_failf(&back->r, "RETR command error: %s", linejmp(line));
               back->r.statuscode = STATUSCODE_INVALID;
             }
           } else {
-            snprintf(back->r.msg, sizeof(back->r.msg), "PORT command error: %s",
-                     linejmp(line));
+            htsblk_failf(&back->r, "PORT command error: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }
 #ifdef _WIN32
@@ -652,8 +642,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 len = 0;        // fin
                 break;
               case 0:
-                snprintf(back->r.msg, sizeof(back->r.msg), "Time out (%d)",
-                         timeout);
+                htsblk_failf(&back->r, "Time out (%d)", timeout);
                 back->r.statuscode = STATUSCODE_INVALID;
                 len = 0;        // fin
                 break;
@@ -716,8 +705,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 strcpybuff(back->r.msg, "OK");
                 back->r.statuscode = HTTP_OK;
               } else {
-                snprintf(back->r.msg, sizeof(back->r.msg), "RETR incorrect: %s",
-                         linejmp(line));
+                htsblk_failf(&back->r, "RETR incorrect: %s", linejmp(line));
                 back->r.statuscode = STATUSCODE_INVALID;
               }
             } else {

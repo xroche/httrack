@@ -199,6 +199,10 @@ T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
    etc.). */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int waitconnect, int addr_index, int *addr_count);
+/* Set r->msg to the formatted failure reason, clipped to fit: the message is
+   diagnostic only. Leaves r->statuscode alone, the caller sets it. */
+void htsblk_failf(htsblk *r, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
+
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
