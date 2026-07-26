@@ -457,6 +457,12 @@ static void basic_selftests(void) {
     // link one level up -> a "../" prefix
     assertf(lienrelatif(s, sizeof(s), "a.html", "dir/index.html") == 0);
     assertf(strcmp(s, "../a.html") == 0);
+    // an empty current path: the trim used to walk off the front of it, which
+    // "?x" reaches too because the query pre-pass hands on the part before it
+    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "") == 0);
+    assertf(strcmp(s, "dir/page.html") == 0);
+    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "?x") == 0);
+    assertf(strcmp(s, "dir/page.html") == 0);
   }
 }
 
