@@ -16,7 +16,8 @@ python=$(find_python) || {
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-"$python" - "$dir/in.zip" <<'EOF'
+rc=0
+"$python" - "$dir/in.zip" <<'EOF' || rc=$?
 import os, sys, zipfile
 
 body = b"hello world"
@@ -45,9 +46,12 @@ except OSError:
 if int(os.stat(sys.argv[1]).st_mtime) < huge:
     sys.exit(77)  # filesystem clamped it, nothing to test
 EOF
-rc=0 || rc=$?
-test "${rc:-0}" != 77 || {
-    echo "filesystem will not hold the mtime; skipping" >&2
+test "$rc" -eq 0 || {
+    test "$rc" -eq 77 || {
+        echo "FAIL: could not build the cache (python exit $rc)" >&2
+        exit 1
+    }
+    echo "filesystem will not hold an out-of-range mtime; skipping" >&2
     exit 77
 }
 
