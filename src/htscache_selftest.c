@@ -1429,8 +1429,8 @@ static int corrupt_expect_disk_header(httrackp *opt, LLint wantsize,
 
 /* An over-long field from a foreign cache must clip, not abort: the entry
    still reads, clipped to capacity, and the canary survives. */
-static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantlen,
-                                         const char *what) {
+static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
+                                         size_t wantlastmod, const char *what) {
   cache_back cache;
   htsblk v, c;
   char BIGSTK lv[HTS_URLMAXSIZE * 2];
@@ -1440,10 +1440,19 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantlen,
   selftest_open_for_read(&cache, opt);
   lv[0] = lc[0] = '\0';
   v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.html", "", lv, NULL, 1);
-  if (v.statuscode != 200 || strlen(v.msg) != wantlen) {
-    fprintf(stderr, "%s: %s: status %d msg len %u, expected 200/%u\n",
-            selftest_tag, what, v.statuscode, (unsigned) strlen(v.msg),
-            (unsigned) wantlen);
+  if (v.statuscode != 200) {
+    fprintf(stderr, "%s: %s: status %d, expected 200\n", selftest_tag, what,
+            v.statuscode);
+    fail++;
+  }
+  if (wantmsg != (size_t) -1 && strlen(v.msg) != wantmsg) {
+    fprintf(stderr, "%s: %s: msg len %u, expected %u\n", selftest_tag, what,
+            (unsigned) strlen(v.msg), (unsigned) wantmsg);
+    fail++;
+  }
+  if (wantlastmod != (size_t) -1 && strlen(v.lastmodified) != wantlastmod) {
+    fprintf(stderr, "%s: %s: lastmodified len %u, expected %u\n", selftest_tag,
+            what, (unsigned) strlen(v.lastmodified), (unsigned) wantlastmod);
     fail++;
   }
   c = cache_readex(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc, NULL, 1);
@@ -1496,17 +1505,30 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
                                     "garbled deflate stream");
 
-  /* A foreign cache may hold a field wider than ours: msg[80] here gets 89
-     bytes. Clipping keeps the entry; aborting would take the crawl down.
-     Overwrite the placeholder Etag line, same byte length, offsets intact. */
+  /* A corrupt cache can hold a field wider than ours. Clipping keeps the
+     entry; aborting would take the crawl down. Overwrite the placeholder Etag
+     line in place, same byte length, so the zip offsets stay intact. */
   corrupt_build_longetag(opt);
   corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
-                "X-StatusMessage: "
-                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "X-StatusMessage: " /* 17 + 89 = 106 */
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                1, 1);
+  failures +=
+      corrupt_expect_victim_clipped(opt, sizeof(((htsblk *) 0)->msg) - 1,
+                                    (size_t) -1, "over-long X-StatusMessage");
+
+  /* lastmodified[64] is narrower than msg[80]: one hardcoded clip length
+     cannot satisfy both. */
+  corrupt_build_longetag(opt);
+  corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
+                "Last-Modified: " /* 15 + 91 = 106 */
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
                 1, 1);
   failures += corrupt_expect_victim_clipped(
-      opt, sizeof(((htsblk *) 0)->msg) - 1, "over-long X-StatusMessage");
+      opt, (size_t) -1, sizeof(((htsblk *) 0)->lastmodified) - 1,
+      "over-long Last-Modified");
 
   /* An X-Size above INT_MAX is positive as int64 (slips a bare sign check) but
      truncates negative in the (int) cast the malloc uses: a wraparound alloc.
