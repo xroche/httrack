@@ -48,6 +48,16 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - Bounds-check every copy. Overflow-safe form: put the untrusted value alone,
   `untrusted < limit - controlled` — never `controlled + untrusted < limit`,
   which can wrap and pass.
+- **Abort or clip is a decision, not a default.** The `*_safe_` helpers
+  (`strcpybuff`, `strlcpybuff`, `strcatbuff`) **abort** on overflow. Right for
+  our own data, wrong for anything read back from a cache, a header or the
+  wire, where it trades a memory smash for a crash on malformed input. Clip
+  with `dst[0] = '\0'; strlncatbuff(dst, src, size, size - 1)`.
+- **A warning class is not the unsafe set.** `-Wformat-truncation` fires only on
+  a *bounded* `snprintf` whose return is discarded, so an unbounded `sprintf`
+  into the same buffer never appears on it. Before scoping a hardening pass off
+  compiler output, grep the unguarded forms yourself (`\bsprintf\s*\(`,
+  `\bstrcpy\s*\(`, `\bstrcat\s*\(`).
 
 ## C conventions
 - **Use the `*t` allocator wrappers, never raw libc** (`htssafe.h`):
@@ -84,6 +94,17 @@ Before pushing, and when reviewing others, don't skim for bugs:
   layout/ABI, cache/wire format, or a security path? A static or unit check
   isn't enough; exercise the wrong behavior at runtime. Claude Code:
   `/review-recipe`.
+- **Poison a canary, never compare it against zero.** Checking that a
+  neighbouring field is still `'\0'` cannot see the stray NUL an off-by-one
+  terminator writes — the exact bug the canary is there for. Fill it with a
+  non-zero byte, and prove it by killing both the stray-`'X'` and the
+  stray-NUL mutant. Neither ASan nor `_FORTIFY_SOURCE` sees an overflow that
+  lands inside the same struct.
+- **Overshoot every destination, not one.** A bounds test that oversizes a
+  single field cannot tell a per-field bound from a one-size-fits-all one, nor
+  from a fix that bounds that field and leaves its neighbours raw. Exercise
+  each destination the path touches, spanning at least two capacities, and
+  check what the code actually emits before writing the expected values.
 
 ## Commits
 - **Sign-off is mandatory.** Every commit carries a `Signed-off-by` trailer:
