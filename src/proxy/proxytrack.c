@@ -771,7 +771,7 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
                   PT_ReadIndex(indexes, StringBuff(itemUrl) + 1, FETCH_HEADERS);
                 if (file != NULL && file->statuscode == HTTP_OK) {
                   size = file->size;
-                  if (file->lastmodified) {
+                  if (file->lastmodified[0] != '\0') {
                     timestamp = get_time_rfc822(file->lastmodified);
                   }
                   if (timestamp == (time_t) 0) {
@@ -785,7 +785,7 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
                     }
                     timestamp = timestampRep;
                   }
-                  if (file->contenttype) {
+                  if (file->contenttype[0] != '\0') {
                     mimeType = file->contenttype;
                   }
                 }

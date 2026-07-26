@@ -59,9 +59,10 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <!-- LIBHTTRACK_EXPORTS turns HTSEXT_API into __declspec(dllexport); ZLIB_DLL
-           imports zlib from its DLL. HTS_USEBROTLI/HTS_USEZSTD enable the br and
-           zstd content codings. Windows 7 floor, matching WinHTTrack. -->
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;HTS_USEBROTLI=1;HTS_USEZSTD=1;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+           imports zlib from its DLL, ZLIB_CONST makes its next_in const as the
+           autotools build does. HTS_USEBROTLI/HTS_USEZSTD enable the br and zstd
+           content codings. Windows 7 floor, matching WinHTTrack. -->
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;ZLIB_CONST;HTS_USEBROTLI=1;HTS_USEZSTD=1;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)coucal;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
