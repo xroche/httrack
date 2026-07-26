@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscache_selftest.h"
 #include "htsdns_selftest.h"
 #include "htscharset.h"
+#include "htscmdline.h"
 #include "htsencoding.h"
 #include "htsftp.h"
 #include "htsmd5.h"
@@ -565,6 +566,54 @@ static int string_safety_selftests(void) {
 
     htsbuff_cat(&c, "abc");
     if (strcmp(htsbuff_str(&c), "abc") != 0 || c.len != 3)
+      return 1;
+  }
+
+  /* sprintfbuff: truncate-and-report. Must never abort (its callers format
+     remote banners) nor write past the array, which the canary catches. */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    const char *const big = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+    /* repoison before every call, or an implementation that measures first and
+       writes nothing "passes" the truncating cases on the previous content */
+#define POISON_DST() memset(s.dst, '#', sizeof(s.dst))
+
+    memset(&s, '#', sizeof(s));
+    if (!sprintfbuff(s.dst, "%s-%d", "ab", 42) || strcmp(s.dst, "ab-42") != 0)
+      return 1;
+
+    /* exact fit: 7 characters plus the NUL */
+    POISON_DST();
+    if (!sprintfbuff(s.dst, "%s", "1234567") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+
+    /* one over, then far over: truncated to the prefix, terminated, reported */
+    POISON_DST();
+    if (sprintfbuff(s.dst, "%s", "12345678") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+    POISON_DST();
+    if (sprintfbuff(s.dst, "%s", big) || strcmp(s.dst, "0123456") != 0)
+      return 1;
+
+    /* explicit-capacity form, down to the degenerate size 1 */
+    {
+      char *const p = s.dst;
+
+      POISON_DST();
+      if (slprintfbuff(p, 1, "%s", "x") || p[0] != '\0')
+        return 1;
+      POISON_DST();
+      if (!slprintfbuff(p, sizeof(s.dst), "%s", "ok") || strcmp(p, "ok") != 0)
+        return 1;
+    }
+#undef POISON_DST
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
       return 1;
   }
 
@@ -1123,6 +1172,128 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(wide, "\xC3\xA9") == 0);
   }
   printf("unescape-bounds self-test OK\n");
+  return 0;
+}
+
+// hts_split_cmdline(): the vector must grow with the argument count, and a
+// quote inside a value must not end the argument and hand -V to the parser.
+static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
+  char line[512];
+  char **args;
+  int nargs = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  // control: every separator splits, and argv[0] is the program name
+  strcpybuff(line, "httrack http://x/ --quiet\t-c8\n-O out");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(args != NULL && nargs == 6);
+  assertf(args[nargs] == NULL); // callers may walk to the terminator
+  assertf(strcmp(args[0], "httrack") == 0);
+  assertf(strcmp(args[1], "http://x/") == 0);
+  assertf(strcmp(args[2], "--quiet") == 0);
+  assertf(strcmp(args[3], "-c8") == 0);
+  assertf(strcmp(args[4], "-O") == 0);
+  assertf(strcmp(args[5], "out") == 0);
+  freet(args);
+
+  // the template pads with whitespace: empty arguments are kept (the engine
+  // skips them), so the count is one per separator
+  strcpybuff(line, "httrack  --quiet");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 3 && args[1][0] == '\0');
+  assertf(strcmp(args[2], "--quiet") == 0);
+  freet(args);
+
+  // a quoted run keeps both its spaces and its quotes: the engine unquotes
+  strcpybuff(line, "httrack --user-agent \"Mozilla 5.0\" -c8");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 4);
+  assertf(strcmp(args[2], "\"Mozilla 5.0\"") == 0);
+  assertf(strcmp(args[3], "-c8") == 0);
+  freet(args);
+
+  // an escaped quote is a literal quote, not the end of the argument: the
+  // engine strips only the outer pair
+  strcpybuff(line, "httrack --user-agent \"x\\\" -V \\\"touch /tmp/pwn\" -c8");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 4);
+  assertf(strcmp(args[2], "\"x\" -V \"touch /tmp/pwn\"") == 0);
+  assertf(strcmp(args[3], "-c8") == 0);
+  freet(args);
+
+  // \\ is a literal backslash, so a Windows path survives
+  strcpybuff(line, "httrack --path \"C:\\\\dir\\\\sub\"");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 3);
+  assertf(strcmp(args[2], "\"C:\\dir\\sub\"") == 0);
+  freet(args);
+
+  // outside a quoted run a backslash is literal: the url and wildcard-filter
+  // fields, which the wizard cannot quote, read as before
+  strcpybuff(line, "httrack -*\\** +*.png");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 3);
+  assertf(strcmp(args[1], "-*\\**") == 0);
+  assertf(strcmp(args[2], "+*.png") == 0);
+  freet(args);
+
+  // a quoted run leaves slots unused, so the terminator has to be written and
+  // not inherited: size the vector from a full line first, so freeing it hands
+  // the same chunk back with stale pointers in those slots
+  strcpybuff(line, "httrack a b c d e");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 6);
+  freet(args);
+  strcpybuff(line, "httrack \"a b c d e\"");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 2);
+  assertf(args[nargs] == NULL);
+  freet(args);
+
+  // an unterminated quote protects the rest of the line, as one argument
+  strcpybuff(line, "httrack --footer \"unbalanced -V x");
+  args = hts_split_cmdline(line, &nargs);
+  assertf(nargs == 3);
+  assertf(strcmp(args[2], "\"unbalanced -V x") == 0);
+  freet(args);
+
+  // past the 1024 entries the vector used to hold: distinct arguments, so a
+  // write beyond the allocation cannot read back as the expected parse
+  {
+    const int n = 2000;
+    const size_t size = 16 * (size_t) n + 16;
+    char *big = malloct(size);
+    size_t pos = 0;
+    int i;
+
+    assertf(big != NULL);
+    pos = (size_t) snprintf(big, size, "httrack");
+    assertf(pos < size);
+    for (i = 0; i < n; i++) {
+      // snprintf returns what it wanted to write, so accumulating it blind
+      // would let the next size argument wrap
+      const int len = snprintf(big + pos, size - pos, " a%d", i);
+
+      assertf(len > 0 && (size_t) len < size - pos);
+      pos += (size_t) len;
+    }
+    args = hts_split_cmdline(big, &nargs);
+    assertf(args != NULL && nargs == n + 1);
+    assertf(args[nargs] == NULL);
+    for (i = 0; i < n; i++) {
+      char expect[16];
+
+      snprintf(expect, sizeof(expect), "a%d", i);
+      assertf(strcmp(args[i + 1], expect) == 0);
+    }
+    freet(args);
+    freet(big);
+  }
+
+  printf("cmdline-split self-test OK\n");
   return 0;
 }
 
@@ -2761,6 +2932,32 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
   assertf(strstr(buf, "Refresh") != NULL);
   assertf(strstr(buf, "example.com") != NULL);
+
+  /* a first link whose escaped form overruns the old flat 1024-byte tempo: the
+     redirect must carry the whole URL, not a clipped prefix */
+  {
+    char BIGSTK link[HTS_URLMAXSIZE * 2];
+    char *p = link;
+
+    strcpybuff(link, "http://example.com/");
+    p += strlen(link);
+    memset(p, 'a', 1200);
+    p += 1200;
+    strcpy(p, "/end.html");
+
+    done = 0;
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    hts_finish_makeindex(opt, &done, &fp, 1, link, "%s%s", "", "");
+    assertf(fp == NULL);
+    fp = fopen(path, "rb");
+    assertf(fp != NULL);
+    n = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[n] = '\0';
+    /* the closing quote proves the URL was not clipped mid-way */
+    assertf(strstr(buf, "/end.html\">") != NULL);
+  }
 
   /* no single link: footer only, no refresh meta */
   done = 0;
@@ -4910,6 +5107,9 @@ static const struct selftest_entry {
      st_footerfmt},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
+    {"cmdline-split", "",
+     "webhttrack command-line to argv split (bounds, quoting)",
+     st_cmdlinesplit},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
