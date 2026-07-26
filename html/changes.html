@@ -122,8 +122,8 @@ verbatim and is compared directly.
 
 <br /><br />
 
-Where no digest can be taken on either side &mdash; the cache is disabled, or the
-previous copy is gone &mdash; the report falls back to the transfer signal, and a
+Where no digest can be taken on either side, because the cache is disabled or
+the previous copy is gone, the report falls back to the transfer signal, and a
 server that answers 200 rather than 304 reads as changed. Keeping the cache on
 (the default) is what makes the report precise.
 
@@ -132,34 +132,34 @@ server that answers 200 rather than 304 reads as changed. Keeping the cache on
 <h3>Fields</h3>
 
 <ul>
-<li><tt>schema</tt> &mdash; format version, currently <tt>1</tt>. It is bumped only
+<li><tt>schema</tt>: format version, currently <tt>1</tt>. It is bumped only
 on an incompatible change; new fields may appear without one.</li>
-<li><tt>generator</tt> &mdash; the HTTrack build that wrote the file.</li>
-<li><tt>date</tt> &mdash; when the report was written, UTC, <tt>YYYY-MM-DDThh:mm:ssZ</tt>.</li>
-<li><tt>first_crawl</tt> &mdash; true when no index of a previous mirror
+<li><tt>generator</tt>: the HTTrack build that wrote the file.</li>
+<li><tt>date</tt>: when the report was written, UTC, <tt>YYYY-MM-DDThh:mm:ssZ</tt>.</li>
+<li><tt>first_crawl</tt>: true when no index of a previous mirror
 (<tt>hts-cache/old.lst</tt>) was found, so there was nothing to compare against and
 everything is listed as new.</li>
-<li><tt>partial</tt> &mdash; true when the report ran out of memory and lists only
+<li><tt>partial</tt>: true when the report ran out of memory and lists only
 part of the mirror.</li>
-<li><tt>purged</tt> &mdash; true when <tt>--purge-old</tt> was in effect, so the
+<li><tt>purged</tt>: true when <tt>--purge-old</tt> was in effect, so the
 files under <tt>gone</tt> were also deleted from disk.</li>
-<li><tt>counts</tt> &mdash; the size of each of the four lists.</li>
-<li><tt>new</tt>, <tt>changed</tt>, <tt>unchanged</tt>, <tt>gone</tt> &mdash; the
+<li><tt>counts</tt>: the size of each of the four lists.</li>
+<li><tt>new</tt>, <tt>changed</tt>, <tt>unchanged</tt>, <tt>gone</tt>: the
 lists themselves. Every mirrored file appears in exactly one of them.</li>
 </ul>
 
 Each entry is an object:
 
 <ul>
-<li><tt>url</tt> &mdash; the absolute URL the file came from. Empty under
+<li><tt>url</tt>: the absolute URL the file came from. Empty under
 <tt>gone</tt>: deletions are computed from the mirror's file index, which records
 paths, not URLs.</li>
-<li><tt>file</tt> &mdash; the path relative to the mirror root, with forward
+<li><tt>file</tt>: the path relative to the mirror root, with forward
 slashes. This is the entry's identity: a URL and a redirect that resolve to the
 same local file are one entry, not two.</li>
-<li><tt>size</tt> &mdash; the mirrored file's size in bytes, absent when the file
+<li><tt>size</tt>: the mirrored file's size in bytes, absent when the file
 is not on disk.</li>
-<li><tt>previous_size</tt> &mdash; under <tt>changed</tt> only, the size of the
+<li><tt>previous_size</tt>: under <tt>changed</tt> only, the size of the
 copy the previous run left.</li>
 </ul>
 
