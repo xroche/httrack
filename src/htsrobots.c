@@ -181,7 +181,9 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
 
       while (is_realspace(*a))
         a++;
-      if (strnotempty(a) && strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
+      /* A line at the buffer limit was truncated: a half URL is not one. */
+      if (strnotempty(a) && strlen(line) < sizeof(line) - 3 &&
+          strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
         strlcatbuff(sitemaps, a, sitemapsize);
         strlcatbuff(sitemaps, "\n", sitemapsize);
       }
