@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The WebHTTrack GUI is served over http:, and browsers refuse to navigate from
-# there to a file: URL, so its "browse the mirror" links must go through the
-# server's own /website/ route. Drives the real htsserver over HTTP.
+# A browser will not follow an http: page to a file: URL, so the GUI's "browse
+# the mirror" link has to go through the server's own /website/ route.
 
 set -euo pipefail
 
@@ -23,9 +22,7 @@ python=$(find_python) || {
     exit 77
 }
 
-# file.html still carries file: links: browsing an arbitrary past project needs a
-# route that can serve one, which /website/ cannot. Check the path resolved, or
-# grep would "pass" without having read anything.
+# Control: on a path that does not resolve, grep "passes" without reading anything.
 test -f "${distdir}/html/server/finished.html" || fail "no GUI pages under ${distdir}"
 bad=$(grep -l 'file://' "${distdir}"/html/server/finished.html || true)
 test -z "${bad}" || fail "file: link left in: ${bad}"
@@ -49,8 +46,7 @@ mkdir -p "${proj}"
 printf 'MIRROR-PROBE-OK\n' >"${proj}/probe.txt"
 printf '<html><body>MIRROR-INDEX-OK</body></html>\n' >"${proj}/index.html"
 
-# webhttrack server on a pre-picked port; an isolated HOME keeps a stray
-# ~/.httrack.ini out of it.
+# An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
 sport=$("${python}" -c 'import socket
 s = socket.socket()
 s.bind(("127.0.0.1", 0))
@@ -90,27 +86,22 @@ def get(path):
     return urllib.request.urlopen(url + path, timeout=20).read()
 
 
-# No crawl has run, so neither the commandRunning nor the commandEnd override
-# applies and each page is served as itself.
-pages = {}
-for page in ("/server/finished.html",):
-    body = pages[page] = get(page).decode("latin-1")
-    # Control: an empty or unrendered page would pass "no file:" on its own.
-    check("HTTrack Website Copier" in body, page + " rendered")
-    check('href="/website/index.html"' in body, page + " points at the served mirror")
-    check("file://" not in body, page + " has no file: link")
+# No crawl has run, so no commandRunning/commandEnd override swaps the page out.
+finished = get("/server/finished.html").decode("latin-1")
+# Control: an empty or unrendered page would pass "no file:" on its own.
+check("HTTrack Website Copier" in finished, "finished.html rendered")
+check("file://" not in finished, "finished.html has no file: link")
 
-# /website/ resolves against the running project, and 404s until one is set: the
-# fetches further down therefore really come from the project directory.
+# Control: /website/ 404s until a project is set, so the fetches below are real.
 try:
     get("/website/probe.txt")
     check(False, "/website/ served with no project set")
 except urllib.error.HTTPError as e:
     check(e.code == 404, "/website/ is bound to a project (got %d)" % e.code)
 
-# Point the server at the mirror the way step4.html does when a crawl starts; a
-# body without the session id is refused outright.
-sid = re.search(r'name="sid" value="([0-9a-f]+)"', pages["/server/finished.html"])
+# Point the server at the mirror the way step4.html does; a body without the
+# session id is refused outright.
+sid = re.search(r'name="sid" value="([0-9a-f]+)"', finished)
 if sid is None:
     print("FAIL: no sid in the rendered form")
     sys.exit(1)
@@ -126,8 +117,11 @@ check("MIRROR-INDEX-OK" in get("/website/index.html").decode("latin-1"),
       "mirror index over http")
 
 body = get("/server/finished.html").decode("latin-1")
-check(base + "/proj" in body, "finished.html names the mirror directory")
-check('href="/website/index.html"' in body, "finished.html points at the served mirror")
+# Match the anchor by its mirror-path label: the list below it links /website/
+# too, so a bare "is the route mentioned" check passes on the unfixed page.
+check(re.search(r'href="/website/index\.html"[^>]*>\s*' +
+                re.escape(base + "/proj"), body) is not None,
+      "the mirror-path link points at the served mirror")
 check("file://" not in body, "finished.html has no file: link")
 
 sys.exit(rc)
