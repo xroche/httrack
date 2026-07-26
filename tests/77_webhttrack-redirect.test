@@ -82,9 +82,26 @@ sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2"
 
 portof() { echo "${1##*:}" | tr -d /; }
 
-# Larger than any fixed-size header buffer, to exercise the overflow path.
+# "free"/"inuse"/"unusable": can $1 still be bound on 127.0.0.2? A wildcard
+# listener takes the port on every address, a loopback-only one does not, so
+# this discriminates where the announced URL cannot.
+probe_alias() {
+    python3 -c 'import socket, sys
+s = socket.socket()
+try:
+    s.bind(("127.0.0.2", int(sys.argv[1])))
+except OSError as e:
+    print("unusable" if e.errno in (99, 49, 10049) else "inuse")
+else:
+    print("free")
+finally:
+    s.close()' "$1"
+}
+
+# Non-repeating and not a round number: a truncation, a reorder or a dropped
+# interior byte all stay visible.
+long=$(python3 -c 'print("".join(chr(33 + i % 90) for i in range(4097)))')
 url=$(start)
-long=$(python3 -c 'print("A" * 4096)')
 resp=$(post_redirect "${long}" "$(portof "${url}")") ||
     fail "no response to an oversized redirect value"
 stop
@@ -92,29 +109,45 @@ loc=$(printf '%s' "${resp}" | sed -n 's/^Location: //p' | tr -d '\r')
 test "${loc}" = "${long}" ||
     fail "oversized redirect not echoed whole (got ${#loc} bytes, want ${#long})"
 
-# CR/LF in the value must not reach the header, or the response splits.
+# CR/LF must suppress the header outright. Sanitising it instead would keep the
+# grep for an injected header quiet while still emitting a mangled Location.
 url=$(start)
 resp=$(post_redirect '/foo
 X-Injected: pwned' "$(portof "${url}")") || fail "no response to a CRLF redirect value"
 stop
-printf '%s' "${resp}" | grep -qi '^X-Injected:' &&
-    fail "CRLF in the redirect value injected a header"
-printf '%s' "${resp}" | grep -q '^HTTP/1.0 302' ||
-    fail "CRLF redirect did not yield a 302"
+printf '%s' "${resp}" | grep -qi 'X-Injected' &&
+    fail "CRLF in the redirect value reached the response"
+test "$(printf '%s' "${resp}" | grep -ci '^Location:')" -eq 0 ||
+    fail "CRLF redirect still emitted a Location header"
+test "$(printf '%s' "${resp}" | grep -c '^HTTP/1\.')" -eq 1 ||
+    fail "CRLF redirect did not yield exactly one status line"
 
-# Loopback unless asked otherwise.
+# Loopback unless asked otherwise. Assert the socket, not the announcement.
 url=$(start)
+port=$(portof "${url}")
+alias_state=$(probe_alias "${port}")
 stop
-case "${url}" in
-http://127.0.0.1:*) ;;
-*) fail "default listen address is not loopback: ${url}" ;;
-esac
+if test "${alias_state}" = unusable; then
+    echo "no 127.0.0.2 alias; skipping the listen-address assertions" >&2
+else
+    test "${alias_state}" = free ||
+        fail "default listen address is not loopback-only (127.0.0.2:${port} taken)"
+    case "${url}" in
+    http://127.0.0.1:*) ;;
+    *) fail "default announcement is not loopback: ${url}" ;;
+    esac
 
-url=$(start --bind 0.0.0.0)
-stop
-case "${url}" in
-http://0.0.0.0:*) ;;
-*) fail "--bind 0.0.0.0 not honoured: ${url}" ;;
-esac
+    url=$(start --bind 0.0.0.0)
+    port=$(portof "${url}")
+    alias_state=$(probe_alias "${port}")
+    stop
+    test "${alias_state}" = inuse ||
+        fail "--bind 0.0.0.0 did not take the wildcard (127.0.0.2:${port} ${alias_state})"
+fi
+
+# An empty --bind must not quietly fall back to every interface.
+out=$(htsserver "${distdir}/" --bind "" 2>&1 || true)
+printf '%s' "${out}" | grep -q -- "--bind needs an address" ||
+    fail "empty --bind not refused"
 
 echo "PASS"

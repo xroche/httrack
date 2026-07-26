@@ -181,7 +181,8 @@ int main(int argc, char *argv[]) {
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr,
-            "usage: %s [--port <port>] [--ppid parent-pid] <path-to-html-root-dir> [key value [key value]..]\n",
+            "usage: %s [--port <port>] [--bind <address>] [--ppid parent-pid] "
+            "<path-to-html-root-dir> [key value [key value]..]\n",
             argv[0]);
     fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
     return 1;
@@ -270,6 +271,12 @@ int main(int argc, char *argv[]) {
         return -1;
       }
     } else if (strcmp(argv[i], "--bind") == 0 && i + 1 < argc) {
+      /* empty would fall back to every interface, silently undoing the default
+       */
+      if (!strnotempty(argv[i + 1])) {
+        fprintf(stderr, "--bind needs an address\n");
+        return -1;
+      }
       bindAddr = argv[i + 1];
     } else if (strcmp(argv[i], "--ppid") == 0 && i + 1 < argc) {
       if (sscanf(argv[i + 1], "%u", &parentPid) != 1) {
