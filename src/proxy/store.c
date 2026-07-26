@@ -871,13 +871,11 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
   (headersSize) += (int) strlen(headers + headersSize); \
 } while(0)
 /* refvalue_size is mandatory: the cache line is bounded only by the line
-   buffer, not by the destination. Clip rather than reject, since an
-   engine-written field can be wider than ours. */
+   buffer, not by the destination. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (refvalue)[0] = '\0';                                                    \
-      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
@@ -2160,8 +2158,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
 #define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (refvalue)[0] = '\0';                                                    \
-      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
+      (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
