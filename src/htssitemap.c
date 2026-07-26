@@ -213,8 +213,9 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
   return HTS_FALSE;
 }
 
-/* Decompress a gzip-framed body into a fresh buffer bounded by both the
-   absolute cap and the codec ratio budget. Returns NULL on failure. */
+/* Decompress a gzip-framed body into a fresh buffer. The 64 MiB cap is what
+   binds in practice; deflate tops out near 1032:1, so the tree's codec budget
+   only matters as the shared policy for a coding that could go further. */
 static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   const LLint budget = hts_codec_maxout((LLint) size);
   size_t cap = budget < (LLint) HTS_SITEMAP_MAX_BYTES
