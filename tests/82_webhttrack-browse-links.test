@@ -1,0 +1,139 @@
+#!/bin/bash
+#
+# The WebHTTrack GUI is served over http:, and browsers refuse to navigate from
+# there to a file: URL, so its "browse the mirror" links must go through the
+# server's own /website/ route. Drives the real htsserver over HTTP.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+# No GUI page may carry a file: link, not only the two fetched below. Check the
+# glob resolved: grep over a literal pattern would "pass" without reading a page.
+test -f "${distdir}/html/server/finished.html" || fail "no GUI pages under ${distdir}"
+bad=$(grep -l 'file://' "${distdir}"/html/server/*.html || true)
+test -z "${bad}" || fail "file: link left in: ${bad}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_browse.XXXXXX") || fail "no tmpdir"
+srvlog=$(mktemp)
+srv=
+srvpid=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}" "${srvlog}"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+# Stand in for a finished mirror: the crawl itself is not under test.
+proj="${work}/websites/proj"
+mkdir -p "${proj}"
+printf 'MIRROR-PROBE-OK\n' >"${proj}/probe.txt"
+printf '<html><body>MIRROR-INDEX-OK</body></html>\n' >"${proj}/index.html"
+
+# webhttrack server on a pre-picked port; an isolated HOME keeps a stray
+# ~/.httrack.ini out of it.
+sport=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+(
+    trap '' TERM TTOU
+    export HOME="${work}"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+srv=$!
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
+    kill -0 "${srv}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+
+# htsserver resolves the posted paths itself, so hand it native ones.
+"${python}" - "${url}" "$(nativepath "${work}/websites")" "$(nativepath "${proj}")" <<'PY' || fail "browse-link checks failed"
+import re, sys, urllib.error, urllib.parse, urllib.request
+
+url, base, proj = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3]
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def get(path):
+    # The UI is served ISO-8859-1, so stay in bytes.
+    return urllib.request.urlopen(url + path, timeout=20).read()
+
+
+# No crawl has run, so neither the commandRunning nor the commandEnd override
+# applies and each page is served as itself.
+pages = {}
+for page in ("/server/file.html", "/server/finished.html"):
+    body = pages[page] = get(page).decode("latin-1")
+    # Control: an empty or unrendered page would pass "no file:" on its own.
+    check("HTTrack Website Copier" in body, page + " rendered")
+    check('href="/website/index.html"' in body, page + " points at the served mirror")
+    check("file://" not in body, page + " has no file: link")
+
+# /website/ resolves against the running project, and 404s until one is set: the
+# fetches further down therefore really come from the project directory.
+try:
+    get("/website/probe.txt")
+    check(False, "/website/ served with no project set")
+except urllib.error.HTTPError as e:
+    check(e.code == 404, "/website/ is bound to a project (got %d)" % e.code)
+
+# Point the server at the mirror the way step4.html does when a crawl starts; a
+# body without the session id is refused outright.
+sid = re.search(r'name="sid" value="([0-9a-f]+)"', pages["/server/finished.html"])
+if sid is None:
+    print("FAIL: no sid in the rendered form")
+    sys.exit(1)
+fields = [("sid", sid.group(1)), ("path", base), ("projname", "proj"),
+          ("projpath", proj + "/")]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="")) for k, v in fields)
+urllib.request.urlopen(urllib.request.Request(
+    url + "/server/step4.html", data=body.encode("latin-1"), method="POST"),
+    timeout=20).read()
+
+check(get("/website/probe.txt") == b"MIRROR-PROBE-OK\n", "mirror file over http")
+check("MIRROR-INDEX-OK" in get("/website/index.html").decode("latin-1"),
+      "mirror index over http")
+
+body = get("/server/finished.html").decode("latin-1")
+check(base + "/proj" in body, "finished.html names the mirror directory")
+check('href="/website/index.html"' in body, "finished.html points at the served mirror")
+check("file://" not in body, "finished.html has no file: link")
+
+sys.exit(rc)
+PY
+
+# A leaked htsserver wedges the parallel harness behind a green log.
+cleanup
+! kill -0 "${srv}" 2>/dev/null || fail "htsserver ${srv} survived"
+
+echo "PASS"
