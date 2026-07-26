@@ -74,6 +74,11 @@ int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
    command-line seed. No-op when neither option is set. */
 void hts_sitemap_seed(httrackp *opt, const char *starturl);
 
+/* Carry the sitemap marking of (adr,fil) over to the target of a redirect the
+   engine has already queued, so a moved sitemap is still ingested. */
+void hts_sitemap_redirect(httrackp *opt, const char *adr, const char *fil,
+                          const char *newadr, const char *newfil);
+
 /* HTS_TRUE when (adr,fil) is a queued sitemap document awaiting ingestion. */
 hts_boolean hts_sitemap_pending(httrackp *opt, const char *adr,
                                 const char *fil);

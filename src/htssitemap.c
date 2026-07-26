@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 #include "htscodec.h"
+#include "htsfilters.h"
 #include "htslib.h"
 #include "htsrobots.h"
 #include "htssafe.h"
@@ -186,6 +187,8 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
   const size_t nlen = strlen(name);
   size_t i = 0;
 
+  if (size >= 3 && memcmp(doc, "\xef\xbb\xbf", 3) == 0)
+    i = 3; /* UTF-8 BOM */
   while (i < size) {
     if (isspace((unsigned char) doc[i])) {
       i++;
@@ -202,10 +205,20 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
         i++;
       i++;
     } else {
-      return i + 1 + nlen <= size && memcmp(doc + i + 1, name, nlen) == 0 &&
-                     (i + 1 + nlen == size ||
-                      isspace((unsigned char) doc[i + 1 + nlen]) ||
-                      doc[i + 1 + nlen] == '>')
+      size_t j = i + 1;
+
+      /* an optional namespace prefix: <sm:sitemapindex> is the same element */
+      while (j < size && doc[j] != ':' && doc[j] != '>' &&
+             !isspace((unsigned char) doc[j]))
+        j++;
+      if (j >= size || doc[j] != ':')
+        j = i + 1;
+      else
+        j++;
+      return j + nlen <= size && memcmp(doc + j, name, nlen) == 0 &&
+                     (j + nlen == size ||
+                      isspace((unsigned char) doc[j + nlen]) ||
+                      doc[j + nlen] == '>' || doc[j + nlen] == '/')
                  ? HTS_TRUE
                  : HTS_FALSE;
     }
@@ -394,12 +407,45 @@ static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
   return NULL;
 }
 
+/* A sitemap document is fetched like any other resource, so the user's filters
+   and robots.txt decide whether it may be. The wizard proper is not usable
+   here: it wants a referring link, and its up/down travel rules would judge a
+   child sitemap against the parent sitemap's directory. */
+static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
+                                         const char *fil) {
+  char BIGSTK l[HTS_URLMAXSIZE * 2], lfull[HTS_URLMAXSIZE * 2];
+  int jokdepth = 0;
+
+  if (opt->robots && opt->robotsptr != NULL &&
+      checkrobots((robots_wizard *) opt->robotsptr, adr, fil) == -1) {
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: robots.txt forbids %s%s", adr,
+                  fil);
+    return HTS_FALSE;
+  }
+  strcpybuff(l, jump_identification_const(adr));
+  if (*fil != '/')
+    strcatbuff(l, "/");
+  strcatbuff(l, fil);
+  strcpybuff(lfull, link_has_authority(adr) ? "" : "http://");
+  strcatbuff(lfull, adr);
+  if (*fil != '/')
+    strcatbuff(lfull, "/");
+  strcatbuff(lfull, fil);
+  if (fa_strjoker_dual(0, *opt->filters.filters, *opt->filters.filptr, lfull, l,
+                       NULL, NULL, &jokdepth) == -1) {
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: filter rule #%d refuses %s%s",
+                  jokdepth + 1, adr, fil);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 /* Queue a document and record its link with save="" so the body stays in
    memory: a sitemap is ingested, never mirrored. Top priority so its URLs get
    the full depth budget through htsAddLink. */
-static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
-                                 const char *fil, int level,
-                                 hts_boolean is_robots) {
+static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
+                                  const char *fil, int level,
+                                  hts_boolean is_robots, hts_boolean link_it) {
   hts_sitemap_state *const st = sitemap_state(opt);
   sitemap_doc *d;
 
@@ -414,6 +460,10 @@ static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
     return HTS_FALSE;
   if (sitemap_find(opt, adr, fil) != NULL)
     return HTS_FALSE;
+  /* The robots.txt probe is the request that fetches the rules, so it cannot be
+     judged by them; everything else can. */
+  if (!is_robots && !sitemap_fetch_allowed(opt, adr, fil))
+    return HTS_FALSE;
   d = calloct(1, sizeof(sitemap_doc));
   if (d == NULL)
     return HTS_FALSE;
@@ -425,6 +475,8 @@ static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
   st->docs = d;
   st->ndocs++;
 
+  if (!link_it)
+    return HTS_TRUE;
   if (!hts_record_link(opt, adr, fil, "", "", "", NULL))
     return HTS_FALSE;
   heap_top()->testmode = 0;
@@ -436,6 +488,25 @@ static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
   heap_top()->precedent = heap_top_index();
   hts_log_print(opt, LOG_INFO, "Sitemap: queued %s%s", adr, fil);
   return HTS_TRUE;
+}
+
+static hts_boolean sitemap_queue(httrackp *opt, const char *adr,
+                                 const char *fil, int level,
+                                 hts_boolean is_robots) {
+  return sitemap_queue_(opt, adr, fil, level, is_robots, HTS_TRUE);
+}
+
+void hts_sitemap_redirect(httrackp *opt, const char *adr, const char *fil,
+                          const char *newadr, const char *newfil) {
+  sitemap_doc *const d = sitemap_find(opt, adr, fil);
+
+  if (d == NULL || d->done)
+    return;
+  d->done = HTS_TRUE; /* the body lives at the target now */
+  /* The engine already queued the target link, so only the marking moves. */
+  (void) sitemap_queue_(opt, newadr, newfil, d->level, d->is_robots, HTS_FALSE);
+  hts_log_print(opt, LOG_NOTICE, "Sitemap: %s%s redirects to %s%s", adr, fil,
+                newadr, newfil);
 }
 
 void hts_sitemap_seed(httrackp *opt, const char *starturl) {
@@ -482,6 +553,7 @@ typedef struct sitemap_ingest_ctx {
   const char *adr; /* host of the document being ingested */
   int level;
   hts_boolean is_index;
+  int accepted; /* URLs seeded or documents queued, not merely parsed */
 } sitemap_ingest_ctx;
 
 /* A <loc> of a <urlset>: hand it to the wizard as a top-level seed. */
@@ -501,7 +573,9 @@ static hts_boolean sitemap_seed_url(void *arg, const char *url) {
     return HTS_TRUE;
   st->nurls++;
   strcpybuff(buff, url);
-  (void) htsAddLink(c->str, buff);
+  /* htsAddLink reports the wizard's verdict; only count what it took. */
+  if (htsAddLink(c->str, buff))
+    c->accepted++;
   return HTS_TRUE;
 }
 
@@ -524,7 +598,8 @@ static hts_boolean sitemap_seed_child(void *arg, const char *url) {
                   af.fil);
     return HTS_TRUE;
   }
-  (void) sitemap_queue(c->opt, af.adr, af.fil, c->level + 1, HTS_FALSE);
+  if (sitemap_queue(c->opt, af.adr, af.fil, c->level + 1, HTS_FALSE))
+    c->accepted++;
   return HTS_TRUE;
 }
 
@@ -551,6 +626,7 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
   ctx.adr = adr;
   ctx.level = d->level;
   ctx.is_index = HTS_FALSE;
+  ctx.accepted = 0;
 
   if (d->is_robots) {
     hts_sitemap_state *const st = sitemap_state(opt);
@@ -558,13 +634,16 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
     n = body != NULL ? hts_sitemap_scan_robots(body, size, HTS_SITEMAP_MAX_DOCS,
                                                sitemap_seed_child, &ctx)
                      : 0;
-    /* Fall back to the well-known location only when robots.txt named none. */
-    if (n == 0 && st != NULL && !st->fallback_done) {
+    /* Fall back to the well-known location when robots.txt queued nothing: a
+     lone off-host or filtered Sitemap: line leaves us with no sitemap at all.
+   */
+    if (ctx.accepted == 0 && st != NULL && !st->fallback_done) {
       st->fallback_done = HTS_TRUE;
       (void) sitemap_queue(opt, adr, "/sitemap.xml", 0, HTS_FALSE);
     }
-    hts_log_print(opt, LOG_INFO, "Sitemap: %d sitemap(s) declared in %s%s", n,
-                  adr, fil);
+    hts_log_print(opt, LOG_INFO,
+                  "Sitemap: %d of %d sitemap(s) declared in %s%s", ctx.accepted,
+                  n, adr, fil);
     return;
   }
 
@@ -577,10 +656,11 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
   }
   if (ctx.is_index)
     hts_log_print(opt, LOG_NOTICE,
-                  "Sitemap: %d child sitemap(s) listed by %s%s", n, adr, fil);
+                  "Sitemap: %d of %d child sitemap(s) listed by %s%s",
+                  ctx.accepted, n, adr, fil);
   else
-    hts_log_print(opt, LOG_NOTICE, "Sitemap: %d URL(s) added from %s%s", n, adr,
-                  fil);
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: %d of %d URL(s) added from %s%s",
+                  ctx.accepted, n, adr, fil);
 }
 
 void hts_sitemap_free(httrackp *opt) {

@@ -946,6 +946,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
     /* --sitemap: queue the sitemap probe just after the seeds, so its URLs are
        injected before the crawl gets far. */
+    hts_sitemap_free(opt); /* an earlier mirror may have left a doc list */
     if (opt->sitemap || StringNotEmpty(opt->sitemap_url)) {
       char BIGSTK first[HTS_URLMAXSIZE * 2];
       const char *const eol = strchr(primary, '\n');
@@ -1603,11 +1604,21 @@ int httpmirror(char *url1, httrackp * opt) {
         stre.maketrack_fp = maketrack_fp;
 
         /* Parse */
-        if (hts_mirror_check_moved(&str, &stre) != 0) {
-          XH_uninit;
-          return -1;
-        }
+        {
+          const int nlinks = opt->lien_tot;
 
+          if (hts_mirror_check_moved(&str, &stre) != 0) {
+            XH_uninit;
+            return -1;
+          }
+          /* A redirect re-queues the target as a fresh link; without carrying
+             the marking over, a moved sitemap is fetched and then ignored. */
+          if (opt->sitemap_state != NULL && opt->lien_tot > nlinks &&
+              hts_sitemap_pending(opt, urladr(), urlfil())) {
+            hts_sitemap_redirect(opt, urladr(), urlfil(), heap_top()->adr,
+                                 heap_top()->fil);
+          }
+        }
       }
 
     }                           // if !error

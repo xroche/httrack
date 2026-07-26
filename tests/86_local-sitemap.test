@@ -24,8 +24,8 @@ crawl --errors 0 --rerun \
     --not-found 'sitemapdir/index.xml' \
     --not-found 'sitemapdir/pages.xml.gz' \
     --not-found 'robots.txt' \
-    --log-found 'added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
-    --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemapdir/index\.xml' \
+    --log-found '2 of 3 URL\(s\) added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
+    --log-found '1 of 2 child sitemap\(s\) listed by 127\.0\.0\.1:[0-9]+/sitemapdir/index\.xml' \
     --log-found 'ignoring off-host child sitemap' \
     --log-not-found '/sitemap\.xml' \
     httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2
@@ -64,7 +64,7 @@ crawl --errors 0 \
 # empty document and does not stop --sitemap from seeding the crawl.
 crawl --errors-content 1 \
     --found 'sitemapdir/orphan1.html' \
-    --log-found 'Sitemap: 0 URL\(s\) added' \
+    --log-found 'Sitemap: 0 of 0 URL\(s\) added' \
     httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 \
     --sitemap-url 'BASEURL/sitemapdir/missing.xml'
 
@@ -74,3 +74,25 @@ crawl --errors 0 \
     --log-found 'Sitemap: cap reached' \
     httrack 'BASEURL/sitemapdir/start.html' -r2 \
     --sitemap-url 'BASEURL/sitemapdir/chain0.xml'
+
+# A child sitemap is a fetch like any other: a filter rejecting it stops the
+# whole subtree, so the page only it lists is never reached.
+crawl --errors 0 \
+    --not-found 'sitemapdir/gated.html' \
+    --log-found 'Sitemap: filter rule #[0-9]+ refuses' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 '-*filtered.xml*' \
+    --sitemap-url 'BASEURL/sitemapdir/gatedindex.xml'
+
+# Control: without that filter the same chain does reach the page.
+crawl --errors 0 \
+    --found 'sitemapdir/gated.html' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/gatedindex.xml'
+
+# A redirected sitemap is still ingested: the marking follows the 301.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'moved\.xml redirects to .*pages\.xml\.gz' \
+    --log-found 'URL\(s\) added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/moved.xml'

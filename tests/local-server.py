@@ -625,6 +625,36 @@ class Handler(SimpleHTTPRequestHandler):
     def route_sitemap_deepcap(self):
         self.send_html("\tReachable only past the sitemapindex nesting cap.")
 
+    # An index naming a child that filters (or robots.txt) must be able to
+    # refuse: filtered.xml would list gated.html if it were ever fetched.
+    def route_sitemap_gatedindex(self):
+        host = self.headers.get("Host")
+        self.send_raw(
+            '<?xml version="1.0" encoding="UTF-8"?><sitemapindex>'
+            f"<sitemap><loc>http://{host}/sitemapdir/filtered.xml</loc></sitemap>"
+            "</sitemapindex>\n".encode(),
+            "application/xml",
+        )
+
+    def route_sitemap_filtered(self):
+        host = self.headers.get("Host")
+        self.send_raw(
+            '<?xml version="1.0" encoding="UTF-8"?><urlset>'
+            f"<url><loc>http://{host}/sitemapdir/gated.html</loc></url>"
+            "</urlset>\n".encode(),
+            "application/xml",
+        )
+
+    def route_sitemap_gated(self):
+        self.send_html("\tListed only by the filtered child sitemap.")
+
+    # A moved sitemap: the marking has to follow the redirect.
+    def route_sitemap_moved(self):
+        self.send_response(301)
+        self.send_header("Location", "/sitemapdir/pages.xml.gz")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # --- type/extension matrix (issue #267 family) -------------------------
 
     def send_raw(self, body, content_type, extra_headers=()):
@@ -1660,6 +1690,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/sitemapdir/orphan2.html": route_sitemap_orphan2,
         "/sitemapdir/deep1.html": route_sitemap_deep1,
         "/sitemapdir/deepcap.html": route_sitemap_deepcap,
+        "/sitemapdir/gatedindex.xml": route_sitemap_gatedindex,
+        "/sitemapdir/filtered.xml": route_sitemap_filtered,
+        "/sitemapdir/gated.html": route_sitemap_gated,
+        "/sitemapdir/moved.xml": route_sitemap_moved,
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
