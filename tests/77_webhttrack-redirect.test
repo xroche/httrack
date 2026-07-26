@@ -107,15 +107,15 @@ printf '%s' "${resp}" | grep -q '^HTTP/1.0 302' ||
 url=$(start)
 stop
 case "${url}" in
-    http://127.0.0.1:*) ;;
-    *) fail "default listen address is not loopback: ${url}" ;;
+http://127.0.0.1:*) ;;
+*) fail "default listen address is not loopback: ${url}" ;;
 esac
 
 url=$(start --bind 0.0.0.0)
 stop
 case "${url}" in
-    http://0.0.0.0:*) ;;
-    *) fail "--bind 0.0.0.0 not honoured: ${url}" ;;
+http://0.0.0.0:*) ;;
+*) fail "--bind 0.0.0.0 not honoured: ${url}" ;;
 esac
 
-exit 0
+echo "PASS"
