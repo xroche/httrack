@@ -1584,6 +1584,9 @@ class Handler(SimpleHTTPRequestHandler):
                 "moved.bin",
                 "redir.html",
                 "flaky.bin",
+                "coded.bin",
+                "codedstable.bin",
+                "sized.html",
             )
         )
         if self.refetch_pass() == 1:
@@ -1641,6 +1644,45 @@ class Handler(SimpleHTTPRequestHandler):
     # keep the pre-run sample from the first notify.
     FLAKY = b"CHANGES-FLAKY\n" + b"\x07\x06\x05\x04" * 512
 
+    # A page whose payload never changes, linking through a redirect whose
+    # target is renamed between passes: the rewritten link makes the file on
+    # disk change length while the payload is byte-identical. Only a payload
+    # comparison can call it unchanged.
+    SIZED_SHORT = "s.html"
+    SIZED_LONG = "s" * 40 + ".html"
+
+    def route_changes_sized(self):
+        self.refetch_pass()
+        self.send_raw(
+            b'<html><body><a href="sizedredir.html">t</a></body></html>',
+            "text/html",
+        )
+
+    def route_changes_sizedredir(self):
+        target = self.SIZED_SHORT if self.refetch_pass() == 1 else self.SIZED_LONG
+        self.send_response(302)
+        self.send_header("Location", "/changes/" + target)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_changes_sizedtarget(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>SIZED-TARGET</p></body></html>", "text/html")
+
+    # Content-Encoding on a direct-to-disk body: the decoded temp is renamed
+    # over the mirror file, so the previous copy has to be sampled before the
+    # rename. Same length on both passes, so only a digest can tell them apart.
+    def route_changes_coded(self):
+        pass1 = self.refetch_pass() == 1
+        body = b"CHANGES-CODED-V%d\n" % (1 if pass1 else 2) + b"\x11\x22" * 1024
+        self.send_coded(self.gzipped(body), "application/octet-stream")
+
+    # Control: same coding, same bytes on both passes.
+    def route_changes_coded_stable(self):
+        self.refetch_pass()
+        body = b"CHANGES-CODED-STABLE\n" + b"\x33\x44" * 1024
+        self.send_coded(self.gzipped(body), "application/octet-stream")
+
     def route_changes_flaky(self):
         if self.refetch_pass() % 2 == 1:
             self.send_truncated(self.FLAKY, "application/octet-stream")
@@ -1674,6 +1716,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/changes/redir.html": route_changes_redir,
         "/changes/redirtarget.html": route_changes_redirtarget,
         "/changes/flaky.bin": route_changes_flaky,
+        "/changes/coded.bin": route_changes_coded,
+        "/changes/sized.html": route_changes_sized,
+        "/changes/sizedredir.html": route_changes_sizedredir,
+        "/changes/" + SIZED_SHORT: route_changes_sizedtarget,
+        "/changes/" + SIZED_LONG: route_changes_sizedtarget,
+        "/changes/codedstable.bin": route_changes_coded_stable,
         "/upcodec/index.html": route_upcodec_index,
         "/upcodec/mem.html": route_upcodec_mem,
         "/upcodec/disk.bin": route_upcodec_disk,
