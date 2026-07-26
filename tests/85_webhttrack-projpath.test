@@ -105,12 +105,10 @@ echo "SECRETMARKER" >"${base}/secret.txt"
 mkdir -p "${base}/proj"
 echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 
-# A directory component over NAME_MAX, so mkdir fails whatever the uid and the
-# reply goes through error_redirect: the one branch that skips the URL parsing
-# where fsfile used to be cleared, leaving it holding whatever the style.css
-# request left. Must run before any successful save, which flips commandEnd and
-# swaps the error page for the "finished" one.
-get "${port}" /server/style.css >/dev/null
+# error_redirect is the branch that skipped the fsfile clearing, so fail the save
+# with a component over NAME_MAX (mkdir refuses it whatever the uid). Must precede
+# any successful save: commandEnd then swaps the error page for the finished one.
+get "${port}" /server/style.css >/dev/null # leaves a path behind in fsfile
 post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p" |
     grep -q '^Location: /server/error.html' ||
     fail "the refused save did not redirect to the error page"
@@ -153,8 +151,7 @@ get "${port}" /website/hts-log.txt | grep -q LOGMARKER ||
 seg=$(printf '%0200d' 0)
 longpath="${base}/${seg}/${seg}/${seg}/${seg}"
 fspath="${longpath}/proj"
-# structcheck() refuses a path over HTS_URLMAXSIZE, so the root must stay under
-# it for the save to register at all, and the request path carries the rest.
+# structcheck() refuses a root over HTS_URLMAXSIZE, so the URL carries the rest.
 test "$((${#fspath} + 11))" -le 1024 ||
     fail "the long project path (${#fspath}) would not pass structcheck"
 longurl=$(printf '%0800d' 0)
