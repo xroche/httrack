@@ -495,11 +495,11 @@ static int string_safety_selftests(void) {
   /* Truncating append: stops at N without aborting, what the status-message
      call sites rely on. */
   {
-    char dst[8];
+    char dst[10]; /* never sizeof(char*), or MSVC reads it as a pointer */
 
     dst[0] = '\0';
     strncatbuff(dst, "abcdefghijkl", sizeof(dst) - 1);
-    if (strcmp(dst, "abcdefg") != 0)
+    if (strcmp(dst, "abcdefghi") != 0)
       return 1;
   }
 
@@ -1324,7 +1324,7 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
     } else if (strcmp(argv[0], "overflow-src") == 0) {
       /* Array source with no NUL: its capacity still comes from sizeof(), so
          the bounded strlen aborts rather than running off the array. */
-      char nonul[8];
+      char nonul[6]; /* never sizeof(char*), per the note above */
       char big[64];
 
       memset(nonul, src[0], sizeof(nonul));
