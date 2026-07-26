@@ -579,9 +579,10 @@ PT_Index PT_LoadCache(const char *filename) {
         if (chain != NULL) {
           const char *scheme = link_has_authority(chain->name) ? "" : "http://";
 
-          snprintf(index->slots.common.startUrl,
-                   sizeof(index->slots.common.startUrl), "%s%s", scheme,
-                   (const char *) chain->name);
+          /* dropped rather than truncated: empty already reads as "unset" */
+          if (!sprintfbuff(index->slots.common.startUrl, "%s%s", scheme,
+                           (const char *) chain->name))
+            index->slots.common.startUrl[0] = '\0';
         }
       }
     }
@@ -972,9 +973,12 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                     const char *scheme =
                         link_has_authority(filenameIndex) ? "" : "http://";
 
-                    firstSeen = 1;
-                    snprintf(index->startUrl, sizeof(index->startUrl), "%s%s",
-                             scheme, filenameIndex);
+                    /* dropped rather than truncated; try the next entry */
+                    if (sprintfbuff(index->startUrl, "%s%s", scheme,
+                                    filenameIndex))
+                      firstSeen = 1;
+                    else
+                      index->startUrl[0] = '\0';
                   }
                 }
               } else {
@@ -1570,9 +1574,11 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
                   const char *scheme =
                       link_has_authority(line) ? "" : "http://";
 
-                  firstSeen = 1;
-                  snprintf(index->startUrl, sizeof(index->startUrl), "%s%s",
-                           scheme, line);
+                  /* dropped rather than truncated; try the next entry */
+                  if (sprintfbuff(index->startUrl, "%s%s", scheme, line))
+                    firstSeen = 1;
+                  else
+                    index->startUrl[0] = '\0';
                 }
               }
 

@@ -178,6 +178,7 @@ TESTS = \
 	78_webhttrack-sid.test \
 	79_local-proxytrack-webdav-mime.test \
 	80_engine-crash-symbolize.test \
+	81_webhttrack-maxsize.test \
 	82_webhttrack-browse-links.test \
 	83_webhttrack-argescape.test
 
