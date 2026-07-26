@@ -1,0 +1,238 @@
+/* ------------------------------------------------------------ */
+/*
+HTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) 1998 Xavier Roche and other contributors
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+Ethical use: we kindly ask that you NOT use this software to harvest email
+addresses or to collect any other private information about people. Doing so
+would dishonor our work and waste the many hours we have spent on it.
+
+Please visit our Website: http://www.httrack.com
+*/
+
+/* ------------------------------------------------------------ */
+/* File: crash backtrace printer                                 */
+/* Author: Xavier Roche                                          */
+/* ------------------------------------------------------------ */
+
+/* Before every header: glibc gates dladdr() on it. */
+#if defined(__linux) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
+#include "htsbacktrace.h"
+
+#include "htsglobal.h"
+
+#include <stdlib.h>
+#include <string.h>
+#ifdef _WIN32
+#include <io.h> /* write */
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if (defined(__linux) && defined(HAVE_EXECINFO_H))
+#include <dlfcn.h>
+#include <errno.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <time.h>
+#include <sys/wait.h>
+#define USES_BACKTRACE
+#endif
+
+#ifdef USES_BACKTRACE
+#define BT_MAX_FRAMES 64     /* frames we try to name */
+#define BT_MAX_MODULES 8     /* distinct modules, one child each */
+#define BT_HEX_SIZE 19       /* "0x" + 16 nibbles + NUL */
+#define BT_PATH_SIZE 1024    /* module path; longer is skipped */
+#define BT_WAIT_TICKS 300    /* 10ms ticks, shared: cap a slow child */
+#define BT_NO_SYMBOLIZER 127 /* child exit: execvp() found none */
+
+static hts_boolean symbolize_crash = HTS_TRUE;
+
+/* "0x"-prefixed hex: the handler must stay stdio-free. */
+static void print_hex(char *buffer, uintptr_t value) {
+  static const char digits[] = "0123456789abcdef";
+  size_t i = 2, a, b;
+
+  buffer[0] = '0';
+  buffer[1] = 'x';
+  do {
+    buffer[i++] = digits[value & 0xf];
+    value >>= 4;
+  } while (value != 0);
+  buffer[i] = '\0';
+  for (a = 2, b = i - 1; a < b; a++, b--) {
+    const char c = buffer[a];
+
+    buffer[a] = buffer[b];
+    buffer[b] = c;
+  }
+}
+
+/* HTS_FALSE if src does not fit: a truncated module path would point the
+   symbolizer at the wrong file. */
+static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
+  size_t i;
+
+  for (i = 0; i < size - 1 && src[i] != '\0'; i++) {
+    dest[i] = src[i];
+  }
+  dest[i] = '\0';
+  return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Run the symbolizer on argv, output on fd, within *budget ticks. HTS_FALSE
+   only if none could be run at all; otherwise silent, the raw trace stands. */
+static hts_boolean spawn_symbolizer(char **argv, int fd, int *budget) {
+  const pid_t pid = fork();
+  int status = 0;
+
+  if (pid == -1)
+    return HTS_FALSE;
+  if (pid == 0) {
+    static char llvm_prog[] = "llvm-symbolizer";
+    static char llvm_opts[] = "-p";
+
+    dup2(fd, 1); /* both symbolizers write on stdout */
+    execvp(argv[0], argv);
+    argv[0] = llvm_prog; /* an LLVM-only install ships no addr2line */
+    argv[1] = llvm_opts;
+    execvp(argv[0], argv);
+    _exit(BT_NO_SYMBOLIZER);
+  }
+  for (; *budget > 0; (*budget)--) {
+    const struct timespec tick = {0, 10 * 1000 * 1000};
+    const pid_t reaped = waitpid(pid, &status, WNOHANG);
+
+    if (reaped == pid)
+      return WIFEXITED(status) && WEXITSTATUS(status) == BT_NO_SYMBOLIZER
+                 ? HTS_FALSE
+                 : HTS_TRUE;
+    if (reaped == -1 && errno != EINTR)
+      return HTS_TRUE;
+    nanosleep(&tick, NULL);
+  }
+  kill(pid, SIGKILL);
+  waitpid(pid, NULL, 0);
+  return HTS_TRUE;
+}
+
+/* Name the frames backtrace_symbols_fd() leaves as module+offset:
+   -fvisibility=hidden keeps them out of .dynsym, but DWARF has them. dladdr()
+   is not formally async-signal-safe; accepted, this path is already fatal. */
+static void symbolize_backtrace(void *const *stack, int size, int fd) {
+  static char prog[] = "addr2line";
+  static char opts[] = "-Cfipa";
+  static char dashe[] = "-e";
+  char hex[BT_MAX_FRAMES][BT_HEX_SIZE];
+  const void *base[BT_MAX_FRAMES];
+  const char *name[BT_MAX_FRAMES];
+  hts_boolean grouped[BT_MAX_FRAMES];
+  char module[BT_PATH_SIZE];
+  char *argv[4 + BT_MAX_FRAMES + 1];
+  int budget = BT_WAIT_TICKS;
+  int i, spawned;
+
+  if (size > BT_MAX_FRAMES)
+    size = BT_MAX_FRAMES;
+
+  for (i = 0; i < size; i++) {
+    Dl_info info;
+
+    grouped[i] = HTS_TRUE; /* skipped unless dladdr() places the frame */
+    if (dladdr(stack[i], &info) == 0 || info.dli_fname == NULL ||
+        info.dli_fname[0] == '\0')
+      continue;
+    base[i] = info.dli_fbase;
+    name[i] = info.dli_fname;
+    print_hex(hex[i], (uintptr_t) ((const char *) stack[i] -
+                                   (const char *) info.dli_fbase));
+    grouped[i] = HTS_FALSE;
+  }
+
+  /* One child per module: addr2line takes a single -e. Each frame is claimed
+     once, so argc cannot exceed argv[]. */
+  for (spawned = 0; spawned < BT_MAX_MODULES; spawned++) {
+    int first, j, argc = 0;
+
+    for (first = 0; first < size && grouped[first]; first++)
+      ;
+    if (first >= size)
+      break;
+    argv[argc++] = prog;
+    argv[argc++] = opts;
+    argv[argc++] = dashe;
+    argv[argc++] = module;
+    for (j = first; j < size; j++) {
+      if (grouped[j] || base[j] != base[first])
+        continue;
+      grouped[j] = HTS_TRUE;
+      argv[argc++] = hex[j];
+    }
+    argv[argc] = NULL;
+    /* access(): skip pseudo-modules like linux-vdso, which have no file and
+       would draw nothing but an addr2line complaint. */
+    if (copy_bounded(module, sizeof(module), name[first]) &&
+        access(module, R_OK) == 0) {
+      const size_t len = strlen(module);
+
+      /* addr2line -a prints offsets only: say which module they are in. */
+      (void) (write(fd, module, len) == (ssize_t) len);
+      (void) (write(fd, ":\n", 2) == 2);
+      if (!spawn_symbolizer(argv, fd, &budget))
+        break; /* no symbolizer: stop at one header */
+    }
+  }
+}
+#endif
+
+void hts_backtrace_init(void) {
+#ifdef USES_BACKTRACE
+  symbolize_crash =
+      getenv("HTTRACK_NO_SYMBOLIZE") == NULL ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
+void hts_print_backtrace(int fd) {
+#ifdef USES_BACKTRACE
+  void *stack[256];
+  const int size = backtrace(stack, sizeof(stack) / sizeof(stack[0]));
+
+  /* A fault inside the handler lands back here: symbolizing twice interleaves
+     two traces on fd and spends a second budget. */
+  static volatile sig_atomic_t entered = 0;
+
+  if (size != 0) {
+    backtrace_symbols_fd(stack, size, fd);
+    if (symbolize_crash && entered == 0) {
+      entered = 1;
+      symbolize_backtrace(stack, size, fd);
+      entered = 0;
+    }
+  }
+#else
+  const char msg[] = "No stack trace available on this OS :(\n";
+
+  if (write(fd, msg, sizeof(msg) - 1) != sizeof(msg) - 1) {
+    /* sorry GCC */
+  }
+#endif
+}

@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "httrack.h"
 #include "htslib.h"
 #include "htscharset.h" // after htslib.h: winsock2.h must precede windows.h
+#include "htsbacktrace.h"
 
 /* Static definitions */
 static int fexist(const char *s);
@@ -72,10 +73,6 @@ static int linput(FILE * fp, char *s, int max);
 #include <sys/ioctl.h>
 #endif
 #include <ctype.h>
-#if (defined(__linux) && defined(HAVE_EXECINFO_H))
-#include <execinfo.h>
-#define USES_BACKTRACE
-#endif
 /* END specific definitions */
 
 static void __cdecl htsshow_init(t_hts_callbackarg * carg);
@@ -880,21 +877,6 @@ static void sig_doback(int blind) {     // mettre en backing
 #undef FD_ERR
 #define FD_ERR 2
 
-static void print_backtrace(void) {
-#ifdef USES_BACKTRACE
-  void *stack[256];
-  const int size = backtrace(stack, sizeof(stack)/sizeof(stack[0]));
-  if (size != 0) {
-    backtrace_symbols_fd(stack, size, FD_ERR);
-  }
-#else
-  const char msg[] = "No stack trace available on this OS :(\n";
-  if (write(FD_ERR, msg, sizeof(msg) - 1) != sizeof(msg) - 1) {
-    /* sorry GCC */
-  }
-#endif
-}
-
 static size_t print_num(char *buffer, int num) {
   size_t i, j;
   if (num < 0) {
@@ -928,7 +910,7 @@ static void sig_fatal(int code) {
   size += print_num(&buffer[size], code);
   buffer[size++] = '\n';
   (void) (write(FD_ERR, buffer, size) == size);
-  print_backtrace();
+  hts_print_backtrace(FD_ERR);
   (void) (write(FD_ERR, msgreport, sizeof(msgreport) - 1)
     == sizeof(msgreport) - 1);
   abort();
@@ -951,6 +933,7 @@ static void sig_leave(int code) {
 }
 
 static void signal_handlers(void) {
+  hts_backtrace_init();
 #ifdef _WIN32
   signal(SIGINT, sig_leave);    // ^C
   signal(SIGTERM, sig_finish);  // kill <process>
