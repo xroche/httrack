@@ -541,7 +541,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
                                const char *ext) {
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
-  if (back->url_sav != NULL && back->url_sav[0] != '\0') {
+  if (back->url_sav[0] != '\0') {
     snprintf(back->tmpfile_buffer, sizeof(back->tmpfile_buffer), "%s.%s",
              back->url_sav, ext);
     back->tmpfile = back->tmpfile_buffer;
@@ -887,8 +887,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               HTS_STAT.stat_bytes += back[p].r.size;
               HTS_STAT.stat_files++;
               hts_log_print(opt, LOG_TRACE, "added file %s%s => %s",
-                            back[p].url_adr, back[p].url_fil,
-                            back[p].url_sav != NULL ? back[p].url_sav : "");
+                            back[p].url_adr, back[p].url_fil, back[p].url_sav);
             }
             if ((!back[p].r.notmodified) && (opt->is_update)) {
               HTS_STAT.stat_updated_files++;    // page modifiée
@@ -2302,26 +2301,24 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
               && slot_can_be_finalized(opt, &back[i]);
             int may_serialize = slot_can_be_cached_on_disk(&back[i]);
 
-            hts_log_print(opt, LOG_DEBUG,
-                          "back[%03d]: may_clean=%d, may_finalize_disk=%d, may_serialize=%d:"
-                          LF "\t"
-                          "finalized(%d), status(%d), locked(%d), delayed(%d), test(%d), "
-                          LF "\t"
-                          "statuscode(%d), size(%d), is_write(%d), may_hypertext(%d), "
-                          LF "\t" "contenttype(%s), url(%s%s), save(%s)", i,
-                          may_clean, may_finalize, may_serialize,
-                          back[i].finalized, back[i].status, back[i].locked,
-                          IS_DELAYED_EXT(back[i].url_sav), back[i].testmode,
-                          back[i].r.statuscode, (int) back[i].r.size,
-                          back[i].r.is_write, may_be_hypertext_mime(opt,
-                                                                    back[i].r.
-                                                                    contenttype,
-                                                                    back[i].
-                                                                    url_fil),
-                          /* */
-                          back[i].r.contenttype, back[i].url_adr,
-                          back[i].url_fil,
-                          back[i].url_sav ? back[i].url_sav : "<null>");
+            hts_log_print(
+                opt, LOG_DEBUG,
+                "back[%03d]: may_clean=%d, may_finalize_disk=%d, "
+                "may_serialize=%d:" LF "\t"
+                "finalized(%d), status(%d), locked(%d), delayed(%d), "
+                "test(%d), " LF "\t"
+                "statuscode(%d), size(%d), is_write(%d), may_hypertext(%d), " LF
+                "\t"
+                "contenttype(%s), url(%s%s), save(%s)",
+                i, may_clean, may_finalize, may_serialize, back[i].finalized,
+                back[i].status, back[i].locked, IS_DELAYED_EXT(back[i].url_sav),
+                back[i].testmode, back[i].r.statuscode, (int) back[i].r.size,
+                back[i].r.is_write,
+                may_be_hypertext_mime(opt, back[i].r.contenttype,
+                                      back[i].url_fil),
+                /* */
+                back[i].r.contenttype, back[i].url_adr, back[i].url_fil,
+                back[i].url_sav);
           }
         }
       }
@@ -2857,7 +2854,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                const char* hostname = jump_protocol_const(back[i].url_adr);
+                /* non-const twin: the OpenSSL macro casts the qualifier away */
+                char *hostname = jump_protocol(back[i].url_adr);
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
                 SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
