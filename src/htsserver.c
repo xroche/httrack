@@ -857,7 +857,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
       /* Response */
       if (meth) {
-        int virtualpath = 0;
+        hts_boolean virtualpath = HTS_FALSE;
         char *pos;
         char *url = strchr(line1, ' ');
 
@@ -885,7 +885,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           }
 
           if (strncmp(file, "/website/", 9) == 0) {
-            virtualpath = 1;
+            virtualpath = HTS_TRUE;
           }
 
           /* override */
@@ -899,8 +899,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
+          /* the override above may have swapped a mirror path for a GUI page */
+          virtualpath = strncmp(file, "/website/", 9) == 0;
+
           if (strlen(path) + strlen(file) + 32 < sizeof(fsfile)) {
-            if (strncmp(file, "/website/", 9) != 0) {
+            if (!virtualpath) {
               sprintf(fsfile, "%shtml%s", path, file);
             } else {
               intptr_t adr = 0;
@@ -965,7 +968,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 StringCat(headers, "\r\n");
               }
               coucal_write(NewLangList, "redirect", (intptr_t) NULL);
-            } else if (is_html(file)) {
+            } else if (!virtualpath && is_html(file)) {
+              /* GUI templates only: ${_sid} in a mirrored page would hand the
+                 crawled site the session id that authenticates commands */
               int outputmode = 0;
 
               StringMemcat(headers, ok, sizeof(ok) - 1);
@@ -1384,7 +1389,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               }
 #endif
             } else {
-              if (is_text(file)) {
+              if (is_html(file)) {
+                StringMemcat(headers, ok, sizeof(ok) - 1);
+              } else if (is_text(file)) {
                 StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
               } else if (is_js(file)) {
                 StringMemcat(headers, ok_js, sizeof(ok_js) - 1);

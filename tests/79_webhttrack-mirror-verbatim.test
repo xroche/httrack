@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# htsserver serves the crawled mirror under /website/ alongside its own GUI:
+# mirrored pages must skip the ${...} expander, or ${_sid} leaks the session id.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+command -v python3 >/dev/null || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+log=$(mktemp)
+work=$(mktemp -d)
+# start() runs in a command substitution, so its $! never reaches this shell. A
+# missed kill leaves an orphan holding the CI job open long after a green suite.
+srvpid() { sed -n 's/^PID=//p' "${log}" 2>/dev/null | head -1; }
+cleanup() {
+    local pid
+    pid=$(srvpid)
+    test -z "${pid}" || kill -9 "${pid}" 2>/dev/null || true
+    rm -rf "${log}" "${work}"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+freeport() {
+    python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()'
+}
+
+# Echo the announced URL. Extra args become key/value pairs in the server store,
+# which is how the project path gets set here; the GUI posts it from step4.
+start() {
+    local port url
+    port=$(freeport)
+    : >"${log}"
+    (
+        trap '' TERM TTOU
+        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
+    ) &
+    for _ in $(seq 1 40); do
+        url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
+        sleep 0.25
+    done
+    test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
+    echo "${url}"
+}
+
+portof() { echo "${1##*:}" | tr -d /; }
+
+# GET $2 from 127.0.0.1:$1, headers into $3 and the body, byte for byte, into $4.
+fetch() {
+    python3 -c 'import socket, sys
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+s.settimeout(20)
+s.sendall(("GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % sys.argv[2]).encode())
+out = b""
+while True:
+    b = s.recv(65536)
+    if not b:
+        break
+    out += b
+s.close()
+head, _, body = out.partition(b"\r\n\r\n")
+open(sys.argv[3], "wb").write(head)
+open(sys.argv[4], "wb").write(body)' "$1" "$2" "$3" "$4"
+}
+
+# LF-only, and a line ending in a backslash: the expander rewrites both, so a
+# mangled reply fails the byte comparison even where no directive is present.
+mirror="${work}/hostile.html"
+# shellcheck disable=SC2016 # the directives are the payload, not shell expansions
+printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\n' \
+    >"${mirror}"
+
+hdr="${work}/hdr"
+body="${work}/body"
+
+# The server merges $HOME/.httrack.ini into the same store on the first request;
+# point it somewhere empty so a developer's own file cannot shadow projpath.
+export HOME="${work}"
+
+url=$(start projpath "${work}/")
+port=$(portof "${url}")
+
+# Positive control: the GUI's own templates must still expand. This is also
+# where the real token comes from, so its absence below can be asserted.
+fetch "${port}" /server/index.html "${hdr}" "${body}"
+sid=$(sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' "${body}" | head -1)
+test "${#sid}" -eq 32 || fail "GUI page did not expand \${sid} (got '${sid}')"
+
+fetch "${port}" /website/hostile.html "${hdr}" "${body}"
+grep -q '^HTTP/1\.0 200 ' "${hdr}" || fail "mirrored page not served: $(head -1 "${hdr}")"
+grep -qF "${sid}" "${body}" &&
+    fail "the session id was expanded into mirrored content"
+# shellcheck disable=SC2016 # the directives are the payload, not shell expansions
+grep -qF '${_sid}' "${body}" || fail "\${_sid} did not survive verbatim"
+# shellcheck disable=SC2016
+grep -qF '${sid}' "${body}" || fail "\${sid} did not survive verbatim"
+cmp -s "${mirror}" "${body}" || fail "mirrored file not served byte for byte"
+# The mirror stays browsable: verbatim must not mean served as a download.
+grep -qi '^Content-type: text/html' "${hdr}" ||
+    fail "mirrored page lost its text/html type: $(cat "${hdr}")"
+
+echo "PASS"
