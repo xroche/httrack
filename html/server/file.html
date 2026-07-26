@@ -57,12 +57,25 @@ function info(str) {
 
 <table class="tableWidth" border="0" width="100%" cellspacing="0">
 <tr><td class="tabCtrl" align="left">
-${/* an http: page cannot navigate to file:; /website/ serves the current project only */}
 <a style="background:black;color: white" 
-  href="/website/index.html"
+${do:output-mode:html-urlescaped}
+  href="file://${path}/"
+${do:output-mode:}
   target="_new">
 ${LANG_D8}
 </a>
+</td></tr>
+
+<tr><td class="tabCtrl" align="left">
+${do:loadhash}
+<form method="GET" action="" name="form">
+		${LANG_S11b}
+		<select name="name"
+		        onChange="window.open('file://${path}/' + form.name.value + '/index.html')">
+		<option value="">&nbsp;</option>
+		${liststr:winprofile}
+		</select>
+</form>
 </td></tr>
 
 </table>
