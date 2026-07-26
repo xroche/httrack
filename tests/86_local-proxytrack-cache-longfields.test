@@ -1,0 +1,111 @@
+#!/bin/bash
+# A cached header longer than proxytrack's field must be clipped to that field,
+# not overflow into the next one (contenttype[64] abuts the location pointer).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+pad() { printf "%${1}s" '' | tr ' ' "$2"; }
+
+# Longest surviving run of char $2 in file $1, or 0.
+runlen() {
+    grep -ao "$2\\+" "$1" | awk '{ print length($0) }' | sort -rn | head -n1 || true
+}
+
+# --- ARC reader (HTTP_READFIELD_STRING), no python needed -------------------
+# Each header overshoots its own destination, so a per-field clip is the only
+# way to get every expected length right at once.
+{
+    printf 'HTTP/1.1 200 OK\r\n'
+    printf 'Content-Type: text/html%s\r\n' "$(pad 400 A)"
+    printf 'Etag: %s\r\n' "$(pad 400 E)"
+    printf 'Content-Disposition: %s\r\n' "$(pad 400 D)"
+    printf 'Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n'
+    printf 'Content-Length: 5\r\n\r\n'
+} >"$dir/hdr"
+printf 'hello' >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack crashed reading an ARC with over-long headers" >&2
+    exit 1
+}
+test -s "$dir/out.arc" || {
+    echo "FAIL: ARC entry dropped instead of clipped" >&2
+    exit 1
+}
+# Only contenttype survives into the ARC output; the over-long Etag and
+# Content-Disposition above are still load-bearing, since bounding just one
+# field leaves the others smashing the element (the run above would crash).
+got=$(runlen "$dir/out.arc" A)
+test "${got:-0}" = 54 || {
+    echo "FAIL: ARC content-type clipped to ${got:-0}, expected 54" >&2
+    exit 1
+}
+
+# --- ZIP reader (ZIP_READFIELD_STRING) --------------------------------------
+python=$(find_python) || {
+    echo "python3 missing; ARC half only" >&2
+    exit 0
+}
+
+"$python" - "$dir/in.zip" <<'EOF'
+import sys, zipfile
+
+body = b"hello world"
+meta = (
+    "X-In-Cache: 1\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok%s\r\n"
+    "X-Size: %d\r\n"
+    "Content-Type: text/html%s\r\n"
+    "X-Charset: %s\r\n"
+    "Etag: %s\r\n"
+    "Content-Disposition: %s\r\n"
+    # a parseable date is required: the ARC writer dereferences it unchecked
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "X-Save: out/page.html\r\n"
+    % ("M" * 400, len(body), "A" * 400, "C" * 400, "E" * 400, "D" * 400)
+).encode()
+
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, body)
+EOF
+
+proxytrack --convert "$dir/out2.arc" "$dir/in.zip" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack crashed reading a zip cache with over-long headers" >&2
+    exit 1
+}
+test -s "$dir/out2.arc" || {
+    echo "FAIL: zip entry dropped instead of clipped" >&2
+    exit 1
+}
+# three destinations, two capacities: msg[1024] keeps all 400 M's where a
+# one-size-fits-all clip would cut it to 63 like the others
+while read -r ch want; do
+    got=$(runlen "$dir/out2.arc" "$ch")
+    test "${got:-0}" = "$want" || {
+        echo "FAIL: zip field '$ch' clipped to ${got:-0}, expected $want" >&2
+        exit 1
+    }
+done <<'EOF'
+A 54
+C 63
+M 400
+EOF
