@@ -130,10 +130,11 @@ echo "${page}" | grep -q 'Unable to create the directory structure' ||
 echo "${page}" | grep -q "${tail_marker}" &&
     fail "the whole path reached the error page, so it was never clipped"
 
-# Same overflow one branch down: the tree exists so structcheck() passes, but
-# winprofile.ini cannot be opened. Kept under macOS's 1024-byte PATH_MAX.
+# Same overflow one branch down: structcheck() lets a non-directory hts-cache
+# through, and opening winprofile.ini under it then fails with ENOTDIR.
 path=$(padpath "${base}/isdir" $((995 - 2)))
-mkdir -p "${path}/p/hts-cache/winprofile.ini"
+mkdir -p "${path}/p"
+ln -s /dev/null "${path}/p/hts-cache"
 save "${path}" x p >/dev/null
 alive "${srv}" || fail "an unwritable init file crashed the server: $(cat "${log}")"
 errorpage "${port}" | grep -q 'Unable to create the init file' ||
