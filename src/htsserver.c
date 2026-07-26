@@ -363,6 +363,22 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   return seen;
 }
 
+/** Append src to the NUL-terminated dst of capacity size (NUL included).
+    False, leaving dst untouched, if it would not fit: unlike strcatbuff() this
+    never aborts, because every piece appended here is client-supplied. */
+static hts_boolean path_append(char *dst, size_t size, const char *src) {
+  const size_t used = strlen(dst);
+  const size_t len = strlen(src);
+
+  /* dst holds at most size-1 bytes, so "size - used" is >= 1 and the untrusted
+     len stays alone: "used + len < size" could wrap and pass. */
+  if (len >= size - used) {
+    return HTS_FALSE;
+  }
+  memcpy(dst + used, src, len + 1);
+  return HTS_TRUE;
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
@@ -374,6 +390,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String tmpbuff = STRING_EMPTY;
   String tmpbuff2 = STRING_EMPTY;
   String fspath = STRING_EMPTY;
+  /* Project directory this server set up; the only root /website/ serves from,
+     and deliberately not cleared between requests. */
+  String website = STRING_EMPTY;
   char catbuff[CATBUFF_SIZE];
 
   /* Load strings */
@@ -785,6 +804,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   if (!structcheck(StringBuff(tmpbuff))) {
                     FILE *fp;
 
+                    /* Both halves of fspath come from posted fields, so a ".."
+                       in them would escape the mirror once served. */
+                    if (strstr(StringBuff(fspath), "..") == NULL) {
+                      StringCopy(website, StringBuff(fspath));
+                    }
                     StringCat(tmpbuff, "winprofile.ini");
                     fp = fopen(StringBuff(tmpbuff), "wb");
                     if (fp != NULL) {
@@ -868,11 +892,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           char *qpos;
 
           /* get the URL */
+          fsfile[0] = '\0';
           if (error_redirect == NULL) {
             if ((qpos = strchr(url, '?'))) {
               *qpos = '\0';
             }
-            fsfile[0] = '\0';
             if (strcmp(url, "/") == 0) {
               file = "/server/index.html";
               meth = 2;
@@ -899,18 +923,24 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          if (strlen(path) + strlen(file) + 32 < sizeof(fsfile)) {
-            if (strncmp(file, "/website/", 9) != 0) {
-              sprintf(fsfile, "%shtml%s", path, file);
-            } else {
-              intptr_t adr = 0;
-
-              if (coucal_readptr(NewLangList, "projpath", &adr)) {
-                sprintf(fsfile, "%s%s", (char *) adr, file + 9);
-              }
+          /* test file, not virtualpath: the override may have rewritten it */
+          if (strncmp(file, "/website/", 9) != 0) {
+            if (!path_append(fsfile, sizeof(fsfile), path) ||
+                !path_append(fsfile, sizeof(fsfile), "html") ||
+                !path_append(fsfile, sizeof(fsfile), file)) {
+              fsfile[0] = '\0';
+            }
+          } else if (StringNotEmpty(website)) {
+            /* Never the posted "projpath": a client root reads any file. */
+            if (!path_append(fsfile, sizeof(fsfile), StringBuff(website)) ||
+                !path_append(fsfile, sizeof(fsfile), "/") ||
+                !path_append(fsfile, sizeof(fsfile), file + 9)) {
+              fsfile[0] = '\0';
             }
           }
 
+          /* path itself may hold ".." (webhttrack passes "<bin>/../share"), so
+             only the untrusted halves are checked: file here, website above. */
           if (fsfile[0] && strstr(file, "..") == NULL
               && (fp = fopen(fsfile, "rb"))) {
             char ok[] =
@@ -1491,6 +1521,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   StringFree(tmpbuff);
   StringFree(tmpbuff2);
   StringFree(fspath);
+  StringFree(website);
 
   if (buffer)
     free(buffer);

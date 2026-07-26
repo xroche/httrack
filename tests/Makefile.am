@@ -172,6 +172,7 @@ TESTS = \
 	75_engine-longpath-posix.test \
 	76_cli-resize.test \
 	77_webhttrack-redirect.test \
-	78_webhttrack-sid.test
+	78_webhttrack-sid.test \
+	80_webhttrack-projpath.test
 
 CLEANFILES = check-network_sh.cache
