@@ -47,3 +47,18 @@ case "$err" in
     exit 1
     ;;
 esac
+
+# An array source with no NUL must abort on the source bound rather than run
+# off the array: the array half of the source-capacity selection.
+err=$(httrack -#test=strsafe overflow-src "x" 2>&1) || true
+case "$err" in
+*"strsafe: NOT aborted"*)
+    echo "unterminated source array was NOT caught" >&2
+    exit 1
+    ;;
+*"size < sizeof_source"*) ;;
+*)
+    echo "expected htssafe source-bound abort, got: $err" >&2
+    exit 1
+    ;;
+esac

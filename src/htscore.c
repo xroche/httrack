@@ -696,17 +696,19 @@ int httpmirror(char *url1, httrackp * opt) {
   // copier adresse(s) dans liste des adresses
   {
     char *a = url1;
-    int primary_len = 8192;
-
-    if (StringNotEmpty(opt->filelist)) {
-      primary_len += max(0, fsize_utf8(StringBuff(opt->filelist)) * 2);
-    }
-    primary_len += (int) strlen(url1) * 2;
+    const LLint list_sz = StringNotEmpty(opt->filelist)
+                              ? fsize_utf8(StringBuff(opt->filelist))
+                              : 0;
+    /* two bytes reserved per list byte; -1 makes an undoublable size refused */
+    const LLint list_room =
+        list_sz > 0 ? (list_sz <= INT64_MAX / 2 ? list_sz * 2 : -1) : 0;
+    const size_t primary_len =
+        llint_grow_size_t(8192 + strlen(url1) * 2, list_room, 0);
 
     // création de la première page, qui contient les liens de base à scanner
     // c'est plus propre et plus logique que d'entrer à la main les liens dans la pile
     // on bénéficie ainsi des vérifications et des tests du robot pour les liens "primaires"
-    primary = (char *) malloct(primary_len);
+    primary = primary_len != (size_t) -1 ? (char *) malloct(primary_len) : NULL;
     if (!primary) {
       printf("PANIC! : Not enough memory [%d]\n", __LINE__);
       XH_extuninit;
@@ -887,7 +889,7 @@ int httpmirror(char *url1, httrackp * opt) {
       }
 
       if (filelist_buff != NULL) {
-        int filelist_ptr = 0;
+        size_t filelist_ptr = 0;
         int n = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
 

@@ -682,10 +682,10 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                     char *eps = strchr(back[i].url_adr, '/');
                     int count;
 
-                    if (ep != NULL && ep < eps
-                        && (count = (int) (ep - back[i].url_adr)) < 4) {
+                    if (ep != NULL && eps != NULL && ep < eps &&
+                        (count = (int) (ep - back[i].url_adr)) < 4) {
                       proto[0] = '\0';
-                      strncat(proto, back[i].url_adr, count);
+                      strncatbuff(proto, back[i].url_adr, count);
                     }
                   }
                   snprintf(StatsBuffer[index].state, sizeof(StatsBuffer[index].state),

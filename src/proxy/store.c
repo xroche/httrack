@@ -2191,7 +2191,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
           }
           if ((pos = getArcField(index->line, 2)) != NULL) {
             r->msg[0] = '\0';
-            strncat(r->msg, pos, sizeof(pos) - 1);
+            strncatbuff(r->msg, pos, sizeof(r->msg) - 1);
           }
           while(linput(index->file, index->line, sizeof(index->line) - 1)
                 && index->line[0] != '\0') {
