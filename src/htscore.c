@@ -693,6 +693,9 @@ int httpmirror(char *url1, httrackp * opt) {
   // hash table
   opt->hash = &hash;
 
+  // a change report left by a previous crawl on this opt is not this one's
+  hts_changes_free_opt(opt);
+
   // initialize link heap
   hts_record_init(opt);
 
@@ -2096,6 +2099,7 @@ int httpmirror(char *url1, httrackp * opt) {
     if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
+      hts_changes_indexed(opt);
       //
       opt->state._hts_in_html_parsing = 3;
       //
@@ -2132,7 +2136,17 @@ int httpmirror(char *url1, httrackp * opt) {
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?
                   if (fexist_utf8(file)) { // still on disk
-                    hts_changes_gone(opt, file + StringLength(opt->path_html));
+                    /* A link this crawl did try but never wrote (a transfer
+                       killed mid-flight) also drops out of new.lst. Unless it
+                       is about to be purged, its previous copy stands and the
+                       file is not gone. */
+                    const hts_boolean kept =
+                        !opt->delete_old &&
+                        hash_read(opt->hash, file, NULL,
+                                  HASH_STRUCT_FILENAME) >= 0;
+
+                    hts_changes_dropped(
+                        opt, file + StringLength(opt->path_html), kept);
                     if (opt->delete_old) {
                       hts_log_print(opt, LOG_INFO, "Purging %s", file);
                       UNLINK(file);
@@ -2892,15 +2906,14 @@ int filecreateempty(filenote_strc * strc, const char *filename) {
     return 0;
 }
 
-void hts_savename_listed(const filenote_strc *strc, const char *s, char *dest,
+void hts_savename_listed(const char *root, const char *s, char *dest,
                          size_t destsize) {
   char catbuff[CATBUFF_SIZE];
 
   strlcpybuff(dest, fslash(catbuff, sizeof(catbuff), s), destsize);
-  if (strnotempty(strc->path) &&
-      strncmp(fslash(catbuff, sizeof(catbuff), strc->path), dest,
-              strlen(strc->path)) == 0) {
-    strlcpybuff(dest, s + strlen(strc->path), destsize);
+  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root), dest,
+                                   strlen(root)) == 0) {
+    strlcpybuff(dest, s + strlen(root), destsize);
   }
 }
 
@@ -2914,7 +2927,7 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
   } else if (strc->lst) {
     char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
-    hts_savename_listed(strc, s, savelst, sizeof(savelst));
+    hts_savename_listed(strc->path, s, savelst, sizeof(savelst));
     fprintf(strc->lst, "[%s]" LF, savelst);
     fflush(strc->lst);
   }

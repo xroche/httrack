@@ -1,9 +1,8 @@
 #!/bin/bash
 # --changes (#714): the report must match the mirror's real deltas. Every route
 # answers 200 with no validators on both passes, so the transfer signal alone
-# would call the whole site changed; the stable resources land in "unchanged"
-# only if payloads are really compared.
-set -eu
+# would call the whole site changed.
+set -euo pipefail
 
 : "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
@@ -52,15 +51,15 @@ which httrack >/dev/null || {
 out="${tmpdir}/crawl"
 mkdir "$out"
 report="${out}/hts-changes.json"
-# Purging off throughout: the deleted set must be computed with nothing acting
-# on it.
-common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --changes --purge-old=0 --retries=2)
+# Purging off for the first two passes: the deleted set must be computed with
+# nothing acting on it.
+common=(--quiet --disable-security-limits --robots=0 --timeout=30 --changes --retries=2)
 
-# Report field extractor: bucket counts, and the files listed under a bucket.
-count() { sed -n 's/.*"'"$1"'": \([0-9]*\).*/\1/p' "$report" | head -1; }
+# Report field extractor: a scalar, and the files listed under a bucket.
+field() { sed -n 's/.*"'"$1"'": \([a-z0-9]*\).*/\1/p' "${2:-$report}" | head -1; }
 # tr: python prints CRLF on Windows, and the expectations below are LF.
 listed() {
-    "$python" - "$report" "$1" <<'EOF' | tr -d '\r'
+    "$python" - "${2:-$report}" "$1" <<'EOF' | tr -d '\r'
 import json
 import sys
 
@@ -71,70 +70,90 @@ for entry in report[sys.argv[2]]:
 EOF
 }
 expect() {
-    local label="$1" want="$2" got="$3"
+    local label="$1" want="$2" got="$3" rep="${4:-$report}"
     printf '[%s] ..\t' "$label"
     test "$want" == "$got" || {
         echo "FAIL: expected '${want}', got '${got}'"
-        cat "$report"
+        cat "$rep"
         exit 1
     }
     echo "OK"
 }
+# Every count must equal the length of the list it counts.
+expect_counts_match() {
+    local label="$1" rep="${2:-$report}" bucket n
+    printf '[%s] ..\t' "$label"
+    for bucket in new changed unchanged gone; do
+        n=$(listed "$bucket" "$rep" | grep -c . || true)
+        test "$(field "$bucket" "$rep")" == "$n" || {
+            echo "FAIL: ${bucket} count $(field "$bucket" "$rep") but $n listed"
+            cat "$rep"
+            exit 1
+        }
+    done
+    echo "OK"
+}
+lines() { printf '%s\n' "$@" | sort; }
 
 # --- pass 1: nothing to compare against --------------------------------------
-httrack "${common[@]}" "${base}/changes/index.html" >"${tmpdir}/log1" 2>&1
+httrack "${common[@]}" -O "$out" --purge-old=0 "${base}/changes/index.html" \
+    >"${tmpdir}/log1" 2>&1
 test -s "$report" || {
     echo "FAIL: pass 1 wrote no ${report}"
     exit 1
 }
-expect "pass 1 declares a first crawl" "true" \
-    "$(sed -n 's/.*"first_crawl": \([a-z]*\).*/\1/p' "$report" | head -1)"
+expect "pass 1 declares a first crawl" "true" "$(field first_crawl)"
 # Every mirrored file: index, stable.html, moved.html, stable.bin, moved.bin,
 # doomed.html, redirtarget.html, flaky.bin, coded.bin, codedstable.bin,
-# sized.html and the redirect target it points at.
-expect "pass 1 counts 12 new" "12" "$(count new)"
-expect "pass 1 counts 0 changed" "0" "$(count changed)"
-expect "pass 1 counts 0 gone" "0" "$(count gone)"
+# killed.bin, sized.html and the redirect target it points at.
+expect "pass 1 counts 13 new" "13" "$(field new)"
+expect "pass 1 counts 0 changed" "0" "$(field changed)"
+expect "pass 1 counts 0 gone" "0" "$(field gone)"
+expect_counts_match "pass 1 counts match its lists"
 grep -aq "first crawl" "${out}/hts-log.txt" || {
     echo "FAIL: pass 1 log carries no first-crawl summary"
     exit 1
 }
 
-# --- pass 2: two bodies move, one page appears, one disappears ---------------
-httrack "${common[@]}" --update "${base}/changes/index.html" >"${tmpdir}/log2" 2>&1
-expect "pass 2 is not a first crawl" "false" \
-    "$(sed -n 's/.*"first_crawl": \([a-z]*\).*/\1/p' "$report" | head -1)"
-
 host="127.0.0.1_${port}"
+# A leftover from some earlier failed attempt, at a name pass 2 fetches for the
+# first time: on disk, but never part of the previous mirror, so it is new.
+printf 'leftover junk' >"${out}/${host}/changes/fresh.html"
+
+# --- pass 2: two bodies move, pages appear and disappear ---------------------
+httrack "${common[@]}" -O "$out" --purge-old=0 --update \
+    "${base}/changes/index.html" >"${tmpdir}/log2" 2>&1
+expect "pass 2 is not a first crawl" "false" "$(field first_crawl)"
+
 # The redirect behind sized.html now points at a much longer target name.
 long="${host}/changes/$(printf 's%.0s' $(seq 40)).html"
-expect "new is fresh.html and the renamed redirect target" \
-    "$(printf '%s\n%s' "${host}/changes/fresh.html" "$long" | sort)" \
+expect "new is the two fresh pages and the renamed redirect target" \
+    "$(lines "${host}/changes/fresh.html" "${host}/changes/transient.html" "$long")" \
     "$(listed new | sort)"
 expect "gone is doomed.html and the old redirect target" \
-    "$(printf '%s\n%s' "${host}/changes/doomed.html" "${host}/changes/s.html" | sort)" \
+    "$(lines "${host}/changes/doomed.html" "${host}/changes/s.html")" \
     "$(listed gone | sort)"
 # index.html changes because its link list does; moved.* change their bodies.
 # coded.bin arrives gzipped and direct-to-disk, so its previous copy has to be
 # sampled before the decoded temp is renamed over it; it is the same length on
 # both passes, so only a digest separates it from codedstable.bin.
 expect "changed is exactly the four moved resources" \
-    "$(printf '%s\n%s\n%s\n%s' "${host}/changes/coded.bin" \
-        "${host}/changes/index.html" "${host}/changes/moved.bin" \
-        "${host}/changes/moved.html")" \
+    "$(lines "${host}/changes/coded.bin" "${host}/changes/index.html" \
+        "${host}/changes/moved.bin" "${host}/changes/moved.html")" \
     "$(listed changed | sort)"
-# The teeth: re-served byte for byte, 200, no Last-Modified, no ETag. flaky.bin
-# gets there through a failed transfer and a retry, so its file is notified
-# twice; redirtarget.html arrives behind a 302.
-# sized.html is the sharpest of these: its payload is byte-identical, but the
-# rewritten link to the renamed redirect target makes the file on disk change
-# length, so a size comparison alone would call it changed.
-expect "unchanged is exactly the six stable resources" \
-    "$(printf '%s\n%s\n%s\n%s\n%s\n%s' "${host}/changes/codedstable.bin" \
-        "${host}/changes/flaky.bin" "${host}/changes/redirtarget.html" \
+# Re-served byte for byte, 200, no Last-Modified, no ETag. flaky.bin gets there
+# through a failed transfer and a retry, so its file is notified twice;
+# redirtarget.html arrives behind a 302. sized.html has a byte-identical
+# payload, but the rewritten link to the renamed redirect target makes the file
+# on disk change length. killed.bin never completes a transfer at all, so it
+# reaches none of the lists the engine writes, and its copy is untouched.
+expect "unchanged is exactly the seven stable resources" \
+    "$(lines "${host}/changes/codedstable.bin" "${host}/changes/flaky.bin" \
+        "${host}/changes/killed.bin" "${host}/changes/redirtarget.html" \
         "${host}/changes/sized.html" "${host}/changes/stable.bin" \
-        "${host}/changes/stable.html" | sort)" \
+        "${host}/changes/stable.html")" \
     "$(listed unchanged | sort)"
+expect_counts_match "pass 2 counts match its lists"
 
 # Every mirrored file appears once and only once, across all four buckets.
 printf '[each file in exactly one bucket] ..\t'
@@ -150,13 +169,72 @@ test -z "$dupes" || {
 }
 echo "OK"
 
-# Before #714 the deleted set only existed as a side effect of purging; it must
-# now be computed without one, and reporting it must not delete anything.
-expect "the report says nothing was purged" "false" \
-    "$(sed -n 's/.*"purged": \([a-z]*\).*/\1/p' "$report" | head -1)"
+# The log summary is the report, rendered: it must not drift from the counts.
+summary="Change report: $(field new) new, $(field changed) changed, $(field unchanged) unchanged, $(field gone) gone (hts-changes.json)"
+printf '[the log summary matches the counts] ..\t'
+grep -aqF "$summary" "${out}/hts-log.txt" || {
+    echo "FAIL: no '${summary}' in the log"
+    grep -a "Change report" "${out}/hts-log.txt" || true
+    exit 1
+}
+echo "OK"
+
+expect "the report says nothing was purged" "false" "$(field purged)"
 printf '[reporting gone did not delete it] ..\t'
 test -f "${out}/${host}/changes/doomed.html" || {
     echo "FAIL: doomed.html was deleted with --purge-old=0"
     exit 1
 }
+echo "OK"
+printf '[a killed transfer keeps its file] ..\t'
+test -f "${out}/${host}/changes/killed.bin" || {
+    echo "FAIL: killed.bin lost its previous copy"
+    exit 1
+}
+echo "OK"
+
+# --- pass 3: the same run with purging on ------------------------------------
+httrack "${common[@]}" -O "$out" --update "${base}/changes/index.html" \
+    >"${tmpdir}/log3" 2>&1
+expect "the report says files were purged" "true" "$(field purged)"
+expect "gone is the page that only pass 2 linked" \
+    "${host}/changes/transient.html" "$(listed gone)"
+printf '[a purged file is off disk] ..\t'
+test ! -f "${out}/${host}/changes/transient.html" || {
+    echo "FAIL: transient.html survived --purge-old"
+    exit 1
+}
+echo "OK"
+
+# --- cache off: the report degrades, it does not lie -------------------------
+nocache="${tmpdir}/nocache"
+mkdir "$nocache"
+ncreport="${nocache}/hts-changes.json"
+for pass in 1 2; do
+    httrack "${common[@]}" -O "$nocache" -C0 "${base}/changes2/index.html" \
+        >"${tmpdir}/lognc${pass}" 2>&1
+done
+expect "with no cache first_crawl is undetermined, not guessed" "null" \
+    "$(field first_crawl "$ncreport")" "$ncreport"
+# The bodies on disk are still compared, so a constant one is not called
+# changed. index.html is: a parsed page is compared against the cached payload,
+# and there is no cache, which is the degradation the report declares.
+expect "the constant body is still recognised as unchanged" \
+    "${host}/changes2/stable2.bin" "$(listed unchanged "$ncreport")" "$ncreport"
+expect "the moving body is still recognised as changed" \
+    "$(lines "${host}/changes2/index.html" "${host}/changes2/ticker2.bin")" \
+    "$(listed changed "$ncreport" | sort)" "$ncreport"
+expect_counts_match "cache-off counts match its lists" "$ncreport"
+printf '[every entry carries its size] ..\t'
+"$python" - "$ncreport" <<'EOF' || exit 1
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as fp:
+    report = json.load(fp)
+for bucket in ("new", "changed", "unchanged"):
+    for entry in report[bucket]:
+        if "size" not in entry:
+            sys.exit("FAIL: %s has no size in %s" % (entry["file"], bucket))
+EOF
 echo "OK"

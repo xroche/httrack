@@ -5230,6 +5230,104 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+#define CHANGES_RACE_FILES 8
+#define CHANGES_RACE_ROUNDS 400
+
+static void changes_race_notify(httrackp *opt, int n) {
+  char fil[64];
+  char BIGSTK save[HTS_URLMAXSIZE * 2];
+
+  snprintf(fil, sizeof(fil), "/f%d.bin", n);
+  strlcpybuff(save, StringBuff(opt->path_html), sizeof(save));
+  strlcatbuff(save, "race.example", sizeof(save));
+  strlcatbuff(save, fil, sizeof(save));
+  hts_changes_notify(opt, "race.example", fil, save, HTS_TRUE, HTS_FALSE);
+}
+
+static void changes_race_thread(void *arg) {
+  httrackp *const opt = (httrackp *) arg;
+  int i;
+
+  for (i = 0; i < CHANGES_RACE_ROUNDS; i++)
+    changes_race_notify(opt, i % CHANGES_RACE_FILES);
+}
+
+/* A transfer thread the crawl never joins (FTP) reaches hts_changes_notify()
+   while the report is being resolved and written. Run it under TSan. */
+static int st_changes_race(httrackp *opt, int argc, char **argv) {
+  String out = STRING_EMPTY;
+  char base[HTS_URLMAXSIZE];
+  int err = 0;
+  int i;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=changes-race <writable directory>\n");
+    return 1;
+  }
+  strcpybuff(base, argv[0]);
+  if (base[0] != '\0' && base[strlen(base) - 1] != '/')
+    strcatbuff(base, "/");
+  StringCopy(opt->path_html, base);
+  StringCopy(opt->path_html_utf8, base);
+  StringCopy(opt->path_log, base);
+  opt->changes = HTS_TRUE;
+  hts_changes_free_opt(opt);
+
+  /* Real files, so the reader hashes and stats them for as long as it takes. */
+  {
+    char BIGSTK dir[HTS_URLMAXSIZE * 2];
+
+    strlcpybuff(dir, base, sizeof(dir));
+    strlcatbuff(dir, "race.example", sizeof(dir));
+    for (i = 0; i < CHANGES_RACE_FILES; i++) {
+      char BIGSTK path[HTS_URLMAXSIZE * 2];
+      char name[64];
+      FILE *fp;
+      int n;
+
+      snprintf(name, sizeof(name), "/f%d.bin", i);
+      strlcpybuff(path, dir, sizeof(path));
+      strlcatbuff(path, name, sizeof(path));
+      structcheck(path);
+      fp = FOPEN(path, "wb");
+      if (fp == NULL) {
+        fprintf(stderr, "changes-race: cannot write %s\n", path);
+        return 1;
+      }
+      for (n = 0; n < 16384; n++)
+        fwrite("0123456789abcdef", 1, 16, fp);
+      fclose(fp);
+    }
+  }
+
+  for (i = 0; i < 4; i++) {
+    if (hts_newthread(changes_race_thread, opt) != 0) {
+      fprintf(stderr, "changes-race: cannot spawn a notifier thread\n");
+      return 1;
+    }
+  }
+  for (i = 0; i < 64; i++)
+    hts_changes_report(opt, &out);
+  hts_changes_close_opt(opt);
+  htsthread_wait();
+
+  /* Sealed: a straggler must be dropped, not start a report nobody writes. */
+  changes_race_notify(opt, CHANGES_RACE_FILES + 1);
+  hts_changes_report(opt, &out);
+  if (StringLength(out) == 0) {
+    fprintf(stderr, "changes-race: the report was lost after close\n");
+    err = 1;
+  } else if (strstr(StringBuff(out), "f9.bin") != NULL) {
+    fprintf(stderr, "changes-race: a post-close notify reached the report\n");
+    err = 1;
+  }
+
+  StringFree(out);
+  hts_changes_free_opt(opt);
+  printf("changes-race self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -5287,6 +5385,8 @@ static const struct selftest_entry {
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
+    {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",
+     st_changes_race},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},

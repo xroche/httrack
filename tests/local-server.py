@@ -1587,12 +1587,18 @@ class Handler(SimpleHTTPRequestHandler):
                 "coded.bin",
                 "codedstable.bin",
                 "sized.html",
+                "killed.bin",
             )
         )
-        if self.refetch_pass() == 1:
+        seen = self.refetch_pass()
+        if seen == 1:
             links += '\t<a href="doomed.html">doomed</a>\n'
         else:
             links += '\t<a href="fresh.html">fresh</a>\n'
+        # transient.html appears on pass 2 only, so pass 3 has a deletion of
+        # its own to purge.
+        if seen == 2:
+            links += '\t<a href="transient.html">transient</a>\n'
         self.send_html(links)
 
     def route_changes_stable(self):
@@ -1689,6 +1695,42 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FLAKY, "application/octet-stream")
 
+    def route_changes_transient(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"<html><body><p>CHANGES-TRANSIENT</p></body></html>", "text/html"
+        )
+
+    # Transfers fine once, then dies mid-body on every later attempt, retries
+    # included: the mirrored copy survives untouched but the file never reaches
+    # new.lst, so old.lst minus new.lst offers it up as a deletion.
+    KILLED = b"CHANGES-KILLED\n" + b"\x21\x22\x23\x24" * 512
+
+    def route_changes_killed(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KILLED, "application/octet-stream")
+        else:
+            self.send_truncated(self.KILLED, "application/octet-stream")
+
+    # A second, independent mirror crawled with the cache off: nothing but the
+    # bytes on disk can tell stable2 from ticker2, whose body differs every
+    # fetch at a constant length.
+    def route_changes2_index(self):
+        self.refetch_pass()
+        self.send_html('\t<a href="stable2.bin">s</a>\n\t<a href="ticker2.bin">t</a>\n')
+
+    def route_changes2_stable(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"CHANGES2-STABLE-00\n" + b"\x55\xaa" * 512, "application/octet-stream"
+        )
+
+    def route_changes2_ticker(self):
+        self.send_raw(
+            b"CHANGES2-TICKER-%02d\n" % (self.refetch_pass() % 100) + b"\x55\xaa" * 512,
+            "application/octet-stream",
+        )
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1722,6 +1764,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/changes/" + SIZED_SHORT: route_changes_sizedtarget,
         "/changes/" + SIZED_LONG: route_changes_sizedtarget,
         "/changes/codedstable.bin": route_changes_coded_stable,
+        "/changes/transient.html": route_changes_transient,
+        "/changes/killed.bin": route_changes_killed,
+        "/changes2/index.html": route_changes2_index,
+        "/changes2/stable2.bin": route_changes2_stable,
+        "/changes2/ticker2.bin": route_changes2_ticker,
         "/upcodec/index.html": route_upcodec_index,
         "/upcodec/mem.html": route_upcodec_mem,
         "/upcodec/disk.bin": route_upcodec_disk,

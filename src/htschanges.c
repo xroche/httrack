@@ -80,8 +80,10 @@ struct hts_changes {
   changes_entry *entries;
   size_t count;
   size_t capacity;
+  hts_boolean has_index; /* the run keeps a mirror index (the cache is on) */
   hts_boolean old_index; /* the previous mirror's index was read */
   hts_boolean overflow;  /* an allocation failed; the report is partial */
+  hts_boolean closed;    /* reported: late notifies are dropped, not recorded */
 };
 
 /* ------------------------------------------------------------ */
@@ -218,8 +220,9 @@ static intptr_t changes_slot(hts_changes *changes, const char *file,
   return slot;
 }
 
-/* MD5 of the file at `path`; change detection over our own mirror, not a
-   security boundary. HTS_FALSE if it cannot be read. */
+/* MD5 of the file at `path`; not a security boundary. Never call it holding
+   changes_mutex: hashing a large file would stall every other connection.
+   HTS_FALSE if it cannot be read. */
 static hts_boolean digest_file(const char *path,
                                unsigned char digest[DIGEST_SIZE]) {
   const int endian = 1;
@@ -267,17 +270,24 @@ hts_change_bucket hts_changes_classify(hts_boolean rewritten,
 /* Engine hooks                                                  */
 /* ------------------------------------------------------------ */
 
-/* FTP transfers reach file_notify() from their own detached thread
-   (htsftp.c:631/635), so every entry point below runs under this lock. */
+/* FTP transfers reach file_notify() from a detached thread of their own, and
+   the crawl is not joined before the report is written, so every entry point
+   below (report and teardown included) runs under this lock. */
 static htsmutex changes_mutex = HTSMUTEX_INIT;
 
-/* The live accumulator, created on first use; NULL when --changes is off. */
+/* The live accumulator, created on first use. NULL when --changes is off or
+   the report has been written: a straggler notify must be dropped, not
+   resurrect an accumulator nobody will report. Call under the lock. */
 static hts_changes *changes_get(httrackp *opt) {
+  hts_changes *changes = (hts_changes *) opt->changes_state;
+
   if (!opt->changes)
     return NULL;
-  if (opt->changes_state == NULL)
-    opt->changes_state = changes_new();
-  return (hts_changes *) opt->changes_state;
+  if (changes == NULL) {
+    changes = changes_new();
+    opt->changes_state = changes;
+  }
+  return changes != NULL && !changes->closed ? changes : NULL;
 }
 
 void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
@@ -285,60 +295,70 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
                         hts_boolean not_updated) {
   hts_changes *changes;
   char BIGSTK file[HTS_URLMAXSIZE * 2];
-  hts_boolean is_new;
-  intptr_t slot;
-  changes_entry *entry;
+  char BIGSTK url[HTS_URLMAXSIZE * 4 + 8]; /* holds adr + fil + a scheme */
+  unsigned char prev_digest[DIGEST_SIZE];
+  hts_boolean has_prev = HTS_FALSE;
+  hts_boolean is_new = HTS_FALSE;
+  intptr_t slot = -1;
+  LLint prev_size;
 
+  if (!opt->changes)
+    return;
   /* Engine-generated scaffolding (the top index) carries no URL and is not a
      mirrored resource. */
   if (save == NULL || !strnotempty(save) || adr == NULL || fil == NULL ||
       (!strnotempty(adr) && !strnotempty(fil)))
     return;
 
+  hts_savename_listed(StringBuff(opt->path_html), save, file, sizeof(file));
+
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
-  if (changes == NULL) {
-    hts_mutexrelease(&changes_mutex);
-    return;
+  if (changes != NULL) {
+    slot = changes_slot(changes, file, &is_new);
+    if (slot >= 0 && !is_new) {
+      /* Retry, or a second call site for the same file: the pre-run state was
+         already sampled and the copy on disk may no longer be it. */
+      changes->entries[slot].rewritten =
+          changes->entries[slot].rewritten || rewritten;
+    }
   }
-
-  hts_savename_listed(&opt->state.strc, save, file, sizeof(file));
-  slot = changes_slot(changes, file, &is_new);
-  if (slot < 0) {
-    hts_mutexrelease(&changes_mutex);
+  hts_mutexrelease(&changes_mutex);
+  if (slot < 0 || !is_new)
     return;
-  }
-  entry = &changes->entries[slot];
 
-  if (!is_new) {
-    /* Retry, or a second call site for the same file: the pre-run state was
-       already sampled and the copy on disk may no longer be it. */
-    entry->rewritten = entry->rewritten || rewritten;
-    hts_mutexrelease(&changes_mutex);
-    return;
-  }
+  url[0] = '\0';
+  if (!link_has_authority(adr))
+    strlcatbuff(url, "http://", sizeof(url));
+  strlcatbuff(url, adr, sizeof(url));
+  strlcatbuff(url, fil, sizeof(url));
 
-  {
-    char BIGSTK url[HTS_URLMAXSIZE * 4 + 8]; /* holds adr + fil + a scheme */
+  /* Sample the previous copy with the lock released, and hash it only when it
+     is about to be overwritten: this is the last moment those bytes exist. */
+  prev_size = fsize_utf8(save);
+  if (prev_size >= 0 && rewritten)
+    has_prev = digest_file(save, prev_digest);
 
-    url[0] = '\0';
-    if (!link_has_authority(adr))
-      strlcatbuff(url, "http://", sizeof(url));
-    strlcatbuff(url, adr, sizeof(url));
-    strlcatbuff(url, fil, sizeof(url));
+  hts_mutexlock(&changes_mutex);
+  changes = changes_get(opt);
+  /* The slot index is stable (entries are only ever appended), but realloct()
+     may have moved the array while the lock was down. */
+  if (changes != NULL && (size_t) slot < changes->count) {
+    changes_entry *const entry = &changes->entries[slot];
+
     entry->url = strdupt(url);
     if (entry->url == NULL)
       changes->overflow = HTS_TRUE;
+    entry->rewritten = entry->rewritten || rewritten;
+    entry->not_updated = not_updated;
+    entry->prev_size = prev_size;
+    entry->on_disk = prev_size >= 0;
+    /* hts_changes_html() compares payloads, and its digests win. */
+    if (has_prev && !entry->has_new) {
+      entry->has_prev = HTS_TRUE;
+      memcpy(entry->prev_digest, prev_digest, DIGEST_SIZE);
+    }
   }
-
-  entry->rewritten = rewritten;
-  entry->not_updated = not_updated;
-  entry->prev_size = fsize_utf8(save);
-  entry->on_disk = entry->prev_size >= 0;
-  /* Hash the previous copy only when it is about to be overwritten: this is
-     the last moment those bytes exist. */
-  if (entry->on_disk && rewritten)
-    entry->has_prev = digest_file(save, entry->prev_digest);
   hts_mutexrelease(&changes_mutex);
 }
 
@@ -353,6 +373,10 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   intptr_t slot;
   htsblk prev;
 
+  /* Before the digest and the cache read: with --changes off this hook must
+     cost nothing. */
+  if (!opt->changes)
+    return;
   if (r->adr == NULL || r->size < 0 || save == NULL || !strnotempty(save))
     return;
 
@@ -373,7 +397,7 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   changes = changes_get(opt);
   /* file_notify() records the entry; this call only refines it. */
   if (changes != NULL) {
-    hts_savename_listed(&opt->state.strc, save, file, sizeof(file));
+    hts_savename_listed(StringBuff(opt->path_html), save, file, sizeof(file));
     slot = changes_find(changes, file);
     if (slot >= 0) {
       changes_entry *const entry = &changes->entries[slot];
@@ -388,12 +412,12 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   hts_mutexrelease(&changes_mutex);
 }
 
-void hts_changes_gone(httrackp *opt, const char *file) {
+void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept) {
   hts_changes *changes;
   hts_boolean is_new;
   intptr_t slot;
 
-  if (file == NULL || !strnotempty(file))
+  if (!opt->changes || file == NULL || !strnotempty(file))
     return;
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
@@ -401,8 +425,10 @@ void hts_changes_gone(httrackp *opt, const char *file) {
     slot = changes_slot(changes, file, &is_new);
     if (slot >= 0 && is_new) {
       changes->entries[slot].url = strdupt("");
-      changes->entries[slot].bucket = HTS_CHANGE_GONE;
       changes->entries[slot].listed_prev = HTS_TRUE;
+      /* A kept file leaves rewritten clear, which resolves to unchanged. */
+      if (!kept)
+        changes->entries[slot].bucket = HTS_CHANGE_GONE;
     }
   }
   hts_mutexrelease(&changes_mutex);
@@ -412,16 +438,29 @@ void hts_changes_previous(httrackp *opt, const char *file) {
   hts_changes *changes;
   intptr_t slot;
 
-  if (file == NULL)
+  if (!opt->changes || file == NULL)
     return;
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
   if (changes != NULL) {
+    changes->has_index = HTS_TRUE;
     changes->old_index = HTS_TRUE;
     slot = changes_find(changes, file);
     if (slot >= 0)
       changes->entries[slot].listed_prev = HTS_TRUE;
   }
+  hts_mutexrelease(&changes_mutex);
+}
+
+void hts_changes_indexed(httrackp *opt) {
+  hts_changes *changes;
+
+  if (!opt->changes)
+    return;
+  hts_mutexlock(&changes_mutex);
+  changes = changes_get(opt);
+  if (changes != NULL)
+    changes->has_index = HTS_TRUE;
   hts_mutexrelease(&changes_mutex);
 }
 
@@ -479,9 +518,8 @@ static void changes_resolve(hts_changes *changes, httrackp *opt) {
 static const char *const bucket_names[HTS_CHANGE_BUCKETS] = {
     "new", "changed", "unchanged", "gone"};
 
-/* Callers below run after the crawl's threads are done, so they take no lock.
- */
-void hts_changes_report(httrackp *opt, String *out) {
+/* Serialize the report. Call under changes_mutex. */
+static void changes_serialize(httrackp *opt, String *out) {
   hts_changes *const changes = (hts_changes *) opt->changes_state;
   size_t counts[HTS_CHANGE_BUCKETS];
   char date[32];
@@ -507,7 +545,9 @@ void hts_changes_report(httrackp *opt, String *out) {
   StringCat(*out, ",\n  \"date\": ");
   hts_changes_json_string(out, date);
   StringCat(*out, ",\n  \"first_crawl\": ");
-  StringCat(*out, changes->old_index ? "false" : "true");
+  StringCat(*out, !changes->has_index
+                      ? "null"
+                      : (changes->old_index ? "false" : "true"));
   StringCat(*out, ",\n  \"partial\": ");
   StringCat(*out, changes->overflow ? "true" : "false");
   StringCat(*out, ",\n  \"purged\": ");
@@ -555,25 +595,44 @@ void hts_changes_report(httrackp *opt, String *out) {
   StringCat(*out, "\n}\n");
 }
 
+void hts_changes_report(httrackp *opt, String *out) {
+  hts_mutexlock(&changes_mutex);
+  changes_serialize(opt, out);
+  hts_mutexrelease(&changes_mutex);
+}
+
 void hts_changes_close_opt(httrackp *opt) {
-  /* changes_get(), not the raw field: a crawl that mirrored nothing still owes
-     the user a report, and a stale one from the previous run must not survive
-     on disk as if it described this one. */
-  hts_changes *changes = changes_get(opt);
   char catbuff[CATBUFF_SIZE];
   const char *path;
   String report = STRING_EMPTY;
   size_t counts[HTS_CHANGE_BUCKETS];
-  size_t i;
+  size_t total;
+  hts_boolean has_index, old_index;
   FILE *fp;
 
-  if (changes == NULL)
-    return;
+  hts_mutexlock(&changes_mutex);
+  {
+    /* changes_get(), not the raw field: a crawl that mirrored nothing still
+       owes the user a report, and a stale one from the previous run must not
+       survive on disk as if it described this one. */
+    hts_changes *const changes = changes_get(opt);
+    size_t i;
 
-  hts_changes_report(opt, &report);
-  memset(counts, 0, sizeof(counts));
-  for (i = 0; i < changes->count; i++)
-    counts[changes->entries[i].bucket]++;
+    if (changes == NULL) {
+      hts_mutexrelease(&changes_mutex);
+      return;
+    }
+    changes_serialize(opt, &report);
+    memset(counts, 0, sizeof(counts));
+    for (i = 0; i < changes->count; i++)
+      counts[changes->entries[i].bucket]++;
+    total = changes->count;
+    has_index = changes->has_index;
+    old_index = changes->old_index;
+    /* Sticky: whatever the crawl's stragglers do next is not in this report. */
+    changes->closed = HTS_TRUE;
+  }
+  hts_mutexrelease(&changes_mutex);
 
   path = fconcat(catbuff, sizeof(catbuff), StringBuff(opt->path_log),
                  HTS_CHANGES_FILE);
@@ -590,11 +649,16 @@ void hts_changes_close_opt(httrackp *opt) {
                   "Unable to create the change report %s", path);
   }
 
-  if (!changes->old_index) {
+  if (!has_index) {
+    hts_log_print(opt, LOG_NOTICE,
+                  "Change report: no mirror index (the cache is off), %d files "
+                  "mirrored, deletions not detected (%s)",
+                  (int) total, HTS_CHANGES_FILE);
+  } else if (!old_index) {
     hts_log_print(opt, LOG_NOTICE,
                   "Change report: first crawl, %d files mirrored, nothing to "
                   "compare against (%s)",
-                  (int) changes->count, HTS_CHANGES_FILE);
+                  (int) total, HTS_CHANGES_FILE);
   } else {
     hts_log_print(opt, LOG_NOTICE,
                   "Change report: %d new, %d changed, %d unchanged, %d gone "
@@ -606,13 +670,14 @@ void hts_changes_close_opt(httrackp *opt) {
   }
 
   StringFree(report);
-  changes_free(&changes);
-  opt->changes_state = NULL;
 }
 
 void hts_changes_free_opt(httrackp *opt) {
-  hts_changes *changes = (hts_changes *) opt->changes_state;
+  hts_changes *changes;
 
+  hts_mutexlock(&changes_mutex);
+  changes = (hts_changes *) opt->changes_state;
   changes_free(&changes);
   opt->changes_state = NULL;
+  hts_mutexrelease(&changes_mutex);
 }

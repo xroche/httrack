@@ -62,47 +62,49 @@ typedef enum {
   HTS_CHANGE_BUCKETS
 } hts_change_bucket;
 
-/* Record what this crawl is doing to the local file `save` (an absolute path;
-   adr/fil form the URL it comes from, either may be empty for an engine
-   generated file). `rewritten` means the copy on disk is being written over,
-   `not_updated` is the 200-versus-304 transfer signal, used only when no
-   digest can be taken. Only the first call for a given file samples the
-   previous copy, so a retried or twice-notified resource is counted once.
-   No-op unless --changes is on. */
+/* Record what this crawl is doing to the local file `save` (absolute path;
+   adr/fil form its URL, either may be empty for an engine-generated file).
+   `rewritten` means the copy on disk is being written over, `not_updated` is
+   the 200-versus-304 signal, used only when no digest can be taken. Only the
+   first call for a file samples the previous copy, so a retried or
+   twice-notified resource is counted once. No-op unless --changes is on. */
 void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
                         const char *save, hts_boolean rewritten,
                         hts_boolean not_updated);
 
-/* Refine the entry for a parsed HTML file, whose local copy is the payload
-   after link rewriting plus a footer carrying the crawl date: its bytes differ
-   on every run, so the comparison uses the payload `r` holds against the body
-   the previous run left in the cache. Called once the page is ready to be
-   written, from hts_finish_html_file(). */
+/* Refine the entry for a parsed HTML file: its local copy carries rewritten
+   links and a footer dated by the crawl, so it differs every run. Compares the
+   payload `r` holds against the body the previous run left in the cache. */
 void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
                       const char *adr, const char *fil, const char *save);
 
-/* Record `file` (mirror-relative, as listed in new.lst) as present in the
-   previous mirror and absent from this one. Whether it is also deleted from
-   disk is the purge option's business, not this one's. */
-void hts_changes_gone(httrackp *opt, const char *file);
+/* Record `file` (mirror-relative, as listed in new.lst) as listed by the
+   previous mirror's index and absent from this run's. `kept` means its local
+   copy survives the run because the crawl tried and failed to replace it: a
+   failed transfer is not a deletion, so it is reported unchanged, not gone. */
+void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept);
 
 /* Record that the previous mirror's index listed `file`. That index, not the
-   file's presence on disk, decides what counts as already mirrored: a partial
-   left by this crawl's own failed attempt is on disk but was never part of the
-   previous mirror. Calling it at all marks the run as having one. */
+   file's presence on disk, decides what counts as already mirrored. */
 void hts_changes_previous(httrackp *opt, const char *file);
+
+/* Record that this run keeps a mirror index at all. Without one (the cache is
+   off) deletions cannot be seen and first_crawl cannot be decided, which the
+   report states rather than guesses. */
+void hts_changes_indexed(httrackp *opt);
 
 /* Resolve every entry against the bytes now on disk and serialize the report
    into `out` (replaced). Exposed for the `changes` self-test; the engine goes
    through hts_changes_close_opt(). */
 void hts_changes_report(httrackp *opt, String *out);
 
-/* Write the report and log a one-line summary, then free the accumulator.
-   Null-safe and idempotent. */
+/* Write the report and log a one-line summary. Idempotent, and after it the
+   accumulator is sealed: a late notify from a still-running transfer thread is
+   dropped instead of starting a report nobody will write. */
 void hts_changes_close_opt(httrackp *opt);
 
-/* Drop the accumulator without writing anything, for a run that never reached
-   its end. Null-safe and idempotent. */
+/* Drop the accumulator, for a run that never reached its end and to start the
+   next one clean. Null-safe and idempotent. */
 void hts_changes_free_opt(httrackp *opt);
 
 /* Bucket for one entry, from what was observed. No filesystem access:
