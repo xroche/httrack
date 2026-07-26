@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# /website/ is served from the project directory htsserver set up itself: the
-# posted projpath must neither pick that root nor overflow the composed path.
+# /website/ is served from the project directory htsserver set up itself, never
+# from a root the request body names, and composing that path must stay bounded.
 
 set -euo pipefail
 
@@ -105,6 +105,16 @@ echo "SECRETMARKER" >"${base}/secret.txt"
 mkdir -p "${base}/proj"
 echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 
+# A directory component over NAME_MAX, so mkdir fails whatever the uid and the
+# reply goes through error_redirect: the one branch that skips the URL parsing
+# where fsfile used to be cleared, leaving it holding whatever the style.css
+# request left. Must run before any successful save, which flips commandEnd and
+# swaps the error page for the "finished" one.
+get "${port}" /server/style.css >/dev/null
+post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p" |
+    grep -q '^Location: /server/error.html' ||
+    fail "the refused save did not redirect to the error page"
+
 # No project yet, so no root to serve from.
 post "${port}" "sid=${sid}&projpath=${base}/" >/dev/null
 get "${port}" /website/secret.txt | grep -q SECRETMARKER &&
@@ -130,11 +140,32 @@ post "${port}" "sid=${sid}&projpath=/etc/" >/dev/null
 get "${port}" /website/passwd | grep -q '^root:' &&
     fail "a posted projpath read an arbitrary system file"
 
-# The length guard never measured projpath, so 2000 bytes landed in a
-# 1024-byte stack buffer.
-long=$(printf '%02000d' 0)
-post "${port}" "sid=${sid}&projpath=/${long}/" >/dev/null 2>&1 || true
-get "${port}" /website/x >/dev/null 2>&1 || true
-alive "${srv}" || fail "an over-long projpath crashed the server: $(cat "${log}")"
+# A ".." anywhere in the recorded root would escape the mirror on every later
+# request, so the save must be refused and the previous root kept.
+post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/proj&projname=.." >/dev/null
+get "${port}" /website/secret.txt | grep -q SECRETMARKER &&
+    fail "a '..' in the saved project path escaped the mirror root"
+get "${port}" /website/hts-log.txt | grep -q LOGMARKER ||
+    fail "rejecting the '..' root also lost the previous one"
+
+# The root is now the server's own, but it is still built from two posted
+# fields: 800-odd bytes of them used to be sprintf'd into a 1024-byte buffer.
+seg=$(printf '%0200d' 0)
+longpath="${base}/${seg}/${seg}/${seg}/${seg}"
+fspath="${longpath}/proj"
+# structcheck() refuses a path over HTS_URLMAXSIZE, so the root must stay under
+# it for the save to register at all, and the request path carries the rest.
+test "$((${#fspath} + 11))" -le 1024 ||
+    fail "the long project path (${#fspath}) would not pass structcheck"
+longurl=$(printf '%0800d' 0)
+test "$((${#fspath} + 1 + ${#longurl}))" -gt 1024 ||
+    fail "the composed path (${#fspath} + ${#longurl}) would not overflow"
+post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${longpath}&projname=proj" >/dev/null
+test -f "${fspath}/hts-cache/winprofile.ini" ||
+    fail "the long-path project was not registered: $(cat "${log}")"
+get "${port}" "/website/${longurl}" >/dev/null 2>&1 || true
+alive "${srv}" || fail "an over-long project path crashed the server: $(cat "${log}")"
+get "${port}" /server/index.html | grep -q '200 OK' ||
+    fail "the server stopped answering after the over-long project path"
 
 echo "PASS"
