@@ -4583,7 +4583,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             /* seen as in error */
             in_error = back[b].r.statuscode;
             in_error_msg[0] = 0;
-            strncat(in_error_msg, back[b].r.msg, sizeof(in_error_msg) - 1);
+            strncatbuff(in_error_msg, back[b].r.msg, sizeof(in_error_msg) - 1);
             in_error_size = back[b].r.totalsize;
             /* don't break, even with "don't take error pages" switch, because we need to process the slot anyway (and cache the error) */
           }

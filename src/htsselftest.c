@@ -481,6 +481,28 @@ static int string_safety_selftests(void) {
   if (strcmp(buf, "abcd") != 0)
     return 1;
 
+  /* A decayed source has no known capacity, so the whole tail must land; a
+     sizeof(char*) capacity would abort here instead. */
+  {
+    char src[32] = "0123456789abcdefghij";
+    char dst[32];
+
+    strcpybuff(dst, src + 1);
+    if (strcmp(dst, "123456789abcdefghij") != 0)
+      return 1;
+  }
+
+  /* Truncating append: stops at N without aborting, what the status-message
+     call sites rely on. */
+  {
+    char dst[10]; /* never sizeof(char*), or MSVC reads it as a pointer */
+
+    dst[0] = '\0';
+    strncatbuff(dst, "abcdefghijkl", sizeof(dst) - 1);
+    if (strcmp(dst, "abcdefghi") != 0)
+      return 1;
+  }
+
   /* strlcpybuff: explicit-capacity copy into a pointer destination, the form
      the migration moves toward */
   {
@@ -1299,6 +1321,14 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
       htsbuff b = htsbuff_array(small);
 
       htsbuff_cat(&b, src);
+    } else if (strcmp(argv[0], "overflow-src") == 0) {
+      /* Array source with no NUL: its capacity still comes from sizeof(), so
+         the bounded strlen aborts rather than running off the array. */
+      char nonul[6]; /* never sizeof(char*), per the note above */
+      char big[64];
+
+      memset(nonul, src[0], sizeof(nonul));
+      strcpybuff(big, nonul);
     } else {
       strcpybuff(small, src);
     }
@@ -4810,8 +4840,8 @@ static const struct selftest_entry {
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
-    {"strsafe", "[overflow|overflow-buff [str]]", "bounded string-op self-test",
-     st_strsafe},
+    {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
+     "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",

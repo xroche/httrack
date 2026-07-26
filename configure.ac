@@ -66,10 +66,11 @@ AC_SUBST(LT_CV_OBJDIR,$lt_cv_objdir)
 AC_SUBST(VERSION_INFO)
 
 ### Default CFLAGS
+# No -Wdeclaration-after-statement: nothing sets -std=, so this builds as gnu17.
 DEFAULT_CFLAGS="-Wall -Wformat -Wformat-security \
 -Wmultichar -Wwrite-strings -Wcast-qual -Wcast-align \
 -Wstrict-prototypes -Wmissing-prototypes \
--Wmissing-declarations -Wdeclaration-after-statement \
+-Wmissing-declarations \
 -Wpointer-arith -Wsequence-point -Wnested-externs \
 -D_REENTRANT"
 AC_SUBST(DEFAULT_CFLAGS)
@@ -77,26 +78,28 @@ DEFAULT_LDFLAGS=""
 AC_SUBST(DEFAULT_LDFLAGS)
 
 ### Additional flags (if supported)
-AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"])
-AX_CHECK_COMPILE_FLAG([-Winit-self], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"])
-AX_CHECK_COMPILE_FLAG([-Wunused-but-set-parameter], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wunused-but-set-parameter"])
-AX_CHECK_COMPILE_FLAG([-Waddress], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Waddress"])
-AX_CHECK_COMPILE_FLAG([-Wuninitialized], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wuninitialized"])
-AX_CHECK_COMPILE_FLAG([-Wformat=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat=2"])
-AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat-nonliteral"])
-AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"])
-AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"])
-AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"])
+# -Werror on probes: exit-status-only checks let clang's warn-on-unknown-flag through.
+AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Winit-self], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Winit-self"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wunused-but-set-parameter], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wunused-but-set-parameter"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Waddress], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Waddress"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wuninitialized], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wuninitialized"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wformat=2], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat=2"], [], [-Werror])
+# -Wformat-nonliteral needs -Wformat in the probe or gcc rejects it as ignored.
+AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wformat-nonliteral"], [], [-Werror -Wformat])
+AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"], [], [-Werror])
 # Make htssafe.h's pointer-dest 'warning' attribute a hard error in our build
 # (migration is at zero; a new char* dest is a regression). gcc/clang each take
 # only their own spelling; downstream keeps the plain warning, not a build break.
-AX_CHECK_COMPILE_FLAG([-Werror=attribute-warning], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=attribute-warning"])
-AX_CHECK_COMPILE_FLAG([-Werror=user-defined-warnings], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=user-defined-warnings"])
-AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"])
+AX_CHECK_COMPILE_FLAG([-Werror=attribute-warning], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=attribute-warning"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Werror=user-defined-warnings], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror=user-defined-warnings"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-fstrict-aliasing -Wstrict-aliasing], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-aliasing -Wstrict-aliasing"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector-strong"],
-	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"])])
-AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"])
-AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"])
+	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"], [], [-Werror])], [-Werror])
+AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"], [], [-Werror])
 AX_CHECK_LINK_FLAG([-Wl,--discard-all], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--discard-all"])
 AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--no-undefined"])
 AX_CHECK_LINK_FLAG([-Wl,-z,relro,-z,now], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-z,relro,-z,now"])
@@ -119,13 +122,13 @@ AC_SUBST([LIBC_FORCE_LINK])
 ### PIE
 CFLAGS_PIE=""
 LDFLAGS_PIE=""
-AX_CHECK_COMPILE_FLAG([-fpie -pie], [CFLAGS_PIE="-fpie -pie"])
+AX_CHECK_COMPILE_FLAG([-fpie], [CFLAGS_PIE="-fpie"], [], [-Werror])
 AX_CHECK_LINK_FLAG([-pie], [LDFLAGS_PIE="-pie"])
 AC_SUBST([CFLAGS_PIE])
 AC_SUBST([LDFLAGS_PIE])
 
-## Export all symbols for backtraces
-AX_CHECK_COMPILE_FLAG([-rdynamic], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -rdynamic"])
+## -rdynamic must be a link flag; DEFAULT_CFLAGS (AM_CPPFLAGS) never reaches the linker.
+AX_CHECK_LINK_FLAG([-rdynamic], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -rdynamic"])
 
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY

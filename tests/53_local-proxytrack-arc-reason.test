@@ -1,0 +1,32 @@
+#!/bin/bash
+# An ARC entry's HTTP reason phrase must survive a proxytrack --convert
+# round-trip; it used to be clipped to sizeof(char*) - 1 bytes.
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+printf 'HTTP/1.1 404 Not Found Here At All\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+
+# ARC 1.0: filedesc record and version block, then per entry
+# <nl> <URL-record> <nl> <headers> <body>; the record's last field is that length.
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 404 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1
+
+# HTTP/1.0 is the writer's own prefix (the input says 1.1), so a verbatim copy
+# of the input cannot satisfy this match.
+grep -aqF 'HTTP/1.0 404 Not Found Here At All' "$dir/out.arc" || {
+    echo "reason phrase lost in the ARC round-trip:" >&2
+    grep -a '^HTTP/' "$dir/out.arc" >&2 || echo "(no status line at all)" >&2
+    exit 1
+}
