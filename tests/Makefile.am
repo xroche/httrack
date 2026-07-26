@@ -173,6 +173,8 @@ TESTS = \
 	74_local-warc-verbatim.test \
 	75_engine-longpath-posix.test \
 	76_cli-resize.test \
-	79_engine-crash-symbolize.test
+	77_webhttrack-redirect.test \
+	78_webhttrack-sid.test \
+	80_engine-crash-symbolize.test
 
 CLEANFILES = check-network_sh.cache
