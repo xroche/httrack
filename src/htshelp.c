@@ -433,7 +433,8 @@ void help_catchurl(const char *dest_path) {
       }
       // former URL!
       {
-        char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
+        /* url and dest are each HTS_URLMAXSIZE*2, plus the POSTTOK marker */
+        char BIGSTK finalurl[HTS_URLMAXSIZE * 4 + 32];
 
         inplace_escape_check_url(dest, sizeof(dest));
         snprintf(finalurl, sizeof(finalurl), "%s" POSTTOK "file:%s", url, dest);
