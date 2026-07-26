@@ -74,6 +74,7 @@ if body:
 else:
     req = ("GET /server/%s.html HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % page)
 s = socket.create_connection(("127.0.0.1", port), 10)
+s.settimeout(30)
 s.sendall(req.encode())
 out = b""
 while True:

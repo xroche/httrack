@@ -20,10 +20,13 @@ command -v python3 >/dev/null || {
     exit 77
 }
 
-srv=
 log=$(mktemp)
+# start() runs inside a command substitution, so its $! never reaches this
+# shell. Take the pid from the server's own announcement instead: a missed kill
+# leaves an orphan holding the CI job open long after the suite has passed.
+srvpid() { sed -n 's/^PID=//p' "${log}" 2>/dev/null | head -1; }
 cleanup() {
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    stop
     rm -f "${log}"
 }
 trap cleanup EXIT HUP INT QUIT PIPE TERM
@@ -45,10 +48,8 @@ start() {
         trap '' TERM TTOU
         exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
     ) &
-    srv=$!
     for _ in $(seq 1 40); do
         url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
-        kill -0 "${srv}" 2>/dev/null || break
         sleep 0.25
     done
     test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
@@ -56,9 +57,9 @@ start() {
 }
 
 stop() {
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    wait "${srv}" 2>/dev/null || true
-    srv=
+    local pid
+    pid=$(srvpid)
+    test -z "${pid}" || kill -9 "${pid}" 2>/dev/null || true
 }
 
 # The session id gates the request body, so a POST has to carry one. The server
@@ -66,6 +67,7 @@ stop() {
 scrape_sid() {
     python3 -c 'import socket, sys
 s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+s.settimeout(30)
 s.sendall(b"GET /server/index.html HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
 out = b""
 while True:
@@ -87,6 +89,7 @@ req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
        "Content-type: application/x-www-form-urlencoded\r\n"
        "Content-length: %d\r\n\r\n%s" % (len(body), body))
 s = socket.create_connection(("127.0.0.1", int(sys.argv[2])), 10)
+s.settimeout(30)
 s.sendall(req.encode())
 out = b""
 while True:
