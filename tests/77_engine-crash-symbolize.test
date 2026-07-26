@@ -21,6 +21,9 @@ trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
 out="${tmpdir}/trace"
 raw="${tmpdir}/trace-optout"
 overflow="this string is far too long for the buffer"
+# A frame glibc could not name. Stop at the offset: it prints the trailing
+# "[0xADDR]" with or without a leading space depending on its version.
+rawframe='(+0x[0-9a-f][0-9a-f]*)'
 
 # The strsafe selftest aborts on purpose, which lands in sig_fatal.
 rc=0
@@ -40,7 +43,7 @@ if grep -q 'No stack trace available on this OS' "$out"; then
     exit 77
 fi
 # Unconditional and first: symbolizing must never cost the raw trace.
-grep -q '(+0x[0-9a-f]*) \[0x[0-9a-f]*\]$' "$out" || {
+grep -q "$rawframe" "$out" || {
     echo "raw module+offset frames are gone:" >&2
     cat "$out" >&2
     exit 1
@@ -81,7 +84,7 @@ test "$rc" -ne 124 || {
     echo "the opt-out run did not finish within the deadline" >&2
     exit 1
 }
-grep -q '(+0x[0-9a-f]*) \[0x[0-9a-f]*\]$' "$raw" || {
+grep -q "$rawframe" "$raw" || {
     echo "the opt-out lost the raw trace:" >&2
     cat "$raw" >&2
     exit 1
