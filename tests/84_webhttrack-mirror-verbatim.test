@@ -64,21 +64,6 @@ start() {
 
 portof() { echo "${1##*:}" | tr -d /; }
 
-# POST body $2 to 127.0.0.1:$1, reply discarded.
-post() {
-    python3 -c 'import socket, sys
-body = sys.argv[2]
-req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
-       "Content-type: application/x-www-form-urlencoded\r\n"
-       "Content-length: %d\r\n\r\n%s" % (len(body), body))
-s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
-s.settimeout(20)
-s.sendall(req.encode())
-while s.recv(65536):
-    pass
-s.close()' "$1" "$2"
-}
-
 # GET $2 from 127.0.0.1:$1, headers into $3 and the body, byte for byte, into $4.
 fetch() {
     python3 -c 'import socket, sys
@@ -135,7 +120,8 @@ test "${#sid}" -eq 32 || fail "GUI page did not expand \${sid} (got '${sid}')"
 
 # /website/ serves only the root the server itself recorded, so save a profile
 # (no command_do=start, so nothing crawls) to create it, then plant the file.
-post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${work}&projname=proj"
+post "${port}" "sid=${sid}" command=httrack command_do=save winprofile=x \
+    "path=${work}" projname=proj
 test -f "${work}/proj/hts-cache/winprofile.ini" ||
     fail "profile save did not create the project: $(cat "${log}")"
 mkdir -p "$(dirname "${mirror}")"
