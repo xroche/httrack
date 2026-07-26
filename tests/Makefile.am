@@ -182,6 +182,7 @@ TESTS = \
 	82_webhttrack-browse-links.test \
 	83_webhttrack-argescape.test \
 	84_webhttrack-mirror-verbatim.test \
-	85_webhttrack-projpath.test
+	85_webhttrack-projpath.test \
+	91_webhttrack-directory.test
 
 CLEANFILES = check-network_sh.cache

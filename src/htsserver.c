@@ -118,6 +118,13 @@ static int is_js(const char *file) {
   return ((strstr(file, ".js") != NULL));
 }
 
+/* fopen() succeeds on a directory on POSIX; reading one never reaches EOF. */
+static hts_boolean is_directory(const char *file) {
+  STRUCT_STAT st;
+
+  return STAT(file, &st) == 0 && S_ISDIR(st.st_mode) ? HTS_TRUE : HTS_FALSE;
+}
+
 static void sig_brpipe(int code) {
   /* ignore */
 }
@@ -725,7 +732,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           fp = fopen(StringBuff(fspath), "rb");
           if (fp) {
             /* Read file */
-            while(!feof(fp)) {
+            while (!feof(fp) && !ferror(fp)) {
               char *str = line;
               char *pos;
 
@@ -980,8 +987,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           /* path itself may hold ".." (webhttrack passes "<bin>/../share"), so
              only the untrusted halves are checked: file here, website above. */
-          if (fsfile[0] && strstr(file, "..") == NULL
-              && (fp = fopen(fsfile, "rb"))) {
+          if (fsfile[0] && strstr(file, "..") == NULL &&
+              !is_directory(fsfile) && (fp = fopen(fsfile, "rb"))) {
             char ok[] =
               "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
               "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
@@ -1040,7 +1047,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               int outputmode = 0;
 
               StringMemcat(headers, ok, sizeof(ok) - 1);
-              while(!feof(fp)) {
+              while (!feof(fp) && !ferror(fp)) {
                 char *str = line;
                 int prevlen = (int) StringLength(output);
                 int nocr = 0;
@@ -1474,14 +1481,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
 
-                if (n > 0) {
-                  StringMemcat(output, line, n);
+                if (n <= 0) {
+                  break; /* short read: EOF or error, never a retry */
                 }
+                StringMemcat(output, line, n);
               }
             }
             fclose(fp);
-          } else if (strcmp(file, "/ping") == 0
-                     || strncmp(file, "/ping?", 6) == 0) {
+          } else if (strcmp(file, "/ping") == 0 ||
+                     strncmp(file, "/ping?", 6) == 0) {
             char error_hdr[] =
               "HTTP/1.0 200 Pong\r\n" "Server: httrack small server\r\n"
               "Content-type: text/html\r\n";
