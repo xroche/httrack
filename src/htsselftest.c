@@ -1574,6 +1574,20 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
     err = 1;
 
+  /* single_file pair: the cap is guarded by >0, so an unset source must not
+     overwrite the default the target already carries */
+  from->single_file = HTS_TRUE;
+  from->single_file_max_size = 4096;
+  to->single_file = HTS_FALSE;
+  to->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
+  copy_htsopt(from, to);
+  if (!to->single_file || to->single_file_max_size != 4096)
+    err = 1;
+  from->single_file_max_size = 0;
+  copy_htsopt(from, to);
+  if (to->single_file_max_size != 4096)
+    err = 1;
+
   /* #185 pause pair: copied when enabled (max>0), the 0 sentinel skips */
   from->pause_min_ms = 5000;
   from->pause_max_ms = 10000;

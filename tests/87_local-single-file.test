@@ -216,6 +216,35 @@ cmp -s "${doc}/pixel.svg" "${tmpdir}/got2.svg" || {
 }
 echo OK
 
+printf '[-%%Z0 and a bad cap] ..\t'
+# -%Z0 turns it back off, so the page must come out exactly as the crawl left
+# it; a non-numeric cap is rejected and the built-in default used instead.
+off="${tmpdir}/off"
+mkdir "$off"
+httrack -O "$off" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 -%Z0 "${base}/index.html" >"${tmpdir}/log3" 2>&1
+offpage="${off}/127.0.0.1_${port}/index.html"
+if grep -q 'base64,' "$offpage"; then
+    echo "FAIL: -%Z0 still inlined"
+    exit 1
+fi
+bad="${tmpdir}/bad"
+mkdir "$bad"
+httrack -O "$bad" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 --single-file-max-size notanumber "${base}/index.html" \
+    >"${tmpdir}/log4" 2>&1
+badpage="${bad}/127.0.0.1_${port}/index.html"
+# The default cap is 10 MB, so everything here inlines, big.svg included.
+grep -q 'data:image/svg+xml;base64,' "$badpage" || {
+    echo "FAIL: a rejected cap did not fall back to the default"
+    exit 1
+}
+if grep -q 'src="big.svg"' "$badpage"; then
+    echo "FAIL: the default cap did not cover big.svg"
+    exit 1
+fi
+echo OK
+
 # --- the web GUI must emit the same options ---------------------------------
 printf '[webhttrack renders the options] ..\t'
 command -v htsserver >/dev/null || {
