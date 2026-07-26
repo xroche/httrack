@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsalias.h"
@@ -658,6 +659,35 @@ static int string_safety_selftests(void) {
     if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
       return 1;
 #undef NEIGHBOURS_INTACT
+  }
+
+  /* back_read_ftp_result: the helper's result file is external input, so an
+     over-long message must stop at msg[]'s capacity */
+  {
+    htsblk r;
+    FILE *fp = tmpfile();
+    size_t k;
+
+    if (fp == NULL)
+      return 1;
+    fprintf(fp, "226 ");
+    for (k = 0; k < 4 * sizeof(r.msg); k++)
+      fputc('q', fp);
+    rewind(fp);
+
+    memset(&r, 0, sizeof(r));
+    memset(r.msg, '#', sizeof(r.msg));
+    back_read_ftp_result(fp, &r);
+    fclose(fp);
+
+    if (r.statuscode != 226 || strlen(r.msg) != sizeof(r.msg) - 1)
+      return 1;
+    for (k = 0; k < sizeof(r.msg) - 1; k++) {
+      if (r.msg[k] != 'q')
+        return 1;
+    }
+    if (r.contenttype[0] != '\0') /* neighbour, as above */
+      return 1;
   }
 
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
