@@ -183,6 +183,7 @@ TESTS = \
 	83_webhttrack-argescape.test \
 	84_webhttrack-mirror-verbatim.test \
 	85_webhttrack-projpath.test \
+	86_local-proxytrack-cache-longfields.test \
 	90_webhttrack-checkbox-clear.test
 
 CLEANFILES = check-network_sh.cache
