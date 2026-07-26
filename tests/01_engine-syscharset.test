@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# UTF-8 <-> system codepage ('httrack -#test=syscharset'), the pair an MBCS GUI
+# uses at the Win32 ANSI entry points. WIN32 only, skipped elsewhere.
+
+set -euo pipefail
+
+rc=0
+out=$(httrack -O /dev/null -#test=syscharset) || rc=$?
+echo "$out"
+
+[ "$rc" = 77 ] && exit 77
+[ "$rc" = 0 ] || exit "$rc"
+
+case "$out" in
+"syscharset: acp="*": OK") ;;
+*)
+    echo "FAIL: unexpected report"
+    exit 1
+    ;;
+esac

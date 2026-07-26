@@ -185,6 +185,12 @@ extern LPWSTR hts_pathToUCS2(const char *path);
 HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
 
 /**
+ * Convert UTF-8 to the current system codepage. Caller frees; NULL upon error.
+ * This function is WIN32 specific.
+ **/
+HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
+
+/**
  * Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
  * command line: every char* is UTF-8 on Windows (FOPEN, STAT, ... convert at
  * the syscall boundary). Keeps the CRT's argv on failure; the new array is

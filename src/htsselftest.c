@@ -887,6 +887,54 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* hts_convertStringUTF8ToSystem: the UTF-8 -> ANSI leg an MBCS GUI needs at the
+   Win32 ANSI entry points. Oracle is the raw two-step Win32 dance it replaces,
+   so a mis-wired direction or a plain copy fails whatever the machine's ACP. */
+static int st_syscharset(httrackp *opt, int argc, char **argv) {
+#ifdef _WIN32
+  static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
+  const UINT cp = GetACP();
+  const int len = (int) strlen(utf8);
+  WCHAR wide[64];
+  char want[64];
+  char *sys, *back;
+  BOOL lossy = FALSE;
+  int wn, n;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn > 0);
+  /* lpUsedDefaultChar is rejected for CP_UTF8, and pointless there anyway */
+  n = WideCharToMultiByte(cp, 0, wide, wn, want, (int) sizeof(want) - 1, NULL,
+                          cp == CP_UTF8 ? NULL : &lossy);
+  assertf(n > 0);
+  want[n] = '\0';
+
+  sys = hts_convertStringUTF8ToSystem(utf8, (size_t) len);
+  assertf(sys != NULL);
+  assertf(strcmp(sys, want) == 0);
+  /* only round-trips when the ACP could hold é and € without substitution */
+  if (!lossy) {
+    back = hts_convertStringSystemToUTF8(sys, strlen(sys));
+    assertf(back != NULL);
+    assertf(strcmp(back, utf8) == 0);
+    freet(back);
+  }
+  freet(sys);
+  printf("syscharset: acp=%u %s: OK\n", (unsigned) cp,
+         lossy ? "one-way" : "round-trip");
+  return 0;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return 77; /* WIN32-only entry point */
+#endif
+}
+
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
@@ -4732,6 +4780,8 @@ static const struct selftest_entry {
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
+    {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
+     st_syscharset},
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
