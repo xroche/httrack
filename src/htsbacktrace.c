@@ -216,10 +216,16 @@ void hts_print_backtrace(int fd) {
   void *stack[256];
   const int size = backtrace(stack, sizeof(stack) / sizeof(stack[0]));
 
+  /* A fault inside the handler lands back here: symbolizing twice interleaves
+     two traces on fd and spends a second budget. */
+  static volatile sig_atomic_t entered = 0;
+
   if (size != 0) {
     backtrace_symbols_fd(stack, size, fd);
-    if (symbolize_crash) {
+    if (symbolize_crash && entered == 0) {
+      entered = 1;
       symbolize_backtrace(stack, size, fd);
+      entered = 0;
     }
   }
 #else
