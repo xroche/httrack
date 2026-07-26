@@ -108,16 +108,17 @@ offline browser : copy websites to a local directory</p>
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
 --accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
 --cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
-<b>-%r, --warc</b> ] [ <b>-%n, --do-not-recatch</b> ] [
-<b>-%v, --display</b> ] [ <b>-Q, --do-not-log</b> ] [ <b>-q,
---quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
---debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
---file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
---index</b> ] [ <b>-%i, --build-top-index</b> ] [ <b>-%I,
---search-index</b> ] [ <b>-pN, --priority[=N]</b> ] [ <b>-S,
---stay-on-same-dir</b> ] [ <b>-D, --can-go-down</b> ] [
-<b>-U, --can-go-up</b> ] [ <b>-B, --can-go-up-and-down</b> ]
-[ <b>-a, --stay-on-same-address</b> ] [ <b>-d,
+<b>-%r, --warc</b> ] [ <b>-%d, --changes</b> ] [ <b>-%n,
+--do-not-recatch</b> ] [ <b>-%v, --display</b> ] [ <b>-Q,
+--do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
+--extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
+--verbose</b> ] [ <b>-f, --file-log</b> ] [ <b>-f2,
+--single-log</b> ] [ <b>-I, --index</b> ] [ <b>-%i,
+--build-top-index</b> ] [ <b>-%I, --search-index</b> ] [
+<b>-pN, --priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b>
+] [ <b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
+<b>-B, --can-go-up-and-down</b> ] [ <b>-a,
+--stay-on-same-address</b> ] [ <b>-d,
 --stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
 ] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
 --debug-headers</b> ] [ <b>-%!,
@@ -1138,6 +1139,19 @@ update before) (--cache[=N])</p></td></tr>
 sets the output name, --warc-max-size N rotates segments
 past N bytes, --warc-cdx also writes a sorted CDXJ index,
 --wacz packages it all as a WACZ file (--warc)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%d</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>write hts-changes.json listing what this crawl left new,
+changed, unchanged and gone compared to the previous mirror
+(--changes)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">

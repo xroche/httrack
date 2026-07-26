@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# --changes bucket accounting and JSON escaping (#714).
+httrack -O /dev/null -#test=changes run | grep -q "changes self-test: OK"

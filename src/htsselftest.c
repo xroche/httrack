@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htsproxy.h"
 #include "htswarc.h"
+#include "htschanges.h"
 #if HTS_USEZLIB
 #include "htszlib.h"
 #endif
@@ -1571,6 +1572,12 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   StringCopy(to->warc_file, "");
   copy_htsopt(from, to);
   if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
+    err = 1;
+
+  from->changes = HTS_TRUE;
+  to->changes = HTS_FALSE;
+  copy_htsopt(from, to);
+  if (to->changes != HTS_TRUE)
     err = 1;
 
   /* #185 pause pair: copied when enabled (max>0), the 0 sentinel skips */
@@ -5059,6 +5066,63 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* --changes bucket accounting and JSON escaping (#714). */
+static int st_changes(httrackp *opt, int argc, char **argv) {
+  String out = STRING_EMPTY;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A file the crawl did not rewrite is unchanged whatever the wire said. */
+  assertf(hts_changes_classify(HTS_FALSE, HTS_TRUE, HTS_FALSE, HTS_FALSE,
+                               HTS_FALSE) == HTS_CHANGE_UNCHANGED);
+  /* Rewritten with no previous copy: new, digests or not. */
+  assertf(hts_changes_classify(HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_TRUE,
+                               HTS_FALSE) == HTS_CHANGE_NEW);
+  /* Digests decide, and outrank the transfer signal both ways: a server with
+     no validators answers 200 with the same bytes, and a 304 can still sit in
+     front of a locally damaged copy. */
+  assertf(hts_changes_classify(HTS_TRUE, HTS_TRUE, HTS_FALSE, HTS_TRUE,
+                               HTS_TRUE) == HTS_CHANGE_UNCHANGED);
+  assertf(hts_changes_classify(HTS_TRUE, HTS_TRUE, HTS_TRUE, HTS_TRUE,
+                               HTS_FALSE) == HTS_CHANGE_CHANGED);
+  /* Only with no digest at all does the transfer signal get a say. */
+  assertf(hts_changes_classify(HTS_TRUE, HTS_TRUE, HTS_TRUE, HTS_FALSE,
+                               HTS_FALSE) == HTS_CHANGE_UNCHANGED);
+  assertf(hts_changes_classify(HTS_TRUE, HTS_TRUE, HTS_FALSE, HTS_FALSE,
+                               HTS_FALSE) == HTS_CHANGE_CHANGED);
+
+#define JSON_IS(SRC, WANT)                                                     \
+  do {                                                                         \
+    StringClear(out);                                                          \
+    hts_changes_json_string(&out, SRC);                                        \
+    if (strcmp(StringBuff(out), WANT) != 0) {                                  \
+      fprintf(stderr, "changes: %s -> %s, expected %s\n", #SRC,                \
+              StringBuff(out), WANT);                                          \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  JSON_IS("/a/b.html", "\"/a/b.html\"");
+  JSON_IS("a\"b\\c", "\"a\\\"b\\\\c\"");
+  JSON_IS("tab\there", "\"tab\\u0009here\"");
+  /* Valid UTF-8 rides through; a lone Latin-1 byte, a truncated sequence and
+     an overlong encoding of '/' each become U+FFFD rather than invalid JSON. */
+  JSON_IS("caf\xc3\xa9", "\"caf\xc3\xa9\"");
+  JSON_IS("caf\xe9", "\"caf\\ufffd\"");
+  JSON_IS("\xc3", "\"\\ufffd\"");
+  JSON_IS("\xc0\xaf", "\"\\ufffd\\ufffd\"");
+  /* A UTF-16 surrogate half is well-formed UTF-8 by shape only. */
+  JSON_IS("\xed\xa0\x80", "\"\\ufffd\\ufffd\\ufffd\"");
+
+#undef JSON_IS
+  StringFree(out);
+  printf("changes self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -5114,6 +5178,8 @@ static const struct selftest_entry {
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
+     st_changes},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},

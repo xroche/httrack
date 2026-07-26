@@ -1,0 +1,146 @@
+#!/bin/bash
+# --changes (#714): the report must match the mirror's real deltas. The routes
+# answer 200 with no validators on both passes, so the transfer signal alone
+# would call everything changed; stable.html/stable.bin land in "unchanged"
+# only if the payload is actually compared.
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+out="${tmpdir}/crawl"
+mkdir "$out"
+report="${out}/hts-changes.json"
+# Purging stays off until the last pass: the deleted set must be computed even
+# when nothing acts on it.
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --changes --purge-old=0 --retries=2)
+
+# Report field extractor: bucket counts, and the files listed under a bucket.
+count() { sed -n 's/.*"'"$1"'": \([0-9]*\).*/\1/p' "$report" | head -1; }
+listed() {
+    "$python" - "$report" "$1" <<'EOF'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as fp:
+    report = json.load(fp)
+for entry in report[sys.argv[2]]:
+    print(entry["file"])
+EOF
+}
+expect() {
+    local label="$1" want="$2" got="$3"
+    printf '[%s] ..\t' "$label"
+    test "$want" == "$got" || {
+        echo "FAIL: expected '${want}', got '${got}'"
+        cat "$report"
+        exit 1
+    }
+    echo "OK"
+}
+
+# --- pass 1: nothing to compare against --------------------------------------
+httrack "${common[@]}" "${base}/changes/index.html" >"${tmpdir}/log1" 2>&1
+test -s "$report" || {
+    echo "FAIL: pass 1 wrote no ${report}"
+    exit 1
+}
+expect "pass 1 declares a first crawl" "true" \
+    "$(sed -n 's/.*"first_crawl": \([a-z]*\).*/\1/p' "$report" | head -1)"
+# index, stable.html, moved.html, stable.bin, moved.bin, doomed.html,
+# redirtarget.html, flaky.bin
+expect "pass 1 counts 8 new" "8" "$(count new)"
+expect "pass 1 counts 0 changed" "0" "$(count changed)"
+expect "pass 1 counts 0 gone" "0" "$(count gone)"
+grep -aq "first crawl" "${out}/hts-log.txt" || {
+    echo "FAIL: pass 1 log carries no first-crawl summary"
+    exit 1
+}
+
+# --- pass 2: two bodies move, one page appears, one disappears ---------------
+httrack "${common[@]}" --update "${base}/changes/index.html" >"${tmpdir}/log2" 2>&1
+expect "pass 2 is not a first crawl" "false" \
+    "$(sed -n 's/.*"first_crawl": \([a-z]*\).*/\1/p' "$report" | head -1)"
+
+host="127.0.0.1_${port}"
+expect "new is fresh.html only" "${host}/changes/fresh.html" "$(listed new)"
+expect "gone is doomed.html only" "${host}/changes/doomed.html" "$(listed gone)"
+# index.html changes because its link list does; moved.* change their bodies.
+expect "changed is exactly the three moved resources" \
+    "$(printf '%s\n%s\n%s' "${host}/changes/index.html" \
+        "${host}/changes/moved.bin" "${host}/changes/moved.html")" \
+    "$(listed changed | sort)"
+# The teeth: re-served byte for byte, 200, no Last-Modified, no ETag. flaky.bin
+# gets there through a failed transfer and a retry, so its file is notified
+# twice; redirtarget.html arrives behind a 302.
+expect "unchanged is exactly the four stable resources" \
+    "$(printf '%s\n%s\n%s\n%s' "${host}/changes/flaky.bin" \
+        "${host}/changes/redirtarget.html" "${host}/changes/stable.bin" \
+        "${host}/changes/stable.html")" \
+    "$(listed unchanged | sort)"
+
+# Every mirrored file appears once and only once, across all four buckets.
+printf '[each file in exactly one bucket] ..\t'
+dupes=$( (
+    listed new
+    listed changed
+    listed unchanged
+    listed gone
+) | sort | uniq -d)
+test -z "$dupes" || {
+    echo "FAIL: listed in more than one bucket: ${dupes}"
+    exit 1
+}
+echo "OK"
+
+# Before #714 the deleted set only existed as a side effect of purging; it must
+# now be computed without one, and reporting it must not delete anything.
+expect "the report says nothing was purged" "false" \
+    "$(sed -n 's/.*"purged": \([a-z]*\).*/\1/p' "$report" | head -1)"
+printf '[reporting gone did not delete it] ..\t'
+test -f "${out}/${host}/changes/doomed.html" || {
+    echo "FAIL: doomed.html was deleted with --purge-old=0"
+    exit 1
+}
+echo "OK"

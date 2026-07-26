@@ -46,12 +46,14 @@ cat >"$stubdir/x-www-browser" <<EOF
 echo "stub browser invoked with: \$1" >&2
 # Also fetch an option page and require a rendered title='' tooltip: proves the
 # option template expands and the \${html:} filter escapes into the attribute.
-# option9 additionally proves the WARC control renders with its expanded label.
+# option9 additionally proves the WARC and change-report controls render with
+# their expanded labels.
 opturl="\${1%/}/server/option2.html"
 warcurl="\${1%/}/server/option9.html"
 if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html &&
     opt="\$(curl -fsSL --max-time 20 "\$opturl")" && printf '%s' "\$opt" | grep -qaF "title='" &&
-    warc="\$(curl -fsSL --max-time 20 "\$warcurl")" && printf '%s' "\$warc" | grep -qaF 'name="warcfile"' && printf '%s' "\$warc" | grep -qaF WARC; then
+    warc="\$(curl -fsSL --max-time 20 "\$warcurl")" && printf '%s' "\$warc" | grep -qaF 'name="warcfile"' && printf '%s' "\$warc" | grep -qaF WARC &&
+    printf '%s' "\$warc" | grep -qaF 'name="changes"' && printf '%s' "\$warc" | grep -qaF hts-changes.json; then
     echo PASS >"$marker"
 else
     echo "FAIL: unexpected response from \$1" >"$marker"

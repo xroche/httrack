@@ -190,6 +190,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:cache2:--store-all-in-cache}
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
+	${test:changes:--changes}
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}
@@ -242,6 +243,7 @@ StripQuery=${stripquery}
 StoreAllInCache=${ztest:cache2:0:1}
 Warc=${ztest:warc:0:1}
 WarcFile=${warcfile}
+Changes=${ztest:changes:0:1}
 LogType=${logtype}
 UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
 ProxyType=${proxytype}

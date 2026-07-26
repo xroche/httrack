@@ -354,6 +354,13 @@ int filecreateempty(filenote_strc * strct, const char *filename);
 
 int filenote(filenote_strc * strct, const char *s, filecreate_params * params);
 
+/* Copy into dest (destsize bytes) the form under which the local path s is
+   listed in new.lst: forward slashes, and the mirror root stripped when s sits
+   under it. That listed form is also the change report's key, so the two must
+   not drift. */
+void hts_savename_listed(const filenote_strc *strct, const char *s, char *dest,
+                         size_t destsize);
+
 void file_notify(httrackp * opt, const char *adr, const char *fil,
                  const char *save, int create, int modify, int wasupdated);
 

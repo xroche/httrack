@@ -30,6 +30,7 @@ TEST_EXTENSIONS = .test
 TEST_LOG_COMPILER = $(BASH)
 TESTS = \
 	00_runnable.test \
+	01_engine-changes.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
 	01_engine-cmdline-split.test \
@@ -182,6 +183,7 @@ TESTS = \
 	82_webhttrack-browse-links.test \
 	83_webhttrack-argescape.test \
 	84_webhttrack-mirror-verbatim.test \
-	85_webhttrack-projpath.test
+	85_webhttrack-projpath.test \
+	88_local-changes.test
 
 CLEANFILES = check-network_sh.cache

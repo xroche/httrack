@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsnet.h"
 #include "htscore.h"
 #include "htswarc.h"
+#include "htschanges.h"
 #include "htsthread.h"
 #include <time.h>
 /* END specific definitions */
@@ -712,6 +713,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 if ((size = hts_codec_unpack(codec, back[p].tmpfile,
                                              unpacked)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
+                  if (back[p].r.is_write) {
+                    /* Sample the previous copy now: the rename below replaces
+                       it, and file_notify() only fires once it is gone. */
+                    hts_changes_notify(
+                        opt, back[p].url_adr, back[p].url_fil, back[p].url_sav,
+                        HTS_TRUE, back[p].r.notmodified ? HTS_TRUE : HTS_FALSE);
+                  }
                   if (!back[p].r.is_write) {
                     // fichier -> mémoire ; le fichier est écrit plus tard
                     deleteaddr(&back[p].r);

@@ -253,6 +253,10 @@ void sec2str(char *s, TStamp t);
 
 void time_gmt_rfc822(char *s);
 void time_local_rfc822(char *s);
+
+/* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
+void hts_now_iso8601(char out[32]);
+
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);

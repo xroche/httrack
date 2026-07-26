@@ -1571,6 +1571,82 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # --changes (#714). Every route answers 200 with no validators, so the
+    # transfer signal alone would call the whole site changed on pass 2; only a
+    # payload comparison can tell stable.html and stable.bin from moved.*.
+    def route_changes_index(self):
+        links = "".join(
+            '\t<a href="%s">%s</a>\n' % (name, name)
+            for name in (
+                "stable.html",
+                "moved.html",
+                "stable.bin",
+                "moved.bin",
+                "redir.html",
+                "flaky.bin",
+            )
+        )
+        if self.refetch_pass() == 1:
+            links += '\t<a href="doomed.html">doomed</a>\n'
+        else:
+            links += '\t<a href="fresh.html">fresh</a>\n'
+        self.send_html(links)
+
+    def route_changes_stable(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-STABLE</p></body></html>", "text/html")
+
+    def route_changes_moved(self):
+        pass1 = self.refetch_pass() == 1
+        self.send_raw(
+            b"<html><body><p>CHANGES-MOVED-V%d</p></body></html>" % (1 if pass1 else 2),
+            "text/html",
+        )
+
+    def route_changes_stable_bin(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"CHANGES-STABLE-BIN\n" + b"\x00\x01\x02\xff" * 512,
+            "application/octet-stream",
+        )
+
+    def route_changes_moved_bin(self):
+        pass1 = self.refetch_pass() == 1
+        self.send_raw(
+            b"CHANGES-MOVED-BIN-V%d\n" % (1 if pass1 else 2)
+            + b"\x03\x02\x01\xfe" * 512,
+            "application/octet-stream",
+        )
+
+    def route_changes_doomed(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-DOOMED</p></body></html>", "text/html")
+
+    def route_changes_fresh(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-FRESH</p></body></html>", "text/html")
+
+    def route_changes_redir(self):
+        self.send_response(302)
+        self.send_header("Location", "/changes/redirtarget.html")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_changes_redirtarget(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-REDIR</p></body></html>", "text/html")
+
+    # Direct-to-disk, and the first body fetch of each pass dies mid-transfer:
+    # the retry notifies the same file a second time, so the accumulator has to
+    # keep the pre-run sample from the first notify.
+    FLAKY = b"CHANGES-FLAKY\n" + b"\x07\x06\x05\x04" * 512
+
+    def route_changes_flaky(self):
+        if self.refetch_pass() % 2 == 1:
+            self.send_truncated(self.FLAKY, "application/octet-stream")
+        else:
+            self.send_raw(self.FLAKY, "application/octet-stream")
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1588,6 +1664,16 @@ class Handler(SimpleHTTPRequestHandler):
         "/codec/bad.html": route_codec_bad,
         "/codec/bin.dat": route_codec_bin,
         "/codec/ae.html": route_codec_ae,
+        "/changes/index.html": route_changes_index,
+        "/changes/stable.html": route_changes_stable,
+        "/changes/moved.html": route_changes_moved,
+        "/changes/stable.bin": route_changes_stable_bin,
+        "/changes/moved.bin": route_changes_moved_bin,
+        "/changes/doomed.html": route_changes_doomed,
+        "/changes/fresh.html": route_changes_fresh,
+        "/changes/redir.html": route_changes_redir,
+        "/changes/redirtarget.html": route_changes_redirtarget,
+        "/changes/flaky.bin": route_changes_flaky,
         "/upcodec/index.html": route_upcodec_index,
         "/upcodec/mem.html": route_upcodec_mem,
         "/upcodec/disk.bin": route_upcodec_disk,
