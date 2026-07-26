@@ -1519,7 +1519,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
       size_t i;
       for (i = bench[loop].offset; i < (size_t) count;
            i += bench[loop].modulus) {
-        int result;
+        int result = 0; /* no final else: an unknown type reports failure */
         FMT();
         if (bench[loop].type == DO_ADD || bench[loop].type == DO_DRY_ADD) {
           size_t k;
