@@ -147,7 +147,8 @@ HTS_UNUSED static int LANG_LIST(const char *path, char *buffer, size_t size);
 // 0- Init the URL catcher with standard port
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
+T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
+                           const char *bindAddr) {
   T_SOC soc;
 
   if (defaultPort <= 0) {
@@ -160,12 +161,12 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
     int i = 0;
 
     do {
-      soc = smallserver_init(&try_to_listen_to[i], adr_prox);
+      soc = smallserver_init(&try_to_listen_to[i], adr_prox, bindAddr);
       *port_prox = try_to_listen_to[i];
       i++;
     } while((soc == INVALID_SOCKET) && (try_to_listen_to[i] >= 0));
   } else {
-    soc = smallserver_init(&defaultPort, adr_prox);
+    soc = smallserver_init(&defaultPort, adr_prox, bindAddr);
     *port_prox = defaultPort;
   }
   return soc;
@@ -243,9 +244,10 @@ static int my_gethostname(char *h_loc, size_t size) {
 }
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init(int *port, char *adr) {
+T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
+  SOCaddr server;
 
   commandRunning = commandEnd = commandReturn = commandReturnSet =
     commandEndRequested = 0;
@@ -256,25 +258,23 @@ T_SOC smallserver_init(int *port, char *adr) {
     free(commandReturnCmdl);
   commandReturnCmdl = NULL;
 
-  if (my_gethostname(h_loc, 256) == 0) {   // host name
-    SOCaddr server;
+  SOCaddr_initany(server);
+  if (bindAddr != NULL && *bindAddr != '\0') {
+    /* advertise the bound address, else the URL we print is unreachable */
+    if (strlen(bindAddr) >= sizeof(h_loc) || !gethost(bindAddr, &server)) {
+      return INVALID_SOCKET;
+    }
+    strcpybuff(h_loc, bindAddr);
+  } else if (my_gethostname(h_loc, 256) != 0) { // host name
+    return INVALID_SOCKET;
+  }
 
-    SOCaddr_initany(server);
-    if ((soc =
-         (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
-                        0)) != INVALID_SOCKET) {
-      SOCaddr_initport(server, *port);
-      if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-        if (listen(soc, 10) >= 0) {
-          strcpy(adr, h_loc);
-        } else {
-#ifdef _WIN32
-          closesocket(soc);
-#else
-          close(soc);
-#endif
-          soc = INVALID_SOCKET;
-        }
+  if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
+      INVALID_SOCKET) {
+    SOCaddr_initport(server, *port);
+    if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
+      if (listen(soc, 10) >= 0) {
+        strcpy(adr, h_loc);
       } else {
 #ifdef _WIN32
         closesocket(soc);
@@ -283,6 +283,13 @@ T_SOC smallserver_init(int *port, char *adr) {
 #endif
         soc = INVALID_SOCKET;
       }
+    } else {
+#ifdef _WIN32
+      closesocket(soc);
+#else
+      close(soc);
+#endif
+      soc = INVALID_SOCKET;
     }
   }
   return soc;
@@ -310,6 +317,51 @@ typedef struct {
   coucal_write(NewLangList, "error", (intptr_t)strdup(err)); \
   error_redirect = "/server/error.html"; \
 } while(0)
+
+/* Longest "sid" value worth unescaping: the expected one is an md5 hex digest,
+   so anything near this is already invalid and is rejected unread. */
+#define SID_VALUE_MAX 64
+
+/** Does the urlencoded request body present the expected session id?
+    True only if at least one "sid" field is present and every occurrence
+    matches, so it holds whichever one a later last-write-wins parse keeps.
+    Non-destructive: it runs before the body is tokenized in place. */
+static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
+  const char *s = body;
+  hts_boolean seen = HTS_FALSE;
+
+  while (s != NULL && *s != '\0') {
+    const char *const amp = strchr(s, '&');
+    const char *const eq = strchr(s, '=');
+
+    if (eq != NULL && (amp == NULL || eq < amp) && (size_t) (eq - s) == 3 &&
+        strncmp(s, "sid", 3) == 0) {
+      const size_t len = amp != NULL ? (size_t) (amp - eq - 1) : strlen(eq + 1);
+      hts_boolean match = HTS_FALSE;
+
+      if (len < SID_VALUE_MAX) {
+        char raw[SID_VALUE_MAX];
+        String value = STRING_EMPTY;
+
+        memcpy(raw, eq + 1, len);
+        raw[len] = '\0';
+        unescapehttp(raw, &value);
+        /* StringBuff is NULL until written, so an empty value lands here. */
+        if (StringBuff(value) != NULL &&
+            strcmp(StringBuff(value), expected) == 0) {
+          match = HTS_TRUE;
+        }
+        StringFree(value);
+      }
+      if (!match) {
+        return HTS_FALSE;
+      }
+      seen = HTS_TRUE;
+    }
+    s = amp != NULL ? amp + 1 : NULL;
+  }
+  return seen;
+}
 
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
@@ -395,6 +447,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     T_SOC soc_c;
     LLint length = 0;
     const char *error_redirect = NULL;
+    hts_boolean denied = HTS_FALSE;
 
     line[0] = '\0';
     buffer[0] = '\0';
@@ -506,6 +559,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         }
       }
 
+      /* Authenticate the body before parsing it: every field it carries is
+         written straight into the global key store below, "command" included,
+         and that one reaches the engine. Checking afterwards cannot work — the
+         damage is already done, and the pre-seeded "sid" above would compare
+         equal to itself for a request that simply omits the field. */
+      if (meth && buffer[0]) {
+        intptr_t expected = 0;
+
+        if (!coucal_readptr(NewLangList, "_sid", &expected) ||
+            !body_sid_is_valid(buffer, (const char *) expected)) {
+          buffer[0] = '\0';
+          meth = 0;
+          denied = HTS_TRUE;
+        }
+      }
+
       /* check variables */
       if (meth && buffer[0]) {
         char *s = buffer;
@@ -523,20 +592,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           unescapehttp(ua, &sua);
           coucal_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
           s = f + 1;
-        }
-      }
-
-      /* Error check */
-      {
-        intptr_t adr = 0;
-        intptr_t adr2 = 0;
-
-        if (coucal_readptr(NewLangList, "sid", &adr)) {
-          if (coucal_readptr(NewLangList, "_sid", &adr2)) {
-            if (strcmp((char *) adr, (char *) adr2) != 0) {
-              meth = 0;
-            }
-          }
         }
       }
 
@@ -903,13 +958,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 }
               }
               StringMemcat(headers, redir, strlen(redir));
-              {
-                char tmp[256];
-
-                if (strlen(file) < sizeof(tmp) - 32) {
-                  sprintf(tmp, "Location: %s\r\n", newfile);
-                  StringMemcat(headers, tmp, strlen(tmp));
-                }
+              /* client-supplied: a CR/LF here would split the response */
+              if (newfile[strcspn(newfile, "\r\n")] == '\0') {
+                StringCat(headers, "Location: ");
+                StringCat(headers, newfile);
+                StringCat(headers, "\r\n");
               }
               coucal_write(NewLangList, "redirect", (intptr_t) NULL);
             } else if (is_html(file)) {
@@ -1368,6 +1421,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             StringCat(output, error);
           }
         }
+      } else if (denied) {
+        StringCat(headers, "HTTP/1.0 403 Forbidden\r\n"
+                           "Server: httrack small server\r\n"
+                           "Content-type: text/html\r\n");
+        StringCat(output, "Missing or invalid session id.\r\n");
       } else {
 #ifdef _DEBUG
         char error_hdr[] =

@@ -60,13 +60,20 @@ test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
 
 # Post a "start" whose -O dir is 'café' in the form's ISO-8859-1 charset.
 "${python}" - "${url}" "${work}" <<'PY'
-import sys, urllib.parse, urllib.request
+import re, sys, urllib.parse, urllib.request
 
 url, work = sys.argv[1], sys.argv[2]
 outdir = work + "/caf\xe9"  # 'café' as the single byte the browser would send
 # Port 1 refuses at once: only the decoded -O dir matters, not the fetch.
 cmd = "httrack --quiet --robots=0 http://127.0.0.1:1/x.html -O " + outdir
-fields = [("path", work), ("projname", "proj"), ("command_do", "start"),
+# The body is refused without the session id the server renders into each form.
+# Note the wizard page is under /server/; a bare /step4.html is the doc page.
+page = urllib.request.urlopen(url + "server/step4.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', page)
+if not m:
+    raise SystemExit("no session id in server/step4.html")
+fields = [("sid", m.group(1).decode()),
+          ("path", work), ("projname", "proj"), ("command_do", "start"),
           ("winprofile", "x"), ("command", cmd)]
 body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="", encoding="latin-1"))
                 for k, v in fields)
