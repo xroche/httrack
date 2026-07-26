@@ -124,7 +124,9 @@ typedef struct help_wizard_buffers {
   char stropt[2048];        // options
   char stropt2[2048];       // options longues
   char strwild[2048];       // wildcards
-  char cmd[4096];
+  /* holds all four of the above plus separators: at 4096 a long answer set
+     clipped the filters off the command line */
+  char cmd[HTS_URLMAXSIZE * 2 + 3 * 2048 + 4];
   char str[256];
   char *argv[256];
 } help_wizard_buffers;
@@ -308,7 +310,14 @@ void help_wizard(httrackp * opt) {
       printf("\n");
       if (strlen(stropt) == 1)
         stropt[0] = '\0';       // aucune
-      snprintf(cmd, sizeof(cmd), "%s %s %s %s", urls, stropt, stropt2, strwild);
+      /* the tail is the filter list, and cmd is split into the argv handed to
+         hts_main() below: a clipped line would silently widen the crawl */
+      if (!sprintfbuff(cmd, "%s %s %s %s", urls, stropt, stropt2, strwild)) {
+        printf("* command line too long (%d bytes max)\n",
+               (int) sizeof(cmd) - 1);
+        freet(buffers);
+        return;
+      }
       printf("---> Wizard command line: httrack %s\n\n", cmd);
       printf("Ready to launch the mirror? (Y/n) :");
       fflush(stdout);

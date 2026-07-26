@@ -569,6 +569,54 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* sprintfbuff: truncate-and-report. Must never abort (its callers format
+     remote banners) nor write past the array, which the canary catches. */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    const char *const big = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+    /* repoison before every call, or an implementation that measures first and
+       writes nothing "passes" the truncating cases on the previous content */
+#define POISON_DST() memset(s.dst, '#', sizeof(s.dst))
+
+    memset(&s, '#', sizeof(s));
+    if (!sprintfbuff(s.dst, "%s-%d", "ab", 42) || strcmp(s.dst, "ab-42") != 0)
+      return 1;
+
+    /* exact fit: 7 characters plus the NUL */
+    POISON_DST();
+    if (!sprintfbuff(s.dst, "%s", "1234567") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+
+    /* one over, then far over: truncated to the prefix, terminated, reported */
+    POISON_DST();
+    if (sprintfbuff(s.dst, "%s", "12345678") || strcmp(s.dst, "1234567") != 0)
+      return 1;
+    POISON_DST();
+    if (sprintfbuff(s.dst, "%s", big) || strcmp(s.dst, "0123456") != 0)
+      return 1;
+
+    /* explicit-capacity form, down to the degenerate size 1 */
+    {
+      char *const p = s.dst;
+
+      POISON_DST();
+      if (slprintfbuff(p, 1, "%s", "x") || p[0] != '\0')
+        return 1;
+      POISON_DST();
+      if (!slprintfbuff(p, sizeof(s.dst), "%s", "ok") || strcmp(p, "ok") != 0)
+        return 1;
+    }
+#undef POISON_DST
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
+      return 1;
+  }
+
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
      n_eval == 2 on a double-eval macro. */
   {
@@ -2884,6 +2932,32 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
   assertf(strstr(buf, "Refresh") != NULL);
   assertf(strstr(buf, "example.com") != NULL);
+
+  /* a first link whose escaped form overruns the old flat 1024-byte tempo: the
+     redirect must carry the whole URL, not a clipped prefix */
+  {
+    char BIGSTK link[HTS_URLMAXSIZE * 2];
+    char *p = link;
+
+    strcpybuff(link, "http://example.com/");
+    p += strlen(link);
+    memset(p, 'a', 1200);
+    p += 1200;
+    strcpy(p, "/end.html");
+
+    done = 0;
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    hts_finish_makeindex(opt, &done, &fp, 1, link, "%s%s", "", "");
+    assertf(fp == NULL);
+    fp = fopen(path, "rb");
+    assertf(fp != NULL);
+    n = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[n] = '\0';
+    /* the closing quote proves the URL was not clipped mid-way */
+    assertf(strstr(buf, "/end.html\">") != NULL);
+  }
 
   /* no single link: footer only, no refresh meta */
   done = 0;
