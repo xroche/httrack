@@ -1613,7 +1613,7 @@ int httpmirror(char *url1, httrackp * opt) {
           }
           /* A redirect re-queues the target as a fresh link; without carrying
              the marking over, a moved sitemap is fetched and then ignored. */
-          if (opt->state.sitemap != NULL && opt->lien_tot > nlinks &&
+          if (opt->sitemap_state != NULL && opt->lien_tot > nlinks &&
               hts_sitemap_pending(opt, urladr(), urlfil())) {
             hts_sitemap_redirect(opt, urladr(), urlfil(), heap_top()->adr,
                                  heap_top()->fil);
@@ -1639,7 +1639,7 @@ int httpmirror(char *url1, httrackp * opt) {
       /* Sitemap document: turn its <loc> URLs into top-level seeds. They go
          through htsAddLink, so the wizard's filters and scope rules decide, and
          this link's max depth leaves them the full budget. */
-      if (opt->state.sitemap != NULL &&
+      if (opt->sitemap_state != NULL &&
           hts_sitemap_pending(opt, urladr(), urlfil())) {
         htsmoduleStruct BIGSTK smstr;
         int smptr = ptr;

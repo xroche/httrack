@@ -253,15 +253,15 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
 /* Engine glue                                                           */
 /* --------------------------------------------------------------------- */
 
-static hts_sitemap_state *sitemap_state(httrackp *opt) {
-  if (opt->state.sitemap == NULL)
-    opt->state.sitemap = calloct(1, sizeof(hts_sitemap_state));
-  return (hts_sitemap_state *) opt->state.sitemap;
+static hts_sitemap_state *sitemap_get_state(httrackp *opt) {
+  if (opt->sitemap_state == NULL)
+    opt->sitemap_state = calloct(1, sizeof(hts_sitemap_state));
+  return (hts_sitemap_state *) opt->sitemap_state;
 }
 
 static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
                                  const char *fil) {
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
   sitemap_doc *d;
 
   if (st == NULL)
@@ -325,7 +325,7 @@ static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
 static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
                                   const char *fil, int level,
                                   hts_sitemap_source src, hts_boolean link_it) {
-  hts_sitemap_state *const st = sitemap_state(opt);
+  hts_sitemap_state *const st = sitemap_get_state(opt);
   sitemap_doc *d;
 
   if (st == NULL)
@@ -408,7 +408,7 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
   if (ident_url_absolute(url, &af) < 0)
     return;
   {
-    hts_sitemap_state *const st = sitemap_state(opt);
+    hts_sitemap_state *const st = sitemap_get_state(opt);
 
     if (st != NULL && strlen(af.adr) < sizeof(st->anchor_adr) &&
         strlen(af.fil) < sizeof(st->anchor_fil)) {
@@ -434,7 +434,7 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
 }
 
 void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
   int queued = 0;
 
   if (st == NULL || !opt->sitemap || st->probe_done ||
@@ -498,7 +498,7 @@ typedef struct sitemap_ingest_ctx {
 static hts_boolean sitemap_seed_url(void *arg, const char *url) {
   sitemap_ingest_ctx *const c = (sitemap_ingest_ctx *) arg;
   httrackp *const opt = c->opt;
-  hts_sitemap_state *const st = sitemap_state(opt);
+  hts_sitemap_state *const st = sitemap_get_state(opt);
   char BIGSTK buff[HTS_URLMAXSIZE];
   int before;
 
@@ -555,7 +555,7 @@ static hts_boolean sitemap_seed_any(void *arg, const char *url) {
 void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
                         const char *fil, const char *body, size_t size) {
   sitemap_doc *const d = sitemap_find(opt, adr, fil);
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
   sitemap_ingest_ctx ctx;
   int n, anchor, saved_depth;
 
@@ -600,7 +600,7 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
 }
 
 void hts_sitemap_free(httrackp *opt) {
-  hts_sitemap_state *const st = (hts_sitemap_state *) opt->state.sitemap;
+  hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
 
   if (st == NULL)
     return;
@@ -610,6 +610,6 @@ void hts_sitemap_free(httrackp *opt) {
     freet(st->docs);
     st->docs = next;
   }
-  freet(opt->state.sitemap);
-  opt->state.sitemap = NULL;
+  freet(opt->sitemap_state);
+  opt->sitemap_state = NULL;
 }
