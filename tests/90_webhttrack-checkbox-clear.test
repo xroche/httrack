@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# An unchecked box posts nothing, so a stored "1" survives: each checkbox needs
-# a hidden companion posting an empty value, and a default-on option needs the
-# cleared value to emit the disabling flag.
+# An unchecked box posts nothing and the stored "1" survives: hence a hidden
+# companion per box, plus a disabling flag for the default-on ones.
 
 set -euo pipefail
 
@@ -72,6 +71,7 @@ def check(ok, what):
 
 # cache/cache2 are left to the separate rework of the dead "Cache" seed.
 skip = {"cache", "cache2"}
+page_of = {}
 boxes = 0
 for path in sorted(glob.glob(os.path.join(srcdir, "html", "server", "option*.html"))):
     page = open(path, "rb").read().decode("latin-1")
@@ -81,11 +81,14 @@ for path in sorted(glob.glob(os.path.join(srcdir, "html", "server", "option*.htm
         boxes += 1
         if m.group(1) in skip:
             continue
+        page_of[m.group(1)] = os.path.basename(path)
         at = cleared.get(m.group(1))
         check(at is not None and at < m.start(), "%s: %s is cleared before it is drawn"
               % (os.path.basename(path), m.group(1)))
 # Control: a regex that stopped matching would leave nothing to assert on.
 check(boxes >= 25, "the option pages were scanned (%d checkboxes)" % boxes)
+
+sid = None
 
 
 def get(path):
@@ -94,11 +97,14 @@ def get(path):
 
 
 def post(fields):
-    sid = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
+    global sid
     if sid is None:
-        sys.exit("no session id in server/index.html")
+        m = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
+        if m is None:
+            sys.exit("no session id in server/index.html")
+        sid = m.group(1)
     body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid.group(1))] + fields)
+                    [("sid", sid)] + fields)
     req = urllib.request.Request(url + "/server/step4.html",
                                  data=body.encode("latin-1"), method="POST")
     return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
@@ -115,26 +121,69 @@ def checked(page, name):
     return re.search(r'name="%s"[ \t]*checked' % name, get("/server/" + page)) is not None
 
 
-# Positive control: while set, none of the three renders a disabling flag.
-cmd = textarea(post([("cookies", "on"), ("parsejava", "on"), ("updhack", "on")]), "command")
-check("--cookies=0" not in cmd, "a set cookies emits no --cookies=0")
-check("--parse-java=0" not in cmd, "a set parsejava emits no --parse-java=0")
-check("--updatehack" in cmd, "a set updhack emits --updatehack")
-check(checked("option8.html", "cookies"), "a set cookies draws a ticked box")
+# What each state puts on the command line (None: nothing) and its profile key.
+# Only a value-taking alias can carry a disabling flag: -I and -%I are "single"
+# (htsalias.c), so a --index=0 would read back as the bare enabling flag.
+BOXES = [
+    # field           profile key           set                          cleared
+    ("parseall", "ParseAll", "--near", None),
+    ("link", "Near", "--test", None),
+    ("testall", "Test", "--extended-parsing", None),
+    # htmlfirst emits --priority=7, which the scan-priority list also emits.
+    ("htmlfirst", "HTMLFirst", None, None),
+    ("errpage", "NoErrorPages", "--generate-errors=0", None),
+    ("external", "NoExternalPages", "--replace-external", None),
+    ("hidepwd", "NoPwdInPages", "--disable-passwords", None),
+    ("hidequery", "NoQueryStrings", "--include-query-string=0", None),
+    ("nopurge", "NoPurgeOldFiles", "--purge-old=0", None),
+    ("windebug", None, "--debug-headers", None),
+    ("ka", "KeepAlive", "--keep-alive", None),
+    ("remt", "RemoveTimeout", "--host-control=1", None),
+    ("rems", "RemoveRateout", "--host-control=2", None),
+    ("cookies", "Cookies", None, "--cookies=0"),
+    ("parsejava", "ParseJava", None, "--parse-java=0"),
+    ("updhack", "UpdateHack", "--updatehack", None),
+    ("urlhack", "URLHack", "--urlhack", None),
+    ("keepwww", "KeepWww", "--keep-www-prefix", None),
+    ("keepslashes", "KeepSlashes", "--keep-double-slashes", None),
+    ("keepqueryorder", "KeepQueryOrder", "--keep-query-order", None),
+    ("toler", "TolerantRequests", "--tolerant", None),
+    ("http10", "HTTP10", "--http-10", None),
+    ("warc", "Warc", "--warc", None),
+    ("norecatch", "NoRecatch", "--do-not-recatch", None),
+    ("logf", "Log", "--single-log", None),
+    ("index", "Index", None, None),
+    ("index2", "WordIndex", "--search-index", None),
+    ("ftpprox", "UseHTTPProxyForFTP", "--httpproxy-ftp", None),
+]
 
-page = post([("cookies", ""), ("parsejava", ""), ("updhack", "")])
-cmd = textarea(page, "command")
-check("--cookies=0" in cmd, "a cleared cookies emits --cookies=0")
-check("--parse-java=0" in cmd, "a cleared parsejava emits --parse-java=0")
-check("--updatehack" not in cmd, "a cleared updhack drops --updatehack")
-check(not checked("option8.html", "cookies"), "a cleared cookies draws an empty box")
-# The Windows GUI reads the same option out of the profile.
-check("\nCookies=0" in textarea(page, "winprofile"), "a cleared cookies writes Cookies=0")
+for field, key, when_set, when_clear in BOXES:
+    for value, want, unwanted, stored in (("on", when_set, when_clear, "1"),
+                                          ("", when_clear, when_set, "0")):
+        page = post([(field, value)])
+        cmd = textarea(page, "command").split()
+        label = "%s %s" % (field, "set" if value else "cleared")
+        if want:
+            check(want in cmd, "%s emits %s" % (label, want))
+        if unwanted:
+            check(unwanted not in cmd, "%s drops %s" % (label, unwanted))
+        if key:
+            # The Windows GUI reads the same option out of the profile.
+            check("%s=%s" % (key, stored) in textarea(page, "winprofile").splitlines(),
+                  "%s writes %s=%s" % (label, key, stored))
+        check(checked(page_of[field], field) == bool(value),
+              "%s draws %s box" % (label, "a ticked" if value else "an empty"))
+missing = sorted(set(page_of) - set(b[0] for b in BOXES))
+check(not missing, "every checkbox is exercised (missing %s)" % missing)
 
-# A default-off option is stuck the same way once it has been set.
-check("--tolerant" in textarea(post([("toler", "on")]), "command"), "a set toler emits --tolerant")
-check("--tolerant" not in textarea(post([("toler", "")]), "command"),
-      "a cleared toler drops --tolerant")
+# A browser posts the companion and the ticked box under one name, so the fix
+# rests on the body loop keeping the last value; both orders pin that down.
+cmd = textarea(post([("cookies", ""), ("cookies", "on")]), "command").split()
+check("--cookies=0" not in cmd, "cookies=&cookies=on keeps cookies set")
+check(checked("option8.html", "cookies"), "cookies=&cookies=on draws a ticked box")
+cmd = textarea(post([("cookies", "on"), ("cookies", "")]), "command").split()
+check("--cookies=0" in cmd, "cookies=on&cookies= clears cookies")
+check(not checked("option8.html", "cookies"), "cookies=on&cookies= draws an empty box")
 
 sys.exit(rc)
 PY
