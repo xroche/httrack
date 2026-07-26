@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# proxytrack's WebDAV PROPFIND fallback must behave identically whether or not
+# the cache entry supplies Content-Type and Last-Modified.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+command -v curl >/dev/null 2>&1 || {
+    echo "curl missing, skipping"
+    exit 77
+}
+# First test to run proxytrack as a live server, and MSYS cannot reap a native
+# listener: the orphan wedged the whole Windows suite for 48 minutes (#595).
+if is_windows; then
+    echo "windows: cannot reap a backgrounded proxytrack, skipping"
+    exit 77
+fi
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+trap cleanup EXIT
+
+# Neither header is present, so file->contenttype and ->lastmodified stay "".
+printf 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+freeport() {
+    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+}
+proxyport=$(freeport)
+icpport=$(freeport)
+
+proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$dir/pt.log" 2>&1 &
+ptpid=$!
+waited=0
+until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$dir/pt.log"; do
+    kill -0 "$ptpid" 2>/dev/null || {
+        echo "FAIL: proxytrack exited before listening"
+        cat "$dir/pt.log"
+        exit 1
+    }
+    test "$waited" -lt 50 || {
+        echo "FAIL: proxytrack never announced its listen port"
+        exit 1
+    }
+    sleep 0.1
+    waited=$((waited + 1))
+done
+grep -q "HTTP Proxy installed on" "$dir/pt.log" || {
+    echo "FAIL: proxytrack failed to bind"
+    cat "$dir/pt.log"
+    exit 1
+}
+
+# --max-time: an unbounded read here would wedge the runner rather than fail
+curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
+
+grep -q '<getcontenttype>application/octet-stream</getcontenttype>' "$dir/resp.xml" || {
+    echo "FAIL: missing Content-Type did not fall back to application/octet-stream"
+    cat "$dir/resp.xml"
+    exit 1
+}
+grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" || {
+    echo "FAIL: missing Last-Modified did not fall back to the index timestamp"
+    cat "$dir/resp.xml"
+    exit 1
+}
+
+echo "OK: WebDAV listing falls back correctly for an entry with no Content-Type/Last-Modified"

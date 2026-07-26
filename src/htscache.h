@@ -93,7 +93,7 @@ void cache_rstr(FILE *fp, char *s, size_t s_size);
 char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s, size_t s_size);
 /* binput over a NUL-terminated buffer, bounded: no read starts at/past end. */
-int cache_binput(char *adr, const char *end, char *s, int max);
+int cache_binput(const char *adr, const char *end, char *s, int max);
 int cache_brint(char *adr, int *i);
 void cache_rint(FILE * fp, int *i);
 void cache_rLLint(FILE * fp, LLint * i);
