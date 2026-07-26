@@ -87,17 +87,6 @@ which httrack >/dev/null || {
     exit 1
 }
 
-# --- the rewriter in isolation, over a hand-built mirror --------------------
-printf '[engine self-test] ..\t'
-st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
-case "$st" in
-*": OK") echo OK ;;
-*)
-    echo "FAIL: $st"
-    exit 1
-    ;;
-esac
-
 # --- crawl ------------------------------------------------------------------
 # The cap sits between pixel.svg and big.svg, so one inlines and one must not.
 out="${tmpdir}/crawl"
@@ -249,7 +238,7 @@ srvlog="${tmpdir}/htsserver.log"
 htssrv=$!
 url=
 for _ in $(seq 1 40); do
-    url=$(sed -n 's/^URL=//p' "$srvlog") && test -n "$url" && break
+    url=$(sed -n 's/^URL=//p' "$srvlog" 2>/dev/null) && test -n "$url" && break
     kill -0 "$htssrv" 2>/dev/null || break
     sleep 0.25
 done
@@ -301,3 +290,16 @@ grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.
     exit 1
 }
 echo OK
+
+# --- the rewriter in isolation, over a hand-built mirror --------------------
+# Last, so a failure here cannot hide the crawl assertions above: the two cover
+# different ground (this one reaches media, anchors and the mirror-root clamp).
+printf '[engine self-test] ..\t'
+st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
+case "$st" in
+*": OK") echo OK ;;
+*)
+    echo "FAIL: $st"
+    exit 1
+    ;;
+esac

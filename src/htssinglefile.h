@@ -55,7 +55,9 @@ void singlefile_process_mirror(httrackp *opt);
 /* Rewrite one HTML document held in memory, appending the result to out.
    root is the mirror directory that references may not escape; page_path is
    the document's own path under it (both UTF-8, '/' or native separators).
-   Returns HTS_TRUE if at least one reference was replaced. */
+   Returns HTS_TRUE if at least one reference was replaced; out may still
+   differ from the input when that is HTS_FALSE, since a style or srcset value
+   is re-serialized in place. */
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
                                     const char *page_path, const char *html,
                                     size_t html_len, String *out);
