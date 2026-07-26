@@ -321,22 +321,12 @@ typedef struct {
 /* Longest error message shown on the error page; the rest is clipped. */
 #define ERROR_MESSAGE_MAX 1024
 
-/* Deliberately clipping: these messages quote posted fields, whose length the
-   client picks. */
-static HTS_PRINTF_FUN(3, 4) void format_error(char *dest, size_t size,
-                                              const char *fmt, ...) {
-  va_list args;
-
-  va_start(args, fmt);
-  (void) vslprintfbuff(dest, size, fmt, args);
-  va_end(args);
-}
-
-/* SET_ERROR() with a printf format. */
+/* SET_ERROR() with a printf format. Clips: these messages quote posted fields,
+   whose length the client picks. */
 #define SET_ERRORF(...)                                                        \
   do {                                                                         \
     char errbuf[ERROR_MESSAGE_MAX];                                            \
-    format_error(errbuf, sizeof(errbuf), __VA_ARGS__);                         \
+    slprintfbuff_clip(errbuf, sizeof(errbuf), __VA_ARGS__);                    \
     SET_ERROR(errbuf);                                                         \
   } while (0)
 

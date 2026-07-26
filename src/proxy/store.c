@@ -829,16 +829,8 @@ PT_Element PT_ElementNew(void) {
 }
 
 /* ProxyTrack's htsblk_failf(): a clipped, diagnostic-only failure reason. */
-static void PT_Element_failf(PT_Element r, const char *fmt, ...)
-    HTS_PRINTF_FUN(2, 3);
-
-static void PT_Element_failf(PT_Element r, const char *fmt, ...) {
-  va_list args;
-
-  va_start(args, fmt);
-  (void) vslprintfbuff(r->msg, sizeof(r->msg), fmt, args);
-  va_end(args);
-}
+#define PT_Element_failf(R, ...)                                               \
+  slprintfbuff_clip((R)->msg, sizeof((R)->msg), __VA_ARGS__)
 
 PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
   if (index != NULL && SAFE_INDEX(index)) {
