@@ -67,9 +67,10 @@ grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || {
     exit 77
 }
 
-# The payload. Only "addr2line -a" output starts with an address, so this
-# cannot match the raw trace instead.
-grep '^0x[0-9a-f]*: ' "$out" | grep -qE 'st_strsafe|strcpy_safe_' || {
+# The payload. Dropping the raw frames first is what makes it specific: both
+# names are static, so .dynsym could never have carried them. Not anchored on
+# the "0xOFF:" line, the inline chain puts the name on either half.
+grep -v "$rawframe" "$out" | grep -qE 'st_strsafe|strcpy_safe_' || {
     echo "the handler did not name the hidden frames:" >&2
     cat "$out" >&2
     exit 1

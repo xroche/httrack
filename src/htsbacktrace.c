@@ -188,7 +188,10 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
       argv[argc++] = hex[j];
     }
     argv[argc] = NULL;
-    if (copy_bounded(module, sizeof(module), name[first])) {
+    /* access(): skip pseudo-modules like linux-vdso, which have no file and
+       would draw nothing but an addr2line complaint. */
+    if (copy_bounded(module, sizeof(module), name[first]) &&
+        access(module, R_OK) == 0) {
       const size_t len = strlen(module);
 
       /* addr2line -a prints offsets only: say which module they are in. */
