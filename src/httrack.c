@@ -68,6 +68,9 @@ static int linput(FILE * fp, char *s, int max);
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_SYS_IOCTL_H
+#include <sys/ioctl.h>
+#endif
 #include <ctype.h>
 #if (defined(__linux) && defined(HAVE_EXECINFO_H))
 #include <execinfo.h>
@@ -185,6 +188,43 @@ static void vt_home(void) {
   printf("%s%s", VT_RESET, VT_GOTOXY("1", "0"));
 }
 
+/* Last known terminal geometry; the defaults are the classic VT100 size. */
+static int term_cols = 80;
+static int term_rows = 24;
+
+/* Refresh term_cols/term_rows, and tell whether they moved since last call. */
+static hts_boolean vt_size_refresh(void) {
+  int cols = 0;
+  int rows = 0;
+
+#ifdef _WIN32
+  CONSOLE_SCREEN_BUFFER_INFO info;
+  const HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  if (console != INVALID_HANDLE_VALUE &&
+      GetConsoleScreenBufferInfo(console, &info)) {
+    cols = info.srWindow.Right - info.srWindow.Left + 1;
+    rows = info.srWindow.Bottom - info.srWindow.Top + 1;
+  }
+#elif defined(TIOCGWINSZ)
+  struct winsize ws;
+
+  if (ioctl(fileno(stdout), TIOCGWINSZ, &ws) == 0) {
+    cols = ws.ws_col;
+    rows = ws.ws_row;
+  }
+#endif
+  if (cols <= 0)
+    cols = 80;
+  if (rows <= 0)
+    rows = 24;
+  if (cols == term_cols && rows == term_rows)
+    return HTS_FALSE;
+  term_cols = cols;
+  term_rows = rows;
+  return HTS_TRUE;
+}
+
 //
 
 /*
@@ -195,7 +235,8 @@ static void vt_home(void) {
 #define STYLE_STATTEXT   VT_UNBOLD
 #define STYLE_STATRESET  VT_UNBOLD
 #define NStatsBuffer     14
-#define MAX_LEN_INPROGRESS 40
+/* Rows the stats block and "Current job" take above the in-progress list. */
+#define NStatsHeaderRows 7
 
 static int use_show;
 static httrackp *global_opt = NULL;
@@ -291,6 +332,7 @@ static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
   use_show = 0;
   if (opt->verbosedisplay == HTS_VERBOSE_FULL) {
     use_show = 1;
+    (void) vt_size_refresh();
     vt_clear();
   }
   return 1;
@@ -396,6 +438,10 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
 
     prev_mytime = mytime;
 
+    /* A resize leaves stale wrapped text on screen: repaint everything. */
+    if (vt_size_refresh())
+      vt_clear();
+
     st[0] = '\0';
     qsec2str(st, stat_time);
     vt_home();
@@ -435,6 +481,13 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       //
       t_StatsBuffer StatsBuffer[NStatsBuffer];
 
+      /* Keep the frame within the terminal, or it scrolls the stats away. */
+      const int nstats =
+          min(NStatsBuffer, max(0, term_rows - NStatsHeaderRows));
+      /* URL budget: half the width, i.e. the historical 40 at 80 columns. */
+      const int maxurl =
+          min((int) sizeof(StatsBuffer[0].name) - 1, max(16, term_cols / 2));
+
       {
         int i;
 
@@ -449,10 +502,11 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
         }
       }
       for(k = 0; k < 2; k++) {  // 0: lien en cours 1: autres liens
-        for(j = 0; (j < 3) && (index < NStatsBuffer); j++) {    // passe de priorité
+        for (j = 0; (j < 3) && (index < nstats); j++) { // passe de priorité
           int _i;
 
-          for(_i = 0 + k; (_i < max(back_max * k, 1)) && (index < NStatsBuffer); _i++) {        // no lien
+          for (_i = 0 + k; (_i < max(back_max * k, 1)) && (index < nstats);
+               _i++) {                                  // no lien
             int i = (back_index + _i) % back_max;       // commencer par le "premier" (l'actuel)
 
             if (back[i].status >= 0) { // signifie "lien actif"
@@ -527,16 +581,14 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
                   }
                 }
 
-                if ((l = (int) strlen(s)) < MAX_LEN_INPROGRESS)
+                if ((l = (int) strlen(s)) < maxurl)
                   strcpybuff(StatsBuffer[index].name, s);
                 else {
                   // couper
                   StatsBuffer[index].name[0] = '\0';
-                  strncatbuff(StatsBuffer[index].name, s,
-                              MAX_LEN_INPROGRESS / 2 - 2);
+                  strncatbuff(StatsBuffer[index].name, s, maxurl / 2 - 2);
                   strcatbuff(StatsBuffer[index].name, "...");
-                  strcatbuff(StatsBuffer[index].name,
-                             s + l - MAX_LEN_INPROGRESS / 2 + 2);
+                  strcatbuff(StatsBuffer[index].name, s + l - maxurl / 2 + 2);
                 }
 
                 if (back[i].r.totalsize >= 0) { // taille prédéfinie
@@ -597,7 +649,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       {
         int i;
 
-        for(i = 0; i < NStatsBuffer; i++) {
+        for (i = 0; i < nstats; i++) {
           if (strnotempty(StatsBuffer[i].state)) {
             printf(VT_CLREOL " %s - \t%s%s \t%s / \t%s", StatsBuffer[i].state,
                    StatsBuffer[i].name, StatsBuffer[i].file, int2bytes(&strc,
