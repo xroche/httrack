@@ -89,8 +89,8 @@ TESTS = \
 	01_engine-warc-surt.test \
 	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
-	01_engine-sitemap.test \
 	01_zlib-warc.test \
+	01_zlib-sitemap.test \
 	01_zlib-warc-cdx.test \
 	01_zlib-warc-wacz.test \
 	01_zlib-contentcodings.test \

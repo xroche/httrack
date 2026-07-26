@@ -308,8 +308,11 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   // copy only the current path
   curr = _curr;
   strlcpybuff(curr, curr_fil, sizeof(_curr));
-  if ((a = strchr(curr, '?')) == NULL)  // couper au ? (params)
-    a = curr + strlen(curr) - 1;        // pas de params: aller à la fin
+  if ((a = strchr(curr, '?')) == NULL) { // couper au ? (params)
+    // an empty path has no last character to walk back from: curr-1 reads
+    // before the buffer
+    a = curr[0] != '\0' ? curr + strlen(curr) - 1 : curr;
+  }
   while((*a != '/') && (a > curr))
     a--;                        // chercher dernier / du chemin courant
   if (*a == '/')

@@ -457,6 +457,9 @@ static void basic_selftests(void) {
     // link one level up -> a "../" prefix
     assertf(lienrelatif(s, sizeof(s), "a.html", "dir/index.html") == 0);
     assertf(strcmp(s, "../a.html") == 0);
+    // empty current path: the trim used to walk back off the front of it
+    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "") == 0);
+    assertf(strcmp(s, "dir/page.html") == 0);
   }
 }
 
@@ -1572,6 +1575,22 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   StringCopy(to->warc_file, "");
   copy_htsopt(from, to);
   if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
+    err = 1;
+
+  /* sitemap pair: the flag latches on, the URL takes the String deep copy */
+  from->sitemap = HTS_TRUE;
+  StringCopy(from->sitemap_url, "http://h.test/sitemap.xml");
+  to->sitemap = HTS_FALSE;
+  StringCopy(to->sitemap_url, "");
+  copy_htsopt(from, to);
+  if (!to->sitemap ||
+      strcmp(StringBuff(to->sitemap_url), "http://h.test/sitemap.xml") != 0)
+    err = 1;
+  from->sitemap = HTS_FALSE;
+  StringCopy(from->sitemap_url, "");
+  copy_htsopt(from, to);
+  if (!to->sitemap ||
+      strcmp(StringBuff(to->sitemap_url), "http://h.test/sitemap.xml") != 0)
     err = 1;
 
   /* #185 pause pair: copied when enabled (max>0), the 0 sentinel skips */
@@ -3640,10 +3659,23 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                   100, &idx, &c) == 1);
   assertf(strcmp(c.url[0], "http://h.test/a?b=c") == 0);
 
-  /* A reference outside printable ASCII stays verbatim, not a control byte. */
+  /* A reference to a byte no URL can hold drops the whole value: decoding it
+     would smuggle a control character in, keeping it verbatim would seed a URL
+     the site never published. */
   assertf(sm_scan("<urlset><loc>http://h.test/a&#10;b</loc></urlset>", 100,
-                  &idx, &c) == 1);
-  assertf(strcmp(c.url[0], "http://h.test/a&#10;b") == 0);
+                  &idx, &c) == 0);
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#0;b</loc></urlset>", 100, &idx,
+                  &c) == 0);
+
+  /* A comment naming the other root element must not flip the verdict. */
+  assertf(sm_scan("<!-- <sitemapindex> --><urlset><url>"
+                  "<loc>http://h.test/p</loc></url></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(!idx);
+  assertf(sm_scan("<?xml version=\"1.0\"?><!-- <urlset> -->"
+                  "<sitemapindex><loc>http://h.test/s</loc></sitemapindex>",
+                  100, &idx, &c) == 1);
+  assertf(idx);
 
   /* <location> is not <loc>. */
   assertf(sm_scan("<urlset><location>http://h.test/a</location></urlset>", 100,
@@ -3679,6 +3711,25 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
   assertf(sm_scan("<urlset><loc>http://h.test/1</loc><loc>http://h.test/2</loc>"
                   "<loc>http://h.test/3</loc></urlset>",
                   2, &idx, &c) == 2);
+
+  /* The per-document cap at the value the engine actually uses. */
+  {
+    const int many = HTS_SITEMAP_MAX_URLS_DOC + 10;
+    const size_t per = 32;
+    char *big = malloct((size_t) many * per + 32);
+    size_t off;
+    int i;
+
+    assertf(big != NULL);
+    off = (size_t) snprintf(big, 32, "<urlset>");
+    for (i = 0; i < many; i++)
+      off += (size_t) snprintf(big + off, per + 1,
+                               "<loc>http://h.test/%d</loc>", i);
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(big, off, HTS_SITEMAP_MAX_URLS_DOC, &idx, sm_take,
+                             &c) == HTS_SITEMAP_MAX_URLS_DOC);
+    freet(big);
+  }
 
   /* An unterminated <loc> at end of buffer must not read past it. */
   assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
@@ -3726,9 +3777,15 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                             "Sitemapper: http://h.test/no.xml\n"
                             "Sitemap:\thttps://h.test/s2.xml\n";
 
-    assertf(hts_sitemap_scan_robots(txt, strlen(txt), 100, sm_take, &c) == 2);
+    const size_t len = strlen(txt);
+    char *raw = malloct(len);
+
+    assertf(raw != NULL);
+    memcpy(raw, txt, len);
+    assertf(hts_sitemap_scan_robots(raw, len, 100, sm_take, &c) == 2);
     assertf(strcmp(c.url[0], "http://h.test/s1.xml") == 0);
     assertf(strcmp(c.url[1], "https://h.test/s2.xml") == 0);
+    freet(raw);
   }
 
   printf("sitemap self-test OK\n");

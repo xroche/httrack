@@ -3,7 +3,7 @@
 # --sitemap seeds the crawl from robots.txt -> sitemapindex -> gzipped urlset.
 # start.html links to nothing, so orphan*.html can only arrive through the
 # sitemap; deep1.html proves the seeds keep a full depth budget under -r2, and
-# the off-host page and child sitemap must both be refused (--errors 0).
+# the off-host page and child sitemap must both be refused.
 
 set -eu
 
@@ -11,12 +11,23 @@ set -eu
 
 crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
 
-# robots.txt Sitemap: -> index -> .xml.gz, and the seeds behave like -r2 seeds.
+# robots.txt Sitemap: -> index -> .xml.gz, seeds behaving like -r2 seeds. The
+# log assertions pin which route was taken: the two documents are served from
+# both /sitemapdir/index.xml and the well-known /sitemap.xml, so "some sitemap
+# was read" would pass either way. --not-found pins ingestion-only: the sitemap
+# documents feed the crawl but never land in the mirror.
 # --rerun also walks the update path over a mirror holding sitemap seeds.
 crawl --errors 0 --rerun \
     --found 'sitemapdir/orphan1.html' \
     --found 'sitemapdir/orphan2.html' \
     --found 'sitemapdir/deep1.html' \
+    --not-found 'sitemapdir/index.xml' \
+    --not-found 'sitemapdir/pages.xml.gz' \
+    --not-found 'robots.txt' \
+    --log-found 'added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
+    --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemapdir/index\.xml' \
+    --log-found 'ignoring off-host child sitemap' \
+    --log-not-found '/sitemap\.xml' \
     httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2
 
 # Negative control: without the option nothing but the start page is reached.
@@ -36,18 +47,30 @@ crawl --errors 0 \
 # The test server drops its Sitemap: record for this User-Agent.
 crawl --errors 0 \
     --found 'sitemapdir/orphan1.html' \
-    --log-not-found 'sitemapdir/index.xml' \
+    --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemap\.xml' \
+    --log-not-found 'sitemapdir/index\.xml' \
     httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -F 'nositemap-agent'
 
-# --sitemap-url names the document directly, skipping the robots.txt probe.
+# --sitemap-url alone reads the named document and probes nothing.
 crawl --errors 0 \
     --found 'sitemapdir/orphan1.html' \
     --found 'sitemapdir/orphan2.html' \
-    --log-not-found 'sitemapdir/index.xml' \
+    --log-not-found 'sitemapdir/index\.xml' \
+    --log-not-found '/sitemap\.xml' \
     httrack 'BASEURL/sitemapdir/start.html' -r2 \
     --sitemap-url 'BASEURL/sitemapdir/pages.xml.gz'
 
-# An unfetchable sitemap is not fatal: the crawl still completes.
-crawl --found 'sitemapdir/start.html' \
-    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+# The two options are additive: an unfetchable --sitemap-url is parsed as an
+# empty document and does not stop --sitemap from seeding the crawl.
+crawl --errors-content 1 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'Sitemap: 0 URL\(s\) added' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 \
     --sitemap-url 'BASEURL/sitemapdir/missing.xml'
+
+# The sitemapindex nesting cap stops the chain before its deepest urlset.
+crawl --errors 0 \
+    --not-found 'sitemapdir/deepcap.html' \
+    --log-found 'Sitemap: cap reached' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/chain0.xml'

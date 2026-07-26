@@ -18,6 +18,7 @@ import base64
 import gzip
 import hashlib
 import os
+import re
 import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -601,6 +602,28 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_sitemap_deep1(self):
         self.send_html("\tOne level below an orphan.")
+
+    # chain0..chain5 nest one sitemapindex per level; chain6 is the urlset the
+    # nesting cap must keep out of reach.
+    def route_sitemap_chain(self):
+        host = self.headers.get("Host")
+        level = int(self.path.rsplit("/", 1)[-1][len("chain") : -len(".xml")])
+        if level < 6:
+            body = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex>'
+                f"<sitemap><loc>http://{host}/sitemapdir/chain{level + 1}.xml"
+                "</loc></sitemap></sitemapindex>\n"
+            )
+        else:
+            body = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n<urlset>'
+                f"<url><loc>http://{host}/sitemapdir/deepcap.html</loc></url>"
+                "</urlset>\n"
+            )
+        self.send_raw(body.encode(), "application/xml")
+
+    def route_sitemap_deepcap(self):
+        self.send_html("\tReachable only past the sitemapindex nesting cap.")
 
     # --- type/extension matrix (issue #267 family) -------------------------
 
@@ -1636,6 +1659,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/sitemapdir/orphan1.html": route_sitemap_orphan1,
         "/sitemapdir/orphan2.html": route_sitemap_orphan2,
         "/sitemapdir/deep1.html": route_sitemap_deep1,
+        "/sitemapdir/deepcap.html": route_sitemap_deepcap,
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
@@ -1960,6 +1984,8 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
+        if handler is None and re.fullmatch(r"/sitemapdir/chain\d+\.xml", path):
+            handler = type(self).route_sitemap_chain
         if handler is not None:
             handler(self)
             return True

@@ -69,10 +69,15 @@ typedef struct hts_sitemap_state hts_sitemap_state;
 /* Document parsing (no engine state: fuzzable and self-testable)         */
 /* --------------------------------------------------------------------- */
 
-/* Decode the five XML predefined entities plus ASCII-printable numeric refs
-   in-place; anything else is left verbatim. Never grows the string. */
-static void sitemap_unescape(char *s) {
+/* Decode the five XML predefined entities and numeric character references
+   in-place, never growing the string. Returns HTS_FALSE when a reference
+   decodes outside printable ASCII: the value is then not a URL the site can
+   have published, and decoding it would smuggle a control byte into the
+   crawl. An unrecognized "&..." run is left verbatim ('&' is legal in a URL).
+ */
+static hts_boolean sitemap_unescape(char *s) {
   char *r = s, *w = s;
+  hts_boolean ok = HTS_TRUE;
 
   while (*r != '\0') {
     if (*r != '&') {
@@ -121,11 +126,10 @@ static void sitemap_unescape(char *s) {
             if (v > 0x7e)
               break;
           }
-          /* Only ASCII printables: a URL has no business carrying anything
-             else, and a wider decode would let a reference smuggle in a
-             control character. */
           if (v >= 0x20 && v <= 0x7e)
             c = (int) v;
+          else if (v >= 0)
+            ok = HTS_FALSE; /* a well-formed reference to a byte no URL holds */
         }
       }
       if (c < 0) {
@@ -137,6 +141,7 @@ static void sitemap_unescape(char *s) {
     }
   }
   *w = '\0';
+  return ok;
 }
 
 /* Accept only an absolute http(s) URL with no space or control byte. */
@@ -171,6 +176,41 @@ static const char *sitemap_memstr(const char *p, size_t len,
       return p;
   }
   return NULL;
+}
+
+/* HTS_TRUE when the document's root element is `name`. Skips the XML
+   declaration, comments and processing instructions first, so a comment
+   mentioning the other root element cannot decide the document type. */
+static hts_boolean sitemap_root_is(const char *doc, size_t size,
+                                   const char *name) {
+  const size_t nlen = strlen(name);
+  size_t i = 0;
+
+  while (i < size) {
+    if (isspace((unsigned char) doc[i])) {
+      i++;
+    } else if (doc[i] != '<') {
+      return HTS_FALSE; /* character data before any element: not XML */
+    } else if (i + 4 <= size && memcmp(doc + i, "<!--", 4) == 0) {
+      const char *const e = sitemap_memstr(doc + i, size - i, "-->");
+
+      if (e == NULL)
+        return HTS_FALSE;
+      i = (size_t) (e - doc) + 3;
+    } else if (i + 2 <= size && (doc[i + 1] == '?' || doc[i + 1] == '!')) {
+      while (i < size && doc[i] != '>')
+        i++;
+      i++;
+    } else {
+      return i + 1 + nlen <= size && memcmp(doc + i + 1, name, nlen) == 0 &&
+                     (i + 1 + nlen == size ||
+                      isspace((unsigned char) doc[i + 1 + nlen]) ||
+                      doc[i + 1 + nlen] == '>')
+                 ? HTS_TRUE
+                 : HTS_FALSE;
+    }
+  }
+  return HTS_FALSE;
 }
 
 /* Decompress a gzip-framed body into a fresh buffer bounded by both the
@@ -226,15 +266,10 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
   }
   end = doc + size;
 
-  /* Whichever root element comes first classifies the document; the handler
-     reads the verdict before the first URL, so it must be set up front. */
-  if (is_index != NULL) {
-    const char *const idx = sitemap_memstr(doc, size, "<sitemapindex");
-    const char *const set = sitemap_memstr(doc, size, "<urlset");
-
-    if (idx != NULL && (set == NULL || idx < set))
-      *is_index = HTS_TRUE;
-  }
+  /* The root element classifies the document; the handler reads the verdict
+     before the first URL, so it must be set up front. */
+  if (is_index != NULL)
+    *is_index = sitemap_root_is(doc, size, "sitemapindex");
 
   for (p = doc; n < maxurls;) {
     const char *loc = sitemap_memstr(p, (size_t) (end - p), "<loc");
@@ -270,8 +305,7 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
       continue;
     memcpy(url, val, len);
     url[len] = '\0';
-    sitemap_unescape(url);
-    if (!sitemap_url_ok(url))
+    if (!sitemap_unescape(url) || !sitemap_url_ok(url))
       continue;
     n++;
     if (!handler(arg, url))
@@ -281,6 +315,22 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
   if (unpacked != NULL)
     freet(unpacked);
   return n;
+}
+
+/* Copy one CR-stripped line into `line`, truncating an over-long one, and
+   return how far to advance. Unlike binput() this stops at `size`, so a body
+   that is not NUL-terminated cannot be read past its end. */
+static size_t sitemap_line(const char *body, size_t size, char *line,
+                           size_t linesize) {
+  size_t i = 0, w = 0;
+
+  while (i < size && body[i] != '\n') {
+    if (body[i] != '\r' && w < linesize - 1)
+      line[w++] = body[i];
+    i++;
+  }
+  line[w] = '\0';
+  return i < size ? i + 1 : i;
 }
 
 int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
@@ -295,7 +345,7 @@ int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
     char *comm;
     char *a;
 
-    bptr += binput(body + bptr, line, sizeof(line) - 2);
+    bptr += sitemap_line(body + bptr, size - bptr, line, sizeof(line));
     comm = strchr(line, '#');
     if (comm != NULL)
       *comm = '\0';

@@ -62,8 +62,8 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
                      hts_boolean *is_index, hts_sitemap_handler handler,
                      void *arg);
 
-/* Same, over a NUL-terminated robots.txt body: hands out the "Sitemap:" URLs
-   (a group-independent record in RFC 9309, so no user-agent grouping). */
+/* Same, over a robots.txt body: hands out the "Sitemap:" URLs (a
+   group-independent record in RFC 9309, so no user-agent grouping). */
 int hts_sitemap_scan_robots(const char *body, size_t size, int maxurls,
                             hts_sitemap_handler handler, void *arg);
 
