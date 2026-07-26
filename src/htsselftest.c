@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsalias.h"
@@ -616,6 +617,106 @@ static int string_safety_selftests(void) {
 
     if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
       return 1;
+  }
+
+  /* htsblk_failf: clips a reason quoted from a remote reply into msg[] and
+     touches nothing else in the block */
+  {
+    htsblk r;
+    char expect[sizeof(r.msg)];
+    char big[4 * sizeof(r.msg)];
+
+    /* contenttype abuts msg, so a one-past-the-end store lands in it rather
+       than in padding. Poison it: a stray NUL is invisible against zeroes,
+       and a stray NUL is exactly what an off-by-one terminator writes. */
+#define NEIGHBOURS_INTACT() (r.contenttype[0] == '#' && r.statuscode == 1234)
+
+    memset(&r, 0, sizeof(r));
+    memset(r.contenttype, '#', sizeof(r.contenttype));
+    r.statuscode = 1234;
+
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "PASV incorrect: %s", "220 ok");
+    if (strcmp(r.msg, "PASV incorrect: 220 ok") != 0 || !NEIGHBOURS_INTACT())
+      return 1;
+
+    /* exact fit: capacity - 1 characters plus the NUL */
+    memset(expect, 'y', sizeof(expect) - 1);
+    expect[sizeof(expect) - 1] = '\0';
+    memcpy(expect, "Bad password: ", sizeof("Bad password: ") - 1);
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "%s", expect);
+    if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
+      return 1;
+
+    /* far over: the expected bytes differ from the cases above, so writing
+       nothing cannot pass on the leftovers */
+    memset(big, 'z', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\0';
+    memset(expect, 'z', sizeof(expect) - 1);
+    expect[sizeof(expect) - 1] = '\0';
+    memcpy(expect, "Bad user name: ", sizeof("Bad user name: ") - 1);
+
+    memset(r.msg, '#', sizeof(r.msg));
+    htsblk_failf(&r, "Bad user name: %s", big);
+    if (strcmp(r.msg, expect) != 0 || !NEIGHBOURS_INTACT())
+      return 1;
+#undef NEIGHBOURS_INTACT
+  }
+
+  /* back_read_ftp_result: the helper's result file is external input, so an
+     over-long message must stop at msg[]'s capacity */
+  {
+    htsblk r;
+    size_t k;
+
+    /* poisoned so a short message cannot pass on leftovers, and so a stray
+       NUL past msg[] is visible in the neighbour */
+#define FTP_RESULT_CASE(BODY)                                                  \
+  do {                                                                         \
+    FILE *fp_ = tmpfile();                                                     \
+                                                                               \
+    if (fp_ == NULL)                                                           \
+      return 1;                                                                \
+    BODY;                                                                      \
+    rewind(fp_);                                                               \
+    memset(&r, 0, sizeof(r));                                                  \
+    memset(r.msg, '#', sizeof(r.msg));                                         \
+    memset(r.contenttype, '#', sizeof(r.contenttype));                         \
+    back_read_ftp_result(fp_, &r);                                             \
+    fclose(fp_);                                                               \
+    if (r.contenttype[0] != '#')                                               \
+      return 1;                                                                \
+  } while (0)
+
+    /* over capacity: clipped to 79 payload bytes plus the NUL */
+    FTP_RESULT_CASE({
+      fprintf(fp_, "226 ");
+      for (k = 0; k < 4 * sizeof(r.msg); k++)
+        fputc('q', fp_);
+    });
+    if (r.statuscode != 226 || strlen(r.msg) != sizeof(r.msg) - 1)
+      return 1;
+    for (k = 0; k < sizeof(r.msg) - 1; k++) {
+      if (r.msg[k] != 'q')
+        return 1;
+    }
+
+    /* well under capacity: nothing padded, nothing eaten off the end */
+    FTP_RESULT_CASE(fprintf(fp_, "550 no such file"));
+    if (r.statuscode != 550 || strcmp(r.msg, "no such file") != 0)
+      return 1;
+
+    /* a byte over 0x7f must not read as EOF and cut the message short */
+    FTP_RESULT_CASE(fprintf(fp_, "226 \xff ok"));
+    if (r.statuscode != 226 || strcmp(r.msg, "\xff ok") != 0)
+      return 1;
+
+    /* unparseable status: the message still loads, the code reports failure */
+    FTP_RESULT_CASE(fprintf(fp_, "not-a-number here"));
+    if (r.statuscode != STATUSCODE_INVALID)
+      return 1;
+#undef FTP_RESULT_CASE
   }
 
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
@@ -5420,10 +5521,10 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
 
-  snprintf(fpath, sizeof(fpath), "%s/", dir); /* IE glob wants a trailing sep */
+  assertf(sprintfbuff(fpath, "%s/", dir)); /* IE glob wants a trailing sep */
 
   /* cookies.txt: one Netscape record (host, _, path, _, _, name, value). */
-  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
   {
     FILE *fp = FOPEN(file, "wb");
 
@@ -5433,7 +5534,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   }
 
   /* A copied IE cookie u@v.txt: name, value, url, then 6 unused fields. */
-  snprintf(file, sizeof(file), "%su@v.txt", fpath);
+  assertf(sprintfbuff(file, "%su@v.txt", fpath));
   {
     FILE *fp = FOPEN(file, "wb");
 
@@ -5455,7 +5556,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 #endif
 
   (void) UNLINK(file); /* u@v.txt (already gone on Windows) */
-  snprintf(file, sizeof(file), "%scookies.txt", fpath);
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
   (void) UNLINK(file);
   dir[dirlen] = '\0';
   while (strlen(dir) > base) {
