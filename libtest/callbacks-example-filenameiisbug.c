@@ -71,7 +71,8 @@ static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
       for(j = 0; iisBogus[i][j] == a[j] && iisBogus[i][j] != '\0'; j++) ;
       if (iisBogus[i][j] == '\0'
           && (a[j] == '\0' || a[j] == '/' || a[j] == '\\')) {
-        strncpy(a, iisBogusReplace[i], strlen(iisBogusReplace[i]));
+        /* same length by construction, and the tail must survive */
+        memcpy(a, iisBogusReplace[i], strlen(iisBogusReplace[i]));
         break;
       }
     }
