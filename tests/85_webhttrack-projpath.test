@@ -90,6 +90,15 @@ sys.stdout.write(out.decode("latin-1"))' "$1" "$2" "$3"
 get() { request "$1" "$2" ""; }
 post() { request "$1" "" "$2"; }
 
+# GET $2 into ${reply}, requiring status $3. Captured, not piped: a dead request
+# reads as marker-absent, and so do a truncated body and a 302 to the file.
+reply=
+fetch() {
+    reply=$(get "$1" "$2") || fail "the request for $2 failed"
+    grep -q "^HTTP/1\.0 $3 " <<<"${reply}" ||
+        fail "$2: wanted a $3 reply, got '$(head -1 <<<"${reply}")'"
+}
+
 url=$(start)
 port=$(portof "${url}")
 srv=$(srvpid)
@@ -109,13 +118,14 @@ echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 # with a component over NAME_MAX (mkdir refuses it whatever the uid). Must precede
 # any successful save: commandEnd then swaps the error page for the finished one.
 get "${port}" /server/style.css >/dev/null # leaves a path behind in fsfile
-post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p" |
-    grep -q '^Location: /server/error.html' ||
+saved=$(post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p")
+grep -q '^Location: /server/error.html' <<<"${saved}" ||
     fail "the refused save did not redirect to the error page"
 
 # No project yet, so no root to serve from.
 post "${port}" "sid=${sid}&projpath=${base}/" >/dev/null
-get "${port}" /website/secret.txt | grep -q SECRETMARKER &&
+fetch "${port}" /website/secret.txt 404
+grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath served a file outside any project"
 
 # Positive control: step4's "save settings" flow registers the project without
@@ -126,24 +136,29 @@ body="${body}&path=${base}&projname=proj&projpath=${base}/proj/"
 post "${port}" "${body}" >/dev/null
 test -f "${base}/proj/hts-cache/winprofile.ini" ||
     fail "the project was not registered: $(cat "${log}")"
-get "${port}" /website/hts-log.txt | grep -q LOGMARKER ||
+fetch "${port}" /website/hts-log.txt 200
+grep -q LOGMARKER <<<"${reply}" ||
     fail "the registered project's mirror is not served"
 
 # Same request with the root repointed: the project is legitimate, projpath is
 # not what decides where the bytes come from.
 post "${port}" "sid=${sid}&projpath=${base}/" >/dev/null
-get "${port}" /website/secret.txt | grep -q SECRETMARKER &&
+fetch "${port}" /website/secret.txt 404
+grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath repointed the served root"
 post "${port}" "sid=${sid}&projpath=/etc/" >/dev/null
-get "${port}" /website/passwd | grep -q '^root:' &&
+fetch "${port}" /website/passwd 404
+grep -q '^root:' <<<"${reply}" &&
     fail "a posted projpath read an arbitrary system file"
 
 # A ".." anywhere in the recorded root would escape the mirror on every later
 # request, so the save must be refused and the previous root kept.
 post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/proj&projname=.." >/dev/null
-get "${port}" /website/secret.txt | grep -q SECRETMARKER &&
+fetch "${port}" /website/secret.txt 404
+grep -q SECRETMARKER <<<"${reply}" &&
     fail "a '..' in the saved project path escaped the mirror root"
-get "${port}" /website/hts-log.txt | grep -q LOGMARKER ||
+fetch "${port}" /website/hts-log.txt 200
+grep -q LOGMARKER <<<"${reply}" ||
     fail "rejecting the '..' root also lost the previous one"
 
 # The root is now the server's own, but it is still built from two posted
@@ -162,7 +177,7 @@ test -f "${fspath}/hts-cache/winprofile.ini" ||
     fail "the long-path project was not registered: $(cat "${log}")"
 get "${port}" "/website/${longurl}" >/dev/null 2>&1 || true
 alive "${srv}" || fail "an over-long project path crashed the server: $(cat "${log}")"
-get "${port}" /server/index.html | grep -q '200 OK' ||
-    fail "the server stopped answering after the over-long project path"
+# Not just alive: still answering.
+fetch "${port}" /server/index.html 200
 
 echo "PASS"
