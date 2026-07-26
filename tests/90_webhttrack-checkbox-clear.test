@@ -160,8 +160,8 @@ BOXES = [
 for field, key, when_set, when_clear in BOXES:
     for value, want, unwanted, stored in (("on", when_set, when_clear, "1"),
                                           ("", when_clear, when_set, "0")):
-        page = post([(field, value)])
-        cmd = textarea(page, "command").split()
+        rendered = post([(field, value)])
+        cmd = textarea(rendered, "command").split()
         label = "%s %s" % (field, "set" if value else "cleared")
         if want:
             check(want in cmd, "%s emits %s" % (label, want))
@@ -169,7 +169,7 @@ for field, key, when_set, when_clear in BOXES:
             check(unwanted not in cmd, "%s drops %s" % (label, unwanted))
         if key:
             # The Windows GUI reads the same option out of the profile.
-            check("%s=%s" % (key, stored) in textarea(page, "winprofile").splitlines(),
+            check("%s=%s" % (key, stored) in textarea(rendered, "winprofile").splitlines(),
                   "%s writes %s=%s" % (label, key, stored))
         check(checked(page_of[field], field) == bool(value),
               "%s draws %s box" % (label, "a ticked" if value else "an empty"))
