@@ -26,45 +26,38 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: htsshow.c console progress info                        */
+/* File: in-progress display rows, shared by httrack and htsserver .h */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef HTSTOOLS_DEFH
-#define HTSTOOLS_DEFH
+#ifndef HTS_STATS_DEFH
+#define HTS_STATS_DEFH
 
 #include "htsglobal.h"
-#include "htscore.h"
-#include "htssafe.h"
-#include "htsstats.h"
 
-#ifndef HTS_DEF_FWSTRUCT_t_InpInfo
-#define HTS_DEF_FWSTRUCT_t_InpInfo
-typedef struct t_InpInfo t_InpInfo;
+/* One row of the "in progress" display, shared so the CLI (httrack) and the
+   web GUI (htsserver) cannot drift apart: each fills its own array. */
+
+#define NStatsBuffer 14
+
+#ifndef HTS_DEF_FWSTRUCT_t_StatsBuffer
+#define HTS_DEF_FWSTRUCT_t_StatsBuffer
+typedef struct t_StatsBuffer t_StatsBuffer;
 #endif
-struct t_InpInfo {
-  int ask_refresh;
-  int refresh;
-  LLint stat_bytes;
-  int stat_time;
-  int lien_n;
-  int lien_tot;
-  int stat_nsocket;
-  int rate;
-  int irate;
-  int ft;
-  LLint stat_written;
-  int stat_updated;
-  int stat_errors;
-  int stat_warnings;
-  int stat_infos;
-  TStamp stat_timestart;
-  int stat_back;
+struct t_StatsBuffer {
+  char name[1024];
+  char file[1024];
+  char state[288];                         // a short label plus back->info[256]
+  char BIGSTK url_sav[HTS_URLMAXSIZE * 2]; // pour cancel
+  char BIGSTK url_adr[HTS_URLMAXSIZE * 2];
+  char BIGSTK url_fil[HTS_URLMAXSIZE * 2];
+  LLint size;
+  LLint sizetot;
+  int offset;
+  //
+  int back;
+  //
+  int actived; // pour disabled
 };
 
-int main(int argc, char **argv);
 #endif
-
-extern HTSEXT_API hts_stat_struct HTS_STAT;
-extern int _DEBUG_HEAD;
-extern FILE *ioinfo;
