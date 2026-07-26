@@ -130,7 +130,10 @@ done
 title() { request "$1" "" step3; }
 
 request "${port}" "projname=UNAUTHWRITE" >/dev/null 2>&1 || true
-title "${port}" | grep -q 'UNAUTHWRITE' &&
+# Captured, not piped: a request that never ran would otherwise read as "the
+# store was not written", which is the verdict this is here to earn.
+page=$(title "${port}") || fail "the store probe failed"
+grep -q 'UNAUTHWRITE' <<<"${page}" &&
     fail "a body without a valid sid was written to the key store"
 
 # Paired accept case: without it the assertion above passes even if the server
