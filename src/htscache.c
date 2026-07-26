@@ -1295,12 +1295,17 @@ char *readfile2(const char *fil, LLint * size) {
 }
 
 /* Note: utf-8 */
-char *readfile_utf8(const char *fil) {
+char *readfile_utf8(const char *fil) { return readfile2_utf8(fil, NULL); }
+
+/* Note: utf-8 */
+char *readfile2_utf8(const char *fil, LLint *size) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
   const LLint len = fsize_utf8(fil);
   const size_t buflen = len >= 0 ? llint_to_size_t(len) : (size_t) -1;
 
+  if (size != NULL)
+    *size = len;
   if (buflen != (size_t) -1) { // exists, and is addressable (see readfile2)
     FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), fil), "rb");
 

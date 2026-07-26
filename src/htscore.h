@@ -409,6 +409,8 @@ char *readfile2(const char *fil, LLint * size);
 
 char *readfile_utf8(const char *fil);
 
+char *readfile2_utf8(const char *fil, LLint *size);
+
 char *readfile_or(const char *fil, const char *defaultdata);
 
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).

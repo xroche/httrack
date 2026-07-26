@@ -4820,6 +4820,9 @@ static char *sf_decode(const char *hay, const char *mime, size_t *outlen) {
   return (char *) raw;
 }
 
+/* Must match SF_MAX_ATTRS in htssinglefile.c; the fixture has to cross it. */
+#define SF_ST_MAX_ATTRS 64
+
 /* The 12-byte asset: high bytes and an embedded NUL, so a text-shaped copy
    would be caught. */
 static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
@@ -4833,44 +4836,94 @@ static const char sf_page[] =
     "<style>body { background: url(\"img/a%20b.png\"); }</style>\n"
     "</head><body>\n"
     "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
+    "<link rel=\"icon\" href=\"icon.png\">\n"
+    "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
+    /* example.com/x.png exists on disk, the shape a real mirror has, so a
+       scheme-blind resolver would inline it instead of leaving the link. */
     "<img src=\"http://example.com/x.png\">\n"
-    /* Two shapes of climbing out of the mirror, each aimed at a real image so
-       a missing clamp inlines rather than merely failing to find a file: one
-       resolves outside the root, one lands back inside it if a leading ".."
-       is silently dropped. */
+    "<input type=\"image\" src=\"img/in.png\">\n"
+    "<video poster=\"img/po.png\" controls>"
+    "<source src=\"v.mp4\" type=\"video/mp4\"></video>\n"
+    "<svg><image href=\"img/sv.png\"/></svg>\n"
+    "<table background=\"img/bg.png\"><tr><td>x</td></tr></table>\n"
+    /* Both climb out of the mirror but target a real image, so a missing clamp
+       inlines rather than merely 404s: one escapes the root, one lands back
+       inside it if a leading ".." is dropped. */
     "<img src=\"../escape.png\">\n"
     "<img src=\"../img/a%20b.png\">\n"
     "<a href=\"img/a%20b.png\">link</a>\n"
-    "<video controls><source src=\"v.mp4\" type=\"video/mp4\"></video>\n"
     "<script src=\"js/app.js\"></script>\n"
-    "<script>var s = \"<img src='img/a%20b.png'>\";</script>\n"
+    "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
+    "</script>\n"
+    "<img src=\"missing.png\" >\n"
+    "<!--><img src=\"img/a%20b.png\">\n"
     "<div style=\"background:url(img/a%20b.png)\"></div>\n"
     "<div style='content:\"x\"; background:url(img/a%20b.png)'></div>\n"
     "</body></html>\n";
 
-/* Lay a small mirror down under root and return the page path in page. */
-static void sf_fixture(const char *root, char *page, size_t pagesize) {
-  static const char css[] = "@import \"sub/nested.css\";\n"
-                            "body { background: url(../img/a b.png); }\n"
-                            "/* url(../img/never.png) */\n";
+/* Lay a small mirror down under root. */
+static void sf_fixture(const char *root) {
+  /* The over-cap url() is what drives the rebase fallback: a reference an
+     inlined stylesheet could not embed has to come out relative to the page,
+     not to the stylesheet, or it dangles. */
+  static const char css[] =
+      "@import \"sub/nested.css\";\n"
+      "@import url(\"sub/two.css\");\n"
+      "@import \"a\\\"url(../img/a b.png)b.css\";\n"
+      "@font-face { font-family: f; src: url(../font/f.woff2); }\n"
+      "body { background: url(../img/a b.png); }\n"
+      "div { background: url(../img/big.png); }\n"
+      "/* url(../img/never.png) */\n";
   static const char nested[] = "div { background: url(../../img/a b.png); }\n";
+  static const char two[] = "p { background: url(../../img/a b.png); }\n";
+  static const char deep[] =
+      "<html><head><link rel=\"stylesheet\" href=\"../../css/main.css\">\n"
+      "</head><body>d</body></html>\n";
   static const char js[] = "var app = 1;\n";
   char big[4096];
 
   memset(big, 'B', sizeof(big));
   sf_put(root, "page.html", sf_page, sizeof(sf_page) - 1);
+  sf_put(root, "deep/sub/page.html", deep, sizeof(deep) - 1);
   sf_put(root, "other.html", "<html>o</html>", 14);
   sf_put(root, "css/main.css", css, sizeof(css) - 1);
   sf_put(root, "css/sub/nested.css", nested, sizeof(nested) - 1);
+  sf_put(root, "css/sub/two.css", two, sizeof(two) - 1);
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
+  sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "img/bg.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "icon.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "font/f.woff2", "wOF2\x00\x01", 6);
+  /* Both exist so the assertions that they stay links cannot pass by the
+     target merely being absent. */
+  sf_put(root, "img/never.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "example.com/x.png", sf_png, SF_PNG_LEN);
+  { /* More attributes than the tag parser records, with a '>' inside a quoted
+       value: the give-up path must not rescan quote-blind. */
+    String wide = STRING_EMPTY;
+    int n;
+
+    StringCopy(wide, "<html><body><p");
+    for (n = 0; n <= SF_ST_MAX_ATTRS; n++) {
+      char one[32];
+
+      sprintfbuff(one, " a%d=1", n);
+      StringCat(wide, one);
+    }
+    StringCat(wide,
+              " title=\"> <img src=img/a%20b.png> \">end</p></body></html>");
+    sf_put(root, "wide.html", StringBuff(wide), StringLength(wide));
+    StringFree(wide);
+  }
   sf_put(root, "v.mp4",
          "\x00\x00\x00\x18"
          "ftypisom",
          12);
-  fconcat(page, pagesize, root, "page.html");
 }
 
 /* -#test=singlefile <dir>: rewrite a hand-built mirror and check what gets
@@ -4890,7 +4943,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_put(argv[0], "escape.png", sf_png,
          SF_PNG_LEN); /* just outside the mirror */
   fconcat(root, sizeof(root), argv[0], "mirror/");
-  sf_fixture(root, page, sizeof(page));
+  sf_fixture(root);
+  fconcat(page, sizeof(page), root, "page.html");
 
   /* Cap between the small assets and big.png. */
   opt->single_file_max_size = 1024;
@@ -4908,10 +4962,25 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "image payload does not round-trip");
     freet(img);
   }
-  sf_check(strstr(out, "data:application/x-javascript;base64,") != NULL,
-           "script not inlined");
-  sf_check(strstr(out, "href=\"css/main.css\"") == NULL,
-           "stylesheet not inlined");
+  {
+    char *js = sf_decode(out, "application/x-javascript", &len);
+
+    sf_check(js != NULL && len == 13 && memcmp(js, "var app = 1;\n", 13) == 0,
+             "script payload does not round-trip");
+    freet(js);
+  }
+  sf_check(strstr(out, "href=\"data:text/css;base64,") != NULL,
+           "stylesheet not inlined into the link");
+  sf_check(strstr(out, "data:font/woff2;base64,d09GMgAB") != NULL,
+           "rel=preload font not inlined");
+
+  /* Every other (tag, attribute) rule in the table. */
+  sf_check(strstr(out, "icon.png") == NULL, "rel=icon not inlined");
+  sf_check(strstr(out, "img/in.png") == NULL, "input src not inlined");
+  sf_check(strstr(out, "img/po.png") == NULL, "video poster not inlined");
+  sf_check(strstr(out, "img/sv.png") == NULL, "svg image href not inlined");
+  sf_check(strstr(out, "img/bg.png") == NULL,
+           "legacy background attribute not inlined");
 
   /* Left alone: a page link, a navigational <link>, media, an absolute URL, an
      existing data: URI, and a reference climbing out of the mirror. */
@@ -4925,8 +4994,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
            "a reference outside the mirror was resolved");
   sf_check(strstr(out, "src=\"../img/a%20b.png\"") != NULL,
            "a leading .. was dropped instead of rejected");
-  sf_check(strstr(out, "var s = \"<img src='img/a%20b.png'>\";") != NULL,
-           "script body rewritten");
+  sf_check(strstr(out, "var t = \"<img src='img/a%20b.png'>\";") != NULL,
+           "script body rewritten past a </scripting> lookalike");
 
   /* Nothing an attribute value cannot hold: url() stays unquoted, and a quote
      that was already in the CSS is escaped. */
@@ -4940,7 +5009,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
   sf_check(sf_count(out, "img/a%20b.png") ==
-               3, /* anchor, script, the ".." one */
+               3, /* the anchor, the script body, and the ".." one */
            "an inlinable reference was left as a link");
 
   /* The inlined stylesheet carries its own @import and url() inlined. */
@@ -4953,12 +5022,57 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "url() in stylesheet not inlined");
     sf_check(strstr(css, "url(../img/never.png)") != NULL,
              "url() inside a CSS comment was rewritten");
+    sf_check(strstr(css, "url(data:font/woff2;base64,") != NULL,
+             "@font-face src not inlined");
+    sf_check(strstr(css, "@import url(data:text/css;base64,") != NULL,
+             "@import url() form not inlined");
+    sf_check(strstr(css, "url(../img/a b.png)b.css") != NULL,
+             "url() inside a string with an escaped quote was rewritten");
+    /* The over-cap url() read ../img/big.png from css/; this page sits at the
+       root, so it has to come back out as img/big.png or it dangles. */
+    sf_check(strstr(css, "url(img/big.png)") != NULL,
+             "over-cap url() not rebased onto the page's directory");
     nested = sf_decode(css, "text/css", NULL);
     sf_check(nested != NULL &&
                  strstr(nested, "url(data:image/png;base64,") != NULL,
              "url() in the @import'ed stylesheet not inlined");
     freet(nested);
     freet(css);
+  }
+
+  /* A tag with more attributes than the parser records comes back byte for
+     byte, quoted '>' and all, instead of being re-scanned as markup. */
+  {
+    char BIGSTK wide[HTS_URLMAXSIZE * 2];
+    char *before, *after;
+
+    fconcat(wide, sizeof(wide), root, "wide.html");
+    before = readfile_utf8(wide);
+    assertf(before != NULL);
+    (void) singlefile_rewrite_file(opt, root, wide);
+    after = readfile_utf8(wide);
+    sf_check(after != NULL && strcmp(before, after) == 0,
+             "an over-wide tag was rewritten");
+    freet(after);
+    freet(before);
+  }
+
+  /* The same stylesheet seen from two directories down: now the rebase has to
+     climb, which is the case that used to read past the buffer. */
+  {
+    char BIGSTK deep[HTS_URLMAXSIZE * 2];
+    char *dout, *dcss;
+
+    fconcat(deep, sizeof(deep), root, "deep/sub/page.html");
+    sf_check(singlefile_rewrite_file(opt, root, deep),
+             "deep page not rewritten");
+    dout = readfile_utf8(deep);
+    assertf(dout != NULL);
+    dcss = sf_decode(dout, "text/css", NULL);
+    sf_check(dcss != NULL && strstr(dcss, "url(../../img/big.png)") != NULL,
+             "over-cap url() not rebased from a nested page");
+    freet(dcss);
+    freet(dout);
   }
 
   /* Idempotence: a second pass must find nothing and leave the bytes alone. */
@@ -4974,7 +5088,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 
   /* Same page, a cap above big.png: it now inlines. */
   fconcat(root, sizeof(root), argv[0], "mirror2/");
-  sf_fixture(root, page, sizeof(page));
+  sf_fixture(root);
+  fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1024 * 1024;
   sf_check(singlefile_rewrite_file(opt, root, page),
            "raised-cap pass changed nothing");
@@ -4986,7 +5101,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 
   /* A cap of one byte inlines nothing at all. */
   fconcat(root, sizeof(root), argv[0], "mirror3/");
-  sf_fixture(root, page, sizeof(page));
+  sf_fixture(root);
+  fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1;
   sf_check(!singlefile_rewrite_file(opt, root, page), "one-byte cap inlined");
   out = readfile_utf8(page);

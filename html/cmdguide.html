@@ -300,7 +300,7 @@ ones it kept so the local copy browses offline. These options tune both halves.<
   <tr><td><tt>--preserve (-%p), --disable-passwords (-%x)</tt></td><td>Leave HTML untouched (no rewriting), and strip passwords out of saved links.</td></tr>
   <tr><td><tt>--extended-parsing (-%P), --parse-java (-j)</tt></td><td>Aggressive link discovery, and how much script content is parsed for links.</td></tr>
   <tr><td><tt>--mime-html (-%M)</tt></td><td>Save the whole mirror as a single MIME-encapsulated <tt>.mht</tt> archive (<tt>index.mht</tt>).</td></tr>
-  <tr><td><tt>--single-file (-%Z), --single-file-max-size N</tt></td><td>Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded as <tt>data:</tt> URIs. Assets over the cap (10&nbsp;MB by default) keep their link, as do audio, video, and the links from one page to another.</td></tr>
+  <tr><td><tt>--single-file (-%Z), --single-file-max-size N</tt></td><td>Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded as <tt>data:</tt> URIs. Assets over the cap (10&nbsp;MB by default) keep their link, as do audio, video, and the links from one page to another. A sibling of <tt>-%M</tt>, not a replacement: see the recipe below for which to pick.</td></tr>
   <tr><td><tt>--index (-I), --build-top-index (-%i), --search-index (-%I)</tt></td><td>Build a per-mirror index, a top index across projects, and a searchable keyword index.</td></tr>
 </table>
 
@@ -487,13 +487,17 @@ replayweb.page.</small></p>
 <p><tt>httrack https://example.com/ --single-file --path mydir</tt><br>
 <small>Rewrites each saved page after the crawl so its stylesheets, scripts,
 images and fonts are embedded as <tt>data:</tt> URIs. The mirror stays a normal
-browsable tree &mdash; links between pages remain relative, and the assets are
-still on disk &mdash; but any single <tt>.html</tt> file can now be mailed or
-archived on its own. Unlike <tt>--mime-html</tt>, which produces one
-<tt>.mht</tt> archive that current browsers no longer open, the output is
-ordinary HTML. Raise or lower the 10&nbsp;MB per-asset limit with
+browsable tree, with links between pages relative and the assets still on disk,
+but any single <tt>.html</tt> file can now be mailed or archived on its own.
+Raise or lower the 10&nbsp;MB per-asset limit with
 <tt>--single-file-max-size N</tt>; anything over it, plus audio and video, keeps
-its link.</small></p>
+its link.<br>
+Reach for this when the file has to open for someone you cannot make assumptions
+about: it is plain HTML and needs no add-on. Reach for <tt>--mime-html</tt>
+instead when a Chromium-family browser is a given and the mirror is large: MIME
+carries text parts without the base64 tax, keeps each resource's original URL,
+and stores a shared asset once rather than re-embedding it in every page that
+uses it.</small></p>
 
 <h4>HTTrack as a fetch tool</h4>
 <p><tt>httrack --get https://host/file.bin --path tmp</tt><br>

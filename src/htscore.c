@@ -2183,8 +2183,8 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   // fin purge!
 
-  /* --single-file: inline each page's assets now that the tree is final (after
-     the purge, so we never rewrite a file that is about to be deleted). */
+  /* --single-file: inline each page's assets now the tree is final, after the
+     purge has deleted whatever this run dropped. */
   singlefile_process_mirror(opt);
 
   // Indexation

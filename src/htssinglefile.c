@@ -80,6 +80,7 @@ typedef struct sf_ctx {
   size_t root_len;
   const char *page_dir; /* directory holding the page being rewritten */
   int *warn_budget;
+  LLint budget; /* bytes this page may still inline */
   int inlined;
 } sf_ctx;
 
@@ -169,8 +170,12 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
       common = i + 1;
     i++;
   }
-  if (from_dir[i] == '\0' && to_path[i] == '/')
-    common = i + 1;
+  /* from_dir is an ancestor of to_path: nothing to climb. Handled here rather
+     than by advancing common, which would index past from_dir's terminator. */
+  if (from_dir[i] == '\0' && to_path[i] == '/') {
+    StringCat(*out, to_path + i + 1);
+    return;
+  }
   for (j = common; from_dir[j] != '\0'; j++) {
     if (from_dir[j] == '/')
       nup++;
@@ -186,7 +191,8 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
    '/'-separated path under ctx->root naming an existing regular file. Returns
    HTS_FALSE for anything not resolvable that way: a fragment, an absolute or
    scheme-bearing URL (which covers data:), a reference climbing out of the
-   mirror, or a missing target. */
+   mirror, or a missing target. The containment is lexical, so a symlink the
+   mirror already holds is followed (the engine never writes one). */
 static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
                               const char *ref, size_t reflen, String *out) {
   char raw[SF_MAX_REF];
@@ -227,8 +233,11 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   unescape_http(decoded, sizeof(decoded), raw);
   if (decoded[0] == '\0')
     return HTS_FALSE;
-  if (strlen(base_dir) < ctx->root_len ||
-      memcmp(base_dir, ctx->root, ctx->root_len) != 0)
+  /* base_dir must be the root or a directory under it, matched on a component
+     boundary: a bare prefix test would also accept a sibling <root>foo. */
+  if (strncmp(base_dir, ctx->root, ctx->root_len) != 0 ||
+      (base_dir[ctx->root_len] != '\0' &&
+       !sf_is_sep((unsigned char) base_dir[ctx->root_len])))
     return HTS_FALSE;
 
   /* Walk the page's directory relative to the root, then the reference. */
@@ -306,31 +315,20 @@ static int sf_mime_class(httrackp *opt, const char *path, char *mime,
   return 0;
 }
 
-/* Whole UTF-8-named file into a NUL-terminated buffer the caller freet()s. */
+/* readfile2_utf8() refusing anything code64() could not size. */
 static char *sf_readfile(const char *path, size_t *size) {
-  char catbuff[CATBUFF_SIZE];
-  const LLint len = fsize_utf8(path);
-  const size_t buflen = len >= 0 ? llint_to_size_t(len) : (size_t) -1;
-  FILE *fp;
+  LLint len = 0;
   char *adr;
 
   *size = 0;
-  if (buflen == (size_t) -1 || buflen > SINGLEFILE_HARD_MAX_SIZE)
+  adr = readfile2_utf8(path, &len);
+  if (adr == NULL)
     return NULL;
-  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
-  if (fp == NULL)
+  if (len < 0 || len > SINGLEFILE_HARD_MAX_SIZE) {
+    freet(adr);
     return NULL;
-  adr = (char *) malloct(buflen + 1);
-  if (adr != NULL) {
-    if (buflen > 0 && fread(adr, 1, buflen, fp) != buflen) {
-      freet(adr);
-      adr = NULL;
-    } else {
-      adr[buflen] = '\0';
-      *size = buflen;
-    }
   }
-  fclose(fp);
+  *size = llint_to_size_t(len);
   return adr;
 }
 
@@ -424,28 +422,45 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     sf_warn_oversize(ctx, StringBuff(path), size, cap);
     goto fallback;
   }
+  if (size > ctx->budget) { /* the page has inlined all it may */
+    sf_warn_oversize(ctx, StringBuff(path), size, ctx->budget);
+    goto fallback;
+  }
   body = sf_readfile(StringBuff(path), &body_len);
   if (body == NULL)
     goto fallback;
-  StringCat(*out, "data:");
-  StringCat(*out, mime);
-  StringCat(*out, ";base64,");
-  if ((cls & SF_C_CSS) != 0 && depth < SF_MAX_CSS_DEPTH) {
-    String nested = STRING_EMPTY;
-    String nested_dir = STRING_EMPTY;
+  /* Encode into a scratch String: a failed encode must leave out untouched,
+     not a truncated "data:...;base64," with no payload. */
+  {
+    String payload = STRING_EMPTY;
 
-    sf_dirname(StringBuff(path), &nested_dir);
-    StringClear(nested);
-    sf_rewrite_css(ctx, StringBuff(nested_dir), depth + 1, body, body_len,
-                   &nested);
-    done = sf_append_base64(out, StringBuffRW(nested), StringLength(nested));
-    StringFree(nested);
-    StringFree(nested_dir);
-  } else {
-    done = sf_append_base64(out, body, body_len);
+    StringClear(payload);
+    if ((cls & SF_C_CSS) != 0 && depth < SF_MAX_CSS_DEPTH) {
+      String nested = STRING_EMPTY;
+      String nested_dir = STRING_EMPTY;
+
+      sf_dirname(StringBuff(path), &nested_dir);
+      StringClear(nested);
+      sf_rewrite_css(ctx, StringBuff(nested_dir), depth + 1, body, body_len,
+                     &nested);
+      done = sf_append_base64(&payload, StringBuffRW(nested),
+                              StringLength(nested));
+      StringFree(nested);
+      StringFree(nested_dir);
+    } else {
+      done = sf_append_base64(&payload, body, body_len);
+    }
+    if (done) {
+      StringCat(*out, "data:");
+      StringCat(*out, mime);
+      StringCat(*out, ";base64,");
+      StringMemcat(*out, StringBuff(payload), StringLength(payload));
+    }
+    StringFree(payload);
   }
   freet(body);
   if (done) {
+    ctx->budget -= size;
     ctx->inlined++;
     StringFree(path);
     return HTS_TRUE;
@@ -476,8 +491,12 @@ fallback:
 static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
                            const char *css, size_t len, String *out) {
   size_t i = 0;
+  int importing = 0; /* set for exactly one iteration: see the @import branch */
 
   while (i < len) {
+    const int is_import = importing;
+
+    importing = 0;
     /* A comment or a string is copied verbatim: a url( inside either is not a
        reference. */
     if (css[i] == '/' && i + 1 < len && css[i + 1] == '*') {
@@ -495,13 +514,24 @@ static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
 
       while (j < len && sf_is_space((unsigned char) css[j]))
         j++;
+      /* url(...) here names a stylesheet, so hand it to the url( branch with
+         the import's class rather than the image/font one. */
+      if (j < len && sf_span_starts(css + j, len - j, "url(")) {
+        StringMemcat(*out, css + i, j - i);
+        i = j;
+        importing = 1;
+        continue;
+      }
       if (j < len && (css[j] == '"' || css[j] == '\'')) {
         const char quote = css[j];
         const size_t vstart = j + 1;
         size_t vend = vstart;
 
-        while (vend < len && css[vend] != quote && css[vend] != '\n')
+        while (vend < len && css[vend] != quote && css[vend] != '\n') {
+          if (css[vend] == '\\' && vend + 1 < len)
+            vend++; /* an escaped quote does not end the string */
           vend++;
+        }
         if (vend < len && css[vend] == quote) {
           String repl = STRING_EMPTY;
 
@@ -540,8 +570,11 @@ static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
       }
       vstart = j;
       while (j < len && (quote != '\0' ? css[j] != quote : css[j] != ')') &&
-             css[j] != '\n')
+             css[j] != '\n') {
+        if (quote != '\0' && css[j] == '\\' && j + 1 < len)
+          j++; /* an escaped quote does not end the string */
         j++;
+      }
       vend = j;
       if (quote != '\0' && j < len && css[j] == quote) {
         j++;
@@ -557,8 +590,10 @@ static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
            a quote would end the attribute. A data: payload and an escaped path
            both stay inside the unquoted url-token alphabet. */
         if (sf_inline(ctx, base_dir, css + vstart, vend - vstart,
-                      SF_C_IMAGE | SF_C_FONT, NULL,
-                      depth > 0 ? ctx->page_dir : NULL, depth, &repl)) {
+                      is_import ? SF_C_CSS : SF_C_IMAGE | SF_C_FONT,
+                      is_import ? "text/css" : NULL,
+                      !is_import && depth > 0 ? ctx->page_dir : NULL, depth,
+                      &repl)) {
           StringCat(*out, "url(");
           StringMemcat(*out, StringBuff(repl), StringLength(repl));
           StringCat(*out, ")");
@@ -820,9 +855,16 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
       const size_t start = i;
 
       i += 4;
-      while (i + 3 <= len && memcmp(p + i, "-->", 3) != 0)
+      /* "<!-->" and "<!--->" are empty comments, not unterminated ones. */
+      if (i < len && p[i] == '>')
         i++;
-      i = i + 3 <= len ? i + 3 : len;
+      else if (i + 2 <= len && memcmp(p + i, "->", 2) == 0)
+        i += 2;
+      else {
+        while (i + 3 <= len && memcmp(p + i, "-->", 3) != 0)
+          i++;
+        i = i + 3 <= len ? i + 3 : len;
+      }
       StringMemcat(*out, p + start, i - start);
       continue;
     }
@@ -830,8 +872,17 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
       const size_t start = i; /* doctype, processing instruction, end tag */
 
       i++;
-      while (i < len && p[i] != '>')
-        i++;
+      while (i < len && p[i] != '>') {
+        /* A '>' inside a quoted value does not close the tag. */
+        if (p[i] == '"' || p[i] == '\'') {
+          const char q = p[i++];
+
+          while (i < len && p[i] != q)
+            i++;
+        }
+        if (i < len)
+          i++;
+      }
       if (i < len)
         i++;
       StringMemcat(*out, p + start, i - start);
@@ -856,11 +907,13 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
         i++;
       pre_len = (size_t) (p + i - pre);
       if (i >= len || p[i] == '>' ||
-          (p[i] == '/' && i + 1 < len && p[i + 1] == '>'))
+          (p[i] == '/' && i + 1 < len && p[i + 1] == '>')) {
+        i = (size_t) (pre - p); /* the caller copies this whitespace */
         break;
+      }
       if (nattrs == SF_MAX_ATTRS) {
-        overflow = HTS_TRUE;
-        break;
+        overflow = HTS_TRUE; /* keep parsing, but stop recording */
+        nattrs--;
       }
       a = &attrs[nattrs++];
       a->pre = pre;
@@ -913,22 +966,17 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
       a->has_value = HTS_TRUE;
       a->raw_len = (size_t) (p + i - a->raw);
     }
-    if (overflow) { /* pathological tag: copy it through untouched */
-      i = tag_start;
-      while (i < len && p[i] != '>')
-        i++;
-      if (i < len)
-        i++;
+    if (overflow) { /* pathological tag: copy the whole of it untouched */
       StringMemcat(*out, p + tag_start, i - tag_start);
-      continue;
+    } else {
+      if (sf_span_eq(tag, tag_len, "link"))
+        link_classes = sf_link_classes(attrs, nattrs, &link_fallback);
+      StringAddchar(*out, '<');
+      StringMemcat(*out, tag, tag_len);
+      for (k = 0; k < nattrs; k++)
+        sf_emit_attr(ctx, tag, tag_len, &attrs[k], link_classes, link_fallback,
+                     out);
     }
-    if (sf_span_eq(tag, tag_len, "link"))
-      link_classes = sf_link_classes(attrs, nattrs, &link_fallback);
-    StringAddchar(*out, '<');
-    StringMemcat(*out, tag, tag_len);
-    for (k = 0; k < nattrs; k++)
-      sf_emit_attr(ctx, tag, tag_len, &attrs[k], link_classes, link_fallback,
-                   out);
     while (i < len && sf_is_space((unsigned char) p[i])) {
       StringAddchar(*out, p[i]);
       i++;
@@ -950,8 +998,13 @@ static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
 
       while (end < len) {
         if (p[end] == '<' && end + 2 < len && p[end + 1] == '/' &&
-            sf_span_starts(p + end + 2, len - end - 2, rawtext))
-          break;
+            sf_span_starts(p + end + 2, len - end - 2, rawtext)) {
+          const size_t after = end + 2 + strlen(rawtext);
+
+          if (after >= len || sf_is_space((unsigned char) p[after]) ||
+              p[after] == '>' || p[after] == '/')
+            break;
+        }
         end++;
       }
       if (sf_span_eq(tag, tag_len, "style"))
@@ -984,6 +1037,7 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   ctx.root_len = StringLength(nroot);
   ctx.page_dir = StringBuff(dir);
   ctx.warn_budget = &budget;
+  ctx.budget = SINGLEFILE_MAX_PAGE_SIZE;
   ctx.inlined = 0;
   /* A UTF-16/32 page is not ASCII-delimited, so byte scanning would corrupt
      it; every ASCII-compatible charset is safe. */
@@ -1071,6 +1125,16 @@ void singlefile_process_mirror(httrackp *opt) {
     if (singlefile_rewrite_file(opt, root, link->sav))
       pages++;
   }
-  hts_log_print(opt, LOG_INFO,
-                "single-file: %d page(s) rewritten with inlined assets", pages);
+  if (pages == 0) {
+    /* Nothing to inline means the saved pages carry no relative asset links,
+       which is what --keep-links and --preserve produce. Say so: a silent
+       no-op looks like the option was ignored. */
+    hts_log_print(opt, LOG_NOTICE,
+                  "single-file: no page had an inlinable asset link "
+                  "(--keep-links or --preserve in use?)");
+  } else {
+    hts_log_print(opt, LOG_INFO,
+                  "single-file: %d page(s) rewritten with inlined assets",
+                  pages);
+  }
 }

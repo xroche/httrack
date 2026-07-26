@@ -48,8 +48,12 @@ extern "C" {
 /* Never base64 more than this, whatever the cap: code64() sizes in int. */
 #define SINGLEFILE_HARD_MAX_SIZE (256 * 1024 * 1024)
 
+/* Total bytes one page may inline. Nested @import fans out multiplicatively,
+   so a few hundred bytes of hostile CSS can otherwise ask for gigabytes. */
+#define SINGLEFILE_MAX_PAGE_SIZE (64 * 1024 * 1024)
+
 /* Rewrite every HTML page the mirror produced. No-op unless opt->single_file;
-   call once the tree is final (after the update purge and the index). */
+   call once the tree is final, after the update purge. */
 void singlefile_process_mirror(httrackp *opt);
 
 /* Rewrite one HTML document held in memory, appending the result to out.

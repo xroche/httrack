@@ -1796,7 +1796,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'Z': // single-file: inline each page's assets as data: URIs
-                if (*(com + 1) == 's') { // --single-file-max-size N: per-asset
+                if (*(com + 1) == 's') { // --single-file-max-size N
                   com++;
                   if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                     HTS_PANIC_PRINTF(
