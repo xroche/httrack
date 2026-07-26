@@ -32,6 +32,7 @@ TESTS = \
 	00_runnable.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
+	01_engine-cmdline-split.test \
 	01_engine-cookies.test \
 	01_engine-copyopt.test \
 	01_engine-crange.test \
@@ -177,6 +178,7 @@ TESTS = \
 	78_webhttrack-sid.test \
 	79_local-proxytrack-webdav-mime.test \
 	80_engine-crash-symbolize.test \
-	82_webhttrack-browse-links.test
+	82_webhttrack-browse-links.test \
+	83_webhttrack-argescape.test
 
 CLEANFILES = check-network_sh.cache
