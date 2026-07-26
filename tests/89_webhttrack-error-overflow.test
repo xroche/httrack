@@ -25,7 +25,9 @@ msgmax=1023
 
 srv=
 log=$(mktemp)
-base=$(mktemp -d)
+# Physical path: macOS resolves TMPDIR through /var -> private/var, and the
+# paths built below sit within a few bytes of its 1024-byte PATH_MAX.
+base=$(cd "$(mktemp -d)" && pwd -P)
 cleanup() {
     test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
     rm -f "${log}"
