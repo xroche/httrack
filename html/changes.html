@@ -129,6 +129,19 @@ server that answers 200 rather than 304 reads as changed. Keeping the cache on
 
 <br /><br />
 
+<h3>With the cache off</h3>
+
+<tt>--cache=0</tt> costs the report more than the digest of a parsed page. The
+mirror's file index (<tt>hts-cache/new.lst</tt>) is what records which files a
+run produced, so without it there is no previous mirror to subtract from: nothing
+is reported <tt>gone</tt>, and whether the run is a first crawl cannot be decided
+at all, which <tt>first_crawl</tt> states as <tt>null</tt> rather than guess. What
+is on disk is still compared byte for byte, so the other three lists stay
+meaningful, except for the pages HTTrack parses: those have no cached payload to
+compare against and fall back to the transfer signal.
+
+<br /><br />
+
 <h3>Fields</h3>
 
 <ul>
@@ -138,7 +151,8 @@ on an incompatible change; new fields may appear without one.</li>
 <li><tt>date</tt>: when the report was written, UTC, <tt>YYYY-MM-DDThh:mm:ssZ</tt>.</li>
 <li><tt>first_crawl</tt>: true when no index of a previous mirror
 (<tt>hts-cache/old.lst</tt>) was found, so there was nothing to compare against and
-everything is listed as new.</li>
+everything is listed as new. Null when the run kept no index at all and the
+question cannot be answered (see above).</li>
 <li><tt>partial</tt>: true when the report ran out of memory and lists only
 part of the mirror.</li>
 <li><tt>purged</tt>: true when <tt>--purge-old</tt> was in effect, so the
@@ -212,6 +226,10 @@ not again.</li>
 MIME type, say) is reported as <tt>new</tt> under its new name; the old name is
 reported as <tt>gone</tt> only if the file is still on disk. The two entries are
 not paired.</li>
+<li>A resource this run tried and failed to transfer also drops out of the
+mirror's index, but its previous copy is untouched, so it is reported
+<tt>unchanged</tt>. Under <tt>--purge-old</tt> that copy is deleted anyway, and
+the report says <tt>gone</tt> to match.</li>
 <li>A run that transfers no data at all is rolled back: HTTrack restores the
 previous cache generation and leaves the previous report in place, so a lost
 connection does not overwrite a good report with an empty one.</li>

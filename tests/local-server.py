@@ -1587,7 +1587,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "coded.bin",
                 "codedstable.bin",
                 "sized.html",
-                "killed.bin",
+                "reset.bin",
             )
         )
         seen = self.refetch_pass()
@@ -1701,16 +1701,17 @@ class Handler(SimpleHTTPRequestHandler):
             b"<html><body><p>CHANGES-TRANSIENT</p></body></html>", "text/html"
         )
 
-    # Transfers fine once, then dies mid-body on every later attempt, retries
-    # included: the mirrored copy survives untouched but the file never reaches
-    # new.lst, so old.lst minus new.lst offers it up as a deletion.
-    KILLED = b"CHANGES-KILLED\n" + b"\x21\x22\x23\x24" * 512
+    # Answers once, then hangs up before sending anything on every later
+    # attempt, retries included: nothing is written, so the file never reaches
+    # new.lst while its mirrored copy stays intact.
+    RESET = b"CHANGES-RESET\n" + b"\x21\x22\x23\x24" * 512
 
-    def route_changes_killed(self):
+    def route_changes_reset(self):
         if self.refetch_pass() == 1:
-            self.send_raw(self.KILLED, "application/octet-stream")
+            self.send_raw(self.RESET, "application/octet-stream")
         else:
-            self.send_truncated(self.KILLED, "application/octet-stream")
+            self.close_connection = True
+            self.connection.close()
 
     # A second, independent mirror crawled with the cache off: nothing but the
     # bytes on disk can tell stable2 from ticker2, whose body differs every
@@ -1765,7 +1766,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/changes/" + SIZED_LONG: route_changes_sizedtarget,
         "/changes/codedstable.bin": route_changes_coded_stable,
         "/changes/transient.html": route_changes_transient,
-        "/changes/killed.bin": route_changes_killed,
+        "/changes/reset.bin": route_changes_reset,
         "/changes2/index.html": route_changes2_index,
         "/changes2/stable2.bin": route_changes2_stable,
         "/changes2/ticker2.bin": route_changes2_ticker,

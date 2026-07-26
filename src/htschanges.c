@@ -270,14 +270,12 @@ hts_change_bucket hts_changes_classify(hts_boolean rewritten,
 /* Engine hooks                                                  */
 /* ------------------------------------------------------------ */
 
-/* FTP transfers reach file_notify() from a detached thread of their own, and
-   the crawl is not joined before the report is written, so every entry point
-   below (report and teardown included) runs under this lock. */
+/* FTP transfers reach file_notify() from a thread the crawl never joins, so
+   every entry point below, report and teardown included, takes this lock. */
 static htsmutex changes_mutex = HTSMUTEX_INIT;
 
-/* The live accumulator, created on first use. NULL when --changes is off or
-   the report has been written: a straggler notify must be dropped, not
-   resurrect an accumulator nobody will report. Call under the lock. */
+/* The live accumulator, created on first use; NULL when --changes is off or
+   the report is already written. Call under the lock. */
 static hts_changes *changes_get(httrackp *opt) {
   hts_changes *changes = (hts_changes *) opt->changes_state;
 
@@ -333,16 +331,15 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
   strlcatbuff(url, adr, sizeof(url));
   strlcatbuff(url, fil, sizeof(url));
 
-  /* Sample the previous copy with the lock released, and hash it only when it
-     is about to be overwritten: this is the last moment those bytes exist. */
+  /* Unlocked: hashing a large file would stall every other connection. Hash
+     it only when it is about to be overwritten, the last moment it exists. */
   prev_size = fsize_utf8(save);
   if (prev_size >= 0 && rewritten)
     has_prev = digest_file(save, prev_digest);
 
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
-  /* The slot index is stable (entries are only ever appended), but realloct()
-     may have moved the array while the lock was down. */
+  /* The slot index is stable, entries being append-only; the array is not. */
   if (changes != NULL && (size_t) slot < changes->count) {
     changes_entry *const entry = &changes->entries[slot];
 
@@ -373,8 +370,7 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   intptr_t slot;
   htsblk prev;
 
-  /* Before the digest and the cache read: with --changes off this hook must
-     cost nothing. */
+  /* Ahead of the digest and the cache read: off must cost nothing. */
   if (!opt->changes)
     return;
   if (r->adr == NULL || r->size < 0 || save == NULL || !strnotempty(save))

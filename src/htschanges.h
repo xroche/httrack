@@ -88,19 +88,16 @@ void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept);
    file's presence on disk, decides what counts as already mirrored. */
 void hts_changes_previous(httrackp *opt, const char *file);
 
-/* Record that this run keeps a mirror index at all. Without one (the cache is
-   off) deletions cannot be seen and first_crawl cannot be decided, which the
-   report states rather than guesses. */
+/* Record that this run keeps a mirror index. Without one (the cache is off)
+   deletions and first_crawl are undecidable, and the report says so. */
 void hts_changes_indexed(httrackp *opt);
 
 /* Resolve every entry against the bytes now on disk and serialize the report
-   into `out` (replaced). Exposed for the `changes` self-test; the engine goes
-   through hts_changes_close_opt(). */
+   into `out` (replaced). Exposed for the self-tests. */
 void hts_changes_report(httrackp *opt, String *out);
 
-/* Write the report and log a one-line summary. Idempotent, and after it the
-   accumulator is sealed: a late notify from a still-running transfer thread is
-   dropped instead of starting a report nobody will write. */
+/* Write the report and log a one-line summary. Idempotent, and seals the
+   accumulator: a late notify is dropped rather than starting a second one. */
 void hts_changes_close_opt(httrackp *opt);
 
 /* Drop the accumulator, for a run that never reached its end and to start the

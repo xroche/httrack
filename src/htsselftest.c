@@ -5244,12 +5244,33 @@ static void changes_race_notify(httrackp *opt, int n) {
   hts_changes_notify(opt, "race.example", fil, save, HTS_TRUE, HTS_FALSE);
 }
 
+/* htsthread_wait() counts a thread only once it is running, so it can return
+   before any of them started; join on our own counter instead. */
+static htsmutex changes_race_lock = HTSMUTEX_INIT;
+static int changes_race_started = 0;
+static int changes_race_live = 0;
+
+static int changes_race_count(int *which) {
+  int n;
+
+  hts_mutexlock(&changes_race_lock);
+  n = *which;
+  hts_mutexrelease(&changes_race_lock);
+  return n;
+}
+
 static void changes_race_thread(void *arg) {
   httrackp *const opt = (httrackp *) arg;
   int i;
 
+  hts_mutexlock(&changes_race_lock);
+  changes_race_started++;
+  hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < CHANGES_RACE_ROUNDS; i++)
     changes_race_notify(opt, i % CHANGES_RACE_FILES);
+  hts_mutexlock(&changes_race_lock);
+  changes_race_live--;
+  hts_mutexrelease(&changes_race_lock);
 }
 
 /* A transfer thread the crawl never joins (FTP) reaches hts_changes_notify()
@@ -5300,16 +5321,26 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
     }
   }
 
+  /* Take both locks once here: hts_mutexlock() initializes lazily, and two
+     threads reaching a fresh one together race on the init itself. */
+  hts_mutexlock(&changes_race_lock);
+  changes_race_started = 0;
+  changes_race_live = 4;
+  hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
     if (hts_newthread(changes_race_thread, opt) != 0) {
       fprintf(stderr, "changes-race: cannot spawn a notifier thread\n");
       return 1;
     }
   }
+  /* Report only once they are all notifying, or there is nothing to race. */
+  while (changes_race_count(&changes_race_started) < 4)
+    Sleep(10);
   for (i = 0; i < 64; i++)
     hts_changes_report(opt, &out);
   hts_changes_close_opt(opt);
-  htsthread_wait();
+  while (changes_race_count(&changes_race_live) > 0)
+    Sleep(10);
 
   /* Sealed: a straggler must be dropped, not start a report nobody writes. */
   changes_race_notify(opt, CHANGES_RACE_FILES + 1);
