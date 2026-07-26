@@ -1195,6 +1195,12 @@ int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
 
 /* --- read-side corruption injection --------------------------------------- */
 
+/* 100 'A's: a placeholder header line long enough to be overwritten by a
+   forged, over-long X-StatusMessage of the same byte length. */
+#define CORRUPT_LONG_ETAG                                                      \
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"                         \
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
 /* canary read back intact after each corruption; victim gets the byte surgery
  */
 #define CORRUPT_ADR "corrupt.example.com"
@@ -1216,6 +1222,24 @@ static void corrupt_build(httrackp *opt) {
   store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
               "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_b,
               strlen(corrupt_body_b));
+  selftest_close(&cache);
+}
+
+/* Like corrupt_build, but the victim carries a 100-char Etag placeholder. */
+static void corrupt_build_longetag(httrackp *opt) {
+  cache_back cache;
+
+  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
+  memset(corrupt_body_b, 'b', sizeof(corrupt_body_b) - 1);
+  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
+  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
+              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
+              strlen(corrupt_body_a));
+  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
+              "OK", "text/html", "utf-8", "", CORRUPT_LONG_ETAG, "", "",
+              corrupt_body_b, strlen(corrupt_body_b));
   selftest_close(&cache);
 }
 
@@ -1403,6 +1427,39 @@ static int corrupt_expect_disk_header(httrackp *opt, LLint wantsize,
   return fail;
 }
 
+/* An over-long field from a foreign cache must clip, not abort: the entry
+   still reads, clipped to capacity, and the canary survives. */
+static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantlen,
+                                         const char *what) {
+  cache_back cache;
+  htsblk v, c;
+  char BIGSTK lv[HTS_URLMAXSIZE * 2];
+  char BIGSTK lc[HTS_URLMAXSIZE * 2];
+  int fail = 0;
+
+  selftest_open_for_read(&cache, opt);
+  lv[0] = lc[0] = '\0';
+  v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.html", "", lv, NULL, 1);
+  if (v.statuscode != 200 || strlen(v.msg) != wantlen) {
+    fprintf(stderr, "%s: %s: status %d msg len %u, expected 200/%u\n",
+            selftest_tag, what, v.statuscode, (unsigned) strlen(v.msg),
+            (unsigned) wantlen);
+    fail++;
+  }
+  c = cache_readex(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc, NULL, 1);
+  if (c.statuscode != 200) {
+    fprintf(stderr, "%s: %s: canary tainted (status %d)\n", selftest_tag, what,
+            c.statuscode);
+    fail++;
+  }
+  if (v.adr != NULL)
+    freet(v.adr);
+  if (c.adr != NULL)
+    freet(c.adr);
+  selftest_close(&cache);
+  return fail;
+}
+
 /* One zip corruption case: build, patch, then check victim+canary in-session.
  */
 static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
@@ -1438,6 +1495,18 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   corrupt_victim_body(opt);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
                                     "garbled deflate stream");
+
+  /* A foreign cache may hold a field wider than ours: msg[80] here gets 89
+     bytes. Clipping keeps the entry; aborting would take the crawl down.
+     Overwrite the placeholder Etag line, same byte length, offsets intact. */
+  corrupt_build_longetag(opt);
+  corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
+                "X-StatusMessage: "
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                1, 1);
+  failures += corrupt_expect_victim_clipped(
+      opt, sizeof(((htsblk *) 0)->msg) - 1, "over-long X-StatusMessage");
 
   /* An X-Size above INT_MAX is positive as int64 (slips a bare sign check) but
      truncates negative in the (int) cast the malloc uses: a wraparound alloc.

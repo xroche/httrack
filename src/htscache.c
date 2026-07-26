@@ -142,10 +142,13 @@ struct cache_back_zip_entry {
   int compressionMethod;
 };
 
+/* Clip: strlcpybuff aborts on overflow, and a cache written by another build
+   (or a corrupt one) can legitimately carry a field wider than ours. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      strlcpybuff(refvalue, value, refvalue_size);                             \
+      (refvalue)[0] = '\0';                                                    \
+      strlncatbuff(refvalue, value, refvalue_size, (refvalue_size) - 1);       \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
