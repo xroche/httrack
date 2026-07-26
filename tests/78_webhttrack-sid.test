@@ -103,9 +103,10 @@ sid=$(scrape_sid "${port}")
 test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '${sid}')"
 
 # Accept: the legitimate flow still works. "redirect" is the cheapest field
-# with a reply that is visible in the headers.
+# with a reply that is visible in the headers. Matched from a here-string, not a
+# pipe: grep -q SIGPIPEs the producer, and pipefail then buries the verdict.
 resp=$(request "${port}" "sid=${sid}&redirect=/accepted")
-printf '%s' "${resp}" | grep -q '^Location: /accepted' ||
+grep -q '^Location: /accepted' <<<"${resp}" ||
     fail "a body carrying the correct sid was refused"
 
 # Refuse: missing and wrong. A missing one is the regression under test — the
@@ -114,12 +115,12 @@ printf '%s' "${resp}" | grep -q '^Location: /accepted' ||
 for bad in "redirect=/nosid" "sid=&redirect=/empty" \
     "sid=00000000000000000000000000000000&redirect=/wrong"; do
     resp=$(request "${port}" "${bad}")
-    printf '%s' "${resp}" | grep -q '^Location:' &&
+    grep -q '^Location:' <<<"${resp}" &&
         fail "body accepted without a valid sid: ${bad}"
     # A refusal has to be a well-formed reply, not a headerless fragment: the
     # release build used to emit only Content-length, which reads as a protocol
     # error to any client and hides the reason.
-    printf '%s' "${resp}" | grep -q '^HTTP/1\.0 403 ' ||
+    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "refusal was not a 403: ${bad}"
 done
 
@@ -127,16 +128,23 @@ done
 # applied to one global key store that later requests render from, and the
 # command dispatcher reads it from there. Probe the store itself — step3
 # interpolates ${projname} into its title — rather than the refused reply.
-title() { request "$1" "" step3; }
+store_page() {
+    # a dead probe or a non-page reply must not read as "the store was not written"
+    page=$(request "$1" "" step3) || fail "the key store probe failed"
+    grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
+        fail "the key store probe did not answer: '$(head -1 <<<"${page}")'"
+}
 
 request "${port}" "projname=UNAUTHWRITE" >/dev/null 2>&1 || true
-title "${port}" | grep -q 'UNAUTHWRITE' &&
+store_page "${port}"
+grep -q 'UNAUTHWRITE' <<<"${page}" &&
     fail "a body without a valid sid was written to the key store"
 
 # Paired accept case: without it the assertion above passes even if the server
 # simply ignores every body, which would prove nothing.
 request "${port}" "sid=${sid}&projname=AUTHWRITE" >/dev/null 2>&1 || true
-title "${port}" | grep -q 'AUTHWRITE' ||
+store_page "${port}"
+grep -q 'AUTHWRITE' <<<"${page}" ||
     fail "a body carrying the correct sid was not written to the key store"
 
 echo "PASS"

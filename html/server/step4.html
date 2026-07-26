@@ -114,7 +114,7 @@ ${do:end-if}
 
 ${/* Real commands and ini file generated below */}
 
-<!-- engine commandline -->
+<!-- engine commandline; ztest so a cleared default-on option still emits its disabling flag -->
 ${do:output-mode:html}
 <textarea name="command" cols="50" rows="4" style="visibility:hidden">
 httrack \
@@ -175,8 +175,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 \
 	${unquoted:url2}
 \
-	${test:cookies:--cookies=0:}
-	${test:parsejava:--parse-java=0:}
+	${ztest:cookies:--cookies=0:}
+	${ztest:parsejava:--parse-java=0:}
 	${test:updhack:--updatehack}
 	${test:urlhack:--urlhack=0:--urlhack}
 	${test:keepwww:--keep-www-prefix}

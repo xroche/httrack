@@ -48,7 +48,7 @@ htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 
 lib_LTLIBRARIES = libhttrack.la
 
-htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h \
+htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htscmdline.c htscmdline.h \
 	htsurlport.c htsurlport.h
 proxytrack_SOURCES = proxy/main.c \
@@ -87,7 +87,7 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) 
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
-EXTRA_DIST = httrack.h webhttrack \
+EXTRA_DIST = httrack.h htsstats.h webhttrack \
 		version.rc \
 		libhttrack.rc \
 		httrack.rc \
