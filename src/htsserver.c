@@ -318,6 +318,28 @@ typedef struct {
   error_redirect = "/server/error.html"; \
 } while(0)
 
+/* Longest error message shown on the error page; the rest is clipped. */
+#define ERROR_MESSAGE_MAX 1024
+
+/* Deliberately clipping: these messages quote posted fields, whose length the
+   client picks. */
+static HTS_PRINTF_FUN(3, 4) void format_error(char *dest, size_t size,
+                                              const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  (void) vslprintfbuff(dest, size, fmt, args);
+  va_end(args);
+}
+
+/* SET_ERROR() with a printf format. */
+#define SET_ERRORF(...)                                                        \
+  do {                                                                         \
+    char errbuf[ERROR_MESSAGE_MAX];                                            \
+    format_error(errbuf, sizeof(errbuf), __VA_ARGS__);                         \
+    SET_ERROR(errbuf);                                                         \
+  } while (0)
+
 /* Longest "sid" value worth unescaping: the expected one is an md5 hex digest,
    so anything near this is already invalid and is rejected unread. */
 #define SID_VALUE_MAX 64
@@ -879,28 +901,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           commandEnd = 1;
                         }
                       } else {
-                        char tmp[1024];
-
-                        sprintf(tmp,
-                                "Unable to write %d bytes in the the init file %s",
-                                count, StringBuff(fspath));
-                        SET_ERROR(tmp);
+                        SET_ERRORF(
+                            "Unable to write %d bytes in the the init file %s",
+                            count, StringBuff(fspath));
                       }
                       fclose(fp);
                     } else {
-                      char tmp[1024];
-
-                      sprintf(tmp, "Unable to create the init file %s",
-                              StringBuff(fspath));
-                      SET_ERROR(tmp);
+                      SET_ERRORF("Unable to create the init file %s",
+                                 StringBuff(fspath));
                     }
                   } else {
-                    char tmp[1024];
-
-                    sprintf(tmp,
-                            "Unable to create the directory structure in %s",
-                            StringBuff(fspath));
-                    SET_ERROR(tmp);
+                    SET_ERRORF("Unable to create the directory structure in %s",
+                               StringBuff(fspath));
                   }
 
                 } else {
