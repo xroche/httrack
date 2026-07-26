@@ -980,9 +980,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          /* path itself may hold ".." (webhttrack passes "<bin>/../share"), so
-             only the untrusted halves are checked: file here, website above. */
-          /* Regular files only: serving a directory or a FIFO never ends. */
+          /* Regular files only: reading a directory or FIFO never ends, and
+             "path" may hold "..", so only the untrusted halves are checked. */
           if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
               (fp = fopen(fsfile, "rb"))) {
             char ok[] =
