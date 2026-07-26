@@ -118,13 +118,6 @@ static int is_js(const char *file) {
   return ((strstr(file, ".js") != NULL));
 }
 
-/* fopen() succeeds on a directory on POSIX; reading one never reaches EOF. */
-static hts_boolean is_directory(const char *file) {
-  STRUCT_STAT st;
-
-  return STAT(file, &st) == 0 && S_ISDIR(st.st_mode) ? HTS_TRUE : HTS_FALSE;
-}
-
 static void sig_brpipe(int code) {
   /* ignore */
 }
@@ -987,8 +980,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           /* path itself may hold ".." (webhttrack passes "<bin>/../share"), so
              only the untrusted halves are checked: file here, website above. */
-          if (fsfile[0] && strstr(file, "..") == NULL &&
-              !is_directory(fsfile) && (fp = fopen(fsfile, "rb"))) {
+          /* Regular files only: serving a directory or a FIFO never ends. */
+          if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
+              (fp = fopen(fsfile, "rb"))) {
             char ok[] =
               "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
               "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"

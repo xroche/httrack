@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# fopen() succeeds on a directory on POSIX and reading one never reaches EOF, so
-# a request naming one used to spin the single-threaded server forever.
+# fopen() succeeds on a directory on POSIX and reading one never reaches EOF; a
+# FIFO blocks in fopen() instead. Either used to wedge the single-threaded server.
 
 set -euo pipefail
 
@@ -67,9 +67,8 @@ alive() { kill -0 "$1" 2>/dev/null; }
 
 portof() { echo "${1##*:}" | tr -d /; }
 
-# Raw request to 127.0.0.1:$1: GET the path $2, or POST the body $3 to / when $2
-# is empty. The socket timeout is what makes an unfixed tree fail rather than
-# wedge CI, so it must stay.
+# GET the path $2 from 127.0.0.1:$1, or POST the body $3 to / when $2 is empty.
+# The socket timeout is what makes an unfixed tree fail rather than wedge CI.
 request() {
     python3 -c 'import socket, sys
 port, path, body = int(sys.argv[1]), sys.argv[2], sys.argv[3]
@@ -117,7 +116,7 @@ case "${reply}" in
 *) fail "a GUI directory did not answer 404: $(firstline "${reply}")" ;;
 esac
 
-# Every request body is gated by the session id (78_webhttrack-sid.test).
+# Every request body is gated by the session id.
 reply=$(get "${port}" /server/index.html "the GUI is not served")
 sid=$(firstline "$(echo "${reply}" |
     sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')")
@@ -125,6 +124,13 @@ test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid (got '${sid}')"
 
 mkdir -p "${base}/proj/sub"
 echo "PROBEMARKER" >"${base}/proj/probe.txt"
+
+# mkfifo and ln -s may not work on a Windows checkout, so both stay optional.
+refuse=(/website/ /website/sub/)
+if mkfifo "${base}/proj/fifo.txt" 2>/dev/null; then
+    refuse+=(/website/fifo.txt)
+fi
+ln -s probe.txt "${base}/proj/link.txt" 2>/dev/null || true
 
 # step4's "save settings" flow registers the project without crawling, and that
 # is what arms the /website/ root.
@@ -134,29 +140,42 @@ post "${port}" "${body}" >/dev/null || fail "the save request did not answer"
 test -f "${base}/proj/hts-cache/winprofile.ini" ||
     fail "the project was not registered: $(cat "${log}")"
 
-# Positive control: without it every assertion below would pass on a server that
-# serves nothing at all under /website/.
+# Positive control: every assertion below would pass on a server serving nothing.
 served() {
-    case "$(get "$1" /website/probe.txt "$2")" in
+    case "$(get "$1" "$2" "$3")" in
     *PROBEMARKER*) ;;
-    *) fail "$2" ;;
+    *) fail "$3" ;;
     esac
 }
-served "${port}" "the registered project's mirror is not served"
+served "${port}" /website/probe.txt "the registered project's mirror is not served"
+if test -L "${base}/proj/link.txt"; then
+    # The guard stats rather than lstats, so a symlinked mirror file still serves.
+    served "${port}" /website/link.txt "a symlink to a mirror file is not served"
+fi
 
-# The mirror root and a directory below it. /website/ is where the GUI's own
-# "browse mirrored site" link points.
-for dir in /website/ /website/sub/; do
-    reply=$(get "${port}" "${dir}" "the server wedged on a mirror directory")
+# /website/ is where the GUI's own "browse mirrored site" link points.
+for path in "${refuse[@]}"; do
+    reply=$(get "${port}" "${path}" "the server wedged on ${path}")
     case "${reply}" in
     "HTTP/1.0 404 "*) ;;
-    *) fail "${dir} did not answer 404: $(firstline "${reply}")" ;;
+    *) fail "${path} did not answer 404: $(firstline "${reply}")" ;;
     esac
 done
 
-# A directory answered is worthless if it cost the server: the accept loop is
-# single-threaded, so one spin denies every later request, this shell's included.
+# The accept loop is single-threaded: one spin denies every later request.
 alive "${srv}" || fail "the server died: $(cat "${log}")"
-served "${port}" "the server stopped answering after a directory request"
+served "${port}" /website/probe.txt "the server stopped answering after a directory request"
+
+# This fopen() is reached before any guard, so its read loop must stop on ferror().
+mkdir -p "${base}/proj2/hts-cache/winprofile.ini"
+reply=$(post "${port}" "sid=${sid}&path=${base}&loadprojname=proj2") ||
+    fail "a directory winprofile.ini wedged the server"
+case "${reply}" in
+"HTTP/1.0 3"*) ;;
+*) fail "loading a project did not redirect: $(firstline "${reply}")" ;;
+esac
+
+alive "${srv}" || fail "the server died: $(cat "${log}")"
+served "${port}" /website/probe.txt "the server stopped answering after a project load"
 
 echo "PASS"
