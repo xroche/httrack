@@ -95,6 +95,7 @@ TESTS += 106_engine-repair-rename.test
 TESTS += 10_crawl-simple.test
 TESTS += 110_local-ftp-parallel.test
 TESTS += 111_local-ftp-update-rest.test
+TESTS += 113_engine-threadattr-leak.test
 TESTS += 112_local-single-file-fragment.test
 TESTS += 114_local-update-304-leak.test
 TESTS += 116_engine-rtrim.test
