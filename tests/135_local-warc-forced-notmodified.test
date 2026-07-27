@@ -6,9 +6,15 @@ set -eu
 
 # Scenario 1: real 304 (mini304) and engine-forced (errmask) side by side.
 export WARC_VALIDATE_UPDATE="warc-forced.warc.gz"
-export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html errmask/keep.dat"
-export WARC_VALIDATE_PROFILE="errmask/keep.dat=identical-payload-digest"
 export WARC_VALIDATE_EXCHANGE=1
+if test "${HTTPS_SUPPORT:-}" = "no"; then
+    # no OpenSSL: no payload digest to point a revisit at, so no record.
+    export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html"
+    export WARC_VALIDATE_NORECORD="errmask/keep.dat"
+else
+    export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html errmask/keep.dat"
+    export WARC_VALIDATE_PROFILE="errmask/keep.dat=identical-payload-digest"
+fi
 
 bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
     --rerun-args '--warc-file warc-forced' \
@@ -19,7 +25,9 @@ bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
 
 # Scenario 2: an all-forced pass, same archive name as pass 1, must not
 # replace the previous archive with an (almost) empty one (#777's shape).
-bash "$top_srcdir/tests/local-crawl.sh" --wacz-validate --archive-kept-on-rerun \
+# No --wacz: that needs OpenSSL and would skip this scenario on a build
+# without it, hiding the one thing it exists to catch.
+bash "$top_srcdir/tests/local-crawl.sh" --archive-kept-on-rerun \
     --archive-min-files 2 --rerun \
     --found 'errmask/keep.dat' \
-    httrack 'BASEURL/errmask/index.html' --warc-file warc-out --wacz
+    httrack 'BASEURL/errmask/index.html' --warc-file warc-out --warc-cdx

@@ -11,6 +11,8 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
+#   --no-record-for SUB       no record of any type (response/revisit/resource)
+#                             may target an asset containing SUB
 #   --expect-ip SUB=IP        a response or revisit targeting SUB must carry
 #                             WARC-IP-Address: IP exactly
 #   --expect-revisit-profile SUB=SUBSTR  a revisit targeting SUB must carry a
@@ -113,6 +115,7 @@ def main():
     verbatim = "--verbatim" in argv
     body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
     no_resp = opt_values(argv, "--no-response-for")
+    no_record = opt_values(argv, "--no-record-for")
     ip_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-ip")]
     profile_specs = [
         s.split("=", 1) for s in opt_values(argv, "--expect-revisit-profile")
@@ -155,6 +158,13 @@ def main():
             sys.exit("record %d: missing \\r\\n\\r\\n trailer" % total)
         wtype = field(header, b"WARC-Type")
         uri = field(header, b"WARC-Target-URI") or b""
+        if wtype in (b"response", b"revisit", b"resource"):
+            for sub in no_record:
+                if sub.encode() in uri:
+                    sys.exit(
+                        "unexpected %s record for %s (want no record)"
+                        % (wtype.decode(), sub)
+                    )
         if wtype in (b"response", b"revisit"):
             for sub, want_ip in ip_specs:
                 if sub.encode() in uri:

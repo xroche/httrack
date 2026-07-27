@@ -2076,6 +2076,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                             back[p].url_adr, back[p].url_fil);
             }
             back[p].r.notmodified = 1;  // fichier non modifié
+            // no request was sent at all, so this is never a server 304 (#839)
+            back[p].r.warc_forced_notmodified = HTS_TRUE;
             back[p].status = STATUS_READY; // OK prêt
             back_set_finished(sback, p);
 

@@ -1,0 +1,22 @@
+#!/bin/bash
+# A cache-priority resume (-C1) never sent a request either: it must not be
+# archived as a server-not-modified revisit (#839).
+set -eu
+
+: "${top_srcdir:=..}"
+
+export WARC_VALIDATE_UPDATE="warc-cprio.warc.gz"
+export WARC_VALIDATE_EXCHANGE=1
+if test "${HTTPS_SUPPORT:-}" = "no"; then
+    # no OpenSSL: no payload digest to point a revisit at, so no record.
+    export WARC_VALIDATE_NORECORD="mini304/index.html mini304/page.html"
+    export WARC_VALIDATE_NO_REVISIT=1
+else
+    export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html"
+    export WARC_VALIDATE_PROFILE="mini304/index.html=identical-payload-digest mini304/page.html=identical-payload-digest"
+fi
+
+bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
+    --rerun-args '-C1 --warc-file warc-cprio' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html' --warc-file warc-out

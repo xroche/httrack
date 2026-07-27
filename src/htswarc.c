@@ -1721,12 +1721,16 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     /* Served from cache: the payload sits in the previous archive, not here. */
     w->unbacked_revisits++;
   } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
+    /* Served from cache with no exchange either way: still unbacked. */
+    w->unbacked_revisits++;
+    /* No digest (no OpenSSL) means nothing to point a revisit at, and there
+       was no real exchange to record as a response; write nothing (#839). */
+    if (!have_pdig)
+      return 0;
     is_revisit = 1;
     profile =
         "http://netpreserve.org/warc/1.1/revisit/identical-payload-digest";
-    /* Self-referencing, no server exchange to name (#839); still unbacked. */
     refers_uri = target_uri;
-    w->unbacked_revisits++;
   } else if (have_pdig && w->seen != NULL) {
     void *prev = NULL;
     if (coucal_read_pvoid(w->seen, pdig, &prev) && prev != NULL) {
