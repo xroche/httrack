@@ -1108,13 +1108,8 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
       (void) chmod(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)),
                    HTS_ACCESS_FILE);
 #endif
-    if (ok) {
-      /* RENAME does not clobber an existing target on Windows. */
-      if (RENAME(StringBuff(tmp), page_path) != 0) {
-        (void) UNLINK(page_path);
-        ok = RENAME(StringBuff(tmp), page_path) == 0 ? HTS_TRUE : HTS_FALSE;
-      }
-    }
+    if (ok)
+      ok = hts_rename_over(StringBuff(tmp), page_path);
     if (!ok) {
       hts_log_print(opt, LOG_ERROR, "single-file: could not rewrite %s",
                     page_path);

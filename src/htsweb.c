@@ -224,9 +224,7 @@ int main(int argc, char *argv[]) {
 #ifdef HTS_USESWF
   smallserver_setkey("USESWF", "1");
 #endif
-#ifdef HTS_USEZLIB
   smallserver_setkey("USEZLIB", "1");
-#endif
 #ifdef _WIN32
   smallserver_setkey("WIN32", "1");
 #endif

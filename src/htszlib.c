@@ -40,7 +40,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htszlib.h"
 
-#if HTS_USEZLIB
 /* zlib */
 /*
 #include <zlib.h>
@@ -274,4 +273,3 @@ const char *hts_get_zerror(int err) {
     break;
   }
 }
-#endif
