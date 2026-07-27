@@ -223,6 +223,7 @@ TESTS = \
 	100_local-purge-longpath.test \
 	101_local-update-stale-bak.test \
 	102_local-ftp-refetch.test \
+	104_engine-warc-longurl.test \
 	105_suite-timeout.test
 
 CLEANFILES = check-network_sh.cache

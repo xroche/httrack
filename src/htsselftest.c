@@ -4944,6 +4944,101 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A URL longer than the old 1024-byte header-format buffer must still reach the
+   archive: the record used to be abandoned whole, silently (#785). The sweep
+   straddles the boundary so both the stack-buffer and the grow path run. */
+static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
+  /* "WARC-Target-URI: " + CRLF costs 19 bytes, so the old buffer failed at
+     1005; 9000 forces several reallocs within one record. */
+  static const size_t lengths[] = {100, 1003, 1004, 1005, 1006, 2000, 9000};
+  static const char resp_hdr[] =
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
+  char path[HTS_URLMAXSIZE * 2];
+  char body[64];
+  warc_writer *w;
+  FILE *fp;
+  char *blob;
+  LLint fsz;
+  const char *at2;
+  size_t i, n, nrec = 0;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-longurl: need a writable directory\n");
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s/longurl.warc", argv[0]);
+
+  w = warc_open(opt, path);
+  if (w == NULL) {
+    fprintf(stderr, "warc-longurl: could not create %s\n", path);
+    return 1;
+  }
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    const size_t len = lengths[i];
+    char *uri = malloct(len + 1);
+
+    if (uri == NULL) {
+      warc_close(w);
+      return 1;
+    }
+    /* A distinct tail per URI so a truncated one cannot match another. */
+    snprintf(uri, len + 1, "http://example.com/%04d/", (int) len);
+    memset(uri + strlen(uri), 'a', len - strlen(uri));
+    uri[len] = '\0';
+    /* Distinct payloads: identical ones dedupe into revisit records. */
+    snprintf(body, sizeof(body), "<html><body>%04d</body></html>\n", (int) len);
+    if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr, body, strlen(body),
+                               NULL, 200, 0, 0) != 0) {
+      fprintf(stderr, "warc-longurl: write failed at length %d\n", (int) len);
+      err = 1;
+    }
+    freet(uri);
+  }
+  warc_close(w);
+
+  fsz = fsize_utf8(path);
+  blob = (fsz > 0) ? malloct((size_t) fsz + 1) : NULL;
+  if (blob == NULL) {
+    fprintf(stderr, "warc-longurl: no archive written\n");
+    return 1;
+  }
+  fp = FOPEN(path, "rb");
+  n = (fp != NULL) ? fread(blob, 1, (size_t) fsz, fp) : 0;
+  if (fp != NULL)
+    fclose(fp);
+  blob[n] = '\0';
+
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    const size_t len = lengths[i];
+    char want[64];
+    const char *at;
+
+    snprintf(want, sizeof(want), "WARC-Target-URI: http://example.com/%04d/",
+             (int) len);
+    at = strstr(blob, want);
+    if (at == NULL) {
+      fprintf(stderr, "warc-longurl: length %d lost its record\n", (int) len);
+      err = 1;
+    } else if (strlen(at) < strlen("WARC-Target-URI: ") + len ||
+               at[strlen("WARC-Target-URI: ") + len] != '\r') {
+      fprintf(stderr, "warc-longurl: length %d truncated\n", (int) len);
+      err = 1;
+    }
+  }
+  for (at2 = blob; (at2 = strstr(at2, "WARC-Type: response")) != NULL; at2++)
+    nrec++;
+  if (nrec != sizeof(lengths) / sizeof(lengths[0])) {
+    fprintf(stderr, "warc-longurl: %d response records, want %d\n", (int) nrec,
+            (int) (sizeof(lengths) / sizeof(lengths[0])));
+    err = 1;
+  }
+
+  freet(blob);
+  printf("warc-longurl: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
    .cdx is sorted, has exactly one line per response/revisit/resource (none for
    warcinfo/request), and each offset/length points at a gzip member that
@@ -6787,6 +6882,9 @@ static const struct selftest_entry {
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
+    {"warc-longurl", "<dir>",
+     "a URL past the header-format buffer still reaches the archive",
+     st_warc_longurl},
     {"longpath", "<dir>",
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",
