@@ -57,6 +57,8 @@ rerun_dead=
 tmpdir=
 serverpid=
 crawlpid=
+wacz_poisoned=
+wacz_poison="stale-wacz-that-a-second-pass-must-replace"
 
 function warning {
     echo "** $*" >&2
@@ -272,6 +274,14 @@ if test -n "$warc_validate"; then
     test -z "$w1" || cp "$w1" "${tmpdir}/warc-pass1.gz"
 fi
 
+# Poison the first-pass .wacz when a second pass follows: repackaging moves the
+# new archive over it, so the marker must be gone afterwards (#726). Poisoning
+# beats comparing the two packages, which can come out byte-identical.
+if test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
+    wacz_poisoned=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
+    test -z "$wacz_poisoned" || echo "$wacz_poison" >"$wacz_poisoned"
+fi
+
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
@@ -415,6 +425,12 @@ if test -n "$wacz_validate"; then
             exit 77
         fi
         die "no .wacz file produced under $mirrorroot"
+    fi
+    if test -n "$wacz_poisoned"; then
+        info "checking the second pass replaced the .wacz"
+        grep -q "$wacz_poison" "$wacz_poisoned" 2>/dev/null &&
+            die "stale .wacz kept: $wacz_poisoned"
+        result "OK"
     fi
     validator=$(nativepath "${testdir}/wacz-validate.py")
     info "validating WACZ package"

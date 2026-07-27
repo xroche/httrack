@@ -5,11 +5,16 @@
 # real gate: STORE-mode entries, the fixed layout, recomputed sha256 digests and
 # the datapackage-digest chain (plus py-wacz/pywb when importable). The crawl
 # skips cleanly on a build without OpenSSL (no conformant SHA-256 -> no package).
+#
+# The cacheless second pass repackages over the .wacz the first one left: the
+# clobber, not the happy rename, is what breaks when a platform refuses to
+# rename onto an existing file (#726).
 
 set -eu
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --wacz-validate \
+    --rerun-args '-C0' --log-not-found 'could not finalize' \
     --found 'mini304/index.html' --found 'mini304/page.html' \
     httrack 'BASEURL/mini304/index.html' --warc-file warc-out --wacz

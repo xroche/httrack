@@ -109,6 +109,9 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
 /* Remove the temp-ref for (adr,fil); HTS_TRUE if it was removed. */
 hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil);
+/* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both
+   paths are fconv()'d. */
+hts_boolean hts_rename_over(const char *src, const char *dst);
 #endif
 
 #endif

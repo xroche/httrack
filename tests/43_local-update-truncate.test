@@ -18,6 +18,7 @@ set -euo pipefail
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update -M400000' \
     --log-found 'More than 400000 bytes have been transferred.. giving up' \
+    --log-not-found 'could not restore' \
     --found bigtrunc/slow.bin \
     --file-min-bytes bigtrunc/slow.bin 655360 \
     --file-min-bytes bigtrunc/fast.bin 655360 \
