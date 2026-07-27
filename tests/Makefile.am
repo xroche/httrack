@@ -207,6 +207,8 @@ TESTS = \
 	93_local-changes.test \
 	94_local-single-file.test \
 	95_local-sitemap.test \
-	96_local-refetch-keep.test
+	96_local-refetch-keep.test \
+	97_local-warc-update-keep.test \
+	98_local-warc-segments.test
 
 CLEANFILES = check-network_sh.cache
