@@ -1,7 +1,6 @@
 #!/bin/bash
-# Issue #769: a failed robots.txt under -o1, with .txt assumed image/gif, was
-# the one input reaching the --errpage placeholder block, which swapped r.adr
-# for a 1070-byte GIF but left r.size alone: robots_parse then over-read it.
+# Issue #769: -o1 with .txt assumed image/gif was the one input reaching the
+# removed --errpage placeholder block, which over-read in robots_parse.
 
 set -eu
 
