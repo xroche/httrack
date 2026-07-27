@@ -84,13 +84,25 @@ run_pass() {
 
 run_pass fresh
 run_pass update --update
+# only --warc-file stashes the two header blocks, so the archive limb of the fix
+# runs on this pass alone
+run_pass warc --update --warc-file leak
 
-# Teeth: the update pass must have gone through the 304 path, or a run that
+# Teeth: the update passes must have gone through the 304 path, or a run that
 # re-downloaded everything would report clean having tested nothing.
 printf '[update used the cache] ..\t'
 if grep -aqE "no files updated" "${out}/hts-log.txt"; then
     echo "OK"
 else
     echo "FAIL: the update pass did not report unchanged files"
+    exit 1
+fi
+
+# ... and the WARC pass must have written an archive, or it stashed nothing.
+printf '[warc pass archived] ..\t'
+if [ -n "$(find "$out" -name 'leak*.warc*' -size +0c 2>/dev/null)" ]; then
+    echo "OK"
+else
+    echo "FAIL: the --warc-file pass produced no archive"
     exit 1
 fi

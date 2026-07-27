@@ -1176,8 +1176,7 @@ void back_connxfr(htsblk * src, htsblk * dst) {
 /* Release the buffers a response owns. The connection members are left alone:
    back_connxfr() moves those, and the file handles are closed elsewhere. */
 static void back_free_response(htsblk *r) {
-  freet(r->adr);
-  freet(r->headers);
+  deleteaddr(r);
   warc_free_request(r);
 }
 
