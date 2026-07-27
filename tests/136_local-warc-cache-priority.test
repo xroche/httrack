@@ -7,6 +7,10 @@ set -eu
 
 export WARC_VALIDATE_UPDATE="warc-cprio.warc.gz"
 export WARC_VALIDATE_EXCHANGE=1
+# Positive control on the fresh (pass-1) archive: a write-nothing regression
+# in warc_write_transaction would otherwise slip past the update-pass checks
+# below, which only assert the ABSENCE of certain records.
+export WARC_VALIDATE_BODY="mini304/index.html=3c68746d6c3e3c626f64793e0a093c6120687265663d22706167652e68746d6c223e706167653c2f613e0a3c2f626f64793e3c2f68746d6c3e0a"
 if test "${HTTPS_SUPPORT:-}" = "no"; then
     # no OpenSSL: no payload digest to point a revisit at, so no record.
     export WARC_VALIDATE_NORECORD="mini304/index.html mini304/page.html"

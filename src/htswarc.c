@@ -94,7 +94,8 @@ struct warc_writer {
   hts_boolean protect_prev;   /* previous archive present: build in a temp */
   hts_boolean opened;         /* open completed; a failed one swaps nothing */
   hts_boolean failed;         /* a record or segment was lost: swap nothing */
-  uint64_t unbacked_revisits; /* revisits whose payload no file here holds */
+  uint64_t unbacked_revisits; /* URLs this pass didn't capture here: an
+                                  unbacked revisit, or nothing written at all */
   char **page_lines; /* one JSON page line per 200 text/html response, owned */
   size_t page_count;
   size_t page_cap;
@@ -1612,7 +1613,7 @@ static hts_boolean warc_commit(warc_writer *w) {
     hts_log_print(
         w->opt, LOG_ERROR,
         "WARC: this pass revisited %llu URL(s) without re-downloading them, so "
-        "its archive would name bodies no file holds; kept the previous %s "
+        "this archive doesn't hold their current content; kept the previous %s "
         "(re-run with -C0, or --warc-file with a name of its own)",
         (unsigned long long) w->unbacked_revisits,
         warc_seg_path(w, 0, finalbuf, sizeof(finalbuf)));
@@ -1723,6 +1724,11 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     /* Served from cache: the payload sits in the previous archive, not here. */
     w->unbacked_revisits++;
   } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
+    /* has_payload requires body_len>0, so a genuinely empty body looks
+       digest-less too; it still has a well-defined digest (sha1 of nothing),
+       so compute it here rather than treat it as a missing-crypto case. */
+    if (!have_pdig && body_len == 0 && (body != NULL || body_path != NULL))
+      have_pdig = payload_digest_b32(body, body_len, body_path, pdig);
     /* Served from cache with no exchange either way: still unbacked. */
     w->unbacked_revisits++;
     /* No digest (no OpenSSL) means nothing to point a revisit at, and there

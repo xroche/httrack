@@ -1646,7 +1646,9 @@ class Handler(SimpleHTTPRequestHandler):
     ERRMASK_ERR = b"<html><body>error 403</body></html>\n"
 
     def route_errmask_index(self):
-        self.send_html('\t<a href="keep.dat">keep</a>\n')
+        self.send_html(
+            '\t<a href="keep.dat">keep</a>\n\t<a href="empty.dat">empty</a>\n'
+        )
 
     def route_errmask_keep(self):
         # First crawl (no validator) gets the 1024 B body + Last-Modified; the
@@ -1666,6 +1668,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(self.ERRMASK_GOOD)
+
+    def route_errmask_empty(self):
+        # Same masking shape as keep.dat, but a genuinely zero-length body: an
+        # engine-forced revisit must still digest and archive it, not treat
+        # it as a missing-crypto case (#839).
+        if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
+            self.send_response(403, "Forbidden")
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(self.ERRMASK_ERR)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.ERRMASK_ERR)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Last-Modified", BIG_LASTMOD)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
@@ -2228,6 +2248,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,
         "/errmask/keep.dat": route_errmask_keep,
+        "/errmask/empty.dat": route_errmask_empty,
         "/maxrecv/index.html": route_maxrecv_index,
         "/maxrecv/r0.bin": route_maxrecv_404,
         "/maxrecv/r1.bin": route_maxrecv_404,
