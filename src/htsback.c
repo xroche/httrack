@@ -638,8 +638,20 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
 void back_refetch_backup(httrackp *opt, lien_back *const back) {
   back->tmpfile = NULL;
   if (fexist_utf8(back->url_sav)) {
-    if (create_back_tmpfile(opt, back, "bak") != 0 ||
-        RENAME(back->url_sav, back->tmpfile) != 0) {
+    hts_boolean saved = HTS_FALSE;
+
+    if (create_back_tmpfile(opt, back, "bak") == 0) {
+      /* clobber a .bak a killed run left behind, or the guard stays off for
+         good (#758) */
+      if (fexist_utf8(back->tmpfile))
+        hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
+                      back->tmpfile);
+      saved = hts_rename_over(back->url_sav, back->tmpfile);
+    }
+    if (!saved) {
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "could not back up %s; an aborted re-fetch will lose it",
+                    back->url_sav);
       back->tmpfile = NULL;
     }
   }
