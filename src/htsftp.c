@@ -237,6 +237,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   strcpybuff(back->r.msg, "");
   back->r.statuscode = 0;
   back->r.size = 0;
+  back->r.lastmodified[0] = '\0'; // a retry must not stamp the previous MDTM
 
   // récupérer user et pass si présents, et sauter user:id@ dans adr
   real_adr = strchr(back->url_adr, ':');
