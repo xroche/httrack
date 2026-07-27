@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A cache-served second pass fetches no bodies, so it must leave the WARC, CDXJ
+# and WACZ of the first pass untouched (#759). The kept package is re-validated
+# to prove it still replays, not just that a same-named file is still there.
+# The one Error: line is the keep notice; a second means the pass also failed.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --archive-kept-on-rerun \
+    --rerun --wacz-validate --log-found 'WARC: this pass revisited' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html' --warc-file warc-out --wacz

@@ -585,6 +585,19 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   return 0;
 }
 
+/* Did the fetch fail to produce a response, as opposed to the engine
+   deliberately passing the resource over? Only the latter may be purged. */
+static hts_boolean back_transfer_failed(const int statuscode) {
+  switch (statuscode) {
+  case STATUSCODE_TOO_BIG:
+  case STATUSCODE_EXCLUDED:
+  case STATUSCODE_TEST_OK:
+    return HTS_FALSE;
+  default:
+    return statuscode <= 0 ? HTS_TRUE : HTS_FALSE;
+  }
+}
+
 /* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
    existing file moved the good copy to back->tmpfile before truncating url_sav.
    commit keeps the new file and drops the backup; else restore it so an aborted
@@ -1031,6 +1044,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
   /* Aborted, error, or not ready: url_sav (if written) is broken; restore the
      previous copy from the backup. */
   back_finalize_backup(opt, &back[p], HTS_FALSE);
+  /* Note the surviving copy, or the end-of-update purge drops what this run
+     never managed to replace (#746). */
+  if (!back[p].testmode && back_transfer_failed(back[p].r.statuscode) &&
+      back[p].url_sav[0] != '\0' && fexist_utf8(back[p].url_sav)) {
+    filenote(&opt->state.strc, back[p].url_sav, NULL);
+    file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0,
+                back[p].r.notmodified);
+  }
   return -1;
 }
 
