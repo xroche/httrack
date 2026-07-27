@@ -63,9 +63,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
-#if HTS_USEZLIB
 #include "htszlib.h"
-#endif
 #if HTS_USEZSTD
 #include <zstd.h>
 #endif
@@ -3377,7 +3375,6 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-#if HTS_USEZLIB
 /* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
 static int ae_write_packed(const char *path, int windowBits,
                            const unsigned char *src, size_t len) {
@@ -3451,7 +3448,6 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   freet(buf);
   return ok ? 0 : 1;
 }
-#endif
 
 /* Write src[0..len) to path as-is; 0 on success. */
 static int ae_write_raw(const char *path, const unsigned char *src,
@@ -3501,7 +3497,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   assertf(strstr(on, "br") == NULL && strstr(on, "zstd") == NULL);
   assertf((strstr(tls, ", br") != NULL) == (HTS_USEBROTLI != 0));
   assertf((strstr(tls, "zstd") != NULL) == (HTS_USEZSTD != 0));
-#if HTS_USEZLIB
   if (argc >= 1) {
     static const int windowBits[] = {16 + MAX_WBITS, MAX_WBITS, -MAX_WBITS};
     const unsigned char small[] =
@@ -3580,10 +3575,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     }
     freet(body);
   }
-#else
-  (void) argc;
-  (void) argv;
-#endif
   printf("acceptencoding self-test OK: %s\n", on);
   return 0;
 }
@@ -3928,7 +3919,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(big);
   }
 
-#if HTS_USEZLIB
   /* A highly compressible document decodes without running away: the ratio
      budget cannot bind (deflate tops out near 1032:1), so this pins the
      decompression path itself rather than the 64 MiB ceiling. */
@@ -3979,13 +3969,11 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(z);
     freet(x);
   }
-#endif
 
   /* An unterminated <loc> at end of buffer must not read past it. */
   assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
   assertf(sm_scan("<urlset><lo", 100, &idx, &c) == 0);
 
-#if HTS_USEZLIB
   /* A gzip-framed document is decompressed before scanning. */
   {
     const char *const xml =
@@ -4015,7 +4003,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
     freet(z);
   }
-#endif
 
   /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
      and group-independent (no User-agent line needed). */
