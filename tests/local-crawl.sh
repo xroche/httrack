@@ -345,6 +345,7 @@ if test "${#plants[@]}" -gt 0; then
         if test "${plants[$i]}" = "--plant-dir"; then
             mkdir -p "$path" || die "could not create $path"
         else
+            mkdir -p "$(dirname "$path")" || die "could not create ${path%/*}"
             echo "$plant_poison" >"$path" || die "could not write $path"
         fi
         result "OK"
@@ -549,9 +550,25 @@ if test -n "$wacz_validate"; then
 fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
-# #483), or the .z/.u content-coding temps (#557).
+# #483), the .z/.u content-coding temps (#557), or the hts-tmp directory those
+# and the re-fetch backup live in (#774). Only a test that planted something in
+# hts-tmp itself owns what is left there, so only that case skips the scan.
 info "checking for leftover engine temporaries"
-leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) 2>/dev/null | head -5)
+scan_tmpdir=1
+i=0
+while test "$i" -lt "${#plants[@]}"; do
+    case "${plants[$((i + 1))]}" in
+    */hts-tmp/*) scan_tmpdir=0 ;;
+    esac
+    i=$((i + 2))
+done
+if test "$scan_tmpdir" -eq 1; then
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \
+        -o -name 'hts-tmp' \) 2>/dev/null | head -5)
+else
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) \
+        2>/dev/null | head -5)
+fi
 if test -z "$leftovers"; then result "OK"; else
     result "leftover: $leftovers"
     exit 1

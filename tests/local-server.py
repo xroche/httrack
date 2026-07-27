@@ -1196,6 +1196,59 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # variant -> (Content-Type, title bytes, body bytes); the gb2312 and l1decl
+    # titles are valid UTF-8 as bytes, so only the declared charset decodes them
+    TITLEENC_PAGES = {
+        "u8": (
+            "text/html",
+            "Café-u8".encode(),
+            '<img src="s.svg#café"><a href="né.txt">leaf</a>'.encode(),
+        ),
+        # genuine latin-1: the guess must still be applied
+        "l1": (
+            "text/html",
+            "Café-l1".encode("latin-1"),
+            b'<a href="l1.txt">leaf</a>',
+        ),
+        "declared": ("text/html; charset=utf-8", "Café-declared".encode(), b"x"),
+        "gb2312": ("text/html; charset=gb2312", "图片".encode("gb2312") + b"-gb", b"x"),
+        "l1decl": (
+            "text/html; charset=iso-8859-1",
+            "Ã©".encode("latin-1") + b"-l1d",
+            b"x",
+        ),
+    }
+
+    def route_titleenc(self):
+        name = unquote(urlsplit(self.path).path)[len("/titleenc/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else None
+        if variant in self.TITLEENC_PAGES:
+            ctype, title, body = self.TITLEENC_PAGES[variant]
+            self.send_raw(
+                b"<html><head><title>"
+                + title
+                + b"</title></head><body>"
+                + body
+                + b"</body></html>",
+                ctype,
+            )
+            return
+        if name == "s.svg":
+            self.send_raw(
+                (
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<symbol id="café"><rect/></symbol></svg>'
+                ).encode(),
+                "image/svg+xml",
+            )
+            return
+        if name in ("né.txt", "l1.txt"):
+            self.send_raw(b"leaf\n", "text/plain")
+            return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
     # can be interrupted (partial + temp-ref); every later request is 416.
     RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
@@ -1552,6 +1605,40 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_mini304_page(self):
         self.big_send(b"<html><body>tiny cacheable page</body></html>\n", "text/html")
+
+    # --- /bakname/: #774 — a mirrored file named like a re-fetch backup ----
+    # a.bin gets a new body every pass, so the update re-fetches it and takes a
+    # backup. The sibling carries a validator, so it only revalidates and must
+    # still be there afterwards. It is served under hts-tmp/, the directory the
+    # backup lives in, so the crawl asks for the exact path the engine writes.
+    BAKNAME_SIB = b"BAKNAME-SIBLING\n" + b"\x41\x42\x43\x44" * 512
+
+    def route_bakname_index(self):
+        self.send_html(
+            '\t<a href="a.bin">a</a>\n'
+            '\t<a href="hts-tmp/a.bin.bak">bak</a>\n'
+        )
+
+    def route_bakname_main(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_raw(
+            b"BAKNAME-MAIN-V%d\n" % v + b"\x31\x32\x33\x34" * 512,
+            "application/octet-stream",
+        )
+
+    def route_bakname_sibling(self):
+        if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
+            self.send_response(304)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Last-Modified", BIG_LASTMOD)
+        self.send_header("Content-Length", str(len(self.BAKNAME_SIB)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.BAKNAME_SIB)
 
     # --- /errmask/: issue #176 — a page that 200'd on the first crawl but 403s
     # on the update fetch must keep its good copy, not be overwritten nor purged.
@@ -2134,6 +2221,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/bakname/index.html": route_bakname_index,
+        "/bakname/a.bin": route_bakname_main,
+        "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,
@@ -2324,6 +2414,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/charset/"):
             self.route_charset()
+            return True
+        if path.startswith("/titleenc/"):
+            self.route_titleenc()
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))

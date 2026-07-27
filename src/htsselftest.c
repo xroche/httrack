@@ -6385,6 +6385,90 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
+// inside the reserved hts-tmp directory, whose segment url_savename escapes so
+// no mirrored file can ever sit there (#774), and must never leave the resource
+// without a copy (#775).
+static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
+  lien_back *back;
+  char want[HTS_URLMAXSIZE * 2 + 32];
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "refetchbackup: needs a writable base dir\n");
+    return 1;
+  }
+  back = calloct(1, sizeof(lien_back));
+  if (back == NULL) {
+    fprintf(stderr, "refetchbackup: out of memory\n");
+    return 1;
+  }
+  /* explicit separator: fconcat() joins without one, which would put the
+     temporary in the parent of the directory under test */
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/refetch.bin", argv[0]);
+  snprintf(want, sizeof(want), "%s/hts-tmp/refetch.bin.bak", argv[0]);
+
+  /* #774: pin the name, so moving the temporary out of the reserved directory
+     cannot pass without url_savename reserving wherever it went instead. */
+  ro_put(back->url_sav, "old");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
+    fprintf(stderr, "refetchbackup: the previous copy was not moved aside\n");
+    err++;
+  } else if (strcmp(back->tmpfile, want) != 0) {
+    fprintf(stderr, "refetchbackup: temporary is %s, want %s\n", back->tmpfile,
+            want);
+    err++;
+  }
+  ro_put(back->url_sav, "new"); /* what filecreate() + the transfer produce */
+  back_finalize_backup(opt, back, HTS_TRUE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: the committed copy is not the new one\n");
+    err++;
+  }
+
+  /* #758: only a killed run can leave something there, and it must be replaced
+     rather than disable the backup for good. */
+  if (structcheck(want) != 0) {
+    fprintf(stderr, "refetchbackup: cannot create %s\n", want);
+    freet(back);
+    return 1;
+  }
+  ro_put(want, "leftover");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || !ro_is(want, "new")) {
+    fprintf(stderr, "refetchbackup: a leftover temporary blocked the backup\n");
+    err++;
+  }
+
+  /* #775: filecreate() failed, so there is nothing to commit to. Saying so is
+     load-bearing: the caller must not cache this response against the old
+     body, or the next --update gets a 304 pinning it. */
+  (void) UNLINK(back->url_sav);
+  if (back_finalize_backup(opt, back, HTS_TRUE)) {
+    fprintf(stderr, "refetchbackup: a commit that restored reported success\n");
+    err++;
+  }
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: a commit with no new copy lost both\n");
+    err++;
+  }
+
+  /* An aborted transfer restores, as before. */
+  back_refetch_backup(opt, back);
+  ro_put(back->url_sav, "partial");
+  back_finalize_backup(opt, back, HTS_FALSE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
+    err++;
+  }
+
+  (void) UNLINK(back->url_sav);
+  freet(back);
+  printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6864,6 +6948,149 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #806: hts_localtime() must own its output too, same rationale as
+   hts_gmtime() (#794). Reference table computed under TZ=XXX5 (fixed
+   UTC-5, no DST), which the driving .test script sets. */
+#define LOCALTIME_THREADS 8
+#define LOCALTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} localtime_refs[] = {
+    {(time_t) 0, 69, 11, 31, 19, 0, 0, 3, 364},
+    {(time_t) 951782400, 100, 1, 28, 19, 0, 0, 1,
+     58}, /* a leap day, GMT side */
+    {(time_t) 1000000000, 101, 8, 8, 20, 46, 40, 6, 250},
+    {(time_t) 2147483647, 138, 0, 18, 22, 14, 7, 1, 17},
+};
+
+#define LOCALTIME_REFS                                                         \
+  ((int) (sizeof(localtime_refs) / sizeof(localtime_refs[0])))
+
+static hts_boolean localtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != localtime_refs[i].year ||
+      tm->tm_mon != localtime_refs[i].mon ||
+      tm->tm_mday != localtime_refs[i].mday ||
+      tm->tm_hour != localtime_refs[i].hour ||
+      tm->tm_min != localtime_refs[i].min ||
+      tm->tm_sec != localtime_refs[i].sec ||
+      tm->tm_wday != localtime_refs[i].wday ||
+      tm->tm_yday != localtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex localtime_lock = HTSMUTEX_INIT;
+static int localtime_bad = 0;
+
+static void localtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < LOCALTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv) ||
+        !localtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&localtime_lock);
+  localtime_bad += bad;
+  hts_mutexrelease(&localtime_lock);
+}
+
+static int st_localtime(httrackp *opt, int argc, char **argv) {
+  static int idx[LOCALTIME_THREADS];
+  int err = 0, i;
+
+  (void) opt;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
+    return 1;
+  }
+
+  for (i = 0; i < LOCALTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "localtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!localtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "localtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  if (sizeof(time_t) >= 8) {
+    const time_t beyond = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_localtime(beyond, &tmv)) {
+      fprintf(stderr,
+              "localtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < LOCALTIME_THREADS; i++) {
+    idx[i] = i % LOCALTIME_REFS;
+    if (hts_newthread(localtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "localtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (localtime_bad != 0) {
+    fprintf(stderr, "localtime: %d/%d concurrent conversions were corrupt\n",
+            localtime_bad, LOCALTIME_THREADS * LOCALTIME_ROUNDS);
+    err = 1;
+  }
+
+  /* get_filetime_rfc822() must report GMT, never the process's local zone,
+     and never a silent fallback to it on gmtime() failure (#806). */
+  {
+    char path[HTS_URLMAXSIZE];
+    char date[256];
+    struct tm parsed;
+
+    snprintf(path, sizeof(path), "%s/filetime.bin", argv[0]);
+    structcheck(path);
+    {
+      FILE *fp = FOPEN(path, "wb");
+
+      if (fp == NULL) {
+        fprintf(stderr, "localtime: cannot write %s\n", path);
+        return 1;
+      }
+      fputc('x', fp);
+      fclose(fp);
+    }
+    if (set_filetime_rfc822(path, "Tue, 29 Feb 2000 00:00:00 GMT") != 0) {
+      fprintf(stderr, "localtime: cannot set %s's mtime\n", path);
+      err = 1;
+    } else if (!get_filetime_rfc822(path, date)) {
+      fprintf(stderr, "localtime: get_filetime_rfc822 failed on %s\n", path);
+      err = 1;
+    } else if (convert_time_rfc822(&parsed, date) == NULL ||
+               parsed.tm_year != 100 || parsed.tm_mon != 1 ||
+               parsed.tm_mday != 29 || parsed.tm_hour != 0) {
+      fprintf(stderr,
+              "localtime: get_filetime_rfc822 reported \"%s\" (TZ=%s)\n", date,
+              getenv("TZ") ? getenv("TZ") : "");
+      err = 1;
+    }
+  }
+
+  printf("localtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -7291,6 +7518,9 @@ static const struct selftest_entry {
      st_threadwait},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"localtime", "<dir>",
+     "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
+     st_localtime},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
@@ -7399,6 +7629,9 @@ static const struct selftest_entry {
      "hts_rename_over(): replace dst, but never delete a dst it did not "
      "replace",
      st_renameover},
+    {"refetchbackup", "<dir>",
+     "the re-fetch backup always leaves a copy, and stays out of the mirror",
+     st_refetchbackup},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

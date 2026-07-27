@@ -170,6 +170,17 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_gmtime(time_t t,
 #endif
 }
 
+/* Break t down as local time into the caller's buffer, HTS_FALSE if that
+   failed. localtime()'s static is shared, same rationale as hts_gmtime(). */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
+                                                       struct tm *tmbuf) {
+#ifdef _WIN32
+  return localtime_s(tmbuf, &t) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return localtime_r(&t, tmbuf) != NULL ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
