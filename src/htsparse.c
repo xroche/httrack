@@ -3065,9 +3065,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if (singlefile_ref_is_markable(tempo)) {
                               strcatbuff(tempo, SINGLEFILE_MARK);
                             } else {
-                              hts_log_print(opt, LOG_WARNING,
-                                            "single-file: not marking \"%s\": the saved reference was not escaped",
-                                            tempo);
+                              hts_log_print(
+                                  opt, LOG_WARNING,
+                                  "single-file: not marking \"%s\": the saved "
+                                  "reference was not escaped",
+                                  tempo);
                             }
                           }
 

@@ -95,10 +95,13 @@ static void sf_init(void) {
   sf_write("a.png", png, sizeof(png) - 1);
   sf_write("big.png", big, sizeof(big));
   sf_text("j.js", "var x=1;\n");
-  /* @import plus a url(), so an inlined stylesheet recurses and its own
-     relative reference is rebased. */
-  sf_text("s.css", "@import url(sub/b.css);\ndiv{background:url(a.png)}\n");
-  sf_text("sub/b.css", "p{background:url(../a.png)}\n");
+  /* Marked, so an inlined stylesheet recurses into its own marks and its
+     un-inlinable reference is rebased; unmarked assets leave the target as a
+     bare scan that reaches nothing. */
+  sf_text("s.css", "@import url(sub/b.css" SINGLEFILE_MARK ");\n"
+                   "div{background:url(a.png" SINGLEFILE_MARK ")}\n"
+                   "p{background:url(big.png" SINGLEFILE_MARK ")}\n");
+  sf_text("sub/b.css", "p{background:url(../a.png" SINGLEFILE_MARK ")}\n");
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
