@@ -97,6 +97,7 @@ TESTS += 110_local-ftp-parallel.test
 TESTS += 111_local-ftp-update-rest.test
 TESTS += 112_local-single-file-fragment.test
 TESTS += 114_local-update-304-leak.test
+TESTS += 116_engine-rtrim.test
 TESTS += 117_local-proxytrack-ndx-cursor.test
 TESTS += 121_local-ftp-nocache-splice.test
 TESTS += 11_crawl-cookies.test
