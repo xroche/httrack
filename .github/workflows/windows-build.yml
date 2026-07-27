@@ -209,10 +209,11 @@ jobs:
           : >"$progress"
 
           pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
-          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
+          # Globbed, not enumerated: a new NNN_engine-*.test or NNN_local-*.test
+          # is picked up automatically instead of silently getting zero coverage.
+          for t in 00_runnable.test *_engine-*.test 01_zlib-*.test \
                    *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
-                   60_crawl-log-salvage.test 116_engine-rtrim.test \
-                   106_engine-repair-rename.test; do
+                   60_crawl-log-salvage.test; do
             elapsed=$((SECONDS - started))
             if [ "$elapsed" -ge "$suite_deadline" ]; then
               echo "::error::suite deadline: ${elapsed}s elapsed, stopping before $t"
@@ -259,17 +260,37 @@ jobs:
 
           # Every gate here exits 77, so an all-skipped suite would report green having
           # tested nothing: pin the skips, and floor the passes in case the glob empties.
+          # One name per line, so two branches each appending one don't collide on the
+          # same line; compared as a sorted set below, so glob discovery order can't
+          # cause a false mismatch either.
           # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
           # crange pending #581;
           # webdav-mime needs a reapable background listener, which MSYS cannot give it;
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
           # single-file ends on a GUI half needing htsserver, which this job does not build;
-          # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of.
-          expected_skips=" 01_engine-footer-overflow.test 100_local-purge-longpath.test 114_local-update-304-leak.test 48_local-crange-memresume.test 71_local-crange-repaircache.test 79_local-proxytrack-webdav-mime.test 88_local-proxytrack-badmtime.test 94_local-single-file.test"
+          # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
+          # crash-symbolize needs backtrace(), which Windows has no equivalent of.
+          expected_skips="01_engine-footer-overflow.test
+          100_local-purge-longpath.test
+          114_local-update-304-leak.test
+          48_local-crange-memresume.test
+          71_local-crange-repaircache.test
+          79_local-proxytrack-webdav-mime.test
+          80_engine-crash-symbolize.test
+          88_local-proxytrack-badmtime.test
+          94_local-single-file.test"
           # First, or the deadline reads as an unexplained shortfall in the gates below.
           [ "$deadline" -eq 0 ] || { echo "::error::suite did not finish within ${suite_deadline}s"; exit 1; }
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
-          [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
+          # Word-split on whitespace (space-joined $skipped, newline-joined
+          # expected_skips both work) and sort, so the compare is a set, not a string.
+          got=$(printf '%s\n' $skipped | sort)
+          want=$(printf '%s\n' $expected_skips | sort)
+          if [ "$got" != "$want" ]; then
+            echo "::error::skip set changed from expected; - missing, + newly skipped"
+            diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /'
+            exit 1
+          fi
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
 
       - name: Upload the test logs
