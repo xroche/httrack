@@ -30,6 +30,7 @@ TEST_EXTENSIONS = .test
 TEST_LOG_COMPILER = $(BASH)
 TESTS = \
 	00_runnable.test \
+	01_engine-addlink.test \
 	01_engine-changes.test \
 	01_engine-charset.test \
 	01_engine-cmdline.test \
