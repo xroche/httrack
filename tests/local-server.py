@@ -19,6 +19,8 @@ import gzip
 import hashlib
 import os
 import re
+import socket
+import struct
 import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -1560,6 +1562,120 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
         self.wfile.write(b"0\r\n\r\n")
 
+    # #840: a chunked stream cut before its terminating zero-length chunk.
+    CHUNKTRUNC_V1 = b"<html><body><p>CHUNKTRUNC-PAGE-V1</p></body></html>"
+    CHUNKTRUNC_V2 = b"<html><body><p>CHUNKTRUNC-PAGE-V2</p></body></html>"
+
+    CHUNKTRUNC_BIN_V1 = b"CHUNKTRUNC-BIN-V1\n" + b"\x07\x08\x09\xfe" * 8192
+    CHUNKTRUNC_BIN_V2 = b"CHUNKTRUNC-BIN-V2\n" + b"\x17\x18\x19\xee" * 8192
+
+    def route_chunktrunc_index(self):
+        self.send_html(
+            '\t<a href="page.html">page</a>\n'
+            '\t<a href="always.html">always</a>\n'
+            '\t<a href="stay.html">stay</a>\n'
+            '\t<a href="file.bin">file</a>\n'
+            '\t<a href="always.bin">alwaysbin</a>\n'
+            '\t<a href="hostile.html">hostile</a>\n'
+            '\t<a href="reset.bin">reset</a>\n'
+        )
+
+    def send_chunked(self, body, terminate, ctype="text/html; charset=utf-8"):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            if terminate:
+                self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunktrunc_page(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(self.CHUNKTRUNC_V1, True)
+        else:
+            self.send_chunked(self.CHUNKTRUNC_V2, False)
+
+    # Same over the direct-to-disk path: the update pass delivers half the new
+    # body and never terminates it.
+    def route_chunktrunc_file(self):
+        octet = "application/octet-stream"
+        if self.refetch_pass() == 1:
+            self.send_chunked(self.CHUNKTRUNC_BIN_V1, True, octet)
+        else:
+            half = self.CHUNKTRUNC_BIN_V2[: len(self.CHUNKTRUNC_BIN_V2) // 2]
+            self.send_chunked(half, False, octet)
+
+    # Truncated on every pass, so a first crawl has nothing good to fall back on.
+    def route_chunktrunc_always(self):
+        self.send_chunked(b"<html><body><p>CHUNKTRUNC-ALWAYS</p></body></html>", False)
+
+    def route_chunktrunc_alwaysbin(self):
+        self.send_chunked(
+            b"CHUNKTRUNC-ALWAYSBIN\n" + b"\x27\x28\x29\xde" * 1000,
+            False,
+            "application/octet-stream",
+        )
+
+    # Control: terminated on both passes, so a normal --update still lands.
+    def route_chunktrunc_stay(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_chunked(b"<html><body><p>CHUNKSTAY-V%d</p></body></html>" % v, True)
+
+    # The update pass declares a chunk of 0x80000000, which sscanf("%x") lands in
+    # an int as INT_MIN: it must not read as the terminating chunk, and the sum
+    # it drives negative must not read as a complete body either.
+    def route_chunktrunc_hostile(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(b"<html><body><p>CHUNKHOSTILE-V1</p></body></html>", True)
+            return
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"80000000\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # Aborts the chunked body with an RST, so the read fails rather than seeing a
+    # clean EOF and the transfer is already in error before the framing check.
+    def route_chunktrunc_reset(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"CHUNKRESET\n" + b"\x31\x32\x33\xcd" * 4096
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.flush()
+            time.sleep(0.5)  # let the client consume the chunk first
+            self.connection.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+            self.connection.close()
+        except OSError:
+            pass
+        self.close_connection = True
+
     # Content-Disposition naming: the attachment filename replaces the
     # URL-derived name; path components in it are stripped (RFC 2616).
     CDISPO_NAMES = {
@@ -1615,8 +1731,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_bakname_index(self):
         self.send_html(
-            '\t<a href="a.bin">a</a>\n'
-            '\t<a href="hts-tmp/a.bin.bak">bak</a>\n'
+            '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp/a.bin.bak">bak</a>\n'
         )
 
     def route_bakname_main(self):
@@ -2175,6 +2290,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,
         "/chunked/page.html": route_chunked_page,
+        "/chunktrunc/index.html": route_chunktrunc_index,
+        "/chunktrunc/page.html": route_chunktrunc_page,
+        "/chunktrunc/always.html": route_chunktrunc_always,
+        "/chunktrunc/file.bin": route_chunktrunc_file,
+        "/chunktrunc/always.bin": route_chunktrunc_alwaysbin,
+        "/chunktrunc/stay.html": route_chunktrunc_stay,
+        "/chunktrunc/hostile.html": route_chunktrunc_hostile,
+        "/chunktrunc/reset.bin": route_chunktrunc_reset,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,

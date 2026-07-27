@@ -203,6 +203,7 @@ TESTS += 131_local-savename-reserved.test
 TESTS += 132_local-bak-space-collision.test
 TESTS += 119_local-proxytrack-ndx-fields2.test
 TESTS += 118_local-proxytrack-arcwrite.test
+TESTS += 130_local-chunked-truncated.test
 TESTS += 134_local-warc-revisit-ip.test
 TESTS += 135_local-warc-forced-notmodified.test
 TESTS += 136_local-warc-cache-priority.test
