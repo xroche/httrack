@@ -19,7 +19,7 @@ printf -- '-*/zzmarker*\n' >"$tmp/rules.txt"
 # the rules file lands in the URL/filter string, echoed back by the banner
 run=$(httrack -O "$tmp/out" --quiet -n "-%S" "$tmp/rules.txt" \
     "file://$tmp/index.html" 2>&1) || true
-printf '%s\n' "$run" | grep -q 'zzmarker' || {
+grep -q 'zzmarker' <<<"$run" || {
     echo "FAIL: -%S rules file was not loaded"
     printf '%s\n' "$run"
     exit 1

@@ -1109,7 +1109,7 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
                    HTS_ACCESS_FILE);
 #endif
     if (ok)
-      ok = hts_rename_over(StringBuff(tmp), page_path);
+      ok = hts_rename_over(opt, StringBuff(tmp), page_path);
     if (!ok) {
       hts_log_print(opt, LOG_ERROR, "single-file: could not rewrite %s",
                     page_path);

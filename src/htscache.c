@@ -985,6 +985,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
               StringBuff(opt->path_log),
               "hts-cache/new.zip")))) { // a previous cache exists.. rename it
         if (!hts_rename_over(
+                opt,
                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                         StringBuff(opt->path_log), "hts-cache/new.zip"),
                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
