@@ -773,7 +773,7 @@ int httpmirror(char *url1, httrackp * opt) {
         // sauter les + sans rien après..
         if (strnotempty(tempo)) {
           if ((plus == 0) && (type == 1)) {     // implicite: *www.edf.fr par exemple
-            if (tempo[strlen(tempo) - 1] != '*') {
+            if (hts_lastchar(tempo) != '*') {
               strcatbuff(tempo, "*");   // ajouter un *
             }
           }
@@ -2191,7 +2191,9 @@ int httpmirror(char *url1, httrackp * opt) {
                   continue;
                 strcpybuff(file, StringBuff(opt->path_html));
                 strcatbuff(file, line + 1);
-                file[strlen(file) - 1] = '\0';
+                /* drop filenote()'s wrapping ']'; a linput() chunk split leaves
+                   a tail with none, which used to underflow file when 1 byte */
+                hts_striplastchar(file, ']');
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?
                   if (fexist_utf8(file)) { // still on disk
@@ -2218,12 +2220,11 @@ int httpmirror(char *url1, httrackp * opt) {
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
-                  while(strnotempty(line) && (line[strlen(line) - 1] != '/')
-                        && (line[strlen(line) - 1] != '\\')) {
-                    line[strlen(line) - 1] = '\0';
+                  while (strnotempty(line) && (hts_lastchar(line) != '/') &&
+                         (hts_lastchar(line) != '\\')) {
+                    hts_choplastchar(line);
                   }
-                  if (strnotempty(line))
-                    line[strlen(line) - 1] = '\0';
+                  hts_choplastchar(line);
                   if (strnotempty(line))
                     if (!strstr(adr, line)) {   // non trouvé?
                       char BIGSTK file[HTS_URLMAXSIZE * 2];
@@ -2236,13 +2237,12 @@ int httpmirror(char *url1, httrackp * opt) {
                         if (opt->log) {
                           hts_log_print(opt, LOG_INFO, "Purging directory %s/",
                                         file);
-                          while(strnotempty(file)
-                                && (file[strlen(file) - 1] != '/')
-                                && (file[strlen(file) - 1] != '\\')) {
-                            file[strlen(file) - 1] = '\0';
+                          while (strnotempty(file) &&
+                                 (hts_lastchar(file) != '/') &&
+                                 (hts_lastchar(file) != '\\')) {
+                            hts_choplastchar(file);
                           }
-                          if (strnotempty(file))
-                            file[strlen(file) - 1] = '\0';
+                          hts_choplastchar(file);
                         }
                       }
                     }

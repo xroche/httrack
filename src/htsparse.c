@@ -1701,7 +1701,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 #endif
                                     )   // ok pas de problème
                                     url_ok = 1;
-                                  else if (tempo[strlen(tempo) - 1] == '/') {   // un slash: ok..
+                                  else if (hts_lastchar(tempo) ==
+                                           '/') {       // un slash: ok..
                                     if (inscript)       // sinon si pas javascript, méfiance (répertoire style base?)
                                       url_ok = 1;
                                   }
@@ -2005,9 +2006,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (eadr - html - 1 < HTS_URLMAXSIZE) {        // pas trop long?
                 strncpy(lien, html, eadr - html - 1);
                 lien[eadr - html - 1] = '\0';
-                // supprimer les espaces
-                while((lien[strlen(lien) - 1] == ' ') && (strnotempty(lien)))
-                  lien[strlen(lien) - 1] = '\0';
+                // strip trailing spaces
+                while (hts_striplastchar(lien, ' ')) {
+                }
 
               } else
                 lien[0] = '\0'; // erreur
@@ -2207,7 +2208,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // supposition dangereuse?
                 // OUI!!
 #if HTS_TILDE_SLASH
-                if (lien[strlen(lien) - 1] != '/') {
+                if (hts_lastchar(lien) != '/') {
                   char *a = lien + strlen(lien) - 1;
 
                   // éviter aussi index~1.html
@@ -2272,7 +2273,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // Vérifier les codebase=applet (au lieu de applet/)
                     if (p_type == -2) { // codebase
                       if (strnotempty(lien)) {
-                        if (lien[strlen(lien) - 1] != '/') {     // pas répertoire
+                        if (hts_lastchar(lien) != '/') { // pas répertoire
                           strcatbuff(lien, "/");
                         }
                       }
@@ -2688,9 +2689,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             int cat_data_len = 0;
 
                             // ajouter lien external
-                            switch ((link_has_authority(afs.af.adr)) ? 1
-                                    : ((afs.af.fil[strlen(afs.af.fil) - 1] ==
-                                        '/') ? 1 : (ishtml(opt, afs.af.fil)))) {
+                            switch ((link_has_authority(afs.af.adr))
+                                        ? 1
+                                        : ((hts_lastchar(afs.af.fil) == '/')
+                                               ? 1
+                                               : (ishtml(opt, afs.af.fil)))) {
                             case 1:
                             case -2:   // html ou répertoire
                               if (opt->getmode & HTS_GETMODE_HTML) {
@@ -2733,7 +2736,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
                               }
                               break;
-                            }   // html,gif
+                            } // html,gif
 
                             if (patch_it) {
                               char BIGSTK save[HTS_URLMAXSIZE * 2];

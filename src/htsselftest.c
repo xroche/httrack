@@ -6236,7 +6236,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   strcpybuff(base, argv[0]);
-  if (base[0] != '\0' && base[strlen(base) - 1] != '/')
+  if (base[0] != '\0' && hts_lastchar(base) != '/')
     strcatbuff(base, "/");
   StringCopy(opt->path_html, base);
   StringCopy(opt->path_html_utf8, base);
@@ -6307,6 +6307,88 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The x[strlen(x) - 1] class (#770). The string starts mid-arena so the byte
+   it must not touch is a real neighbour; poisoned with '#', not 0, or a stray
+   NUL terminator would read as untouched. */
+static int st_lastchar(httrackp *opt, int argc, char **argv) {
+  enum { off = 8 };
+
+  char arena[16];
+  char *const s = &arena[off];
+  const int guard = off - 1; /* what the old idiom clobbers */
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+#define REPOISON(str)                                                          \
+  do {                                                                         \
+    memset(arena, '#', sizeof(arena));                                         \
+    strlcpybuff(s, (str), sizeof(arena) - off);                                \
+  } while (0)
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* the empty string: every helper must report "nothing" and touch nothing */
+  REPOISON("");
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(arena[guard] == '#');
+  REPOISON("");
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+  REPOISON("");
+  CHECK(hts_choplastchar(s) == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+
+  /* a '/' sitting where the underflow would land must not be mistaken for the
+     string's own last byte -- this is the #768 shape */
+  REPOISON("");
+  arena[guard] = '/';
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '/');
+
+  /* non-empty: ordinary behaviour */
+  REPOISON("ab/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(strcmp(s, "a") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* one-character string: the boundary the guards get wrong */
+  REPOISON("/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* control: the canary must be able to fail, or the checks above prove
+     nothing. Clobber it exactly as the unguarded idiom would. */
+  REPOISON("");
+  s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+
+#undef REPOISON
+#undef CHECK
+
+  printf("lastchar self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -6362,6 +6444,8 @@ static const struct selftest_entry {
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"lastchar", "", "last-char helpers never index before the buffer (#770)",
+     st_lastchar},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",

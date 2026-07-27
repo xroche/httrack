@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Guards the x[strlen(x) - 1] class (#770): on an empty string that index is -1,
+# one byte before the buffer. Drives 'httrack -#test=lastchar', which checks the
+# helpers against a poisoned neighbouring byte.
+
+set -eu
+
+out=$(httrack -#test=lastchar)
+
+# Exact-match the success line so a renamed/removed test can't pass silently.
+test "$out" = "lastchar self-test: OK" || {
+    echo "expected 'lastchar self-test: OK', got: $out" >&2
+    exit 1
+}

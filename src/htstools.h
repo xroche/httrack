@@ -37,6 +37,8 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 
+#include <string.h>
+
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -58,6 +60,37 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+/* Last character of s, or '\0' when s is empty. Replaces s[strlen(s) - 1],
+   which indexes one byte before the buffer on an empty string. */
+static HTS_INLINE HTS_UNUSED char hts_lastchar(const char *s) {
+  const size_t len = strlen(s);
+
+  return len != 0 ? s[len - 1] : '\0';
+}
+
+/* Drop a trailing c from s if present; HTS_TRUE if one was dropped. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
+  const size_t len = strlen(s);
+
+  if (len != 0 && s[len - 1] == c) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* Drop the last character of s whatever it is; HTS_TRUE if s was not empty. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
+  const size_t len = strlen(s);
+
+  if (len != 0) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 int ident_url_relatif(const char *lien, const char *origin_adr,
                       const char *origin_fil,
                       lien_adrfil* const adrfil);
