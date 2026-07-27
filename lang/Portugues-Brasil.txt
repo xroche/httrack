@@ -1024,3 +1024,11 @@ Largest inlined asset (bytes):
 Maior recurso incorporado (bytes):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Um recurso acima desse tamanho mantém um link comum; deixe em branco para o padrão de 10485760 bytes.
+Seed the crawl from the site's sitemap
+Iniciar a captura pelo mapa do site
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Ler o mapa do site (linhas Sitemap: do robots.txt, depois /sitemap.xml) e adicionar como endereço inicial cada URL nele listada.
+Sitemap address:
+Endereço do mapa do site:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Endereço de um mapa do site a ser lido em vez de sondar o site; deixe em branco para sondar robots.txt e depois /sitemap.xml.

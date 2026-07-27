@@ -2,7 +2,7 @@
 if FUZZERS
 noinst_PROGRAMS = fuzz-charset fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
-	fuzz-htsparse fuzz-singlefile
+	fuzz-htsparse fuzz-singlefile fuzz-sitemap
 endif
 
 AM_CPPFLAGS = \
@@ -28,6 +28,7 @@ fuzz_header_SOURCES = fuzz-header.c fuzz.h
 fuzz_cachendx_SOURCES = fuzz-cachendx.c fuzz.h
 fuzz_htsparse_SOURCES = fuzz-htsparse.c fuzz.h
 fuzz_singlefile_SOURCES = fuzz-singlefile.c fuzz.h
+fuzz_sitemap_SOURCES = fuzz-sitemap.c fuzz.h
 
 # List corpus files explicitly: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh \
@@ -52,4 +53,6 @@ EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/singlefile/img-src.html corpus/singlefile/link-rel.html \
 	corpus/singlefile/style-block.html corpus/singlefile/style-attr.html \
 	corpus/singlefile/srcset.html corpus/singlefile/rawtext.html \
-	corpus/singlefile/malformed.html corpus/singlefile/many-attrs.html
+	corpus/singlefile/malformed.html corpus/singlefile/many-attrs.html \
+	corpus/sitemap/urlset.xml corpus/sitemap/sitemapindex.xml \
+	corpus/sitemap/truncated.xml corpus/sitemap/urlset.xml.gz

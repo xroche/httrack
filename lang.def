@@ -1054,3 +1054,11 @@ LANG_SINGLEFILEMAX
 Largest inlined asset (bytes):
 LANG_SINGLEFILEMAXTIP
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+LANG_SITEMAP
+Seed the crawl from the site's sitemap
+LANG_SITEMAPTIP
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+LANG_SITEMAPURL
+Sitemap address:
+LANG_SITEMAPURLTIP
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.

@@ -49,6 +49,13 @@ typedef struct httrackp httrackp;
 typedef struct lien_url lien_url;
 #endif
 
+/* The engine's robots.txt verdict for (adr,fil): HTS_TRUE when the fetch is
+   forbidden. `filters_decided`/`filters_refused` carry the filter outcome,
+   which overrides a ban under -s1 (HTS_ROBOTS_SOMETIMES). */
+hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
+                               hts_boolean filters_decided,
+                               hts_boolean filters_refused);
+
 int hts_acceptlink(httrackp * opt, int ptr,
                    const char *adr, const char *fil,
                    const char *tag, const char *attribute,

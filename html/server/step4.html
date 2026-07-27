@@ -188,6 +188,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
+	${test:sitemap:--sitemap}
+	${test:sitemapurl:--sitemap-url "}${html:sitemapurl}${test:sitemapurl:"}
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
 	${test:changes:--changes}
@@ -243,6 +245,8 @@ KeepSlashes=${ztest:keepslashes:0:1}
 KeepQueryOrder=${ztest:keepqueryorder:0:1}
 StripQuery=${stripquery}
 StoreAllInCache=${ztest:cache2:0:1}
+Sitemap=${ztest:sitemap:0:1}
+SitemapUrl=${sitemapurl}
 Warc=${ztest:warc:0:1}
 WarcFile=${warcfile}
 Changes=${ztest:changes:0:1}

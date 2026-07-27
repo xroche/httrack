@@ -978,3 +978,11 @@ Largest inlined asset (bytes):
 Suurin upotettu resurssi (tavua):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 T‰t‰ suurempi resurssi s‰ilytt‰‰ tavallisen linkin; j‰t‰ tyhj‰ksi, jolloin k‰ytet‰‰n oletusarvoa 10485760 tavua.
+Seed the crawl from the site's sitemap
+Aloita haku sivuston sivukartasta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Lue sivuston sivukartta (robots.txt-tiedoston Sitemap:-rivit, sitten /sitemap.xml) ja lis‰‰ jokainen siin‰ lueteltu URL-osoite aloitusosoitteeksi.
+Sitemap address:
+Sivukartan osoite:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Luettavan sivukartan osoite sivuston luotaamisen sijaan; j‰t‰ tyhj‰ksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.

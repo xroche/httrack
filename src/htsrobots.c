@@ -147,7 +147,8 @@ static void robots_blob_add(char *blob, size_t blobsize, char marker,
 
 void robots_parse(robots_wizard *robots, const char *adr, const char *body,
                   size_t bodysize, char *info, size_t infosize,
-                  hts_boolean keep_root_disallow) {
+                  hts_boolean keep_root_disallow, char *sitemaps,
+                  size_t sitemapsize) {
   size_t bptr = 0;
   int record = 0;
   char BIGSTK line[1024];
@@ -156,6 +157,8 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
   blob[0] = '\0';
   if (info != NULL && infosize > 0)
     info[0] = '\0';
+  if (sitemaps != NULL && sitemapsize > 0)
+    sitemaps[0] = '\0';
 #if DEBUG_ROBOTS
   printf("robots.txt dump:\n%s\n", body);
 #endif
@@ -172,7 +175,19 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
       line[llen - 1] = '\0';
       llen--;
     }
-    if (strfield(line, "user-agent:")) {
+    if (sitemaps != NULL && strfield(line, "sitemap:")) {
+      // group-independent record (RFC 9309): collected whatever the group
+      char *a = line + 8;
+
+      while (is_realspace(*a))
+        a++;
+      /* A line at the buffer limit was truncated: a half URL is not one. */
+      if (strnotempty(a) && strlen(line) < sizeof(line) - 3 &&
+          strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
+        strlcatbuff(sitemaps, a, sitemapsize);
+        strlcatbuff(sitemaps, "\n", sitemapsize);
+      }
+    } else if (strfield(line, "user-agent:")) {
       char *a = line + 11;
 
       while (is_realspace(*a))

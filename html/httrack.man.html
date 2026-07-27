@@ -87,8 +87,8 @@ offline browser : copy websites to a local directory</p>
 --host-control[=N]</b> ] [ <b>-%P,
 --extended-parsing[=N]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
 --test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S, --urllist</b>
-] [ <b>-NN, --structure[=N]</b> ] [ <b>-%N,
---delayed-type-check</b> ] [ <b>-%D,
+] [ <b>-%m, --sitemap</b> ] [ <b>-NN, --structure[=N]</b> ]
+[ <b>-%N, --delayed-type-check</b> ] [ <b>-%D,
 --cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
 ] [ <b>-%Z, --single-file</b> ] [ <b>-LN,
 --long-names[=N]</b> ] [ <b>-KN, --keep-links[=N]</b> ] [
@@ -577,6 +577,22 @@ URL per line) (--list &lt;param&gt;)</p></td></tr>
 
 <p>&lt;file&gt; add all scan rules located in this text
 file (one scan rule per line) (--urllist &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%m</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>seed the crawl from the site&rsquo;s sitemap (robots.txt
+Sitemap:, then /sitemap.xml); --sitemap-url URL names one
+explicitly. A sitemap you name, or one the site declares, is
+fetched even under robots.txt Disallow; only the guessed
+/sitemap.xml obeys it. The URLs found still pass every
+filter and scope rule (--sitemap)</p></td></tr>
 </table>
 
 <h3>Build options:
