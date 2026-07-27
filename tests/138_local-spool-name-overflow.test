@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# A frozen backlog slot spools to disk under a path_html-derived name when -p0
+# is in force, into a buffer sized from the save name instead. A one-character
+# save name (-N '%n') overruns it; only the sanitized build sees the write.
+
+set -e
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_spool.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$(nativepath "${testdir}/server-root")" \
+    >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+rc=0
+httrack -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 \
+    --timeout=30 --retries=0 -p0 -N '%n' -c4 \
+    "http://127.0.0.1:${port}/bakname/index.html" \
+    >"${tmpdir}/log" 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "httrack exited $rc"
+    cat "${tmpdir}/log"
+    exit 1
+}
