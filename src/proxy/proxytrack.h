@@ -360,21 +360,14 @@ HTS_UNUSED static struct tm *convert_time_rfc822(struct tm *result, const char *
 HTS_UNUSED static struct tm PT_GetTime(time_t t) {
   struct tm tmbuf;
 
-#ifdef _WIN32
-  struct tm *tm = gmtime(&t);
-#else
-  struct tm *tm = gmtime_r(&t, &tmbuf);
-#endif
-  if (tm != NULL)
-    return *tm;
-  else {
+  if (!hts_gmtime(t, &tmbuf)) {
     /* an all-zero tm has tm_mday == 0, which the ARC date field prints as a
        day of "00"; the epoch is the conventional "date unknown" */
     memset(&tmbuf, 0, sizeof(tmbuf));
     tmbuf.tm_year = 70;
     tmbuf.tm_mday = 1;
-    return tmbuf;
   }
+  return tmbuf;
 }
 HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   struct utimbuf tim;
