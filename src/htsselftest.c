@@ -6089,6 +6089,116 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #747: a thread is outstanding from the moment hts_newthread() returns, not
+   from the moment it starts running, or a wait right after the spawn joins
+   nothing. One thread per round is what makes the old bug visible: the wait
+   had to find the counter at zero, and a batch of spawns gives the earlier
+   threads time to raise it. Unfixed, one round in two caught it, so the round
+   count is what turns that into a reliable failure. */
+#define THREADWAIT_N 8
+#define THREADWAIT_ROUNDS 16
+#define THREADWAIT_SLEEP_MS 50
+#define THREADWAIT_GATE_MS 10000
+
+static htsmutex threadwait_lock = HTSMUTEX_INIT;
+static int threadwait_done = 0;
+static hts_boolean threadwait_gated = HTS_FALSE;
+
+static int threadwait_count(void) {
+  int n;
+
+  hts_mutexlock(&threadwait_lock);
+  n = threadwait_done;
+  hts_mutexrelease(&threadwait_lock);
+  return n;
+}
+
+static void threadwait_thread(void *arg) {
+  (void) arg;
+  Sleep(THREADWAIT_SLEEP_MS);
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+/* Stays outstanding until the gate clears, so wait_n() can be asked to leave a
+   known number of live threads behind. Bounded: a wait_n() that wrongly drains
+   them would otherwise never return, and hang the suite instead of failing. */
+static void threadwait_gated_thread(void *arg) {
+  int waited;
+
+  (void) arg;
+  for (waited = 0; waited < THREADWAIT_GATE_MS; waited += 10) {
+    hts_boolean gated;
+
+    hts_mutexlock(&threadwait_lock);
+    gated = threadwait_gated;
+    hts_mutexrelease(&threadwait_lock);
+    if (!gated)
+      break;
+    Sleep(10);
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+static int st_threadwait(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int i, round;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* htsthread_wait() joins a thread spawned just before it */
+  for (round = 0; round < THREADWAIT_ROUNDS && !err; round++) {
+    hts_mutexlock(&threadwait_lock);
+    threadwait_done = 0;
+    hts_mutexrelease(&threadwait_lock);
+    if (hts_newthread(threadwait_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn\n");
+      return 1;
+    }
+    htsthread_wait();
+    if (threadwait_count() != 1) {
+      fprintf(stderr, "threadwait: round %d returned before the thread ran\n",
+              round);
+      err = 1;
+    }
+  }
+
+  /* htsthread_wait_n(n) leaves n behind rather than draining everything */
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done = 0;
+  threadwait_gated = HTS_TRUE;
+  hts_mutexrelease(&threadwait_lock);
+  for (i = 0; i < THREADWAIT_N; i++) {
+    if (hts_newthread(threadwait_gated_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn a gated thread\n");
+      return 1;
+    }
+  }
+  htsthread_wait_n(THREADWAIT_N);
+  if (threadwait_count() != 0) {
+    fprintf(stderr, "threadwait: wait_n(%d) joined %d gated threads\n",
+            THREADWAIT_N, threadwait_count());
+    err = 1;
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_gated = HTS_FALSE;
+  hts_mutexrelease(&threadwait_lock);
+  htsthread_wait();
+  if (threadwait_count() != THREADWAIT_N) {
+    fprintf(stderr, "threadwait: wait left %d/%d gated threads running\n",
+            THREADWAIT_N - threadwait_count(), THREADWAIT_N);
+    err = 1;
+  }
+
+  printf("threadwait self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -6103,11 +6213,8 @@ static void changes_race_notify(httrackp *opt, int n) {
   hts_changes_notify(opt, "race.example", fil, save, HTS_TRUE, HTS_FALSE);
 }
 
-/* htsthread_wait() counts a thread only once it is running, so it can return
-   before any of them started; join on our own counter instead. */
 static htsmutex changes_race_lock = HTSMUTEX_INIT;
 static int changes_race_started = 0;
-static int changes_race_live = 0;
 
 static int changes_race_count(int *which) {
   int n;
@@ -6127,9 +6234,6 @@ static void changes_race_thread(void *arg) {
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < CHANGES_RACE_ROUNDS; i++)
     changes_race_notify(opt, i % CHANGES_RACE_FILES);
-  hts_mutexlock(&changes_race_lock);
-  changes_race_live--;
-  hts_mutexrelease(&changes_race_lock);
 }
 
 /* A transfer thread the crawl never joins (FTP) reaches hts_changes_notify()
@@ -6184,7 +6288,6 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
      threads reaching a fresh one together race on the init itself. */
   hts_mutexlock(&changes_race_lock);
   changes_race_started = 0;
-  changes_race_live = 4;
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
     if (hts_newthread(changes_race_thread, opt) != 0) {
@@ -6198,8 +6301,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 64; i++)
     hts_changes_report(opt, &out);
   hts_changes_close_opt(opt);
-  while (changes_race_count(&changes_race_live) > 0)
-    Sleep(10);
+  htsthread_wait();
 
   /* Sealed: a straggler must be dropped, not start a report nobody writes. */
   changes_race_notify(opt, CHANGES_RACE_FILES + 1);
@@ -6277,6 +6379,8 @@ static const struct selftest_entry {
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",
      st_changes_race},
+    {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
+     st_threadwait},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
