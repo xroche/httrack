@@ -40,7 +40,6 @@ test -z "$hits" || {
 hits=$(command grep -rnE '\+ *\(?(int|size_t)?\)? *strlen *\([^)]*\) *- *1' \
     "$top_srcdir/src" --include='*.c' --include='*.h' --exclude-dir=coucal |
     grep -v 'htsname\.c:.*char\* a=\(fil+strlen(fil)\|save+strlen(save)\)-1;' |
-    grep -v 'htssafe\.h:.*Replaces S + strlen(S) - 1' |
     grep -v 'htsselftest\.c:.*pointer spelling x + strlen(x) - 1' |
     grep -v 'htsselftest\.c:.*\*(s + strlen(s) - 1) =' || true)
 
