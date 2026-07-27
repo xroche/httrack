@@ -4442,14 +4442,14 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
       "Transfer-Encoding : chunked\r\nContent-Length: 999\r\n\r\n",
-      a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
+      a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
 
   /* 302 redirect: header-only, no body. */
   warc_write_transaction(
       w, "http://test.local/r", "127.0.0.1",
       "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
-      0, NULL, 302, 0, 0);
+      0, NULL, NULL, 302, 0, 0);
 
   /* 200 binary, chunked coding on the wire (already de-chunked here). */
   warc_write_transaction(
@@ -4457,7 +4457,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
       "Transfer-Encoding: chunked\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
 
   /* 200 with a body shorter than the declared Content-Length (rewritten). */
   warc_write_transaction(
@@ -4465,20 +4465,20 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
       "100\r\n\r\n",
-      "short", 5, NULL, 200, 0, 0);
+      "short", 5, NULL, NULL, 200, 0, 0);
 
   /* Same payload as a.html at a new URL: identical-payload-digest revisit
      (OpenSSL builds only; a plain build writes a second full response). */
   warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
                          "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
+                         a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
 
   /* 304 revisit with an EMPTY response-header block: the block is just the
      2-byte separator, so declared Content-Length must be exactly 2 (F3). */
   warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
                          "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
-                         NULL, 0, NULL, 304, 1, 0);
+                         NULL, 0, NULL, NULL, 304, 1, 0);
 
   warc_close(w);
 
@@ -4649,13 +4649,13 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       w, "http://test.local/big.bin", "127.0.0.1",
       "GET /big.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n", body,
-      sizeof(body) - 1, NULL, 200, 0, WARC_TRUNC_LENGTH);
+      sizeof(body) - 1, NULL, NULL, 200, 0, WARC_TRUNC_LENGTH);
   warc_write_transaction(
       w, "http://test.local/big.gz", "127.0.0.1",
       "GET /big.gz HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\n\r\n",
-      (const char *) gz, sizeof(gz), NULL, 200, 0, WARC_TRUNC_TIME);
+      (const char *) gz, sizeof(gz), NULL, NULL, 200, 0, WARC_TRUNC_TIME);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -4809,7 +4809,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     warc_write_transaction(
         w, uri, "127.0.0.1", "GET / HTTP/1.1\r\nHost: test.local\r\n\r\n",
         "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
-        (const char *) body, sizeof(body), NULL, 200, 0, 0);
+        (const char *) body, sizeof(body), NULL, NULL, 200, 0, 0);
   }
   warc_close(w);
   opt->warc_max_size = saved_max;
@@ -4891,7 +4891,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       "GET /z.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      (const char *) a_gz, sizeof(a_gz), NULL, 200, 0, 0);
+      (const char *) a_gz, sizeof(a_gz), NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -5057,7 +5057,7 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
     /* Distinct payloads: identical ones dedupe into revisit records. */
     snprintf(body, sizeof(body), "<html><body>%04d</body></html>\n", (int) len);
     if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr, body, strlen(body),
-                               NULL, 200, 0, 0) != 0) {
+                               NULL, NULL, 200, 0, 0) != 0) {
       fprintf(stderr, "warc-longurl: write failed at length %d\n", (int) len);
       err = 1;
     }
@@ -5117,7 +5117,7 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   unsigned char *warc = NULL, *cdx = NULL;
   size_t warc_len = 0, cdx_len = 0;
   hts_boolean saved_cdx;
-  int err = 0, nlines = 0;
+  int err = 0, nlines = 0, nm_lines = 0;
   const char *lp, *cend;
   char prev[2048];
 
@@ -5134,20 +5134,27 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/one", "127.0.0.1",
                          "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0);
+                         "one body\n", 9, NULL, NULL, 200, 0, 0);
   warc_write_resource(w, "ftp://files.example.com/data.bin", "127.0.0.1",
                       "application/octet-stream", "\x00\x01\x02\x03", 4, NULL,
                       0);
   warc_write_transaction(w, "http://alpha.example.com/two", "127.0.0.1",
                          "GET /two HTTP/1.1\r\nHost: alpha.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
-                         "two body\n", 9, NULL, 200, 0, 0);
+                         "two body\n", 9, NULL, NULL, 200, 0, 0);
   /* Same payload as /one at a new URL: identical-payload-digest revisit under
      OpenSSL, a full response otherwise; either way one index line. */
   warc_write_transaction(w, "http://zeta.example.com/dup", "127.0.0.1",
                          "GET /dup HTTP/1.1\r\nHost: zeta.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0);
+                         "one body\n", 9, NULL, NULL, 200, 0, 0);
+  /* A 304 declares no type, so the index line takes the caller's (#826). */
+  warc_write_transaction(w, "http://nm.example.com/kept", "127.0.0.1",
+                         "GET /kept HTTP/1.1\r\nHost: nm.example.com\r\n"
+                         "If-Modified-Since: Mon, 01 Jan 2024 00:00:00 GMT\r\n"
+                         "\r\n",
+                         "HTTP/1.1 304 Not Modified\r\n\r\n", NULL, 0, NULL,
+                         "text/html", 200, 1, 0);
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
@@ -5200,6 +5207,11 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     }
     memcpy(url, us, urllen);
     url[urllen] = '\0';
+    if (strstr(url, "nm.example.com") != NULL) {
+      nm_lines++;
+      if (strstr(line, "\"mime\": \"text/html\"") == NULL)
+        err = 1;
+    }
     if (len == 0 || off > warc_len || len > warc_len - off) {
       err = 1;
       goto nextline;
@@ -5223,8 +5235,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   }
   freet(warc);
   freet(cdx);
-  if (nlines != 4)
-    err = 1; /* 3 responses/revisits + 1 resource; no warcinfo/request */
+  if (nlines != 5 || nm_lines != 1)
+    err = 1; /* 4 responses/revisits + 1 resource; no warcinfo/request */
   printf("warc-cdx: %d index lines: %s\n", nlines, err ? "FAIL" : "OK");
   return err;
 }
@@ -5291,13 +5303,13 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/", "127.0.0.1",
                          "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "<html>home</html>\n", 18, NULL, 200, 0, 0);
+                         "<html>home</html>\n", 18, NULL, NULL, 200, 0, 0);
   warc_write_transaction(
       w, "http://www.example.com/data.bin", "127.0.0.1",
       "GET /data.bin HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
       "HTTP/1.1 200 OK\r\n"
       "Content-Type: application/octet-stream\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   /* Unzip every member in-process. */
@@ -6373,6 +6385,90 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
+// inside the reserved hts-tmp directory, whose segment url_savename escapes so
+// no mirrored file can ever sit there (#774), and must never leave the resource
+// without a copy (#775).
+static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
+  lien_back *back;
+  char want[HTS_URLMAXSIZE * 2 + 32];
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "refetchbackup: needs a writable base dir\n");
+    return 1;
+  }
+  back = calloct(1, sizeof(lien_back));
+  if (back == NULL) {
+    fprintf(stderr, "refetchbackup: out of memory\n");
+    return 1;
+  }
+  /* explicit separator: fconcat() joins without one, which would put the
+     temporary in the parent of the directory under test */
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/refetch.bin", argv[0]);
+  snprintf(want, sizeof(want), "%s/hts-tmp/refetch.bin.bak", argv[0]);
+
+  /* #774: pin the name, so moving the temporary out of the reserved directory
+     cannot pass without url_savename reserving wherever it went instead. */
+  ro_put(back->url_sav, "old");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
+    fprintf(stderr, "refetchbackup: the previous copy was not moved aside\n");
+    err++;
+  } else if (strcmp(back->tmpfile, want) != 0) {
+    fprintf(stderr, "refetchbackup: temporary is %s, want %s\n", back->tmpfile,
+            want);
+    err++;
+  }
+  ro_put(back->url_sav, "new"); /* what filecreate() + the transfer produce */
+  back_finalize_backup(opt, back, HTS_TRUE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: the committed copy is not the new one\n");
+    err++;
+  }
+
+  /* #758: only a killed run can leave something there, and it must be replaced
+     rather than disable the backup for good. */
+  if (structcheck(want) != 0) {
+    fprintf(stderr, "refetchbackup: cannot create %s\n", want);
+    freet(back);
+    return 1;
+  }
+  ro_put(want, "leftover");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || !ro_is(want, "new")) {
+    fprintf(stderr, "refetchbackup: a leftover temporary blocked the backup\n");
+    err++;
+  }
+
+  /* #775: filecreate() failed, so there is nothing to commit to. Saying so is
+     load-bearing: the caller must not cache this response against the old
+     body, or the next --update gets a 304 pinning it. */
+  (void) UNLINK(back->url_sav);
+  if (back_finalize_backup(opt, back, HTS_TRUE)) {
+    fprintf(stderr, "refetchbackup: a commit that restored reported success\n");
+    err++;
+  }
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: a commit with no new copy lost both\n");
+    err++;
+  }
+
+  /* An aborted transfer restores, as before. */
+  back_refetch_backup(opt, back);
+  ro_put(back->url_sav, "partial");
+  back_finalize_backup(opt, back, HTS_FALSE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
+    err++;
+  }
+
+  (void) UNLINK(back->url_sav);
+  freet(back);
+  printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6852,6 +6948,149 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #806: hts_localtime() must own its output too, same rationale as
+   hts_gmtime() (#794). Reference table computed under TZ=XXX5 (fixed
+   UTC-5, no DST), which the driving .test script sets. */
+#define LOCALTIME_THREADS 8
+#define LOCALTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} localtime_refs[] = {
+    {(time_t) 0, 69, 11, 31, 19, 0, 0, 3, 364},
+    {(time_t) 951782400, 100, 1, 28, 19, 0, 0, 1,
+     58}, /* a leap day, GMT side */
+    {(time_t) 1000000000, 101, 8, 8, 20, 46, 40, 6, 250},
+    {(time_t) 2147483647, 138, 0, 18, 22, 14, 7, 1, 17},
+};
+
+#define LOCALTIME_REFS                                                         \
+  ((int) (sizeof(localtime_refs) / sizeof(localtime_refs[0])))
+
+static hts_boolean localtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != localtime_refs[i].year ||
+      tm->tm_mon != localtime_refs[i].mon ||
+      tm->tm_mday != localtime_refs[i].mday ||
+      tm->tm_hour != localtime_refs[i].hour ||
+      tm->tm_min != localtime_refs[i].min ||
+      tm->tm_sec != localtime_refs[i].sec ||
+      tm->tm_wday != localtime_refs[i].wday ||
+      tm->tm_yday != localtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex localtime_lock = HTSMUTEX_INIT;
+static int localtime_bad = 0;
+
+static void localtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < LOCALTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv) ||
+        !localtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&localtime_lock);
+  localtime_bad += bad;
+  hts_mutexrelease(&localtime_lock);
+}
+
+static int st_localtime(httrackp *opt, int argc, char **argv) {
+  static int idx[LOCALTIME_THREADS];
+  int err = 0, i;
+
+  (void) opt;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
+    return 1;
+  }
+
+  for (i = 0; i < LOCALTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "localtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!localtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "localtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  if (sizeof(time_t) >= 8) {
+    const time_t beyond = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_localtime(beyond, &tmv)) {
+      fprintf(stderr,
+              "localtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < LOCALTIME_THREADS; i++) {
+    idx[i] = i % LOCALTIME_REFS;
+    if (hts_newthread(localtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "localtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (localtime_bad != 0) {
+    fprintf(stderr, "localtime: %d/%d concurrent conversions were corrupt\n",
+            localtime_bad, LOCALTIME_THREADS * LOCALTIME_ROUNDS);
+    err = 1;
+  }
+
+  /* get_filetime_rfc822() must report GMT, never the process's local zone,
+     and never a silent fallback to it on gmtime() failure (#806). */
+  {
+    char path[HTS_URLMAXSIZE];
+    char date[256];
+    struct tm parsed;
+
+    snprintf(path, sizeof(path), "%s/filetime.bin", argv[0]);
+    structcheck(path);
+    {
+      FILE *fp = FOPEN(path, "wb");
+
+      if (fp == NULL) {
+        fprintf(stderr, "localtime: cannot write %s\n", path);
+        return 1;
+      }
+      fputc('x', fp);
+      fclose(fp);
+    }
+    if (set_filetime_rfc822(path, "Tue, 29 Feb 2000 00:00:00 GMT") != 0) {
+      fprintf(stderr, "localtime: cannot set %s's mtime\n", path);
+      err = 1;
+    } else if (!get_filetime_rfc822(path, date)) {
+      fprintf(stderr, "localtime: get_filetime_rfc822 failed on %s\n", path);
+      err = 1;
+    } else if (convert_time_rfc822(&parsed, date) == NULL ||
+               parsed.tm_year != 100 || parsed.tm_mon != 1 ||
+               parsed.tm_mday != 29 || parsed.tm_hour != 0) {
+      fprintf(stderr,
+              "localtime: get_filetime_rfc822 reported \"%s\" (TZ=%s)\n", date,
+              getenv("TZ") ? getenv("TZ") : "");
+      err = 1;
+    }
+  }
+
+  printf("localtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -7279,6 +7518,9 @@ static const struct selftest_entry {
      st_threadwait},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"localtime", "<dir>",
+     "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
+     st_localtime},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
@@ -7387,6 +7629,9 @@ static const struct selftest_entry {
      "hts_rename_over(): replace dst, but never delete a dst it did not "
      "replace",
      st_renameover},
+    {"refetchbackup", "<dir>",
+     "the re-fetch backup always leaves a copy, and stays out of the mirror",
+     st_refetchbackup},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},
