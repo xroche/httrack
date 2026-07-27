@@ -50,14 +50,18 @@ test -z "$hits" || {
     exit 1
 }
 
-# Same for the unsigned index spelling. Its (i > 0) guard is vacuous, since
-# SIZE_MAX passes it; the self-test's own control is the only survivor.
-hits=$(command grep -rnE '(size_t|unsigned +(int|long|short)) +[A-Za-z_][A-Za-z0-9_]* *= *(\([^)]*\) *)?strlen *\([^;]*\) *- *1' \
+# Same for the unsigned index spelling, whose (i > 0) guard is vacuous since
+# SIZE_MAX passes it. The second pattern catches a bare reassignment, which
+# carries no type to match; an (int) cast is the safe form, so it must be uncast.
+hits=$(command grep -rnE \
+    -e '(size_t|unsigned +(int|long|short)) +[A-Za-z_][A-Za-z0-9_]* *= *(\([^)]*\) *)?strlen *\([^;]*\) *- *1' \
+    -e '[A-Za-z_][A-Za-z0-9_]* *= *strlen *\([^;]*\) *- *1' \
     "$top_srcdir/src" --include='*.c' --include='*.h' --exclude-dir=coucal |
-    grep -v 'htsselftest\.c:.*size_t vacuous = strlen' || true)
+    grep -v 'htsselftest\.c:.*size_t vacuous = strlen' |
+    grep -v 'htswizard\.c:.*int i=strlen(adr)-1;' || true)
 
 test -z "$hits" || {
-    echo "size_t i = strlen(x) - 1 reintroduced; use hts_lastcharoffset:" >&2
+    echo "an unsigned index from strlen(x) - 1 reintroduced; use hts_lastcharoffset:" >&2
     echo "$hits" >&2
     exit 1
 }
