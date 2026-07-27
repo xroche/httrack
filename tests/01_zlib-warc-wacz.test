@@ -16,7 +16,7 @@ if ! "$httrack_bin" -#test 2>&1 | grep -q '^  warc-wacz'; then
 fi
 
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+trap 'set +e; rm -rf "$scratch"' EXIT
 
 out=$("$httrack_bin" -O /dev/null -#test=warc-wacz "$scratch/")
 echo "$out"

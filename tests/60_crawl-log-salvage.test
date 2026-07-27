@@ -12,7 +12,7 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 
 TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/httrack_salv.XXXXXX")
 export TMPDIR
-trap 'rm -rf "$TMPDIR"' EXIT
+trap 'set +e; rm -rf "$TMPDIR"' EXIT
 fail() {
     echo "FAIL: $*" >&2
     exit 1

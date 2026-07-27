@@ -18,7 +18,7 @@
 set -eu
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # The working directory is a required argument; without it the test prints a
 # usage line to stderr and returns non-zero.

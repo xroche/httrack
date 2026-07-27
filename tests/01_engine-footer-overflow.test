@@ -18,7 +18,7 @@ MINGW* | MSYS* | CYGWIN*) exit 77 ;;
 esac
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # A few-hundred-char file path (kept well under the URL length limit) makes the
 # {path} field long.

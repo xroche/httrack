@@ -15,7 +15,7 @@ python=$(find_python) || {
 }
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # each field fills binput's own bound, so together they run one past line[]
 "$python" - "$dir/foo.ndx" <<'EOF'

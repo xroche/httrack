@@ -26,6 +26,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
 - Give new `.test` scripts `set -e`: the older ones predate the rule, so several
   `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
+- Run teardown with errexit off: `trap 'set +e; cleanup' EXIT`. Under `set -e` a
+  failing cleanup command becomes the test's exit status (#773). Keep the other
+  signals on their own `trap` line, or errexit stays off for the rest of the run.
+  The guard also resets `$?`, so save it first if teardown reads it.
 - Never assert with `cmd | grep -q MARKER && fail`. Under `pipefail` the
   pipeline is non-zero both when `cmd` fails and when `grep -q` matches early
   and SIGPIPEs it, so the `&&` never fires and a probe that proved nothing reads

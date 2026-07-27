@@ -27,9 +27,8 @@ serverpid=
 cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
-    return 0
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # start_stall_server <tag> <mode-args...>: sets $port from the announced one.
 start_stall_server() {

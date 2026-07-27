@@ -4,7 +4,8 @@
 set -euo pipefail
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes_st.XXXXXX") || exit 1
-trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
 
 # No pipe into grep: SIGPIPE would mask a failing exit status.
 expect_ok() {

@@ -22,7 +22,8 @@ cleanup() {
     htssrv=
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # --- the site ---------------------------------------------------------------
 doc="${tmpdir}/doc"

@@ -32,7 +32,8 @@ cleanup() {
     srv=
     rm -rf "${work}" "${srvlog}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # webhttrack server on a pre-picked port; an isolated HOME keeps a stray
 # ~/.httrack.ini out of it.

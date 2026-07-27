@@ -14,7 +14,8 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 . "${testdir}/testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_portsib.XXXXXX") || exit 1
-trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
 
 # A port the old code accepted only by wrapping: 4295009395 = 2^32 + 42099 and
 # 4294967376 = 2^32 + 80 both fold to a plausible listen port. They are the

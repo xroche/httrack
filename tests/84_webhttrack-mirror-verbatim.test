@@ -34,7 +34,8 @@ cleanup() {
     wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
     rm -rf "${log}" "${work}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 freeport() {
     python3 -c 'import socket

@@ -10,7 +10,7 @@ set -euo pipefail
 httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+trap 'set +e; rm -rf "$scratch"' EXIT
 
 for t in warc warc-trunc warc-ftp warc-rotate warc-verbatim; do
     out=$("$httrack_bin" -O /dev/null "-#test=$t" "$scratch/")

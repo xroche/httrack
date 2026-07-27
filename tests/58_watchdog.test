@@ -12,7 +12,7 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 . "${testdir}/testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT
+trap 'set +e; rm -rf "$tmp"' EXIT
 fail() {
     echo "FAIL: $*" >&2
     exit 1

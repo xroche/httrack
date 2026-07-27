@@ -28,7 +28,8 @@ cleanup() {
     rm -f "${log}"
     rm -rf "${base}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # First line only. A "| head -1" would close the pipe early and, under pipefail,
 # SIGPIPE the producer into a spurious failure.

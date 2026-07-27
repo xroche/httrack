@@ -6,7 +6,7 @@
 set -eu
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # the refusal errors land on stdout (no log file); pin them and the verdict
 out=$(httrack -#test=cache-legacy "$dir" 2>/dev/null)

@@ -34,7 +34,7 @@ cleanup() {
     done
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 openssl req -x509 -newkey rsa:2048 -keyout "$tmpdir/key.pem" \
     -out "$tmpdir/cert.pem" -days 2 -nodes -subj "/CN=127.0.0.1" \

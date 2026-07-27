@@ -13,7 +13,7 @@ test -x "$wht" || {
 work="$(mktemp -d)"
 # webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
 # to this prefix) so a lingering server can never hold the CI step open.
-trap 'pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work"' EXIT
+trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work"' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"

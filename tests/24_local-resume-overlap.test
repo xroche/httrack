@@ -24,7 +24,8 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # OVERLAP_COUNTER gets a byte per flaky.bin request so pass 1 knows when to interrupt.
 serverlog="${tmpdir}/server.log"

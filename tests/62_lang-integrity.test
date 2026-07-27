@@ -19,7 +19,7 @@ for f in "$eng" "$def"; do
 done
 
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+trap 'set +e; rm -rf "$tmp"' EXIT
 keys="$tmp/english.keys"
 
 # Byte-wise: each file is in its own declared legacy charset, lang.def is CRLF.

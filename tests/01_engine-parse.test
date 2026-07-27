@@ -7,7 +7,8 @@
 set -euo pipefail
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parse.XXXXXX") || exit 1
-trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
 
 # a minimal valid 1x1 GIF, reused for every referenced asset
 gif() {

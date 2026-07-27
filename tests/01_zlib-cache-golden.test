@@ -27,7 +27,7 @@ test -e "$fixture/hts-cache/new.zip" || {
 }
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # Read against a private copy so the source tree is never touched (a read
 # session does not write, but copying keeps the test hermetic). Create the dir
