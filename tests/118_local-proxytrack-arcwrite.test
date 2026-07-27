@@ -1,0 +1,121 @@
+#!/bin/bash
+# The .arc writer builds each entry's headers in a fixed 8192-byte block, and
+# its one bound ignored what the block already held: a long cached header
+# string wrapped the subtraction and smashed it.
+
+set -euo pipefail
+export LC_ALL=C
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+dir=$(mktemp -d)
+cleanup() { rm -rf "$dir"; }
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+# sizeof(PT_SaveCache__Arc_t.headers)
+HDRMAX=8192
+BODY=BODYMARKER
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+pad() { printf "%${1}s" '' | tr ' ' "$2"; }
+
+# Longest surviving run of char $2 in file $1, or 0.
+runlen() {
+    grep -ao "$2\\+" "$1" | awk '{ print length($0) }' | sort -rn | head -n1 || true
+}
+
+P1000=$(pad 1000 P)
+
+# Header lines contributing exactly $1 bytes to the entry's stored headers: the
+# reader rebuilds each as "name: value\r\n", and its line buffer holds 2048.
+gen_headers() {
+    local want=$1 c
+    while [ "$want" -gt 0 ]; do
+        c=$want
+        if [ "$c" -gt 1008 ]; then
+            c=1008
+            test "$((want - c))" -ge 9 || c=$((c - 9))
+        fi
+        printf 'X-P0: %s\r\n' "${P1000:0:$((c - 8))}"
+        want=$((want - c))
+    done
+}
+
+# $1 reason phrase, $2 Location value, $3 bytes of passthrough headers.
+build_arc() {
+    {
+        printf 'HTTP/1.1 200 %s\r\n' "$1"
+        printf 'Content-Type: text/html\r\n'
+        printf 'Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n'
+        printf 'Content-Length: %d\r\n' "${#BODY}"
+        test -z "$2" || printf 'Location: %s\r\n' "$2"
+        test "$3" -eq 0 || gen_headers "$3"
+        printf '\r\n'
+    } >"$dir/hdr"
+    printf '%s' "$BODY" >"$dir/body"
+    local alen
+    alen=$(($(wc -c <"$dir/hdr") + ${#BODY}))
+    {
+        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+        printf '2 0 test\n'
+        printf '\n\n'
+        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+        cat "$dir/hdr" "$dir/body"
+    } >"$dir/in.arc"
+}
+
+# Convert $dir/in.arc and check the emitted record, $1 naming the case.
+convert_check() {
+    local rec off alen total dataoff
+    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 ||
+        fail "$1: proxytrack died writing the .arc"
+    rec=$(grep -a -m1 '^http://example.com/p.html ' "$dir/out.arc") ||
+        fail "$1: entry dropped from the .arc"
+    off=$(grep -abo -m1 '^http://example.com/p.html ' "$dir/out.arc" | cut -d: -f1)
+    alen=${rec##* }
+    total=$(wc -c <"$dir/out.arc")
+    dataoff=$((off + ${#rec} + 1))
+    test "$((total - dataoff))" -eq "$alen" ||
+        fail "$1: record declares $alen bytes, wrote $((total - dataoff))"
+    test "$((alen - ${#BODY}))" -le "$HDRMAX" ||
+        fail "$1: header block is $((alen - ${#BODY})) bytes, cap is $HDRMAX"
+    # a clip landing mid-line must still close it, or the body reads as headers
+    tail -c $((${#BODY} + 4)) "$dir/out.arc" >"$dir/got.tail"
+    printf '\r\n\r\n%s' "$BODY" >"$dir/want.tail"
+    cmp -s "$dir/got.tail" "$dir/want.tail" ||
+        fail "$1: header block does not end on a blank line"
+}
+
+# Control: nothing overshoots, so a broken probe cannot pass as a clean bound.
+build_arc OK "" 0
+convert_check "short entry"
+
+# The reported bug: 12000 bytes wrap "sizeof - strlen - 1", so the guard passes.
+build_arc OK "" 12000
+convert_check "over-long cached headers"
+
+# Three sources at once, each with its own limit: the reason phrase is cut at
+# msg[1024], the shorter location not at all, the passthrough takes what is
+# left. One all-fields bound gets at least one of them wrong.
+build_arc "$(pad 1200 M)" "http://example.com/$(pad 1500 L)" 5000
+convert_check "long reason, location and headers"
+got=$(runlen "$dir/out.arc" M)
+test "${got:-0}" = 1023 || fail "reason phrase kept ${got:-0} bytes, expected 1023"
+got=$(runlen "$dir/out.arc" L)
+test "${got:-0}" = 1500 || fail "location kept ${got:-0} bytes, expected 1500"
+
+# An off-by-one in the room held back for the closing blank line shows up only
+# on the exact boundary, so walk the block across its cap byte by byte.
+for n in $(seq 7950 8250); do
+    build_arc OK "" "$n"
+    convert_check "passthrough of $n bytes"
+done
+
+echo "OK: the .arc writer clips its header block instead of overflowing it"
