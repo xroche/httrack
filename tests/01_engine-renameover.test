@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
+# must leave dst alone when the rename failed for a reason removing dst cannot
+# fix (#779). The selftest prints the regime it detected; pin it per platform so
+# a leg cannot pass having tested the other half.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+case "$(uname -s)" in
+MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
+*) want=clobber ;;
+esac
+
+out=$(httrack -O /dev/null -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: regime $want"
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
+    exit 0
+fi
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the interposed legs would pass vacuously.
+if [ ! -r "${RENAMEFAIL_LA:-}" ]; then
+    echo "renameover: ${RENAMEFAIL_LA:-\$RENAMEFAIL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$RENAMEFAIL_LA"; then
+    echo "renameover: static-only build, skipping the interposed legs"
+    exit 0
+fi
+if [ ! -r "${RENAMEFAIL_LIB:-}" ]; then
+    echo "renameover: ${RENAMEFAIL_LIB:-\$RENAMEFAIL_LIB} was not built" >&2
+    exit 1
+fi
+
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# The unlink fallback is dead code on POSIX, so borrow Windows' rename().
+out=$(LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: regime fallback"
+
+# A source another process holds fails with EACCES, which dst had no part in.
+out=$(RENAMEFAIL_MODE=locked LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: regime refused"
