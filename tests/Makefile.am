@@ -64,6 +64,7 @@ TESTS = \
 	01_engine-filterdual.test \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
+	01_engine-gmtime.test \
 	01_engine-backswap.test \
 	01_engine-cacheindex.test \
 	01_engine-hashtable.test \
