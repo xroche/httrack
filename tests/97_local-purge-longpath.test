@@ -14,6 +14,12 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+# python3 is required; mirror check-network.sh's skip-with-77 convention.
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
 # Resolve httrack now: the harness prepends a RELATIVE dir to PATH, so the cd
 # below would otherwise silently fall through to an installed copy.
 httrack_bin=$(command -v httrack)
@@ -28,7 +34,7 @@ trap 'kill -9 "${spid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
 
 mkdir -p "$work/root" "$work/proj"
 
-python3 "$top_srcdir/tests/local-server.py" --root "$work/root" \
+"$python" "$top_srcdir/tests/local-server.py" --root "$work/root" \
     >"$work/server.out" 2>"$work/server.err" &
 spid=$!
 
