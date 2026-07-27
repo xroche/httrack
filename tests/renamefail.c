@@ -1,9 +1,10 @@
-/* Borrows Windows' rename() for 01_engine-renameover.test, since POSIX cannot
-   reach hts_rename_over()'s aside fallback: an existing target is refused with
+/* Borrows Windows' rename() for the tests POSIX cannot otherwise reach:
+   hts_rename_over()'s aside fallback needs an existing target refused with
    EEXIST, and RENAMEFAIL_MODE=locked reports EACCES instead, as the CRT does
-   for a source another process holds. RENAMEFAIL_ASIDE_FAILS=N refuses the
-   first N moves back out of the parked ".hts-old" name, which is the only way
-   to reach hts_rename_over()'s restore retry (#790). */
+   for a source another process holds. =repair and =repair-eexist narrow the
+   refusal to the cache-repair move (#786), the latter through the fallback so
+   the retry inside it is the failing one. RENAMEFAIL_ASIDE_FAILS=N refuses the
+   first N moves back out of a parked ".hts-old" name (#790). */
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -23,20 +24,29 @@ SHIM_EXPORT int rename(const char *oldpath, const char *newpath) {
   static int aside_failures = 0;
   const char *const mode = getenv("RENAMEFAIL_MODE");
   const char *const aside_fails = getenv("RENAMEFAIL_ASIDE_FAILS");
-  const int locked = mode != NULL && strcmp(mode, "locked") == 0;
+  const char *const slash = strrchr(oldpath, '/');
+  const char *const base = slash != NULL ? slash + 1 : oldpath;
+  const int repaired = strcmp(base, "repair.zip") == 0;
   struct stat st;
 
-  if (locked) {
+  if (mode != NULL && (strcmp(mode, "locked") == 0 ||
+                       (repaired && strcmp(mode, "repair") == 0))) {
     errno = EACCES;
     return -1;
   }
-  if (aside_fails != NULL && strstr(oldpath, ".hts-old") != NULL &&
+  if (repaired && mode != NULL && strcmp(mode, "repair-eexist") == 0) {
+    errno = stat(newpath, &st) == 0 ? EEXIST : EACCES;
+    return -1;
+  }
+  if (aside_fails != NULL && strstr(base, ".hts-old") != NULL &&
       aside_failures < atoi(aside_fails)) {
     aside_failures++;
     errno = EACCES;
     return -1;
   }
-  if (aside_fails == NULL && stat(newpath, &st) == 0) {
+  /* Only the bare shim emulates Windows for every rename; a narrowed mode
+     leaves the rest of the run on plain POSIX semantics. */
+  if (mode == NULL && aside_fails == NULL && stat(newpath, &st) == 0) {
     errno = EEXIST;
     return -1;
   }

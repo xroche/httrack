@@ -9,6 +9,7 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   truncate  send a prefix of the body, then drop the data connection
   empty     open the data connection and send nothing
   norest    answer REST with 500, so the client re-fetches from scratch
+  nomdtm    answer MDTM with 500, like a server predating RFC 3659
 """
 
 import argparse
@@ -16,6 +17,7 @@ import os
 import socket
 import sys
 import threading
+import time
 
 
 def reply(conn, text):
@@ -146,6 +148,15 @@ class Session(threading.Thread):
             path = self.resolve(arg)
             if path and os.path.isfile(path):
                 reply(conn, "213 %d" % os.path.getsize(path))
+            else:
+                reply(conn, "550 no such file")
+        elif verb == "MDTM":
+            path = self.resolve(arg)
+            if "nomdtm" in self.modes():
+                reply(conn, "500 MDTM not understood")
+            elif path and os.path.isfile(path):
+                stamp = time.gmtime(os.path.getmtime(path))
+                reply(conn, "213 " + time.strftime("%Y%m%d%H%M%S", stamp))
             else:
                 reply(conn, "550 no such file")
         elif verb == "REST":

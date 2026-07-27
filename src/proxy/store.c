@@ -259,7 +259,6 @@ static int binput(char *buff, char *s, int max) {
   int count = 0;
   int destCount = 0;
 
-  // Note: \0 will return 1
   while(destCount < max && buff[count] != '\0' && buff[count] != '\n') {
     if (buff[count] != '\r') {
       s[destCount++] = buff[count];
@@ -268,8 +267,9 @@ static int binput(char *buff, char *s, int max) {
   }
   s[destCount] = '\0';
 
-  // then return the supplemental jump offset
-  return count + 1;
+  /* only step over a real separator: past the terminating NUL leaves the
+     caller's buffer, past a truncated field's next byte silently eats it */
+  return buff[count] == '\n' ? count + 1 : count;
 }
 
 static time_t file_timestamp(const char *file) {
@@ -1390,11 +1390,10 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   char buff[256 + 4];
 
   off = binput(adr, buff, 256);
-  /* binput stops at adr's terminating NUL; a value only follows a real line
-     terminator, so never step past end-of-buffer. */
-  if (adr[off - 1] == '\0') {
+  /* no length-prefixed value follows a field the terminating NUL stopped */
+  if (adr[off] == '\0') {
     s[0] = '\0';
-    return off - 1;
+    return off;
   }
   /* an empty/non-numeric field leaves i unset: treat as length 0 */
   if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > 32768)
